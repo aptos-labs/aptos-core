@@ -9,7 +9,7 @@ use aptos_gas_schedule::{
 use aptos_types::{
     on_chain_config::{ConfigStorage, OnChainConfig, StorageGasSchedule},
     state_store::state_key::StateKey,
-    write_set::{WriteOp, WriteOpSize},
+    write_set::WriteOpSize,
 };
 use either::Either;
 use move_core_types::{
@@ -76,7 +76,7 @@ impl StoragePricingV1 {
             Modification(value_size) => {
                 cost += self.write_data_per_byte_in_val * NumBytes::new(*value_size);
             },
-            Deletion => (),
+            Deletion | DeletionWithDeposit(_) => (),
         }
 
         cost
@@ -159,7 +159,7 @@ impl StoragePricingV2 {
                 self.per_item_write * NumArgs::new(1)
                     + self.write_op_size(key, *value_size) * self.per_byte_write
             },
-            Deletion => 0.into(),
+            Deletion | DeletionWithDeposit(_) => 0.into(),
         }
     }
 }
@@ -201,7 +201,7 @@ impl StoragePricingV3 {
                 STORAGE_IO_PER_STATE_SLOT_WRITE * NumArgs::new(1)
                     + STORAGE_IO_PER_STATE_BYTE_WRITE * self.write_op_size(key, *value_size),
             ),
-            Deletion => Either::Right(InternalGas::zero()),
+            Deletion | DeletionWithDeposit(..) => Either::Right(InternalGas::zero()),
         }
     }
 }
@@ -364,8 +364,8 @@ impl CheckChangeSet for ChangeSetConfigs {
         }
 
         let mut write_set_size = 0;
-        for (key, op) in change_set.write_set_iter() {
-            if let Some(len) = op.materialized_size().write_len() {
+        for (key, op_size) in change_set.write_set_size_iter() {
+            if let Some(len) = op_size.write_len() {
                 let write_op_size = len + (key.size() as u64);
                 if write_op_size > self.max_bytes_per_write_op {
                     return Err(VMStatus::error(ERR, None));

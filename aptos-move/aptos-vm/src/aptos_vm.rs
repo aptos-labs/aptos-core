@@ -53,7 +53,7 @@ use aptos_types::{
 use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
 use aptos_vm_types::{
-    change_set::VMChangeSet,
+    change_set::{VMChangeSet, AbstractResourceWriteOp},
     output::VMOutput,
     resolver::{ExecutorView, ResourceGroupView},
     storage::{ChangeSetConfigs, StorageGasParameters},
@@ -566,8 +566,8 @@ impl AptosVM {
     ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
         let mut change_set = session.finish(change_set_configs)?;
 
-        for (key, op) in change_set.write_set_iter() {
-            gas_meter.charge_io_gas_for_write(key, &op.materialized_size())?;
+        for (key, op_size) in change_set.write_set_size_iter() {
+            gas_meter.charge_io_gas_for_write(key, &op_size)?;
         }
 
         let mut storage_refund = gas_meter.process_storage_fee_for_all(
@@ -1493,16 +1493,16 @@ impl AptosVM {
                 .get_module_state_value(state_key)
                 .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
         }
-        for state_key in change_set.resource_write_set().keys() {
+        for (state_key, write_op) in change_set.resource_write_set().iter() {
             executor_view
                 .get_resource_state_value(state_key, None)
                 .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
-        }
-        for (state_key, group_write) in change_set.resource_group_write_set().iter() {
-            for (tag, (_, maybe_layout)) in group_write.inner_ops() {
-                resource_group_view
-                    .get_resource_from_group(state_key, tag, maybe_layout.as_deref())
-                    .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
+            if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write_op {
+                for (tag, (_, maybe_layout)) in group_write.inner_ops() {
+                    resource_group_view
+                        .get_resource_from_group(state_key, tag, maybe_layout.as_deref())
+                        .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
+                }
             }
         }
 

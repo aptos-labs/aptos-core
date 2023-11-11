@@ -5,7 +5,7 @@ use crate::traits::{AptosGasMeter, GasAlgebra};
 use aptos_gas_algebra::{Fee, FeePerGasUnit};
 use aptos_gas_schedule::gas_params::{instr::*, txn::*};
 use aptos_types::{
-    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::{WriteOp, WriteOpSize},
+    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
 };
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
@@ -507,7 +507,7 @@ where
     fn storage_fee_for_state_bytes(&self, key: &StateKey, op: &WriteOpSize) -> Fee {
         self.vm_gas_params()
             .txn
-            .storage_fee_for_bytes(key, maybe_value_size)
+            .storage_fee_for_bytes(key, op)
     }
 
     fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee {

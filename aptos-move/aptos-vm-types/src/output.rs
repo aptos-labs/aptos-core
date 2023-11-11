@@ -8,10 +8,10 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionOutput, TransactionStatus},
-    write_set::WriteOp,
+    write_set::WriteOp, aggregator::PanicError,
 };
-use move_core_types::vm_status::VMStatus;
-use std::collections::BTreeMap;
+use move_core_types::vm_status::{VMStatus, StatusCode};
+
 /// Output produced by the VM after executing a transaction.
 ///
 /// **WARNING**: This type should only be used inside the VM. For storage backends,
@@ -108,19 +108,25 @@ impl VMOutput {
         resolver: &impl AggregatorV1Resolver,
     ) -> anyhow::Result<TransactionOutput, VMStatus> {
         let materialized_output = self.try_materialize(resolver)?;
-        Self::convert_to_transaction_output(materialized_output)
+        Self::convert_to_transaction_output(materialized_output).map_err(|e| VMStatus::error(
+            StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+            Some(e.to_string()),
+        ))
     }
 
-    /// Same as `try_materialize` but also constructs `TransactionOutput`.
+    /// Constructs `TransactionOutput`, without doing `try_materialize`
     pub fn into_transaction_output(self) -> anyhow::Result<TransactionOutput, VMStatus> {
         let (change_set, fee_statement, status) = self.unpack_with_fee_statement();
         let materialized_output = VMOutput::new(change_set, fee_statement, status);
-        Self::convert_to_transaction_output(materialized_output)
+        Self::convert_to_transaction_output(materialized_output).map_err(|e| VMStatus::error(
+            StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+            Some(e.to_string()),
+        ))
     }
 
     fn convert_to_transaction_output(
         materialized_output: VMOutput,
-    ) -> anyhow::Result<TransactionOutput, VMStatus> {
+    ) -> Result<TransactionOutput, PanicError> {
         assert!(
             materialized_output
                 .change_set()
@@ -135,13 +141,6 @@ impl VMOutput {
                 .is_empty(),
             "Delayed fields must be empty after materialization."
         );
-        assert!(
-            materialized_output
-                .change_set()
-                .resource_group_write_set()
-                .is_empty(),
-            "Resource Groups must be empty after materialization."
-        );
         let (vm_change_set, gas_used, status) = materialized_output.unpack();
         let (write_set, events) = vm_change_set.try_into_storage_change_set()?.into_inner();
         Ok(TransactionOutput::new(write_set, events, gas_used, status))
@@ -154,7 +153,7 @@ impl VMOutput {
         materialized_aggregator_v1_deltas: Vec<(StateKey, WriteOp)>,
         patched_resource_write_set: Vec<(StateKey, WriteOp)>,
         patched_events: Vec<ContractEvent>,
-    ) -> TransactionOutput {
+    ) -> Result<TransactionOutput, PanicError> {
         assert_eq!(
             materialized_aggregator_v1_deltas.len(),
             self.change_set().aggregator_v1_delta_set().len(),
@@ -170,7 +169,7 @@ impl VMOutput {
             .extend_aggregator_v1_write_set(materialized_aggregator_v1_deltas.into_iter());
         self.change_set.extend_resource_write_set(
             patched_resource_write_set.into_iter(),
-        );
+        )?;
 
         assert_eq!(
             patched_events.len(),
@@ -180,11 +179,12 @@ impl VMOutput {
         self.change_set.set_events(patched_events.into_iter());
         // TODO[agg_v2](cleanup) move drain to happen when getting what to materialize.
         let _ = self.change_set.drain_delayed_field_change_set();
+        let _ = self.change_set.drain_aggregator_v1_delta_set();
 
         let (vm_change_set, gas_used, status) = self.unpack();
         let (write_set, events) = vm_change_set
             .into_storage_change_set_forced()
             .into_inner();
-        TransactionOutput::new(write_set, events, gas_used, status)
+        Ok(TransactionOutput::new(write_set, events, gas_used, status))
     }
 }

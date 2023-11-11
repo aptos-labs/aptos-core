@@ -31,7 +31,7 @@ use std::{
 };
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-enum AbstractResourceWriteOp {
+pub enum AbstractResourceWriteOp {
     Write(WriteOp),
     WriteWithDelayedFields(WriteWithDelayedFields),
     // Prior to adding a dedicated write-set for resource groups, all resource group
@@ -44,6 +44,14 @@ enum AbstractResourceWriteOp {
 }
 
 impl AbstractResourceWriteOp {
+    pub fn try_to_concrete_write(&self) -> Option<&WriteOp> {
+        if let AbstractResourceWriteOp::Write(write_op) = self {
+            Some(write_op)
+        } else {
+            None
+        }
+    }
+
     pub fn try_into_concrete_write(self) -> Option<WriteOp> {
         if let AbstractResourceWriteOp::Write(write_op) = self {
             Some(write_op)
@@ -59,8 +67,8 @@ impl AbstractResourceWriteOp {
             | AbstractResourceWriteOp::WriteResourceGroup(GroupWrite{metadata_op: write_op, maybe_group_op_size: materialized_size, ..}) => {
                 use WriteOp::*;
                 match write_op {
-                    Creation(data) | CreationWithMetadata { data, .. } => WriteOpSize::Creation(materialized_size.unwrap()),
-                    Modification(data) | ModificationWithMetadata { data, .. } => WriteOpSize::Modification(materialized_size.unwrap()),
+                    Creation(_) | CreationWithMetadata { .. } => WriteOpSize::Creation(materialized_size.unwrap()),
+                    Modification(_) | ModificationWithMetadata { .. } => WriteOpSize::Modification(materialized_size.unwrap()),
                     Deletion => WriteOpSize::Deletion,
                     DeletionWithMetadata { metadata } => WriteOpSize::DeletionWithDeposit(metadata.deposit()),
                 }
@@ -158,22 +166,22 @@ impl GroupWrite {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-struct WriteWithDelayedFields {
-    write_op: WriteOp,
-    layout: Arc<MoveTypeLayout>,
-    materialized_size: Option<u64>,
+pub struct WriteWithDelayedFields {
+    pub write_op: WriteOp,
+    pub layout: Arc<MoveTypeLayout>,
+    pub materialized_size: Option<u64>,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-struct InPlaceDelayedFieldChange {
-    layout: Arc<MoveTypeLayout>,
-    materialized_size: u64,
+pub struct InPlaceDelayedFieldChange {
+    pub layout: Arc<MoveTypeLayout>,
+    pub materialized_size: u64,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-struct ResourceGroupInPlaceDelayedFieldChange {
-    metadata_op: WriteOp,
-    materialized_size: u64,
+pub struct ResourceGroupInPlaceDelayedFieldChange {
+    pub metadata_op: WriteOp,
+    pub materialized_size: u64,
 }
 
 /// A change set produced by the VM.
@@ -265,17 +273,21 @@ impl VMChangeSet {
     ) -> Result<Self, VMStatus> {
         Self::new(
             resource_write_set.into_iter().map(|(k, (w, l))| {
-                if let Some(layout) = l {
-                    AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFields(w, layout, WriteOpSize::from(&w).into()))
-                } else {
-                    AbstractResourceWriteOp::Write(w)
-                }
+                (
+                    k,
+                    if let Some(layout) = l {
+                        let materialized_size = WriteOpSize::from(&w).write_len();
+                        AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFields{write_op: w, layout, materialized_size})
+                    } else {
+                        AbstractResourceWriteOp::Write(w)
+                    },
+                )
             }).chain(
-                resource_group_write_set.into_iter().map(|(k, w)| AbstractResourceWriteOp::WriteResourceGroup(w))
+                resource_group_write_set.into_iter().map(|(k, w)| (k, AbstractResourceWriteOp::WriteResourceGroup(w)))
             ).chain(
-                reads_needing_delayed_field_exchange.into_iter().map(|(k, (w, layout))| AbstractResourceWriteOp::InPlaceDelayedFieldChange(InPlaceDelayedFieldChange { layout, materialized_size: w.bytes().map(|b| b.len()).unwrap() }))
+                reads_needing_delayed_field_exchange.into_iter().map(|(k, (w, layout))| (k, AbstractResourceWriteOp::InPlaceDelayedFieldChange(InPlaceDelayedFieldChange { layout, materialized_size: w.bytes().map(|b| b.len() as u64).unwrap() })))
             ).chain(
-                group_reads_needing_delayed_field_exchange.into_iter().map(|(k, (metadata_op, materialized_size))| AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(ResourceGroupInPlaceDelayedFieldChange { metadata_op, materialized_size }))
+                group_reads_needing_delayed_field_exchange.into_iter().map(|(k, (metadata_op, materialized_size))| (k, AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(ResourceGroupInPlaceDelayedFieldChange { metadata_op, materialized_size })))
             ).collect(),
             module_write_set,
             events,
@@ -398,11 +410,26 @@ impl VMChangeSet {
         Ok(StorageChangeSet::new(write_set, events))
     }
 
-    pub fn write_set_iter(&self) -> impl Iterator<Item = (&StateKey, &AbstractResourceWriteOp)> {
+    pub fn concrete_write_set_iter(&self) -> impl Iterator<Item = (&StateKey, Option<&WriteOp>)> {
         self.resource_write_set()
             .iter()
-            .chain(self.module_write_set().iter())
-            .chain(self.aggregator_v1_write_set().iter())
+            .map(|(k, v)| (k, v.try_to_concrete_write()))
+            .chain(
+                self.module_write_set().iter()
+                    .chain(self.aggregator_v1_write_set().iter())
+                    .map(|(k, v)| (k, Some(v)))
+            )
+    }
+
+    pub fn write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)> {
+        self.resource_write_set()
+            .iter()
+            .map(|(k, v)| (k, v.materialized_size()))
+            .chain(
+                self.module_write_set().iter()
+                    .chain(self.aggregator_v1_write_set().iter())
+                    .map(|(k, v)| (k, WriteOpSize::from(v)))
+            )
     }
 
     pub fn num_write_ops(&self) -> usize {
@@ -418,7 +445,7 @@ impl VMChangeSet {
             .chain(
                 self.module_write_set.iter_mut()
                     .chain(self.aggregator_v1_write_set.iter_mut())
-                    .map(|(k, v)| (k, WriteOpSize::from(v), match v {
+                    .map(|(k, v)| (k, WriteOpSize::from(v as &WriteOp), match v {
                         WriteOp::CreationWithMetadata{metadata, ..} => Some(metadata),
                         _ => None,
                     }))
@@ -489,6 +516,12 @@ impl VMChangeSet {
         &mut self,
     ) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
         std::mem::take(&mut self.delayed_field_change_set)
+    }
+
+    pub(crate) fn drain_aggregator_v1_delta_set(
+        &mut self,
+    ) -> BTreeMap<StateKey, DeltaOp> {
+        std::mem::take(&mut self.aggregator_v1_delta_set)
     }
 
     pub fn aggregator_v1_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
@@ -695,61 +728,12 @@ impl VMChangeSet {
         Ok(())
     }
 
-    fn squash_group_writes(
-        write_set: &mut BTreeMap<StateKey, GroupWrite>,
-        additional_write_set: BTreeMap<StateKey, GroupWrite>,
-    ) -> anyhow::Result<(), VMStatus> {
-        for (key, additional_update) in additional_write_set.into_iter() {
-            match write_set.entry(key) {
-                Occupied(mut group_entry) => {
-                    let GroupWrite {
-                        metadata_op: additional_metadata_op,
-                        inner_ops: additional_inner_ops,
-                        maybe_group_op_size: additional_maybe_group_op_size,
-                    } = additional_update;
-
-                    // Squashing creation and deletion is a no-op. In that case, we have to
-                    // remove the old GroupWrite from the group write set.
-                    let noop = !WriteOp::squash(
-                        &mut group_entry.get_mut().metadata_op,
-                        additional_metadata_op,
-                    )
-                    .map_err(|e| {
-                        VMStatus::error(
-                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                            err_msg(format!(
-                                "Error while squashing two group write metadata ops: {}.",
-                                e
-                            )),
-                        )
-                    })?;
-                    if noop {
-                        group_entry.remove();
-                    } else {
-                        Self::squash_additional_resource_writes(
-                            &mut group_entry.get_mut().inner_ops,
-                            additional_inner_ops,
-                        )?;
-
-                        let maybe_op_size = additional_maybe_group_op_size
-                            .or(group_entry.get_mut().maybe_group_op_size);
-                        group_entry.get_mut().maybe_group_op_size = maybe_op_size;
-                    }
-                },
-                Vacant(entry) => {
-                    entry.insert(additional_update);
-                },
-            }
-        }
-        Ok(())
-    }
-
-    fn squash_additional_resource_writes<
+    fn squash_additional_resource_write_ops<
         K: Hash + Eq + PartialEq + Ord + Clone + std::fmt::Debug,
     >(
         write_set: &mut BTreeMap<K, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
         additional_write_set: BTreeMap<K, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
-    ) -> anyhow::Result<(), VMStatus> {
+    ) -> Result<(), PanicError> {
         for (key, additional_entry) in additional_write_set.into_iter() {
             match write_set.entry(key.clone()) {
                 Occupied(mut entry) => {
@@ -757,20 +741,14 @@ impl VMChangeSet {
                     let (additional_write_op, additional_type_layout) = additional_entry;
                     let (write_op, type_layout) = entry.get_mut();
                     if *type_layout != additional_type_layout {
-                        return Err(VMStatus::error(
-                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                            err_msg(format!(
-                                "Cannot squash two writes with different type layouts.
-                                key: {:?}, type_layout: {:?}, additional_type_layout: {:?}",
-                                key, type_layout, additional_type_layout
-                            )),
-                        ));
+                        return Err(code_invariant_error(format!(
+                            "Cannot squash two writes with different type layouts.
+                            key: {:?}, type_layout: {:?}, additional_type_layout: {:?}",
+                            key, type_layout, additional_type_layout
+                        )));
                     }
                     let noop = !WriteOp::squash(write_op, additional_write_op).map_err(|e| {
-                        VMStatus::error(
-                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                            err_msg(format!("Error while squashing two write ops: {}.", e)),
-                        )
+                        code_invariant_error(format!("Error while squashing two write ops: {}.", e))
                     })?;
                     if noop {
                         entry.remove();
@@ -784,37 +762,96 @@ impl VMChangeSet {
         Ok(())
     }
 
-    fn squash_additional_reads_needing_exchange<K>(
-        reads_needing_exchange: &mut BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
-        additional_reads_needing_exchange: BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
-        skip: &BTreeMap<StateKey, K>,
-    ) -> anyhow::Result<(), VMStatus> {
-        for key in skip.keys() {
-            reads_needing_exchange.remove(key);
-        }
+    fn squash_additional_resource_writes(
+        write_set: &mut BTreeMap<StateKey, AbstractResourceWriteOp>,
+        additional_write_set: BTreeMap<StateKey, AbstractResourceWriteOp>,
+    ) -> Result<(), PanicError> {
+        for (key, additional_entry) in additional_write_set.into_iter() {
+            match write_set.entry(key.clone()) {
+                Occupied(mut entry) => {
+                    let (to_delete, to_overwite) = match (entry.get_mut(), &additional_entry) {
+                        (AbstractResourceWriteOp::Write(write_op), AbstractResourceWriteOp::Write(additional_write_op)) => {
+                            let to_delete = !WriteOp::squash(write_op, additional_write_op.clone()).map_err(|e| {
+                                code_invariant_error(format!("Error while squashing two write ops: {}.", e))
+                            })?;
+                            (to_delete, false)
+                        },
+                        (AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFields { write_op, layout, materialized_size }), AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFields { write_op: additional_write_op, layout: additional_layout, materialized_size: additional_materialized_size })) => {
+                            if layout != additional_layout {
+                                return Err(code_invariant_error(format!(
+                                    "Cannot squash two writes with different type layouts.
+                                    key: {:?}, type_layout: {:?}, additional_type_layout: {:?}",
+                                    key, layout, additional_layout
+                                )));
+                            }
+                            let to_delete = !WriteOp::squash(write_op, additional_write_op.clone()).map_err(|e| {
+                                code_invariant_error(format!("Error while squashing two write ops: {}.", e))
+                            })?;
+                            *materialized_size = *additional_materialized_size;
+                            (to_delete, false)
+                        },
+                        (AbstractResourceWriteOp::WriteResourceGroup(group), AbstractResourceWriteOp::WriteResourceGroup(GroupWrite {
+                            metadata_op: additional_metadata_op,
+                            inner_ops: additional_inner_ops,
+                            maybe_group_op_size: additional_maybe_group_op_size,
+                        })) => {
+                            // Squashing creation and deletion is a no-op. In that case, we have to
+                            // remove the old GroupWrite from the group write set.
+                            let to_delete = !WriteOp::squash(
+                                &mut group.metadata_op,
+                                additional_metadata_op.clone(),
+                            )
+                            .map_err(|e| {
+                                code_invariant_error(format!(
+                                        "Error while squashing two group write metadata ops: {}.",
+                                        e
+                                ))
+                            })?;
+                            if to_delete {
+                                (true, false)
+                            } else {
+                                Self::squash_additional_resource_write_ops(
+                                    &mut group.inner_ops,
+                                    additional_inner_ops.clone(),
+                                )?;
 
-        for (key, additional_value) in additional_reads_needing_exchange.into_iter() {
-            if skip.contains_key(&key) {
-                continue;
-            }
-            reads_needing_exchange.insert(key, additional_value);
-        }
-        Ok(())
-    }
+                                group.maybe_group_op_size = *additional_maybe_group_op_size;
+                                (false, false)
+                            }
+                        },
+                        (AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFields { materialized_size, .. }), AbstractResourceWriteOp::InPlaceDelayedFieldChange(InPlaceDelayedFieldChange { materialized_size: additional_materialized_size, .. }))
+                        | (AbstractResourceWriteOp::WriteResourceGroup(GroupWrite { maybe_group_op_size: materialized_size, .. }), AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(ResourceGroupInPlaceDelayedFieldChange { materialized_size: additional_materialized_size, .. })) => {
+                                // newer read should've read the original write and contain all info from it, but could have additional delayed field writes, that change the size.
+                            *materialized_size = Some(*additional_materialized_size);
+                            (false, false)
+                        },
+                        // If previous value is a read, newer value overwrites it
+                        (AbstractResourceWriteOp::InPlaceDelayedFieldChange(_), AbstractResourceWriteOp::WriteWithDelayedFields(_) | AbstractResourceWriteOp::InPlaceDelayedFieldChange(_))
+                        | (AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(_), AbstractResourceWriteOp::WriteResourceGroup(_) | AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(_)) => {
+                            (false, true)
+                        },
+                        (AbstractResourceWriteOp::Write(_), AbstractResourceWriteOp::WriteWithDelayedFields(_) | AbstractResourceWriteOp::WriteResourceGroup(_) | AbstractResourceWriteOp::InPlaceDelayedFieldChange(_) | AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(_))
+                        | (AbstractResourceWriteOp::WriteWithDelayedFields(_), AbstractResourceWriteOp::Write(_) | AbstractResourceWriteOp::WriteResourceGroup(_) | AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(_))
+                        | (AbstractResourceWriteOp::WriteResourceGroup(_), AbstractResourceWriteOp::Write(_) | AbstractResourceWriteOp::WriteWithDelayedFields(_) | AbstractResourceWriteOp::InPlaceDelayedFieldChange(_))
+                        | (AbstractResourceWriteOp::InPlaceDelayedFieldChange(_), AbstractResourceWriteOp::Write(_) | AbstractResourceWriteOp::WriteResourceGroup(_) | AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(_))
+                        | (AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(_), AbstractResourceWriteOp::Write(_) | AbstractResourceWriteOp::WriteWithDelayedFields(_) | AbstractResourceWriteOp::InPlaceDelayedFieldChange(_))
+                        => {
+                            return Err(code_invariant_error(format!(
+                                "Trying to squash incompatible writes: {:?}: {:?} into {:?}.", entry.key(), entry.get(), additional_entry
+                            )));
+                        },
+                    };
 
-    fn squash_additional_group_reads_needing_exchange<K>(
-        group_reads_needing_exchange: &mut BTreeMap<StateKey, (WriteOp, u64)>,
-        additional_group_reads_needing_exchange: BTreeMap<StateKey, (WriteOp, u64)>,
-        skip: &BTreeMap<StateKey, K>,
-    ) -> anyhow::Result<(), VMStatus> {
-        for key in skip.keys() {
-            group_reads_needing_exchange.remove(key);
-        }
-        for (key, additional_value) in additional_group_reads_needing_exchange.into_iter() {
-            if skip.contains_key(&key) {
-                continue;
+                    if to_overwite {
+                        entry.insert(additional_entry);
+                    } else if to_delete {
+                        entry.remove();
+                    }
+                },
+                Vacant(entry) => {
+                    entry.insert(additional_entry);
+                },
             }
-            group_reads_needing_exchange.insert(key, additional_value);
         }
         Ok(())
     }
@@ -826,14 +863,10 @@ impl VMChangeSet {
     ) -> anyhow::Result<(), VMStatus> {
         let Self {
             resource_write_set: additional_resource_write_set,
-            resource_group_write_set: additional_resource_group_write_set,
             module_write_set: additional_module_write_set,
             aggregator_v1_write_set: additional_aggregator_write_set,
             aggregator_v1_delta_set: additional_aggregator_delta_set,
             delayed_field_change_set: additional_delayed_field_change_set,
-            reads_needing_delayed_field_exchange: additional_reads_needing_delayed_field_exchange,
-            group_reads_needing_delayed_field_exchange:
-                additional_group_reads_needing_delayed_field_exchange,
             events: additional_events,
         } = additional_change_set;
 
@@ -846,11 +879,12 @@ impl VMChangeSet {
         Self::squash_additional_resource_writes(
             &mut self.resource_write_set,
             additional_resource_write_set,
-        )?;
-        Self::squash_group_writes(
-            &mut self.resource_group_write_set,
-            additional_resource_group_write_set,
-        )?;
+        ).map_err(|e| {
+            VMStatus::error(
+                StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+                err_msg(format!("Error while squashing two write ops: {:?}.", e)),
+            )
+        })?;
         Self::squash_additional_module_writes(
             &mut self.module_write_set,
             additional_module_write_set,
@@ -859,27 +893,14 @@ impl VMChangeSet {
             &mut self.delayed_field_change_set,
             additional_delayed_field_change_set,
         )?;
-        // This must be called after resource_write_set is squashed
-        Self::squash_additional_reads_needing_exchange(
-            &mut self.reads_needing_delayed_field_exchange,
-            additional_reads_needing_delayed_field_exchange,
-            &self.resource_write_set,
-        )?;
-        // This must be called after resource_group_write_set is squashed
-        Self::squash_additional_group_reads_needing_exchange(
-            &mut self.group_reads_needing_delayed_field_exchange,
-            additional_group_reads_needing_delayed_field_exchange,
-            &self.resource_group_write_set,
-        )?;
         self.events.extend(additional_events);
 
         checker.check_change_set(self)
     }
 
     pub fn has_creation(&self) -> bool {
-        use WriteOp::*;
-        self.write_set_iter()
-            .any(|(_key, op)| matches!(op, Creation(..) | CreationWithMetadata { .. }))
+        self.write_set_size_iter()
+            .any(|(_key, op_size)| matches!(op_size, WriteOpSize::Creation(..)))
     }
 }
 

@@ -5,7 +5,7 @@ use aptos_gas_algebra::{AbstractValueSize, Fee, FeePerGasUnit, InternalGas, NumA
 use aptos_gas_meter::AptosGasMeter;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, contract_event::ContractEvent,
-    state_store::state_key::StateKey, write_set::{WriteOp, WriteOpSize},
+    state_store::state_key::StateKey, write_set::WriteOpSize,
 };
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult, VMResult},
@@ -467,7 +467,7 @@ where
 
         fn storage_fee_refund_for_state_slot(&self, op: &WriteOpSize) -> Fee;
 
-        fn storage_fee_for_state_bytes(&self, key: &StateKey, maybe_value_size: Option<u64>) -> Fee;
+        fn storage_fee_for_state_bytes(&self, key: &StateKey, op: &WriteOpSize) -> Fee;
 
         fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee;
 

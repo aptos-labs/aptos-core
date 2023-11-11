@@ -8,7 +8,7 @@ use crate::log::{
 use aptos_gas_algebra::{Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes};
 use aptos_gas_meter::AptosGasMeter;
 use aptos_types::{
-    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
+    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
 };
 use aptos_vm_types::change_set::VMChangeSet;
 use move_binary_format::{
@@ -467,7 +467,7 @@ fn write_op_type(op: &WriteOpSize) -> WriteOpType {
     match op {
         O::Creation(..) => T::Creation,
         O::Modification(..) => T::Modification,
-        O::Deletion => T::Deletion,
+        O::Deletion | O::DeletionWithDeposit(_) => T::Deletion,
     }
 }
 
@@ -549,7 +549,7 @@ where
             let fee = slot_fee + bytes_fee;
             write_set_storage.push(WriteStorage {
                 key: key.clone(),
-                op_type: write_op_type(op),
+                op_type: write_op_type(&op_size),
                 cost: fee,
                 refund: slot_refund,
             });

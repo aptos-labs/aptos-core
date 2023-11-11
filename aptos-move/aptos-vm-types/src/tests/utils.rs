@@ -132,7 +132,7 @@ pub(crate) fn build_change_set(
     aggregator_v1_delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
     delayed_field_change_set: impl IntoIterator<Item = (DelayedFieldID, DelayedChange<DelayedFieldID>)>,
 ) -> VMChangeSet {
-    VMChangeSet::new(
+    VMChangeSet::new_expanded(
         BTreeMap::from_iter(resource_write_set),
         BTreeMap::from_iter(resource_group_write_set),
         BTreeMap::from_iter(module_write_set),

@@ -60,7 +60,7 @@ fn failed_transaction_cleanup_test() {
         &change_set_configs,
     );
 
-    let write_set: Vec<(&StateKey, &WriteOp)> = out1.change_set().write_set_iter().collect();
+    let write_set: Vec<(&StateKey, &WriteOp)> = out1.change_set().concrete_write_set_iter().map(|(k, v)| (k, v.unwrap())).collect();
     assert!(!write_set.is_empty());
     assert_eq!(out1.gas_used(), 90_000);
     assert!(!out1.status().is_discarded());

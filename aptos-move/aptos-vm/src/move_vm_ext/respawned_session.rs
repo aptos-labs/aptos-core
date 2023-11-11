@@ -26,7 +26,7 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_types::{
-    change_set::VMChangeSet,
+    change_set::{VMChangeSet, AbstractResourceWriteOp, WriteWithDelayedFields},
     resolver::{
         ExecutorView, ResourceGroupView, StateStorageView, TModuleView, TResourceGroupView,
         TResourceView,
@@ -329,8 +329,8 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<StateValue>> {
         match self.change_set.resource_write_set().get(state_key) {
-            Some((write_op, _)) => Ok(write_op.as_state_value()),
-            None => self
+            Some(AbstractResourceWriteOp::Write(write_op) | AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFields{ write_op, ..})) => Ok(write_op.as_state_value()),
+            Some(_) | None => self
                 .base_executor_view
                 .get_resource_state_value(state_key, maybe_layout),
         }
@@ -355,8 +355,13 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
     ) -> anyhow::Result<Option<Bytes>> {
         if let Some((write_op, layout)) = self
             .change_set
-            .resource_group_write_set()
+            .resource_write_set()
             .get(group_key)
+            .and_then(|write| if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
+                Some(group_write)
+            } else {
+                None
+            })
             .and_then(|g| g.inner_ops().get(resource_tag))
         {
             randomly_check_layout_matches(maybe_layout, layout.as_deref())
@@ -557,7 +562,7 @@ mod test {
             ),
         ]);
 
-        let change_set = VMChangeSet::new(
+        let change_set = VMChangeSet::new_expanded(
             resource_write_set,
             resource_group_write_set,
             module_write_set,

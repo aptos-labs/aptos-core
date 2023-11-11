@@ -10,7 +10,7 @@ use aptos_gas_algebra::{
     GasScalingFactor, GasUnit, NumSlots,
 };
 use aptos_types::{
-    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::{WriteOp, WriteOpSize},
+    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
 };
 use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumBytes, ToUnitWithParams,
@@ -194,17 +194,16 @@ impl TransactionGasParameters {
         }
     }
 
-    pub fn storage_fee_for_slot(&self, op: &WriteOp) -> Fee {
-        use WriteOp::*;
+    pub fn storage_fee_for_slot(&self, op: &WriteOpSize) -> Fee {
+        use WriteOpSize::*;
 
         match op {
-            Creation(..) | CreationWithMetadata { .. } => {
+            Creation(_) => {
                 self.storage_fee_per_state_slot_create * NumSlots::new(1)
             },
-            Modification(..)
-            | ModificationWithMetadata { .. }
+            Modification(_)
             | Deletion
-            | DeletionWithMetadata { .. } => 0.into(),
+            | DeletionWithDeposit(_) => 0.into(),
         }
     }
 

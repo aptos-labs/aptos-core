@@ -4,7 +4,7 @@
 use aptos_gas_algebra::{Fee, FeePerGasUnit, Gas, GasExpression, GasScalingFactor, Octa};
 use aptos_gas_schedule::VMGasParameters;
 use aptos_types::{
-    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::{WriteOp, WriteOpSize},
+    contract_event::ContractEvent, state_store::{state_key::StateKey, state_value::StateValueMetadata}, write_set::WriteOpSize,
 };
 use aptos_vm_types::{change_set::VMChangeSet, storage::StorageGasParameters};
 use move_binary_format::errors::{Location, PartialVMResult, VMResult};

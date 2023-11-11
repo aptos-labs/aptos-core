@@ -17,8 +17,8 @@ use std::collections::BTreeMap;
 fn assert_eq_outputs(vm_output: &VMOutput, txn_output: TransactionOutput) {
     let vm_output_writes = &vm_output
         .change_set()
-        .write_set_iter()
-        .map(|(k, v)| (k.clone(), v.clone()))
+        .concrete_write_set_iter()
+        .map(|(k, v)| (k.clone(), v.unwrap().clone()))
         .collect::<BTreeMap<StateKey, WriteOp>>();
 
     // A way to obtain a reference to the map inside a WriteSet.
@@ -53,7 +53,6 @@ fn test_ok_output_equality_no_deltas() {
         .clone()
         .into_transaction_output_with_materialized_write_set(
             vec![],
-            BTreeMap::new(),
             vec![],
             vec![],
         );
@@ -62,7 +61,7 @@ fn test_ok_output_equality_no_deltas() {
     // also all calls must succeed.
     assert_eq!(&vm_output, &materialized_vm_output);
     assert_eq_outputs(&vm_output, txn_output_1);
-    assert_eq_outputs(&vm_output, txn_output_2);
+    assert_eq_outputs(&vm_output, txn_output_2.unwrap());
 }
 
 #[test]
@@ -86,7 +85,6 @@ fn test_ok_output_equality_with_deltas() {
         .clone()
         .into_transaction_output_with_materialized_write_set(
             vec![mock_modify("3", 400)],
-            BTreeMap::new(),
             vec![],
             vec![],
         );
@@ -117,7 +115,7 @@ fn test_ok_output_equality_with_deltas() {
     );
     assert_eq!(vm_output.status(), materialized_vm_output.status());
     assert_eq_outputs(&materialized_vm_output, txn_output_1);
-    assert_eq_outputs(&materialized_vm_output, txn_output_2);
+    assert_eq_outputs(&materialized_vm_output, txn_output_2.unwrap());
 }
 
 #[test]

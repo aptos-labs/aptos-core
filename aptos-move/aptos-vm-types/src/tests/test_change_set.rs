@@ -18,7 +18,7 @@ use aptos_types::{
     access_path::AccessPath,
     state_store::state_key::StateKey,
     transaction::ChangeSet as StorageChangeSet,
-    write_set::{WriteOp, WriteSetMut},
+    write_set::{WriteOp, WriteSetMut}, aggregator::PanicError,
 };
 use claims::{assert_matches, assert_ok, assert_some_eq};
 use move_core_types::{
@@ -427,11 +427,7 @@ fn test_failed_conversion_to_change_set() {
     let vm_status = change_set.try_into_storage_change_set();
     assert_matches!(
         vm_status,
-        Err(VMStatus::Error {
-            status_code: StatusCode::DATA_FORMAT_ERROR,
-            sub_status: None,
-            message: Some(_),
-        })
+        Err(PanicError::CodeInvariantError(_))
     );
 }
 
