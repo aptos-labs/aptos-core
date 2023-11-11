@@ -114,7 +114,10 @@ pub enum SpecBlockContext<'a> {
     Struct(QualifiedSymbol),
     Function(QualifiedSymbol),
     FunctionCode(QualifiedSymbol, &'a SpecInfo),
-    FunctionCodeV2(QualifiedSymbol, BTreeMap<Symbol, (Loc, Type)>),
+    FunctionCodeV2(
+        QualifiedSymbol,                                  // function name
+        BTreeMap<Symbol, (Loc, Type, Option<TempIndex>)>, // local variables
+    ),
     Schema(QualifiedSymbol),
 }
 
@@ -849,7 +852,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             self.def_ana_constant(&name, def, compiled_module);
         }
 
-        // Analyze all functions.
+        // Need to run def_ana_fun twice.
+        // In the first time we need to analyze all functions in the spec mode
+        // then we can check whether the function is pure or not
         for (idx, (name, fun_def)) in module_def.functions.key_cloned_iter().enumerate() {
             self.def_ana_fun(&name, fun_def, idx);
         }
@@ -868,6 +873,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 .fun_table
                 .entry(self.qualified_by_module_from_name(&name.0))
                 .and_modify(|e| e.is_pure = is_pure);
+        }
+
+        // Run def_ana_fun the second time in the move function mode
+        // Inline spec will be checked in this pass
+        for (idx, (name, fun_def)) in module_def.functions.key_cloned_iter().enumerate() {
+            self.def_ana_fun(&name, fun_def, idx, false);
         }
 
         // Analyze all schemas. This must be done before other things because schemas need to be
@@ -1223,6 +1234,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     /// Definition analysis for Move functions.
+    /// When as_spec_fun is true, the function is translated into a spec function.
+    /// When as_spec_fun is false, the function is translated as a move function.
     /// If the function is pure, we translate its body.
     /// If we are operating as a Move compiler, we also translate its body.
     fn def_ana_fun(&mut self, name: &PA::FunctionName, def: &EA::Function, fun_idx: usize) {

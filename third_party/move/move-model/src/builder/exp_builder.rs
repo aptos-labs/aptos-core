@@ -83,7 +83,7 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
 #[derive(Debug)]
 pub struct SpecBlockInfo {
     spec_id: EA::SpecId,
-    locals: BTreeMap<Symbol, (Loc, Type)>,
+    locals: BTreeMap<Symbol, (Loc, Type, Option<TempIndex>)>, // local variables are represented as temp_index in the bytecode
 }
 
 /// Mode of translation
@@ -1390,8 +1390,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 
     /// Returns a map representing the current locals in scope and their associated declaration
-    /// location and type.
-    fn get_locals(&self) -> BTreeMap<Symbol, (Loc, Type)> {
+    /// location, type and temp index.
+    fn get_locals(&self) -> BTreeMap<Symbol, (Loc, Type, Option<TempIndex>)> {
         let mut locals = BTreeMap::new();
         for scope in &self.local_table {
             for (name, entry) in scope {

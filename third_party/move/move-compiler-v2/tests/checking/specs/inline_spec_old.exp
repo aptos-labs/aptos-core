@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: invalid old(..) expression in inline spec block
+  ┌─ tests/checking/specs/inline_spec_old.move:5:13
+  │
+5 │             assert forall k in 0..len(vec): vec[k] == old(vec)[k];
+  │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │             │                                             │
+  │             │                                             this expression is not a function parameter
+  │             only a function parameter is allowed in old(..) expressions in inline spec block
