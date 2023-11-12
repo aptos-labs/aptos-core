@@ -890,7 +890,7 @@ where
             serialized_groups,
         );
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
-            let txn_output = last_input_output.txn_output(txn_idx).unwrap();
+            let txn_output = last_input_output.load_txn_output(txn_idx).unwrap();
             let execution_status = txn_output.output_status();
 
             match execution_status {
