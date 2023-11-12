@@ -22,6 +22,7 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct OrderRule {
     epoch_state: Arc<EpochState>,
+    // TODO: try to share order rule, instead of this Arc.
     lowest_unordered_anchor_round: Arc<RwLock<Round>>,
     dag: Arc<RwLock<Dag>>,
     anchor_election: Arc<dyn AnchorElection>,
