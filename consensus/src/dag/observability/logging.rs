@@ -14,7 +14,7 @@ pub struct LogSchema {
 
 #[derive(Serialize)]
 pub enum LogEvent {
-    Start,
+    EpochStart,
     ModeTransition,
     BroadcastNode,
     ReceiveNode,
