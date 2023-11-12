@@ -13,7 +13,6 @@ use aptos_types::{
     fee_statement::FeeStatement, transaction::BlockExecutableTransaction as Transaction,
     write_set::WriteOp,
 };
-use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
 use move_core_types::value::MoveTypeLayout;
@@ -23,7 +22,7 @@ use std::{
     iter::{empty, Iterator},
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc,
+        Arc, RwLock,
     },
 };
 
@@ -53,7 +52,7 @@ impl<O: TransactionOutput, E: Debug> TxnOutput<O, E> {
 }
 
 pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug> {
-    inputs: Vec<CachePadded<ArcSwapOption<TxnInput<T>>>>, // txn_idx -> input.
+    inputs: Vec<CachePadded<RwLock<Option<Arc<TxnInput<T>>>>>>, // txn_idx -> input.
     // Set once when the group outputs are committed sequentially, to be processed later by
     // concurrent materialization / output preparation.
     finalized_groups: Vec<
@@ -62,7 +61,7 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: 
         >,
     >,
 
-    outputs: Vec<CachePadded<ArcSwapOption<TxnOutput<O, E>>>>, // txn_idx -> output.
+    outputs: Vec<CachePadded<RwLock<Option<Arc<TxnOutput<O, E>>>>>>, // txn_idx -> output.
 
     // Record all writes and reads to access paths corresponding to modules (code) in any
     // (speculative) executions. Used to avoid a potential race with module publishing and
@@ -79,10 +78,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub fn new(num_txns: TxnIndex) -> Self {
         Self {
             inputs: (0..num_txns)
-                .map(|_| CachePadded::new(ArcSwapOption::empty()))
+                .map(|_| CachePadded::new(RwLock::new(None)))
                 .collect(),
             outputs: (0..num_txns)
-                .map(|_| CachePadded::new(ArcSwapOption::empty()))
+                .map(|_| CachePadded::new(RwLock::new(None)))
                 .collect(),
             finalized_groups: (0..num_txns)
                 .map(|_| CachePadded::new(ExplicitSyncWrapper::<Vec<_>>::new(vec![])))
@@ -154,20 +153,21 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             }
         }
 
-        self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
-        self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput::from_output_status(output))));
+        *self.inputs[txn_idx as usize].write().unwrap() = Some(Arc::new(input));
+        *self.outputs[txn_idx as usize].write().unwrap() =
+            Some(Arc::new(TxnOutput::from_output_status(output)));
 
         true
     }
 
     pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<CapturedReads<T>>> {
-        self.inputs[txn_idx as usize].load_full()
+        self.inputs[txn_idx as usize].read().unwrap().clone()
     }
 
     /// Returns the total gas, execution gas, io gas and storage gas of the transaction.
     pub(crate) fn fee_statement(&self, txn_idx: TxnIndex) -> Option<FeeStatement> {
-        match &self.outputs[txn_idx as usize]
-            .load_full()
+        match &self
+            .load_txn_output(txn_idx)
             .expect("[BlockSTM]: Execution output must be recorded after execution")
             .output_status
         {
@@ -181,8 +181,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     /// Does a transaction at txn_idx have SkipRest or Abort status.
     pub(crate) fn block_skips_rest_at_idx(&self, txn_idx: TxnIndex) -> bool {
         matches!(
-            &self.outputs[txn_idx as usize]
-                .load_full()
+            &self
+                .load_txn_output(txn_idx)
                 .expect("[BlockSTM]: Execution output must be recorded after execution")
                 .output_status,
             ExecutionStatus::SkipRest(_)
@@ -196,8 +196,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             )));
         }
 
-        if let ExecutionStatus::Abort(err) = &self.outputs[txn_idx as usize]
-            .load_full()
+        if let ExecutionStatus::Abort(err) = &self
+            .load_txn_output(txn_idx)
             .expect("[BlockSTM]: Execution output must be recorded after execution")
             .output_status
         {
@@ -208,16 +208,16 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
 
     pub(crate) fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
         if let ExecutionStatus::Success(output) = self.take_output(txn_idx) {
-            self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput {
+            *self.outputs[txn_idx as usize].write().unwrap() = Some(Arc::new(TxnOutput {
                 output_status: ExecutionStatus::SkipRest(output),
-            })));
+            }));
         } else {
             unreachable!();
         }
     }
 
-    pub(crate) fn txn_output(&self, txn_idx: TxnIndex) -> Option<Arc<TxnOutput<O, E>>> {
-        self.outputs[txn_idx as usize].load_full()
+    pub(crate) fn load_txn_output(&self, txn_idx: TxnIndex) -> Option<Arc<TxnOutput<O, E>>> {
+        self.outputs[txn_idx as usize].read().unwrap().clone()
     }
 
     // Extracts a set of paths (keys) written or updated during execution from transaction
@@ -226,8 +226,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         &self,
         txn_idx: TxnIndex,
     ) -> Option<impl Iterator<Item = (T::Key, KeyKind)>> {
-        self.outputs[txn_idx as usize]
-            .load_full()
+        self.load_txn_output(txn_idx)
             .and_then(|txn_output| match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => Some(
                     t.resource_write_set()
@@ -257,8 +256,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         &self,
         txn_idx: TxnIndex,
     ) -> Option<BTreeMap<T::Key, (T::Value, Option<Arc<MoveTypeLayout>>)>> {
-        self.outputs[txn_idx as usize]
-            .load_full()
+        self.load_txn_output(txn_idx)
             .and_then(|txn_output| match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                     Some(t.resource_write_set())
@@ -274,8 +272,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         &self,
         txn_idx: TxnIndex,
     ) -> Option<impl Iterator<Item = T::Identifier>> {
-        self.outputs[txn_idx as usize]
-            .load()
+        self.load_txn_output(txn_idx)
             .as_ref()
             .and_then(|txn_output| match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
@@ -292,8 +289,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         &self,
         txn_idx: TxnIndex,
     ) -> Option<BTreeMap<T::Key, (T::Value, Arc<MoveTypeLayout>)>> {
-        self.outputs[txn_idx as usize]
-            .load()
+        self.load_txn_output(txn_idx)
             .as_ref()
             .and_then(|txn_output| match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
@@ -310,8 +306,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         &self,
         txn_idx: TxnIndex,
     ) -> Option<BTreeMap<T::Key, T::Value>> {
-        self.outputs[txn_idx as usize]
-            .load()
+        self.load_txn_output(txn_idx)
             .as_ref()
             .and_then(|txn_output| match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
@@ -325,9 +320,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     }
 
     pub(crate) fn aggregator_v1_delta_keys(&self, txn_idx: TxnIndex) -> Vec<T::Key> {
-        self.outputs[txn_idx as usize].load().as_ref().map_or(
-            vec![],
-            |txn_output| match &txn_output.output_status {
+        self.load_txn_output(txn_idx)
+            .as_ref()
+            .map_or(vec![], |txn_output| match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                     t.aggregator_v1_delta_set().into_keys().collect()
                 },
@@ -335,14 +330,13 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => vec![],
-            },
-        )
+            })
     }
 
     pub(crate) fn group_metadata_ops(&self, txn_idx: TxnIndex) -> Vec<(T::Key, T::Value)> {
-        self.outputs[txn_idx as usize].load().as_ref().map_or(
-            vec![],
-            |txn_output| match &txn_output.output_status {
+        self.load_txn_output(txn_idx)
+            .as_ref()
+            .map_or(vec![], |txn_output| match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                     t.resource_group_metadata_ops()
                 },
@@ -350,15 +344,14 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => vec![],
-            },
-        )
+            })
     }
 
     pub(crate) fn events(
         &self,
         txn_idx: TxnIndex,
     ) -> Box<dyn Iterator<Item = (T::Event, Option<MoveTypeLayout>)>> {
-        self.outputs[txn_idx as usize].load().as_ref().map_or(
+        self.load_txn_output(txn_idx).as_ref().map_or(
             Box::new(empty::<(T::Event, Option<MoveTypeLayout>)>()),
             |txn_output| match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
@@ -401,8 +394,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         patched_events: Vec<T::Event>,
         combined_groups: Vec<(T::Key, T::Value)>,
     ) {
-        match &self.outputs[txn_idx as usize]
-            .load_full()
+        match &self
+            .load_txn_output(txn_idx)
             .expect("Output must exist")
             .output_status
         {
@@ -425,7 +418,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     // other outstanding references to the recorded outputs exist.
     pub(crate) fn take_output(&self, txn_idx: TxnIndex) -> ExecutionStatus<O, Error<E>> {
         let owning_ptr = self.outputs[txn_idx as usize]
-            .swap(None)
+            .write()
+            .unwrap()
+            .take()
             .expect("[BlockSTM]: Output must be recorded after execution");
 
         Arc::try_unwrap(owning_ptr)
