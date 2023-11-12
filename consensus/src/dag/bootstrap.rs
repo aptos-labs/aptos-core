@@ -111,7 +111,12 @@ impl TDagMode for ActiveMode {
                 .ledger_info_provider
                 .get_latest_ledger_info()
                 .commit_info()
-                .round()
+                .round(),
+            highest_ordered_round = self
+                .base_state
+                .dag_store
+                .read()
+                .highest_ordered_anchor_round(),
         );
 
         // Spawn the fetch service
@@ -203,13 +208,7 @@ impl TDagMode for SyncMode {
         let (res_tx, res_rx) = oneshot::channel();
         let handle = tokio::spawn(async move {
             let result = sync_manager
-                .sync_dag_to(
-                    dag_fetcher,
-                    request,
-                    responders,
-                    sync_dag_store,
-                    commit_li,
-                )
+                .sync_dag_to(dag_fetcher, request, responders, sync_dag_store, commit_li)
                 .await;
             let _ = res_tx.send(result);
         });
@@ -543,7 +542,7 @@ impl DagBootstrapper {
         mut shutdown_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
         info!(
-            LogSchema::new(LogEvent::Start),
+            LogSchema::new(LogEvent::EpochStart),
             epoch = self.epoch_state.epoch,
         );
 
@@ -560,7 +559,7 @@ impl DagBootstrapper {
                 biased;
                 Ok(ack_tx) = &mut shutdown_rx => {
                     let _ = ack_tx.send(());
-                    info!(LogSchema::new(LogEvent::Shutdown), "shutdown complete");
+                    info!(LogSchema::new(LogEvent::Shutdown), epoch = self.epoch_state.epoch);
                     return;
                 },
                 Some(next_mode) = mode.run(&mut dag_rpc_rx, &self) => {

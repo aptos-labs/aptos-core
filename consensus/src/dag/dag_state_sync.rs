@@ -236,7 +236,7 @@ impl DagStateSynchronizer {
         responders: Vec<Author>,
         sync_dag_store: Arc<RwLock<Dag>>,
         commit_li: LedgerInfoWithSignatures,
-    ) -> anyhow::Result<Option<Dag>> {
+    ) -> anyhow::Result<Dag> {
         match dag_fetcher
             .fetch(request, responders, sync_dag_store.clone())
             .await
@@ -250,7 +250,7 @@ impl DagStateSynchronizer {
 
         self.state_computer.sync_to(commit_li).await?;
 
-        Ok(Arc::into_inner(sync_dag_store).map(|r| r.into_inner()))
+        Ok(Arc::into_inner(sync_dag_store).unwrap().into_inner())
     }
 }
 

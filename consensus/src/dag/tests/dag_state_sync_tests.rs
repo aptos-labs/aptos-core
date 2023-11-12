@@ -209,7 +209,7 @@ async fn test_dag_state_sync() {
             sync_node_li.ledger_info().clone(),
         )
         .await;
-    let new_dag = sync_result.unwrap().unwrap();
+    let new_dag = sync_result.unwrap();
 
     assert_eq!(
         new_dag.lowest_round(),
