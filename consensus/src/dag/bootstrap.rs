@@ -39,7 +39,7 @@ use aptos_channels::{
 use aptos_config::config::DagConsensusConfig;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
-use aptos_logger::{info, debug};
+use aptos_logger::{debug, info};
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_types::{
     epoch_state::EpochState, on_chain_config::DagConsensusConfigV1,
@@ -47,13 +47,17 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
-use futures::executor::block_on;
+use futures::{executor::block_on, Future, FutureExt};
 use futures_channel::{
     mpsc::{UnboundedReceiver, UnboundedSender},
     oneshot,
 };
 use std::{collections::HashMap, fmt, sync::Arc, time::Duration};
-use tokio::{select, task::JoinHandle};
+use tokio::{
+    runtime::Handle,
+    select,
+    task::{block_in_place, spawn_blocking, JoinHandle},
+};
 use tokio_retry::strategy::ExponentialBackoff;
 
 #[derive(Clone)]
@@ -125,7 +129,7 @@ impl TDagMode for ActiveMode {
             // Signal and stop the fetch service
             debug!("aborting fetch service");
             handle.abort();
-            let _ = block_on(handle);
+            let _ = block_in_place(move || Handle::current().block_on(handle));
             debug!("aborting fetch service complete");
         });
 
@@ -217,7 +221,7 @@ impl TDagMode for SyncMode {
         defer!({
             debug!("aborting dag synchronizer");
             handle.abort();
-            let _ = block_on(handle);
+            let _ = block_in_place(move || Handle::current().block_on(handle));            
             debug!("aborting dag synchronizer complete");
         });
 
