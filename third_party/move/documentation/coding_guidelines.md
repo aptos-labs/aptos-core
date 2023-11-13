@@ -33,10 +33,14 @@ We require every PR to have approval by at least two reviewers. This is enforced
     - the purpose of a PR
     - major design decisions
     - testing strategy
-    - any additional, non-primary changes related to the PR. It is OK to do minor refactorings of the code as you visit it.
-- Respond to each comment of the reviewers. If you think you resolved a request for a change, just use 'done' as a response. If you diasgree with the reviewer, explain why
-- Once you are done with addressing comments, indicate this to the reviewers by adding a top-level comment to the PR. You can use 'PTLA' ('please take a look again') as an acronym for this purpose.
-- If possible, avoid force push so the reviewer can see how you changed code in comparison. There are exceptions to this, for example if you need to rebase
+    - if applicable, any security relevant arguments
+    - any additional, non-primary changes related to the PR. It is OK to do minor refactorings and bug fixes of the code as you visit it.
+- Avoid merging independent things into one PR. (Except minor refactoring and bug fixes as mentioned above.)
+- Don't forget to list any issues this PR fixes (if you mention 'closes #nnn' in the PR description the issue will be automatically closed).
+- If you have any significant TODOs in your code, please open an issue for them. Use `TODO(#nnn)` to link the TODO to the issue.
+- Respond to each comment of the reviewers. If you think you resolved a request for a change, just use 'done' as a response. If you disagree with the reviewer, explain why -- it is OK to pushback, but should be justified.
+- Once you are done with addressing comments, indicate this to the reviewers by adding a top-level comment to the PR. You can use 'PTLA' ('please take another look') as an acronym for this purpose.
+- If possible, avoid force push so the reviewer can see how you changed code in comparison. There are exceptions to this, for example if you need to rebase.
 
 ### Guidelines for Reviewers of PRs
 
@@ -44,7 +48,7 @@ We require every PR to have approval by at least two reviewers. This is enforced
 - Change requests should try to avoid minor coding style issues. It's a final balancing about what minor or major code style issues are.
 - When you review, consider the context of the code. You can use an IDE like VS Code or CLion to conduct reviews in the IDE which allows navigating the code.
 - Be cordial in the way how to formulate your comments. "Can you please explain what this does?" goes a long way compared to "This looks strange to me".
-
+- Do not micromanage style. It is good to have some alignment on coding style, but there is also some freedom how things can be done.  
 
 ## Code documentation
 
