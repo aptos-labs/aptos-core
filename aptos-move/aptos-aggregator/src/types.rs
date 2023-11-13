@@ -15,6 +15,8 @@ use move_core_types::{
 };
 use move_vm_types::values::{Struct, Value};
 
+const STRING_AGG_FIXED_LEN: usize = 20;
+
 // Wrapping another error, to add a variant that represents
 // something that should never happen - i.e. a code invariant error,
 // which we would generally just panic, but since we are inside of the VM,
@@ -212,7 +214,26 @@ impl TryIntoMoveValue for DelayedFieldValue {
         Ok(match (self, layout) {
             (Aggregator(v) | Snapshot(v), U64) => Value::u64(v as u64),
             (Aggregator(v) | Snapshot(v), U128) => Value::u128(v),
-            (Derived(bytes), layout) if is_string_layout(layout) => bytes_to_string(bytes),
+            (Derived(bytes), layout) if is_string_layout(layout) => {
+                if bytes.len() > STRING_AGG_FIXED_LEN {
+                    return Err(
+                        PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(format!(
+                            "string snapshot too large: {:?}",
+                            String::from_utf8(bytes)
+                        )),
+                    );
+                }
+
+                let bytes = if bytes.len() < STRING_AGG_FIXED_LEN {
+                    let mut widened = vec![b' '; STRING_AGG_FIXED_LEN - bytes.len()];
+                    widened.extend(bytes);
+                    assert_eq!(widened.len(), STRING_AGG_FIXED_LEN);
+                    widened
+                } else {
+                    bytes
+                };
+                bytes_to_string(bytes)
+            },
             (value, layout) => {
                 return Err(
                     PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(format!(
