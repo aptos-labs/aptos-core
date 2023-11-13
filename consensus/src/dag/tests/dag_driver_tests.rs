@@ -131,7 +131,7 @@ fn setup(
     });
 
     let mock_ledger_info = LedgerInfo::mock_genesis(None);
-    let mock_ledger_info = generate_ledger_info_with_sig(&signers, mock_ledger_info);
+    let mock_ledger_info = generate_ledger_info_with_sig(signers, mock_ledger_info);
     let storage = Arc::new(MockStorage::new_with_ledger_info(mock_ledger_info.clone()));
     let dag = Arc::new(RwLock::new(Dag::new(
         epoch_state.clone(),
@@ -171,7 +171,7 @@ fn setup(
         Box::new(OptimisticResponsive::new(round_tx)),
     );
 
-    let driver = DagDriver::new(
+    DagDriver::new(
         signers[0].author(),
         epoch_state,
         dag,
@@ -187,14 +187,15 @@ fn setup(
         TEST_DAG_WINDOW as Round,
         DagPayloadConfig::default(),
         Arc::new(MockChainHealthBackoff {}),
-    );
-    driver
+    )
 }
 
 #[tokio::test]
 async fn test_certified_node_handler() {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
-    let network_sender = Arc::new(MockNetworkSender { _drop_notifier: None });
+    let network_sender = Arc::new(MockNetworkSender {
+        _drop_notifier: None,
+    });
     let mut driver = setup(&signers, validator_verifier, network_sender);
 
     let first_round_node = new_certified_node(1, signers[0].author(), vec![]);
@@ -217,7 +218,9 @@ async fn test_dag_driver_drop() {
 
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
     let (tx, rx) = oneshot::channel();
-    let network_sender = Arc::new(MockNetworkSender { _drop_notifier: Some(tx) });
+    let network_sender = Arc::new(MockNetworkSender {
+        _drop_notifier: Some(tx),
+    });
     let mut driver = setup(&signers, validator_verifier, network_sender);
 
     driver.enter_new_round(1).await;
