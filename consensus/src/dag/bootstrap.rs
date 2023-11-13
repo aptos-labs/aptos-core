@@ -19,7 +19,7 @@ use crate::{
     dag::{
         adapter::{compute_initial_block_and_ledger_info, LedgerInfoProvider},
         anchor_election::{LeaderReputationAdapter, MetadataBackendAdapter},
-        dag_state_sync::StateSyncStatus,
+        dag_state_sync::{SyncModeMessageHandler, SyncOutcome},
         observability::logging::{LogEvent, LogSchema},
         round_state::{AdaptiveResponsive, RoundState},
     },
@@ -39,7 +39,7 @@ use aptos_channels::{
 use aptos_config::config::DagConsensusConfig;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
-use aptos_logger::{debug, info};
+use aptos_logger::info;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_types::{
     epoch_state::EpochState, on_chain_config::DagConsensusConfigV1,
@@ -52,7 +52,7 @@ use futures_channel::{
     mpsc::{UnboundedReceiver, UnboundedSender},
     oneshot,
 };
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, fmt, sync::Arc, time::Duration};
 use tokio::{select, task::JoinHandle};
 use tokio_retry::strategy::ExponentialBackoff;
 
@@ -70,6 +70,15 @@ enum Mode {
     Sync(SyncMode),
 }
 
+impl fmt::Display for Mode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Mode::Active(_) => write!(f, "Active"),
+            Mode::Sync(_) => write!(f, "Sync"),
+        }
+    }
+}
+
 #[async_trait]
 #[enum_dispatch]
 trait TDagMode {
@@ -84,6 +93,7 @@ struct ActiveMode {
     handler: NetworkHandler,
     fetch_service: DagFetcherService,
     base_state: BootstrapBaseState,
+    buffer: Vec<DAGMessage>,
 }
 
 #[async_trait]
@@ -93,6 +103,22 @@ impl TDagMode for ActiveMode {
         dag_rpc_rx: &mut Receiver<Author, IncomingDAGRequest>,
         _bootstrapper: &DagBootstrapper,
     ) -> Option<Mode> {
+        info!(
+            LogSchema::new(LogEvent::ActiveMode)
+                .round(self.base_state.dag_store.read().highest_round()),
+            highest_committed_round = self
+                .base_state
+                .ledger_info_provider
+                .get_latest_ledger_info()
+                .commit_info()
+                .round(),
+            highest_ordered_round = self
+                .base_state
+                .dag_store
+                .read()
+                .highest_ordered_anchor_round(),
+        );
+
         // Spawn the fetch service
         let handle = tokio::spawn(self.fetch_service.start());
         defer!({
@@ -102,14 +128,19 @@ impl TDagMode for ActiveMode {
         });
 
         // Run the network handler until it returns with state sync status.
-        let sync_status = self.handler.run(dag_rpc_rx).await;
+        let sync_outcome = self.handler.run(dag_rpc_rx, self.buffer).await;
 
-        match sync_status {
-            StateSyncStatus::NeedsSync(certified_node_msg) => Some(Mode::Sync(SyncMode {
+        info!(
+            LogSchema::new(LogEvent::SyncOutcome),
+            sync_outcome = %sync_outcome,
+        );
+
+        match sync_outcome {
+            SyncOutcome::NeedsSync(certified_node_msg) => Some(Mode::Sync(SyncMode {
                 certified_node_msg,
                 base_state: self.base_state,
             })),
-            StateSyncStatus::EpochEnds => None,
+            SyncOutcome::EpochEnds => None,
             _ => unreachable!(),
         }
     }
@@ -124,7 +155,7 @@ struct SyncMode {
 impl TDagMode for SyncMode {
     async fn run(
         self,
-        _dag_rpc_rx: &mut Receiver<Author, IncomingDAGRequest>,
+        dag_rpc_rx: &mut Receiver<Author, IncomingDAGRequest>,
         bootstrapper: &DagBootstrapper,
     ) -> Option<Mode> {
         let sync_manager = DagStateSynchronizer::new(
@@ -141,8 +172,9 @@ impl TDagMode for SyncMode {
             .base_state
             .ledger_info_provider
             .get_highest_committed_anchor_round();
-        debug!(
-            LogSchema::new(LogEvent::StateSync)
+
+        info!(
+            LogSchema::new(LogEvent::SyncMode)
                 .round(self.base_state.dag_store.read().highest_round()),
             target_round = self.certified_node_msg.round(),
             local_ordered_round = self
@@ -159,42 +191,80 @@ impl TDagMode for SyncMode {
             bootstrapper.config.fetcher_config.clone(),
         );
 
-        let success = match sync_manager
-            .sync_dag_to(
-                &self.certified_node_msg,
-                dag_fetcher,
-                self.base_state.dag_store.clone(),
-                highest_committed_anchor_round,
-            )
-            .await
-        {
-            Ok(_) => {
-                info!("sync success. going to rebootstrap.");
-                true
-            },
-            Err(_) => {
-                info!("sync failed. continuing without advancing.");
-                false
-            },
-        };
+        let (request, responders, sync_dag_store) = sync_manager.build_request(
+            &self.certified_node_msg,
+            self.base_state.dag_store.clone(),
+            highest_committed_anchor_round,
+        );
 
-        let next_mode = if success {
-            let (new_state, new_handler, new_fetch_service) = bootstrapper.full_bootstrap();
-            Mode::Active(ActiveMode {
-                handler: new_handler,
-                fetch_service: new_fetch_service,
-                base_state: new_state,
-            })
-        } else {
-            let (new_handler, new_fetch_service) =
-                bootstrapper.bootstrap_components(&self.base_state);
-            Mode::Active(ActiveMode {
-                handler: new_handler,
-                fetch_service: new_fetch_service,
-                base_state: self.base_state,
-            })
-        };
-        Some(next_mode)
+        let commit_li = self.certified_node_msg.ledger_info().clone();
+
+        let network_handle = SyncModeMessageHandler::new(
+            bootstrapper.epoch_state.clone(),
+            request.start_round(),
+            request.target_round(),
+        );
+
+        let (res_tx, res_rx) = oneshot::channel();
+        let handle = tokio::spawn(async move {
+            let result = sync_manager
+                .sync_dag_to(dag_fetcher, request, responders, sync_dag_store, commit_li)
+                .await;
+            let _ = res_tx.send(result);
+        });
+        defer!({
+            handle.abort();
+            let _ = block_on(handle);
+        });
+
+        let mut buffer = Vec::new();
+
+        select! {
+            biased;
+            res = res_rx => {
+                match res {
+                    Ok(sync_result) => {
+                        if sync_result.is_ok() {
+                            info!("sync succeeded. running full bootstrap.");
+                            // If the sync task finishes successfully, we can transition to Active mode by
+                            // rebootstrapping all components starting from the DAG store.
+                            let (new_state, new_handler, new_fetch_service) = bootstrapper.full_bootstrap();
+                            return Some(Mode::Active(ActiveMode {
+                                handler: new_handler,
+                                fetch_service: new_fetch_service,
+                                base_state: new_state,
+                                buffer,
+                            }))
+                        } else {
+                            info!("sync failed. resuming with current DAG state.");
+                            // If the sync task fails, then continue the DAG in Active Mode with existing state.
+                            let (new_handler, new_fetch_service) =
+                                bootstrapper.bootstrap_components(&self.base_state);
+                            return Some(Mode::Active(ActiveMode {
+                                handler: new_handler,
+                                fetch_service: new_fetch_service,
+                                base_state: self.base_state,
+                                buffer,
+                            }))
+                        }
+                    },
+                    Err(_) => unreachable!("sender won't be dropped without sending"),
+                }
+            },
+            res = network_handle.run(dag_rpc_rx, &mut buffer) => {
+                // The network handle returns if the sender side of dag_rpc_rx closes,
+                // or network handle found a future CertifiedNodeMessage to cancel the
+                // current sync.
+                if let Some(msg) = res {
+                    return Some(Mode::Sync(SyncMode {
+                        certified_node_msg: msg,
+                        base_state: self.base_state,
+                    }));
+                } else {
+                    unreachable!("remote mustn't drop the network message sender until bootstrapper returns");
+                }
+            }
+        }
     }
 }
 
@@ -471,21 +541,30 @@ impl DagBootstrapper {
         mut dag_rpc_rx: Receiver<Author, IncomingDAGRequest>,
         mut shutdown_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
+        info!(
+            LogSchema::new(LogEvent::EpochStart),
+            epoch = self.epoch_state.epoch,
+        );
+
         let (base_state, handler, fetch_service) = self.full_bootstrap();
+
         let mut mode = Mode::Active(ActiveMode {
             handler,
             fetch_service,
             base_state,
+            buffer: Vec::new(),
         });
         loop {
             select! {
                 biased;
                 Ok(ack_tx) = &mut shutdown_rx => {
                     let _ = ack_tx.send(());
+                    info!(LogSchema::new(LogEvent::Shutdown), epoch = self.epoch_state.epoch);
                     return;
                 },
                 Some(next_mode) = mode.run(&mut dag_rpc_rx, &self) => {
-                    mode = next_mode
+                    info!(LogSchema::new(LogEvent::ModeTransition), next_mode = %next_mode);
+                    mode = next_mode;
                 }
             }
         }
@@ -505,7 +584,7 @@ pub(super) fn bootstrap_dag_for_test(
     payload_client: Arc<dyn PayloadClient>,
     state_computer: Arc<dyn StateComputer>,
 ) -> (
-    JoinHandle<StateSyncStatus>,
+    JoinHandle<SyncOutcome>,
     JoinHandle<()>,
     aptos_channel::Sender<Author, IncomingDAGRequest>,
     UnboundedReceiver<OrderedBlocks>,
@@ -534,7 +613,7 @@ pub(super) fn bootstrap_dag_for_test(
 
     let dh_handle = tokio::spawn(async move {
         let mut dag_rpc_rx = dag_rpc_rx;
-        handler.run(&mut dag_rpc_rx).await
+        handler.run(&mut dag_rpc_rx, Vec::new()).await
     });
     let df_handle = tokio::spawn(fetch_service.start());
 
