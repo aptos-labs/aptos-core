@@ -1181,7 +1181,7 @@ impl TransactionsApi {
         txn: SignedTransaction,
     ) -> SimulateTransactionResult<Vec<UserTransaction>> {
         // Transactions shouldn't have a valid signature or this could be used to attack
-        if txn.signature_is_valid() {
+        if txn.verify_signature().is_ok() {
             return Err(SubmitTransactionError::bad_request_with_code(
                 "Simulated transactions must have a non-valid signature",
                 AptosErrorCode::InvalidInput,
