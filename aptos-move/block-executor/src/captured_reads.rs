@@ -12,7 +12,7 @@ use aptos_aggregator::{
 use aptos_mvhashmap::{
     types::{
         MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion, TxnIndex,
-        UnsetOrLayout, Version,
+        ValueWithLayout, Version,
     },
     versioned_data::VersionedData,
     versioned_delayed_fields::TVersionedDelayedFieldView,
@@ -143,6 +143,16 @@ impl<V: TransactionWrite> DataRead<V> {
             },
             (_, _) => unreachable!("{:?}, {:?} must be covered", self_kind, kind),
         })
+    }
+
+    pub(crate) fn from_value_with_layout(version: Version, value: ValueWithLayout<V>) -> Self {
+        match value {
+            // If value was never exchanged, then it can be the highest one without full value.
+            ValueWithLayout::RawFromStorage(v) => DataRead::Metadata(v.as_state_value_metadata()),
+            ValueWithLayout::Exchanged(v, layout) => {
+                DataRead::Versioned(version, v.clone(), layout)
+            },
+        }
     }
 }
 
@@ -522,7 +532,7 @@ impl<T: Transaction> CapturedReads<T> {
     //     self.delayed_field_reads.keys()
     // }
 
-    pub(crate) fn validate_incorrect_use(&self) -> bool {
+    pub(crate) fn is_incorrect_use(&self) -> bool {
         self.incorrect_use
     }
 
@@ -539,9 +549,9 @@ impl<T: Transaction> CapturedReads<T> {
         use MVDataOutput::*;
         self.data_reads.iter().all(|(k, r)| {
             match data_map.fetch_data(k, idx_to_validate) {
-                Ok(Versioned(version, v, layout)) => {
+                Ok(Versioned(version, v)) => {
                     matches!(
-                        DataRead::Versioned(version, v, layout).contains(r),
+                        DataRead::from_value_with_layout(version, v).contains(r),
                         DataReadComparison::Contains
                     )
                 },
@@ -578,10 +588,10 @@ impl<T: Transaction> CapturedReads<T> {
             }
 
             ret && group.inner_reads.iter().all(|(tag, r)| {
-                match group_map.read_from_group(key, tag, idx_to_validate, UnsetOrLayout::Unset) {
-                    Ok((version, v, layout)) => {
+                match group_map.fetch_tagged_data(key, tag, idx_to_validate) {
+                    Ok((version, v)) => {
                         matches!(
-                            DataRead::Versioned(version, v, layout).contains(r),
+                            DataRead::from_value_with_layout(version, v).contains(r),
                             DataReadComparison::Contains
                         )
                     },
@@ -655,6 +665,10 @@ impl<T: Transaction> CapturedReads<T> {
 
     pub(crate) fn mark_failure(&mut self) {
         self.speculative_failure = true;
+    }
+
+    pub(crate) fn mark_incorrect_use(&mut self) {
+        self.incorrect_use = true;
     }
 }
 

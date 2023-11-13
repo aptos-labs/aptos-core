@@ -6,7 +6,7 @@ use super::{
     types::{test::KeyType, MVDataError, MVDataOutput, MVGroupError, TxnIndex},
     MVHashMap,
 };
-use crate::types::UnsetOrLayout;
+use crate::types::ValueWithLayout;
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp};
 use aptos_types::{
     executable::ExecutableTestType,
@@ -20,10 +20,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     fmt::Debug,
     hash::Hash,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 const DEFAULT_TIMEOUT: u64 = 30;
@@ -248,10 +245,8 @@ where
         let value = Value::new(None);
         let idx = idx as TxnIndex;
         if test_group {
-            map.group_data().write(key.clone(), idx, 0, vec![(
-                5,
-                (value, UnsetOrLayout::Set(None)),
-            )]);
+            map.group_data()
+                .write(key.clone(), idx, 0, vec![(5, (value, None))]);
             map.group_data().mark_estimate(&key, idx);
         } else {
             map.data().write(key.clone(), idx, 0, (value, None));
@@ -278,7 +273,11 @@ where
                         use MVDataOutput::*;
 
                         let baseline = baseline.get(key, idx as TxnIndex);
-                        let assert_value = |v: Arc<Value<V>>| match v.maybe_value.as_ref() {
+                        let assert_value = |v: ValueWithLayout<Value<V>>| match v
+                            .extract_value_no_layout()
+                            .maybe_value
+                            .as_ref()
+                        {
                             Some(w) => {
                                 assert_eq!(baseline, ExpectedOutput::Value(w.clone()), "{:?}", idx);
                             },
@@ -290,13 +289,12 @@ where
                         let mut retry_attempts = 0;
                         loop {
                             if test_group {
-                                match map.group_data.read_from_group(
+                                match map.group_data.fetch_tagged_data(
                                     &KeyType(key.clone()),
                                     &5,
                                     idx as TxnIndex,
-                                    UnsetOrLayout::Set(None),
                                 ) {
-                                    Ok((_, v, _)) => {
+                                    Ok((_, v)) => {
                                         assert_value(v);
                                         break;
                                     },
@@ -312,7 +310,7 @@ where
                                     .data()
                                     .fetch_data(&KeyType(key.clone()), idx as TxnIndex)
                                 {
-                                    Ok(Versioned(_, v, _)) => {
+                                    Ok(Versioned(_, v)) => {
                                         assert_value(v);
                                         break;
                                     },
@@ -356,10 +354,8 @@ where
                         let key = KeyType(key.clone());
                         let value = Value::new(None);
                         if test_group {
-                            map.group_data().write(key, idx as TxnIndex, 1, vec![(
-                                5,
-                                (value, UnsetOrLayout::Set(None)),
-                            )]);
+                            map.group_data()
+                                .write(key, idx as TxnIndex, 1, vec![(5, (value, None))]);
                         } else {
                             map.data().write(key, idx as TxnIndex, 1, (value, None));
                         }
@@ -368,10 +364,8 @@ where
                         let key = KeyType(key.clone());
                         let value = Value::new(Some(v.clone()));
                         if test_group {
-                            map.group_data().write(key, idx as TxnIndex, 1, vec![(
-                                5,
-                                (value, UnsetOrLayout::Set(None)),
-                            )]);
+                            map.group_data()
+                                .write(key, idx as TxnIndex, 1, vec![(5, (value, None))]);
                         } else {
                             map.data().write(key, idx as TxnIndex, 1, (value, None));
                         }

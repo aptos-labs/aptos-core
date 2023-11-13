@@ -8,7 +8,7 @@ use crate::{
     task::{ExecutionStatus, TransactionOutput},
 };
 use aptos_aggregator::types::PanicOr;
-use aptos_mvhashmap::types::TxnIndex;
+use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
 use aptos_types::{
     fee_statement::FeeStatement, transaction::BlockExecutableTransaction as Transaction,
     write_set::WriteOp,
@@ -58,13 +58,7 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: 
     // concurrent materialization / output preparation.
     finalized_groups: Vec<
         CachePadded<
-            ExplicitSyncWrapper<
-                Vec<(
-                    T::Key,
-                    T::Value,
-                    Vec<(T::Tag, (Arc<T::Value>, Option<Arc<MoveTypeLayout>>))>,
-                )>,
-            >,
+            ExplicitSyncWrapper<Vec<(T::Key, T::Value, Vec<(T::Tag, ValueWithLayout<T::Value>)>)>>,
         >,
     >,
 
@@ -384,11 +378,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn record_finalized_group(
         &self,
         txn_idx: TxnIndex,
-        finalized_groups: Vec<(
-            T::Key,
-            T::Value,
-            Vec<(T::Tag, (Arc<T::Value>, Option<Arc<MoveTypeLayout>>))>,
-        )>,
+        finalized_groups: Vec<(T::Key, T::Value, Vec<(T::Tag, ValueWithLayout<T::Value>)>)>,
     ) {
         *self.finalized_groups[txn_idx as usize].acquire() = finalized_groups;
     }
@@ -396,11 +386,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn take_finalized_group(
         &self,
         txn_idx: TxnIndex,
-    ) -> Vec<(
-        T::Key,
-        T::Value,
-        Vec<(T::Tag, (Arc<T::Value>, Option<Arc<MoveTypeLayout>>))>,
-    )> {
+    ) -> Vec<(T::Key, T::Value, Vec<(T::Tag, ValueWithLayout<T::Value>)>)> {
         std::mem::take(&mut self.finalized_groups[txn_idx as usize].acquire())
     }
 

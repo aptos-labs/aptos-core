@@ -23,7 +23,7 @@ use aptos_aggregator::{
 };
 use aptos_logger::{debug, error, info};
 use aptos_mvhashmap::{
-    types::{Incarnation, MVDelayedFieldsError, TxnIndex, UnsetOrLayout},
+    types::{Incarnation, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
     unsync_map::UnsyncMap,
     versioned_delayed_fields::CommitError,
     MVHashMap,
@@ -143,9 +143,7 @@ where
                     incarnation,
                     group_ops
                         .into_iter()
-                        .map(|(tag, (write_op, maybe_layout))| {
-                            (tag, (write_op, UnsetOrLayout::Set(maybe_layout)))
-                        }),
+                        .map(|(tag, (write_op, maybe_layout))| (tag, (write_op, maybe_layout))),
                 ) {
                     // Should return true if writes outside.
                     updates_outside = true;
@@ -298,7 +296,7 @@ where
             .read_set(idx_to_validate)
             .expect("[BlockSTM]: Prior read-set must be recorded");
 
-        if read_set.validate_incorrect_use() {
+        if read_set.is_incorrect_use() {
             return Err(code_invariant_error(
                 "Incorrect use detected in CapturedReads",
             ));
@@ -532,31 +530,30 @@ where
                 }
             }
 
-            let process_finalized_group = |finalized_group: anyhow::Result<
-                Vec<(T::Tag, (Arc<T::Value>, Option<Arc<MoveTypeLayout>>))>,
-            >,
-                                           metadata_is_deletion: bool|
-             -> Result<_, _> {
-                match finalized_group {
-                    Ok(finalized_group) => {
-                        // finalize_group already applies the deletions.
-                        if finalized_group.is_empty() != metadata_is_deletion {
-                            return Err(Error::FallbackToSequential(resource_group_error(
-                                format!(
+            let process_finalized_group =
+                |finalized_group: anyhow::Result<Vec<(T::Tag, ValueWithLayout<T::Value>)>>,
+                 metadata_is_deletion: bool|
+                 -> Result<_, _> {
+                    match finalized_group {
+                        Ok(finalized_group) => {
+                            // finalize_group already applies the deletions.
+                            if finalized_group.is_empty() != metadata_is_deletion {
+                                return Err(Error::FallbackToSequential(resource_group_error(
+                                    format!(
                                 "Group is empty = {} but op is deletion = {} in parallel execution",
                                 finalized_group.is_empty(),
                                 metadata_is_deletion
                             ),
-                            )));
-                        }
-                        Ok(finalized_group)
-                    },
-                    Err(e) => Err(Error::FallbackToSequential(resource_group_error(format!(
-                        "Error committing resource group {:?}",
-                        e
-                    )))),
-                }
-            };
+                                )));
+                            }
+                            Ok(finalized_group)
+                        },
+                        Err(e) => Err(Error::FallbackToSequential(resource_group_error(format!(
+                            "Error committing resource group {:?}",
+                            e
+                        )))),
+                    }
+                };
 
             let group_metadata_ops = last_input_output.group_metadata_ops(txn_idx);
             let mut finalized_groups = Vec::with_capacity(group_metadata_ops.len());
@@ -686,30 +683,21 @@ where
     }
 
     fn map_id_to_values_in_group_writes(
-        finalized_groups: Vec<(
-            T::Key,
-            T::Value,
-            Vec<(T::Tag, (Arc<T::Value>, Option<Arc<MoveTypeLayout>>))>,
-        )>,
+        finalized_groups: Vec<(T::Key, T::Value, Vec<(T::Tag, ValueWithLayout<T::Value>)>)>,
         latest_view: &LatestView<T, S, X>,
     ) -> Vec<(T::Key, T::Value, Vec<(T::Tag, Arc<T::Value>)>)> {
         let mut patched_finalized_groups = Vec::new();
         for (group_key, group_metadata_op, resource_vec) in finalized_groups.into_iter() {
             let mut patched_resource_vec = Vec::new();
-            for (tag, (value, maybe_layout)) in resource_vec.into_iter() {
-                // maybe_layout is Some(_) if it contains a delayed field
-                if let Some(layout) = maybe_layout {
-                    patched_resource_vec.push((
-                        tag,
-                        Arc::new(Self::replace_ids_with_values(
-                            &value,
-                            layout.as_ref(),
-                            latest_view,
-                        )),
-                    ));
-                } else {
-                    patched_resource_vec.push((tag, value.clone()));
-                }
+            for (tag, value_with_layout) in resource_vec.into_iter() {
+                let value = match value_with_layout {
+                    ValueWithLayout::RawFromStorage(value) => value,
+                    ValueWithLayout::Exchanged(value, None) => value,
+                    ValueWithLayout::Exchanged(value, Some(layout)) => Arc::new(
+                        Self::replace_ids_with_values(&value, layout.as_ref(), latest_view),
+                    ),
+                };
+                patched_resource_vec.push((tag, value));
             }
             patched_finalized_groups.push((group_key, group_metadata_op, patched_resource_vec));
         }
@@ -803,7 +791,9 @@ where
                         .expect("Aggregator base value deserialization error")
                         .expect("Aggregator base value must exist");
 
-                    versioned_cache.data().set_base_value(k.clone(), w, None);
+                    versioned_cache
+                        .data()
+                        .set_base_value(k.clone(), ValueWithLayout::RawFromStorage(Arc::new(w)));
                     op.apply_to(value_u128)
                         .expect("Materializing delta w. base value set must succeed")
                 });
@@ -1162,12 +1152,12 @@ where
             unsync_map.write(group_key, metadata_op, None);
         }
 
-        for (key, write_op) in output
-            .aggregator_v1_write_set()
-            .into_iter()
-            .chain(output.module_write_set().into_iter())
-        {
+        for (key, write_op) in output.aggregator_v1_write_set().into_iter() {
             unsync_map.write(key, write_op, None);
+        }
+
+        for (key, write_op) in output.module_write_set().into_iter() {
+            unsync_map.write_module(key, write_op);
         }
 
         let mut second_phase = Vec::new();
@@ -1242,14 +1232,12 @@ where
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let latest_view = LatestView::<T, S, X>::new(
                 base_view,
-                ViewState::Unsync(SequentialState {
-                    unsync_map: &unsync_map,
+                ViewState::Unsync(SequentialState::new(
+                    &unsync_map,
                     start_counter,
-                    counter: &counter,
-                    resource_read_set: RefCell::new(HashSet::new()),
-                    group_read_set: RefCell::new(HashSet::new()),
+                    &counter,
                     dynamic_change_set_optimizations_enabled,
-                }),
+                )),
                 idx as TxnIndex,
             );
             let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex, true);
@@ -1352,6 +1340,10 @@ where
                         );
                     } else {
                         output.set_txn_output_for_non_dynamic_change_set();
+                    }
+
+                    if latest_view.is_incorrect_use() {
+                        panic!("Incorrect use in sequential execution")
                     }
 
                     if let Some(commit_hook) = &self.transaction_commit_hook {

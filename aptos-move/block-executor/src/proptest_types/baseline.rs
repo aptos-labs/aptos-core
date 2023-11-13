@@ -21,7 +21,7 @@ use aptos_aggregator::delta_change_set::serialize;
 use aptos_types::{contract_event::ReadWriteEvent, write_set::TransactionWrite};
 use aptos_vm_types::resource_group_adapter::group_size_as_sum;
 use bytes::Bytes;
-use claims::{assert_matches, assert_none, assert_some, assert_some_eq};
+use claims::{assert_matches, assert_none, assert_ok_eq, assert_some, assert_some_eq};
 use itertools::izip;
 use std::{collections::HashMap, fmt::Debug, hash::Hash, result::Result, sync::atomic::Ordering};
 
@@ -270,7 +270,10 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                     for (group_key, size) in output.read_group_sizes.iter() {
                         let group_map = group_world.entry(group_key).or_insert(base_map.clone());
 
-                        assert_eq!(*size, group_size_as_sum(group_map.iter()).unwrap());
+                        assert_ok_eq!(
+                            group_size_as_sum(group_map.iter().map(|(t, v)| (t, v.len()))),
+                            *size
+                        );
                     }
 
                     // Test normal reads.
