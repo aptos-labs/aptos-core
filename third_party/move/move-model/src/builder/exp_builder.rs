@@ -906,8 +906,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 if is_wildcard(resource) {
                     ResourceSpecifier::DeclaredInModule(module_id)
                 } else {
-                    // Construct an expansion type so we can feed it through the standard translation
-                    // process.
                     let mident = sp(specifier.loc, EA::ModuleIdent_ {
                         address: *address,
                         module: *module,
@@ -916,16 +914,33 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         specifier.loc,
                         EA::ModuleAccess_::ModuleAccess(mident, *resource),
                     );
-                    let ety = sp(
-                        specifier.loc,
-                        EA::Type_::Apply(maccess, type_args.as_ref().cloned().unwrap_or_default()),
-                    );
-                    let ty = self.translate_type(&ety);
-                    if let Type::Struct(mid, sid, inst) = ty {
-                        ResourceSpecifier::Resource(mid.qualified_inst(sid, inst))
+                    let sym = self.parent.module_access_to_qualified(&maccess);
+                    if let Type::Struct(mid, sid, _) = self.parent.parent.lookup_type(&loc, &sym) {
+                        if type_args.is_none() {
+                            // If no type args are provided, we assume this is a partial type without
+                            // instantiation
+                            ResourceSpecifier::Resource(mid.qualified_inst(sid, vec![]))
+                        } else {
+                            // Otherwise construct an expansion type so we can feed it through the standard translation
+                            // process.
+                            let ety = sp(
+                                specifier.loc,
+                                EA::Type_::Apply(
+                                    maccess,
+                                    type_args.as_ref().cloned().unwrap_or_default(),
+                                ),
+                            );
+                            let ty = self.translate_type(&ety);
+                            if let Type::Struct(mid, sid, inst) = ty {
+                                ResourceSpecifier::Resource(mid.qualified_inst(sid, inst))
+                            } else {
+                                // errors reported
+                                debug_assert!(self.parent.parent.env.has_errors());
+                                ResourceSpecifier::Any
+                            }
+                        }
                     } else {
-                        // errors reported
-                        debug_assert!(self.parent.parent.env.has_errors());
+                        // error reported
                         ResourceSpecifier::Any
                     }
                 }
@@ -1788,13 +1803,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         Some(entries) => {
                             if entries.len() != 1 {
                                 self.error(
-                                loc,
-                                &format!(
-                                    "Expect a unique spec function from lifted lambda: {}, found {}",
-                                    remapped_sym.display(self.symbol_pool()),
-                                    entries.len()
-                                ),
-                            );
+                                    loc,
+                                    &format!(
+                                        "Expect a unique spec function from lifted lambda: {}, found {}",
+                                        remapped_sym.display(self.symbol_pool()),
+                                        entries.len()
+                                    ),
+                                );
                                 return Some(self.new_error_exp());
                             }
                             entries.last().unwrap().clone()
@@ -1835,12 +1850,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
                     if full_arg_types.len() != spec_fun_entry.params.len() {
                         self.error(
-                        loc,
-                        &format!(
-                            "Parameter number mismatch on calling a spec function from lifted lambda: {},",
-                            remapped_sym.display(self.symbol_pool())
-                        ),
-                    );
+                            loc,
+                            &format!(
+                                "Parameter number mismatch on calling a spec function from lifted lambda: {},",
+                                remapped_sym.display(self.symbol_pool())
+                            ),
+                        );
                         return Some(self.new_error_exp());
                     }
                     let param_type_error = full_arg_types
