@@ -553,13 +553,22 @@ pub fn setup_environment_and_start_node(
     remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
     logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) -> anyhow::Result<AptosHandle> {
-    // Override the state sync node configurations (fast sync and output)
+    // Always use fast sync
     node_config.state_sync.state_sync_driver.bootstrapping_mode =
         BootstrappingMode::DownloadLatestStates;
-    node_config
-        .state_sync
-        .state_sync_driver
-        .continuous_syncing_mode = ContinuousSyncingMode::ApplyTransactionOutputs;
+
+    // If the node is a validator, use execution syncing, otherwise output syncing
+    if node_config.base.role.is_validator() {
+        node_config
+            .state_sync
+            .state_sync_driver
+            .continuous_syncing_mode = ContinuousSyncingMode::ExecuteTransactions;
+    } else {
+        node_config
+            .state_sync
+            .state_sync_driver
+            .continuous_syncing_mode = ContinuousSyncingMode::ApplyTransactionOutputs;
+    }
 
     // If the node isn't using storage sharding, panic!
     if !node_config.storage.rocksdb_configs.enable_storage_sharding {
