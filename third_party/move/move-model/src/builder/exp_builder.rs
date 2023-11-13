@@ -2960,21 +2960,20 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         field_decls: &BTreeMap<Symbol, (Loc, usize, Type)>,
         fields: &EA::Fields<T>,
     ) -> BTreeSet<usize> {
-        // maps exp_idx to def_idx
-        let mut permutation = BTreeMap::new();
-        for (_, name, (exp_idx, _)) in fields.iter() {
-            let field_name = self.symbol_pool().make(name);
-            let (_, def_idx, _) = field_decls.get(&field_name).unwrap();
-            permutation.insert(*exp_idx, *def_idx);
-        }
-        let permutation = permutation
-            .into_iter()
-            .sorted_by_key(|(i, _)| *i)
-            .map(|(_, value)| value)
+        // def_indices in evaluation order
+        let def_indices = fields
+            .iter()
+            .map(|(_, name, (exp_idx, _))| {
+                let field_name = self.symbol_pool().make(name);
+                let (_, def_idx, _) = field_decls.get(&field_name).unwrap();
+                (*exp_idx, *def_idx)
+            })
+            .sorted_by_key(|(exp_idx, _)| *exp_idx)
+            .map(|(_, def_idx)| def_idx)
             .collect_vec();
         // longest in order tail of permutation
         let mut in_order_fields = BTreeSet::new();
-        for i in permutation.into_iter().rev() {
+        for i in def_indices.into_iter().rev() {
             if let Some(min) = in_order_fields.iter().next() {
                 if i < *min {
                     in_order_fields.insert(i);
