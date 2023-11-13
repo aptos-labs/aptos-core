@@ -20,7 +20,7 @@ use aptos_types::{
     transaction::signature_verified_transaction::SignatureVerifiedTransaction,
     write_set::TransactionWrite,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use rayon::Scope;
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -236,7 +236,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
         // TODO(ptx): maybe warm up vm like done in AptosExecutorTask
         let vm = {
             let _timer = PER_WORKER_TIMER.timer_with(&[&idx, "vm_init"]);
-            AptosVM::new_from_state_view(&self.base_view)
+            AptosVM::new(&self.base_view.as_move_resolver())
         };
 
         loop {
