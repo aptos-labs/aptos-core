@@ -290,7 +290,7 @@ impl SyncModeMessageHandler {
                 },
             }
         }
-        return None;
+        None
     }
 
     fn process_rpc(
@@ -331,6 +331,6 @@ impl SyncModeMessageHandler {
                 return Err(err);
             },
         };
-        return Ok(None);
+        Ok(None)
     }
 }
