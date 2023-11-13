@@ -145,4 +145,11 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
         let output_message = bcs::to_bytes(&txn_idx_output).unwrap();
         self.result_tx.send(Message::new(output_message), &MessageType::new(execute_result_type));
     }
+
+    fn record_execution_complete_time_on_shard(&self) {
+        let duration_since_epoch = self.cmd_rx_msg_duration_since_epoch.load(std::sync::atomic::Ordering::Relaxed);
+        let delta = get_delta_time(duration_since_epoch);
+        REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+            .with_label_values(&["6_exe_complete_on_shard"]).observe(delta as f64);
+    }
 }
