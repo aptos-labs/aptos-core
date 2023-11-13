@@ -33,6 +33,7 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::transaction_argument::convert_txn_args;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
     convert::TryFrom,
@@ -47,14 +48,14 @@ mod module;
 mod multisig;
 mod script;
 pub mod signature_verified_transaction;
-mod transaction_argument;
 
 use crate::{
-    contract_event::ReadWriteEvent, executable::ModulePath, fee_statement::FeeStatement,
+    contract_event::TransactionEvent, executable::ModulePath, fee_statement::FeeStatement,
     proof::accumulator::InMemoryEventAccumulator, write_set::TransactionWrite,
 };
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
+pub use move_core_types::transaction_argument::TransactionArgument;
 use move_core_types::vm_status::AbortLocation;
 pub use multisig::{ExecutionError, Multisig, MultisigTransactionPayload};
 use once_cell::sync::OnceCell;
@@ -64,7 +65,6 @@ pub use script::{
 };
 use serde::de::DeserializeOwned;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
-pub use transaction_argument::{parse_transaction_argument, TransactionArgument};
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
@@ -1515,9 +1515,11 @@ impl TransactionListWithProof {
         );
 
         // Verify the transaction hashes match those of the transaction infos
-        let transaction_hashes: Vec<_> = self.transactions.iter().map(CryptoHash::hash).collect();
-        itertools::zip_eq(transaction_hashes, &self.proof.transaction_infos)
-            .map(|(txn_hash, txn_info)| {
+        self.transactions
+            .par_iter()
+            .zip_eq(self.proof.transaction_infos.par_iter())
+            .map(|(txn, txn_info)| {
+                let txn_hash = CryptoHash::hash(txn);
                 ensure!(
                     txn_hash == txn_info.transaction_hash(),
                     "The hash of transaction does not match the transaction info in proof. \
@@ -1541,7 +1543,9 @@ impl TransactionListWithProof {
                 event_lists.len(),
                 self.transactions.len(),
             );
-            itertools::zip_eq(event_lists, &self.proof.transaction_infos)
+            event_lists
+                .into_par_iter()
+                .zip_eq(self.proof.transaction_infos.par_iter())
                 .map(|(events, txn_info)| verify_events_against_root_hash(events, txn_info))
                 .collect::<Result<Vec<_>>>()?;
         }
@@ -1616,10 +1620,7 @@ impl TransactionOutputListWithProof {
         );
 
         // Verify the events, status, gas used and transaction hashes.
-        itertools::zip_eq(
-            &self.transactions_and_outputs,
-            &self.proof.transaction_infos,
-        )
+        self.transactions_and_outputs.par_iter().zip_eq(self.proof.transaction_infos.par_iter())
         .map(|((txn, txn_output), txn_info)| {
             // Check the events against the expected events root hash
             verify_events_against_root_hash(&txn_output.events, txn_info)?;
@@ -1867,5 +1868,5 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         + TryIntoMoveValue
         + TryFromMoveValue<Hint = ()>;
     type Value: Send + Sync + Debug + Clone + TransactionWrite;
-    type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
+    type Event: Send + Sync + Debug + Clone + TransactionEvent;
 }

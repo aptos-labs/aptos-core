@@ -38,7 +38,10 @@ use aptos_vm_validator::{
 };
 use futures::channel::mpsc;
 use maplit::hashmap;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 use tokio::runtime::{Handle, Runtime};
 
 /// Mock of a running instance of shared mempool.
@@ -187,7 +190,7 @@ impl MockSharedMempool {
     pub fn get_txns(&self, size: u64) -> Vec<SignedTransaction> {
         let pool = self.mempool.lock();
         // assume txn size is less than 100kb
-        pool.get_batch(size, size * 102400, true, false, vec![])
+        pool.get_batch(size, size * 102400, true, false, BTreeMap::new())
     }
 
     pub fn remove_txn(&self, txn: &SignedTransaction) {

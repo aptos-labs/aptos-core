@@ -19,7 +19,7 @@
 ## Function `borrow_address`
 
 Borrows the address of the signer
-Conceptually, you can think of the <code><a href="signer.md#0x1_signer">signer</a></code> as being a struct wrapper arround an
+Conceptually, you can think of the <code><a href="signer.md#0x1_signer">signer</a></code> as being a struct wrapper around an
 address
 ```
 struct signer has drop { addr: address }
