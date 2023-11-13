@@ -134,6 +134,11 @@ pub async fn emit_transactions_with_cluster(
         emit_job_request = emit_job_request.coins_per_account_override(coins);
     }
 
+    if let Some(latency_polling_interval_s) = args.latency_polling_interval_s {
+        emit_job_request = emit_job_request
+            .latency_polling_interval(Duration::from_secs_f32(latency_polling_interval_s));
+    }
+
     let stats = emitter
         .emit_txn_for_with_stats(
             &mut coin_source_account,

@@ -243,7 +243,7 @@ pub struct DataStreamingServiceConfig {
 impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
-            enable_subscription_streaming: true,
+            enable_subscription_streaming: false,
             global_summary_refresh_interval_ms: 50,
             max_concurrent_requests: MAX_CONCURRENT_REQUESTS,
             max_concurrent_state_requests: MAX_CONCURRENT_STATE_REQUESTS,

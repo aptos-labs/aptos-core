@@ -16,7 +16,11 @@ use itertools::Itertools;
 use maplit::hashset;
 use ordered_float::OrderedFloat;
 use rand::seq::{IteratorRandom, SliceRandom};
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{
+    collections::{BTreeMap, HashSet},
+    sync::Arc,
+    time::Duration,
+};
 
 // Useful constants
 const ERROR_LOG_FREQ_SECS: u64 = 3;
@@ -66,33 +70,40 @@ pub fn is_priority_peer(
     false
 }
 
-/// Chooses the peer with the lowest distance from the validator set and
-/// measured latency (using the given set of serviceable peers). We prioritize
-/// distance over latency, since we want to avoid close but not up-to-date peers.
-pub fn choose_lowest_distance_and_latency_peer(
+/// Chooses a peer with the lowest distance from the validator set weighted by
+/// latency (from the given set of peers). We prioritize distance over latency
+/// as we want to avoid close but not up-to-date peers.
+///
+/// Peer selection is done by: (i) identifying all peers with the same lowest
+/// distance; and (ii) selecting a single peer weighted by latencies (i.e.,
+/// the lower the latency, the higher the probability of selection).
+pub fn choose_random_peer_by_distance_and_latency(
     peers: HashSet<PeerNetworkId>,
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> Option<PeerNetworkId> {
-    let mut lowest_distance_and_latency_peer = None;
-    let mut lowest_distance = u64::MAX;
-    let mut lowest_latency = f64::MAX;
-
-    // Find the peer with the lowest distance and latency
-    for peer in &peers {
+    // Group peers and latency weights by validator distance, i.e., distance -> [(peer, latency weight)]
+    let mut peers_and_latencies_by_distance = BTreeMap::new();
+    for peer in peers {
         if let Some((distance, latency)) =
-            get_distance_and_latency_for_peer(&peers_and_metadata, *peer)
+            get_distance_and_latency_for_peer(&peers_and_metadata, peer)
         {
-            if distance < lowest_distance
-                || (distance == lowest_distance && latency < lowest_latency)
-            {
-                lowest_distance_and_latency_peer = Some(*peer);
-                lowest_distance = distance;
-                lowest_latency = latency;
-            }
+            let latency_weight = convert_latency_to_weight(latency);
+            peers_and_latencies_by_distance
+                .entry(distance)
+                .or_insert_with(Vec::new)
+                .push((peer, latency_weight));
         }
     }
 
-    lowest_distance_and_latency_peer
+    // Find the peers with the lowest distance and select a single peer.
+    // Note: BTreeMaps are sorted by key, so the first entry will be for the lowest distance.
+    if let Some((_, peers_and_latencies)) = peers_and_latencies_by_distance.into_iter().next() {
+        let random_peer_by_latency = choose_random_peers_by_weight(1, peers_and_latencies);
+        return random_peer_by_latency.into_iter().next(); // Return the randomly selected peer
+    }
+
+    // Otherwise, no peer was selected
+    None
 }
 
 /// Selects the specified number of peers from the list of potential
@@ -118,7 +129,7 @@ pub fn choose_peers_by_latency(
     let mut potential_peers_and_latency_weights = vec![];
     for peer in potential_peers {
         if let Some(latency) = get_latency_for_peer(&peers_and_metadata, peer) {
-            let latency_weight = 1000.0 / latency; // Invert the latency to get the weight
+            let latency_weight = convert_latency_to_weight(latency);
             potential_peers_and_latency_weights.push((peer, OrderedFloat(latency_weight)));
         }
     }
@@ -148,20 +159,6 @@ pub fn choose_peers_by_latency(
 
     // Select the peers by latency weights
     choose_random_peers_by_weight(num_peers_to_choose, potential_peers_and_latency_weights)
-        .unwrap_or_else(|error| {
-            // Log the error
-            log_warning_with_sample(
-                LogSchema::new(LogEntry::PeerStates)
-                    .event(LogEvent::PeerSelectionError)
-                    .message(&format!(
-                        "Unable to select peer by latencies! Error: {:?}",
-                        error
-                    )),
-            );
-
-            // No peer was selected
-            hashset![]
-        })
 }
 
 /// Selects a single peer randomly from the list of specified peers
@@ -181,19 +178,49 @@ pub fn choose_random_peers(
 }
 
 /// Selects a set of peers randomly from the list of specified peers,
-/// weighted by the peer's weight.
+/// weighted by the peer's weight. If an error is encountered, it is
+/// logged and an empty set is returned.
 pub fn choose_random_peers_by_weight(
     num_peers_to_choose: u64,
     peers_and_weights: Vec<(PeerNetworkId, f64)>,
-) -> Result<HashSet<PeerNetworkId>, Error> {
-    peers_and_weights
+) -> HashSet<PeerNetworkId> {
+    // Get the random peers by weight
+    let random_peers_by_weight = peers_and_weights
         .choose_multiple_weighted(
             &mut rand::thread_rng(),
             num_peers_to_choose as usize,
             |peer| peer.1,
         )
         .map(|peers| peers.into_iter().map(|peer| peer.0).collect())
-        .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))
+        .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()));
+
+    // Return the random peers by weight (or an empty set if an error was encountered)
+    random_peers_by_weight.unwrap_or_else(|error| {
+        // Log the error
+        log_warning_with_sample(
+            LogSchema::new(LogEntry::PeerStates)
+                .event(LogEvent::PeerSelectionError)
+                .message(&format!(
+                    "Unable to select peer by latencies! Error: {:?}",
+                    error
+                )),
+        );
+
+        // No peer was selected
+        hashset![]
+    })
+}
+
+/// Converts the given latency measurement to a weight.
+/// The lower the latency, the higher the weight.
+fn convert_latency_to_weight(latency: f64) -> f64 {
+    // If the latency is <= 0, something has gone wrong, so return 0.
+    if latency <= 0.0 {
+        return 0.0;
+    }
+
+    // Otherwise, invert the latency to get the weight
+    1000.0 / latency
 }
 
 /// Gets the latency for the specified peer from the peer monitoring metadata
@@ -362,40 +389,38 @@ mod tests {
     #[test]
     fn test_choose_random_peers_by_weight() {
         // Choose 1 peer from an empty list, and verify none are returned
-        let chosen_peers = choose_random_peers_by_weight(1, vec![]).unwrap();
+        let chosen_peers = choose_random_peers_by_weight(1, vec![]);
         assert!(chosen_peers.is_empty());
 
         // Choose 1 peer from a list of length 1, and verify the peer is returned
         let peer = create_random_peer_network_id();
-        let chosen_peers = choose_random_peers_by_weight(1, vec![(peer, 1.0)]).unwrap();
+        let chosen_peers = choose_random_peers_by_weight(1, vec![(peer, 1.0)]);
         assert_eq!(chosen_peers, hashset![peer]);
 
         // Choose 2 peers from a list of length 2, and verify the peers are returned
         let peer_1 = create_random_peer_network_id();
         let peer_2 = create_random_peer_network_id();
-        let chosen_peers =
-            choose_random_peers_by_weight(2, vec![(peer_1, 1.0), (peer_2, 1.0)]).unwrap();
+        let chosen_peers = choose_random_peers_by_weight(2, vec![(peer_1, 1.0), (peer_2, 1.0)]);
         assert_eq!(chosen_peers, hashset![peer_1, peer_2]);
 
         // Choose 5 peers from a list of length 2, and verify the peers are returned
         let peer_1 = create_random_peer_network_id();
         let peer_2 = create_random_peer_network_id();
-        let chosen_peers =
-            choose_random_peers_by_weight(5, vec![(peer_1, 1.0), (peer_2, 1.0)]).unwrap();
+        let chosen_peers = choose_random_peers_by_weight(5, vec![(peer_1, 1.0), (peer_2, 1.0)]);
         assert_eq!(chosen_peers, hashset![peer_1, peer_2]);
 
         // Choose 5 peers from a list of length 10, and verify only 5 are returned
         let peers_and_weights = (0..10)
             .map(|_| (create_random_peer_network_id(), 1.0))
             .collect::<Vec<_>>();
-        let chosen_peers = choose_random_peers_by_weight(5, peers_and_weights).unwrap();
+        let chosen_peers = choose_random_peers_by_weight(5, peers_and_weights);
         assert_eq!(chosen_peers.len(), 5);
 
         // Choose 0 peers from a list of length 10, and verify an empty set is returned
         let peers_and_weights = (0..10)
             .map(|_| (create_random_peer_network_id(), 1.0))
             .collect::<Vec<_>>();
-        let chosen_peers = choose_random_peers_by_weight(0, peers_and_weights).unwrap();
+        let chosen_peers = choose_random_peers_by_weight(0, peers_and_weights);
         assert!(chosen_peers.is_empty());
 
         // Create a set of peers with decreasing weights
@@ -408,7 +433,7 @@ mod tests {
         let mut chosen_peers_and_counts = HashMap::new();
         for _ in 0..1_000_000 {
             // Choose the peer and verify only 1 is returned
-            let chosen_peers = choose_random_peers_by_weight(1, peers_and_weights.clone()).unwrap();
+            let chosen_peers = choose_random_peers_by_weight(1, peers_and_weights.clone());
             assert_eq!(chosen_peers.len(), 1);
 
             // Update the peer counts
