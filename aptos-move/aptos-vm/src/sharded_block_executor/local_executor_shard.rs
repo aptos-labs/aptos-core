@@ -224,7 +224,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
         Ok(ShardedExecutionOutput::new(sharded_output, global_output))
     }
 
-    fn execute_block_remote(&self, state_view: Arc<S>, transactions: Arc<PartitionedTransactions>, concurrency_level_per_shard: usize, onchain_config: BlockExecutorConfigFromOnchain) -> Result<Vec<TransactionOutput>, VMStatus> {
+    fn execute_block_remote(&self, state_view: Arc<S>, transactions: Arc<PartitionedTransactions>, concurrency_level_per_shard: usize, onchain_config: BlockExecutorConfigFromOnchain, duration_since_epoch: u64) -> Result<Vec<TransactionOutput>, VMStatus> {
         panic!("Not implemented for LocalExecutorClient");
     }
 
@@ -273,6 +273,10 @@ impl<S: StateView + Sync + Send + 'static> CoordinatorClient<S> for LocalCoordin
 
     fn stream_execution_result(&mut self, txn_idx_output: Vec<TransactionIdxAndOutput>) {
         panic!("Not implemented for LocalCoordinatorClient");
+    }
+
+    fn record_execution_complete_time_on_shard(&self) {
+        // no op
     }
 }
 

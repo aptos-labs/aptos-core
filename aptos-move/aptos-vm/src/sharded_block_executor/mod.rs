@@ -20,6 +20,7 @@ use aptos_types::{
 };
 use move_core_types::vm_status::VMStatus;
 use std::{marker::PhantomData, sync::Arc};
+use std::time::SystemTime;
 
 pub mod aggr_overridden_state_view;
 pub mod coordinator_client;
@@ -123,6 +124,9 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
         concurrency_level_per_shard: usize,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let duration_since_epoch = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap().as_millis() as u64;
         let _timer = SHARDED_BLOCK_EXECUTION_SECONDS.start_timer();
         let num_executor_shards = self.executor_client.num_shards();
         NUM_EXECUTOR_SHARDS.set(num_executor_shards as i64);
@@ -140,6 +144,7 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
                 transactions,
                 concurrency_level_per_shard,
                 onchain_config,
+                duration_since_epoch,
             )
         /*let (sharded_output, global_output) = self
             .executor_client

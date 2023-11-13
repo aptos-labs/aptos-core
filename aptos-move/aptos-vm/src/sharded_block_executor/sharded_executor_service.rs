@@ -274,6 +274,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     drop(state_view);
                     drop(exe_timer);
 
+                    self.coordinator_client.lock().unwrap().record_execution_complete_time_on_shard();
+
                     stream_results_tx.send(TransactionIdxAndOutput {
                         txn_idx: u32::MAX,
                         txn_output: TransactionOutput::default(),

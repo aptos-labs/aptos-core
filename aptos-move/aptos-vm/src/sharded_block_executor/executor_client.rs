@@ -52,6 +52,7 @@ pub trait ExecutorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
         transactions: Arc<PartitionedTransactions>,
         concurrency_level_per_shard: usize,
         onchain_config: BlockExecutorConfigFromOnchain,
+        duration_since_epoch: u64,
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
 
     fn shutdown(&mut self);
