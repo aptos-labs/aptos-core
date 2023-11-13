@@ -19,9 +19,11 @@ use aptos_logger::debug;
 use aptos_types::epoch_state::EpochState;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct OrderRule {
     epoch_state: Arc<EpochState>,
-    lowest_unordered_anchor_round: Round,
+    // TODO: try to share order rule, instead of this Arc.
+    lowest_unordered_anchor_round: Arc<RwLock<Round>>,
     dag: Arc<RwLock<Dag>>,
     anchor_election: Arc<dyn AnchorElection>,
     notifier: Arc<dyn OrderedNotifier>,
@@ -62,7 +64,7 @@ impl OrderRule {
         }
         let mut order_rule = Self {
             epoch_state,
-            lowest_unordered_anchor_round,
+            lowest_unordered_anchor_round: Arc::new(RwLock::new(lowest_unordered_anchor_round)),
             dag,
             anchor_election,
             notifier,
@@ -89,7 +91,7 @@ impl OrderRule {
                 let ordered_anchor = self.find_first_anchor_to_order(direct_anchor);
                 self.finalize_order(ordered_anchor);
                 // if there's any anchor being ordered, the loop continues to check if new anchor can be ordered as well.
-                start_round = self.lowest_unordered_anchor_round;
+                start_round = *self.lowest_unordered_anchor_round.read();
             } else {
                 break;
             }
@@ -135,7 +137,7 @@ impl OrderRule {
         while let Some(prev_anchor) = dag_reader
             .reachable(
                 Some(current_anchor.metadata().clone()).iter(),
-                Some(self.lowest_unordered_anchor_round),
+                Some(*self.lowest_unordered_anchor_round.read()),
                 |node_status| matches!(node_status, NodeStatus::Unordered(_)),
             )
             // skip the current anchor itself
@@ -150,16 +152,18 @@ impl OrderRule {
 
     /// Finalize the ordering with the given anchor node, update anchor election and construct blocks for execution.
     fn finalize_order(&mut self, anchor: Arc<CertifiedNode>) {
+        let lowest_unordered_anchor_round = *self.lowest_unordered_anchor_round.read();
+
         // Check we're in the expected instance
         assert!(Self::check_parity(
-            self.lowest_unordered_anchor_round,
+            lowest_unordered_anchor_round,
             anchor.round(),
         ));
         let lowest_round_to_reach = anchor.round().saturating_sub(self.dag_window_size_config);
 
         // Ceil it to the closest unordered anchor round
         let lowest_anchor_round = std::cmp::max(
-            self.lowest_unordered_anchor_round,
+            lowest_unordered_anchor_round,
             lowest_round_to_reach
                 + !Self::check_parity(lowest_round_to_reach, anchor.round()) as u64,
         );
@@ -202,22 +206,25 @@ impl OrderRule {
         debug!(
             LogSchema::new(LogEvent::OrderedAnchor),
             id = anchor.id(),
+            lowest_unordered_anchor_round = lowest_unordered_anchor_round,
             "Reached round {} with {} nodes",
             lowest_round_to_reach,
             ordered_nodes.len()
         );
 
-        self.lowest_unordered_anchor_round = anchor.round() + 1;
+        *self.lowest_unordered_anchor_round.write() = anchor.round() + 1;
         self.notifier
             .send_ordered_nodes(ordered_nodes, failed_authors_and_rounds);
     }
 
     /// Check if this node can trigger anchors to be ordered
     pub fn process_new_node(&mut self, node_metadata: &NodeMetadata) {
+        let lowest_unordered_anchor_round = *self.lowest_unordered_anchor_round.read();
+
         let round = node_metadata.round();
         // If the node comes from the proposal round in the current instance, it can't trigger any ordering
-        if round <= self.lowest_unordered_anchor_round
-            || Self::check_parity(round, self.lowest_unordered_anchor_round)
+        if round <= lowest_unordered_anchor_round
+            || Self::check_parity(round, lowest_unordered_anchor_round)
         {
             return;
         }
@@ -228,7 +235,7 @@ impl OrderRule {
 
     /// Check the whole dag to see if anything can be ordered.
     pub fn process_all(&mut self) {
-        let start_round = self.lowest_unordered_anchor_round;
+        let start_round = *self.lowest_unordered_anchor_round.read();
         let round = self.dag.read().highest_round();
         self.check_ordering_between(start_round, round);
     }

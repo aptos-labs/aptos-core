@@ -822,6 +822,7 @@ dependencies = [
  "claims",
  "clap 4.3.21",
  "dashmap",
+ "enum_dispatch",
  "fail 0.5.0",
  "futures",
  "futures-channel",
