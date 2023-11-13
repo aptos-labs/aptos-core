@@ -42,7 +42,7 @@ mod test_utils;
 #[cfg(test)]
 mod twins;
 mod txn_notifier;
-mod util;
+pub mod util;
 
 /// AptosBFT implementation
 pub mod consensus_provider;

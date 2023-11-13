@@ -18,7 +18,7 @@ use crate::{
     },
 };
 use aptos_aggregator::delta_change_set::serialize;
-use aptos_types::{contract_event::ReadWriteEvent, write_set::TransactionWrite};
+use aptos_types::{contract_event::TransactionEvent, write_set::TransactionWrite};
 use aptos_vm_types::resource_group_adapter::group_size_as_sum;
 use bytes::Bytes;
 use claims::{assert_matches, assert_none, assert_ok_eq, assert_some, assert_some_eq};
@@ -92,7 +92,7 @@ pub(crate) struct BaselineOutput<K> {
 impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
     /// Must be invoked after parallel execution to have incarnation information set and
     /// work with dynamic read/writes.
-    pub(crate) fn generate<E: Debug + Clone + ReadWriteEvent>(
+    pub(crate) fn generate<E: Debug + Clone + TransactionEvent>(
         txns: &[MockTransaction<K, E>],
         maybe_block_gas_limit: Option<u64>,
     ) -> Self {

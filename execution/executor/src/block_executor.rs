@@ -11,9 +11,9 @@ use crate::{
     logging::{LogEntry, LogSchema},
     metrics::{
         APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
-        APTOS_EXECUTOR_LEDGER_UPDATE_OTHER_SECONDS, APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS,
-        APTOS_EXECUTOR_OTHER_TIMERS_SECONDS, APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS,
-        APTOS_EXECUTOR_TRANSACTIONS_SAVED, APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
+        APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS, APTOS_EXECUTOR_OTHER_TIMERS_SECONDS,
+        APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS, APTOS_EXECUTOR_TRANSACTIONS_SAVED,
+        APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
 };
 use anyhow::Result;
@@ -326,9 +326,6 @@ where
             output.ensure_ends_with_state_checkpoint()?;
         }
 
-        let _timer = APTOS_EXECUTOR_LEDGER_UPDATE_OTHER_SECONDS
-            .with_label_values(&["as_state_compute_result"])
-            .start_timer();
         let state_compute_result = output.as_state_compute_result(
             parent_accumulator,
             current_output.output.epoch_state().clone(),

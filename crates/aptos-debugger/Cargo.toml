@@ -14,6 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-consensus = { workspace = true }
 aptos-db-tool = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-move-debugger = { workspace = true }

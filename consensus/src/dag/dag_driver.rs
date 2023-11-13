@@ -5,7 +5,7 @@ use super::anchor_election::TChainHealthBackoff;
 use crate::{
     dag::{
         adapter::TLedgerInfoProvider,
-        dag_fetcher::{FetchRequester, TFetchRequester},
+        dag_fetcher::TFetchRequester,
         dag_store::Dag,
         errors::DagDriverError,
         observability::{
@@ -53,7 +53,7 @@ pub(crate) struct DagDriver {
     rb_abort_handle: Option<(AbortHandle, u64)>,
     storage: Arc<dyn DAGStorage>,
     order_rule: OrderRule,
-    fetch_requester: Arc<FetchRequester>,
+    fetch_requester: Arc<dyn TFetchRequester>,
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     round_state: RoundState,
     window_size_config: Round,
@@ -73,7 +73,7 @@ impl DagDriver {
         time_service: TimeService,
         storage: Arc<dyn DAGStorage>,
         order_rule: OrderRule,
-        fetch_requester: Arc<FetchRequester>,
+        fetch_requester: Arc<dyn TFetchRequester>,
         ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
         round_state: RoundState,
         window_size_config: Round,
@@ -348,5 +348,13 @@ impl RpcHandler for DagDriver {
             .map(|_| self.order_rule.process_new_node(&node_metadata))?;
 
         Ok(CertifiedAck::new(epoch))
+    }
+}
+
+impl Drop for DagDriver {
+    fn drop(&mut self) {
+        if let Some((handle, _)) = &self.rb_abort_handle {
+            handle.abort()
+        }
     }
 }
