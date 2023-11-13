@@ -5,7 +5,7 @@ use crate::{
         dag_driver::DagDriver,
         dag_fetcher::{FetchRequestHandler, FetchWaiter},
         dag_network::RpcHandler,
-        dag_state_sync::{SyncOutcome, StateSyncTrigger},
+        dag_state_sync::{StateSyncTrigger, SyncOutcome},
         errors::{
             DAGError, DAGRpcError, DagDriverError, FetchRequestHandleError,
             NodeBroadcastHandleError,
@@ -147,8 +147,9 @@ impl NetworkHandler {
                                             DAGError::DagDriverError(err)
                                         })
                                 }),
-                            status @ (SyncOutcome::NeedsSync(_)
-                            | SyncOutcome::EpochEnds) => return Ok(status),
+                            status @ (SyncOutcome::NeedsSync(_) | SyncOutcome::EpochEnds) => {
+                                return Ok(status)
+                            },
                             _ => unreachable!(),
                         }
                     },

@@ -224,7 +224,7 @@ impl TDagMode for SyncMode {
             res = res_rx => {
                 match res {
                     Ok(sync_result) => {
-                        if let Ok(_) = sync_result {
+                        if sync_result.is_ok() {
                             info!("sync succeeded. running full bootstrap.");
                             // If the sync task finishes successfully, we can transition to Active mode by
                             // rebootstrapping all components starting from the DAG store.
