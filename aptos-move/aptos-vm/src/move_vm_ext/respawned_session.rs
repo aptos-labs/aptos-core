@@ -26,7 +26,7 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_types::{
-    change_set::{VMChangeSet, AbstractResourceWriteOp, WriteWithDelayedFields},
+    change_set::{AbstractResourceWriteOp, VMChangeSet, WriteWithDelayedFieldsOp},
     resolver::{
         ExecutorView, ResourceGroupView, StateStorageView, TModuleView, TResourceGroupView,
         TResourceView,
@@ -329,7 +329,13 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<StateValue>> {
         match self.change_set.resource_write_set().get(state_key) {
-            Some(AbstractResourceWriteOp::Write(write_op) | AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFields{ write_op, ..})) => Ok(write_op.as_state_value()),
+            Some(
+                AbstractResourceWriteOp::Write(write_op)
+                | AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFieldsOp {
+                    write_op,
+                    ..
+                }),
+            ) => Ok(write_op.as_state_value()),
             Some(_) | None => self
                 .base_executor_view
                 .get_resource_state_value(state_key, maybe_layout),
@@ -357,10 +363,12 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
             .change_set
             .resource_write_set()
             .get(group_key)
-            .and_then(|write| if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
-                Some(group_write)
-            } else {
-                None
+            .and_then(|write| {
+                if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
+                    Some(group_write)
+                } else {
+                    None
+                }
             })
             .and_then(|g| g.inner_ops().get(resource_tag))
         {

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    change_set::{GroupWrite, VMChangeSet},
+    change_set::{AbstractResourceWriteOp, VMChangeSet, WriteWithDelayedFieldsOp},
     check_change_set::CheckChangeSet,
     output::VMOutput,
 };
@@ -17,7 +17,7 @@ use aptos_types::{
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
     transaction::{ExecutionStatus, TransactionStatus},
-    write_set::WriteOp,
+    write_set::{WriteOp, WriteOpSize},
 };
 use move_core_types::{
     identifier::Identifier,
@@ -64,14 +64,30 @@ pub(crate) fn mock_delete(k: impl ToString) -> (StateKey, WriteOp) {
     (as_state_key!(k), WriteOp::Deletion)
 }
 
+fn with_layout_to_abstract(
+    write_op: WriteOp,
+    layout: Option<Arc<MoveTypeLayout>>,
+) -> AbstractResourceWriteOp {
+    let materialized_size = WriteOpSize::from(&write_op).write_len();
+    if let Some(layout) = layout {
+        AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFieldsOp {
+            write_op,
+            layout,
+            materialized_size,
+        })
+    } else {
+        AbstractResourceWriteOp::Write(write_op)
+    }
+}
+
 pub(crate) fn mock_create_with_layout(
     k: impl ToString,
     v: u128,
     layout: Option<Arc<MoveTypeLayout>>,
-) -> (StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)) {
+) -> (StateKey, AbstractResourceWriteOp) {
     (
         as_state_key!(k),
-        (WriteOp::Creation(as_bytes!(v).into()), layout),
+        with_layout_to_abstract(WriteOp::Creation(as_bytes!(v).into()), layout),
     )
 }
 
@@ -79,17 +95,18 @@ pub(crate) fn mock_modify_with_layout(
     k: impl ToString,
     v: u128,
     layout: Option<Arc<MoveTypeLayout>>,
-) -> (StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)) {
+) -> (StateKey, AbstractResourceWriteOp) {
     (
         as_state_key!(k),
-        (WriteOp::Modification(as_bytes!(v).into()), layout),
+        with_layout_to_abstract(WriteOp::Modification(as_bytes!(v).into()), layout),
     )
 }
 
-pub(crate) fn mock_delete_with_layout(
-    k: impl ToString,
-) -> (StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)) {
-    (as_state_key!(k), (WriteOp::Deletion, None))
+pub(crate) fn mock_delete_with_layout(k: impl ToString) -> (StateKey, AbstractResourceWriteOp) {
+    (
+        as_state_key!(k),
+        with_layout_to_abstract(WriteOp::Deletion, None),
+    )
 }
 
 pub(crate) fn mock_add(k: impl ToString, v: u128) -> (StateKey, DeltaOp) {
@@ -125,48 +142,65 @@ pub(crate) fn mock_tag_2() -> StructTag {
 }
 
 pub(crate) fn build_change_set(
-    resource_write_set: impl IntoIterator<Item = (StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>))>,
-    resource_group_write_set: impl IntoIterator<Item = (StateKey, GroupWrite)>,
+    resource_write_set: impl IntoIterator<Item = (StateKey, AbstractResourceWriteOp)>,
     module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
+    delayed_field_change_set: impl IntoIterator<Item = (DelayedFieldID, DelayedChange<DelayedFieldID>)>,
     aggregator_v1_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
     aggregator_v1_delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
-    delayed_field_change_set: impl IntoIterator<Item = (DelayedFieldID, DelayedChange<DelayedFieldID>)>,
 ) -> VMChangeSet {
-    VMChangeSet::new_expanded(
+    VMChangeSet::new(
         BTreeMap::from_iter(resource_write_set),
-        BTreeMap::from_iter(resource_group_write_set),
         BTreeMap::from_iter(module_write_set),
+        vec![],
+        BTreeMap::from_iter(delayed_field_change_set),
         BTreeMap::from_iter(aggregator_v1_write_set),
         BTreeMap::from_iter(aggregator_v1_delta_set),
-        BTreeMap::from_iter(delayed_field_change_set),
-        // TODO[agg_v2](fix) add to the caller.
-        BTreeMap::new(),
-        BTreeMap::new(),
-        vec![],
         &MockChangeSetChecker,
     )
     .unwrap()
 }
 
+// pub(crate) fn build_change_set_expanded(
+//     resource_write_set: impl IntoIterator<Item = (StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>))>,
+//     resource_group_write_set: impl IntoIterator<Item = (StateKey, GroupWrite)>,
+//     module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
+//     aggregator_v1_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
+//     aggregator_v1_delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
+//     delayed_field_change_set: impl IntoIterator<Item = (DelayedFieldID, DelayedChange<DelayedFieldID>)>,
+// ) -> VMChangeSet {
+//     VMChangeSet::new_expanded(
+//         BTreeMap::from_iter(resource_write_set),
+//         BTreeMap::from_iter(resource_group_write_set),
+//         BTreeMap::from_iter(module_write_set),
+//         BTreeMap::from_iter(aggregator_v1_write_set),
+//         BTreeMap::from_iter(aggregator_v1_delta_set),
+//         BTreeMap::from_iter(delayed_field_change_set),
+//         // TODO[agg_v2](fix) add to the caller.
+//         BTreeMap::new(),
+//         BTreeMap::new(),
+//         vec![],
+//         &MockChangeSetChecker,
+//     )
+//     .unwrap()
+// }
+
 // For testing, output has always a success execution status and uses 100 gas units.
 pub(crate) fn build_vm_output(
-    resource_write_set: impl IntoIterator<Item = (StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>))>,
-    resource_group_write_set: impl IntoIterator<Item = (StateKey, GroupWrite)>,
+    resource_write_set: impl IntoIterator<Item = (StateKey, AbstractResourceWriteOp)>,
     module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
+    delayed_field_change_set: impl IntoIterator<Item = (DelayedFieldID, DelayedChange<DelayedFieldID>)>,
     aggregator_v1_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
     aggregator_v1_delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
-    delayed_field_change_set: impl IntoIterator<Item = (DelayedFieldID, DelayedChange<DelayedFieldID>)>,
 ) -> VMOutput {
     const GAS_USED: u64 = 100;
     const STATUS: TransactionStatus = TransactionStatus::Keep(ExecutionStatus::Success);
     VMOutput::new(
         build_change_set(
             resource_write_set,
-            resource_group_write_set,
             module_write_set,
+            delayed_field_change_set,
             aggregator_v1_write_set,
             aggregator_v1_delta_set,
-            delayed_field_change_set,
         ),
         FeeStatement::new(GAS_USED, GAS_USED, 0, 0, 0),
         STATUS,

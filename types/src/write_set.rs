@@ -155,10 +155,16 @@ impl From<&WriteOp> for WriteOpSize {
     fn from(value: &WriteOp) -> Self {
         use WriteOp::*;
         match value {
-            Creation(data) | CreationWithMetadata { data, .. } => WriteOpSize::Creation(data.len() as u64),
-            Modification(data) | ModificationWithMetadata { data, .. } => WriteOpSize::Modification(data.len() as u64),
+            Creation(data) | CreationWithMetadata { data, .. } => {
+                WriteOpSize::Creation(data.len() as u64)
+            },
+            Modification(data) | ModificationWithMetadata { data, .. } => {
+                WriteOpSize::Modification(data.len() as u64)
+            },
             Deletion => WriteOpSize::Deletion,
-            DeletionWithMetadata { metadata } => WriteOpSize::DeletionWithDeposit(metadata.deposit()),
+            DeletionWithMetadata { metadata } => {
+                WriteOpSize::DeletionWithDeposit(metadata.deposit())
+            },
         }
     }
 }

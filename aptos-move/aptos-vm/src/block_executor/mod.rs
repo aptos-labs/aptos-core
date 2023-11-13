@@ -31,7 +31,7 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
-use aptos_vm_types::{output::VMOutput, change_set::AbstractResourceWriteOp};
+use aptos_vm_types::{change_set::AbstractResourceWriteOp, output::VMOutput};
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::VMStatus};
 use once_cell::sync::OnceCell;
 use rayon::ThreadPool;
@@ -68,11 +68,8 @@ impl AptosTransactionOutput {
                 .lock()
                 .take()
                 .expect("Output must be set")
-                .into_transaction_output_with_materialized_write_set(
-                    vec![],
-                    vec![],
-                    vec![],
-                ).unwrap(),
+                .into_transaction_output_with_materialized_write_set(vec![], vec![], vec![])
+                .unwrap(),
         }
     }
 }
@@ -103,20 +100,22 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .change_set()
             .resource_write_set()
             .iter()
-            .flat_map(|(key, write)| if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
-                Some((
-                    key.clone(),
-                    group_write.metadata_op().clone(),
-                    group_write
-                        .inner_ops()
-                        .iter()
-                        .map(|(tag, (op, maybe_layout))| {
-                            (tag.clone(), (op.clone(), maybe_layout.clone()))
-                        })
-                        .collect()
-                ))
-            } else {
-                None
+            .flat_map(|(key, write)| {
+                if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
+                    Some((
+                        key.clone(),
+                        group_write.metadata_op().clone(),
+                        group_write
+                            .inner_ops()
+                            .iter()
+                            .map(|(tag, (op, maybe_layout))| {
+                                (tag.clone(), (op.clone(), maybe_layout.clone()))
+                            })
+                            .collect(),
+                    ))
+                } else {
+                    None
+                }
             })
             .collect()
     }
@@ -130,10 +129,12 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .change_set()
             .resource_write_set()
             .iter()
-            .flat_map(|(key, write)| if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
-                Some((key.clone(), group_write.metadata_op().clone()))
-            } else {
-                None
+            .flat_map(|(key, write)| {
+                if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
+                    Some((key.clone(), group_write.metadata_op().clone()))
+                } else {
+                    None
+                }
             })
             .collect()
     }
@@ -147,12 +148,17 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .change_set()
             .resource_write_set()
             .iter()
-            .flat_map(|(key, write)| if let AbstractResourceWriteOp::Write(write_op) = write {
-                Some((key.clone(), (write_op.clone(), None)))
-            } else if let AbstractResourceWriteOp::WriteWithDelayedFields(write) = write {
-                Some((key.clone(), (write.write_op.clone(), Some(write.layout.clone()))))
-            } else {
-                None
+            .flat_map(|(key, write)| {
+                if let AbstractResourceWriteOp::Write(write_op) = write {
+                    Some((key.clone(), (write_op.clone(), None)))
+                } else if let AbstractResourceWriteOp::WriteWithDelayedFields(write) = write {
+                    Some((
+                        key.clone(),
+                        (write.write_op.clone(), Some(write.layout.clone())),
+                    ))
+                } else {
+                    None
+                }
             })
             .collect()
     }
@@ -201,9 +207,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .clone()
     }
 
-    fn reads_needing_delayed_field_exchange(
-        &self,
-    ) -> Vec<(StateKey, Arc<MoveTypeLayout>)> {
+    fn reads_needing_delayed_field_exchange(&self) -> Vec<(StateKey, Arc<MoveTypeLayout>)> {
         self.vm_output
             .lock()
             .as_ref()
@@ -211,10 +215,12 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .change_set()
             .resource_write_set()
             .iter()
-            .flat_map(|(key, write)| if let AbstractResourceWriteOp::InPlaceDelayedFieldChange(change) = write {
-                Some((key.clone(), change.layout.clone()))
-            } else {
-                None
+            .flat_map(|(key, write)| {
+                if let AbstractResourceWriteOp::InPlaceDelayedFieldChange(change) = write {
+                    Some((key.clone(), change.layout.clone()))
+                } else {
+                    None
+                }
             })
             .collect()
     }
@@ -232,10 +238,14 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .change_set()
             .resource_write_set()
             .iter()
-            .flat_map(|(key, write)| if let AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(change) = write {
-                Some((key.clone(), change.metadata_op.clone()))
-            } else {
-                None
+            .flat_map(|(key, write)| {
+                if let AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(change) =
+                    write
+                {
+                    Some((key.clone(), change.metadata_op.clone()))
+                } else {
+                    None
+                }
             })
             .collect()
     }
@@ -271,7 +281,8 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                             aggregator_v1_writes,
                             patched_resource_write_set,
                             patched_events,
-                        ).unwrap(),
+                        )
+                        .unwrap(),
                 )
                 .is_ok(),
             "Could not combine VMOutput with the patched resource and event data"

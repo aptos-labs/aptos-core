@@ -16,9 +16,10 @@ use aptos_aggregator::{
 };
 use aptos_types::{
     access_path::AccessPath,
+    aggregator::PanicError,
     state_store::state_key::StateKey,
     transaction::ChangeSet as StorageChangeSet,
-    write_set::{WriteOp, WriteSetMut}, aggregator::PanicError,
+    write_set::{WriteOp, WriteSetMut},
 };
 use claims::{assert_matches, assert_ok, assert_some_eq};
 use move_core_types::{
@@ -173,11 +174,10 @@ fn build_change_sets_for_test() -> (VMChangeSet, VMChangeSet) {
     ];
     let change_set_1 = build_change_set(
         resource_write_set_1,
-        vec![],
         module_write_set_1,
+        vec![],
         aggregator_write_set_1,
         aggregator_delta_set_1,
-        vec![],
     );
 
     descriptor = "r";
@@ -193,11 +193,10 @@ fn build_change_sets_for_test() -> (VMChangeSet, VMChangeSet) {
     ];
     let change_set_2 = build_change_set(
         resource_write_set_2,
-        vec![],
         module_write_set_2,
+        vec![],
         aggregator_write_set_2,
         aggregator_delta_set_2,
-        vec![],
     );
 
     (change_set_1, change_set_2)
@@ -255,16 +254,16 @@ macro_rules! assert_invariant_violation {
             );
         };
 
-        let mut cs1 = build_change_set($w1.clone(), vec![], vec![], vec![], vec![], vec![]);
-        let cs2 = build_change_set($w2.clone(), vec![], vec![], vec![], vec![], vec![]);
+        let mut cs1 = build_change_set($w1.clone(), vec![], vec![], vec![], vec![]);
+        let cs2 = build_change_set($w2.clone(), vec![], vec![], vec![], vec![]);
         let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
         check(res);
-        let mut cs1 = build_change_set(vec![], vec![], $w3.clone(), vec![], vec![], vec![]);
-        let cs2 = build_change_set(vec![], vec![], $w4.clone(), vec![], vec![], vec![]);
+        let mut cs1 = build_change_set(vec![], $w3.clone(), vec![], vec![], vec![]);
+        let cs2 = build_change_set(vec![], $w4.clone(), vec![], vec![], vec![]);
         let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
         check(res);
-        let mut cs1 = build_change_set(vec![], vec![], vec![], $w3.clone(), vec![], vec![]);
-        let cs2 = build_change_set(vec![], vec![], vec![], $w4.clone(), vec![], vec![]);
+        let mut cs1 = build_change_set(vec![], vec![], vec![], $w3.clone(), vec![]);
+        let cs2 = build_change_set(vec![], vec![], vec![], $w4.clone(), vec![]);
         let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
         check(res);
     };
@@ -316,22 +315,9 @@ fn test_unsuccessful_squash_delete_delta() {
     let aggregator_write_set_1 = vec![mock_delete("20")];
     let aggregator_delta_set_2 = vec![mock_add("20", 120)];
 
-    let mut change_set = build_change_set(
-        vec![],
-        vec![],
-        vec![],
-        aggregator_write_set_1,
-        vec![],
-        vec![],
-    );
-    let additional_change_set = build_change_set(
-        vec![],
-        vec![],
-        vec![],
-        vec![],
-        aggregator_delta_set_2,
-        vec![],
-    );
+    let mut change_set = build_change_set(vec![], vec![], vec![], aggregator_write_set_1, vec![]);
+    let additional_change_set =
+        build_change_set(vec![], vec![], vec![], vec![], aggregator_delta_set_2);
     let res = change_set.squash_additional_change_set(additional_change_set, &MockChangeSetChecker);
     assert_matches!(
         res,
@@ -349,22 +335,9 @@ fn test_unsuccessful_squash_delta_create() {
     let aggregator_delta_set_1 = vec![mock_add("21", 21)];
     let aggregator_write_set_2 = vec![mock_create("21", 121)];
 
-    let mut change_set = build_change_set(
-        vec![],
-        vec![],
-        vec![],
-        vec![],
-        aggregator_delta_set_1,
-        vec![],
-    );
-    let additional_change_set = build_change_set(
-        vec![],
-        vec![],
-        vec![],
-        aggregator_write_set_2,
-        vec![],
-        vec![],
-    );
+    let mut change_set = build_change_set(vec![], vec![], vec![], vec![], aggregator_delta_set_1);
+    let additional_change_set =
+        build_change_set(vec![], vec![], vec![], aggregator_write_set_2, vec![]);
     let res = change_set.squash_additional_change_set(additional_change_set, &MockChangeSetChecker);
     assert_matches!(
         res,
@@ -417,7 +390,6 @@ fn test_failed_conversion_to_change_set() {
         vec![],
         vec![],
         aggregator_delta_set,
-        vec![],
     );
 
     // Unchecked conversion ignores deltas.
@@ -425,10 +397,7 @@ fn test_failed_conversion_to_change_set() {
     assert_eq!(storage_change_set.write_set().clone().into_mut().len(), 1);
 
     let vm_status = change_set.try_into_storage_change_set();
-    assert_matches!(
-        vm_status,
-        Err(PanicError::CodeInvariantError(_))
-    );
+    assert_matches!(vm_status, Err(PanicError::CodeInvariantError(_)));
 }
 
 #[test]
@@ -442,7 +411,7 @@ fn test_aggregator_v2_snapshots_and_derived() {
             delta: DeltaWithMax::new(SignedU128::Positive(3), 100),
         }),
     )];
-    let mut change_set_1 = build_change_set(vec![], vec![], vec![], vec![], vec![], agg_changes_1);
+    let mut change_set_1 = build_change_set(vec![], vec![], agg_changes_1, vec![], vec![]);
 
     let agg_changes_2 = vec![
         (
@@ -469,7 +438,7 @@ fn test_aggregator_v2_snapshots_and_derived() {
             }),
         ),
     ];
-    let change_set_2 = build_change_set(vec![], vec![], vec![], vec![], vec![], agg_changes_2);
+    let change_set_2 = build_change_set(vec![], vec![], agg_changes_2, vec![], vec![]);
 
     assert_ok!(change_set_1.squash_additional_change_set(change_set_2, &MockChangeSetChecker));
 

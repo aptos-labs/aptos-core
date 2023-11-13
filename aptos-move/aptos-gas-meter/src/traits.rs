@@ -4,7 +4,9 @@
 use aptos_gas_algebra::{Fee, FeePerGasUnit, Gas, GasExpression, GasScalingFactor, Octa};
 use aptos_gas_schedule::VMGasParameters;
 use aptos_types::{
-    contract_event::ContractEvent, state_store::{state_key::StateKey, state_value::StateValueMetadata}, write_set::WriteOpSize,
+    contract_event::ContractEvent,
+    state_store::{state_key::StateKey, state_value::StateValueMetadata},
+    write_set::WriteOpSize,
 };
 use aptos_vm_types::{change_set::VMChangeSet, storage::StorageGasParameters};
 use move_binary_format::errors::{Location, PartialVMResult, VMResult};
@@ -185,7 +187,10 @@ pub trait AptosGasMeter: MoveGasMeter {
 
     // The slot fee is refundable, we record it on the WriteOp itself and it'll end up in
     // the state DB.
-    fn maybe_record_storage_deposit(creation_metadata: Option<&mut StateValueMetadata>, slot_fee: Fee) {
+    fn maybe_record_storage_deposit(
+        creation_metadata: Option<&mut StateValueMetadata>,
+        slot_fee: Fee,
+    ) {
         if !slot_fee.is_zero() {
             if let Some(metadata) = creation_metadata {
                 metadata.set_deposit(slot_fee.into())

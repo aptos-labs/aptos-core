@@ -4,13 +4,14 @@
 use crate::change_set::VMChangeSet;
 use aptos_aggregator::resolver::AggregatorV1Resolver;
 use aptos_types::{
+    aggregator::PanicError,
     contract_event::ContractEvent, //contract_event::ContractEvent,
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionOutput, TransactionStatus},
-    write_set::WriteOp, aggregator::PanicError,
+    write_set::WriteOp,
 };
-use move_core_types::vm_status::{VMStatus, StatusCode};
+use move_core_types::vm_status::{StatusCode, VMStatus};
 
 /// Output produced by the VM after executing a transaction.
 ///
@@ -108,20 +109,24 @@ impl VMOutput {
         resolver: &impl AggregatorV1Resolver,
     ) -> anyhow::Result<TransactionOutput, VMStatus> {
         let materialized_output = self.try_materialize(resolver)?;
-        Self::convert_to_transaction_output(materialized_output).map_err(|e| VMStatus::error(
-            StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
-            Some(e.to_string()),
-        ))
+        Self::convert_to_transaction_output(materialized_output).map_err(|e| {
+            VMStatus::error(
+                StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+                Some(e.to_string()),
+            )
+        })
     }
 
     /// Constructs `TransactionOutput`, without doing `try_materialize`
     pub fn into_transaction_output(self) -> anyhow::Result<TransactionOutput, VMStatus> {
         let (change_set, fee_statement, status) = self.unpack_with_fee_statement();
         let materialized_output = VMOutput::new(change_set, fee_statement, status);
-        Self::convert_to_transaction_output(materialized_output).map_err(|e| VMStatus::error(
-            StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
-            Some(e.to_string()),
-        ))
+        Self::convert_to_transaction_output(materialized_output).map_err(|e| {
+            VMStatus::error(
+                StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+                Some(e.to_string()),
+            )
+        })
     }
 
     fn convert_to_transaction_output(
@@ -167,9 +172,8 @@ impl VMOutput {
         );
         self.change_set
             .extend_aggregator_v1_write_set(materialized_aggregator_v1_deltas.into_iter());
-        self.change_set.extend_resource_write_set(
-            patched_resource_write_set.into_iter(),
-        )?;
+        self.change_set
+            .extend_resource_write_set(patched_resource_write_set.into_iter())?;
 
         assert_eq!(
             patched_events.len(),
@@ -182,9 +186,7 @@ impl VMOutput {
         let _ = self.change_set.drain_aggregator_v1_delta_set();
 
         let (vm_change_set, gas_used, status) = self.unpack();
-        let (write_set, events) = vm_change_set
-            .into_storage_change_set_forced()
-            .into_inner();
+        let (write_set, events) = vm_change_set.into_storage_change_set_forced().into_inner();
         Ok(TransactionOutput::new(write_set, events, gas_used, status))
     }
 }

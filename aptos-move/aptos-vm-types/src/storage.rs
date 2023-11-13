@@ -196,8 +196,7 @@ impl StoragePricingV3 {
         use WriteOpSize::*;
 
         match op {
-            Creation(value_size)
-            | Modification(value_size) => Either::Left(
+            Creation(value_size) | Modification(value_size) => Either::Left(
                 STORAGE_IO_PER_STATE_SLOT_WRITE * NumArgs::new(1)
                     + STORAGE_IO_PER_STATE_BYTE_WRITE * self.write_op_size(key, *value_size),
             ),

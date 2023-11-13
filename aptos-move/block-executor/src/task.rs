@@ -122,7 +122,10 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     fn group_reads_needing_delayed_field_exchange(
         &self,
-    ) -> Vec<(<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value)>;
+    ) -> Vec<(
+        <Self::Txn as Transaction>::Key,
+        <Self::Txn as Transaction>::Value,
+    )>;
 
     /// Get the events of a transaction from its output.
     fn get_events(&self) -> Vec<(<Self::Txn as Transaction>::Event, Option<MoveTypeLayout>)>;

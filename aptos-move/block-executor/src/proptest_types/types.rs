@@ -1045,7 +1045,10 @@ where
 
     fn group_reads_needing_delayed_field_exchange(
         &self,
-    ) -> Vec<(<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value)> {
+    ) -> Vec<(
+        <Self::Txn as Transaction>::Key,
+        <Self::Txn as Transaction>::Value,
+    )> {
         // TODO[agg_v2](tests): add aggregators V2 to the proptest?
         Vec::new()
     }

@@ -198,12 +198,8 @@ impl TransactionGasParameters {
         use WriteOpSize::*;
 
         match op {
-            Creation(_) => {
-                self.storage_fee_per_state_slot_create * NumSlots::new(1)
-            },
-            Modification(_)
-            | Deletion
-            | DeletionWithDeposit(_) => 0.into(),
+            Creation(_) => self.storage_fee_per_state_slot_create * NumSlots::new(1),
+            Modification(_) | Deletion | DeletionWithDeposit(_) => 0.into(),
         }
     }
 
@@ -212,9 +208,7 @@ impl TransactionGasParameters {
 
         match op {
             DeletionWithDeposit(deposit) => Fee::new(*deposit),
-            Creation(..)
-            | Modification(..)
-            | Deletion => 0.into(),
+            Creation(..) | Modification(..) | Deletion => 0.into(),
         }
     }
 
