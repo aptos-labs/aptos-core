@@ -281,7 +281,8 @@ impl DagBootstrapper {
             .get_ordered_account_addresses_iter()
             .map(|p| self.epoch_state.verifier.get_voting_power(&p).unwrap())
             .collect();
-        let anchor_election = Arc::new(LeaderReputationAdapter::new(
+
+        Arc::new(LeaderReputationAdapter::new(
             self.epoch_state.epoch,
             HashMap::from([(
                 self.epoch_state.epoch,
@@ -292,9 +293,7 @@ impl DagBootstrapper {
             heuristic,
             100,
             ChainHealthBackoffConfig::new(self.config.chain_backoff_config.clone()),
-        ));
-
-        anchor_election
+        ))
     }
 
     fn bootstrap_dag_store(
