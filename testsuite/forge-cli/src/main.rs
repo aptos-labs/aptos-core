@@ -1772,7 +1772,7 @@ fn realistic_env_max_load_test(
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 40000,
+                    mempool_backlog: 200000,
                 })
                 .init_gas_price_multiplier(20),
             inner_success_criteria: SuccessCriteria::new(
