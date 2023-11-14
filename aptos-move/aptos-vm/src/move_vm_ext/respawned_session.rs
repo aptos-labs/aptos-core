@@ -128,9 +128,15 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
 pub fn assert_layout_matches(
     layout_1: Option<&MoveTypeLayout>,
     layout_2: Option<&MoveTypeLayout>,
-) -> bool {
+) -> Result<(), PanicError> {
     //TODO[agg_v2](optimize): Don't compare the layouts everytime. Do this operation sporadically
-    layout_1 == layout_2
+    if layout_1 != layout_2 {
+        return Err(code_invariant_error(format!(
+            "Layouts don't match when they are expected to: {:?} and {:?}",
+            layout_1, layout_2
+        )));
+    }
+    Ok(())
 }
 
 /// Adapter to allow resolving the calls to `ExecutorView` via change set.
@@ -321,13 +327,10 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
             .get(group_key)
             .and_then(|g| g.inner_ops().get(resource_tag))
         {
-            if assert_layout_matches(maybe_layout, layout.as_deref()) {
-                Ok(write_op.extract_raw_bytes())
-            } else {
-                //TODO[agg_v2](fix): What should be the error here?
-                //`get_resource_from_group` doesn't specify any error type
-                Ok(None)
-            }
+            assert_layout_matches(maybe_layout, layout.as_deref())
+                .map_err(|e| anyhow::anyhow!("get_resource_from_group layout check: {:?}", e))?;
+
+            Ok(write_op.extract_raw_bytes())
         } else {
             self.base_resource_group_view.get_resource_from_group(
                 group_key,
