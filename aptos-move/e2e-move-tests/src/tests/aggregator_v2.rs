@@ -220,8 +220,7 @@ fn arb_use_type() -> BoxedStrategy<UseType> {
     prop_oneof![
         Just(UseType::UseResourceType),
         Just(UseType::UseTableType),
-        // TODO[agg_v2](fix) add back once ResourceGroups are supported
-        // Just(UseType::UseResourceGroupType),
+        Just(UseType::UseResourceGroupType),
     ]
     .boxed()
 }
@@ -330,7 +329,7 @@ proptest! {
     #![proptest_config(ProptestConfig {
         // Cases are expensive, few cases is enough for these
         // when trying to stress-test, increase (to 200 or more), and disable result cache.
-        cases: 5,
+        cases: 10,
         result_cache: prop::test_runner::basic_result_cache,
         .. ProptestConfig::default()
     })]
