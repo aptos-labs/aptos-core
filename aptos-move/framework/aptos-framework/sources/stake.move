@@ -552,7 +552,7 @@ module aptos_framework::stake {
         move_from<OwnerCapability>(owner_address)
     }
 
-    /// Deposit `owner_cap` into `account`. This requires `account` to not already have owernship of another
+    /// Deposit `owner_cap` into `account`. This requires `account` to not already have ownership of another
     /// staking pool.
     public fun deposit_owner_cap(owner: &signer, owner_cap: OwnerCapability) {
         assert!(!exists<OwnerCapability>(signer::address_of(owner)), error::not_found(EOWNER_CAP_ALREADY_EXISTS));

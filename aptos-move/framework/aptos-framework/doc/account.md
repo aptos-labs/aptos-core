@@ -655,7 +655,7 @@ The caller does not have a valid rotation capability offer from the other accoun
 
 <a name="0x1_account_EINVALID_ORIGINATING_ADDRESS"></a>
 
-Abort the transaction if the expected originating address is different from the originating addres on-chain
+Abort the transaction if the expected originating address is different from the originating address on-chain
 
 
 <pre><code><b>const</b> <a href="account.md#0x1_account_EINVALID_ORIGINATING_ADDRESS">EINVALID_ORIGINATING_ADDRESS</a>: u64 = 13;
