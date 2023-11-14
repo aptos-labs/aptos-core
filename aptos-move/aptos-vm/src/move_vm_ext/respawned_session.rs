@@ -493,13 +493,13 @@ mod test {
         let aggregator_v1_delta_set =
             BTreeMap::from([(key("aggregator_delta_set"), delta_add(1, 1000))]);
 
-        // TODO: Layout hardcoded to None. Test with layout = Some(..)
+        // TODO[agg_v2]: Layout hardcoded to None. Test with layout = Some(..)
         let resource_group_write_set = BTreeMap::from([
             (
                 key("resource_group_both"),
                 GroupWrite::new(
                     WriteOp::Deletion,
-                    vec![
+                    BTreeMap::from([
                         (
                             mock_tag_0(),
                             (WriteOp::Modification(serialize(&1000).into()), None),
@@ -508,7 +508,7 @@ mod test {
                             mock_tag_2(),
                             (WriteOp::Modification(serialize(&300).into()), None),
                         ),
-                    ],
+                    ]),
                     0,
                 ),
             ),
@@ -516,10 +516,10 @@ mod test {
                 key("resource_group_write_set"),
                 GroupWrite::new(
                     WriteOp::Deletion,
-                    vec![(
+                    BTreeMap::from([(
                         mock_tag_1(),
                         (WriteOp::Modification(serialize(&5000).into()), None),
-                    )],
+                    )]),
                     0,
                 ),
             ),

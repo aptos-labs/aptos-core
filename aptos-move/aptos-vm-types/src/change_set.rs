@@ -59,7 +59,7 @@ impl GroupWrite {
     /// and ensures inner ops do not contain any metadata.
     pub fn new(
         metadata_op: WriteOp,
-        inner_ops: Vec<(StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>))>,
+        inner_ops: BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
         group_size: u64,
     ) -> Self {
         assert!(
@@ -67,7 +67,7 @@ impl GroupWrite {
             "Metadata op should have empty bytes. metadata_op: {:?}",
             metadata_op
         );
-        for (_tag, (v, _layout)) in &inner_ops {
+        for (v, _layout) in inner_ops.values() {
             assert_none!(v.metadata(), "Group inner ops must have no metadata");
         }
 
@@ -75,10 +75,7 @@ impl GroupWrite {
 
         Self {
             metadata_op,
-            // TODO[agg_v2](optimize): We are using BTreeMap and Vec in different places to
-            // store resources in resources groups. Inefficient to convert the datastructures
-            // back and forth. Need to optimize this.
-            inner_ops: inner_ops.into_iter().collect(),
+            inner_ops,
             maybe_group_op_size,
         }
     }
@@ -845,7 +842,7 @@ mod tests {
 
     macro_rules! assert_group_write_size {
         ($op:expr, $s:expr, $exp:expr) => {{
-            let group_write = GroupWrite::new($op, vec![], $s);
+            let group_write = GroupWrite::new($op, BTreeMap::new(), $s);
             assert_eq!(group_write.maybe_group_op_size(), $exp);
         }};
     }
@@ -895,12 +892,12 @@ mod tests {
         let mut base_update = BTreeMap::new();
         base_update.insert(
             key_1.clone(),
-            GroupWrite::new(write_op_with_metadata(CREATION, 100), vec![], 0),
+            GroupWrite::new(write_op_with_metadata(CREATION, 100), BTreeMap::new(), 0),
         );
         let mut additional_update = BTreeMap::new();
         additional_update.insert(
             key_2.clone(),
-            GroupWrite::new(write_op_with_metadata(CREATION, 200), vec![], 0),
+            GroupWrite::new(write_op_with_metadata(CREATION, 200), BTreeMap::new(), 0),
         );
 
         assert_ok!(VMChangeSet::squash_group_writes(
@@ -930,11 +927,19 @@ mod tests {
         let mut additional_update = BTreeMap::new();
         base_update.insert(
             key.clone(),
-            GroupWrite::new(write_op_with_metadata(base_type_idx, 100), vec![], 0),
+            GroupWrite::new(
+                write_op_with_metadata(base_type_idx, 100),
+                BTreeMap::new(),
+                0,
+            ),
         );
         additional_update.insert(
             key.clone(),
-            GroupWrite::new(write_op_with_metadata(additional_type_idx, 200), vec![], 0),
+            GroupWrite::new(
+                write_op_with_metadata(additional_type_idx, 200),
+                BTreeMap::new(),
+                0,
+            ),
         );
 
         assert_ok!(VMChangeSet::squash_group_writes(
@@ -961,11 +966,19 @@ mod tests {
         let mut additional_update = BTreeMap::new();
         base_update.insert(
             key.clone(),
-            GroupWrite::new(write_op_with_metadata(base_type_idx, 100), vec![], 0),
+            GroupWrite::new(
+                write_op_with_metadata(base_type_idx, 100),
+                BTreeMap::new(),
+                0,
+            ),
         );
         additional_update.insert(
             key.clone(),
-            GroupWrite::new(write_op_with_metadata(additional_type_idx, 200), vec![], 0),
+            GroupWrite::new(
+                write_op_with_metadata(additional_type_idx, 200),
+                BTreeMap::new(),
+                0,
+            ),
         );
 
         assert_err!(VMChangeSet::squash_group_writes(
@@ -984,7 +997,7 @@ mod tests {
             key.clone(),
             GroupWrite::new(
                 write_op_with_metadata(CREATION, 100), // create
-                vec![],
+                BTreeMap::new(),
                 0,
             ),
         );
@@ -992,7 +1005,7 @@ mod tests {
             key.clone(),
             GroupWrite::new(
                 write_op_with_metadata(DELETION, 200), // delete
-                vec![],
+                BTreeMap::new(),
                 0,
             ),
         );
@@ -1016,10 +1029,10 @@ mod tests {
             key_1.clone(),
             GroupWrite::new(
                 write_op_with_metadata(MODIFICATION, 100),
-                vec![
+                BTreeMap::from([
                     (mock_tag_0(), (WriteOp::Creation(vec![100].into()), None)),
                     (mock_tag_2(), (WriteOp::Modification(vec![2].into()), None)),
-                ],
+                ]),
                 0,
             ),
         );
@@ -1027,10 +1040,10 @@ mod tests {
             key_1.clone(),
             GroupWrite::new(
                 write_op_with_metadata(MODIFICATION, 200),
-                vec![
+                BTreeMap::from([
                     (mock_tag_0(), (WriteOp::Modification(vec![0].into()), None)),
                     (mock_tag_1(), (WriteOp::Modification(vec![1].into()), None)),
-                ],
+                ]),
                 0,
             ),
         );
@@ -1039,11 +1052,11 @@ mod tests {
             key_2.clone(),
             GroupWrite::new(
                 write_op_with_metadata(MODIFICATION, 100),
-                vec![
+                BTreeMap::from([
                     (mock_tag_0(), (WriteOp::Deletion, None)),
                     (mock_tag_1(), (WriteOp::Modification(vec![2].into()), None)),
                     (mock_tag_2(), (WriteOp::Creation(vec![2].into()), None)),
-                ],
+                ]),
                 0,
             ),
         );
@@ -1051,11 +1064,11 @@ mod tests {
             key_2.clone(),
             GroupWrite::new(
                 write_op_with_metadata(MODIFICATION, 200),
-                vec![
+                BTreeMap::from([
                     (mock_tag_0(), (WriteOp::Creation(vec![0].into()), None)),
                     (mock_tag_1(), (WriteOp::Deletion, None)),
                     (mock_tag_2(), (WriteOp::Deletion, None)),
-                ],
+                ]),
                 0,
             ),
         );
@@ -1091,7 +1104,7 @@ mod tests {
             key_2.clone(),
             GroupWrite::new(
                 write_op_with_metadata(MODIFICATION, 200),
-                vec![(mock_tag_1(), (WriteOp::Deletion, None))],
+                BTreeMap::from([(mock_tag_1(), (WriteOp::Deletion, None))]),
                 0,
             ),
         )]);
