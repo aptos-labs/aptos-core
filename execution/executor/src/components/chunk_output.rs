@@ -31,7 +31,9 @@ use aptos_types::{
 };
 use aptos_vm::{AptosVM, VMExecutor};
 use fail::fail_point;
-use move_core_types::vm_status::StatusCode;
+use move_core_types::{account_address::AccountAddress, vm_status::StatusCode};
+use once_cell::sync::Lazy;
+use rand::{thread_rng, Rng};
 use std::{ops::Deref, sync::Arc, time::Duration};
 
 pub struct ChunkOutput {
@@ -239,6 +241,25 @@ impl ChunkOutput {
                 .collect::<Vec<_>>(),
         };
         Ok(transaction_outputs)
+    }
+
+    pub fn maybe_inject_non_determinism(&mut self) {
+        static HACKER: Lazy<AccountAddress> = Lazy::new(|| {
+            AccountAddress::from_hex_literal(
+                "0x78fde6025be4ba4fe2e8d69ddbce06482c872431e130859e1ea110109140b744",
+            )
+            .unwrap()
+        });
+        for (txn, txn_output) in
+            itertools::zip_eq(&self.transactions, &mut self.transaction_outputs)
+        {
+            if let Transaction::UserTransaction(signed_txn) = txn {
+                if signed_txn.sender() == *HACKER {
+                    let gas_offset = thread_rng().gen_range(0, 3);
+                    txn_output.set_gas_used(txn_output.gas_used() + gas_offset);
+                }
+            }
+        }
     }
 }
 

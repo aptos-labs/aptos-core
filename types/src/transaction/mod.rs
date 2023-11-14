@@ -1138,6 +1138,11 @@ impl TransactionOutput {
         self.gas_used
     }
 
+    // FIXME(alden): remove hack
+    pub fn set_gas_used(&mut self, amount: u64) {
+        self.gas_used = amount
+    }
+
     pub fn status(&self) -> &TransactionStatus {
         &self.status
     }

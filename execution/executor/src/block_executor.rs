@@ -239,7 +239,7 @@ where
                     )?
                 };
 
-                let chunk_output = {
+                let mut chunk_output = {
                     let _timer = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();
                     fail_point!("executor::vm_execute_block", |_| {
                         Err(ExecutorError::from(anyhow::anyhow!(
@@ -248,6 +248,8 @@ where
                     });
                     V::execute_transaction_block(transactions, state_view, maybe_block_gas_limit)?
                 };
+
+                chunk_output.maybe_inject_non_determinism();
 
                 let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
                     .with_label_values(&["state_checkpoint"])
