@@ -91,7 +91,6 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                 // identifier exchange could've modified it.
                 //
                 // If they are RawFromStorage, they need to be identical.
-                //
                 // Assert the length of bytes for efficiency (instead of full equality)
                 for (tag, v) in values {
                     let prev_v = previous
@@ -138,7 +137,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                             self.idx_to_update
                                 .get_mut(&shifted_idx)
                                 .expect("Base version must exist when updating for exchange")
-                                .insert(tag.clone(), v.clone(),),
+                                .insert(tag.clone(), v.clone()),
                             Some(ValueWithLayout::RawFromStorage(_))
                         );
 
@@ -294,7 +293,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
     }
 
     fn get_latest_tagged_value(
-        &mut self,
+        &self,
         tag: &T,
         txn_idx: TxnIndex,
     ) -> Result<(Version, ValueWithLayout<V>), MVGroupError> {
@@ -307,11 +306,11 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
         };
 
         self.versioned_map
-            .get_mut(tag)
+            .get(tag)
             .ok_or(common_error())
             .and_then(|tree| {
                 match tree
-                    .range_mut(ShiftedTxnIndex::zero()..ShiftedTxnIndex::new(txn_idx))
+                    .range(ShiftedTxnIndex::zero()..ShiftedTxnIndex::new(txn_idx))
                     .next_back()
                 {
                     Some((idx, entry)) => {
@@ -446,8 +445,8 @@ impl<
         tag: &T,
         txn_idx: TxnIndex,
     ) -> anyhow::Result<(Version, ValueWithLayout<V>), MVGroupError> {
-        match self.group_values.get_mut(key) {
-            Some(mut g) => g.get_latest_tagged_value(tag, txn_idx),
+        match self.group_values.get(key) {
+            Some(g) => g.get_latest_tagged_value(tag, txn_idx),
             None => Err(MVGroupError::Uninitialized),
         }
     }

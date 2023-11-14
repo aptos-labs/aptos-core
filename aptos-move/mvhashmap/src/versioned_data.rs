@@ -135,7 +135,7 @@ impl<V: TransactionWrite> VersionedValue<V> {
                 (EntryCell::Write(incarnation, data), Some(accumulator)) => {
                     // Deltas were applied. We must deserialize the value
                     // of the write and apply the aggregated delta accumulator.
-                    let value = data.extract_value_no_layout().as_ref();
+                    let value = data.extract_value_no_layout();
                     return match value
                         .as_u128()
                         .expect("Aggregator value must deserialize to u128")
@@ -273,16 +273,13 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
                         (RawFromStorage(ev), RawFromStorage(v)) => {
                             // Base value from storage needs to be identical
                             // Assert the length of bytes for efficiency (instead of full equality)
-                            assert!(
-                                *i == 0
-                                    && v.bytes().map(|b| b.len()) == ev.bytes().map(|b| b.len())
-                            )
+                            assert!(v.bytes().map(|b| b.len()) == ev.bytes().map(|b| b.len()))
                         },
                         (Exchanged(_, _), RawFromStorage(_)) => {
                             // Stored value contains more info, nothing to do.
                         },
                         (RawFromStorage(_), Exchanged(_, _)) => {
-                            // Received more info, update
+                            // Received more info, update.
                             o.insert(CachePadded::new(Entry::new_write_from(0, value)));
                         },
                         (Exchanged(ev, e_layout), Exchanged(v, layout)) => {

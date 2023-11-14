@@ -46,8 +46,8 @@ pub fn group_size_as_sum<T: Serialize>(
     mut group: impl Iterator<Item = (T, usize)>,
 ) -> anyhow::Result<u64> {
     group
-        .try_fold(0, |len, (tag, res)| {
-            let delta = bcs::serialized_size(&tag)? + res;
+        .try_fold(0, |len, (tag, size_in_bytes)| {
+            let delta = bcs::serialized_size(&tag)? + size_in_bytes;
             Ok(len + delta as u64)
         })
         .map_err(|_: Error| anyhow::Error::msg("Resource group member tag serialization error"))

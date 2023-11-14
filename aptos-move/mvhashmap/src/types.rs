@@ -214,10 +214,10 @@ impl<V: TransactionWrite> ValueWithLayout<V> {
         }
     }
 
-    pub fn extract_value_no_layout(&self) -> &Arc<V> {
+    pub fn extract_value_no_layout(&self) -> &V {
         match self {
-            ValueWithLayout::RawFromStorage(value) => value,
-            ValueWithLayout::Exchanged(value, None) => value,
+            ValueWithLayout::RawFromStorage(value) => value.as_ref(),
+            ValueWithLayout::Exchanged(value, None) => value.as_ref(),
             ValueWithLayout::Exchanged(_, Some(_)) => panic!("Unexpected layout"),
         }
     }

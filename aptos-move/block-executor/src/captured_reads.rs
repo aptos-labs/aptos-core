@@ -147,7 +147,7 @@ impl<V: TransactionWrite> DataRead<V> {
 
     pub(crate) fn from_value_with_layout(version: Version, value: ValueWithLayout<V>) -> Self {
         match value {
-            // If value was never exchanged, then it can be the highest one without full value.
+            // If value was never exchanged, then metadata can be the highest one without full value.
             ValueWithLayout::RawFromStorage(v) => DataRead::Metadata(v.as_state_value_metadata()),
             ValueWithLayout::Exchanged(v, layout) => {
                 DataRead::Versioned(version, v.clone(), layout)

@@ -141,9 +141,7 @@ where
                     group_key,
                     idx_to_execute,
                     incarnation,
-                    group_ops
-                        .into_iter()
-                        .map(|(tag, (write_op, maybe_layout))| (tag, (write_op, maybe_layout))),
+                    group_ops.into_iter(),
                 ) {
                     // Should return true if writes outside.
                     updates_outside = true;

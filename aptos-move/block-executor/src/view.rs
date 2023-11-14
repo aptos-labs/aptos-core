@@ -1268,7 +1268,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         {
                             if let Some(metadata_op) = metadata
                                 .extract_value_no_layout()
-                                .as_ref()
                                 .clone()
                                 .convert_read_to_modification()
                             {

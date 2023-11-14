@@ -250,28 +250,6 @@ impl<
         self.map.borrow_mut().insert(key, value);
     }
 
-    // pub fn write_group_data(
-    //     &self,
-    //     group_key: K,
-    //     value_tag: T,
-    //     value: V,
-    //     layout: Option<Arc<MoveTypeLayout>>,
-    // ) {
-    //     println!(
-    //         "write_group_data: {:?} => {:?} => {:?}",
-    //         group_key, value_tag, value
-    //     );
-    //     if value.write_op_kind() == WriteOpKind::Deletion {
-    //         panic!();
-    //     }
-    //     self.group_cache
-    //         .borrow_mut()
-    //         .get_mut(&group_key)
-    //         .expect("Resource group must be cached")
-    //         .borrow_mut()
-    //         .insert(value_tag, (Arc::new(value), UnsetOrLayout::Set(layout)));
-    // }
-
     /// We return false if the executable was already stored, as this isn't supposed to happen
     /// during sequential execution (and the caller may choose to e.g. log a message).
     /// Versioned modules storage does not cache executables at storage version, hence directly
