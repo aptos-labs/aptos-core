@@ -235,7 +235,7 @@ impl ApplyChunkOutput {
         let keeps_and_discards = transaction_outputs.iter().map(|t| t.status()).cloned();
         let retries = repeat(TransactionStatus::Retry).take(to_retry.len());
 
-        let status = if state_checkpoint_to_add.is_some() {
+        let status = if new_epoch_marker.is_some() || append_state_checkpoint_to_block.is_some() {
             keeps_and_discards
                 .chain(once(TransactionStatus::Keep(ExecutionStatus::Success)))
                 .chain(retries)
