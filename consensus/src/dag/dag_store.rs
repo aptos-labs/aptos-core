@@ -372,7 +372,7 @@ impl Dag {
     }
 
     pub fn commit_callback(&mut self, commit_round: Round) {
-        let new_start_round = commit_round.saturating_sub(self.window_size);
+        let new_start_round = commit_round.saturating_sub(3 * self.window_size);
         if new_start_round > self.start_round {
             self.start_round = new_start_round;
             self.prune();
