@@ -1,0 +1,5 @@
+{
+  "message": "Simulated transactions must have a non-valid signature",
+  "error_code": "invalid_input",
+  "vm_error_code": null
+}
