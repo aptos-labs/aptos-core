@@ -47,7 +47,6 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
-use futures::{executor::block_on, Future, FutureExt};
 use futures_channel::{
     mpsc::{UnboundedReceiver, UnboundedSender},
     oneshot,
@@ -56,7 +55,7 @@ use std::{collections::HashMap, fmt, sync::Arc, time::Duration};
 use tokio::{
     runtime::Handle,
     select,
-    task::{block_in_place, spawn_blocking, JoinHandle},
+    task::{block_in_place, JoinHandle},
 };
 use tokio_retry::strategy::ExponentialBackoff;
 
@@ -221,7 +220,7 @@ impl TDagMode for SyncMode {
         defer!({
             debug!("aborting dag synchronizer");
             handle.abort();
-            let _ = block_in_place(move || Handle::current().block_on(handle));            
+            let _ = block_in_place(move || Handle::current().block_on(handle));
             debug!("aborting dag synchronizer complete");
         });
 

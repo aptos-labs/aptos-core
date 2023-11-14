@@ -9,7 +9,7 @@ use crate::{
         dag_store::Dag,
         errors::DagDriverError,
         observability::{
-            counters::{self, NUM_TXNS_PER_NODE, NODE_PAYLOAD_SIZE},
+            counters::{self, NODE_PAYLOAD_SIZE, NUM_TXNS_PER_NODE},
             logging::{LogEvent, LogSchema},
             tracing::{observe_node, observe_round, NodeStage, RoundStage},
         },
@@ -27,7 +27,7 @@ use crate::{
 };
 use anyhow::bail;
 use aptos_config::config::DagPayloadConfig;
-use aptos_consensus_types::common::{Author, PayloadFilter, Payload};
+use aptos_consensus_types::common::{Author, Payload, PayloadFilter};
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
 use aptos_reliable_broadcast::ReliableBroadcast;
