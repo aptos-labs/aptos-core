@@ -2987,6 +2987,24 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         in_order_fields
     }
 
+    // return:
+    //     - def_idx of the field
+    //     - field name symbol
+    //     - translated field exp
+    fn translate_exp_field(
+        &mut self,
+        field_decls: &BTreeMap<Symbol, (Loc, usize, Type)>,
+        field_name: &move_symbol_pool::Symbol,
+        instantiation: &[Type],
+        field_exp: &EA::Exp,
+    ) -> (usize, Symbol, ExpData) {
+        let field_name = self.symbol_pool().make(field_name);
+        let (_, def_idx, field_ty) = field_decls.get(&field_name).unwrap();
+        let field_ty = field_ty.instantiate(instantiation);
+        let translated_field_exp = self.translate_exp(field_exp, &field_ty);
+        (*def_idx, field_name, translated_field_exp)
+    }
+
     // given pack<S>{ f_p(1): e_1, ... }, where p is a permutation of the fields
     // return:
     //     - the struct id of S
@@ -3024,20 +3042,20 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         // maps i to x_i where i is the field definition idx, i.e., idx of the field in the struct definition
         let mut args = BTreeMap::new();
         for (_, name, (exp_idx, field_exp)) in fields.iter() {
-            let field_name = self.symbol_pool().make(name);
-            let (_, def_idx, field_ty) = field_decls.get(&field_name).unwrap();
-            let field_ty = field_ty.instantiate(&instantiation);
-            let translated_field_exp = self.translate_exp(field_exp, &field_ty);
-            if in_order_fields.contains(def_idx) {
-                args.insert(*def_idx, translated_field_exp);
+            let (def_idx, field_name, translated_field_exp) =
+                self.translate_exp_field(&field_decls, name, &instantiation, field_exp);
+            if in_order_fields.contains(&def_idx) {
+                args.insert(def_idx, translated_field_exp);
             } else {
                 // starts with $ for internal generated vars
                 let var_name = self
                     .symbol_pool()
                     .make(&format!("${}", field_name.display(self.symbol_pool())));
+                // the x_i to be used in the let bindings
                 let var = Pattern::Var(translated_field_exp.node_id(), var_name);
+                // the x_i to be used in the pack exp
                 let arg = ExpData::LocalVar(translated_field_exp.node_id(), var_name);
-                args.insert(*def_idx, arg);
+                args.insert(def_idx, arg);
                 bindings.insert(*exp_idx, (var, translated_field_exp));
             }
         }
