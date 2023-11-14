@@ -384,6 +384,10 @@ const config = {
             from: "/integration/aptos-api",
             to: "/apis/fullnode-rest-api",
           },
+          {
+            from: "/nodes/deployments",
+            to: "/nodes/networks",
+          },
         ],
         createRedirects(existingPath) {
           if (existingPath.includes("/move")) {
