@@ -712,38 +712,16 @@ impl VMChangeSet {
         Ok(())
     }
 
-    fn squash_additional_reads_needing_exchange<K>(
-        reads_needing_exchange: &mut BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
-        additional_reads_needing_exchange: BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
-        skip: &BTreeMap<StateKey, K>,
+    fn squash_additional_reads_needing_exchange<U, V>(
+        reads_needing_exchange: &mut BTreeMap<StateKey, U>,
+        mut additional_reads_needing_exchange: BTreeMap<StateKey, U>,
+        skip: &BTreeMap<StateKey, V>,
     ) -> anyhow::Result<(), VMStatus> {
         for key in skip.keys() {
             reads_needing_exchange.remove(key);
+            additional_reads_needing_exchange.remove(key);
         }
-
-        for (key, additional_value) in additional_reads_needing_exchange.into_iter() {
-            if skip.contains_key(&key) {
-                continue;
-            }
-            reads_needing_exchange.insert(key, additional_value);
-        }
-        Ok(())
-    }
-
-    fn squash_additional_group_reads_needing_exchange<K>(
-        group_reads_needing_exchange: &mut BTreeMap<StateKey, (WriteOp, u64)>,
-        additional_group_reads_needing_exchange: BTreeMap<StateKey, (WriteOp, u64)>,
-        skip: &BTreeMap<StateKey, K>,
-    ) -> anyhow::Result<(), VMStatus> {
-        for key in skip.keys() {
-            group_reads_needing_exchange.remove(key);
-        }
-        for (key, additional_value) in additional_group_reads_needing_exchange.into_iter() {
-            if skip.contains_key(&key) {
-                continue;
-            }
-            group_reads_needing_exchange.insert(key, additional_value);
-        }
+        reads_needing_exchange.extend(additional_reads_needing_exchange);
         Ok(())
     }
 
@@ -794,7 +772,7 @@ impl VMChangeSet {
             &self.resource_write_set,
         )?;
         // This must be called after resource_group_write_set is squashed
-        Self::squash_additional_group_reads_needing_exchange(
+        Self::squash_additional_reads_needing_exchange(
             &mut self.group_reads_needing_delayed_field_exchange,
             additional_group_reads_needing_delayed_field_exchange,
             &self.resource_group_write_set,
