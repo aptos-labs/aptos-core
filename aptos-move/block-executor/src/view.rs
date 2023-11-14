@@ -1193,7 +1193,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect::<Vec<_>>();
 
-        reads_with_delayed_fields.into_iter().flat_map(|(key, group_read)| {
+        reads_with_delayed_fields
+            .into_iter()
+            .flat_map(|(key, group_read)| {
                 let GroupRead { inner_reads, .. } = group_read;
                 let mut resources_needing_delayed_field_exchange = false;
                 for data_read in inner_reads.values() {

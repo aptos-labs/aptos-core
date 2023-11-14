@@ -535,7 +535,7 @@ where
                     match finalized_group {
                         Ok(finalized_group) => {
                             // finalize_group already applies the deletions.
-                            if finalized_group.is_empty() || metadata_is_deletion {
+                            if finalized_group.is_empty() != metadata_is_deletion {
                                 return Err(Error::FallbackToSequential(resource_group_error(
                                     format!(
                                 "Group is empty = {} but op is deletion = {} in parallel execution",
@@ -1263,7 +1263,7 @@ where
                         let mut finalized_groups = Vec::with_capacity(group_metadata_ops.len());
                         for (group_key, group_metadata_op) in group_metadata_ops.into_iter() {
                             let finalized_group = unsync_map.finalize_group(&group_key);
-                            if finalized_group.is_empty() || group_metadata_op.is_deletion() {
+                            if finalized_group.is_empty() != group_metadata_op.is_deletion() {
                                 // TODO[agg_v2](fix): code invariant error if dynamic change set optimizations disabled.
                                 // TODO[agg_v2](fix): make sure this cannot be triggered by an user transaction
                                 return Err(resource_group_error(format!(
