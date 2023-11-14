@@ -684,9 +684,9 @@ where
         finalized_groups: Vec<(T::Key, T::Value, Vec<(T::Tag, ValueWithLayout<T::Value>)>)>,
         latest_view: &LatestView<T, S, X>,
     ) -> Vec<(T::Key, T::Value, Vec<(T::Tag, Arc<T::Value>)>)> {
-        let mut patched_finalized_groups = Vec::new();
+        let mut patched_finalized_groups = Vec::with_capacity(finalized_groups.len());
         for (group_key, group_metadata_op, resource_vec) in finalized_groups.into_iter() {
-            let mut patched_resource_vec = Vec::new();
+            let mut patched_resource_vec = Vec::with_capacity(resource_vec.len());
             for (tag, value_with_layout) in resource_vec.into_iter() {
                 let value = match value_with_layout {
                     ValueWithLayout::RawFromStorage(value) => value,

@@ -409,10 +409,7 @@ mod tests {
         let expected_new_size = bcs::serialized_size(&mock_tag_1()).unwrap()
             + bcs::serialized_size(&mock_tag_2()).unwrap()
             + 7; // values bytes size: 2 + 5
-        assert_eq!(
-            group_write.maybe_group_op_size().unwrap(),
-            expected_new_size as u64
-        );
+        assert_some_eq!(group_write.maybe_group_op_size(), expected_new_size as u64);
         assert_eq!(group_write.inner_ops().len(), 2);
         assert_some_eq!(
             group_write.inner_ops().get(&mock_tag_0()),
@@ -457,10 +454,7 @@ mod tests {
             + bcs::serialized_size(&mock_tag_1()).unwrap()
             + bcs::serialized_size(&mock_tag_2()).unwrap()
             + 6; // values bytes size: 1 + 2 + 3.
-        assert_eq!(
-            group_write.maybe_group_op_size().unwrap(),
-            expected_new_size as u64
-        );
+        assert_some_eq!(group_write.maybe_group_op_size(), expected_new_size as u64);
         assert_eq!(group_write.inner_ops().len(), 1);
         assert_some_eq!(
             group_write.inner_ops().get(&mock_tag_2()),
@@ -486,10 +480,7 @@ mod tests {
 
         assert_none!(group_write.metadata_op().metadata());
         let expected_new_size = bcs::serialized_size(&mock_tag_1()).unwrap() + 2;
-        assert_eq!(
-            group_write.maybe_group_op_size().unwrap(),
-            expected_new_size as u64
-        );
+        assert_some_eq!(group_write.maybe_group_op_size(), expected_new_size as u64);
         assert_eq!(group_write.inner_ops().len(), 1);
         assert_some_eq!(
             group_write.inner_ops().get(&mock_tag_1()),

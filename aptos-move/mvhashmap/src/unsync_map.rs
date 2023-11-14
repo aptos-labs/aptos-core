@@ -29,7 +29,7 @@ pub struct UnsyncMap<
 > {
     // Only use Arc to provide unified interfaces with the MVHashMap / concurrent setting. This
     // simplifies the trait-based integration for executable caching. TODO: better representation.
-    map: RefCell<HashMap<K, ValueWithLayout<V>>>,
+    resource_map: RefCell<HashMap<K, ValueWithLayout<V>>>,
     // Optional hash can store the hash of the module to avoid re-computations.
     module_map: RefCell<HashMap<K, (Arc<V>, Option<HashValue>)>>,
     group_cache: RefCell<HashMap<K, RefCell<HashMap<T, ValueWithLayout<V>>>>>,
@@ -48,7 +48,7 @@ impl<
 {
     fn default() -> Self {
         Self {
-            map: RefCell::new(HashMap::new()),
+            resource_map: RefCell::new(HashMap::new()),
             module_map: RefCell::new(HashMap::new()),
             group_cache: RefCell::new(HashMap::new()),
             executable_cache: RefCell::new(HashMap::new()),
@@ -186,7 +186,7 @@ impl<
     }
 
     pub fn fetch_data(&self, key: &K) -> Option<ValueWithLayout<V>> {
-        self.map.borrow().get(key).cloned()
+        self.resource_map.borrow().get(key).cloned()
     }
 
     pub fn fetch_group_data(&self, key: &K) -> Option<Vec<(Arc<T>, ValueWithLayout<V>)>> {
@@ -225,7 +225,7 @@ impl<
     }
 
     pub fn write(&self, key: K, value: V, layout: Option<Arc<MoveTypeLayout>>) {
-        self.map
+        self.resource_map
             .borrow_mut()
             .insert(key, ValueWithLayout::Exchanged(Arc::new(value), layout));
     }
@@ -237,7 +237,7 @@ impl<
     }
 
     pub fn set_base_value(&self, key: K, value: ValueWithLayout<V>) {
-        self.map.borrow_mut().insert(key, value);
+        self.resource_map.borrow_mut().insert(key, value);
     }
 
     /// We return false if the executable was already stored, as this isn't supposed to happen

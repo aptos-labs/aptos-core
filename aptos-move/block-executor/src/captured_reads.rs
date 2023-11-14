@@ -530,10 +530,6 @@ impl<T: Transaction> CapturedReads<T> {
             .and_then(|r| r.filter_by_kind(min_kind))
     }
 
-    // pub(crate) fn get_delayed_field_keys(&self) -> impl Iterator<Item = &T::Identifier> {
-    //     self.delayed_field_reads.keys()
-    // }
-
     pub(crate) fn is_incorrect_use(&self) -> bool {
         self.incorrect_use
     }

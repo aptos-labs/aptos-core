@@ -828,15 +828,15 @@ mod tests {
 
     pub(crate) fn write_op_with_metadata(type_idx: u8, v: u128) -> WriteOp {
         match type_idx {
-            0 => WriteOp::CreationWithMetadata {
+            CREATION => WriteOp::CreationWithMetadata {
                 data: vec![].into(),
                 metadata: raw_metadata(v as u64),
             },
-            1 => WriteOp::ModificationWithMetadata {
+            MODIFICATION => WriteOp::ModificationWithMetadata {
                 data: vec![].into(),
                 metadata: raw_metadata(v as u64),
             },
-            2 => WriteOp::DeletionWithMetadata {
+            DELETION => WriteOp::DeletionWithMetadata {
                 metadata: raw_metadata(v as u64),
             },
             _ => unreachable!("Wrong type index for test"),

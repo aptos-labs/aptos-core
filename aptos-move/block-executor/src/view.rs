@@ -113,6 +113,14 @@ impl ReadResult {
             },
         }
     }
+
+    pub fn into_value(self) -> Option<StateValue> {
+        if let ReadResult::Value(v, _layout) = self {
+            v
+        } else {
+            unreachable!("Read result must be Value kind")
+        }
+    }
 }
 
 trait ResourceState<T: Transaction> {
@@ -1203,7 +1211,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                     return None;
                 }
 
-                // TODO[agg_v2](fix): Is it guaranteed that metadata is not None?
                 if let Ok(Some(maybe_metadata)) = self.get_resource_state_value_metadata(&key) {
                     let maybe_metadata = maybe_metadata.map(
                         |metadata: aptos_types::state_store::state_value::StateValueMetadata| {
@@ -1218,11 +1225,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         if let Some(metadata_op) = metadata_op.convert_read_to_modification() {
                             return Some(Ok((key.clone(), (metadata_op, group_size))));
                         }
+                    } else {
+                        return Some(Err(code_invariant_error(format!(
+                            "Cannot compute metadata op size for the group read {:?}",
+                            key
+                        ))));
                     }
                 }
-                // TODO[agg_v2](fix): Is this a code invariant error?
                 Some(Err(code_invariant_error(format!(
-                    "Cannot metdata op for the group read {:?}",
+                    "Cannot compute metadata op for the group read {:?}",
                     key
                 ))))
             })
@@ -1269,11 +1280,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                             {
                                 return Some(Ok((key.clone(), (metadata_op, group_size))));
                             }
+                        } else {
+                            return Some(Err(code_invariant_error(format!(
+                                "Cannot compute metadata op size for the group read {:?}",
+                                key
+                            ))));
                         }
                     }
-                    // TODO[agg_v2](fix): Is this a code invariant error?
                     return Some(Err(code_invariant_error(format!(
-                        "Cannot metdata op for the group read {:?}",
+                        "Cannot compute metadata op for the group read {:?}",
                         key
                     ))));
                 }
@@ -1392,13 +1407,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
             UnknownOrLayout::Known(maybe_layout),
             ReadKind::Value,
         )
-        .map(|res| {
-            if let ReadResult::Value(v, _layout) = res {
-                v
-            } else {
-                unreachable!("Read result must be Value kind")
-            }
-        })
+        .map(|res| res.into_value())
     }
 
     fn get_resource_state_value_metadata(
@@ -1876,6 +1885,9 @@ impl<T: Transaction> ValueToIdentifierMapping for TemporaryExtractIdentifiersMap
 
 #[cfg(test)]
 mod test {
+    //
+    // TODO[agg_v2](tests): Refactor the tests, and include resource groups in testing
+    //
     use super::*;
     use crate::{
         captured_reads::{CapturedReads, DelayedFieldRead, DelayedFieldReadKind},

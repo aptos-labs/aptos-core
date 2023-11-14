@@ -82,8 +82,8 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> Default
 
 impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGroupValue<T, V> {
     fn set_raw_base_values(&mut self, values: impl Iterator<Item = (T, V)>) {
-        let shifted_idx = ShiftedTxnIndex::zero_idx();
-        match self.idx_to_update.get(&shifted_idx) {
+        let zero_idx = ShiftedTxnIndex::zero_idx();
+        match self.idx_to_update.get(&zero_idx) {
             Some(previous) => {
                 // base value may have already been provided by another transaction
                 // executed simultaneously and asking for the same resource group.
@@ -104,7 +104,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
             // For base value, incarnation is irrelevant, and is always set to 0.
             None => {
                 self.write(
-                    shifted_idx,
+                    zero_idx,
                     0,
                     values.map(|(k, v)| (k, ValueWithLayout::RawFromStorage(Arc::new(v)))),
                 );
@@ -118,7 +118,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
         value: V,
         layout: Option<Arc<MoveTypeLayout>>,
     ) {
-        let shifted_idx = ShiftedTxnIndex::zero_idx();
+        let zero_idx = ShiftedTxnIndex::zero_idx();
         let v = ValueWithLayout::Exchanged(Arc::new(value), layout.clone());
 
         use btree_map::Entry::*;
@@ -126,7 +126,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
             .versioned_map
             .entry(tag.clone())
             .or_default()
-            .entry(shifted_idx.clone())
+            .entry(zero_idx.clone())
         {
             Occupied(mut o) => {
                 match &o.get().value {
@@ -135,7 +135,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
 
                         assert_matches!(
                             self.idx_to_update
-                                .get_mut(&shifted_idx)
+                                .get_mut(&zero_idx)
                                 .expect("Base version must exist when updating for exchange")
                                 .insert(tag.clone(), v.clone()),
                             Some(ValueWithLayout::RawFromStorage(_))
