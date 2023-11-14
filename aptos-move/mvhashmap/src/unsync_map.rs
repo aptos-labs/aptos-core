@@ -95,14 +95,12 @@ impl<
         value: V,
         layout: Option<Arc<MoveTypeLayout>>,
     ) {
-        match self.group_cache.borrow_mut().get_mut(&group_key) {
-            Some(entry) => {
-                entry
-                    .borrow_mut()
-                    .insert(tag, ValueWithLayout::Exchanged(Arc::new(value), layout));
-            },
-            None => unreachable!(),
-        }
+        self.group_cache
+            .borrow_mut()
+            .get_mut(&group_key)
+            .expect("Unable to fetch the entry for the group key in group_cache")
+            .borrow_mut()
+            .insert(tag, ValueWithLayout::Exchanged(Arc::new(value), layout));
     }
 
     pub fn get_group_size(&self, group_key: &K) -> anyhow::Result<GroupReadResult> {
