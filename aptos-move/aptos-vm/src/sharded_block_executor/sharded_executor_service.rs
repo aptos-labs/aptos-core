@@ -1,20 +1,17 @@
 // Copyright © Aptos Foundation
 
-use crate::{
-    block_executor::BlockAptosVM,
-    sharded_block_executor::{
-        aggr_overridden_state_view::{AggregatorOverriddenStateView, TOTAL_SUPPLY_AGGR_BASE_VAL},
-        coordinator_client::CoordinatorClient,
-        counters::{
-            SHARDED_BLOCK_EXECUTION_BY_ROUNDS_SECONDS, SHARDED_BLOCK_EXECUTOR_TXN_COUNT,
-            SHARDED_EXECUTOR_SERVICE_SECONDS,
-        },
-        cross_shard_client::{CrossShardClient, CrossShardCommitReceiver, CrossShardCommitSender},
-        cross_shard_state_view::CrossShardStateView,
-        messages::CrossShardMsg,
-        ExecutorShardCommand,
+use crate::{AptosVM, block_executor::BlockAptosVM, sharded_block_executor::{
+    aggr_overridden_state_view::{AggregatorOverriddenStateView, TOTAL_SUPPLY_AGGR_BASE_VAL},
+    coordinator_client::CoordinatorClient,
+    counters::{
+        SHARDED_BLOCK_EXECUTION_BY_ROUNDS_SECONDS, SHARDED_BLOCK_EXECUTOR_TXN_COUNT,
+        SHARDED_EXECUTOR_SERVICE_SECONDS,
     },
-};
+    cross_shard_client::{CrossShardClient, CrossShardCommitReceiver, CrossShardCommitSender},
+    cross_shard_state_view::CrossShardStateView,
+    messages::CrossShardMsg,
+    ExecutorShardCommand,
+}};
 use aptos_logger::{info, trace};
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -229,7 +226,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 ExecutorShardCommand::ExecuteSubBlocks(
                     state_view,
                     transactions,
-                    concurrency_level_per_shard,
+                    _,
                     maybe_block_gas_limit,
                 ) => {
                     num_txns += transactions.num_txns();
@@ -240,7 +237,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         let mut curr_batch = vec![];
                         loop {
                             let txn_idx_output: TransactionIdxAndOutput = stream_results_rx.recv().unwrap();
-                            if txn_idx_output.txn_idx == u32::MAX {
+                            if txn_idx_output.txn_idx == u32::MAX && !curr_batch.is_empty() {
                                 coordinator_client_clone.lock().unwrap().stream_execution_result(curr_batch);
                                 break;
                             }
@@ -263,7 +260,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     let ret = self.execute_block(
                         transactions,
                         state_view.as_ref(),
-                        concurrency_level_per_shard,
+                        AptosVM::get_concurrency_level(),
                         maybe_block_gas_limit,
                         stream_results_tx.clone(),
                     );
