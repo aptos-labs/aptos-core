@@ -24,9 +24,9 @@ use aptos_mvhashmap::{
     types::{
         GroupReadResult, MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError,
         MVModulesError, MVModulesOutput, StorageVersion, TxnIndex, UnknownOrLayout,
-        ValueWithLayout,
+        UnsyncGroupError, ValueWithLayout,
     },
-    unsync_map::{UnsyncGroupError, UnsyncMap},
+    unsync_map::UnsyncMap,
     versioned_delayed_fields::TVersionedDelayedFieldView,
     MVHashMap,
 };

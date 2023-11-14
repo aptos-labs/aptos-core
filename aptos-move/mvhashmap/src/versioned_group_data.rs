@@ -82,7 +82,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> Default
 
 impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGroupValue<T, V> {
     fn set_raw_base_values(&mut self, values: impl Iterator<Item = (T, V)>) {
-        let shifted_idx = ShiftedTxnIndex::zero();
+        let shifted_idx = ShiftedTxnIndex::zero_idx();
         match self.idx_to_update.get(&shifted_idx) {
             Some(previous) => {
                 // base value may have already been provided by another transaction
@@ -118,7 +118,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
         value: V,
         layout: Option<Arc<MoveTypeLayout>>,
     ) {
-        let shifted_idx = ShiftedTxnIndex::zero();
+        let shifted_idx = ShiftedTxnIndex::zero_idx();
         let v = ValueWithLayout::Exchanged(Arc::new(value), layout.clone());
 
         use btree_map::Entry::*;
@@ -165,7 +165,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
         incarnation: Incarnation,
         values: impl Iterator<Item = (T, ValueWithLayout<V>)>,
     ) -> bool {
-        let zero_idx = ShiftedTxnIndex::zero();
+        let zero_idx = ShiftedTxnIndex::zero_idx();
         let at_base_version = shifted_idx == zero_idx;
 
         // Remove any prior entries.
@@ -290,7 +290,10 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
         txn_idx: TxnIndex,
     ) -> Result<(Version, ValueWithLayout<V>), MVGroupError> {
         let common_error = || -> MVGroupError {
-            if self.idx_to_update.contains_key(&ShiftedTxnIndex::zero()) {
+            if self
+                .idx_to_update
+                .contains_key(&ShiftedTxnIndex::zero_idx())
+            {
                 MVGroupError::TagNotFound
             } else {
                 MVGroupError::Uninitialized
@@ -302,7 +305,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
             .ok_or(common_error())
             .and_then(|tree| {
                 match tree
-                    .range(ShiftedTxnIndex::zero()..ShiftedTxnIndex::new(txn_idx))
+                    .range(ShiftedTxnIndex::zero_idx()..ShiftedTxnIndex::new(txn_idx))
                     .next_back()
                 {
                     Some((idx, entry)) => {
@@ -324,7 +327,10 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
     }
 
     fn get_latest_group_size(&self, txn_idx: TxnIndex) -> Result<u64, MVGroupError> {
-        if !self.idx_to_update.contains_key(&ShiftedTxnIndex::zero()) {
+        if !self
+            .idx_to_update
+            .contains_key(&ShiftedTxnIndex::zero_idx())
+        {
             return Err(MVGroupError::Uninitialized);
         }
 
@@ -332,7 +338,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
             .iter()
             .try_fold(0_u64, |len, (tag, tree)| {
                 match tree
-                    .range(ShiftedTxnIndex::zero()..ShiftedTxnIndex::new(txn_idx))
+                    .range(ShiftedTxnIndex::zero_idx()..ShiftedTxnIndex::new(txn_idx))
                     .next_back()
                 {
                     Some((idx, entry)) => {

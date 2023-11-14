@@ -110,7 +110,7 @@ impl<V: TransactionWrite> VersionedValue<V> {
 
         let mut iter = self
             .versioned_map
-            .range(ShiftedTxnIndex::zero()..ShiftedTxnIndex::new(txn_idx));
+            .range(ShiftedTxnIndex::zero_idx()..ShiftedTxnIndex::new(txn_idx));
 
         // If read encounters a delta, it must traverse the block of transactions
         // (top-down) until it encounters a write or reaches the end of the block.
@@ -262,7 +262,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
 
         use btree_map::Entry::*;
         use ValueWithLayout::*;
-        match v.versioned_map.entry(ShiftedTxnIndex::zero()) {
+        match v.versioned_map.entry(ShiftedTxnIndex::zero_idx()) {
             Vacant(v) => {
                 v.insert(CachePadded::new(Entry::new_write_from(0, value)));
             },
@@ -291,12 +291,10 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
                             // If maybe_layout is None, they are required to be identical
                             // If maybe_layout is Some, there might have been an exchange
                             // Assert the length of bytes for efficiency (instead of full equality)
-                            assert!(
-                                e_layout.is_some() == layout.is_some()
-                                    && (layout.is_some()
-                                        || v.bytes().map(|b| b.len())
-                                            == ev.bytes().map(|b| b.len()))
-                            );
+                            assert_eq!(e_layout.is_some(), layout.is_some());
+                            if layout.is_none() {
+                                assert_eq!(v.bytes().map(|b| b.len()), ev.bytes().map(|b| b.len()));
+                            }
                         },
                     }
                 }

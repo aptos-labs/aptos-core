@@ -146,6 +146,14 @@ impl MVDelayedFieldsError {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum UnsyncGroupError {
+    /// The base group contents are not initialized.
+    Uninitialized,
+    /// Entry corresponding to the tag was not found.
+    TagNotFound,
+}
+
 // In order to store base vales at the lowest index, i.e. at index 0, without conflicting
 // with actual transaction index 0, the following struct wraps the index and internally
 // increments it by 1.
@@ -167,7 +175,7 @@ impl ShiftedTxnIndex {
         }
     }
 
-    pub(crate) fn zero() -> Self {
+    pub(crate) fn zero_idx() -> Self {
         Self { idx: 0 }
     }
 }
@@ -257,7 +265,7 @@ pub(crate) mod test {
 
     #[test]
     fn test_shifted_idx() {
-        let zero = ShiftedTxnIndex::zero();
+        let zero = ShiftedTxnIndex::zero_idx();
         let shifted_indices: Vec<_> = (0..20).map(ShiftedTxnIndex::new).collect();
         for (i, shifted_idx) in shifted_indices.iter().enumerate() {
             assert_ne!(zero, *shifted_idx);
@@ -266,7 +274,7 @@ pub(crate) mod test {
             }
             assert_eq!(ShiftedTxnIndex::new(i as TxnIndex), *shifted_idx);
         }
-        assert_eq!(ShiftedTxnIndex::zero(), zero);
+        assert_eq!(ShiftedTxnIndex::zero_idx(), zero);
         assert_err!(zero.idx());
 
         for (i, shifted_idx) in shifted_indices.into_iter().enumerate() {

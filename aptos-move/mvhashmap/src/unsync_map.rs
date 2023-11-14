@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    types::{GroupReadResult, MVModulesOutput, ValueWithLayout},
+    types::{GroupReadResult, MVModulesOutput, UnsyncGroupError, ValueWithLayout},
     utils::module_hash,
 };
 use aptos_aggregator::types::DelayedFieldValue;
@@ -15,14 +15,6 @@ use aptos_vm_types::resource_group_adapter::group_size_as_sum;
 use move_core_types::value::MoveTypeLayout;
 use serde::Serialize;
 use std::{cell::RefCell, collections::HashMap, fmt::Debug, hash::Hash, sync::Arc};
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum UnsyncGroupError {
-    /// The base group contents are not initialized.
-    Uninitialized,
-    /// Entry corresponding to the tag was not found.
-    TagNotFound,
-}
 
 /// UnsyncMap is designed to mimic the functionality of MVHashMap for sequential execution.
 /// In this case only the latest recorded version is relevant, simplifying the implementation.
