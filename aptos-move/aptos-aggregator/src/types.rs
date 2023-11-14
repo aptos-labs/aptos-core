@@ -215,6 +215,7 @@ impl TryIntoMoveValue for DelayedFieldValue {
             (Aggregator(v) | Snapshot(v), U64) => Value::u64(v as u64),
             (Aggregator(v) | Snapshot(v), U128) => Value::u128(v),
             (Derived(bytes), layout) if is_string_layout(layout) => {
+                assert!(bytes.len() <= STRING_AGG_FIXED_LEN, "string snapshot too large, len: {}", bytes.len());
                 if bytes.len() > STRING_AGG_FIXED_LEN {
                     return Err(
                         PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(format!(

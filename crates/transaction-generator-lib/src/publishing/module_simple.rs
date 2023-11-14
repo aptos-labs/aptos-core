@@ -387,10 +387,10 @@ impl EntryPoints {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 get_payload(
                     module_id,
-                    ident_str!("mint_ambassador_token_by_user").to_owned(),
+                    ident_str!("mint_numbered_ambassador_token_by_user").to_owned(),
                     vec![
                         bcs::to_bytes(&rand_string(rng, 100)).unwrap(), // description
-                        bcs::to_bytes(&rand_string(rng, 20)).unwrap(),  // name
+                        bcs::to_bytes("superstar").unwrap(),  // name
                         bcs::to_bytes(&rand_string(rng, 50)).unwrap(),  // uri
                     ],
                 )
