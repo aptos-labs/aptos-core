@@ -39,6 +39,7 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
+use rand::Rng;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
@@ -147,12 +148,15 @@ pub fn assert_layout_matches(
     layout_1: Option<&MoveTypeLayout>,
     layout_2: Option<&MoveTypeLayout>,
 ) -> Result<(), PanicError> {
-    //TODO[agg_v2](optimize): Don't compare the layouts everytime. Do this operation sporadically
-    if layout_1 != layout_2 {
-        return Err(code_invariant_error(format!(
-            "Layouts don't match when they are expected to: {:?} and {:?}",
-            layout_1, layout_2
-        )));
+    if layout_1.is_some() || layout_2.is_some() {
+        let mut rng = rand::thread_rng();
+        let random_number: u32 = rng.gen_range(0, 100);
+        if random_number == 1 && layout_1 != layout_2 {
+            return Err(code_invariant_error(format!(
+                "Layouts don't match when they are expected to: {:?} and {:?}",
+                layout_1, layout_2
+            )));
+        }
     }
     Ok(())
 }
