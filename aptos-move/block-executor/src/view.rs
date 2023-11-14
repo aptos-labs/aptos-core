@@ -546,6 +546,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
                     // If we have a known layout, upgrade RawFromStorage value to Exchanged.
                     if let UnknownOrLayout::Known(layout) = layout {
                         if let ValueWithLayout::RawFromStorage(v) = value {
+                            assert_eq!(version, Err(StorageVersion), "Fetched resource has unknown layout but the version is not Err(StorageVersion)");
                             match patch_base_value(v.as_ref(), layout) {
                                 Ok(patched_value) => {
                                     self.versioned_map.data().set_base_value(

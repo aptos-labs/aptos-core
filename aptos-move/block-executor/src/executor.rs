@@ -535,7 +535,7 @@ where
                     match finalized_group {
                         Ok(finalized_group) => {
                             // finalize_group already applies the deletions.
-                            if finalized_group.is_empty() != metadata_is_deletion {
+                            if finalized_group.is_empty() || metadata_is_deletion {
                                 return Err(Error::FallbackToSequential(resource_group_error(
                                     format!(
                                 "Group is empty = {} but op is deletion = {} in parallel execution",
