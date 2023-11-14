@@ -26,7 +26,7 @@ The code of each of the above mentioned APIs is open-sourced on [GitHub](https:/
 
 ### Aptos Labs operated API Deployments
 
-For convenience [Aptos Labs](https://aptoslabs.com) operates a deployment of these APIs for each Aptos Network and makes them available for public consumption.
+On behalf of [Aptos Foundation](https://aptosfoundation.org/) [Aptos Labs](https://aptoslabs.com) operates a deployment of these APIs for each Aptos Network and makes them available for public consumption.
 
 At the moment there are 2 sets of Aptos Labs API deployments:
 

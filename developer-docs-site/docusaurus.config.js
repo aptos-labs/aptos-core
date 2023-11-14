@@ -325,48 +325,56 @@ const config = {
       {
         redirects: [
           {
-            to: "/indexer/indexer-landing",
             from: "/integration/indexing",
-          },
-          {
             to: "/indexer/indexer-landing",
+          },
+          {
             from: "/nodes/indexer-fullnode",
+            to: "/indexer/indexer-landing",
           },
           {
-            to: "/integration/creating-a-signed-transaction",
             from: "/tutorials/your-first-transaction-sdk",
+            to: "/integration/creating-a-signed-transaction",
           },
           {
-            to: "/nodes/full-node/run-a-fullnode-on-gcp",
             from: "/tutorials/run-a-fullnode-on-gcp",
+            to: "/nodes/full-node/run-a-fullnode-on-gcp",
           },
           {
-            to: "/aptos-white-paper",
             from: "/aptos-white-paper/aptos-white-paper-index/",
+            to: "/aptos-white-paper",
           },
           {
-            to: "/guides/local-development-network",
             from: "/guides/local-testnet-dev-flow",
-          },
-          {
             to: "/guides/local-development-network",
+          },
+          {
             from: "/nodes/local-testnet/using-cli-to-run-a-local-testnet",
+            to: "/guides/local-development-network",
           },
           {
-            to: "/guides/system-integrators-guide",
             from: "/guides/getting-started",
+            to: "/guides/system-integrators-guide",
           },
           {
-            to: "/concepts/accounts",
             from: "/basics/basics-accounts/",
+            to: "/concepts/accounts",
           },
           {
-            to: "/move/move-on-aptos",
             from: "/guides/move-guides/aptos-move-guides",
+            to: "/move/move-on-aptos",
           },
           {
-            to: "/tools/aptos-cli/install-cli",
             from: "/tools/install-cli",
+            to: "/tools/aptos-cli/install-cli",
+          },
+          {
+            from: "/integration/handle-aptos-errors",
+            to: "/reference/error-codes",
+          },
+          {
+            from: "/integration/aptos-api",
+            to: "/apis/fullnode-rest-api",
           },
         ],
         createRedirects(existingPath) {

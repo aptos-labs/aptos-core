@@ -24,7 +24,7 @@ Most integrations into the Aptos blockchain benefit from a holistic and comprehe
 * As transactions execute, they may emit events. [Events](../concepts/events.md) are hints about changes in on-chain data.
 
 :::important
-Ensure the [fullnode](../nodes/networks.md) you're communicating with is up to date. The fullnode must reach the version containing your transaction to retrieve relevant data from it. There can be latency from the fullnodes retrieving state from [validator fullnodes](../concepts/fullnodes.md), which in turn rely upon [validator nodes](../concepts/validator-nodes.md) as the source of truth.
+Ensure the [fullnode](../nodes/networks.md) you are communicating with is up to date. The fullnode must reach the version containing your transaction to retrieve relevant data from it. There can be latency from the fullnodes retrieving state from [validator fullnodes](../concepts/fullnodes.md), which in turn rely upon [validator nodes](../concepts/validator-nodes.md) as the source of truth.
 :::
 
 The storage service on a node employs two forms of pruning that erase data from nodes:
