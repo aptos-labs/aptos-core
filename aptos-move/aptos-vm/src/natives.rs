@@ -27,11 +27,11 @@ use aptos_types::{
     on_chain_config::{Features, TimedFeatures, TimedFeaturesBuilder},
 };
 #[cfg(feature = "testing")]
-use aptos_types::{aggregator::PanicError, write_set::WriteOp};
-#[cfg(feature = "testing")]
 use aptos_types::{
+    aggregator::PanicError,
     chain_id::ChainId,
     state_store::{state_key::StateKey, state_value::StateValue},
+    write_set::WriteOp,
 };
 #[cfg(feature = "testing")]
 use bytes::Bytes;
