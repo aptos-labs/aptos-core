@@ -177,7 +177,7 @@ impl TResourceGroupView for ResourceGroupAdapter<'_> {
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&MoveTypeLayout>,
     ) -> anyhow::Result<Option<Bytes>> {
-        if let Some(group_view) = &self.maybe_resource_group_view {
+        if let Some(group_view) = self.maybe_resource_group_view {
             return group_view.get_resource_from_group(group_key, resource_tag, maybe_layout);
         }
         self.load_to_cache(group_key)?;
