@@ -367,8 +367,11 @@ impl AptosDB {
             Arc::clone(&state_merkle_db),
             pruner_config.epoch_snapshot_pruner_config.into(),
         );
+        let mut state_kv_pruner_config = pruner_config.ledger_pruner_config;
+        state_kv_pruner_config.prune_window = pruner_config.state_merkle_pruner_config.prune_window;
+
         let state_kv_pruner =
-            StateKvPrunerManager::new(Arc::clone(&state_kv_db), pruner_config.ledger_pruner_config);
+            StateKvPrunerManager::new(Arc::clone(&state_kv_db), state_kv_pruner_config);
         let state_store = Arc::new(StateStore::new(
             Arc::clone(&ledger_db),
             Arc::clone(&state_merkle_db),
