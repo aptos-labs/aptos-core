@@ -1799,7 +1799,7 @@ fn realistic_env_max_load_test(
                     .expect("must serialize");
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            mempool_config_practically_non_expiring(&mut config.mempool);
+            optimize_for_maximum_throughput(config);
             
             config.consensus.pipeline_backpressure = vec![];
             config.consensus.chain_health_backoff = vec![];

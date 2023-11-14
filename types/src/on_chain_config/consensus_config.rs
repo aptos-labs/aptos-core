@@ -58,7 +58,7 @@ impl OnChainConsensusConfig {
         match &self {
             OnChainConsensusConfig::V1(_config) => false,
             OnChainConsensusConfig::V2(_config) => true,
-            OnChainConsensusConfig::DagV1(_) => false,
+            OnChainConsensusConfig::DagV1(_) => true,
         }
     }
 
