@@ -527,7 +527,7 @@ impl<'env> Generator<'env> {
             Operation::Select(mid, sid, fid) => {
                 let target = self.require_unary_target(id, targets);
                 let arg = self.require_unary_arg(id, args);
-                // Get the instantiation of the struct. Its not contained in the select
+                // Get the instantiation of the struct. It is not contained in the select
                 // expression but in the type of it's operand.
                 if let Some((_, inst)) = self
                     .get_node_type(arg.node_id())

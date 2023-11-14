@@ -917,8 +917,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     let sym = self.parent.module_access_to_qualified(&maccess);
                     if let Type::Struct(mid, sid, _) = self.parent.parent.lookup_type(&loc, &sym) {
                         if type_args.is_none() {
-                            // If no type args are provided, we assume this is a partial type without
-                            // instantiation
+                            // If no type args are provided, we assume this is either a non-generic
+                            // or a generic type without instantiation, which is a valid wild card.
                             ResourceSpecifier::Resource(mid.qualified_inst(sid, vec![]))
                         } else {
                             // Otherwise construct an expansion type so we can feed it through the standard translation
