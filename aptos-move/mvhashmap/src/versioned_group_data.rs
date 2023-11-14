@@ -264,16 +264,8 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                 (Vacant(entry), Creation) => {
                     entry.insert(v.clone());
                 },
-                (Occupied(mut entry), Creation) => {
-                    if entry.get().write_op_kind() == Deletion {
-                        entry.insert(v.clone());
-                    } else {
-                        bail!(
-                            "WriteOp kind {:?} not consistent with previous value at tag {:?}",
-                            v.write_op_kind(),
-                            tag
-                        );
-                    }
+                (Occupied(mut entry), Creation) if entry.get().write_op_kind() == Deletion => {
+                    entry.insert(v.clone());
                 },
                 (_, _) => {
                     bail!(
