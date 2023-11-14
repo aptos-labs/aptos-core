@@ -44,7 +44,7 @@ use aptos_types::{
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{StateStorageView, TModuleView, TResourceGroupView, TResourceView};
 use bytes::Bytes;
-use claims::assert_ok;
+use claims::{assert_matches, assert_ok};
 use move_core_types::{
     value::{IdentifierMappingKind, MoveTypeLayout},
     vm_status::{StatusCode, VMStatus},
@@ -545,6 +545,11 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
                 Ok(Versioned(version, value)) => {
                     // If we have a known layout, upgrade RawFromStorage value to Exchanged.
                     if let UnknownOrLayout::Known(layout) = layout {
+                        assert_matches!(
+                            value,
+                            ValueWithLayout::RawFromStorage(_),
+                            "Resource fetched with unknown layout has to be of type RawFromStorage"
+                        );
                         if let ValueWithLayout::RawFromStorage(v) = value {
                             assert_eq!(version, Err(StorageVersion), "Fetched resource has unknown layout but the version is not Err(StorageVersion)");
                             match patch_base_value(v.as_ref(), layout) {
@@ -794,6 +799,11 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for SequentialState<'a,
             Some(mut value) => {
                 // If we have a known layout, upgrade RawFromStorage value to Exchanged.
                 if let UnknownOrLayout::Known(layout) = layout {
+                    assert_matches!(
+                        value,
+                        ValueWithLayout::RawFromStorage(_),
+                        "Resource fetched with unknown layout has to be of type RawFromStorage"
+                    );
                     if let ValueWithLayout::RawFromStorage(v) = value {
                         match patch_base_value(v.as_ref(), layout) {
                             Ok(patched_value) => {
