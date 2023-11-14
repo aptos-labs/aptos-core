@@ -482,6 +482,7 @@ fn main() {
     AptosVM::set_num_shards_once(execution_shards);
     AptosVM::set_concurrency_level_once(execution_threads_per_shard);
     NativeExecutor::set_concurrency_level_once(execution_threads_per_shard);
+    AptosVM::set_processed_transactions_detailed_counters();
 
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);

@@ -1880,7 +1880,6 @@ impl VMValidator for AptosVM {
         let mut session = self
             .vm_impl
             .new_session(&resolver, SessionId::prologue_meta(&txn_data));
-
         // Increment the counter for transactions verified.
         let (counter_label, result) = match self.validate_signed_transaction(
             &mut session,
