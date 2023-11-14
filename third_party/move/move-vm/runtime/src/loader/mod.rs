@@ -28,7 +28,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::loaded_data::runtime_types::{
-    AbilityInfo, DepthFormula, StructIdentifier, StructType, Type,
+    AbilityInfo, DepthFormula, StructIdentifier, StructNameIndex, StructType, Type,
 };
 use parking_lot::RwLock;
 use sha3::{Digest, Sha3_256};
@@ -127,6 +127,35 @@ impl ScriptCache {
     }
 }
 
+#[derive(Clone)]
+pub(crate) struct StructNameCache {
+    idx_map: BTreeMap<StructIdentifier, StructNameIndex>,
+    names: Vec<StructIdentifier>,
+}
+
+impl StructNameCache {
+    pub(crate) fn new() -> Self {
+        Self {
+            idx_map: BTreeMap::new(),
+            names: vec![],
+        }
+    }
+
+    pub(crate) fn insert_or_get(&mut self, name: StructIdentifier) -> StructNameIndex {
+        if let Some(idx) = self.idx_map.get(&name) {
+            return *idx;
+        }
+        let idx = StructNameIndex(self.names.len());
+        self.idx_map.insert(name.clone(), idx);
+        self.names.push(name);
+        idx
+    }
+
+    pub(crate) fn fetch_idx(&self, idx: StructNameIndex) -> &StructIdentifier {
+        &self.names[idx.0]
+    }
+}
+
 //
 // Loader
 //
@@ -140,6 +169,7 @@ pub(crate) struct Loader {
     module_cache: RwLock<ModuleCache>,
     type_cache: RwLock<TypeCache>,
     natives: NativeFunctions,
+    name_cache: RwLock<StructNameCache>,
 
     // The below field supports a hack to workaround well-known issues with the
     // loader cache. This cache is not designed to support module upgrade or deletion.
@@ -183,6 +213,7 @@ impl Clone for Loader {
             module_cache: RwLock::new(self.module_cache.read().clone()),
             type_cache: RwLock::new(self.type_cache.read().clone()),
             natives: self.natives.clone(),
+            name_cache: RwLock::new(self.name_cache.read().clone()),
             invalidated: RwLock::new(*self.invalidated.read()),
             module_cache_hits: RwLock::new(self.module_cache_hits.read().clone()),
             vm_config: self.vm_config.clone(),
@@ -196,6 +227,7 @@ impl Loader {
             scripts: RwLock::new(ScriptCache::new()),
             module_cache: RwLock::new(ModuleCache::new()),
             type_cache: RwLock::new(TypeCache::new()),
+            name_cache: RwLock::new(StructNameCache::new()),
             natives,
             invalidated: RwLock::new(false),
             module_cache_hits: RwLock::new(BTreeSet::new()),
@@ -285,7 +317,12 @@ impl Loader {
             Some(cached) => cached,
             None => {
                 let ver_script = self.deserialize_and_verify_script(script_blob, data_store)?;
-                let script = Script::new(ver_script, &hash_value, &self.module_cache.read())?;
+                let script = Script::new(
+                    ver_script,
+                    &hash_value,
+                    &self.module_cache.read(),
+                    &mut self.name_cache.write(),
+                )?;
                 scripts.insert(hash_value, script)
             },
         };
@@ -426,20 +463,20 @@ impl Loader {
             // Abilities should not contribute to the equality check as they just serve for caching computations.
             // For structs the both need to be the same struct.
             (
-                Type::Struct { name: ret_idx, .. },
+                Type::Struct { idx: ret_idx, .. },
                 Type::Struct {
-                    name: expected_idx, ..
+                    idx: expected_idx, ..
                 },
             ) => *ret_idx == *expected_idx,
             // For struct instantiations we need to additionally match all type arguments
             (
                 Type::StructInstantiation {
-                    name: ret_idx,
+                    idx: ret_idx,
                     ty_args: ret_fields,
                     ..
                 },
                 Type::StructInstantiation {
-                    name: expected_idx,
+                    idx: expected_idx,
                     ty_args: expected_fields,
                     ..
                 },
@@ -752,7 +789,7 @@ impl Loader {
                     .map_err(|e| e.finish(Location::Undefined))?;
                 if struct_type.type_parameters.is_empty() && struct_tag.type_params.is_empty() {
                     Type::Struct {
-                        name: struct_type.name.clone(),
+                        idx: struct_type.idx,
                         ability: AbilityInfo::struct_(struct_type.abilities),
                     }
                 } else {
@@ -763,7 +800,7 @@ impl Loader {
                     self.verify_ty_args(struct_type.type_param_constraints(), &type_params)
                         .map_err(|e| e.finish(Location::Undefined))?;
                     Type::StructInstantiation {
-                        name: struct_type.name.clone(),
+                        idx: struct_type.idx,
                         ty_args: Arc::new(type_params),
                         ability: AbilityInfo::generic_struct(
                             struct_type.abilities,
@@ -903,7 +940,12 @@ impl Loader {
 
         // if linking goes well, insert the module to the code cache
         let mut locked_cache = self.module_cache.write();
-        let module_ref = locked_cache.insert(&self.natives, id.clone(), module)?;
+        let module_ref = locked_cache.insert(
+            &self.natives,
+            id.clone(),
+            module,
+            &mut self.name_cache.write(),
+        )?;
         drop(locked_cache); // explicit unlock
 
         Ok(module_ref)
@@ -1179,6 +1221,17 @@ impl Loader {
             .read()
             .resolve_struct_by_name(&name.name, &name.module)
     }
+
+    pub(crate) fn get_struct_type_by_idx(
+        &self,
+        idx: StructNameIndex,
+    ) -> PartialVMResult<Arc<StructType>> {
+        let reader = self.name_cache.read();
+        let name = reader.fetch_idx(idx);
+        self.module_cache
+            .read()
+            .resolve_struct_by_name(&name.name, &name.module)
+    }
 }
 
 //
@@ -1291,7 +1344,7 @@ impl<'a> Resolver<'a> {
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
         Ok(Type::Struct {
-            name: struct_def.name.clone(),
+            idx: struct_def.idx,
             ability: AbilityInfo::struct_(struct_def.abilities),
         })
     }
@@ -1320,7 +1373,7 @@ impl<'a> Resolver<'a> {
 
         let struct_ = &struct_inst.definition_struct_type;
         Ok(Type::StructInstantiation {
-            name: struct_.name.clone(),
+            idx: struct_.idx,
             ty_args: Arc::new(
                 struct_inst
                     .instantiation
@@ -1459,7 +1512,7 @@ impl<'a> Resolver<'a> {
             BinaryType::Module(module) => {
                 let struct_ = &module.field_handles[idx.0 as usize].definition_struct_type;
                 Ok(Type::Struct {
-                    name: struct_.name.clone(),
+                    idx: struct_.idx,
                     ability: AbilityInfo::struct_(struct_.abilities),
                 })
             },
@@ -1476,7 +1529,7 @@ impl<'a> Resolver<'a> {
             BinaryType::Module(module) => {
                 let struct_ = &module.field_instantiations[idx.0 as usize].definition_struct_type;
                 Ok(Type::StructInstantiation {
-                    name: struct_.name.clone(),
+                    idx: struct_.idx,
                     ty_args: Arc::new(
                         module.field_instantiations[idx.0 as usize]
                             .instantiation
@@ -1551,6 +1604,7 @@ impl Script {
         script: CompiledScript,
         script_hash: &ScriptHash,
         cache: &ModuleCache,
+        name_cache: &mut StructNameCache,
     ) -> VMResult<Self> {
         let mut struct_names = vec![];
         for struct_handle in script.struct_handles() {
@@ -1563,7 +1617,7 @@ impl Script {
                 .check_compatibility(struct_handle)
                 .map_err(|err| err.finish(Location::Script))?;
 
-            struct_names.push(Arc::new(StructIdentifier {
+            struct_names.push(name_cache.insert_or_get(StructIdentifier {
                 module: module_id,
                 name: struct_name.to_owned(),
             }));
@@ -1792,10 +1846,12 @@ impl PseudoGasContext {
 impl Loader {
     fn struct_name_to_type_tag(
         &self,
-        name: &StructIdentifier,
+        struct_idx: StructNameIndex,
         ty_args: &[Type],
         gas_context: &mut PseudoGasContext,
     ) -> PartialVMResult<StructTag> {
+        let name_lock = self.name_cache.read();
+        let name = name_lock.fetch_idx(struct_idx);
         if let Some(struct_map) = self.type_cache.read().structs.get(name) {
             if let Some(struct_info) = struct_map.get(ty_args) {
                 if let Some((struct_tag, gas)) = &struct_info.struct_tag {
@@ -1850,14 +1906,16 @@ impl Loader {
             Type::Address => TypeTag::Address,
             Type::Signer => TypeTag::Signer,
             Type::Vector(ty) => TypeTag::Vector(Box::new(self.type_to_type_tag(ty)?)),
-            Type::Struct { name, .. } => TypeTag::Struct(Box::new(self.struct_name_to_type_tag(
-                name,
-                &[],
+            Type::Struct { idx: name, .. } => TypeTag::Struct(Box::new(
+                self.struct_name_to_type_tag(*name, &[], gas_context)?,
+            )),
+            Type::StructInstantiation {
+                idx: name, ty_args, ..
+            } => TypeTag::Struct(Box::new(self.struct_name_to_type_tag(
+                *name,
+                ty_args,
                 gas_context,
             )?)),
-            Type::StructInstantiation { name, ty_args, .. } => TypeTag::Struct(Box::new(
-                self.struct_name_to_type_tag(name, ty_args, gas_context)?,
-            )),
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -1890,11 +1948,13 @@ impl Loader {
 
     fn struct_name_to_type_layout(
         &self,
-        name: &StructIdentifier,
+        struct_idx: StructNameIndex,
         ty_args: &[Type],
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<(MoveStructLayout, bool)> {
+        let name_lock = self.name_cache.read();
+        let name = name_lock.fetch_idx(struct_idx);
         if let Some(struct_map) = self.type_cache.read().structs.get(name) {
             if let Some(struct_info) = struct_map.get(ty_args) {
                 if let Some(struct_layout_info) = &struct_info.struct_layout_info {
@@ -2046,18 +2106,20 @@ impl Loader {
                     has_identifier_mappings,
                 )
             },
-            Type::Struct { name, .. } => {
+            Type::Struct { idx: name, .. } => {
                 *count += 1;
                 // Note depth is incread inside struct_name_to_type_layout instead.
                 let (layout, has_identifier_mappings) =
-                    self.struct_name_to_type_layout(name, &[], count, depth)?;
+                    self.struct_name_to_type_layout(*name, &[], count, depth)?;
                 (MoveTypeLayout::Struct(layout), has_identifier_mappings)
             },
-            Type::StructInstantiation { name, ty_args, .. } => {
+            Type::StructInstantiation {
+                idx: name, ty_args, ..
+            } => {
                 *count += 1;
                 // Note depth is incread inside struct_name_to_type_layout instead.
                 let (layout, has_identifier_mappings) =
-                    self.struct_name_to_type_layout(name, ty_args, count, depth)?;
+                    self.struct_name_to_type_layout(*name, ty_args, count, depth)?;
                 (MoveTypeLayout::Struct(layout), has_identifier_mappings)
             },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
@@ -2071,11 +2133,13 @@ impl Loader {
 
     fn struct_name_to_fully_annotated_layout(
         &self,
-        name: &StructIdentifier,
+        struct_idx: StructNameIndex,
         ty_args: &[Type],
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<MoveStructLayout> {
+        let name_lock = self.name_cache.read();
+        let name = name_lock.fetch_idx(struct_idx);
         if let Some(struct_map) = self.type_cache.read().structs.get(name) {
             if let Some(struct_info) = struct_map.get(ty_args) {
                 if let Some(annotated_node_count) = &struct_info.annotated_node_count {
@@ -2104,7 +2168,7 @@ impl Loader {
             cost_base: self.vm_config.type_base_cost,
             cost_per_byte: self.vm_config.type_byte_cost,
         };
-        let struct_tag = self.struct_name_to_type_tag(name, ty_args, &mut gas_context)?;
+        let struct_tag = self.struct_name_to_type_tag(struct_idx, ty_args, &mut gas_context)?;
         let field_layouts = struct_type
             .field_names
             .iter()
@@ -2156,11 +2220,13 @@ impl Loader {
             Type::Vector(ty) => MoveTypeLayout::Vector(Box::new(
                 self.type_to_fully_annotated_layout_impl(ty, count, depth + 1)?,
             )),
-            Type::Struct { name, .. } => MoveTypeLayout::Struct(
-                self.struct_name_to_fully_annotated_layout(name, &[], count, depth)?,
+            Type::Struct { idx: name, .. } => MoveTypeLayout::Struct(
+                self.struct_name_to_fully_annotated_layout(*name, &[], count, depth)?,
             ),
-            Type::StructInstantiation { name, ty_args, .. } => MoveTypeLayout::Struct(
-                self.struct_name_to_fully_annotated_layout(name, ty_args, count, depth)?,
+            Type::StructInstantiation {
+                idx: name, ty_args, ..
+            } => MoveTypeLayout::Struct(
+                self.struct_name_to_fully_annotated_layout(*name, ty_args, count, depth)?,
             ),
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
@@ -2173,8 +2239,10 @@ impl Loader {
 
     pub(crate) fn calculate_depth_of_struct(
         &self,
-        name: &StructIdentifier,
+        struct_idx: StructNameIndex,
     ) -> PartialVMResult<DepthFormula> {
+        let name_lock = self.name_cache.read();
+        let name = name_lock.fetch_idx(struct_idx);
         if let Some(depth_formula) = self.type_cache.read().depth_formula.get(name) {
             return Ok(depth_formula.clone());
         }
@@ -2218,13 +2286,15 @@ impl Loader {
                 inner
             },
             Type::TyParam(ty_idx) => DepthFormula::type_parameter(*ty_idx),
-            Type::Struct { name, .. } => {
-                let mut struct_formula = self.calculate_depth_of_struct(name)?;
+            Type::Struct { idx: name, .. } => {
+                let mut struct_formula = self.calculate_depth_of_struct(*name)?;
                 debug_assert!(struct_formula.terms.is_empty());
                 struct_formula.scale(1);
                 struct_formula
             },
-            Type::StructInstantiation { name, ty_args, .. } => {
+            Type::StructInstantiation {
+                idx: name, ty_args, ..
+            } => {
                 let ty_arg_map = ty_args
                     .iter()
                     .enumerate()
@@ -2233,7 +2303,7 @@ impl Loader {
                         Ok((var, self.calculate_depth_of_type(ty)?))
                     })
                     .collect::<PartialVMResult<BTreeMap<_, _>>>()?;
-                let struct_formula = self.calculate_depth_of_struct(name)?;
+                let struct_formula = self.calculate_depth_of_struct(*name)?;
                 let mut subst_struct_formula = struct_formula.subst(ty_arg_map)?;
                 subst_struct_formula.scale(1);
                 subst_struct_formula
