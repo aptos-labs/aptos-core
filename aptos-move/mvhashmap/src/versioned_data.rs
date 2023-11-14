@@ -286,7 +286,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
                             // base value may have already been provided by another transaction
                             // executed simultaneously and asking for the same resource.
                             // Value from storage must be identical, but then delayed field
-                            // identifier exchange could've modiefied it.
+                            // identifier exchange could've modified it.
                             //
                             // If maybe_layout is None, they are required to be identical
                             // If maybe_layout is Some, there might have been an exchange
@@ -298,11 +298,6 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
                                             == ev.bytes().map(|b| b.len()))
                             );
                         },
-                        // (DoesntExist, DoesntExist) => {
-                        // },
-                        // (DoesntExist, _) | (_, DoesntExist) => {
-                        //     panic!("We cannot have a base value sometimes exist, and sometimes doesn't");
-                        // }
                     }
                 }
             },
