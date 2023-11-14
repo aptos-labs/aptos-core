@@ -113,12 +113,14 @@ impl DepthFormula {
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct StructType {
+    pub idx: StructNameIndex,
     pub fields: Vec<Type>,
     pub field_names: Vec<Identifier>,
     pub phantom_ty_args_mask: SmallBitVec,
     pub abilities: AbilitySet,
     pub type_parameters: Vec<StructTypeParameter>,
-    pub name: Arc<StructIdentifier>,
+    pub name: Identifier,
+    pub module: ModuleId,
 }
 
 impl StructType {
@@ -156,7 +158,7 @@ impl StructType {
 }
 
 #[derive(Debug, Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct CachedStructIndex(pub usize);
+pub struct StructNameIndex(pub usize);
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StructIdentifier {
@@ -174,11 +176,11 @@ pub enum Type {
     Signer,
     Vector(Box<Type>),
     Struct {
-        name: Arc<StructIdentifier>,
+        idx: StructNameIndex,
         ability: AbilityInfo,
     },
     StructInstantiation {
-        name: Arc<StructIdentifier>,
+        idx: StructNameIndex,
         ty_args: Arc<Vec<Type>>,
         ability: AbilityInfo,
     },
@@ -258,12 +260,12 @@ impl Type {
             Type::MutableReference(ty) => {
                 Type::MutableReference(Box::new(ty.apply_subst(subst, depth + 1)?))
             },
-            Type::Struct { name, ability } => Type::Struct {
-                name: name.clone(),
+            Type::Struct { idx, ability } => Type::Struct {
+                idx: *idx,
                 ability: ability.clone(),
             },
             Type::StructInstantiation {
-                name,
+                idx,
                 ty_args: instantiation,
                 ability,
             } => {
@@ -272,7 +274,7 @@ impl Type {
                     inst.push(ty.apply_subst(subst, depth + 1)?)
                 }
                 Type::StructInstantiation {
-                    name: name.clone(),
+                    idx: *idx,
                     ty_args: Arc::new(inst),
                     ability: ability.clone(),
                 }

@@ -2,6 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use super::StructNameCache;
 use crate::{
     loader::{
         function::{Function, FunctionHandle, FunctionInstantiation},
@@ -25,7 +26,9 @@ use move_core_types::{
     language_storage::ModuleId,
     vm_status::StatusCode,
 };
-use move_vm_types::loaded_data::runtime_types::{StructIdentifier, StructType, Type};
+use move_vm_types::loaded_data::runtime_types::{
+    StructIdentifier, StructNameIndex, StructType, Type,
+};
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Debug,
@@ -59,12 +62,13 @@ impl ModuleCache {
         natives: &NativeFunctions,
         id: ModuleId,
         module: CompiledModule,
+        name_cache: &StructNameCache,
     ) -> VMResult<Arc<Module>> {
         if let Some(cached) = self.module_at(&id) {
             return Ok(cached);
         }
 
-        match Module::new(natives, module, self) {
+        match Module::new(natives, module, self, name_cache) {
             Ok(module) => Ok(Arc::clone(self.modules.insert(id, module))),
             Err((err, _)) => Err(err.finish(Location::Undefined)),
         }
@@ -74,7 +78,7 @@ impl ModuleCache {
         &self,
         module: &CompiledModule,
         struct_def: &StructDefinition,
-        struct_name_table: &[Arc<StructIdentifier>],
+        struct_name_table: &[StructNameIndex],
     ) -> PartialVMResult<StructType> {
         let struct_handle = module.struct_handle_at(struct_def.struct_handle);
         let field_names = match &struct_def.field_information {
@@ -113,10 +117,9 @@ impl ModuleCache {
             field_names,
             abilities,
             type_parameters,
-            name: Arc::new(StructIdentifier {
-                name,
-                module: module.self_id(),
-            }),
+            idx: struct_name_table[struct_def.struct_handle.0 as usize],
+            module: module.self_id(),
+            name,
         })
     }
 
@@ -249,6 +252,7 @@ impl Module {
         natives: &NativeFunctions,
         module: CompiledModule,
         cache: &ModuleCache,
+        name_cache: &StructNameCache,
     ) -> Result<Self, (PartialVMError, CompiledModule)> {
         let id = module.self_id();
 
@@ -265,7 +269,7 @@ impl Module {
         let mut signature_table = vec![];
 
         let mut create = || {
-            let mut struct_names = vec![];
+            let mut struct_idxs = vec![];
             // validate the correctness of struct handle references.
             for struct_handle in module.struct_handles() {
                 let struct_name = module.identifier_at(struct_handle.name);
@@ -277,10 +281,10 @@ impl Module {
                         .resolve_struct_by_name(struct_name, &module_id)?
                         .check_compatibility(struct_handle)?;
                 }
-                struct_names.push(Arc::new(StructIdentifier {
+                struct_idxs.push(name_cache.insert_or_get(StructIdentifier {
                     module: module_id,
                     name: struct_name.to_owned(),
-                }))
+                }));
             }
 
             // Build signature table
@@ -290,7 +294,7 @@ impl Module {
                         .0
                         .iter()
                         .map(|sig| {
-                            intern_type(BinaryIndexedView::Module(&module), sig, &struct_names)
+                            intern_type(BinaryIndexedView::Module(&module), sig, &struct_idxs)
                         })
                         .collect::<PartialVMResult<Vec<_>>>()?,
                 )
@@ -298,7 +302,7 @@ impl Module {
 
             for (idx, struct_def) in module.struct_defs().iter().enumerate() {
                 let definition_struct_type =
-                    Arc::new(cache.make_struct_type(&module, struct_def, &struct_names)?);
+                    Arc::new(cache.make_struct_type(&module, struct_def, &struct_idxs)?);
                 structs.push(StructDef {
                     field_count: definition_struct_type.fields.len() as u16,
                     definition_struct_type,
@@ -356,7 +360,7 @@ impl Module {
                                         intern_type(
                                             BinaryIndexedView::Module(&module),
                                             ty,
-                                            &struct_names,
+                                            &struct_idxs,
                                         )?,
                                     );
                                 }
