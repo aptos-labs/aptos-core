@@ -325,6 +325,14 @@ const config = {
       {
         redirects: [
           {
+            to: "/tools/aptos-cli/install-cli",
+            from: "/releases/cli-release",
+          },
+          {
+            to: "/sdks/index",
+            from: "/releases/sdk-release",
+          },
+          {
             from: "/integration/indexing",
             to: "/indexer/indexer-landing",
           },

@@ -48,6 +48,7 @@ CDN
 Choco
 CLI
 CMake
+CoinFlipEvents
 CPU
 CPUs
 ChainID
@@ -241,6 +242,7 @@ Poelstra
 Pontem
 Postcondition
 Postgres
+postgresql
 PowerShell
 PropertyMap
 Prover

@@ -77,7 +77,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         Ok(RespawnedSessionBuilder {
             executor_view,
             resolver_builder: |executor_view| vm.as_move_resolver(executor_view),
-            session_builder: |resolver| Some(vm.0.new_session(resolver, session_id)),
+            session_builder: |resolver| Some(vm.vm_impl.new_session(resolver, session_id)),
             storage_refund,
         }
         .build())
@@ -242,6 +242,14 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
 
     fn generate_delayed_field_id(&self) -> Self::Identifier {
         self.base_executor_view.generate_delayed_field_id()
+    }
+
+    fn validate_and_convert_delayed_field_id(
+        &self,
+        id: u64,
+    ) -> Result<Self::Identifier, PanicError> {
+        self.base_executor_view
+            .validate_and_convert_delayed_field_id(id)
     }
 
     fn get_reads_needing_exchange(

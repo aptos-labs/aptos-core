@@ -78,8 +78,6 @@ const sidebars = {
           link: { type: "doc", id: "releases/mainnet-release" },
           items: ["releases/mainnet-release", "releases/testnet-release", "releases/devnet-release"],
         },
-        "releases/cli-release",
-        "releases/sdk-release",
       ],
     },
     "nodes/networks",

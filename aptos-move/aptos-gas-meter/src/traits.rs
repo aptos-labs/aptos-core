@@ -30,6 +30,9 @@ pub trait GasAlgebra {
     /// Returns the current balance, measured in internal gas units.
     fn balance_internal(&self) -> InternalGas;
 
+    /// Checks if the internal states (counters) are consistent.
+    fn check_consistency(&self) -> PartialVMResult<()>;
+
     /// Charges gas under the execution category.
     ///
     /// The amount charged can be a quantity or an abstract expression containing

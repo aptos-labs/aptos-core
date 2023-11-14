@@ -31,7 +31,7 @@ use aptos_mvhashmap::{
 use aptos_state_view::TStateView;
 use aptos_types::{
     aggregator::PanicError,
-    contract_event::ReadWriteEvent,
+    contract_event::TransactionEvent,
     executable::Executable,
     fee_statement::FeeStatement,
     transaction::BlockExecutableTransaction as Transaction,
@@ -424,6 +424,7 @@ where
             Option<Error<E::Error>>,
         )>,
         base_view: &S,
+        start_shared_counter: u32,
         shared_counter: &AtomicU32,
         executor: &E,
         block: &[T],
@@ -471,7 +472,12 @@ where
                     versioned_cache,
                     executor,
                     base_view,
-                    ParallelState::new(versioned_cache, scheduler, shared_counter),
+                    ParallelState::new(
+                        versioned_cache,
+                        scheduler,
+                        start_shared_counter,
+                        shared_counter,
+                    ),
                 )?;
 
                 scheduler.finish_execution_during_commit(txn_idx);
@@ -666,13 +672,13 @@ where
         let mut patched_events = vec![];
         for (event, layout) in events {
             if let Some(layout) = layout {
-                let (_, _, _, event_data) = event.get_event_data();
+                let event_data = event.get_event_data();
                 match latest_view
                     .replace_identifiers_with_values(&Bytes::from(event_data.to_vec()), &layout)
                 {
                     Ok((bytes, _)) => {
                         let mut patched_event = event;
-                        patched_event.update_event_data(bytes.to_vec());
+                        patched_event.set_event_data(bytes.to_vec());
                         patched_events.push(patched_event);
                     },
                     Err(_) => unreachable!("Failed to replace identifiers with values in event"),
@@ -766,12 +772,18 @@ where
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         scheduler: &Scheduler,
+        start_shared_counter: u32,
         shared_counter: &AtomicU32,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         base_view: &S,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
     ) -> ::std::result::Result<(), PanicOr<IntentionalFallbackToSequential>> {
-        let parallel_state = ParallelState::<T, X>::new(versioned_cache, scheduler, shared_counter);
+        let parallel_state = ParallelState::<T, X>::new(
+            versioned_cache,
+            scheduler,
+            start_shared_counter,
+            shared_counter,
+        );
         let latest_view = LatestView::new(base_view, ViewState::Sync(parallel_state), txn_idx);
         let resource_write_set = last_input_output.resource_write_set(txn_idx);
         let finalized_groups = last_input_output.take_finalized_group(txn_idx);
@@ -860,6 +872,7 @@ where
         scheduler: &Scheduler,
         // TODO: should not need to pass base view.
         base_view: &S,
+        start_shared_counter: u32,
         shared_counter: &AtomicU32,
         shared_commit_state: &ExplicitSyncWrapper<(
             FeeStatement,
@@ -883,6 +896,7 @@ where
                         txn_idx,
                         versioned_cache,
                         scheduler,
+                        start_shared_counter,
                         shared_counter,
                         last_input_output,
                         base_view,
@@ -903,6 +917,7 @@ where
                     last_input_output,
                     shared_commit_state,
                     base_view,
+                    start_shared_counter,
                     shared_counter,
                     &executor,
                     block,
@@ -938,7 +953,12 @@ where
                         versioned_cache,
                         &executor,
                         base_view,
-                        ParallelState::new(versioned_cache, scheduler, shared_counter),
+                        ParallelState::new(
+                            versioned_cache,
+                            scheduler,
+                            start_shared_counter,
+                            shared_counter,
+                        ),
                     )?;
                     scheduler.finish_execution(txn_idx, incarnation, updates_outside)
                 },
@@ -975,7 +995,8 @@ where
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
         let versioned_cache = MVHashMap::new();
-        let shared_counter = AtomicU32::new(gen_id_start_value(false));
+        let start_shared_counter = gen_id_start_value(false);
+        let shared_counter = AtomicU32::new(start_shared_counter);
 
         if signature_verified_block.is_empty() {
             return Ok(vec![]);
@@ -1013,6 +1034,7 @@ where
                         &versioned_cache,
                         &scheduler,
                         base_view,
+                        start_shared_counter,
                         &shared_counter,
                         &shared_commit_state,
                         &final_results,
@@ -1133,7 +1155,8 @@ where
         let executor = E::init(executor_arguments);
         drop(init_timer);
 
-        let counter = RefCell::new(gen_id_start_value(true));
+        let start_counter = gen_id_start_value(true);
+        let counter = RefCell::new(start_counter);
         let unsync_map = UnsyncMap::new();
         let mut ret = Vec::with_capacity(num_txns);
         let mut accumulated_fee_statement = FeeStatement::zero();
@@ -1143,6 +1166,7 @@ where
                 base_view,
                 ViewState::Unsync(SequentialState {
                     unsync_map: &unsync_map,
+                    start_counter,
                     counter: &counter,
                     read_set: RefCell::new(HashSet::new()),
                     dynamic_change_set_optimizations_enabled,

@@ -95,6 +95,7 @@ impl ReadResult {
 pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
     versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
     scheduler: &'a Scheduler,
+    start_counter: u32,
     counter: &'a AtomicU32,
     captured_reads: RefCell<CapturedReads<T>>,
 }
@@ -377,11 +378,13 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
     pub(crate) fn new(
         shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         shared_scheduler: &'a Scheduler,
+        start_shared_counter: u32,
         shared_counter: &'a AtomicU32,
     ) -> Self {
         Self {
             versioned_map: shared_map,
             scheduler: shared_scheduler,
+            start_counter: start_shared_counter,
             counter: shared_counter,
             captured_reads: RefCell::new(CapturedReads::new()),
         }
@@ -609,6 +612,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
 pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
     pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
     pub(crate) read_set: RefCell<HashSet<T::Key>>,
+    pub(crate) start_counter: u32,
     pub(crate) counter: &'a RefCell<u32>,
     pub(crate) dynamic_change_set_optimizations_enabled: bool,
 }
@@ -1261,6 +1265,37 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
                 id
             },
         }
+    }
+
+    fn validate_and_convert_delayed_field_id(
+        &self,
+        id: u64,
+    ) -> Result<Self::Identifier, PanicError> {
+        let start_counter = match &self.latest_view {
+            ViewState::Sync(state) => state.start_counter,
+            ViewState::Unsync(state) => state.start_counter,
+        };
+
+        if id < start_counter as u64 {
+            return Err(code_invariant_error(format!(
+                "Invalid delayed field id: {}, we've started from {}",
+                id, start_counter
+            )));
+        }
+
+        let current = match &self.latest_view {
+            ViewState::Sync(state) => state.counter.load(Ordering::SeqCst),
+            ViewState::Unsync(state) => *state.counter.borrow(),
+        };
+
+        if id > current as u64 {
+            return Err(code_invariant_error(format!(
+                "Invalid delayed field id: {}, we've only reached to {}",
+                id, current
+            )));
+        }
+
+        Ok(id.into())
     }
 
     // TODO - update comment.
@@ -2029,6 +2064,7 @@ mod test {
             &base_view,
             super::ViewState::Unsync(super::SequentialState {
                 unsync_map: &unsync_map,
+                start_counter: 5,
                 counter: &counter,
                 read_set: RefCell::new(HashSet::new()),
                 dynamic_change_set_optimizations_enabled: true,

@@ -121,6 +121,7 @@ pub enum LivenessStorageData {
 pub struct EpochManager<P: OnChainConfigProvider> {
     author: Author,
     config: ConsensusConfig,
+    #[allow(unused)]
     execution_config: ExecutionConfig,
     time_service: Arc<dyn TimeService>,
     self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
@@ -1074,6 +1075,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             payload_manager,
             payload_client,
             state_computer,
+            block_tx,
         );
 
         let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);
@@ -1081,7 +1083,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let (dag_shutdown_tx, dag_shutdown_rx) = oneshot::channel();
         self.dag_shutdown_tx = Some(dag_shutdown_tx);
 
-        tokio::spawn(bootstrapper.start(dag_rpc_rx, block_tx, dag_shutdown_rx));
+        tokio::spawn(bootstrapper.start(dag_rpc_rx, dag_shutdown_rx));
     }
 
     fn enable_quorum_store(&mut self, onchain_config: &OnChainConsensusConfig) -> bool {

@@ -12,6 +12,8 @@ use serde::{Deserialize, Serialize};
 enum Matcher {
     All,
     BlockId(HashValue),
+    BlockTimeStampGreaterThan(u64),
+    BlockTimeStampLessThan(u64),
     TransactionId(HashValue),
     Sender(AccountAddress),
     ModuleAddress(AccountAddress),
@@ -19,10 +21,12 @@ enum Matcher {
 }
 
 impl Matcher {
-    fn matches(&self, block_id: HashValue, txn: &SignedTransaction) -> bool {
+    fn matches(&self, block_id: HashValue, timestamp: u64, txn: &SignedTransaction) -> bool {
         match self {
             Matcher::All => true,
             Matcher::BlockId(id) => block_id == *id,
+            Matcher::BlockTimeStampGreaterThan(ts) => timestamp > *ts,
+            Matcher::BlockTimeStampLessThan(ts) => timestamp < *ts,
             Matcher::TransactionId(id) => txn.clone().committed_hash() == *id,
             Matcher::Sender(sender) => txn.sender() == *sender,
             Matcher::ModuleAddress(address) => match txn.payload() {
@@ -56,17 +60,17 @@ enum EvalResult {
 }
 
 impl Rule {
-    fn eval(&self, block_id: HashValue, txn: &SignedTransaction) -> EvalResult {
+    fn eval(&self, block_id: HashValue, timestamp: u64, txn: &SignedTransaction) -> EvalResult {
         match self {
             Rule::Allow(matcher) => {
-                if matcher.matches(block_id, txn) {
+                if matcher.matches(block_id, timestamp, txn) {
                     EvalResult::Allow
                 } else {
                     EvalResult::NoMatch
                 }
             },
             Rule::Deny(matcher) => {
-                if matcher.matches(block_id, txn) {
+                if matcher.matches(block_id, timestamp, txn) {
                     EvalResult::Deny
                 } else {
                     EvalResult::NoMatch
@@ -124,6 +128,12 @@ impl Filter {
         self
     }
 
+    pub fn add_allow_block_timestamp_greater_than(mut self, timestamp: u64) -> Self {
+        self.rules
+            .push(Rule::Allow(Matcher::BlockTimeStampGreaterThan(timestamp)));
+        self
+    }
+
     pub fn add_deny_transaction_id(mut self, txn_id: HashValue) -> Self {
         self.rules.push(Rule::Deny(Matcher::TransactionId(txn_id)));
         self
@@ -178,11 +188,11 @@ impl Filter {
         self
     }
 
-    pub fn allows(&self, block_id: HashValue, txn: &SignedTransaction) -> bool {
+    pub fn allows(&self, block_id: HashValue, timestamp: u64, txn: &SignedTransaction) -> bool {
         for rule in &self.rules {
             // Rules are evaluated in the order and the first rule that matches is used. If no rule
             // matches, the transaction is allowed.
-            match rule.eval(block_id, txn) {
+            match rule.eval(block_id, timestamp, txn) {
                 EvalResult::Allow => return true,
                 EvalResult::Deny => return false,
                 EvalResult::NoMatch => continue,

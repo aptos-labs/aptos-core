@@ -14,6 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-consensus = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-gas-meter = { workspace = true }
 aptos-gas-profiling = { workspace = true }
@@ -39,5 +40,6 @@ move-resource-viewer = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-test-utils = { workspace = true }
 regex = { workspace = true }
+reqwest = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
