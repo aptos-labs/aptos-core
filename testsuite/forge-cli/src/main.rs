@@ -269,7 +269,8 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::parse();
-    let duration = Duration::from_secs(args.duration_secs as u64);
+    // let duration = Duration::from_secs(args.duration_secs as u64);
+    let duration = Duration::from_secs(60 * 60 * 6);
     let suite_name: &str = args.suite.as_ref();
 
     let runtime = Runtime::new()?;
@@ -1772,7 +1773,7 @@ fn realistic_env_max_load_test(
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 200000,
+                    mempool_backlog: 400000,
                 })
                 .init_gas_price_multiplier(20),
             inner_success_criteria: SuccessCriteria::new(
@@ -1790,12 +1791,28 @@ fn realistic_env_max_load_test(
 
             // Have single epoch change in land blocking, and a few on long-running
             helm_values["chain"]["epoch_duration_secs"] =
-                (if long_running { 600 } else { 300 }).into();
+                (if long_running { 1800 } else { 300 }).into();
             helm_values["chain"]["on_chain_consensus_config"] =
                 serde_yaml::to_value(onchain_consensus_config).expect("must serialize");
             helm_values["chain"]["on_chain_execution_config"] =
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
+        }))
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            mempool_config_practically_non_expiring(&mut config.mempool);
+            
+            config.consensus.pipeline_backpressure = vec![];
+            config.consensus.chain_health_backoff = vec![];
+
+            // Other consensus / Quroum store configs
+            config
+                .consensus
+                .wait_for_full_blocks_above_recent_fill_threshold = 0.2;
+            config.consensus.wait_for_full_blocks_above_pending_blocks = 8;
+            config.consensus.quorum_store_pull_timeout_ms = 200;
+
+            // Experimental storage optimizations
+            config.storage.rocksdb_configs.enable_storage_sharding = true;
         }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
