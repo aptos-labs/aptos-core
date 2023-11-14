@@ -39,6 +39,7 @@ itertools = { workspace = true }
 move-core-types = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
+rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 
