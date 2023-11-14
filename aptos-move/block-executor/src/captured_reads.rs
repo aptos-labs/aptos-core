@@ -30,7 +30,7 @@ use std::{
             Entry,
             Entry::{Occupied, Vacant},
         },
-        HashMap,
+        HashMap, HashSet,
     },
     sync::Arc,
 };
@@ -330,16 +330,18 @@ impl<T: Transaction> CapturedReads<T> {
     }
 
     // Return an iterator over the captured group reads that contain a delayed field
-    pub(crate) fn get_group_read_values_with_delayed_fields(
-        &self,
+    pub(crate) fn get_group_read_values_with_delayed_fields<'a>(
+        &'a self,
+        skip: &'a HashSet<T::Key>,
     ) -> impl Iterator<Item = (&T::Key, &GroupRead<T>)> {
         // TODO[agg_v2](optimize) - We could potentially filter out inner_reads
         // to only contain those that have Some(layout)
-        self.group_reads.iter().filter(|(_, group_read)| {
-            group_read
-                .inner_reads
-                .iter()
-                .any(|(_, data_read)| matches!(data_read, DataRead::Versioned(_, _, Some(_))))
+        self.group_reads.iter().filter(|(key, group_read)| {
+            !skip.contains(key)
+                && group_read
+                    .inner_reads
+                    .iter()
+                    .any(|(_, data_read)| matches!(data_read, DataRead::Versioned(_, _, Some(_))))
         })
     }
 

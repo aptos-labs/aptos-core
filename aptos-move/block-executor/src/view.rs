@@ -1177,15 +1177,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         delayed_write_set_keys: &HashSet<T::Identifier>,
         skip: &HashSet<T::Key>,
     ) -> Result<BTreeMap<T::Key, (T::Value, u64)>, PanicError> {
-        let group_read_values_with_delayed_fields = parallel_state
+        parallel_state
             .captured_reads
             .borrow()
-            .get_group_read_values_with_delayed_fields()
+            .get_group_read_values_with_delayed_fields(skip)
             .map(|(k, v)| (k.clone(), v.clone()))
-            .collect::<Vec<_>>();
-        group_read_values_with_delayed_fields
-            .into_iter()
-            .filter(|(key, _)| !skip.contains(key))
             .flat_map(|(key, group_read)| {
                 let GroupRead { inner_reads, .. } = group_read;
                 let mut resources_needing_delayed_field_exchange = false;
