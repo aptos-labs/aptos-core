@@ -58,7 +58,7 @@ fn types(context: &mut Context, ss: &mut Vec<Type>) {
 }
 
 // type_ for expanding the `i`-th type param of struct `ty_name`
-fn type_struct_ty_param(context: &mut Context, ty: &mut Type, i: usize, ty_name: &TypeName_) {s
+fn type_struct_ty_param(context: &mut Context, ty: &mut Type, i: usize, ty_name: &TypeName_) {
     if let TypeName_::ModuleType(mod_id, struct_name) = ty_name {
         let param_name = &context
             .struct_definition(mod_id, struct_name)
