@@ -15,7 +15,7 @@ public fun m::destroy_none<#0>($t0: m::Option<#0>) {
   6: $t3 := 262144
   7: abort($t3)
   8: label L2
-  9: $t4 := unpack m::Option<?7>($t0)
+  9: $t4 := unpack m::Option<#0>($t0)
  10: vector::destroy_empty<#0>($t4)
  11: return ()
 }
@@ -57,7 +57,7 @@ public fun m::destroy_none<#0>($t0: m::Option<#0>) {
      # live vars: $t0
   8: label L2
      # live vars: $t0
-  9: $t4 := unpack m::Option<?7>($t0)
+  9: $t4 := unpack m::Option<#0>($t0)
      # live vars: $t4
  10: vector::destroy_empty<#0>($t4)
      # live vars:
@@ -79,18 +79,6 @@ public fun m::is_none<#0>($t0: &m::Option<#0>): bool {
 
 
 ============ disassembled file-format ==================
-
-Diagnostics:
-bug: unexpected type: ?7
-   ┌─ tests/file-format-generator/unpack_generic_struct.move:13:5
-   │
-13 │ ╭     public fun destroy_none<Element>(t: Option<Element>) {
-14 │ │         assert!(is_none(&t), 0x40000);
-15 │ │         let Option { vec } = t;
-16 │ │         vector::destroy_empty(vec)
-17 │ │     }
-   │ ╰─────^
-
 // Move bytecode v7
 module 42.m {
 use 0000000000000000000000000000000000000000000000000000000000000001::vector;
@@ -112,7 +100,7 @@ B2:
 	5: Abort
 B3:
 	6: MoveLoc[0](Arg0: Option<Ty0>)
-	7: UnpackGeneric[0](Option<bool>)
+	7: UnpackGeneric[0](Option<Ty0>)
 	8: VecUnpack(2, 0)
 	9: Ret
 }

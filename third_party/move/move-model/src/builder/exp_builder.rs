@@ -17,8 +17,8 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{
-        Constraint, PrimitiveType, ReferenceKind, Substitution, Type, TypeDisplayContext,
-        TypeUnificationError, Variance, WideningOrder, BOOL_TYPE,
+        Constraint, PrimitiveType, ReferenceKind, Substitution, Type, Type::Struct,
+        TypeDisplayContext, TypeUnificationError, Variance, WideningOrder, BOOL_TYPE,
     },
 };
 use codespan_reporting::diagnostic::Severity;
@@ -1607,7 +1607,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     let ty =
                         self.check_type_with_order(expected_order, loc, &ty, &expected_type, "");
                     let id = self.new_node_id_with_type_loc(&ty, loc);
-                    Pattern::Struct(id, struct_id, args)
+                    let mut std = struct_id;
+                    if let Struct(_, _, types) = ty {
+                        std.inst = types;
+                    }
+                    Pattern::Struct(id, std, args)
                 } else {
                     // Error reported
                     self.new_error_pat(loc)
