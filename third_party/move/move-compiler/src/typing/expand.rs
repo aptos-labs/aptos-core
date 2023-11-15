@@ -6,7 +6,7 @@ use super::core::{self, forward_tvar, Context, Subst};
 use crate::{
     diag,
     expansion::ast::{ModuleIdent, Value_},
-    naming::ast::{BuiltinTypeName_, FunctionSignature, Type, TypeName_, Type_},
+    naming::ast::{BuiltinTypeName_, FunctionSignature, Type, TypeName_, Type_, TVar},
     parser::ast::{Ability_, FunctionName},
     typing::ast as T,
 };
@@ -68,7 +68,7 @@ fn type_struct_ty_param(context: &mut Context, ty: &mut Type, i: usize, ty_name:
                 .user_specified_name
                 .value;
             let msg = format!("Cannot infer the type parameter `{param_name}` for generic struct `{ty_name}`. Try providing a type parameter.");
-            type_msg_(context, ty, &msg);
+            type_with_context_msg(context, ty, &msg);
         },
         _ => type_(context, ty),
     }
@@ -82,43 +82,46 @@ fn type_fun_ty_param(
     n: &FunctionName,
 ) {
     let param_name = context.function_info(m, n).signature.type_parameters[i].user_specified_name;
-    type_msg_(context, ty, &format!("Cannot infer the type parameter `{param_name}` for generic function `{m}::{n}`. Try providing a type parameter."));
+    type_with_context_msg(context, ty, &format!("Cannot infer the type parameter `{param_name}` for generic function `{m}::{n}`. Try providing a type parameter."));
+}
+
+// Unfold the type vars. If the type cannot be inferred, return the last tvar.
+fn unfold_type_or_last_var(subst: &Subst, sp!(loc, t_): Type) -> Result<Type, Spanned<TVar>> {
+    match t_ {
+        Type_::Var(i) => {
+            let last_tvar = forward_tvar(subst, i);
+            match subst.get(last_tvar) {
+                Some(sp!(_, Type_::Var(_))) => panic!("ICE forward_tvar returned a type variable"),
+                Some(inner) => Ok(inner.clone()),
+                None => {
+                    Err(sp(loc, last_tvar))
+                },
+            }
+        },
+        _ => Ok(sp(loc, t_)),
+    }
 }
 
 // Try to expand the type of ty, warning with msg_uninferred if type cannot be inferred.
-fn type_msg_(context: &mut Context, ty: &mut Type, msg_uninferred: &str) {
+fn type_with_context_msg(context: &mut Context, ty: &mut Type, msg_uninferred: &str) {
     use Type_::*;
     match &mut ty.value {
         Anything | UnresolvedError | Param(_) | Unit => (),
         Ref(_, b) => type_(context, b),
         Var(tvar) => {
             let ty_tvar = sp(ty.loc, Var(*tvar));
-            fn unfold_type_mut(subst: &mut Subst, sp!(loc, t_): Type) -> Type {
-                match t_ {
-                    Type_::Var(i) => {
-                        let last_tvar = forward_tvar(subst, i);
-                        match subst.get(last_tvar) {
-                            Some(sp!(_, Type_::Var(_))) => unreachable!(),
-                            None => {
-                                subst.insert(last_tvar, sp(loc, Type_::UnresolvedError));
-                                sp(loc, Type_::Anything)
-                            },
-                            Some(inner) => inner.clone(),
-                        }
-                    },
-                    x => sp(loc, x),
-                }
-            }
-            let replacement = unfold_type_mut(&mut context.subst, ty_tvar);
+            let replacement = unfold_type_or_last_var(&context.subst, ty_tvar);
             let replacement = match replacement {
-                sp!(_, Var(_)) => panic!("ICE unfold_type_base failed to expand"),
-                sp!(loc, Anything) => {
+                Err(sp!(loc, last_tvar)) => {
+                    // avoid duplicate error messages
+                    context.subst.insert(last_tvar, sp(ty.loc, Type_::Anything));
                     context
                         .env
-                        .add_diag(diag!(TypeSafety::UninferredType, (ty.loc, msg_uninferred)));
+                        .add_diag(diag!(TypeSafety::UninferredType, (loc, msg_uninferred)));
                     sp(loc, UnresolvedError)
-                },
-                t => t,
+                }
+                Ok(sp!(_, Var(_))) => panic!("ICE unfold_type_base failed to expand"),
+                Ok(t) => t,
             };
             *ty = replacement;
             type_(context, ty);
@@ -142,7 +145,7 @@ fn type_msg_(context: &mut Context, ty: &mut Type, msg_uninferred: &str) {
 }
 
 pub fn type_(context: &mut Context, ty: &mut Type) {
-    type_msg_(
+    type_with_context_msg(
         context,
         ty,
         "Could not infer this type. Try adding an annotation",
@@ -355,7 +358,7 @@ pub fn exp(context: &mut Context, e: &mut T::Exp) {
                 type_struct_ty_param(context, b, i, &TypeName_::ModuleType(*mod_id, *struct_name));
             }
             for (_, s, (_, (bt, fe))) in fields.iter_mut() {
-                type_msg_(
+                type_with_context_msg(
                     context,
                     bt,
                     &format!("Could not infer the type of field {s}"),
@@ -415,7 +418,7 @@ fn builtin_function(context: &mut Context, b: &mut T::BuiltinFunction) {
         | B::BorrowGlobal(_, bt)
         | B::Exists(bt)
         | B::Freeze(bt) => {
-            type_msg_(
+            type_with_context_msg(
                 context,
                 bt,
                 &format!("Cannot infer a type parameter for built-in function `{f_name}`"),
