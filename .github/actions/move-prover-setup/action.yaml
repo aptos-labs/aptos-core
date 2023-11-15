@@ -16,9 +16,21 @@ runs:
     - name: Run cargo cache
       uses: Swatinem/rust-cache@359a70e43a0bb8a13953b04a90f76428b4959bb6 # pin@v2.2.0
 
-    - name: install protoc and related tools
+    - name: install related tools and prover dependencies
       shell: bash
-      run: scripts/dev_setup.sh -b -r -y -P -J -t
+      run: scripts/dev_setup.sh -b -p -r -y -P -t
+
+    - name: prepare move lang prover tooling.
+      shell: bash
+      run: |
+        echo 'Z3_EXE='/home/runner/bin/z3 | tee -a $GITHUB_ENV
+        echo 'CVC5_EXE='/home/runner/bin/cvc5 | tee -a $GITHUB_ENV
+        echo 'DOTNET_ROOT='/home/runner/.dotnet/ | tee -a $GITHUB_ENV
+        echo 'BOOGIE_EXE='/home/runner/.dotnet/tools/boogie | tee -a $GITHUB_ENV
+        echo 'MVP_TEST_ON_CI'='1' | tee -a $GITHUB_ENV
+        echo "/home/runner/bin" | tee -a $GITHUB_PATH
+        echo "/home/runner/.dotnet" | tee -a $GITHUB_PATH
+        echo "/home/runner/.dotnet/tools" | tee -a $GITHUB_PATH
 
     - run: echo "/home/runner/.cargo/bin" | tee -a $GITHUB_PATH
       shell: bash
