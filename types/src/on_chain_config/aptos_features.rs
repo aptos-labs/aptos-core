@@ -49,6 +49,7 @@ pub enum FeatureFlag {
     OPERATOR_BENEFICIARY_CHANGE = 39,
     VM_BINARY_FORMAT_V7 = 40,
     RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM = 41,
+    COMMISSION_CHANGE_DELEGATION_POOL = 42,
 }
 
 /// Representation of features on chain as a bitset.
