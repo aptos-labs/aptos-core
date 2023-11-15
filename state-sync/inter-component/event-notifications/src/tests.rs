@@ -25,8 +25,7 @@ use claims::{assert_lt, assert_matches, assert_ok};
 use futures::{FutureExt, StreamExt};
 use move_core_types::language_storage::TypeTag;
 use serde::{Deserialize, Serialize};
-use std::{convert::TryInto, sync::Arc};
-use std::str::FromStr;
+use std::{convert::TryInto, str::FromStr, sync::Arc};
 
 #[test]
 fn test_all_configs_returned() {
@@ -369,7 +368,8 @@ fn test_no_events_no_subscribers() {
     );
 
     // Add subscribers to the service
-    let _event_listener = event_service.subscribe_to_events(vec![create_random_event_key()], vec![]);
+    let _event_listener =
+        event_service.subscribe_to_events(vec![create_random_event_key()], vec![]);
     let _reconfig_listener = event_service.subscribe_to_reconfigurations();
 
     // Verify a notification with zero events returns successfully
@@ -396,7 +396,10 @@ fn test_event_v2_subscription_by_tag() {
     let version = 99;
     let event_1 = create_test_event(event_key_1);
     let event_2 = ContractEvent::new_v2(TypeTag::from_str(event_tag_2).unwrap(), b"xyz".to_vec());
-    notify_events(&mut event_service, version, vec![event_1.clone(), event_2.clone()]);
+    notify_events(&mut event_service, version, vec![
+        event_1.clone(),
+        event_2.clone(),
+    ]);
 
     // Listener 1 should receive 2 events.
     verify_event_notification_received(vec![&mut listener_1], version, vec![
@@ -406,9 +409,7 @@ fn test_event_v2_subscription_by_tag() {
     verify_no_event_notifications(vec![&mut listener_1]);
 
     // Listener 2 should receive 1 event.
-    verify_event_notification_received(vec![&mut listener_2], version, vec![
-        event_1,
-    ]);
+    verify_event_notification_received(vec![&mut listener_2], version, vec![event_1]);
     verify_no_event_notifications(vec![&mut listener_2]);
 }
 /// Defines a new on-chain config for test purposes.

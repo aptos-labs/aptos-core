@@ -204,12 +204,8 @@ impl EventSubscriptionService {
 
     fn is_new_epoch_event(&self, event: &ContractEvent) -> bool {
         match event {
-            ContractEvent::V1(evt) => {
-                *evt.key() == on_chain_config::new_epoch_event_key()
-            }
-            ContractEvent::V2(_) => {
-                false
-            }
+            ContractEvent::V1(evt) => *evt.key() == on_chain_config::new_epoch_event_key(),
+            ContractEvent::V2(_) => false,
         }
     }
 
@@ -224,15 +220,12 @@ impl EventSubscriptionService {
         let mut reconfig_event_found = false;
         let mut event_subscription_ids_to_notify = HashSet::new();
 
-        // TODO(eventv2): This doesn't deal with module events subscriptions.
         for event in events.iter() {
             // Process all subscriptions for the current event
-            // let maybe_subscription_ids = self.subscription_ids_by_event(event);
             let maybe_subscription_ids = match event {
                 ContractEvent::V1(evt) => self.event_key_subscriptions.get(evt.key()),
                 ContractEvent::V2(evt) => {
                     let tag = evt.type_tag().to_string();
-                    println!("[Oracle] EventNotification::notify_event_subscribers: tag={}", tag);
                     self.event_v2_tag_subscriptions.get(&tag)
                 },
             };

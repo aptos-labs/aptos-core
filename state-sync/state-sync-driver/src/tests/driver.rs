@@ -351,7 +351,7 @@ async fn create_driver_for_tests(
     let event_key_subscriptions =
         event_key_subscriptions.unwrap_or_else(|| vec![EventKey::random()]);
     let event_subscriber = event_subscription_service
-        .subscribe_to_events(event_key_subscriptions)
+        .subscribe_to_events(event_key_subscriptions, vec![])
         .unwrap();
 
     // Create consensus and mempool notifiers and listeners
