@@ -150,8 +150,9 @@ spec aptos_framework::staking_config {
         aborts_if !exists<StakingConfig>(@aptos_framework);
         aborts_if new_rewards_rate > MAX_REWARDS_RATE;
         aborts_if new_rewards_rate > new_rewards_rate_denominator;
-         ensures global<StakingConfig>(@aptos_framework).rewards_rate == new_rewards_rate;
-          ensures global<StakingConfig>(@aptos_framework).rewards_rate_denominator == new_rewards_rate_denominator;
+        let post staking_config = global<StakingConfig>(@aptos_framework);
+        ensures staking_config.rewards_rate == new_rewards_rate;
+        ensures staking_config.rewards_rate.rewards_rate_denominator == new_rewards_rate_denominator;
     }
 
     /// Caller must be @aptos_framework.
@@ -170,10 +171,11 @@ spec aptos_framework::staking_config {
         aborts_if global<StakingRewardsConfig>(@aptos_framework).rewards_rate_period_in_secs != rewards_rate_period_in_secs;
         include StakingRewardsConfigValidationAbortsIf;
         aborts_if !exists<StakingRewardsConfig>(addr);
-        ensures global<StakingRewardsConfig>(@aptos_framework).rewards_rate == rewards_rate;
-        ensures global<StakingRewardsConfig>(@aptos_framework).min_rewards_rate == min_rewards_rate;
-        ensures global<StakingRewardsConfig>(@aptos_framework).rewards_rate_period_in_secs == rewards_rate_period_in_secs;
-        ensures global<StakingRewardsConfig>(@aptos_framework).rewards_rate_decrease_rate == rewards_rate_decrease_rate;
+        let staking_rewards_config = global<StakingRewardsConfig>(@aptos_framework);
+        ensures staking_rewards_config.rewards_rate == rewards_rate;
+        ensures staking_rewards_config.min_rewards_rate == min_rewards_rate;
+        ensures staking_rewards_config.rewards_rate_period_in_secs == rewards_rate_period_in_secs;
+        ensures staking_rewards_config.rewards_rate_decrease_rate == rewards_rate_decrease_rate;
     }
 
     /// Caller must be @aptos_framework.

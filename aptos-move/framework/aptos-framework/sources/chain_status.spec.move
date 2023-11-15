@@ -6,7 +6,7 @@ spec aptos_framework::chain_status {
 
     spec set_genesis_end(aptos_framework: &signer) {
         use std::signer;
-        requires is_operating();
+        pragma disable_invariants_in_body;
         let addr = signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
         aborts_if exists<GenesisEndMarker>(@aptos_framework);
