@@ -23,7 +23,7 @@ use move_symbol_pool::Symbol;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     iter::FromIterator,
-    ops::Range, intrinsics::unreachable,
+    ops::Range,
 };
 
 //**************************************************************************************************
