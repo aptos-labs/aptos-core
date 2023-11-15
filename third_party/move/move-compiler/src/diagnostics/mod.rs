@@ -23,7 +23,7 @@ use move_symbol_pool::Symbol;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     iter::FromIterator,
-    ops::Range,
+    ops::Range, intrinsics::unreachable,
 };
 
 //**************************************************************************************************
@@ -58,6 +58,7 @@ pub struct Diagnostics {
 pub fn report_diagnostics(files: &FilesSourceText, diags: Diagnostics) -> ! {
     let should_exit = true;
     report_diagnostics_impl(files, diags, should_exit);
+    unreachable!()
 }
 
 // report diagnostics, but do not exit if diags are all warnings
