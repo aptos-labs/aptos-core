@@ -1291,8 +1291,9 @@ rewards_rate/rewards_rate_denominator <= 1.
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
 <b>aborts_if</b> new_rewards_rate &gt; <a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">MAX_REWARDS_RATE</a>;
 <b>aborts_if</b> new_rewards_rate &gt; new_rewards_rate_denominator;
-<b>ensures</b> <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework).rewards_rate == new_rewards_rate;
-<b>ensures</b> <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework).rewards_rate_denominator == new_rewards_rate_denominator;
+<b>let</b> <b>post</b> <a href="staking_config.md#0x1_staking_config">staking_config</a> = <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
+<b>ensures</b> <a href="staking_config.md#0x1_staking_config">staking_config</a>.rewards_rate == new_rewards_rate;
+<b>ensures</b> <a href="staking_config.md#0x1_staking_config">staking_config</a>.rewards_rate_denominator == new_rewards_rate_denominator;
 </code></pre>
 
 
@@ -1316,10 +1317,11 @@ StakingRewardsConfig is under the @aptos_framework.
 <b>aborts_if</b> <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework).rewards_rate_period_in_secs != rewards_rate_period_in_secs;
 <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigValidationAbortsIf">StakingRewardsConfigValidationAbortsIf</a>;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(addr);
-<b>ensures</b> <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework).rewards_rate == rewards_rate;
-<b>ensures</b> <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework).min_rewards_rate == min_rewards_rate;
-<b>ensures</b> <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework).rewards_rate_period_in_secs == rewards_rate_period_in_secs;
-<b>ensures</b> <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework).rewards_rate_decrease_rate == rewards_rate_decrease_rate;
+<b>let</b> <b>post</b> staking_rewards_config = <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework);
+<b>ensures</b> staking_rewards_config.rewards_rate == rewards_rate;
+<b>ensures</b> staking_rewards_config.min_rewards_rate == min_rewards_rate;
+<b>ensures</b> staking_rewards_config.rewards_rate_period_in_secs == rewards_rate_period_in_secs;
+<b>ensures</b> staking_rewards_config.rewards_rate_decrease_rate == rewards_rate_decrease_rate;
 </code></pre>
 
 
