@@ -13,7 +13,7 @@ use crate::{
     monitor,
     network_interface::{ConsensusMsg, ConsensusNetworkClient, RPC},
     pipeline::commit_reliable_broadcast::CommitMessage,
-    quorum_store::types::{Batch, BatchMsg, BatchRequest},
+    quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
     rand::rand_gen::RandGenMessage,
 };
 use anyhow::{anyhow, bail, ensure};
@@ -137,7 +137,7 @@ pub trait QuorumStoreSender: Send + Clone {
         request: BatchRequest,
         recipient: Author,
         timeout: Duration,
-    ) -> anyhow::Result<Batch>;
+    ) -> anyhow::Result<BatchResponse>;
 
     async fn send_batch(&self, batch: Batch, recipients: Vec<Author>);
 
@@ -406,7 +406,7 @@ impl QuorumStoreSender for NetworkSender {
         request: BatchRequest,
         recipient: Author,
         timeout: Duration,
-    ) -> anyhow::Result<Batch> {
+    ) -> anyhow::Result<BatchResponse> {
         let request_digest = request.digest();
         let msg = ConsensusMsg::BatchRequestMsg(Box::new(request));
         let response = self
@@ -414,10 +414,12 @@ impl QuorumStoreSender for NetworkSender {
             .send_rpc(recipient, msg, timeout)
             .await?;
         match response {
+            // TODO: deprecated, remove after two releases
             ConsensusMsg::BatchResponse(batch) => {
                 batch.verify_with_digest(request_digest)?;
-                Ok(*batch)
+                Ok(BatchResponse::Batch(*batch))
             },
+            ConsensusMsg::BatchResponseV2(maybe_batch) => Ok(*maybe_batch),
             _ => Err(anyhow!("Invalid batch response")),
         }
     }

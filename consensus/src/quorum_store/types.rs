@@ -8,7 +8,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_crypto_derive::CryptoHasher;
-use aptos_types::{transaction::SignedTransaction, PeerId};
+use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction, PeerId};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -273,6 +273,13 @@ impl From<Batch> for PersistedValue {
         } = value;
         PersistedValue::new(batch_info, Some(payload.into_transactions()))
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum BatchResponse {
+    Batch(Batch),
+    NotFound(LedgerInfoWithSignatures),
+    Uninitialized,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

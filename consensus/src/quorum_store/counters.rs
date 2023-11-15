@@ -500,6 +500,24 @@ pub static RECEIVED_BATCH_RESPONSE_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the number of batch not found responses received from other nodes.
+pub static RECEIVED_BATCH_NOT_FOUND_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_received_batch_not_found_count",
+        "Count of the number of batch not found responses received from other nodes."
+    )
+    .unwrap()
+});
+
+/// Count of the number of batch expired responses received from other nodes.
+pub static RECEIVED_BATCH_EXPIRED_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_received_batch_expired_count",
+        "Count of the number of batch expired responses received from other nodes."
+    )
+    .unwrap()
+});
+
 pub static QS_BACKPRESSURE_TXN_COUNT: Lazy<Histogram> = Lazy::new(|| {
     register_avg_counter(
         "quorum_store_backpressure_txn_count",
