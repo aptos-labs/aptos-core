@@ -24,9 +24,13 @@ pub mod metrics;
 #[cfg(test)]
 mod tests;
 
-/// The acceleration parameter to use for FAST compression mode.
+/// The acceleration parameters to use for FAST compression mode.
 /// This was determined anecdotally.
-const ACCELERATION_PARAMETER: i32 = 1;
+const FAST_ACCELERATION_PARAMETER: i32 = 1;
+
+/// The acceleration parameters to use for HIGHCOMPRESSION compression mode.
+/// This was determined anecdotally.
+const HIGHCOMPRESSION_ACCELERATION_PARAMETER: i32 = 12;
 
 /// A useful wrapper for representing compressed data
 pub type CompressedData = Vec<u8>;
@@ -49,11 +53,20 @@ pub fn compress(
             max_bytes
         )));
     }
+
     // Start the compression timer
     let timer = start_compression_operation_timer(COMPRESS, client.clone());
 
+    // Determine the compression mode to use based on the client
+    let compression_mode = if client == CompressionClient::StateSync {
+        // State sync messages are typically large (so use a higher compression mode)
+        CompressionMode::HIGHCOMPRESSION(HIGHCOMPRESSION_ACCELERATION_PARAMETER)
+    } else {
+        // Otherwise, use fast mode to provide a reasonable compression ratio and latency
+        CompressionMode::FAST(FAST_ACCELERATION_PARAMETER)
+    };
+
     // Compress the data
-    let compression_mode = CompressionMode::FAST(ACCELERATION_PARAMETER);
     let compressed_data = match lz4::block::compress(&raw_data, Some(compression_mode), true) {
         Ok(compressed_data) => compressed_data,
         Err(error) => {
