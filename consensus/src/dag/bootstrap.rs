@@ -168,6 +168,7 @@ impl TDagMode for SyncMode {
             bootstrapper.time_service.clone(),
             bootstrapper.state_computer.clone(),
             bootstrapper.storage.clone(),
+            bootstrapper.payload_manager.clone(),
             bootstrapper
                 .onchain_config
                 .dag_ordering_causal_history_window as Round,
@@ -402,6 +403,7 @@ impl DagBootstrapper {
         let dag = Arc::new(RwLock::new(Dag::new(
             self.epoch_state.clone(),
             self.storage.clone(),
+            self.payload_manager.clone(),
             initial_round,
             dag_window_size_config,
         )));
@@ -487,7 +489,6 @@ impl DagBootstrapper {
             self.self_peer,
             self.epoch_state.clone(),
             dag_store.clone(),
-            self.payload_manager.clone(),
             self.payload_client.clone(),
             rb,
             self.time_service.clone(),

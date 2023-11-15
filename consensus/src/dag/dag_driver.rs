@@ -22,7 +22,6 @@ use crate::{
         },
         DAGRpcResult, RpcHandler,
     },
-    payload_manager::PayloadManager,
     state_replication::PayloadClient,
 };
 use anyhow::bail;
@@ -46,7 +45,6 @@ pub(crate) struct DagDriver {
     author: Author,
     epoch_state: Arc<EpochState>,
     dag: Arc<RwLock<Dag>>,
-    payload_manager: Arc<PayloadManager>,
     payload_client: Arc<dyn PayloadClient>,
     reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
     time_service: TimeService,
@@ -67,7 +65,6 @@ impl DagDriver {
         author: Author,
         epoch_state: Arc<EpochState>,
         dag: Arc<RwLock<Dag>>,
-        payload_manager: Arc<PayloadManager>,
         payload_client: Arc<dyn PayloadClient>,
         reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
         time_service: TimeService,
@@ -90,7 +87,6 @@ impl DagDriver {
             author,
             epoch_state,
             dag,
-            payload_manager,
             payload_client,
             reliable_broadcast,
             time_service,
@@ -135,8 +131,6 @@ impl DagDriver {
                 bail!(DagDriverError::MissingParents);
             }
 
-            self.payload_manager
-                .prefetch_payload_data(node.payload(), node.metadata().timestamp());
             dag_writer.add_node(node)?;
 
             let highest_strong_links_round =
