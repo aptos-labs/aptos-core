@@ -77,6 +77,7 @@ pub trait EventNotificationSender: Send {
 pub struct EventSubscriptionService {
     // Event subscription registry
     event_key_subscriptions: HashMap<EventKey, HashSet<SubscriptionId>>,
+    event_v2_tag_subscriptions: HashMap<String, HashSet<SubscriptionId>>,
     subscription_id_to_event_subscription: HashMap<SubscriptionId, EventSubscription>,
 
     // Reconfig subscription registry
@@ -93,6 +94,7 @@ impl EventSubscriptionService {
     pub fn new(storage: Arc<RwLock<DbReaderWriter>>) -> Self {
         Self {
             event_key_subscriptions: HashMap::new(),
+            event_v2_tag_subscriptions: HashMap::new(),
             subscription_id_to_event_subscription: HashMap::new(),
             reconfig_subscriptions: HashMap::new(),
             storage,
@@ -110,8 +112,9 @@ impl EventSubscriptionService {
     pub fn subscribe_to_events(
         &mut self,
         event_keys: Vec<EventKey>,
+        event_v2_tags: Vec<String>,
     ) -> Result<EventNotificationListener, Error> {
-        if event_keys.is_empty() {
+        if event_keys.is_empty() && event_v2_tags.is_empty() {
             return Err(Error::CannotSubscribeToZeroEventKeys);
         }
 
@@ -140,6 +143,15 @@ impl EventSubscriptionService {
         for event_key in event_keys {
             self.event_key_subscriptions
                 .entry(event_key)
+                .and_modify(|subscriptions| {
+                    subscriptions.insert(subscription_id);
+                })
+                .or_insert_with(|| HashSet::from_iter([subscription_id].iter().cloned()));
+        }
+
+        for event_tag in event_v2_tags {
+            self.event_v2_tag_subscriptions
+                .entry(event_tag)
                 .and_modify(|subscriptions| {
                     subscriptions.insert(subscription_id);
                 })
@@ -190,6 +202,17 @@ impl EventSubscriptionService {
         self.subscription_id_generator.next()
     }
 
+    fn is_new_epoch_event(&self, event: &ContractEvent) -> bool {
+        match event {
+            ContractEvent::V1(evt) => {
+                *evt.key() == on_chain_config::new_epoch_event_key()
+            }
+            ContractEvent::V2(_) => {
+                false
+            }
+        }
+    }
+
     /// This notifies all the event subscribers of the new events found at the
     /// specified version. If a reconfiguration event (i.e., new epoch) is found,
     /// this method will return true.
@@ -203,31 +226,36 @@ impl EventSubscriptionService {
 
         // TODO(eventv2): This doesn't deal with module events subscriptions.
         for event in events.iter() {
-            if let ContractEvent::V1(v1) = event {
-                let event_key = v1.key();
-
-                // Process all subscriptions for the current event
-                if let Some(subscription_ids) = self.event_key_subscriptions.get(event_key) {
-                    // Add the event to the subscription's pending event buffer
-                    // and store the subscriptions that will need to notified once all
-                    // events have been processed.
-                    for subscription_id in subscription_ids.iter() {
-                        if let Some(event_subscription) = self
-                            .subscription_id_to_event_subscription
-                            .get_mut(subscription_id)
-                        {
-                            event_subscription.buffer_event(event.clone());
-                            event_subscription_ids_to_notify.insert(*subscription_id);
-                        } else {
-                            return Err(Error::MissingEventSubscription(*subscription_id));
-                        }
+            // Process all subscriptions for the current event
+            // let maybe_subscription_ids = self.subscription_ids_by_event(event);
+            let maybe_subscription_ids = match event {
+                ContractEvent::V1(evt) => self.event_key_subscriptions.get(evt.key()),
+                ContractEvent::V2(evt) => {
+                    let tag = evt.type_tag().to_string();
+                    println!("[Oracle] EventNotification::notify_event_subscribers: tag={}", tag);
+                    self.event_v2_tag_subscriptions.get(&tag)
+                },
+            };
+            if let Some(subscription_ids) = maybe_subscription_ids {
+                // Add the event to the subscription's pending event buffer
+                // and store the subscriptions that will need to notified once all
+                // events have been processed.
+                for subscription_id in subscription_ids.iter() {
+                    if let Some(event_subscription) = self
+                        .subscription_id_to_event_subscription
+                        .get_mut(subscription_id)
+                    {
+                        event_subscription.buffer_event(event.clone());
+                        event_subscription_ids_to_notify.insert(*subscription_id);
+                    } else {
+                        return Err(Error::MissingEventSubscription(*subscription_id));
                     }
                 }
+            }
 
-                // Take note if a reconfiguration (new epoch) has occurred
-                if *event_key == on_chain_config::new_epoch_event_key() {
-                    reconfig_event_found = true;
-                }
+            // Take note if a reconfiguration (new epoch) has occurred
+            if self.is_new_epoch_event(event) {
+                reconfig_event_found = true;
             }
         }
 
