@@ -14,7 +14,7 @@ use crate::{
     error::Error,
     logging::{LogEntry, LogEvent, LogSchema},
     metrics,
-    metrics::{increment_counter, increment_counter_multiple, start_timer},
+    metrics::{increment_counter, increment_counter_multiple_labels, start_timer},
     stream_engine::{DataStreamEngine, StreamEngine},
     streaming_client::{NotificationFeedback, StreamRequest},
 };
@@ -275,10 +275,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
     ) -> PendingClientResponse {
         // Create a new pending client response
         let pending_client_response = Arc::new(Mutex::new(Box::new(
-            data_notification::PendingClientResponse {
-                client_request: data_client_request.clone(),
-                client_response: None,
-            },
+            data_notification::PendingClientResponse::new(data_client_request.clone()),
         )));
 
         // Calculate the request timeout to use, based on the
@@ -299,7 +296,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
             );
 
             // Update the retry counter and log the request
-            increment_counter_multiple(
+            increment_counter_multiple_labels(
                 &metrics::RETRIED_DATA_REQUESTS,
                 data_client_request.get_label(),
                 &request_timeout_ms.to_string(),
@@ -394,23 +391,53 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         // Process any ready data responses
         for _ in 0..self.get_max_concurrent_requests() {
             if let Some(pending_response) = self.pop_pending_response_queue()? {
+                // Get the client request and response information
                 let maybe_client_response = pending_response.lock().client_response.take();
                 let client_response = maybe_client_response.ok_or_else(|| {
                     Error::UnexpectedErrorEncountered("The client response should be ready!".into())
                 })?;
                 let client_request = &pending_response.lock().client_request.clone();
 
+                // Process the client response
                 match client_response {
                     Ok(client_response) => {
-                        if sanity_check_client_response(client_request, &client_response) {
+                        // Sanity check and process the response
+                        if sanity_check_client_response_type(client_request, &client_response) {
+                            // If the response wasn't enough to satisfy the original request (e.g.,
+                            // it was truncated), missing data should be requested.
+                            let missing_data_requested = self.missing_data_requested(
+                                client_request,
+                                client_response.payload.clone(),
+                            );
+
+                            // Send the data notification to the client
                             self.send_data_notification_to_client(client_request, client_response)
                                 .await?;
+
+                            // Check if any missing data was requested
+                            match missing_data_requested {
+                                Ok(missing_data_requested) => {
+                                    if missing_data_requested {
+                                        break; // We're now head of line blocked on the missing data
+                                    }
+                                },
+                                Err(error) => {
+                                    warn!(LogSchema::new(LogEntry::ReceivedDataResponse)
+                                        .stream_id(self.data_stream_id)
+                                        .event(LogEvent::Error)
+                                        .error(&error)
+                                        .message(
+                                            "Failed to determine if missing data was requested!"
+                                        ));
+                                },
+                            }
                         } else {
+                            // The sanity check failed
                             self.handle_sanity_check_failure(
                                 client_request,
                                 &client_response.context,
                             )?;
-                            break;
+                            break; // We're now head of line blocked on the failed request
                         }
                     },
                     Err(error) => {
@@ -425,18 +452,49 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                                 .notify_optimistic_fetch_timeout(client_request)?;
                         } else {
                             self.handle_data_client_error(client_request, &error)?;
-                        };
-                        break;
+                        }
+                        break; // We're now head of line blocked on the failed request
                     },
                 }
             } else {
-                break; // The first response hasn't arrived yet.
+                break; // The first response hasn't arrived yet
             }
         }
 
         // Create and send further client requests to the network
         // to ensure we're maximizing the number of concurrent requests.
         self.create_and_send_client_requests(&global_data_summary)
+    }
+
+    /// Returns true iff we requested missing data from a previous
+    /// client response.
+    fn missing_data_requested(
+        &mut self,
+        data_client_request: &DataClientRequest,
+        response_payload: ResponsePayload,
+    ) -> Result<bool, Error> {
+        // Identify if any missing data needs to be requested
+        if let Some(missing_data_request) =
+            create_missing_data_request(data_client_request, response_payload)?
+        {
+            // Increment the missing client request counter
+            increment_counter(
+                &metrics::SENT_DATA_REQUESTS_FOR_MISSING_DATA,
+                data_client_request.get_label(),
+            );
+
+            // Send the missing data request
+            let pending_client_response =
+                self.send_client_request(false, missing_data_request.clone());
+
+            // Push the pending response to the front of the queue
+            self.get_sent_data_requests()?
+                .push_front(pending_client_response);
+
+            return Ok(true); // Missing data was requested
+        }
+
+        Ok(false) // No missing data was requested
     }
 
     /// Pops and returns the first pending client response if the response has
@@ -711,9 +769,271 @@ impl FusedStream for DataStreamListener {
     }
 }
 
-/// Returns true iff the data client response payload matches the expected type
-/// of the original request. No other sanity checks are done.
-fn sanity_check_client_response(
+/// Creates and returns a missing data request if the given client response
+/// doesn't satisfy the original request. If the request is satisfied,
+/// None is returned.
+pub(crate) fn create_missing_data_request(
+    data_client_request: &DataClientRequest,
+    response_payload: ResponsePayload,
+) -> Result<Option<DataClientRequest>, Error> {
+    // Determine if the request was satisfied, and if not, create
+    // a missing data request to satisfy the original request.
+    match data_client_request {
+        DataClientRequest::EpochEndingLedgerInfos(request) => {
+            create_missing_epoch_ending_ledger_infos_request(request, &response_payload)
+        },
+        DataClientRequest::StateValuesWithProof(request) => {
+            create_missing_state_values_request(request, &response_payload)
+        },
+        DataClientRequest::TransactionsWithProof(request) => {
+            create_missing_transactions_request(request, &response_payload)
+        },
+        DataClientRequest::TransactionOutputsWithProof(request) => {
+            create_missing_transaction_outputs_request(request, &response_payload)
+        },
+        DataClientRequest::TransactionsOrOutputsWithProof(request) => {
+            create_missing_transactions_or_outputs_request(request, &response_payload)
+        },
+        _ => Ok(None), // The request was trivially satisfied (based on the type)
+    }
+}
+
+/// Creates and returns a missing epoch ending ledger info request if the
+/// given client response doesn't satisfy the original request. If the request
+/// is satisfied, None is returned.
+fn create_missing_epoch_ending_ledger_infos_request(
+    request: &EpochEndingLedgerInfosRequest,
+    response_payload: &ResponsePayload,
+) -> Result<Option<DataClientRequest>, Error> {
+    // Determine the number of requested ledger infos
+    let num_requested_ledger_infos = request
+        .end_epoch
+        .checked_sub(request.start_epoch)
+        .and_then(|v| v.checked_add(1))
+        .ok_or_else(|| {
+            Error::IntegerOverflow("Number of requested ledger infos has overflown!".into())
+        })?;
+
+    // Identify the missing data if the request was not satisfied
+    match response_payload {
+        ResponsePayload::EpochEndingLedgerInfos(ledger_infos) => {
+            // Check if the request was satisfied
+            let num_received_ledger_infos = ledger_infos.len() as u64;
+            if num_received_ledger_infos < num_requested_ledger_infos {
+                let start_epoch = request
+                    .start_epoch
+                    .checked_add(num_received_ledger_infos)
+                    .ok_or_else(|| Error::IntegerOverflow("Start epoch has overflown!".into()))?;
+                Ok(Some(DataClientRequest::EpochEndingLedgerInfos(
+                    EpochEndingLedgerInfosRequest {
+                        start_epoch,
+                        end_epoch: request.end_epoch,
+                    },
+                )))
+            } else {
+                Ok(None) // The request was satisfied!
+            }
+        },
+        payload => Err(Error::AptosDataClientResponseIsInvalid(format!(
+            "Invalid response payload found for epoch ending ledger info request: {:?}",
+            payload
+        ))),
+    }
+}
+
+/// Creates and returns a missing state values request if the given client
+/// response doesn't satisfy the original request. If the request is satisfied,
+/// None is returned.
+fn create_missing_state_values_request(
+    request: &StateValuesWithProofRequest,
+    response_payload: &ResponsePayload,
+) -> Result<Option<DataClientRequest>, Error> {
+    // Determine the number of requested state values
+    let num_requested_state_values = request
+        .end_index
+        .checked_sub(request.start_index)
+        .and_then(|v| v.checked_add(1))
+        .ok_or_else(|| {
+            Error::IntegerOverflow("Number of requested state values has overflown!".into())
+        })?;
+
+    // Identify the missing data if the request was not satisfied
+    match response_payload {
+        ResponsePayload::StateValuesWithProof(state_values_with_proof) => {
+            // Check if the request was satisfied
+            let num_received_state_values = state_values_with_proof.raw_values.len() as u64;
+            if num_received_state_values < num_requested_state_values {
+                let start_index = request
+                    .start_index
+                    .checked_add(num_received_state_values)
+                    .ok_or_else(|| Error::IntegerOverflow("Start index has overflown!".into()))?;
+                Ok(Some(DataClientRequest::StateValuesWithProof(
+                    StateValuesWithProofRequest {
+                        version: request.version,
+                        start_index,
+                        end_index: request.end_index,
+                    },
+                )))
+            } else {
+                Ok(None) // The request was satisfied!
+            }
+        },
+        payload => Err(Error::AptosDataClientResponseIsInvalid(format!(
+            "Invalid response payload found for state values request: {:?}",
+            payload
+        ))),
+    }
+}
+
+/// Creates and returns a missing transactions request if the given client
+/// response doesn't satisfy the original request. If the request is satisfied,
+/// None is returned.
+fn create_missing_transactions_request(
+    request: &TransactionsWithProofRequest,
+    response_payload: &ResponsePayload,
+) -> Result<Option<DataClientRequest>, Error> {
+    // Determine the number of requested transactions
+    let num_requested_transactions = request
+        .end_version
+        .checked_sub(request.start_version)
+        .and_then(|v| v.checked_add(1))
+        .ok_or_else(|| {
+            Error::IntegerOverflow("Number of requested transactions has overflown!".into())
+        })?;
+
+    // Identify the missing data if the request was not satisfied
+    match response_payload {
+        ResponsePayload::TransactionsWithProof(transactions_with_proof) => {
+            // Check if the request was satisfied
+            let num_received_transactions = transactions_with_proof.transactions.len() as u64;
+            if num_received_transactions < num_requested_transactions {
+                let start_version = request
+                    .start_version
+                    .checked_add(num_received_transactions)
+                    .ok_or_else(|| Error::IntegerOverflow("Start version has overflown!".into()))?;
+                Ok(Some(DataClientRequest::TransactionsWithProof(
+                    TransactionsWithProofRequest {
+                        start_version,
+                        end_version: request.end_version,
+                        proof_version: request.proof_version,
+                        include_events: request.include_events,
+                    },
+                )))
+            } else {
+                Ok(None) // The request was satisfied!
+            }
+        },
+        payload => Err(Error::AptosDataClientResponseIsInvalid(format!(
+            "Invalid response payload found for transactions request: {:?}",
+            payload
+        ))),
+    }
+}
+
+/// Creates and returns a missing transaction outputs request if the given client
+/// response doesn't satisfy the original request. If the request is satisfied,
+/// None is returned.
+fn create_missing_transaction_outputs_request(
+    request: &TransactionOutputsWithProofRequest,
+    response_payload: &ResponsePayload,
+) -> Result<Option<DataClientRequest>, Error> {
+    // Determine the number of requested transaction outputs
+    let num_requested_outputs = request
+        .end_version
+        .checked_sub(request.start_version)
+        .and_then(|v| v.checked_add(1))
+        .ok_or_else(|| {
+            Error::IntegerOverflow("Number of requested transaction outputs has overflown!".into())
+        })?;
+
+    // Identify the missing data if the request was not satisfied
+    match response_payload {
+        ResponsePayload::TransactionOutputsWithProof(transaction_outputs_with_proof) => {
+            // Check if the request was satisfied
+            let num_received_outputs = transaction_outputs_with_proof
+                .transactions_and_outputs
+                .len() as u64;
+            if num_received_outputs < num_requested_outputs {
+                let start_version = request
+                    .start_version
+                    .checked_add(num_received_outputs)
+                    .ok_or_else(|| Error::IntegerOverflow("Start version has overflown!".into()))?;
+                Ok(Some(DataClientRequest::TransactionOutputsWithProof(
+                    TransactionOutputsWithProofRequest {
+                        start_version,
+                        end_version: request.end_version,
+                        proof_version: request.proof_version,
+                    },
+                )))
+            } else {
+                Ok(None) // The request was satisfied!
+            }
+        },
+        payload => Err(Error::AptosDataClientResponseIsInvalid(format!(
+            "Invalid response payload found for transaction outputs request: {:?}",
+            payload
+        ))),
+    }
+}
+
+/// Creates and returns a missing transactions or outputs request if the
+/// given client response doesn't satisfy the original request. If the request
+/// is satisfied, None is returned.
+fn create_missing_transactions_or_outputs_request(
+    request: &TransactionsOrOutputsWithProofRequest,
+    response_payload: &ResponsePayload,
+) -> Result<Option<DataClientRequest>, Error> {
+    // Determine the number of requested transactions or outputs
+    let num_request_data_items = request
+        .end_version
+        .checked_sub(request.start_version)
+        .and_then(|v| v.checked_add(1))
+        .ok_or_else(|| {
+            Error::IntegerOverflow(
+                "Number of requested transactions or outputs has overflown!".into(),
+            )
+        })?;
+
+    // Calculate the number of received data items
+    let num_received_data_items = match response_payload {
+        ResponsePayload::TransactionsWithProof(transactions_with_proof) => {
+            transactions_with_proof.transactions.len() as u64
+        },
+        ResponsePayload::TransactionOutputsWithProof(transaction_outputs_with_proof) => {
+            transaction_outputs_with_proof
+                .transactions_and_outputs
+                .len() as u64
+        },
+        payload => {
+            return Err(Error::AptosDataClientResponseIsInvalid(format!(
+                "Invalid response payload found for transactions or outputs request: {:?}",
+                payload
+            )))
+        },
+    };
+
+    // Identify the missing data if the request was not satisfied
+    if num_received_data_items < num_request_data_items {
+        let start_version = request
+            .start_version
+            .checked_add(num_received_data_items)
+            .ok_or_else(|| Error::IntegerOverflow("Start version has overflown!".into()))?;
+        Ok(Some(DataClientRequest::TransactionsOrOutputsWithProof(
+            TransactionsOrOutputsWithProofRequest {
+                start_version,
+                end_version: request.end_version,
+                proof_version: request.proof_version,
+                include_events: request.include_events,
+            },
+        )))
+    } else {
+        Ok(None) // The request was satisfied!
+    }
+}
+
+/// Returns true iff the data client response payload type matches the
+/// expected type of the original request. No other sanity checks are done.
+fn sanity_check_client_response_type(
     data_client_request: &DataClientRequest,
     data_client_response: &Response<ResponsePayload>,
 ) -> bool {
