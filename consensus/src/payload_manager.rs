@@ -66,7 +66,6 @@ impl PayloadManager {
         match self {
             PayloadManager::DirectMempool => {},
             PayloadManager::InQuorumStore(batch_reader, coordinator_tx) => {
-                // TODO: move this to somewhere in quorum store, so this can be a batch reader
                 batch_reader.update_certified_timestamp(block_timestamp);
 
                 let batches: Vec<_> = payloads

@@ -1,14 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    quorum_store::{
-        batch_requester::BatchRequester,
-        batch_store::{BatchStore, QuotaManager},
-        quorum_store_db::QuorumStoreDB,
-        types::{PersistedValue, StorageMode},
-    },
-    test_utils::mock_quorum_store_sender::MockQuorumStoreSender,
+use crate::quorum_store::{
+    batch_store::{BatchStore, QuotaManager},
+    quorum_store_db::QuorumStoreDB,
+    types::{PersistedValue, StorageMode},
 };
 use aptos_consensus_types::proof_of_store::{BatchId, BatchInfo};
 use aptos_crypto::HashValue;
@@ -23,24 +19,13 @@ use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
     Arc,
 };
-use tokio::{sync::mpsc::channel, task::spawn_blocking};
+use tokio::task::spawn_blocking;
 
 static TEST_REQUEST_ACCOUNT: Lazy<AccountAddress> = Lazy::new(AccountAddress::random);
 
 fn batch_store_for_test(memory_quota: usize) -> Arc<BatchStore> {
     let tmp_dir = TempPath::new();
     let db = Arc::new(QuorumStoreDB::new(&tmp_dir));
-    let (tx, _rx) = channel(10);
-    // TODO: remove completely?
-    let _requester = BatchRequester::new(
-        10,
-        AccountAddress::random(),
-        1,
-        1,
-        1,
-        1,
-        MockQuorumStoreSender::new(tx),
-    );
     let (signers, _validator_verifier) = random_validator_verifier(4, None, false);
 
     Arc::new(BatchStore::new(
