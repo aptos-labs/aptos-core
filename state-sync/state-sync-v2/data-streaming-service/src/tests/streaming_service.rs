@@ -4,6 +4,7 @@
 
 use crate::{
     data_notification::DataPayload,
+    data_stream::DataStreamListener,
     error::Error,
     streaming_client::{
         new_streaming_service_client_listener_pair, DataStreamingClient, NotificationAndFeedback,
@@ -19,6 +20,10 @@ use crate::{
     },
 };
 use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
+use aptos_types::{
+    ledger_info::LedgerInfoWithSignatures,
+    transaction::{TransactionListWithProof, TransactionOutputListWithProof},
+};
 use claims::{assert_le, assert_matches, assert_ok, assert_some};
 
 macro_rules! unexpected_payload_type {
@@ -38,91 +43,23 @@ async fn test_notifications_state_values() {
         .await
         .unwrap();
 
-    // Read the data notifications from the stream and verify index ordering
-    let mut next_expected_index = 0;
-    loop {
-        let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
-        match data_notification.data_payload {
-            DataPayload::StateValuesWithProof(state_values_with_proof) => {
-                // Verify the start index matches the expected index
-                assert_eq!(state_values_with_proof.first_index, next_expected_index);
-
-                // Verify the last index matches the state value list length
-                let num_state_values = state_values_with_proof.raw_values.len() as u64;
-                assert_eq!(
-                    state_values_with_proof.last_index,
-                    next_expected_index + num_state_values - 1,
-                );
-
-                // Verify the number of state values is as expected
-                assert_eq!(
-                    state_values_with_proof.raw_values.len() as u64,
-                    num_state_values
-                );
-
-                next_expected_index += num_state_values;
-            },
-            DataPayload::EndOfStream => {
-                return assert_eq!(next_expected_index, TOTAL_NUM_STATE_VALUES)
-            },
-            data_payload => unexpected_payload_type!(data_payload),
-        }
-    }
+    // Verify that the stream listener receives all state value notifications
+    verify_continuous_state_value_notifications(&mut stream_listener).await
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_notifications_state_values_limited_chunks() {
-    // Create a new streaming client and service
+    // Create a new streaming client and service where chunks may be truncated
     let streaming_client = create_streaming_client_and_service_with_chunk_limits();
 
     // Request a new state value stream starting at the next expected index
-    let mut next_expected_index = 0;
     let mut stream_listener = streaming_client
-        .get_all_state_values(MAX_ADVERTISED_STATES, Some(next_expected_index))
+        .get_all_state_values(MAX_ADVERTISED_STATES, Some(0))
         .await
         .unwrap();
 
-    // Terminate and request streams when the chunks are no longer contiguous
-    loop {
-        let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
-        let reset_stream = match data_notification.data_payload {
-            DataPayload::StateValuesWithProof(state_values_with_proof) => {
-                if state_values_with_proof.first_index == next_expected_index {
-                    next_expected_index += state_values_with_proof.raw_values.len() as u64;
-                    false
-                } else {
-                    true // We hit a non-contiguous chunk
-                }
-            },
-            DataPayload::EndOfStream => {
-                if next_expected_index != TOTAL_NUM_STATE_VALUES {
-                    true // The stream thought it had completed, but the chunk was incomplete
-                } else {
-                    return; // All data was received!
-                }
-            },
-            data_payload => unexpected_payload_type!(data_payload),
-        };
-
-        if reset_stream {
-            // Terminate the stream and fetch a new one (we hit non-contiguous data)
-            streaming_client
-                .terminate_stream_with_feedback(
-                    stream_listener.data_stream_id,
-                    Some(NotificationAndFeedback::new(
-                        data_notification.notification_id,
-                        NotificationFeedback::InvalidPayloadData,
-                    )),
-                )
-                .await
-                .unwrap();
-
-            stream_listener = streaming_client
-                .get_all_state_values(MAX_ADVERTISED_STATES, Some(next_expected_index))
-                .await
-                .unwrap();
-        }
-    }
+    // Verify that the stream listener receives all state value notifications
+    verify_continuous_state_value_notifications(&mut stream_listener).await
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -144,8 +81,11 @@ async fn test_notifications_state_values_multiple_streams() {
             DataPayload::StateValuesWithProof(state_values_with_proof) => {
                 // Verify the indices
                 assert_eq!(state_values_with_proof.first_index, next_expected_index);
+
+                // Update the next expected index
                 next_expected_index += state_values_with_proof.raw_values.len() as u64;
 
+                // Terminate the stream if we haven't reached the end
                 if next_expected_index < TOTAL_NUM_STATE_VALUES {
                     // Terminate the stream
                     streaming_client
@@ -167,7 +107,8 @@ async fn test_notifications_state_values_multiple_streams() {
                 }
             },
             DataPayload::EndOfStream => {
-                return assert_eq!(next_expected_index, TOTAL_NUM_STATE_VALUES)
+                assert_eq!(next_expected_index, TOTAL_NUM_STATE_VALUES);
+                return; // We've reached the end
             },
             data_payload => unexpected_payload_type!(data_payload),
         }
@@ -189,40 +130,27 @@ async fn test_notifications_continuous_outputs() {
         .await
         .unwrap();
 
-    // Read the data notifications from the stream and verify the payloads
-    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
-    let mut next_expected_version = MIN_ADVERTISED_TRANSACTION_OUTPUT;
-    loop {
-        if let Ok(data_notification) = get_data_notification(&mut stream_listener).await {
-            match data_notification.data_payload {
-                DataPayload::ContinuousTransactionOutputsWithProof(
-                    ledger_info_with_sigs,
-                    outputs_with_proofs,
-                ) => {
-                    let ledger_info = ledger_info_with_sigs.ledger_info();
-                    // Verify the epoch of the ledger info
-                    assert_eq!(ledger_info.epoch(), next_expected_epoch);
+    // Verify that the stream listener receives all output notifications
+    verify_continuous_output_notifications(&mut stream_listener, false).await
+}
 
-                    // Verify the output start version matches the expected version
-                    let first_output_version = outputs_with_proofs.first_transaction_output_version;
-                    assert_eq!(Some(next_expected_version), first_output_version);
+#[tokio::test(flavor = "multi_thread")]
+async fn test_notifications_continuous_outputs_limited_chunks() {
+    // Create a new streaming client and service where chunks may be truncated
+    let streaming_client = create_streaming_client_and_service_with_chunk_limits();
 
-                    let num_outputs = outputs_with_proofs.transactions_and_outputs.len() as u64;
-                    next_expected_version += num_outputs;
+    // Request a continuous output stream starting at the next expected version
+    let mut stream_listener = streaming_client
+        .continuously_stream_transaction_outputs(
+            MIN_ADVERTISED_TRANSACTION_OUTPUT - 1,
+            MIN_ADVERTISED_EPOCH_END,
+            None,
+        )
+        .await
+        .unwrap();
 
-                    // Update epochs if we've hit the epoch end
-                    let last_output_version = first_output_version.unwrap() + num_outputs - 1;
-                    if ledger_info.version() == last_output_version && ledger_info.ends_epoch() {
-                        next_expected_epoch += 1;
-                    }
-                },
-                data_payload => unexpected_payload_type!(data_payload),
-            }
-        } else {
-            assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH_END + 1);
-            return assert_eq!(next_expected_version, MAX_ADVERTISED_TRANSACTION_OUTPUT + 1);
-        }
-    }
+    // Verify that the stream listener receives all output notifications
+    verify_continuous_output_notifications(&mut stream_listener, false).await
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -252,14 +180,15 @@ async fn test_notifications_continuous_outputs_target() {
                 ledger_info_with_sigs,
                 outputs_with_proofs,
             ) => {
-                let ledger_info = ledger_info_with_sigs.ledger_info();
                 // Verify the epoch of the ledger info
+                let ledger_info = ledger_info_with_sigs.ledger_info();
                 assert_eq!(ledger_info.epoch(), next_expected_epoch);
 
                 // Verify the output start version matches the expected version
                 let first_output_version = outputs_with_proofs.first_transaction_output_version;
                 assert_eq!(Some(next_expected_version), first_output_version);
 
+                // Update the next expected version
                 let num_outputs = outputs_with_proofs.transactions_and_outputs.len() as u64;
                 next_expected_version += num_outputs;
 
@@ -273,84 +202,6 @@ async fn test_notifications_continuous_outputs_target() {
                 return assert_eq!(next_expected_version, target_version + 1)
             },
             data_payload => unexpected_payload_type!(data_payload),
-        }
-    }
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn test_notifications_continuous_outputs_limited_chunks() {
-    // Create a new streaming client and service
-    let streaming_client = create_streaming_client_and_service_with_chunk_limits();
-    let end_epoch = MIN_ADVERTISED_EPOCH_END + 5;
-
-    // Request a continuous output stream starting at the next expected version
-    let mut next_expected_version = MIN_ADVERTISED_TRANSACTION_OUTPUT;
-    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
-    let mut stream_listener = streaming_client
-        .continuously_stream_transaction_outputs(
-            next_expected_version - 1,
-            next_expected_epoch,
-            None,
-        )
-        .await
-        .unwrap();
-
-    // Terminate and request new streams when the chunks are no longer contiguous
-    loop {
-        let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
-        let reset_stream = match data_notification.data_payload {
-            DataPayload::ContinuousTransactionOutputsWithProof(
-                ledger_info_with_sigs,
-                outputs_with_proofs,
-            ) => {
-                let first_output_version = outputs_with_proofs
-                    .first_transaction_output_version
-                    .unwrap();
-                let num_outputs = outputs_with_proofs.transactions_and_outputs.len() as u64;
-                let last_output_version = first_output_version + num_outputs - 1;
-
-                if first_output_version == next_expected_version {
-                    // Update the next version and epoch (if applicable)
-                    next_expected_version += num_outputs;
-                    let ledger_info = ledger_info_with_sigs.ledger_info();
-                    if ledger_info.version() == last_output_version && ledger_info.ends_epoch() {
-                        next_expected_epoch += 1;
-                    }
-
-                    // Check if we've hit the target epoch
-                    if next_expected_epoch > end_epoch {
-                        return; // All data was received!
-                    }
-
-                    false
-                } else {
-                    true // We hit a non-contiguous chunk
-                }
-            },
-            data_payload => unexpected_payload_type!(data_payload),
-        };
-
-        if reset_stream {
-            // Terminate the stream and fetch a new one (we hit non-contiguous data)
-            streaming_client
-                .terminate_stream_with_feedback(
-                    stream_listener.data_stream_id,
-                    Some(NotificationAndFeedback::new(
-                        data_notification.notification_id,
-                        NotificationFeedback::InvalidPayloadData,
-                    )),
-                )
-                .await
-                .unwrap();
-
-            stream_listener = streaming_client
-                .continuously_stream_transaction_outputs(
-                    next_expected_version - 1,
-                    next_expected_epoch,
-                    None,
-                )
-                .await
-                .unwrap();
         }
     }
 }
@@ -381,17 +232,22 @@ async fn test_notifications_continuous_outputs_multiple_streams() {
                 ledger_info_with_sigs,
                 outputs_with_proofs,
             ) => {
+                // Verify the first output version
                 let first_output_version = outputs_with_proofs.first_transaction_output_version;
                 assert_eq!(Some(next_expected_version), first_output_version);
 
+                // Update the next expected version
                 let num_outputs = outputs_with_proofs.transactions_and_outputs.len() as u64;
                 next_expected_version += num_outputs;
 
+                // Update the next expected epoch if we've hit the epoch end
                 let last_output_version = first_output_version.unwrap() + num_outputs - 1;
                 let ledger_info = ledger_info_with_sigs.ledger_info();
                 if ledger_info.version() == last_output_version && ledger_info.ends_epoch() {
                     next_expected_epoch += 1;
                 }
+
+                // Terminate the stream if we haven't reached the end
                 if next_expected_version < MAX_ADVERTISED_TRANSACTION_OUTPUT {
                     // Terminate the stream
                     streaming_client
@@ -415,6 +271,8 @@ async fn test_notifications_continuous_outputs_multiple_streams() {
                         .await
                         .unwrap();
                 }
+
+                // Check if we've reached the end
                 if next_expected_epoch > end_epoch {
                     return;
                 }
@@ -440,126 +298,28 @@ async fn test_notifications_continuous_transactions() {
         .await
         .unwrap();
 
-    // Read the data notifications from the stream and verify the payloads
-    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
-    let mut next_expected_version = MIN_ADVERTISED_TRANSACTION;
-    loop {
-        if let Ok(data_notification) = get_data_notification(&mut stream_listener).await {
-            match data_notification.data_payload {
-                DataPayload::ContinuousTransactionsWithProof(
-                    ledger_info_with_sigs,
-                    transactions_with_proof,
-                ) => {
-                    let ledger_info = ledger_info_with_sigs.ledger_info();
-                    // Verify the epoch of the ledger info
-                    assert_eq!(ledger_info.epoch(), next_expected_epoch);
-
-                    // Verify the transaction start version matches the expected version
-                    let first_transaction_version =
-                        transactions_with_proof.first_transaction_version;
-                    assert_eq!(Some(next_expected_version), first_transaction_version);
-
-                    // Verify the payload contains events
-                    assert_some!(transactions_with_proof.events);
-
-                    let num_transactions = transactions_with_proof.transactions.len() as u64;
-                    next_expected_version += num_transactions;
-
-                    // Update epochs if we've hit the epoch end
-                    let last_transaction_version =
-                        first_transaction_version.unwrap() + num_transactions - 1;
-                    if ledger_info.version() == last_transaction_version && ledger_info.ends_epoch()
-                    {
-                        next_expected_epoch += 1;
-                    }
-                },
-                data_payload => unexpected_payload_type!(data_payload),
-            }
-        } else {
-            assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH_END + 1);
-            return assert_eq!(next_expected_version, MAX_ADVERTISED_TRANSACTION + 1);
-        }
-    }
+    // Verify that the stream listener receives all transaction notifications
+    verify_continuous_transaction_notifications(&mut stream_listener, false).await
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_notifications_continuous_transactions_limited_chunks() {
-    // Create a new streaming client and service
+    // Create a new streaming client and service where chunks may be truncated
     let streaming_client = create_streaming_client_and_service_with_chunk_limits();
-    let end_epoch = MIN_ADVERTISED_EPOCH_END + 5;
 
     // Request a continuous transaction stream and get a data stream listener
-    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
-    let mut next_expected_version = MIN_ADVERTISED_TRANSACTION;
     let mut stream_listener = streaming_client
         .continuously_stream_transactions(
-            next_expected_version - 1,
-            next_expected_epoch,
+            MIN_ADVERTISED_TRANSACTION - 1,
+            MIN_ADVERTISED_EPOCH_END,
             true,
             None,
         )
         .await
         .unwrap();
 
-    // Terminate and request new streams when the chunks are no longer contiguous
-    loop {
-        let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
-        let reset_stream = match data_notification.data_payload {
-            DataPayload::ContinuousTransactionsWithProof(
-                ledger_info_with_sigs,
-                transactions_with_proofs,
-            ) => {
-                let first_transaction_version =
-                    transactions_with_proofs.first_transaction_version.unwrap();
-                let num_transactions = transactions_with_proofs.transactions.len() as u64;
-                let last_transaction_version = first_transaction_version + num_transactions - 1;
-
-                if first_transaction_version == next_expected_version {
-                    // Update the next version and epoch (if applicable)
-                    next_expected_version += num_transactions;
-                    let ledger_info = ledger_info_with_sigs.ledger_info();
-                    if ledger_info.version() == last_transaction_version && ledger_info.ends_epoch()
-                    {
-                        next_expected_epoch += 1;
-                    }
-
-                    // Check if we've hit the target epoch
-                    if next_expected_epoch > end_epoch {
-                        return; // All data was received!
-                    }
-
-                    false
-                } else {
-                    true // We hit a non-contiguous chunk
-                }
-            },
-            data_payload => unexpected_payload_type!(data_payload),
-        };
-
-        if reset_stream {
-            // Terminate the stream and fetch a new one (we hit non-contiguous data)
-            streaming_client
-                .terminate_stream_with_feedback(
-                    stream_listener.data_stream_id,
-                    Some(NotificationAndFeedback::new(
-                        data_notification.notification_id,
-                        NotificationFeedback::InvalidPayloadData,
-                    )),
-                )
-                .await
-                .unwrap();
-
-            stream_listener = streaming_client
-                .continuously_stream_transactions(
-                    next_expected_version - 1,
-                    next_expected_epoch,
-                    true,
-                    None,
-                )
-                .await
-                .unwrap();
-        }
-    }
+    // Verify that the stream listener receives all transaction notifications
+    verify_continuous_transaction_notifications(&mut stream_listener, false).await
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -590,8 +350,8 @@ async fn test_notifications_continuous_transactions_target() {
                 ledger_info_with_sigs,
                 transactions_with_proof,
             ) => {
-                let ledger_info = ledger_info_with_sigs.ledger_info();
                 // Verify the epoch of the ledger info
+                let ledger_info = ledger_info_with_sigs.ledger_info();
                 assert_eq!(ledger_info.epoch(), next_expected_epoch);
 
                 // Verify the transaction start version matches the expected version
@@ -601,6 +361,7 @@ async fn test_notifications_continuous_transactions_target() {
                 // Verify the payload contains events
                 assert_some!(transactions_with_proof.events);
 
+                // Update the next expected version
                 let num_transactions = transactions_with_proof.transactions.len() as u64;
                 next_expected_version += num_transactions;
 
@@ -620,32 +381,78 @@ async fn test_notifications_continuous_transactions_target() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_notifications_epoch_ending() {
+async fn test_notifications_continuous_transactions_multiple_streams() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
+    let end_epoch = MIN_ADVERTISED_EPOCH_END + 5;
 
-    // Request an epoch ending stream and get a data stream listener
+    // Request a continuous transaction stream starting at the next expected version
+    let mut next_expected_version = MIN_ADVERTISED_TRANSACTION;
+    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
     let mut stream_listener = streaming_client
-        .get_all_epoch_ending_ledger_infos(MIN_ADVERTISED_EPOCH_END)
+        .continuously_stream_transactions(
+            next_expected_version - 1,
+            next_expected_epoch,
+            true,
+            None,
+        )
         .await
         .unwrap();
 
-    // Read the data notifications from the stream and verify epoch ordering
-    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
+    // Terminate and request new transaction streams at increasing versions
     loop {
         let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
         match data_notification.data_payload {
-            DataPayload::EpochEndingLedgerInfos(ledger_infos_with_sigs) => {
-                // Verify the epochs of the ledger infos are contiguous
-                for ledger_info_with_sigs in ledger_infos_with_sigs {
-                    let epoch = ledger_info_with_sigs.ledger_info().commit_info().epoch();
-                    assert_eq!(next_expected_epoch, epoch);
-                    assert_le!(epoch, MAX_ADVERTISED_EPOCH_END);
+            DataPayload::ContinuousTransactionsWithProof(
+                ledger_info_with_sigs,
+                transactions_with_proofs,
+            ) => {
+                // Verify the first transaction version
+                let first_transaction_version = transactions_with_proofs.first_transaction_version;
+                assert_eq!(Some(next_expected_version), first_transaction_version);
+
+                // Update the next expected version
+                let num_transactions = transactions_with_proofs.transactions.len() as u64;
+                next_expected_version += num_transactions;
+
+                // Update the next expected epoch if we've hit the epoch end
+                let last_transaction_version =
+                    first_transaction_version.unwrap() + num_transactions - 1;
+                let ledger_info = ledger_info_with_sigs.ledger_info();
+                if ledger_info.version() == last_transaction_version && ledger_info.ends_epoch() {
                     next_expected_epoch += 1;
                 }
-            },
-            DataPayload::EndOfStream => {
-                return assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH_END + 1)
+
+                // Terminate the stream if we haven't reached the end
+                if next_expected_version < MAX_ADVERTISED_TRANSACTION_OUTPUT {
+                    // Terminate the stream
+                    streaming_client
+                        .terminate_stream_with_feedback(
+                            stream_listener.data_stream_id,
+                            Some(NotificationAndFeedback::new(
+                                data_notification.notification_id,
+                                NotificationFeedback::InvalidPayloadData,
+                            )),
+                        )
+                        .await
+                        .unwrap();
+
+                    // Fetch a new stream
+                    stream_listener = streaming_client
+                        .continuously_stream_transactions(
+                            next_expected_version - 1,
+                            next_expected_epoch,
+                            true,
+                            None,
+                        )
+                        .await
+                        .unwrap();
+                }
+
+                // Check if we've reached the end
+                if next_expected_epoch > end_epoch {
+                    return;
+                }
             },
             data_payload => unexpected_payload_type!(data_payload),
         }
@@ -653,42 +460,202 @@ async fn test_notifications_epoch_ending() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_notifications_epoch_ending_limited_chunks() {
+async fn test_notifications_continuous_transactions_or_outputs() {
     // Create a new streaming client and service
-    let streaming_client = create_streaming_client_and_service_with_chunk_limits();
+    let streaming_client = create_streaming_client_and_service();
 
-    // Request a new epoch ending stream starting at the next expected index.
-    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
+    // Request a continuous transaction or output stream and get a data stream listener
     let mut stream_listener = streaming_client
-        .get_all_epoch_ending_ledger_infos(next_expected_epoch)
+        .continuously_stream_transactions_or_outputs(
+            MIN_ADVERTISED_TRANSACTION - 1,
+            MIN_ADVERTISED_EPOCH_END,
+            true,
+            None,
+        )
         .await
         .unwrap();
 
-    // Terminate and request streams when the chunks are no longer contiguous
+    // Verify that the stream listener receives all transaction or output notifications
+    verify_continuous_transaction_or_output_notifications(&mut stream_listener, false).await
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_notifications_continuous_transactions_or_outputs_limited_chunks() {
+    // Create a new streaming client and service where chunks may be truncated
+    let streaming_client = create_streaming_client_and_service_with_chunk_limits();
+
+    // Request a continuous transaction or output stream and get a data stream listener
+    let mut stream_listener = streaming_client
+        .continuously_stream_transactions_or_outputs(
+            MIN_ADVERTISED_TRANSACTION - 1,
+            MIN_ADVERTISED_EPOCH_END,
+            true,
+            None,
+        )
+        .await
+        .unwrap();
+
+    // Verify that the stream listener receives all transaction or output notifications
+    verify_continuous_transaction_or_output_notifications(&mut stream_listener, false).await
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_notifications_continuous_transactions_or_outputs_target() {
+    // Create a new streaming client and service
+    let streaming_client = create_streaming_client_and_service();
+
+    // Request a continuous transaction or output stream and get a data stream listener
+    let target_version = MAX_ADVERTISED_TRANSACTION - 101;
+    let target = create_ledger_info(target_version, MAX_ADVERTISED_EPOCH_END, true);
+    let mut stream_listener = streaming_client
+        .continuously_stream_transactions_or_outputs(
+            MIN_ADVERTISED_TRANSACTION - 1,
+            MIN_ADVERTISED_EPOCH_END,
+            true,
+            Some(target),
+        )
+        .await
+        .unwrap();
+
+    // Read the data notifications from the stream and verify the payloads
+    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
+    let mut next_expected_version = MIN_ADVERTISED_TRANSACTION;
     loop {
         let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
-        let reset_stream = match data_notification.data_payload {
-            DataPayload::EpochEndingLedgerInfos(ledger_infos_with_sigs) => {
-                let first_ledger_info_epoch = ledger_infos_with_sigs[0].ledger_info().epoch();
-                if first_ledger_info_epoch == next_expected_epoch {
-                    next_expected_epoch += ledger_infos_with_sigs.len() as u64;
-                    false
-                } else {
-                    true // We hit a non-contiguous chunk
-                }
-            },
-            DataPayload::EndOfStream => {
-                if next_expected_epoch != MAX_ADVERTISED_EPOCH_END + 1 {
-                    true // The stream thought it had completed, but the chunk was incomplete
-                } else {
-                    return; // All data was received!
-                }
-            },
-            data_payload => unexpected_payload_type!(data_payload),
-        };
 
-        if reset_stream {
-            // Terminate the stream and fetch a new one (we hit non-contiguous data)
+        // Extract the ledger info and transactions or outputs with proof
+        let (ledger_info_with_sigs, transactions_with_proof, outputs_with_proof) =
+            match data_notification.data_payload {
+                DataPayload::ContinuousTransactionsWithProof(
+                    ledger_info_with_sigs,
+                    transactions_with_proof,
+                ) => (ledger_info_with_sigs, Some(transactions_with_proof), None),
+                DataPayload::ContinuousTransactionOutputsWithProof(
+                    ledger_info_with_sigs,
+                    outputs_with_proof,
+                ) => (ledger_info_with_sigs, None, Some(outputs_with_proof)),
+                DataPayload::EndOfStream => {
+                    return assert_eq!(next_expected_version, target_version + 1)
+                },
+                data_payload => unexpected_payload_type!(data_payload),
+            };
+
+        // Verify the epoch of the ledger info
+        let ledger_info = ledger_info_with_sigs.ledger_info();
+        assert_eq!(ledger_info.epoch(), next_expected_epoch);
+
+        // Verify the transactions or outputs start version matches the expected version
+        let first_version = if transactions_with_proof.is_some() {
+            transactions_with_proof
+                .clone()
+                .unwrap()
+                .first_transaction_version
+        } else {
+            outputs_with_proof
+                .clone()
+                .unwrap()
+                .first_transaction_output_version
+        };
+        assert_eq!(Some(next_expected_version), first_version);
+
+        // Verify the payload contains events
+        if transactions_with_proof.is_some() {
+            assert_some!(transactions_with_proof.clone().unwrap().events);
+        }
+
+        // Update the next expected version
+        let num_transactions = if transactions_with_proof.is_some() {
+            transactions_with_proof.clone().unwrap().transactions.len() as u64
+        } else {
+            outputs_with_proof
+                .clone()
+                .unwrap()
+                .transactions_and_outputs
+                .len() as u64
+        };
+        next_expected_version += num_transactions;
+
+        // Update epochs if we've hit the epoch end
+        let last_transaction_version = first_version.unwrap() + num_transactions - 1;
+        if ledger_info.version() == last_transaction_version && ledger_info.ends_epoch() {
+            next_expected_epoch += 1;
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_notifications_continuous_transactions_or_outputs_multiple_streams() {
+    // Create a new streaming client and service
+    let streaming_client = create_streaming_client_and_service();
+    let end_epoch = MIN_ADVERTISED_EPOCH_END + 5;
+
+    // Request a continuous transaction or output stream starting at the next expected version
+    let mut next_expected_version = MIN_ADVERTISED_TRANSACTION;
+    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
+    let mut stream_listener = streaming_client
+        .continuously_stream_transactions_or_outputs(
+            next_expected_version - 1,
+            next_expected_epoch,
+            true,
+            None,
+        )
+        .await
+        .unwrap();
+
+    // Terminate and request new transaction or output streams at increasing versions
+    loop {
+        let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
+
+        // Extract the ledger info and transactions or outputs with proof
+        let (ledger_info_with_sigs, transactions_with_proof, outputs_with_proof) =
+            match data_notification.data_payload {
+                DataPayload::ContinuousTransactionsWithProof(
+                    ledger_info_with_sigs,
+                    transactions_with_proof,
+                ) => (ledger_info_with_sigs, Some(transactions_with_proof), None),
+                DataPayload::ContinuousTransactionOutputsWithProof(
+                    ledger_info_with_sigs,
+                    outputs_with_proof,
+                ) => (ledger_info_with_sigs, None, Some(outputs_with_proof)),
+                data_payload => unexpected_payload_type!(data_payload),
+            };
+
+        // Verify the first transaction or output version
+        let first_version = if transactions_with_proof.is_some() {
+            transactions_with_proof
+                .clone()
+                .unwrap()
+                .first_transaction_version
+        } else {
+            outputs_with_proof
+                .clone()
+                .unwrap()
+                .first_transaction_output_version
+        };
+        assert_eq!(Some(next_expected_version), first_version);
+
+        // Update the next expected version
+        let num_transactions = if transactions_with_proof.is_some() {
+            transactions_with_proof.clone().unwrap().transactions.len() as u64
+        } else {
+            outputs_with_proof
+                .clone()
+                .unwrap()
+                .transactions_and_outputs
+                .len() as u64
+        };
+        next_expected_version += num_transactions;
+
+        // Update the next expected epoch if we've hit the epoch end
+        let last_transaction_version = first_version.unwrap() + num_transactions - 1;
+        let ledger_info = ledger_info_with_sigs.ledger_info();
+        if ledger_info.version() == last_transaction_version && ledger_info.ends_epoch() {
+            next_expected_epoch += 1;
+        }
+
+        // Terminate the stream if we haven't reached the end
+        if next_expected_version < MAX_ADVERTISED_TRANSACTION_OUTPUT {
+            // Terminate the stream
             streaming_client
                 .terminate_stream_with_feedback(
                     stream_listener.data_stream_id,
@@ -700,12 +667,53 @@ async fn test_notifications_epoch_ending_limited_chunks() {
                 .await
                 .unwrap();
 
+            // Fetch a new stream
             stream_listener = streaming_client
-                .get_all_epoch_ending_ledger_infos(next_expected_epoch)
+                .continuously_stream_transactions_or_outputs(
+                    next_expected_version - 1,
+                    next_expected_epoch,
+                    true,
+                    None,
+                )
                 .await
                 .unwrap();
         }
+
+        // Check if we've reached the end
+        if next_expected_epoch > end_epoch {
+            return;
+        }
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_notifications_epoch_ending() {
+    // Create a new streaming client and service
+    let streaming_client = create_streaming_client_and_service();
+
+    // Request an epoch ending stream and get a data stream listener
+    let mut stream_listener = streaming_client
+        .get_all_epoch_ending_ledger_infos(MIN_ADVERTISED_EPOCH_END)
+        .await
+        .unwrap();
+
+    // Verify that the stream listener receives all epoch ending notifications
+    verify_continuous_epoch_ending_notifications(&mut stream_listener).await
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_notifications_epoch_ending_limited_chunks() {
+    // Create a new streaming client and service where chunks may be truncated
+    let streaming_client = create_streaming_client_and_service_with_chunk_limits();
+
+    // Request a new epoch ending stream starting at the next expected index.
+    let mut stream_listener = streaming_client
+        .get_all_epoch_ending_ledger_infos(MIN_ADVERTISED_EPOCH_END)
+        .await
+        .unwrap();
+
+    // Verify that the stream listener receives all epoch ending notifications
+    verify_continuous_epoch_ending_notifications(&mut stream_listener).await
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -725,7 +733,10 @@ async fn test_notifications_epoch_ending_multiple_streams() {
         let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
         match data_notification.data_payload {
             DataPayload::EpochEndingLedgerInfos(ledger_infos_with_sigs) => {
+                // Update the next expected epoch
                 next_expected_epoch += ledger_infos_with_sigs.len() as u64;
+
+                // Terminate the stream if we haven't reached the end
                 if next_expected_epoch < MAX_ADVERTISED_EPOCH_END {
                     // Terminate the stream
                     streaming_client
@@ -747,7 +758,8 @@ async fn test_notifications_epoch_ending_multiple_streams() {
                 }
             },
             DataPayload::EndOfStream => {
-                return assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH_END + 1)
+                assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH_END + 1);
+                return; // We've reached the end
             },
             data_payload => unexpected_payload_type!(data_payload),
         }
@@ -769,40 +781,8 @@ async fn test_notifications_optimistic_fetch_outputs() {
         .await
         .unwrap();
 
-    // Read the data notifications from the stream and verify the payloads
-    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
-    let mut next_expected_version = MIN_ADVERTISED_TRANSACTION_OUTPUT;
-    loop {
-        if let Ok(data_notification) = get_data_notification(&mut stream_listener).await {
-            match data_notification.data_payload {
-                DataPayload::ContinuousTransactionOutputsWithProof(
-                    ledger_info_with_sigs,
-                    outputs_with_proofs,
-                ) => {
-                    let ledger_info = ledger_info_with_sigs.ledger_info();
-                    // Verify the epoch of the ledger info
-                    assert_eq!(ledger_info.epoch(), next_expected_epoch);
-
-                    // Verify the output start version matches the expected version
-                    let first_output_version = outputs_with_proofs.first_transaction_output_version;
-                    assert_eq!(Some(next_expected_version), first_output_version);
-
-                    let num_outputs = outputs_with_proofs.transactions_and_outputs.len() as u64;
-                    next_expected_version += num_outputs;
-
-                    // Update epochs if we've hit the epoch end
-                    let last_output_version = first_output_version.unwrap() + num_outputs - 1;
-                    if ledger_info.version() == last_output_version && ledger_info.ends_epoch() {
-                        next_expected_epoch += 1;
-                    }
-                },
-                data_payload => unexpected_payload_type!(data_payload),
-            }
-        } else {
-            assert_eq!(next_expected_epoch, MAX_REAL_EPOCH_END + 1);
-            return assert_eq!(next_expected_version, MAX_REAL_TRANSACTION_OUTPUT + 1);
-        }
-    }
+    // Verify that the stream listener receives all output notifications
+    verify_continuous_output_notifications(&mut stream_listener, true).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -821,43 +801,28 @@ async fn test_notifications_optimistic_fetch_transactions() {
         .await
         .unwrap();
 
-    // Read the data notifications from the stream and verify the payloads
-    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
-    let mut next_expected_version = MIN_ADVERTISED_TRANSACTION;
-    loop {
-        if let Ok(data_notification) = get_data_notification(&mut stream_listener).await {
-            match data_notification.data_payload {
-                DataPayload::ContinuousTransactionsWithProof(
-                    ledger_info_with_sigs,
-                    transactions_with_proofs,
-                ) => {
-                    let ledger_info = ledger_info_with_sigs.ledger_info();
-                    // Verify the epoch of the ledger info
-                    assert_eq!(ledger_info.epoch(), next_expected_epoch);
+    // Verify that the stream listener receives all transaction notifications
+    verify_continuous_transaction_notifications(&mut stream_listener, true).await;
+}
 
-                    // Verify the transaction start version matches the expected version
-                    let first_transaction_version =
-                        transactions_with_proofs.first_transaction_version;
-                    assert_eq!(Some(next_expected_version), first_transaction_version);
+#[tokio::test(flavor = "multi_thread")]
+async fn test_notifications_optimistic_fetch_transactions_or_outputs() {
+    // Create a new streaming client and service
+    let streaming_client = create_streaming_client_and_service_with_data_delay();
 
-                    let num_transactions = transactions_with_proofs.transactions.len() as u64;
-                    next_expected_version += num_transactions;
+    // Request a continuous transaction or output stream and get a data stream listener
+    let mut stream_listener = streaming_client
+        .continuously_stream_transactions_or_outputs(
+            MIN_ADVERTISED_TRANSACTION - 1,
+            MIN_ADVERTISED_EPOCH_END,
+            false,
+            None,
+        )
+        .await
+        .unwrap();
 
-                    // Update epochs if we've hit the epoch end
-                    let last_transaction_version =
-                        first_transaction_version.unwrap() + num_transactions - 1;
-                    if ledger_info.version() == last_transaction_version && ledger_info.ends_epoch()
-                    {
-                        next_expected_epoch += 1;
-                    }
-                },
-                data_payload => unexpected_payload_type!(data_payload),
-            }
-        } else {
-            assert_eq!(next_expected_epoch, MAX_REAL_EPOCH_END + 1);
-            return assert_eq!(next_expected_version, MAX_REAL_TRANSACTION + 1);
-        }
-    }
+    // Verify that the stream listener receives all transaction or output notifications
+    verify_continuous_transaction_or_output_notifications(&mut stream_listener, true).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -866,40 +831,52 @@ async fn test_notifications_transaction_outputs() {
     let streaming_client = create_streaming_client_and_service();
 
     // Request a transaction output stream and get a data stream listener
-    let mut next_expected_version = MIN_ADVERTISED_TRANSACTION_OUTPUT;
     let mut stream_listener = streaming_client
         .get_all_transaction_outputs(
-            next_expected_version,
+            MIN_ADVERTISED_TRANSACTION_OUTPUT,
             MAX_ADVERTISED_TRANSACTION_OUTPUT,
             MAX_ADVERTISED_TRANSACTION_OUTPUT,
         )
         .await
         .unwrap();
 
-    // Read the data notifications from the stream and verify the payloads
-    loop {
-        let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
-        match data_notification.data_payload {
-            DataPayload::TransactionOutputsWithProof(outputs_with_proof) => {
-                // Verify the transaction output start version matches the expected version
-                let first_output_version = outputs_with_proof.first_transaction_output_version;
-                assert_eq!(Some(next_expected_version), first_output_version);
-
-                let num_outputs = outputs_with_proof.transactions_and_outputs.len();
-                next_expected_version += num_outputs as u64;
-            },
-            DataPayload::EndOfStream => {
-                return assert_eq!(next_expected_version, MAX_ADVERTISED_TRANSACTION_OUTPUT + 1)
-            },
-            data_payload => unexpected_payload_type!(data_payload),
-        }
-    }
+    // Verify that the stream listener receives all output notifications
+    verify_output_notifications(
+        &mut stream_listener,
+        MIN_ADVERTISED_TRANSACTION_OUTPUT,
+        MAX_ADVERTISED_TRANSACTION_OUTPUT,
+    )
+    .await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_notifications_transaction_outputs_limited_chunks() {
-    // Create a new streaming client and service
+    // Create a new streaming client and service where chunks may be truncated
     let streaming_client = create_streaming_client_and_service_with_chunk_limits();
+
+    // Request a transaction output stream starting at the next expected version
+    let mut stream_listener = streaming_client
+        .get_all_transaction_outputs(
+            MIN_ADVERTISED_TRANSACTION_OUTPUT,
+            MAX_ADVERTISED_TRANSACTION_OUTPUT,
+            MAX_ADVERTISED_TRANSACTION_OUTPUT,
+        )
+        .await
+        .unwrap();
+
+    // Verify that the stream listener receives all output notifications
+    verify_output_notifications(
+        &mut stream_listener,
+        MIN_ADVERTISED_TRANSACTION_OUTPUT,
+        MAX_ADVERTISED_TRANSACTION_OUTPUT,
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_notifications_transaction_outputs_multiple_streams() {
+    // Create a new streaming client and service
+    let streaming_client = create_streaming_client_and_service();
 
     // Request a transaction output stream starting at the next expected version
     let mut next_expected_version = MIN_ADVERTISED_TRANSACTION_OUTPUT;
@@ -912,52 +889,48 @@ async fn test_notifications_transaction_outputs_limited_chunks() {
         .await
         .unwrap();
 
-    // Terminate and request streams when the chunks are no longer contiguous
+    // Terminate and request new output streams at increasing versions
     loop {
         let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
-        let reset_stream = match data_notification.data_payload {
+        match data_notification.data_payload {
             DataPayload::TransactionOutputsWithProof(outputs_with_proof) => {
-                let first_output_version =
-                    outputs_with_proof.first_transaction_output_version.unwrap();
-                if first_output_version == next_expected_version {
-                    next_expected_version +=
-                        outputs_with_proof.transactions_and_outputs.len() as u64;
-                    false
-                } else {
-                    true // We hit a non-contiguous chunk
+                // Verify the first transaction output version
+                let first_output_version = outputs_with_proof.first_transaction_output_version;
+                assert_eq!(Some(next_expected_version), first_output_version);
+
+                // Update the next expected version
+                next_expected_version += outputs_with_proof.transactions_and_outputs.len() as u64;
+
+                // Terminate the stream if we haven't reached the end
+                if next_expected_version < MAX_ADVERTISED_TRANSACTION_OUTPUT {
+                    // Terminate the stream
+                    streaming_client
+                        .terminate_stream_with_feedback(
+                            stream_listener.data_stream_id,
+                            Some(NotificationAndFeedback::new(
+                                data_notification.notification_id,
+                                NotificationFeedback::InvalidPayloadData,
+                            )),
+                        )
+                        .await
+                        .unwrap();
+
+                    // Fetch a new stream
+                    stream_listener = streaming_client
+                        .get_all_transaction_outputs(
+                            next_expected_version,
+                            MAX_ADVERTISED_TRANSACTION_OUTPUT,
+                            MAX_ADVERTISED_TRANSACTION_OUTPUT,
+                        )
+                        .await
+                        .unwrap();
                 }
             },
             DataPayload::EndOfStream => {
-                if next_expected_version != MAX_ADVERTISED_TRANSACTION_OUTPUT + 1 {
-                    true // The stream thought it had completed, but the chunk was incomplete
-                } else {
-                    return; // All data was received!
-                }
+                assert_eq!(next_expected_version, MAX_ADVERTISED_TRANSACTION_OUTPUT + 1);
+                return; // We've reached the end
             },
             data_payload => unexpected_payload_type!(data_payload),
-        };
-
-        if reset_stream {
-            // Terminate the stream and fetch a new one (we hit non-contiguous data)
-            streaming_client
-                .terminate_stream_with_feedback(
-                    stream_listener.data_stream_id,
-                    Some(NotificationAndFeedback::new(
-                        data_notification.notification_id,
-                        NotificationFeedback::InvalidPayloadData,
-                    )),
-                )
-                .await
-                .unwrap();
-
-            stream_listener = streaming_client
-                .get_all_transaction_outputs(
-                    next_expected_version,
-                    MAX_ADVERTISED_TRANSACTION_OUTPUT,
-                    MAX_ADVERTISED_TRANSACTION_OUTPUT,
-                )
-                .await
-                .unwrap();
         }
     }
 }
@@ -978,95 +951,38 @@ async fn test_notifications_transactions() {
         .await
         .unwrap();
 
-    // Read the data notifications from the stream and verify the payloads
-    let mut next_expected_transaction = MIN_ADVERTISED_TRANSACTION;
-    loop {
-        let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
-        match data_notification.data_payload {
-            DataPayload::TransactionsWithProof(transactions_with_proof) => {
-                // Verify the transaction start version matches the expected version
-                let first_transaction_version = transactions_with_proof.first_transaction_version;
-                assert_eq!(Some(next_expected_transaction), first_transaction_version);
-
-                // Verify the payload contains events
-                assert_some!(transactions_with_proof.events);
-
-                let num_transactions = transactions_with_proof.transactions.len();
-                next_expected_transaction += num_transactions as u64;
-            },
-            DataPayload::EndOfStream => {
-                return assert_eq!(next_expected_transaction, MAX_ADVERTISED_TRANSACTION + 1)
-            },
-            data_payload => unexpected_payload_type!(data_payload),
-        }
-    }
+    // Verify that the stream listener receives all transaction notifications
+    verify_transaction_notifications(
+        &mut stream_listener,
+        MIN_ADVERTISED_TRANSACTION,
+        MAX_ADVERTISED_TRANSACTION,
+    )
+    .await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_notifications_transactions_limited_chunks() {
-    // Create a new streaming client and service
+    // Create a new streaming client and service where chunks may be truncated
     let streaming_client = create_streaming_client_and_service_with_chunk_limits();
 
-    // Request a transaction stream starting at the next expected version
-    let mut next_expected_version = MIN_ADVERTISED_TRANSACTION;
+    // Request a transaction stream (without events) and get a data stream listener
     let mut stream_listener = streaming_client
         .get_all_transactions(
-            next_expected_version,
+            MIN_ADVERTISED_TRANSACTION,
             MAX_ADVERTISED_TRANSACTION,
             MAX_ADVERTISED_TRANSACTION,
-            true,
+            false,
         )
         .await
         .unwrap();
 
-    // Terminate and request streams when the chunks are no longer contiguous
-    loop {
-        let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
-        let reset_stream = match data_notification.data_payload {
-            DataPayload::TransactionsWithProof(transactions_with_proof) => {
-                let first_transaction_version =
-                    transactions_with_proof.first_transaction_version.unwrap();
-                if first_transaction_version == next_expected_version {
-                    next_expected_version += transactions_with_proof.transactions.len() as u64;
-                    false
-                } else {
-                    true // We hit a non-contiguous chunk
-                }
-            },
-            DataPayload::EndOfStream => {
-                if next_expected_version != MAX_ADVERTISED_TRANSACTION + 1 {
-                    true // The stream thought it had completed, but the chunk was incomplete
-                } else {
-                    return; // All data was received!
-                }
-            },
-            data_payload => unexpected_payload_type!(data_payload),
-        };
-
-        if reset_stream {
-            // Terminate the stream and fetch a new one (we hit non-contiguous data)
-            streaming_client
-                .terminate_stream_with_feedback(
-                    stream_listener.data_stream_id,
-                    Some(NotificationAndFeedback::new(
-                        data_notification.notification_id,
-                        NotificationFeedback::InvalidPayloadData,
-                    )),
-                )
-                .await
-                .unwrap();
-
-            stream_listener = streaming_client
-                .get_all_transactions(
-                    next_expected_version,
-                    MAX_ADVERTISED_TRANSACTION,
-                    MAX_ADVERTISED_TRANSACTION,
-                    true,
-                )
-                .await
-                .unwrap();
-        }
-    }
+    // Verify that the stream listener receives all transaction notifications
+    verify_transaction_notifications(
+        &mut stream_listener,
+        MIN_ADVERTISED_TRANSACTION,
+        MAX_ADVERTISED_TRANSACTION,
+    )
+    .await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1091,10 +1007,14 @@ async fn test_notifications_transactions_multiple_streams() {
         let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
         match data_notification.data_payload {
             DataPayload::TransactionsWithProof(transactions_with_proof) => {
+                // Verify the first transaction version
                 let first_transaction_version = transactions_with_proof.first_transaction_version;
                 assert_eq!(Some(next_expected_version), first_transaction_version);
 
+                // Update the next expected version
                 next_expected_version += transactions_with_proof.transactions.len() as u64;
+
+                // Terminate the stream if we haven't reached the end
                 if next_expected_version < MAX_ADVERTISED_TRANSACTION {
                     // Terminate the stream
                     streaming_client
@@ -1121,7 +1041,8 @@ async fn test_notifications_transactions_multiple_streams() {
                 }
             },
             DataPayload::EndOfStream => {
-                return assert_eq!(next_expected_version, MAX_ADVERTISED_TRANSACTION + 1)
+                assert_eq!(next_expected_version, MAX_ADVERTISED_TRANSACTION + 1);
+                return; // We've reached the end
             },
             data_payload => unexpected_payload_type!(data_payload),
         }
@@ -1546,4 +1467,354 @@ pub fn create_streaming_client_and_server(
     );
 
     (streaming_client, streaming_service)
+}
+
+/// Verifies that the stream listener receives all epoch ending
+/// notifications and that the payloads are contiguous.
+async fn verify_continuous_epoch_ending_notifications(stream_listener: &mut DataStreamListener) {
+    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
+
+    // Read notifications until we reach the end of the stream
+    loop {
+        let data_notification = get_data_notification(stream_listener).await.unwrap();
+        match data_notification.data_payload {
+            DataPayload::EpochEndingLedgerInfos(ledger_infos_with_sigs) => {
+                // Verify the epochs of the ledger infos are contiguous
+                for ledger_info_with_sigs in ledger_infos_with_sigs {
+                    let ledger_info = ledger_info_with_sigs.ledger_info();
+                    let epoch = ledger_info.commit_info().epoch();
+                    assert!(ledger_info.ends_epoch());
+                    assert_eq!(next_expected_epoch, epoch);
+                    assert_le!(epoch, MAX_ADVERTISED_EPOCH_END);
+                    next_expected_epoch += 1;
+                }
+            },
+            DataPayload::EndOfStream => {
+                assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH_END + 1);
+                return; // We've reached the end of the stream
+            },
+            data_payload => unexpected_payload_type!(data_payload),
+        }
+    }
+}
+
+/// Verifies that the stream listener receives all state value
+/// notifications and that the payloads are contiguous.
+async fn verify_continuous_state_value_notifications(stream_listener: &mut DataStreamListener) {
+    let mut next_expected_index = 0;
+
+    // Read notifications until we reach the end of the stream
+    loop {
+        let data_notification = get_data_notification(stream_listener).await.unwrap();
+        match data_notification.data_payload {
+            DataPayload::StateValuesWithProof(state_values_with_proof) => {
+                // Verify the start index matches the expected index
+                assert_eq!(state_values_with_proof.first_index, next_expected_index);
+
+                // Verify the last index matches the state value list length
+                let num_state_values = state_values_with_proof.raw_values.len() as u64;
+                assert_eq!(
+                    state_values_with_proof.last_index,
+                    next_expected_index + num_state_values - 1,
+                );
+
+                // Verify the number of state values is as expected
+                assert_eq!(
+                    state_values_with_proof.raw_values.len() as u64,
+                    num_state_values
+                );
+
+                next_expected_index += num_state_values;
+            },
+            DataPayload::EndOfStream => {
+                assert_eq!(next_expected_index, TOTAL_NUM_STATE_VALUES);
+                return; // We've reached the end of the stream
+            },
+            data_payload => unexpected_payload_type!(data_payload),
+        }
+    }
+}
+
+/// Verifies that the stream listener receives all transaction
+/// output notifications and that the payloads are contiguous.
+async fn verify_continuous_output_notifications(
+    stream_listener: &mut DataStreamListener,
+    data_beyond_advertised: bool,
+) {
+    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
+    let mut next_expected_version = MIN_ADVERTISED_TRANSACTION_OUTPUT;
+
+    // Read notifications until we reach the end of the stream
+    loop {
+        if let Ok(data_notification) = get_data_notification(stream_listener).await {
+            match data_notification.data_payload {
+                DataPayload::ContinuousTransactionOutputsWithProof(
+                    ledger_info_with_sigs,
+                    outputs_with_proofs,
+                ) => {
+                    // Verify the continuous outputs payload
+                    let (new_expected_version, new_expected_epoch) =
+                        verify_continuous_outputs_with_proof(
+                            next_expected_epoch,
+                            next_expected_version,
+                            ledger_info_with_sigs,
+                            outputs_with_proofs,
+                        );
+
+                    // Update the next expected version and epoch
+                    next_expected_version = new_expected_version;
+                    next_expected_epoch = new_expected_epoch;
+                },
+                data_payload => unexpected_payload_type!(data_payload),
+            }
+        } else {
+            // Verify the next expected version and epoch depending on data availability
+            if data_beyond_advertised {
+                assert_eq!(next_expected_epoch, MAX_REAL_EPOCH_END + 1);
+                assert_eq!(next_expected_version, MAX_REAL_TRANSACTION_OUTPUT + 1);
+            } else {
+                assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH_END + 1);
+                assert_eq!(next_expected_version, MAX_ADVERTISED_TRANSACTION_OUTPUT + 1);
+            }
+
+            return; // We've reached the end of the stream
+        }
+    }
+}
+
+/// Verifies that the stream listener receives all transaction
+/// notifications and that the payloads are contiguous.
+async fn verify_continuous_transaction_notifications(
+    stream_listener: &mut DataStreamListener,
+    data_beyond_advertised: bool,
+) {
+    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
+    let mut next_expected_version = MIN_ADVERTISED_TRANSACTION;
+
+    // Read notifications until we reach the end of the stream
+    loop {
+        if let Ok(data_notification) = get_data_notification(stream_listener).await {
+            match data_notification.data_payload {
+                DataPayload::ContinuousTransactionsWithProof(
+                    ledger_info_with_sigs,
+                    transactions_with_proofs,
+                ) => {
+                    // Verify the continuous transactions payload
+                    let (new_expected_version, new_expected_epoch) =
+                        verify_continuous_transactions_with_proof(
+                            next_expected_epoch,
+                            next_expected_version,
+                            ledger_info_with_sigs,
+                            transactions_with_proofs,
+                        );
+
+                    // Update the next expected version and epoch
+                    next_expected_version = new_expected_version;
+                    next_expected_epoch = new_expected_epoch;
+                },
+                data_payload => unexpected_payload_type!(data_payload),
+            }
+        } else {
+            // Verify the next expected version and epoch depending on data availability
+            if data_beyond_advertised {
+                assert_eq!(next_expected_epoch, MAX_REAL_EPOCH_END + 1);
+                assert_eq!(next_expected_version, MAX_REAL_TRANSACTION + 1);
+            } else {
+                assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH_END + 1);
+                assert_eq!(next_expected_version, MAX_ADVERTISED_TRANSACTION + 1);
+            }
+
+            return; // We've reached the end of the stream
+        }
+    }
+}
+
+/// Verifies that the stream listener receives all transaction
+/// or output notifications and that the payloads are contiguous.
+async fn verify_continuous_transaction_or_output_notifications(
+    stream_listener: &mut DataStreamListener,
+    data_beyond_advertised: bool,
+) {
+    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
+    let mut next_expected_version = MIN_ADVERTISED_TRANSACTION;
+
+    // Read notifications until we reach the end of the stream
+    loop {
+        if let Ok(data_notification) = get_data_notification(stream_listener).await {
+            match data_notification.data_payload {
+                DataPayload::ContinuousTransactionsWithProof(
+                    ledger_info_with_sigs,
+                    transactions_with_proofs,
+                ) => {
+                    // Verify the continuous transactions payload
+                    let (new_expected_version, new_expected_epoch) =
+                        verify_continuous_transactions_with_proof(
+                            next_expected_epoch,
+                            next_expected_version,
+                            ledger_info_with_sigs,
+                            transactions_with_proofs,
+                        );
+
+                    // Update the next expected version and epoch
+                    next_expected_version = new_expected_version;
+                    next_expected_epoch = new_expected_epoch;
+                },
+                DataPayload::ContinuousTransactionOutputsWithProof(
+                    ledger_info_with_sigs,
+                    outputs_with_proofs,
+                ) => {
+                    // Verify the continuous outputs payload
+                    let (new_expected_version, new_expected_epoch) =
+                        verify_continuous_outputs_with_proof(
+                            next_expected_epoch,
+                            next_expected_version,
+                            ledger_info_with_sigs,
+                            outputs_with_proofs,
+                        );
+
+                    // Update the next expected version and epoch
+                    next_expected_version = new_expected_version;
+                    next_expected_epoch = new_expected_epoch;
+                },
+                data_payload => unexpected_payload_type!(data_payload),
+            }
+        } else {
+            // Verify the next expected version and epoch depending on data availability
+            if data_beyond_advertised {
+                assert_eq!(next_expected_epoch, MAX_REAL_EPOCH_END + 1);
+                assert_eq!(next_expected_version, MAX_REAL_TRANSACTION + 1);
+            } else {
+                assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH_END + 1);
+                assert_eq!(next_expected_version, MAX_ADVERTISED_TRANSACTION + 1);
+            }
+
+            return; // We've reached the end of the stream
+        }
+    }
+}
+
+/// Verifies the continuous transaction outputs payload
+/// and returns the new expected version and epoch.
+fn verify_continuous_outputs_with_proof(
+    expected_epoch: u64,
+    expected_version: u64,
+    ledger_info_with_sigs: LedgerInfoWithSignatures,
+    outputs_with_proofs: TransactionOutputListWithProof,
+) -> (u64, u64) {
+    // Verify the ledger info epoch matches the expected epoch
+    let ledger_info = ledger_info_with_sigs.ledger_info();
+    assert_eq!(ledger_info.epoch(), expected_epoch);
+
+    // Verify the output start version matches the expected version
+    let first_output_version = outputs_with_proofs.first_transaction_output_version;
+    assert_eq!(Some(expected_version), first_output_version);
+
+    // Calculate the next expected version
+    let num_outputs = outputs_with_proofs.transactions_and_outputs.len() as u64;
+    let next_expected_version = expected_version + num_outputs;
+
+    // Update epochs if we've hit the epoch end
+    let last_output_version = first_output_version.unwrap() + num_outputs - 1;
+    let next_expected_epoch =
+        if ledger_info.version() == last_output_version && ledger_info.ends_epoch() {
+            expected_epoch + 1
+        } else {
+            expected_epoch
+        };
+
+    // Return the new expected epoch and version
+    (next_expected_version, next_expected_epoch)
+}
+
+/// Verifies the continuous transaction payload
+/// and returns the new expected version and epoch.
+fn verify_continuous_transactions_with_proof(
+    expected_epoch: u64,
+    expected_version: u64,
+    ledger_info_with_sigs: LedgerInfoWithSignatures,
+    transactions_with_proofs: TransactionListWithProof,
+) -> (u64, u64) {
+    // Verify the ledger info epoch matches the expected epoch
+    let ledger_info = ledger_info_with_sigs.ledger_info();
+    assert_eq!(ledger_info.epoch(), expected_epoch);
+
+    // Verify the transaction start version matches the expected version
+    let first_transaction_version = transactions_with_proofs.first_transaction_version;
+    assert_eq!(Some(expected_version), first_transaction_version);
+
+    // Calculate the next expected version
+    let num_transactions = transactions_with_proofs.transactions.len() as u64;
+    let next_expected_version = expected_version + num_transactions;
+
+    // Update epochs if we've hit the epoch end
+    let last_transaction_version = first_transaction_version.unwrap() + num_transactions - 1;
+    let next_expected_epoch =
+        if ledger_info.version() == last_transaction_version && ledger_info.ends_epoch() {
+            expected_epoch + 1
+        } else {
+            expected_epoch
+        };
+
+    // Return the new expected epoch and version
+    (next_expected_version, next_expected_epoch)
+}
+
+/// Verifies that the stream listener receives all output notifications
+/// (for the specified range) and that the payloads are contiguous.
+async fn verify_output_notifications(
+    stream_listener: &mut DataStreamListener,
+    first_output_version: u64,
+    last_output_version: u64,
+) {
+    let mut next_expected_version = first_output_version;
+
+    // Read notifications until we reach the end of the stream
+    loop {
+        let data_notification = get_data_notification(stream_listener).await.unwrap();
+        match data_notification.data_payload {
+            DataPayload::TransactionOutputsWithProof(outputs_with_proof) => {
+                // Verify the transaction output start version matches the expected version
+                let first_output_version = outputs_with_proof.first_transaction_output_version;
+                assert_eq!(Some(next_expected_version), first_output_version);
+
+                // Calculate the next expected version
+                let num_outputs = outputs_with_proof.transactions_and_outputs.len();
+                next_expected_version += num_outputs as u64;
+            },
+            DataPayload::EndOfStream => {
+                return assert_eq!(next_expected_version, last_output_version + 1)
+            },
+            data_payload => unexpected_payload_type!(data_payload),
+        }
+    }
+}
+
+/// Verifies that the stream listener receives all transaction notifications
+/// (for the specified range) and that the payloads are contiguous.
+async fn verify_transaction_notifications(
+    stream_listener: &mut DataStreamListener,
+    first_transaction_version: u64,
+    last_transaction_version: u64,
+) {
+    let mut next_expected_version = first_transaction_version;
+
+    // Read notifications until we reach the end of the stream
+    loop {
+        let data_notification = get_data_notification(stream_listener).await.unwrap();
+        match data_notification.data_payload {
+            DataPayload::TransactionsWithProof(transactions_with_proof) => {
+                // Verify the transaction start version matches the expected version
+                let first_transaction_version = transactions_with_proof.first_transaction_version;
+                assert_eq!(Some(next_expected_version), first_transaction_version);
+
+                // Calculate the next expected version
+                let num_transactions = transactions_with_proof.transactions.len();
+                next_expected_version += num_transactions as u64;
+            },
+            DataPayload::EndOfStream => {
+                return assert_eq!(next_expected_version, last_transaction_version + 1)
+            },
+            data_payload => unexpected_payload_type!(data_payload),
+        }
+    }
 }
