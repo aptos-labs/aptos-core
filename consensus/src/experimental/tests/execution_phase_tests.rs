@@ -23,7 +23,10 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorError, StateComputeResult};
 use aptos_types::{ledger_info::LedgerInfo, validator_verifier::random_validator_verifier};
 use async_trait::async_trait;
-use std::sync::{atomic::AtomicU64, Arc};
+use std::sync::{
+    atomic::{AtomicBool, AtomicU64},
+    Arc,
+};
 
 // ExecutionSchedulePhase and ExecutionWaitPhase chained together.
 // In BufferManager they are chained through the main loop.
@@ -139,11 +142,13 @@ fn execution_phase_tests() {
     // e2e tests
     let (in_channel_tx, in_channel_rx) = create_channel::<CountedRequest<ExecutionRequest>>();
     let (out_channel_tx, out_channel_rx) = create_channel::<ExecutionResponse>();
+    let reset_flag = Arc::new(AtomicBool::new(false));
 
     let execution_phase_pipeline = PipelinePhase::new(
         in_channel_rx,
         Some(out_channel_tx),
         Box::new(execution_phase),
+        reset_flag,
     );
 
     runtime.spawn(execution_phase_pipeline.start());
