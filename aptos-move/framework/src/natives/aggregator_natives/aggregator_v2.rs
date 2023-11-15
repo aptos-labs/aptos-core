@@ -54,7 +54,7 @@ pub const ECONCAT_STRING_LENGTH_TOO_LARGE: u64 = 0x03_0008;
 /// and any calls will raise this error.
 pub const EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED: u64 = 0x03_0009;
 
-pub const CONCAT_PREFIX_AND_SUFFIX_MAX_LENGTH: usize = 256;
+pub const CONCAT_PREFIX_AND_SUFFIX_MAX_LENGTH: usize = 20;
 
 /// Checks if the type argument `type_arg` is a string type.
 fn is_string_type(context: &SafeNativeContext, type_arg: &Type) -> SafeNativeResult<bool> {
@@ -442,6 +442,14 @@ fn native_create_snapshot(
 
     let snapshot_type = SnapshotType::from_ty_arg(context, &ty_args[0])?;
     let input = snapshot_type.pop_snapshot_value_by_type(&mut args)?;
+
+    if let SnapshotValue::String(v) = &input {
+        if v.len() > CONCAT_PREFIX_AND_SUFFIX_MAX_LENGTH {
+            return Err(SafeNativeError::Abort {
+                abort_code: ECONCAT_STRING_LENGTH_TOO_LARGE,
+            });
+        }
+    }
 
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
         let snapshot_id = delayed_field_data.create_new_snapshot(input, resolver);
