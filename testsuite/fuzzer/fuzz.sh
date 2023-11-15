@@ -72,8 +72,8 @@ function build-oss-fuzz() {
     fi
     oss_fuzz_out=$1
     mkdir -p $oss_fuzz_out
-    mkdir ./target
-    if ! build all ./target; then
+    if ! build all $oss_fuzz_out; then
+        env
         error "Build failed. Exiting."
     fi
     find ./target/*/release/ -maxdepth 1 -type f -executable -exec cp {} $oss_fuzz_out \;
