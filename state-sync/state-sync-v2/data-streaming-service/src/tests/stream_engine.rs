@@ -7,7 +7,10 @@ use crate::{
     error::Error,
     stream_engine::{DataStreamEngine, EpochEndingStreamEngine, StreamEngine},
     streaming_client::{GetAllEpochEndingLedgerInfosRequest, StreamRequest},
-    tests::utils::initialize_logger,
+    tests::{
+        utils,
+        utils::{create_ledger_info, initialize_logger},
+    },
 };
 use aptos_data_client::{
     global_summary::{GlobalDataSummary, OptimalChunkSizes},
@@ -201,7 +204,7 @@ fn test_update_epoch_ending_stream_progress() {
                     start_epoch,
                     end_epoch,
                 }),
-                create_empty_client_response_payload(),
+                create_epoch_ending_ledger_info_payload(start_epoch, end_epoch),
                 create_notification_id_generator(),
             )
             .unwrap();
@@ -218,13 +221,15 @@ fn test_update_epoch_ending_stream_panic() {
     let mut stream_engine = create_epoch_ending_stream_engine(0, 1000);
 
     // Update the engine with a valid notification
+    let client_response_payload =
+        ResponsePayload::EpochEndingLedgerInfos(vec![create_ledger_info(0, 0, true)]);
     let _ = stream_engine
         .transform_client_response_into_notification(
             &DataClientRequest::EpochEndingLedgerInfos(EpochEndingLedgerInfosRequest {
                 start_epoch: 0,
                 end_epoch: 100,
             }),
-            create_empty_client_response_payload(),
+            client_response_payload,
             create_notification_id_generator(),
         )
         .unwrap();
@@ -285,4 +290,12 @@ fn create_notification_id_generator() -> Arc<U64IdGenerator> {
 
 fn create_empty_client_response_payload() -> ResponsePayload {
     ResponsePayload::EpochEndingLedgerInfos(vec![])
+}
+
+/// Creates a response payload with the given number of epoch ending ledger infos
+fn create_epoch_ending_ledger_info_payload(start_epoch: u64, end_epoch: u64) -> ResponsePayload {
+    let epoch_ending_ledger_infos = (start_epoch..end_epoch + 1)
+        .map(|i| utils::create_ledger_info(i, i, true))
+        .collect();
+    ResponsePayload::EpochEndingLedgerInfos(epoch_ending_ledger_infos)
 }

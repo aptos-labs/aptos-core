@@ -35,8 +35,13 @@ use aptos_id_generator::U64IdGenerator;
 use aptos_infallible::Mutex;
 use aptos_storage_service_types::responses::CompleteDataRange;
 use aptos_types::{
-    ledger_info::LedgerInfoWithSignatures, proof::SparseMerkleRangeProof,
-    state_store::state_value::StateValueChunkWithProof, transaction::Version,
+    ledger_info::LedgerInfoWithSignatures,
+    proof::SparseMerkleRangeProof,
+    state_store::{
+        state_key::StateKey,
+        state_value::{StateValue, StateValueChunkWithProof},
+    },
+    transaction::Version,
 };
 use claims::{assert_err, assert_ge, assert_matches, assert_none, assert_ok};
 use futures::{FutureExt, StreamExt};
@@ -69,13 +74,10 @@ async fn test_stream_blocked() {
             id: 0,
             response_callback: Box::new(NoopResponseCallback),
         };
-        let pending_response = PendingClientResponse {
-            client_request: client_request.clone(),
-            client_response: Some(Ok(Response {
-                context,
-                payload: ResponsePayload::NumberOfStates(10),
-            })),
-        };
+        let pending_response = PendingClientResponse::new_with_response(
+            client_request.clone(),
+            Ok(Response::new(context, ResponsePayload::NumberOfStates(10))),
+        );
         insert_response_into_pending_queue(&mut data_stream, pending_response);
 
         // Process the data responses and force a data re-fetch
@@ -196,12 +198,12 @@ async fn test_stream_data_error() {
         start_epoch: MIN_ADVERTISED_EPOCH_END,
         end_epoch: MIN_ADVERTISED_EPOCH_END + 1,
     });
-    let pending_response = PendingClientResponse {
-        client_request: client_request.clone(),
-        client_response: Some(Err(aptos_data_client::error::Error::DataIsUnavailable(
+    let pending_response = PendingClientResponse::new_with_response(
+        client_request.clone(),
+        Err(aptos_data_client::error::Error::DataIsUnavailable(
             "Missing data!".into(),
-        ))),
-    };
+        )),
+    );
     insert_response_into_pending_queue(&mut data_stream, pending_response);
 
     // Process the responses and verify the data client request was resent to the network
@@ -233,11 +235,10 @@ async fn test_stream_invalid_response() {
         id: 0,
         response_callback: Box::new(NoopResponseCallback),
     };
-    let client_response = Response::new(context, ResponsePayload::NumberOfStates(10));
-    let pending_response = PendingClientResponse {
-        client_request: client_request.clone(),
-        client_response: Some(Ok(client_response)),
-    };
+    let pending_response = PendingClientResponse::new_with_response(
+        client_request.clone(),
+        Ok(Response::new(context, ResponsePayload::NumberOfStates(10))),
+    );
     insert_response_into_pending_queue(&mut data_stream, pending_response);
 
     // Process the responses and verify the data client request was resent to the network
@@ -349,12 +350,12 @@ async fn test_state_stream_out_of_order_responses() {
     );
 
     // Set a response for the second request and verify no notifications
-    set_state_value_response_in_queue(&mut data_stream, 1);
+    set_state_value_response_in_queue(&mut data_stream, 1, 1, 1);
     process_data_responses(&mut data_stream, &global_data_summary).await;
     assert_none!(stream_listener.select_next_some().now_or_never());
 
     // Set a response for the first request and verify two notifications
-    set_state_value_response_in_queue(&mut data_stream, 0);
+    set_state_value_response_in_queue(&mut data_stream, 0, 0, 0);
     process_data_responses(&mut data_stream, &global_data_summary).await;
     for _ in 0..2 {
         let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
@@ -366,8 +367,8 @@ async fn test_state_stream_out_of_order_responses() {
     assert_none!(stream_listener.select_next_some().now_or_never());
 
     // Set the response for the first and third request and verify one notification sent
-    set_state_value_response_in_queue(&mut data_stream, 0);
-    set_state_value_response_in_queue(&mut data_stream, 2);
+    set_state_value_response_in_queue(&mut data_stream, 2, 2, 0);
+    set_state_value_response_in_queue(&mut data_stream, 4, 4, 2);
     process_data_responses(&mut data_stream, &global_data_summary).await;
     let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
     assert_matches!(
@@ -377,8 +378,8 @@ async fn test_state_stream_out_of_order_responses() {
     assert_none!(stream_listener.select_next_some().now_or_never());
 
     // Set the response for the first and third request and verify three notifications sent
-    set_state_value_response_in_queue(&mut data_stream, 0);
-    set_state_value_response_in_queue(&mut data_stream, 2);
+    set_state_value_response_in_queue(&mut data_stream, 3, 3, 0);
+    set_state_value_response_in_queue(&mut data_stream, 5, 5, 2);
     process_data_responses(&mut data_stream, &global_data_summary).await;
     for _ in 0..3 {
         let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
@@ -796,14 +797,14 @@ async fn test_transactions_and_output_stream_timeout() {
 
         // Handle multiple invalid type responses on the first request
         for _ in 0..max_request_retry / 2 {
-            set_state_value_response_in_queue(&mut data_stream, 0);
+            set_state_value_response_in_queue(&mut data_stream, 0, 0, 0);
             process_data_responses(&mut data_stream, &global_data_summary).await;
             wait_for_data_client_to_respond(&mut data_stream, 0).await;
         }
 
         // Handle multiple invalid type responses on the third request
         for _ in 0..max_request_retry / 2 {
-            set_state_value_response_in_queue(&mut data_stream, 2);
+            set_state_value_response_in_queue(&mut data_stream, 2, 2, 2);
             process_data_responses(&mut data_stream, &global_data_summary).await;
             wait_for_data_client_to_respond(&mut data_stream, 2).await;
         }
@@ -1120,17 +1121,23 @@ fn set_num_state_values_response_in_queue(
 /// state value data response.
 fn set_state_value_response_in_queue(
     data_stream: &mut DataStream<MockAptosDataClient>,
-    index: usize,
+    first_state_value_index: u64,
+    last_state_value_index: u64,
+    request_index: usize,
 ) {
     let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
-    let pending_response = sent_requests.as_mut().unwrap().get_mut(index).unwrap();
+    let pending_response = sent_requests
+        .as_mut()
+        .unwrap()
+        .get_mut(request_index)
+        .unwrap();
     let client_response = Some(Ok(create_data_client_response(
         ResponsePayload::StateValuesWithProof(StateValueChunkWithProof {
-            first_index: 0,
-            last_index: 0,
+            first_index: first_state_value_index,
+            last_index: last_state_value_index,
             first_key: Default::default(),
             last_key: Default::default(),
-            raw_values: vec![],
+            raw_values: vec![(StateKey::raw(vec![]), StateValue::new_legacy(vec![]))],
             proof: SparseMerkleRangeProof::new(vec![]),
             root_hash: Default::default(),
         }),
