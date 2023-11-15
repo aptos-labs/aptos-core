@@ -285,7 +285,7 @@ impl DataStreamEngine for StateStreamEngine {
                 // Identify the last received state index and bound it appropriately
                 let last_received_index = match &client_response_payload {
                     ResponsePayload::StateValuesWithProof(state_values_with_proof) => {
-                        // Verify that we received at least state value
+                        // Verify that we received at least one state value
                         if state_values_with_proof.raw_values.is_empty() {
                             return Err(Error::AptosDataClientResponseIsInvalid(format!(
                                 "Received an empty state values response! Request: {:?}",
@@ -1488,7 +1488,7 @@ impl DataStreamEngine for TransactionStreamEngine {
 /// If the number is less than the min, the min is returned. If the number is
 /// greater than the max, the max is returned. Otherwise, the number is returned.
 pub(crate) fn bound_by_range(number: u64, min: u64, max: u64) -> u64 {
-    cmp::min(cmp::max(number, min), max)
+    number.clamp(min, max)
 }
 
 /// Verifies that the `expected_next_index` matches the `start_index` and that
