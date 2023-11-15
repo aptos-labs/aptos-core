@@ -56,6 +56,8 @@ and implement the governance voting logic on top.
 -  [Struct `TransactionExecutionSucceededEvent`](#0x1_multisig_account_TransactionExecutionSucceededEvent)
 -  [Struct `TransactionExecutionFailedEvent`](#0x1_multisig_account_TransactionExecutionFailedEvent)
 -  [Struct `MetadataUpdatedEvent`](#0x1_multisig_account_MetadataUpdatedEvent)
+-  [Struct `MultisigAccountGroup`](#0x1_multisig_account_MultisigAccountGroup)
+-  [Resource `FeePayerConfig`](#0x1_multisig_account_FeePayerConfig)
 -  [Constants](#@Constants_0)
 -  [Function `metadata`](#0x1_multisig_account_metadata)
 -  [Function `num_signatures_required`](#0x1_multisig_account_num_signatures_required)
@@ -75,6 +77,10 @@ and implement the governance voting logic on top.
 -  [Function `create_with_owners`](#0x1_multisig_account_create_with_owners)
 -  [Function `create_with_owners_then_remove_bootstrapper`](#0x1_multisig_account_create_with_owners_then_remove_bootstrapper)
 -  [Function `create_with_owners_internal`](#0x1_multisig_account_create_with_owners_internal)
+-  [Function `is_multisig_account_as_fee_payer_enabled`](#0x1_multisig_account_is_multisig_account_as_fee_payer_enabled)
+-  [Function `enable_multisig_account_as_fee_payer`](#0x1_multisig_account_enable_multisig_account_as_fee_payer)
+-  [Function `disable_multisig_account_as_fee_payer`](#0x1_multisig_account_disable_multisig_account_as_fee_payer)
+-  [Function `update_fee_payer_config`](#0x1_multisig_account_update_fee_payer_config)
 -  [Function `add_owner`](#0x1_multisig_account_add_owner)
 -  [Function `add_owners`](#0x1_multisig_account_add_owners)
 -  [Function `add_owners_and_update_signatures_required`](#0x1_multisig_account_add_owners_and_update_signatures_required)
@@ -92,6 +98,7 @@ and implement the governance voting logic on top.
 -  [Function `reject_transaction`](#0x1_multisig_account_reject_transaction)
 -  [Function `vote_transanction`](#0x1_multisig_account_vote_transanction)
 -  [Function `execute_rejected_transaction`](#0x1_multisig_account_execute_rejected_transaction)
+-  [Function `assert_multisig_account_owner`](#0x1_multisig_account_assert_multisig_account_owner)
 -  [Function `validate_multisig_transaction`](#0x1_multisig_account_validate_multisig_transaction)
 -  [Function `successful_transaction_execution_cleanup`](#0x1_multisig_account_successful_transaction_execution_cleanup)
 -  [Function `failed_transaction_execution_cleanup`](#0x1_multisig_account_failed_transaction_execution_cleanup)
@@ -777,6 +784,68 @@ Event emitted when a transaction's metadata is updated.
 </dd>
 <dt>
 <code>new_metadata: <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_multisig_account_MultisigAccountGroup"></a>
+
+## Struct `MultisigAccountGroup`
+
+
+
+<pre><code>#[resource_group(#[scope = <b>global</b>])]
+<b>struct</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccountGroup">MultisigAccountGroup</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_multisig_account_FeePayerConfig"></a>
+
+## Resource `FeePayerConfig`
+
+
+
+<pre><code>#[resource_group_member(#[group = <a href="multisig_account.md#0x1_multisig_account_MultisigAccountGroup">0x1::multisig_account::MultisigAccountGroup</a>])]
+<b>struct</b> <a href="multisig_account.md#0x1_multisig_account_FeePayerConfig">FeePayerConfig</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>enabled_multisig_account_as_fee_payer: bool</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>new_enabled_multisig_account_as_fee_payer: bool</code>
 </dt>
 <dd>
 
@@ -1680,6 +1749,123 @@ be an owner after the vanity multisig address has been secured.
 
 </details>
 
+<a id="0x1_multisig_account_is_multisig_account_as_fee_payer_enabled"></a>
+
+## Function `is_multisig_account_as_fee_payer_enabled`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_is_multisig_account_as_fee_payer_enabled">is_multisig_account_as_fee_payer_enabled</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_is_multisig_account_as_fee_payer_enabled">is_multisig_account_as_fee_payer_enabled</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>): bool <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_FeePayerConfig">FeePayerConfig</a> {
+    <b>if</b> (<b>exists</b>&lt;<a href="multisig_account.md#0x1_multisig_account_FeePayerConfig">FeePayerConfig</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>)) {
+        <b>borrow_global</b>&lt;<a href="multisig_account.md#0x1_multisig_account_FeePayerConfig">FeePayerConfig</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>).enabled_multisig_account_as_fee_payer
+    }
+    <b>else</b> {
+        <b>false</b>
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_multisig_account_enable_multisig_account_as_fee_payer"></a>
+
+## Function `enable_multisig_account_as_fee_payer`
+
+
+
+<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_enable_multisig_account_as_fee_payer">enable_multisig_account_as_fee_payer</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_enable_multisig_account_as_fee_payer">enable_multisig_account_as_fee_payer</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_FeePayerConfig">FeePayerConfig</a> {
+    <b>let</b> multisig_addr = address_of(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+    <b>if</b> (<b>exists</b>&lt;<a href="multisig_account.md#0x1_multisig_account_FeePayerConfig">FeePayerConfig</a>&gt;(multisig_addr)) {
+        <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_FeePayerConfig">FeePayerConfig</a>&gt;(multisig_addr).new_enabled_multisig_account_as_fee_payer = <b>true</b>;
+    }
+    <b>else</b> {
+        <b>move_to</b>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, <a href="multisig_account.md#0x1_multisig_account_FeePayerConfig">FeePayerConfig</a> {
+            enabled_multisig_account_as_fee_payer: <b>false</b>,
+            new_enabled_multisig_account_as_fee_payer: <b>true</b>,
+        });
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_multisig_account_disable_multisig_account_as_fee_payer"></a>
+
+## Function `disable_multisig_account_as_fee_payer`
+
+
+
+<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_disable_multisig_account_as_fee_payer">disable_multisig_account_as_fee_payer</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_disable_multisig_account_as_fee_payer">disable_multisig_account_as_fee_payer</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_FeePayerConfig">FeePayerConfig</a> {
+    <b>let</b> multisig_addr = address_of(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+    <b>if</b> (<b>exists</b>&lt;<a href="multisig_account.md#0x1_multisig_account_FeePayerConfig">FeePayerConfig</a>&gt;(multisig_addr)) {
+        <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_FeePayerConfig">FeePayerConfig</a>&gt;(multisig_addr).new_enabled_multisig_account_as_fee_payer = <b>false</b>;
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_multisig_account_update_fee_payer_config"></a>
+
+## Function `update_fee_payer_config`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_update_fee_payer_config">update_fee_payer_config</a>(multisig_addr: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_update_fee_payer_config">update_fee_payer_config</a>(multisig_addr: <b>address</b>) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_FeePayerConfig">FeePayerConfig</a> {
+    <b>if</b> (<b>exists</b>&lt;<a href="multisig_account.md#0x1_multisig_account_FeePayerConfig">FeePayerConfig</a>&gt;(multisig_addr)) {
+        <b>let</b> fee_payer_config = <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_FeePayerConfig">FeePayerConfig</a>&gt;(multisig_addr);
+        fee_payer_config.enabled_multisig_account_as_fee_payer = fee_payer_config.new_enabled_multisig_account_as_fee_payer;
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_multisig_account_add_owner"></a>
 
 ## Function `add_owner`
@@ -2312,6 +2498,36 @@ Remove the next transaction if it has sufficient owner rejections.
 
 </details>
 
+<a id="0x1_multisig_account_assert_multisig_account_owner"></a>
+
+## Function `assert_multisig_account_owner`
+
+Assert that the provided multisig account exists, and the caller is an owner of the multisig account.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_assert_multisig_account_owner">assert_multisig_account_owner</a>(owner: <b>address</b>, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_assert_multisig_account_owner">assert_multisig_account_owner</a>(owner: <b>address</b>, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
+    <a href="multisig_account.md#0x1_multisig_account_assert_multisig_account_exists">assert_multisig_account_exists</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+    <b>let</b> multisig_account_resource = <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+    <b>assert</b>!(
+        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_contains">vector::contains</a>(&multisig_account_resource.owners, &owner),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="multisig_account.md#0x1_multisig_account_ENOT_OWNER">ENOT_OWNER</a>),
+    );
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_multisig_account_validate_multisig_transaction"></a>
 
 ## Function `validate_multisig_transaction`
@@ -2333,9 +2549,8 @@ Transaction payload is optional if it's already stored on chain for the transact
 
 <pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_validate_multisig_transaction">validate_multisig_transaction</a>(
     owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, payload: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
-    <a href="multisig_account.md#0x1_multisig_account_assert_multisig_account_exists">assert_multisig_account_exists</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+    <a href="multisig_account.md#0x1_multisig_account_assert_multisig_account_owner">assert_multisig_account_owner</a>(address_of(owner), <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
     <b>let</b> multisig_account_resource = <b>borrow_global</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
-    <a href="multisig_account.md#0x1_multisig_account_assert_is_owner">assert_is_owner</a>(owner, multisig_account_resource);
     <b>let</b> sequence_number = multisig_account_resource.last_executed_sequence_number + 1;
     <b>assert</b>!(
         <a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(&multisig_account_resource.transactions, sequence_number),

@@ -11,11 +11,13 @@
 -  [Function `prologue_common`](#0x1_transaction_validation_prologue_common)
 -  [Function `module_prologue`](#0x1_transaction_validation_module_prologue)
 -  [Function `script_prologue`](#0x1_transaction_validation_script_prologue)
+-  [Function `multisig_script_prologue`](#0x1_transaction_validation_multisig_script_prologue)
 -  [Function `multi_agent_script_prologue`](#0x1_transaction_validation_multi_agent_script_prologue)
 -  [Function `multi_agent_common_prologue`](#0x1_transaction_validation_multi_agent_common_prologue)
 -  [Function `fee_payer_script_prologue`](#0x1_transaction_validation_fee_payer_script_prologue)
 -  [Function `epilogue`](#0x1_transaction_validation_epilogue)
 -  [Function `epilogue_gas_payer`](#0x1_transaction_validation_epilogue_gas_payer)
+-  [Function `epilogue_multisig`](#0x1_transaction_validation_epilogue_multisig)
 -  [Specification](#@Specification_1)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `prologue_common`](#@Specification_1_prologue_common)
@@ -35,6 +37,7 @@
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+<b>use</b> <a href="multisig_account.md#0x1_multisig_account">0x1::multisig_account</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
@@ -415,6 +418,57 @@ Only called during genesis to initialize system resources for this module.
 
 </details>
 
+<a id="0x1_transaction_validation_multisig_script_prologue"></a>
+
+## Function `multisig_script_prologue`
+
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_multisig_script_prologue">multisig_script_prologue</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, txn_sequence_number: u64, txn_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, _script_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_multisig_script_prologue">multisig_script_prologue</a>(
+    sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>,
+    txn_sequence_number: u64,
+    txn_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    txn_gas_price: u64,
+    txn_max_gas_units: u64,
+    txn_expiration_time: u64,
+    <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8,
+    _script_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+) {
+    <b>let</b> sender_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&sender);
+    <b>let</b> fee_payer = <b>if</b> (is_multisig_account_as_fee_payer_enabled(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>)) {
+        <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>
+    }
+    <b>else</b> {
+        sender_addr
+    };
+    <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(
+        sender,
+        fee_payer,
+        txn_sequence_number,
+        txn_public_key,
+        txn_gas_price,
+        txn_max_gas_units,
+        txn_expiration_time,
+        <a href="chain_id.md#0x1_chain_id">chain_id</a>,
+    );
+    <a href="multisig_account.md#0x1_multisig_account_assert_multisig_account_owner">multisig_account::assert_multisig_account_owner</a>(sender_addr, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_transaction_validation_multi_agent_script_prologue"></a>
 
 ## Function `multi_agent_script_prologue`
@@ -663,6 +717,46 @@ Called by the Adapter
     // Increment sequence number
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
     <a href="account.md#0x1_account_increment_sequence_number">account::increment_sequence_number</a>(addr);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_validation_epilogue_multisig"></a>
+
+## Function `epilogue_multisig`
+
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_epilogue_multisig">epilogue_multisig</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_epilogue_multisig">epilogue_multisig</a>(
+    <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>,
+    storage_fee_refunded: u64,
+    txn_gas_price: u64,
+    txn_max_gas_units: u64,
+    gas_units_remaining: u64
+) {
+    <b>let</b> fee_payer = <b>if</b> (is_multisig_account_as_fee_payer_enabled(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>)) {
+        <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>
+    }
+    <b>else</b> {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>)
+    };
+
+    <a href="transaction_validation.md#0x1_transaction_validation_epilogue_gas_payer">epilogue_gas_payer</a>(<a href="account.md#0x1_account">account</a>, fee_payer, storage_fee_refunded, txn_gas_price, txn_max_gas_units, gas_units_remaining);
+
+    <a href="multisig_account.md#0x1_multisig_account_update_fee_payer_config">multisig_account::update_fee_payer_config</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>); // enabled_multisig_account_as_fee_payer &lt;- new_enabled_multisig_account_as_fee_payer
 }
 </code></pre>
 

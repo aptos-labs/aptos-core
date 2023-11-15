@@ -488,6 +488,10 @@ pub enum EntryFunctionCall {
         metadata_values: Vec<Vec<u8>>,
     },
 
+    MultisigAccountDisableMultisigAccountAsFeePayer {},
+
+    MultisigAccountEnableMultisigAccountAsFeePayer {},
+
     /// Remove the next transaction if it has sufficient owner rejections.
     MultisigAccountExecuteRejectedTransaction {
         multisig_account: AccountAddress,
@@ -1192,6 +1196,12 @@ impl EntryFunctionCall {
                 metadata_keys,
                 metadata_values,
             ),
+            MultisigAccountDisableMultisigAccountAsFeePayer {} => {
+                multisig_account_disable_multisig_account_as_fee_payer()
+            },
+            MultisigAccountEnableMultisigAccountAsFeePayer {} => {
+                multisig_account_enable_multisig_account_as_fee_payer()
+            },
             MultisigAccountExecuteRejectedTransaction { multisig_account } => {
                 multisig_account_execute_rejected_transaction(multisig_account)
             },
@@ -2696,6 +2706,36 @@ pub fn multisig_account_create_with_owners_then_remove_bootstrapper(
             bcs::to_bytes(&metadata_keys).unwrap(),
             bcs::to_bytes(&metadata_values).unwrap(),
         ],
+    ))
+}
+
+pub fn multisig_account_disable_multisig_account_as_fee_payer() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("disable_multisig_account_as_fee_payer").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn multisig_account_enable_multisig_account_as_fee_payer() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("enable_multisig_account_as_fee_payer").to_owned(),
+        vec![],
+        vec![],
     ))
 }
 
@@ -4733,6 +4773,26 @@ mod decoder {
         }
     }
 
+    pub fn multisig_account_disable_multisig_account_as_fee_payer(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::MultisigAccountDisableMultisigAccountAsFeePayer {})
+        } else {
+            None
+        }
+    }
+
+    pub fn multisig_account_enable_multisig_account_as_fee_payer(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::MultisigAccountEnableMultisigAccountAsFeePayer {})
+        } else {
+            None
+        }
+    }
+
     pub fn multisig_account_execute_rejected_transaction(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -5750,6 +5810,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "multisig_account_create_with_owners_then_remove_bootstrapper".to_string(),
             Box::new(decoder::multisig_account_create_with_owners_then_remove_bootstrapper),
+        );
+        map.insert(
+            "multisig_account_disable_multisig_account_as_fee_payer".to_string(),
+            Box::new(decoder::multisig_account_disable_multisig_account_as_fee_payer),
+        );
+        map.insert(
+            "multisig_account_enable_multisig_account_as_fee_payer".to_string(),
+            Box::new(decoder::multisig_account_enable_multisig_account_as_fee_payer),
         );
         map.insert(
             "multisig_account_execute_rejected_transaction".to_string(),

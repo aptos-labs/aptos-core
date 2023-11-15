@@ -597,6 +597,56 @@ module aptos_framework::multisig_account {
 
     ////////////////////////// Self-updates ///////////////////////////////
 
+    #[resource_group(scope = global)]
+    struct MultisigAccountGroup {}
+
+    #[resource_group_member(group = aptos_framework::multisig_account::MultisigAccountGroup)]
+    struct FeePayerConfig has key {
+        // This is the setting for the current transaction.
+        enabled_multisig_account_as_fee_payer: bool,
+        // This is the setting to be applied from the next transaction onwards.
+        new_enabled_multisig_account_as_fee_payer: bool,
+    }
+
+    #[view]
+    public fun is_multisig_account_as_fee_payer_enabled(multisig_account: address): bool acquires FeePayerConfig {
+        if (exists<FeePayerConfig>(multisig_account)) {
+            borrow_global<FeePayerConfig>(multisig_account).enabled_multisig_account_as_fee_payer
+        }
+        else {
+            false
+        }
+    }
+
+    entry fun enable_multisig_account_as_fee_payer(multisig_account: &signer) acquires FeePayerConfig {
+        let multisig_addr = address_of(multisig_account);
+        if (exists<FeePayerConfig>(multisig_addr)) {
+            borrow_global_mut<FeePayerConfig>(multisig_addr).new_enabled_multisig_account_as_fee_payer = true;
+        }
+        else {
+            move_to(multisig_account, FeePayerConfig {
+                enabled_multisig_account_as_fee_payer: false,
+                new_enabled_multisig_account_as_fee_payer: true,
+            });
+        }
+    }
+
+    entry fun disable_multisig_account_as_fee_payer(multisig_account: &signer) acquires FeePayerConfig {
+        let multisig_addr = address_of(multisig_account);
+        if (exists<FeePayerConfig>(multisig_addr)) {
+            borrow_global_mut<FeePayerConfig>(multisig_addr).new_enabled_multisig_account_as_fee_payer = false;
+        }
+    }
+
+    friend aptos_framework::transaction_validation;
+    // This is to be called by the epilogue of the transaction_validation module
+    public(friend) fun update_fee_payer_config(multisig_addr: address) acquires FeePayerConfig {
+        if (exists<FeePayerConfig>(multisig_addr)) {
+            let fee_payer_config = borrow_global_mut<FeePayerConfig>(multisig_addr);
+            fee_payer_config.enabled_multisig_account_as_fee_payer = fee_payer_config.new_enabled_multisig_account_as_fee_payer;
+        }
+    }
+
     /// Similar to add_owners, but only allow adding one owner.
     entry fun add_owner(multisig_account: &signer, new_owner: address) acquires MultisigAccount {
         add_owners(multisig_account, vector[new_owner]);
@@ -891,6 +941,16 @@ module aptos_framework::multisig_account {
         );
     }
 
+    /// Assert that the provided multisig account exists, and the caller is an owner of the multisig account.
+    public fun assert_multisig_account_owner(owner: address, multisig_account: address) acquires MultisigAccount {
+        assert_multisig_account_exists(multisig_account);
+        let multisig_account_resource = borrow_global_mut<MultisigAccount>(multisig_account);
+        assert!(
+            vector::contains(&multisig_account_resource.owners, &owner),
+            error::permission_denied(ENOT_OWNER),
+        );
+    }
+
     ////////////////////////// To be called by VM only ///////////////////////////////
 
     /// Called by the VM as part of transaction prologue, which is invoked during mempool transaction validation and as
@@ -899,9 +959,8 @@ module aptos_framework::multisig_account {
     /// Transaction payload is optional if it's already stored on chain for the transaction.
     fun validate_multisig_transaction(
         owner: &signer, multisig_account: address, payload: vector<u8>) acquires MultisigAccount {
-        assert_multisig_account_exists(multisig_account);
+        assert_multisig_account_owner(address_of(owner), multisig_account);
         let multisig_account_resource = borrow_global<MultisigAccount>(multisig_account);
-        assert_is_owner(owner, multisig_account_resource);
         let sequence_number = multisig_account_resource.last_executed_sequence_number + 1;
         assert!(
             table::contains(&multisig_account_resource.transactions, sequence_number),

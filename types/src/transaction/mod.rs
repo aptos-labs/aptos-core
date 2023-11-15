@@ -801,6 +801,30 @@ impl SignedTransaction {
         )
     }
 
+    /// Returns the multisig address if this is a multisig transaction.
+    pub fn multisig_address(&self) -> Option<AccountAddress> {
+        match self.payload() {
+            TransactionPayload::EntryFunction(f)
+                if f.module().address() == &AccountAddress::ONE
+                    && f.module().name().as_str() == "multisig_account" =>
+            {
+                match f.function().as_str() {
+                    "create_transaction"
+                    | "create_transaction_with_hash"
+                    | "approve_transaction"
+                    | "reject_transaction"
+                    | "vote_transaction"
+                    | "execute_rejected_transaction" => {
+                        Some(AccountAddress::from_bytes(&f.args()[0]).ok()?)
+                    },
+                    _ => None,
+                }
+            },
+            TransactionPayload::Multisig(m) => Some(m.multisig_address),
+            _ => None,
+        }
+    }
+
     /// Returns the hash when the transaction is commited onchain.
     pub fn committed_hash(self) -> HashValue {
         Transaction::UserTransaction(self).hash()

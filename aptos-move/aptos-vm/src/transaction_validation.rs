@@ -17,8 +17,10 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
         script_prologue_name: Identifier::new("script_prologue").unwrap(),
         module_prologue_name: Identifier::new("module_prologue").unwrap(),
         multi_agent_prologue_name: Identifier::new("multi_agent_script_prologue").unwrap(),
+        multisig_prologue_name: Identifier::new("multisig_script_prologue").unwrap(),
         user_epilogue_name: Identifier::new("epilogue").unwrap(),
         user_epilogue_gas_payer_name: Identifier::new("epilogue_gas_payer").unwrap(),
+        multisig_epilogue_name: Identifier::new("epilogue_multisig").unwrap(),
     });
 
 /// On-chain functions used to validate transactions
@@ -30,8 +32,10 @@ pub struct TransactionValidation {
     pub script_prologue_name: Identifier,
     pub module_prologue_name: Identifier,
     pub multi_agent_prologue_name: Identifier,
+    pub multisig_prologue_name: Identifier,
     pub user_epilogue_name: Identifier,
     pub user_epilogue_gas_payer_name: Identifier,
+    pub multisig_epilogue_name: Identifier,
 }
 
 impl TransactionValidation {

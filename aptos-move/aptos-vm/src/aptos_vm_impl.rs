@@ -395,6 +395,19 @@ impl AptosVMImpl {
                 &APTOS_TRANSACTION_VALIDATION.multi_agent_prologue_name,
                 args,
             )
+        } else if let Some(multisig_address) = txn_data.multisig_address {
+            let args = vec![
+                MoveValue::Signer(txn_data.sender),
+                MoveValue::Address(multisig_address),
+                MoveValue::U64(txn_sequence_number),
+                MoveValue::vector_u8(txn_authentication_key),
+                MoveValue::U64(txn_gas_price.into()),
+                MoveValue::U64(txn_max_gas_units.into()),
+                MoveValue::U64(txn_expiration_timestamp_secs),
+                MoveValue::U8(chain_id.id()),
+                MoveValue::vector_u8(txn_data.script_hash.clone()),
+            ];
+            (&APTOS_TRANSACTION_VALIDATION.multisig_prologue_name, args)
         } else {
             let args = vec![
                 MoveValue::Signer(txn_data.sender),
@@ -514,6 +527,22 @@ impl AptosVMImpl {
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
                     MoveValue::Address(fee_payer),
+                    MoveValue::U64(fee_statement.storage_fee_refund()),
+                    MoveValue::U64(txn_gas_price.into()),
+                    MoveValue::U64(txn_max_gas_units.into()),
+                    MoveValue::U64(gas_remaining.into()),
+                ]),
+                &mut UnmeteredGasMeter,
+            )
+        } else if let Some(multisig_address) = txn_data.multisig_address {
+            // Multisig tx, run the gas payer epilogue to charge the multisig account
+            session.execute_function_bypass_visibility(
+                &APTOS_TRANSACTION_VALIDATION.module_id(),
+                &APTOS_TRANSACTION_VALIDATION.multisig_epilogue_name,
+                vec![],
+                serialize_values(&vec![
+                    MoveValue::Signer(txn_data.sender),
+                    MoveValue::Address(multisig_address),
                     MoveValue::U64(fee_statement.storage_fee_refund()),
                     MoveValue::U64(txn_gas_price.into()),
                     MoveValue::U64(txn_max_gas_units.into()),

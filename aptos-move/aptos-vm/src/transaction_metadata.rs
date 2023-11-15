@@ -26,6 +26,7 @@ pub struct TransactionMetadata {
     pub chain_id: ChainId,
     pub script_hash: Vec<u8>,
     pub script_size: NumBytes,
+    pub multisig_address: Option<AccountAddress>,
 }
 
 impl TransactionMetadata {
@@ -63,6 +64,7 @@ impl TransactionMetadata {
                 TransactionPayload::Script(s) => (s.code().len() as u64).into(),
                 _ => NumBytes::zero(),
             },
+            multisig_address: txn.multisig_address(),
         }
     }
 
@@ -141,6 +143,7 @@ impl Default for TransactionMetadata {
             chain_id: ChainId::test(),
             script_hash: vec![],
             script_size: NumBytes::zero(),
+            multisig_address: None,
         }
     }
 }
