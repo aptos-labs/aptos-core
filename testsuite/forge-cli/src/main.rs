@@ -819,22 +819,22 @@ fn optimize_for_maximum_throughput(config: &mut NodeConfig) {
         .consensus
         .quorum_store
         .back_pressure
-        .dynamic_min_txn_per_s = 2000;
+        .dynamic_min_txn_per_s = 100;
     config
         .consensus
         .quorum_store
         .back_pressure
-        .dynamic_max_txn_per_s = 8000;
+        .dynamic_max_txn_per_s = 200;
 
-    config.consensus.quorum_store.sender_max_batch_txns = 1000;
+    config.consensus.quorum_store.sender_max_batch_txns = 300;
     config.consensus.quorum_store.sender_max_batch_bytes = 4 * 1024 * 1024;
-    config.consensus.quorum_store.sender_max_num_batches = 100;
-    config.consensus.quorum_store.sender_max_total_txns = 4000;
+    config.consensus.quorum_store.sender_max_num_batches = 5;
+    config.consensus.quorum_store.sender_max_total_txns = 500;
     config.consensus.quorum_store.sender_max_total_bytes = 8 * 1024 * 1024;
-    config.consensus.quorum_store.receiver_max_batch_txns = 1000;
+    config.consensus.quorum_store.receiver_max_batch_txns = 300;
     config.consensus.quorum_store.receiver_max_batch_bytes = 4 * 1024 * 1024;
-    config.consensus.quorum_store.receiver_max_num_batches = 100;
-    config.consensus.quorum_store.receiver_max_total_txns = 4000;
+    config.consensus.quorum_store.receiver_max_num_batches = 5;
+    config.consensus.quorum_store.receiver_max_total_txns = 500;
     config.consensus.quorum_store.receiver_max_total_bytes = 8 * 1024 * 1024;
 }
 
@@ -1773,7 +1773,7 @@ fn realistic_env_max_load_test(
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 400000,
+                    mempool_backlog: 1_000_000,
                 })
                 .init_gas_price_multiplier(20),
             inner_success_criteria: SuccessCriteria::new(
