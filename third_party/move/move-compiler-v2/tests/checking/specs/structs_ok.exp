@@ -31,7 +31,13 @@ module 0x42::M {
         pack M::S(x, y, z)
     }
     spec fun struct_pack_other_order(x: u64,y: bool,z: vector<u64>): M::S {
-        pack M::S(x, y, z)
+        {
+          let $z: vector<u64> = z;
+          {
+            let $y: bool = y;
+            pack M::S(x, $y, $z)
+          }
+        }
     }
     spec fun generic_struct_pack(x: u64,y: bool): M::G<u64> {
         pack M::G<u64>(x, y)
