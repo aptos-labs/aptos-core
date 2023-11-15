@@ -405,10 +405,8 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                         if sanity_check_client_response_type(client_request, &client_response) {
                             // If the response wasn't enough to satisfy the original request (e.g.,
                             // it was truncated), missing data should be requested.
-                            let missing_data_requested = self.missing_data_requested(
-                                client_request,
-                                client_response.payload.clone(),
-                            );
+                            let missing_data_requested =
+                                self.request_missing_data(client_request, &client_response.payload);
 
                             // Send the data notification to the client
                             self.send_data_notification_to_client(client_request, client_response)
@@ -466,12 +464,12 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         self.create_and_send_client_requests(&global_data_summary)
     }
 
-    /// Returns true iff we requested missing data from a previous
-    /// client response.
-    fn missing_data_requested(
+    /// Requests any missing data from the previous client response
+    /// and returns true iff missing data was requested.
+    fn request_missing_data(
         &mut self,
         data_client_request: &DataClientRequest,
-        response_payload: ResponsePayload,
+        response_payload: &ResponsePayload,
     ) -> Result<bool, Error> {
         // Identify if any missing data needs to be requested
         if let Some(missing_data_request) =
@@ -774,25 +772,25 @@ impl FusedStream for DataStreamListener {
 /// None is returned.
 pub(crate) fn create_missing_data_request(
     data_client_request: &DataClientRequest,
-    response_payload: ResponsePayload,
+    response_payload: &ResponsePayload,
 ) -> Result<Option<DataClientRequest>, Error> {
     // Determine if the request was satisfied, and if not, create
     // a missing data request to satisfy the original request.
     match data_client_request {
         DataClientRequest::EpochEndingLedgerInfos(request) => {
-            create_missing_epoch_ending_ledger_infos_request(request, &response_payload)
+            create_missing_epoch_ending_ledger_infos_request(request, response_payload)
         },
         DataClientRequest::StateValuesWithProof(request) => {
-            create_missing_state_values_request(request, &response_payload)
+            create_missing_state_values_request(request, response_payload)
         },
         DataClientRequest::TransactionsWithProof(request) => {
-            create_missing_transactions_request(request, &response_payload)
+            create_missing_transactions_request(request, response_payload)
         },
         DataClientRequest::TransactionOutputsWithProof(request) => {
-            create_missing_transaction_outputs_request(request, &response_payload)
+            create_missing_transaction_outputs_request(request, response_payload)
         },
         DataClientRequest::TransactionsOrOutputsWithProof(request) => {
-            create_missing_transactions_or_outputs_request(request, &response_payload)
+            create_missing_transactions_or_outputs_request(request, response_payload)
         },
         _ => Ok(None), // The request was trivially satisfied (based on the type)
     }
