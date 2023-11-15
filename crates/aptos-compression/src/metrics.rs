@@ -15,7 +15,7 @@ pub const RAW_BYTES: &str = "raw_bytes";
 /// A simple enum for identifying clients of the compression crate. This
 /// allows us to provide a runtime breakdown of compression metrics for
 /// each client.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CompressionClient {
     Consensus,
     Mempool,
