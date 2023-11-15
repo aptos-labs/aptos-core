@@ -37,6 +37,7 @@ pub struct AggregatorChangeSet {
     pub aggregator_v1_changes: BTreeMap<StateKey, AggregatorChangeV1>,
     pub delayed_field_changes: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
     pub reads_needing_exchange: BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
+    pub group_reads_needing_exchange: BTreeMap<StateKey, (WriteOp, u64)>,
 }
 
 /// Native context that can be attached to VM `NativeContextExtensions`.
@@ -128,6 +129,12 @@ impl<'a> NativeAggregatorContext<'a> {
             } else {
                 self.delayed_field_resolver
                     .get_reads_needing_exchange(&delayed_write_set_keys, &HashSet::new())?
+            },
+            group_reads_needing_exchange: if delayed_write_set_keys.is_empty() {
+                BTreeMap::new()
+            } else {
+                self.delayed_field_resolver
+                    .get_group_reads_needing_exchange(&delayed_write_set_keys, &HashSet::new())?
             },
         })
     }

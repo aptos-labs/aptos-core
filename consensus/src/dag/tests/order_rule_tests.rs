@@ -95,7 +95,7 @@ fn create_order_rule(
     epoch_state: Arc<EpochState>,
     dag: Arc<RwLock<Dag>>,
 ) -> (OrderRule, UnboundedReceiver<Vec<Arc<CertifiedNode>>>) {
-    let anchor_election = Box::new(RoundRobinAnchorElection::new(
+    let anchor_election = Arc::new(RoundRobinAnchorElection::new(
         epoch_state.verifier.get_ordered_account_addresses(),
     ));
     let (tx, rx) = unbounded();

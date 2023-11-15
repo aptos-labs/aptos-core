@@ -5,6 +5,7 @@
 #![forbid(unsafe_code)]
 
 use crate::{ChunkCommitNotification, LedgerUpdateOutput};
+use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_storage_interface::{state_delta::StateDelta, ExecutedTrees};
 use aptos_types::{
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
@@ -84,15 +85,20 @@ impl ExecutedChunk {
             Vec::with_capacity(self.ledger_update_output.to_commit.len());
         let mut committed_events =
             Vec::with_capacity(self.ledger_update_output.to_commit.len() * 2);
+        let mut to_drop = Vec::with_capacity(self.ledger_update_output.to_commit.len());
         for txn_to_commit in self.ledger_update_output.to_commit {
             let TransactionToCommit {
                 transaction,
                 events,
+                state_updates,
+                write_set,
                 ..
             } = txn_to_commit;
             committed_transactions.push(transaction);
             committed_events.extend(events);
+            to_drop.push((state_updates, write_set));
         }
+        DEFAULT_DROPPER.schedule_drop(to_drop);
 
         ChunkCommitNotification {
             committed_transactions,
