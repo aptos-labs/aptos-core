@@ -18,6 +18,7 @@ use crate::{
         proof_coordinator::{ProofCoordinator, ProofCoordinatorCommand},
         proof_manager::{ProofManager, ProofManagerCommand},
         quorum_store_coordinator::{CoordinatorCommand, QuorumStoreCoordinator},
+        types::Batch,
     },
     round_manager::VerifiedEvent,
 };
@@ -372,17 +373,22 @@ impl InnerBuilder {
             info!(epoch = epoch, "Batch retrieval task starts");
             while let Some(rpc_request) = batch_retrieval_rx.next().await {
                 counters::RECEIVED_BATCH_REQUEST_COUNT.inc();
-                if let Ok(value) = batch_store.get_batch_from_local(&rpc_request.req.digest()) {
-                    let batch = value.try_into().unwrap();
-                    let msg = ConsensusMsg::BatchResponse(Box::new(batch));
-                    let bytes = rpc_request.protocol.to_bytes(&msg).unwrap();
-                    if let Err(e) = rpc_request
-                        .response_sender
-                        .send(Ok(bytes.into()))
-                        .map_err(|_| anyhow::anyhow!("Failed to send block retrieval response"))
-                    {
-                        warn!(epoch = epoch, error = ?e, kind = error_kind(&e));
-                    }
+                let result = if let Ok(value) =
+                    batch_store.get_batch_from_local(&rpc_request.req.digest())
+                {
+                    let batch: Batch = value.try_into().unwrap();
+                    Some(batch)
+                } else {
+                    None
+                };
+                let msg = ConsensusMsg::BatchResponseV2(Box::new(result));
+                let bytes = rpc_request.protocol.to_bytes(&msg).unwrap();
+                if let Err(e) = rpc_request
+                    .response_sender
+                    .send(Ok(bytes.into()))
+                    .map_err(|_| anyhow::anyhow!("Failed to send block retrieval response"))
+                {
+                    warn!(epoch = epoch, error = ?e, kind = error_kind(&e));
                 }
             }
             info!(epoch = epoch, "Batch retrieval task stops");

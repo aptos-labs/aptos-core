@@ -70,6 +70,8 @@ pub enum ConsensusMsg {
     DAGMessage(DAGNetworkMessage),
     /// Commit message
     CommitMessage(Box<CommitMessage>),
+    /// Quotum Store, response to indicate batch being garbage collected.
+    BatchResponseV2(Box<Option<Batch>>),
 }
 
 /// Network type for consensus
@@ -94,6 +96,7 @@ impl ConsensusMsg {
             ConsensusMsg::ProofOfStoreMsg(_) => "ProofOfStoreMsg",
             ConsensusMsg::DAGMessage(_) => "DAGMessage",
             ConsensusMsg::CommitMessage(_) => "CommitMessage",
+            ConsensusMsg::BatchResponseV2(_) => "BatchResponseV2",
         }
     }
 }
