@@ -171,7 +171,7 @@ impl BlockStore {
             None,                     /* epoch_state */
             vec![],                   /* compute_status */
             vec![],                   /* txn_infos */
-            vec![],                   /* reconfig_events */
+            vec![],                   /* events */
         );
 
         let executed_root_block = ExecutedBlock::new(

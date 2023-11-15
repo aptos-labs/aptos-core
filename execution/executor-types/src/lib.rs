@@ -321,7 +321,8 @@ pub struct StateComputeResult {
     /// The transaction info hashes of all success txns.
     transaction_info_hashes: Vec<HashValue>,
 
-    reconfig_events: Vec<ContractEvent>,
+    /// The events produced by all successful txns.
+    events: Vec<ContractEvent>,
 }
 
 impl StateComputeResult {
@@ -334,7 +335,7 @@ impl StateComputeResult {
         epoch_state: Option<EpochState>,
         compute_status: Vec<TransactionStatus>,
         transaction_info_hashes: Vec<HashValue>,
-        reconfig_events: Vec<ContractEvent>,
+        events: Vec<ContractEvent>,
     ) -> Self {
         Self {
             root_hash,
@@ -345,7 +346,7 @@ impl StateComputeResult {
             epoch_state,
             compute_status,
             transaction_info_hashes,
-            reconfig_events,
+            events,
         }
     }
 
@@ -362,7 +363,7 @@ impl StateComputeResult {
             epoch_state: None,
             compute_status: vec![],
             transaction_info_hashes: vec![],
-            reconfig_events: vec![],
+            events: vec![],
         }
     }
 
@@ -426,8 +427,8 @@ impl StateComputeResult {
         self.epoch_state.is_some()
     }
 
-    pub fn reconfig_events(&self) -> &[ContractEvent] {
-        &self.reconfig_events
+    pub fn events(&self) -> &[ContractEvent] {
+        &self.events
     }
 }
 

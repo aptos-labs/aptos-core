@@ -299,16 +299,14 @@ impl<
             LogSchema::new(LogEntry::ConsensusNotification).message(&format!(
                 "Received a consensus commit notification! Total transactions: {:?}, events: {:?}",
                 consensus_commit_notification.transactions.len(),
-                consensus_commit_notification.reconfiguration_events.len()
+                consensus_commit_notification.events.len()
             ))
         );
         self.update_consensus_commit_metrics(&consensus_commit_notification);
 
-        // TODO(joshlind): can we get consensus to forward the events?
-
         // Handle the commit notification
         let committed_transactions_and_events = CommittedTransactionsAndEvents {
-            events: consensus_commit_notification.reconfiguration_events.clone(),
+            events: consensus_commit_notification.events.clone(),
             transactions: consensus_commit_notification.transactions.clone(),
         };
         utils::handle_committed_transactions(
@@ -355,11 +353,21 @@ impl<
             );
         }
 
-        // Update the synced epoch
-        if !consensus_commit_notification
-            .reconfiguration_events
-            .is_empty()
-        {
+        // Check if an epoch change occurred
+        let mut epoch_change_occurred = false;
+        for event in &consensus_commit_notification.events {
+            if event.is_new_epoch_event() {
+                // Verify only a single epoch change event is present (per commit)
+                if epoch_change_occurred {
+                    error!(LogSchema::new(LogEntry::ConsensusNotification)
+                        .message("Received multiple epoch change events in a single commit! This shouldn't occur!"));
+                }
+                epoch_change_occurred = true;
+            }
+        }
+
+        // Update the synced epoch if an epoch change occurred
+        if epoch_change_occurred {
             utils::update_new_epoch_metrics();
         }
     }
