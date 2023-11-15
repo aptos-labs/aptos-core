@@ -109,7 +109,6 @@ impl ExecutionProxy {
     }
 }
 
-// TODO: filter duplicated transaction before executing
 #[async_trait::async_trait]
 impl StateComputer for ExecutionProxy {
     async fn schedule_compute(
@@ -254,9 +253,7 @@ impl StateComputer for ExecutionProxy {
             .expect("Failed to send async state sync notification");
 
         *latest_logical_time = logical_time;
-        payload_manager
-            .notify_commit(block_timestamp, payloads)
-            .await;
+        payload_manager.notify_commit(block_timestamp, payloads);
         Ok(())
     }
 
@@ -285,9 +282,7 @@ impl StateComputer for ExecutionProxy {
         // Might be none if called in the recovery path, or between epoch stop and start.
         let maybe_payload_manager = self.payload_manager.lock().as_ref().cloned();
         if let Some(payload_manager) = maybe_payload_manager {
-            payload_manager
-                .notify_commit(block_timestamp, Vec::new())
-                .await;
+            payload_manager.notify_commit(block_timestamp, Vec::new());
         }
 
         fail_point!("consensus::sync_to", |_| {

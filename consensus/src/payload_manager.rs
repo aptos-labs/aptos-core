@@ -18,7 +18,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorError::DataNotFound, *};
 use aptos_logger::prelude::*;
 use aptos_types::transaction::SignedTransaction;
-use futures::{channel::mpsc::Sender, SinkExt};
+use futures::channel::mpsc::Sender;
 use std::sync::Arc;
 use tokio::sync::oneshot;
 
@@ -56,14 +56,12 @@ impl PayloadManager {
     }
 
     ///Pass commit information to BatchReader and QuorumStore wrapper for their internal cleanups.
-    pub async fn notify_commit(&self, block_timestamp: u64, payloads: Vec<Payload>) {
+    pub fn notify_commit(&self, block_timestamp: u64, payloads: Vec<Payload>) {
         match self {
             PayloadManager::DirectMempool => {},
             PayloadManager::InQuorumStore(batch_store, coordinator_tx) => {
                 // TODO: move this to somewhere in quorum store, so this can be a batch reader
-                batch_store
-                    .update_certified_timestamp(block_timestamp)
-                    .await;
+                batch_store.update_certified_timestamp(block_timestamp);
 
                 let batches: Vec<_> = payloads
                     .into_iter()
@@ -78,13 +76,10 @@ impl PayloadManager {
 
                 let mut tx = coordinator_tx.clone();
 
-                if let Err(e) = tx
-                    .send(CoordinatorCommand::CommitNotification(
-                        block_timestamp,
-                        batches,
-                    ))
-                    .await
-                {
+                if let Err(e) = tx.try_send(CoordinatorCommand::CommitNotification(
+                    block_timestamp,
+                    batches,
+                )) {
                     warn!(
                         "CommitNotification failed. Is the epoch shutting down? error: {}",
                         e

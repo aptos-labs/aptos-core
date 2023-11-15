@@ -338,7 +338,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         }
     }
 
-    pub async fn update_certified_timestamp(&self, certified_time: u64) {
+    pub fn update_certified_timestamp(&self, certified_time: u64) {
         trace!("QS: batch reader updating time {:?}", certified_time);
         let prev_time = self
             .last_certified_time
