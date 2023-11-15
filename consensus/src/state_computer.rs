@@ -171,7 +171,11 @@ impl StateComputer for ExecutionProxy {
 
             // notify mempool about failed transaction
             if let Err(e) = txn_notifier
-                .notify_failed_txn(shuffled_txns, &compute_result)
+                .notify_failed_txn(
+                    shuffled_txns,
+                    &compute_result,
+                    maybe_block_gas_limit.is_some(),
+                )
                 .await
             {
                 error!(
@@ -422,6 +426,7 @@ async fn test_commit_sync_race() {
             &self,
             _txns: Vec<SignedTransaction>,
             _compute_results: &StateComputeResult,
+            _block_gas_limit_enabled: bool,
         ) -> Result<(), MempoolError> {
             Ok(())
         }
