@@ -460,6 +460,10 @@ impl PartialVMError {
         self
     }
 
+    pub fn message(&self) -> Option<&str> {
+        self.0.message.as_deref()
+    }
+
     pub fn at_index(mut self, kind: IndexKind, index: TableIndex) -> Self {
         self.0.indices.push((kind, index));
         self

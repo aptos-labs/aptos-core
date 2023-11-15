@@ -3,15 +3,24 @@ module 0x42::fields {
     struct T {
         h: u64,
     }
+    struct G {
+        f: #0,
+    }
     struct S {
         f: u64,
         g: fields::T,
+    }
+    private fun read_generic_val(x: fields::G<u64>): u64 {
+        select fields::G.f(x)
     }
     private fun read_ref(x: &fields::S): u64 {
         select fields::T.h(select fields::S.g(x))
     }
     private fun read_val(x: fields::S): u64 {
         select fields::T.h(select fields::S.g(x))
+    }
+    private fun write_generic_val(x: &mut fields::G<u64>,v: u64) {
+        select fields::G.f(x) = v
     }
     private fun write_local_direct(): fields::S {
         {
@@ -38,11 +47,17 @@ module 0x42::fields {
         select fields::T.h(select fields::S.g(x)) = 42;
         x
     }
+    spec fun $read_generic_val(x: fields::G<u64>): u64 {
+        select fields::G.f(x)
+    }
     spec fun $read_ref(x: fields::S): u64 {
         select fields::T.h(select fields::S.g(x))
     }
     spec fun $read_val(x: fields::S): u64 {
         select fields::T.h(select fields::S.g(x))
+    }
+    spec fun $write_generic_val(x: fields::G<u64>,v: u64) {
+        select fields::G.f(x) = v
     }
     spec fun $write_local_direct(): fields::S;
     spec fun $write_local_via_ref(): fields::S;
@@ -51,6 +66,18 @@ module 0x42::fields {
 } // end 0x42::fields
 
 ============ initial bytecode ================
+
+[variant baseline]
+fun fields::read_generic_val($t0: fields::G<u64>): u64 {
+     var $t1: u64
+     var $t2: &fields::G<u64>
+     var $t3: &u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := borrow_field<fields::G<u64>>.f($t2)
+  2: $t1 := read_ref($t3)
+  3: return $t1
+}
+
 
 [variant baseline]
 fun fields::read_ref($t0: &fields::S): u64 {
@@ -75,6 +102,15 @@ fun fields::read_val($t0: fields::S): u64 {
   2: $t4 := borrow_field<fields::T>.h($t2)
   3: $t1 := read_ref($t4)
   4: return $t1
+}
+
+
+[variant baseline]
+fun fields::write_generic_val($t0: &mut fields::G<u64>, $t1: u64) {
+     var $t2: &mut u64
+  0: $t2 := borrow_field<fields::G<u64>>.f($t0)
+  1: write_ref($t2, $t1)
+  2: return ()
 }
 
 

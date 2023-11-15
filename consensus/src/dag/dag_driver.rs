@@ -1,10 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::anchor_election::TChainHealthBackoff;
 use crate::{
     dag::{
         adapter::TLedgerInfoProvider,
-        dag_fetcher::{FetchRequester, TFetchRequester},
+        dag_fetcher::TFetchRequester,
         dag_store::Dag,
         errors::DagDriverError,
         observability::{
@@ -52,14 +53,16 @@ pub(crate) struct DagDriver {
     rb_abort_handle: Option<(AbortHandle, u64)>,
     storage: Arc<dyn DAGStorage>,
     order_rule: OrderRule,
-    fetch_requester: Arc<FetchRequester>,
+    fetch_requester: Arc<dyn TFetchRequester>,
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     round_state: RoundState,
     window_size_config: Round,
     payload_config: DagPayloadConfig,
+    chain_backoff: Arc<dyn TChainHealthBackoff>,
 }
 
 impl DagDriver {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         author: Author,
         epoch_state: Arc<EpochState>,
@@ -70,11 +73,12 @@ impl DagDriver {
         time_service: TimeService,
         storage: Arc<dyn DAGStorage>,
         order_rule: OrderRule,
-        fetch_requester: Arc<FetchRequester>,
+        fetch_requester: Arc<dyn TFetchRequester>,
         ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
         round_state: RoundState,
         window_size_config: Round,
         payload_config: DagPayloadConfig,
+        chain_backoff: Arc<dyn TChainHealthBackoff>,
     ) -> Self {
         let pending_node = storage
             .get_pending_node()
@@ -98,6 +102,7 @@ impl DagDriver {
             round_state,
             window_size_config,
             payload_config,
+            chain_backoff,
         };
 
         // If we were broadcasting the node for the round already, resume it
@@ -188,23 +193,15 @@ impl DagDriver {
                 )
             }
         };
-        // TODO: warn/panic if division yields 0 txns
-        let max_txns = self
-            .payload_config
-            .max_sending_txns_per_round
-            .saturating_div(self.epoch_state.verifier.len() as u64)
-            .max(1);
-        let max_txn_size_bytes = self
-            .payload_config
-            .max_sending_size_per_round_bytes
-            .saturating_div(self.epoch_state.verifier.len() as u64)
-            .max(1024);
+
+        let (max_txns, max_size_bytes) = self.calculate_payload_limits(new_round);
+
         let payload = match self
             .payload_client
             .pull_payload(
                 Duration::from_millis(self.payload_config.payload_pull_max_poll_time_ms),
                 max_txns,
-                max_txn_size_bytes,
+                max_size_bytes,
                 payload_filter,
                 Box::pin(async {}),
                 false,
@@ -290,6 +287,41 @@ impl DagDriver {
             prev_handle.abort();
         }
     }
+
+    fn calculate_payload_limits(&self, round: Round) -> (u64, u64) {
+        let (voting_power_ratio, maybe_backoff_limits) =
+            self.chain_backoff.get_round_payload_limits(round);
+        let (max_txns_per_round, max_size_per_round_bytes) = {
+            if let Some((backoff_max_txns, backoff_max_size_bytes)) = maybe_backoff_limits {
+                (
+                    self.payload_config
+                        .max_sending_txns_per_round
+                        .min(backoff_max_txns),
+                    self.payload_config
+                        .max_sending_size_per_round_bytes
+                        .min(backoff_max_size_bytes),
+                )
+            } else {
+                (
+                    self.payload_config.max_sending_txns_per_round,
+                    self.payload_config.max_sending_size_per_round_bytes,
+                )
+            }
+        };
+        // TODO: warn/panic if division yields 0 txns
+        let max_txns = max_txns_per_round
+            .saturating_div(
+                (self.epoch_state.verifier.len() as f64 * voting_power_ratio).ceil() as u64,
+            )
+            .max(1);
+        let max_txn_size_bytes = max_size_per_round_bytes
+            .saturating_div(
+                (self.epoch_state.verifier.len() as f64 * voting_power_ratio).ceil() as u64,
+            )
+            .max(1024);
+
+        (max_txns, max_txn_size_bytes)
+    }
 }
 
 #[async_trait]
@@ -316,5 +348,13 @@ impl RpcHandler for DagDriver {
             .map(|_| self.order_rule.process_new_node(&node_metadata))?;
 
         Ok(CertifiedAck::new(epoch))
+    }
+}
+
+impl Drop for DagDriver {
+    fn drop(&mut self) {
+        if let Some((handle, _)) = &self.rb_abort_handle {
+            handle.abort()
+        }
     }
 }

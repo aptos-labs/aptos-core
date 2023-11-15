@@ -290,7 +290,13 @@ module aptos_std::crypto_algebra {
         let num_elements = std::vector::length(elements);
         let element_handles = std::vector::empty();
         let i = 0;
-        while (i < num_elements) {
+        while ({
+            spec {
+                invariant len(element_handles) == i;
+                invariant forall k in 0..i: element_handles[k] == elements[k].handle;
+            };
+            i < num_elements
+        }) {
             std::vector::push_back(&mut element_handles, std::vector::borrow(elements, i).handle);
             i = i + 1;
         };

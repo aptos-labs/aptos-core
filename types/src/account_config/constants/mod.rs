@@ -4,8 +4,6 @@
 
 pub mod account;
 pub mod addresses;
-pub mod event;
 
 pub use account::*;
 pub use addresses::*;
-pub use event::*;

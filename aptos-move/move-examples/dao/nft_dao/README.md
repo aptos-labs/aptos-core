@@ -185,7 +185,7 @@ Some possible step:
 ```rust
 public fun migrate(admin: &signer, dao: address) {
 	// extract the old_dao's signer_cap
-	let signer_cap = destory_dao_and_reclaim_signer_capability(admin, old_dao);
+	let signer_cap = destroy_dao_and_reclaim_signer_capability(admin, old_dao);
 	new_dao_platform::create_new_dao(signer_cap, old_dao);
 }
 ```

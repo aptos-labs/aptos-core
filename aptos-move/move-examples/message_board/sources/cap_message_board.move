@@ -15,8 +15,7 @@ module message_board::cap_based_mb {
     use message_board::offer;
     use std::signer;
     use std::vector;
-    use aptos_framework::account;
-    use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::event;
 
     // Error map
     const EACCOUNT_NO_NOTICE_CAP: u64 = 1;
@@ -31,40 +30,30 @@ module message_board::cap_based_mb {
         board: address
     }
 
-    struct MessageCapEventHandle has key {
-        change_events: EventHandle<MessageCapUpdateEvent>
-    }
-
+    #[event]
     /// emit an event from board acct showing the new participant with posting capability
-    struct MessageCapUpdateEvent has store, drop {
+    struct MessageCapUpdate has store, drop {
+        board: address,
         participant: address,
     }
 
-    struct MessageChangeEventHandle has key {
-        change_events: EventHandle<MessageChangeEvent>
-    }
-
+    #[event]
     /// emit an event from participant account showing the board and the new message
-    struct MessageChangeEvent has store, drop {
+    struct MessageChange has store, drop {
+        board: address,
         message: vector<u8>,
         participant: address
     }
 
     /// create the message board and move the resource to signer
     public entry fun message_board_init(account: &signer) {
-        let board = CapBasedMB{
+        let board = CapBasedMB {
             pinned_post: vector::empty<u8>()
         };
         let board_addr = signer::address_of(account);
         move_to(account, board);
-        let notice_cap = MessageChangeCapability{ board: board_addr };
+        let notice_cap = MessageChangeCapability { board: board_addr };
         move_to(account, notice_cap);
-        move_to(account, MessageChangeEventHandle{
-            change_events: account::new_event_handle<MessageChangeEvent>(account)
-        });
-        move_to(account, MessageCapEventHandle{
-            change_events: account::new_event_handle<MessageCapUpdateEvent>(account)
-        })
     }
 
     /// directly view message
@@ -74,18 +63,11 @@ module message_board::cap_based_mb {
     }
 
     /// board owner controls adding new participants
-    public entry fun add_participant(account: &signer, participant: address) acquires MessageCapEventHandle {
-        let board_addr = signer::address_of(account);
-        offer::create(account, MessageChangeCapability{ board: board_addr }, participant);
+    public entry fun add_participant(account: &signer, participant: address) {
+        let board = signer::address_of(account);
+        offer::create(account, MessageChangeCapability { board }, participant);
 
-        let event_handle = borrow_global_mut<MessageCapEventHandle>(board_addr);
-
-        event::emit_event<MessageCapUpdateEvent>(
-            &mut event_handle.change_events,
-            MessageCapUpdateEvent{
-                participant
-            }
-        );
+        event::emit(MessageCapUpdate { board, participant });
     }
 
     /// claim offered capability
@@ -100,21 +82,20 @@ module message_board::cap_based_mb {
         let cap = borrow_global_mut<MessageChangeCapability>(participant);
         assert!(signer::address_of(&account) == cap.board, EONLY_ADMIN_CAN_REMOVE_NOTICE_CAP);
         let cap = move_from<MessageChangeCapability>(participant);
-        let MessageChangeCapability{ board: _ } = cap;
+        let MessageChangeCapability { board: _ } = cap;
     }
 
     /// only the participant with right capability can publish the message
     public entry fun send_pinned_message(
         account: &signer, board_addr: address, message: vector<u8>
-    ) acquires MessageChangeCapability, MessageChangeEventHandle, CapBasedMB {
+    ) acquires MessageChangeCapability, CapBasedMB {
         let cap = borrow_global<MessageChangeCapability>(signer::address_of(account));
         assert!(cap.board == board_addr, EACCOUNT_NO_NOTICE_CAP);
         let board = borrow_global_mut<CapBasedMB>(board_addr);
         board.pinned_post = message;
-        let event_handle = borrow_global_mut<MessageChangeEventHandle>(board_addr);
-        event::emit_event<MessageChangeEvent>(
-            &mut event_handle.change_events,
-            MessageChangeEvent{
+        event::emit(
+            MessageChange {
+                board: board_addr,
                 message,
                 participant: signer::address_of(account)
             }
@@ -122,13 +103,10 @@ module message_board::cap_based_mb {
     }
 
     /// an account can send events containing message
-    public entry fun send_message_to(
-        account: signer, board_addr: address, message: vector<u8>
-    ) acquires MessageChangeEventHandle {
-        let event_handle = borrow_global_mut<MessageChangeEventHandle>(board_addr);
-        event::emit_event<MessageChangeEvent>(
-            &mut event_handle.change_events,
-            MessageChangeEvent{
+    public entry fun send_message_to(account: signer, board_addr: address, message: vector<u8>) {
+        event::emit(
+            MessageChange {
+                board: board_addr,
                 message,
                 participant: signer::address_of(&account)
             }

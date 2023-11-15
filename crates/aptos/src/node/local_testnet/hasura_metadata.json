@@ -1,5 +1,5 @@
 {
-  "resource_version": 340,
+  "resource_version": 288,
   "metadata": {
     "version": 3,
     "sources": [
@@ -535,7 +535,7 @@
           },
           {
             "table": {
-              "name": "current_aptos_names",
+              "name": "current_ans_lookup_v2",
               "schema": "public"
             },
             "select_permissions": [
@@ -543,16 +543,65 @@
                 "role": "anonymous",
                 "permission": {
                   "columns": [
-                    "is_primary",
                     "domain",
+                    "expiration_timestamp",
+                    "is_deleted",
+                    "last_transaction_version",
                     "registered_address",
                     "subdomain",
-                    "expiration_timestamp",
                     "token_name",
-                    "last_transaction_version"
+                    "token_standard"
                   ],
                   "filter": {},
                   "limit": 100
+                },
+                "comment": ""
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_aptos_names",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "is_domain_owner",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "domain_with_suffix": "token_name",
+                      "owner_address": "owner_address"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_aptos_names",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "last_transaction_version",
+                    "is_active",
+                    "is_primary",
+                    "domain",
+                    "owner_address",
+                    "registered_address",
+                    "subdomain",
+                    "token_name",
+                    "token_standard",
+                    "domain_with_suffix",
+                    "expiration_timestamp"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
                 },
                 "comment": ""
               }
@@ -1027,6 +1076,21 @@
                     }
                   }
                 }
+              },
+              {
+                "name": "current_token_ownership",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "token_data_id": "token_data_id"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_token_ownerships_v2",
+                      "schema": "public"
+                    }
+                  }
+                }
               }
             ],
             "select_permissions": [
@@ -1430,7 +1494,8 @@
                     "sequence_number",
                     "transaction_block_height",
                     "transaction_version",
-                    "type"
+                    "type",
+                    "indexed_type"
                   ],
                   "filter": {},
                   "limit": 100
@@ -2019,7 +2084,7 @@
     ],
     "api_limits": {
       "depth_limit": {
-        "global": 4,
+        "global": 5,
         "per_role": {}
       },
       "disabled": false,

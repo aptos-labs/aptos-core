@@ -57,7 +57,7 @@ pub use transaction::{
     UserTransactionRequest, VersionedEvent, WriteModule, WriteResource, WriteSet, WriteSetChange,
     WriteSetPayload, WriteTableItem,
 };
-pub use view::ViewRequest;
+pub use view::{ViewFunction, ViewRequest};
 pub use wrappers::{EventGuid, IdentifierWrapper, StateKeyWrapper};
 
 pub fn deserialize_from_string<'de, D, T>(deserializer: D) -> Result<T, D::Error>

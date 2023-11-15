@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-block-partitioner = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-drop-helper = { workspace = true }
 aptos-scratchpad = { workspace = true }
 aptos-secure-net = { workspace = true }
 aptos-state-view = { workspace = true }

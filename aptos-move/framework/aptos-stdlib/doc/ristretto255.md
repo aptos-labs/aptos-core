@@ -126,7 +126,33 @@ In the future, we might support additional features:
 -  [Function `scalar_sub_internal`](#0x1_ristretto255_scalar_sub_internal)
 -  [Function `scalar_neg_internal`](#0x1_ristretto255_scalar_neg_internal)
 -  [Specification](#@Specification_1)
+    -  [Helper functions](#@Helper_functions_2)
     -  [Function `point_equals`](#@Specification_1_point_equals)
+    -  [Function `double_scalar_mul`](#@Specification_1_double_scalar_mul)
+    -  [Function `multi_scalar_mul`](#@Specification_1_multi_scalar_mul)
+    -  [Function `new_scalar_from_bytes`](#@Specification_1_new_scalar_from_bytes)
+    -  [Function `new_scalar_from_sha2_512`](#@Specification_1_new_scalar_from_sha2_512)
+    -  [Function `new_scalar_from_u8`](#@Specification_1_new_scalar_from_u8)
+    -  [Function `new_scalar_from_u32`](#@Specification_1_new_scalar_from_u32)
+    -  [Function `new_scalar_from_u64`](#@Specification_1_new_scalar_from_u64)
+    -  [Function `new_scalar_from_u128`](#@Specification_1_new_scalar_from_u128)
+    -  [Function `new_scalar_reduced_from_32_bytes`](#@Specification_1_new_scalar_reduced_from_32_bytes)
+    -  [Function `new_scalar_uniform_from_64_bytes`](#@Specification_1_new_scalar_uniform_from_64_bytes)
+    -  [Function `scalar_zero`](#@Specification_1_scalar_zero)
+    -  [Function `scalar_is_zero`](#@Specification_1_scalar_is_zero)
+    -  [Function `scalar_one`](#@Specification_1_scalar_one)
+    -  [Function `scalar_is_one`](#@Specification_1_scalar_is_one)
+    -  [Function `scalar_equals`](#@Specification_1_scalar_equals)
+    -  [Function `scalar_invert`](#@Specification_1_scalar_invert)
+    -  [Function `scalar_mul`](#@Specification_1_scalar_mul)
+    -  [Function `scalar_mul_assign`](#@Specification_1_scalar_mul_assign)
+    -  [Function `scalar_add`](#@Specification_1_scalar_add)
+    -  [Function `scalar_add_assign`](#@Specification_1_scalar_add_assign)
+    -  [Function `scalar_sub`](#@Specification_1_scalar_sub)
+    -  [Function `scalar_sub_assign`](#@Specification_1_scalar_sub_assign)
+    -  [Function `scalar_neg`](#@Specification_1_scalar_neg)
+    -  [Function `scalar_neg_assign`](#@Specification_1_scalar_neg_assign)
+    -  [Function `scalar_to_bytes`](#@Specification_1_scalar_to_bytes)
     -  [Function `new_point_from_sha512_internal`](#@Specification_1_new_point_from_sha512_internal)
     -  [Function `new_point_from_64_uniform_bytes_internal`](#@Specification_1_new_point_from_64_uniform_bytes_internal)
     -  [Function `point_is_canonical_internal`](#@Specification_1_point_is_canonical_internal)
@@ -2398,6 +2424,159 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 ## Specification
 
 
+<a name="@Helper_functions_2"></a>
+
+### Helper functions
+
+
+
+<a name="0x1_ristretto255_spec_scalar_is_zero"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_zero">spec_scalar_is_zero</a>(s: <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): bool {
+   s.data == x"0000000000000000000000000000000000000000000000000000000000000000"
+}
+</code></pre>
+
+
+
+
+<a name="0x1_ristretto255_spec_scalar_is_one"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_one">spec_scalar_is_one</a>(s: <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): bool {
+   s.data == x"0100000000000000000000000000000000000000000000000000000000000000"
+}
+</code></pre>
+
+
+
+
+<a name="0x1_ristretto255_spec_point_is_canonical_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_point_is_canonical_internal">spec_point_is_canonical_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
+</code></pre>
+
+
+
+
+<a name="0x1_ristretto255_spec_double_scalar_mul_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_double_scalar_mul_internal">spec_double_scalar_mul_internal</a>(point1: u64, point2: u64, scalar1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, scalar2: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
+</code></pre>
+
+
+
+
+<a name="0x1_ristretto255_spec_multi_scalar_mul_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_multi_scalar_mul_internal">spec_multi_scalar_mul_internal</a>&lt;P, S&gt;(points: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;P&gt;, scalars: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;S&gt;): u64;
+</code></pre>
+
+
+
+
+<a name="0x1_ristretto255_spec_scalar_is_canonical_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_canonical_internal">spec_scalar_is_canonical_internal</a>(s: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
+</code></pre>
+
+
+
+
+<a name="0x1_ristretto255_spec_scalar_from_u64_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_from_u64_internal">spec_scalar_from_u64_internal</a>(num: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+
+<a name="0x1_ristretto255_spec_scalar_from_u128_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_from_u128_internal">spec_scalar_from_u128_internal</a>(num: u128): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+
+<a name="0x1_ristretto255_spec_scalar_reduced_from_32_bytes_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_reduced_from_32_bytes_internal">spec_scalar_reduced_from_32_bytes_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+
+<a name="0x1_ristretto255_spec_scalar_uniform_from_64_bytes_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_uniform_from_64_bytes_internal">spec_scalar_uniform_from_64_bytes_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+
+<a name="0x1_ristretto255_spec_scalar_invert_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_invert_internal">spec_scalar_invert_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+
+<a name="0x1_ristretto255_spec_scalar_from_sha512_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_from_sha512_internal">spec_scalar_from_sha512_internal</a>(sha2_512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+
+<a name="0x1_ristretto255_spec_scalar_mul_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_mul_internal">spec_scalar_mul_internal</a>(a_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+
+<a name="0x1_ristretto255_spec_scalar_add_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_add_internal">spec_scalar_add_internal</a>(a_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+
+<a name="0x1_ristretto255_spec_scalar_sub_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_sub_internal">spec_scalar_sub_internal</a>(a_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+
+<a name="0x1_ristretto255_spec_scalar_neg_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_neg_internal">spec_scalar_neg_internal</a>(a_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
 <a name="@Specification_1_point_equals"></a>
 
 ### Function `point_equals`
@@ -2410,6 +2589,433 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 <pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_1_double_scalar_mul"></a>
+
+### Function `double_scalar_mul`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_double_scalar_mul">double_scalar_mul</a>(scalar1: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, point1: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, scalar2: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, point2: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_1_multi_scalar_mul"></a>
+
+### Function `multi_scalar_mul`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_multi_scalar_mul">multi_scalar_mul</a>(points: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> len(points) == 0;
+<b>aborts_if</b> len(scalars) == 0;
+<b>aborts_if</b> len(points) != len(scalars);
+<b>ensures</b> result.handle == <a href="ristretto255.md#0x1_ristretto255_spec_multi_scalar_mul_internal">spec_multi_scalar_mul_internal</a>(points, scalars);
+</code></pre>
+
+
+
+<a name="@Specification_1_new_scalar_from_bytes"></a>
+
+### Function `new_scalar_from_bytes`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_scalar_from_bytes">new_scalar_from_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_canonical_internal">spec_scalar_is_canonical_internal</a>(bytes) ==&gt; (std::option::spec_is_some(result)
+    && std::option::spec_borrow(result).data == bytes);
+<b>ensures</b> !<a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_canonical_internal">spec_scalar_is_canonical_internal</a>(bytes) ==&gt; std::option::spec_is_none(result);
+</code></pre>
+
+
+
+<a name="@Specification_1_new_scalar_from_sha2_512"></a>
+
+### Function `new_scalar_from_sha2_512`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_scalar_from_sha2_512">new_scalar_from_sha2_512</a>(sha2_512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_from_sha512_internal">spec_scalar_from_sha512_internal</a>(sha2_512_input);
+</code></pre>
+
+
+
+<a name="@Specification_1_new_scalar_from_u8"></a>
+
+### Function `new_scalar_from_u8`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_scalar_from_u8">new_scalar_from_u8</a>(byte: u8): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result.data[0] == byte;
+<b>ensures</b> <b>forall</b> i in 1..len(result.data): result.data[i] == 0;
+</code></pre>
+
+
+
+<a name="@Specification_1_new_scalar_from_u32"></a>
+
+### Function `new_scalar_from_u32`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_scalar_from_u32">new_scalar_from_u32</a>(four_bytes: u32): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_from_u64_internal">spec_scalar_from_u64_internal</a>(four_bytes);
+</code></pre>
+
+
+
+<a name="@Specification_1_new_scalar_from_u64"></a>
+
+### Function `new_scalar_from_u64`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_scalar_from_u64">new_scalar_from_u64</a>(eight_bytes: u64): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_from_u64_internal">spec_scalar_from_u64_internal</a>(eight_bytes);
+</code></pre>
+
+
+
+<a name="@Specification_1_new_scalar_from_u128"></a>
+
+### Function `new_scalar_from_u128`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_scalar_from_u128">new_scalar_from_u128</a>(sixteen_bytes: u128): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_from_u128_internal">spec_scalar_from_u128_internal</a>(sixteen_bytes);
+</code></pre>
+
+
+
+<a name="@Specification_1_new_scalar_reduced_from_32_bytes"></a>
+
+### Function `new_scalar_reduced_from_32_bytes`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_scalar_reduced_from_32_bytes">new_scalar_reduced_from_32_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>ensures</b> len(bytes) != 32 ==&gt; std::option::spec_is_none(result);
+<b>ensures</b> len(bytes) == 32 ==&gt; std::option::spec_borrow(result).data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_reduced_from_32_bytes_internal">spec_scalar_reduced_from_32_bytes_internal</a>(bytes);
+</code></pre>
+
+
+
+<a name="@Specification_1_new_scalar_uniform_from_64_bytes"></a>
+
+### Function `new_scalar_uniform_from_64_bytes`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_scalar_uniform_from_64_bytes">new_scalar_uniform_from_64_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>ensures</b> len(bytes) != 64 ==&gt; std::option::spec_is_none(result);
+<b>ensures</b> len(bytes) == 64 ==&gt; std::option::spec_borrow(result).data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_uniform_from_64_bytes_internal">spec_scalar_uniform_from_64_bytes_internal</a>(bytes);
+</code></pre>
+
+
+
+<a name="@Specification_1_scalar_zero"></a>
+
+### Function `scalar_zero`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_zero">scalar_zero</a>(): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+</code></pre>
+
+
+
+
+<pre><code><b>ensures</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_zero">spec_scalar_is_zero</a>(result);
+</code></pre>
+
+
+
+<a name="@Specification_1_scalar_is_zero"></a>
+
+### Function `scalar_is_zero`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_is_zero">scalar_is_zero</a>(s: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>ensures</b> result == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_zero">spec_scalar_is_zero</a>(s);
+</code></pre>
+
+
+
+<a name="@Specification_1_scalar_one"></a>
+
+### Function `scalar_one`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_one">scalar_one</a>(): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+</code></pre>
+
+
+
+
+<pre><code><b>ensures</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_one">spec_scalar_is_one</a>(result);
+</code></pre>
+
+
+
+<a name="@Specification_1_scalar_is_one"></a>
+
+### Function `scalar_is_one`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_is_one">scalar_is_one</a>(s: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>ensures</b> result == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_one">spec_scalar_is_one</a>(s);
+</code></pre>
+
+
+
+<a name="@Specification_1_scalar_equals"></a>
+
+### Function `scalar_equals`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_equals">scalar_equals</a>(lhs: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, rhs: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == (lhs.data == rhs.data);
+</code></pre>
+
+
+
+<a name="@Specification_1_scalar_invert"></a>
+
+### Function `scalar_invert`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_invert">scalar_invert</a>(s: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_zero">spec_scalar_is_zero</a>(s) ==&gt; std::option::spec_is_none(result);
+<b>ensures</b> !<a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_zero">spec_scalar_is_zero</a>(s) ==&gt; (std::option::spec_is_some(result) && std::option::spec_borrow(result).data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_invert_internal">spec_scalar_invert_internal</a>(s.data));
+</code></pre>
+
+
+
+<a name="@Specification_1_scalar_mul"></a>
+
+### Function `scalar_mul`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_mul">scalar_mul</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_mul_internal">spec_scalar_mul_internal</a>(a.data, b.data);
+</code></pre>
+
+
+
+<a name="@Specification_1_scalar_mul_assign"></a>
+
+### Function `scalar_mul_assign`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_mul_assign">scalar_mul_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> a.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_mul_internal">spec_scalar_mul_internal</a>(<b>old</b>(a).data, b.data);
+</code></pre>
+
+
+
+<a name="@Specification_1_scalar_add"></a>
+
+### Function `scalar_add`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_add">scalar_add</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_add_internal">spec_scalar_add_internal</a>(a.data, b.data);
+</code></pre>
+
+
+
+<a name="@Specification_1_scalar_add_assign"></a>
+
+### Function `scalar_add_assign`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_add_assign">scalar_add_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> a.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_add_internal">spec_scalar_add_internal</a>(<b>old</b>(a).data, b.data);
+</code></pre>
+
+
+
+<a name="@Specification_1_scalar_sub"></a>
+
+### Function `scalar_sub`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_sub">scalar_sub</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_sub_internal">spec_scalar_sub_internal</a>(a.data, b.data);
+</code></pre>
+
+
+
+<a name="@Specification_1_scalar_sub_assign"></a>
+
+### Function `scalar_sub_assign`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_sub_assign">scalar_sub_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> a.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_sub_internal">spec_scalar_sub_internal</a>(<b>old</b>(a).data, b.data);
+</code></pre>
+
+
+
+<a name="@Specification_1_scalar_neg"></a>
+
+### Function `scalar_neg`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_neg">scalar_neg</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_neg_internal">spec_scalar_neg_internal</a>(a.data);
+</code></pre>
+
+
+
+<a name="@Specification_1_scalar_neg_assign"></a>
+
+### Function `scalar_neg_assign`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_neg_assign">scalar_neg_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> a.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_neg_internal">spec_scalar_neg_internal</a>(<b>old</b>(a).data);
+</code></pre>
+
+
+
+<a name="@Specification_1_scalar_to_bytes"></a>
+
+### Function `scalar_to_bytes`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_to_bytes">scalar_to_bytes</a>(s: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == s.data;
 </code></pre>
 
 
@@ -2458,6 +3064,8 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> result == <a href="ristretto255.md#0x1_ristretto255_spec_point_is_canonical_internal">spec_point_is_canonical_internal</a>(bytes);
 </code></pre>
 
 
@@ -2650,6 +3258,8 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> result == <a href="ristretto255.md#0x1_ristretto255_spec_multi_scalar_mul_internal">spec_multi_scalar_mul_internal</a>&lt;P, S&gt;(points, scalars);
 </code></pre>
 
 
@@ -2666,6 +3276,8 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> result == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_canonical_internal">spec_scalar_is_canonical_internal</a>(s);
 </code></pre>
 
 
@@ -2682,6 +3294,8 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> result == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_from_u64_internal">spec_scalar_from_u64_internal</a>(num);
 </code></pre>
 
 
@@ -2698,6 +3312,8 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> result == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_from_u128_internal">spec_scalar_from_u128_internal</a>(num);
 </code></pre>
 
 
@@ -2714,6 +3330,7 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 <pre><code><b>pragma</b> opaque;
+<b>ensures</b> result == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_reduced_from_32_bytes_internal">spec_scalar_reduced_from_32_bytes_internal</a>(bytes);
 </code></pre>
 
 
@@ -2730,6 +3347,8 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> result == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_uniform_from_64_bytes_internal">spec_scalar_uniform_from_64_bytes_internal</a>(bytes);
 </code></pre>
 
 
@@ -2746,6 +3365,8 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> result == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_invert_internal">spec_scalar_invert_internal</a>(bytes);
 </code></pre>
 
 
@@ -2762,6 +3383,8 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> result == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_from_sha512_internal">spec_scalar_from_sha512_internal</a>(sha2_512_input);
 </code></pre>
 
 
@@ -2778,6 +3401,8 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> result == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_mul_internal">spec_scalar_mul_internal</a>(a_bytes, b_bytes);
 </code></pre>
 
 
@@ -2794,6 +3419,8 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> result == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_add_internal">spec_scalar_add_internal</a>(a_bytes, b_bytes);
 </code></pre>
 
 
@@ -2810,6 +3437,8 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> result == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_sub_internal">spec_scalar_sub_internal</a>(a_bytes, b_bytes);
 </code></pre>
 
 
@@ -2826,6 +3455,8 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> result == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_neg_internal">spec_scalar_neg_internal</a>(a_bytes);
 </code></pre>
 
 

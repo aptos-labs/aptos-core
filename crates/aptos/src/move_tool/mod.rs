@@ -459,6 +459,7 @@ impl CliCommand<&'static str> for TestPackage {
             compiler_config: CompilerConfig {
                 known_attributes: known_attributes.clone(),
                 skip_attribute_checks: self.move_options.skip_attribute_checks,
+                compiler_version: self.move_options.compiler_version,
                 ..Default::default()
             },
             ..Default::default()

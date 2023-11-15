@@ -15,6 +15,8 @@ lazy_static! {
     static ref THREAD_DUMP_MUTEX: Mutex<()> = Mutex::new(());
 }
 
+static MAX_NUM_FRAMES_WITHOUT_VERBOSE: usize = 20;
+
 pub async fn handle_thread_dump_request(req: Request<Body>) -> hyper::Result<Response<Body>> {
     let query = req.uri().query().unwrap_or("");
     let query_pairs: HashMap<_, _> = url::form_urlencoded::parse(query.as_bytes()).collect();
@@ -43,8 +45,16 @@ pub async fn handle_thread_dump_request(req: Request<Body>) -> hyper::Result<Res
         None => false,
     };
 
+    let verbose: bool = match query_pairs.get("verbose") {
+        Some(val) => match val.parse() {
+            Ok(val) => val,
+            Err(err) => return Ok(reply_with_status(StatusCode::BAD_REQUEST, err.to_string())),
+        },
+        None => false,
+    };
+
     info!("Starting dumping stack trace for all threads.");
-    match start_thread_dump(snapshot, location, frame_ip).await {
+    match do_thread_dump(snapshot, location, frame_ip, verbose).await {
         Ok(body) => {
             info!("Thread dumping is done.");
             let headers: Vec<(_, HeaderValue)> =
@@ -61,10 +71,11 @@ pub async fn handle_thread_dump_request(req: Request<Body>) -> hyper::Result<Res
     }
 }
 
-async fn start_thread_dump(
+async fn do_thread_dump(
     snapshot: bool,
     location: bool,
     frame_ip: bool,
+    verbose: bool,
 ) -> anyhow::Result<String> {
     let lock = THREAD_DUMP_MUTEX.try_lock();
     ensure!(lock.is_some(), "A thread dumping task is already running.");
@@ -75,10 +86,49 @@ async fn start_thread_dump(
         .trace(Command::new(exe).arg("--stacktrace"))
         .map_err(Error::msg)?;
 
+    let mut wait_threads = Vec::new();
+    let mut sleep_threads = Vec::new();
     let mut body = String::new();
     for thread in trace.threads() {
+        let frames = thread.frames();
+        if !frames.is_empty() {
+            let symbols = frames[0].symbols();
+            if !symbols.is_empty() {
+                if let Some(name) = symbols[0].name() {
+                    if name.contains("epoll_wait") {
+                        wait_threads.push(thread.name());
+                        continue;
+                    }
+
+                    if name.contains("clock_nanosleep") {
+                        sleep_threads.push(thread.name());
+                        continue;
+                    }
+                }
+            }
+        }
+
+        if frames.len() > 1 {
+            let symbols = frames[1].symbols();
+            if !symbols.is_empty() {
+                if let Some(name) = symbols[0].name() {
+                    if name.contains("futex_wait")
+                        || name.contains("pthread_cond_wait")
+                        || name.contains("pthread_cond_timedwait")
+                    {
+                        wait_threads.push(thread.name());
+                        continue;
+                    }
+                }
+            }
+        }
+
         body.push_str(&format!("Thread {} ({}):\n", thread.id(), thread.name()));
-        for frame in thread.frames() {
+        for (count, frame) in frames.iter().enumerate() {
+            if !verbose && count >= MAX_NUM_FRAMES_WITHOUT_VERBOSE {
+                break;
+            }
+
             if frame_ip {
                 body.push_str(&format!("Frame ip: {}\n", frame.ip()));
             }
@@ -106,6 +156,18 @@ async fn start_thread_dump(
         }
         body.push_str("\n\n");
     }
+
+    body.push_str("Wait threads:");
+    for wait_thread in wait_threads {
+        body.push_str(&format!(" {wait_thread}"));
+    }
+    body.push_str("\n\n");
+
+    body.push_str("Sleep threads:");
+    for sleep_thread in sleep_threads {
+        body.push_str(&format!(" {sleep_thread}"));
+    }
+    body.push_str("\n\n");
 
     Ok(body)
 }

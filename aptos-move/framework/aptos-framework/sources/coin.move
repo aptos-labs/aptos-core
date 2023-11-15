@@ -161,7 +161,7 @@ module aptos_framework::coin {
     //
 
     /// Creates a new aggregatable coin with value overflowing on `limit`. Note that this function can
-    /// only be called by Aptos Framework (0x1) account for now becuase of `create_aggregator`.
+    /// only be called by Aptos Framework (0x1) account for now because of `create_aggregator`.
     public(friend) fun initialize_aggregatable_coin<CoinType>(aptos_framework: &signer): AggregatableCoin<CoinType> {
         let aggregator = aggregator_factory::create_aggregator(aptos_framework, MAX_U64);
         AggregatableCoin<CoinType> {
@@ -602,7 +602,7 @@ module aptos_framework::coin {
         coin.value
     }
 
-    /// Withdraw specifed `amount` of coin `CoinType` from the signing account.
+    /// Withdraw specified `amount` of coin `CoinType` from the signing account.
     public fun withdraw<CoinType>(
         account: &signer,
         amount: u64,

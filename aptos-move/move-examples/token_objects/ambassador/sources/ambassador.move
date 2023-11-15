@@ -3,7 +3,7 @@
 /// The creator of the collection is the only one who can mint and burn ambassador tokens.
 /// Ambassador tokens are souldbound, thus non-transferable. Each ambassador token has a custom attribute
 /// called level. The level of a newly minted token is 0, and can be updated by the creator.
-/// Whenever the level of a token is updated, an event called LevelUpdateEvent is emitted.
+/// Whenever the level of a token is updated, an event called LevelUpdate is emitted.
 /// Each ambassador token has another custom attribute called rank, which is associated with the level.
 /// The rank is determined by the level such that the rank is Bronze if the level is between 0 and 9,
 /// Silver if the level is between 10 and 19, and Gold if the level is 20 or greater.
@@ -56,8 +56,6 @@ module ambassador::ambassador {
         burn_ref: token::BurnRef,
         /// Used to mutate properties
         property_mutator_ref: property_map::MutatorRef,
-        /// Used to emit LevelUpdateEvent
-        level_update_events: event::EventHandle<LevelUpdateEvent>,
         /// the base URI of the token
         base_uri: String,
     }
@@ -68,8 +66,10 @@ module ambassador::ambassador {
         ambassador_level: u64,
     }
 
+    #[event]
     /// The ambassador level update event
-    struct LevelUpdateEvent has drop, store {
+    struct LevelUpdate has drop, store {
+        token: Object<AmbassadorToken>,
         old_level: u64,
         new_level: u64,
     }
@@ -188,12 +188,11 @@ module ambassador::ambassador {
             string::utf8(RANK_BRONZE)
         );
 
-        // Publishes the AmbassadorToken resource with the refs and the event handle for `LevelUpdateEvent`.
+        // Publishes the AmbassadorToken resource with the refs.
         let ambassador_token = AmbassadorToken {
             mutator_ref,
             burn_ref,
             property_mutator_ref,
-            level_update_events: object::new_event_handle(&object_signer),
             base_uri
         };
         move_to(&object_signer, ambassador_token);
@@ -208,17 +207,15 @@ module ambassador::ambassador {
             mutator_ref: _,
             burn_ref,
             property_mutator_ref,
-            level_update_events,
             base_uri: _
         } = ambassador_token;
 
-        event::destroy_handle(level_update_events);
         property_map::burn(property_mutator_ref);
         token::burn(burn_ref);
     }
 
     /// Sets the ambassador level of the token. Only the creator of the token can set the level. When the level
-    /// is updated, the `LevelUpdateEvent` is emitted. The ambassador rank is updated based on the new level.
+    /// is updated, the `LevelUpdate` is emitted. The ambassador rank is updated based on the new level.
     public entry fun set_ambassador_level(
         creator: &signer,
         token: Object<AmbassadorToken>,
@@ -229,10 +226,10 @@ module ambassador::ambassador {
 
         let token_address = object::object_address(&token);
         let ambassador_level = borrow_global_mut<AmbassadorLevel>(token_address);
-        // Emits the `LevelUpdateEvent`.
-        event::emit_event(
-            &mut borrow_global_mut<AmbassadorToken>(token_address).level_update_events,
-            LevelUpdateEvent {
+        // Emits the `LevelUpdate`.
+        event::emit(
+            LevelUpdate {
+                token,
                 old_level: ambassador_level.ambassador_level,
                 new_level: new_ambassador_level,
             }

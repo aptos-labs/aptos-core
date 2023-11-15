@@ -110,7 +110,7 @@ impl WriteOp {
             (Deletion, Creation(data) | CreationWithMetadata {data, ..}) => {
                 *op = Modification(data)
             },
-            (DeletionWithMetadata {metadata, ..}, Creation(data)| CreationWithMetadata {data, ..}) => {
+            (DeletionWithMetadata {metadata, ..}, Creation(data) | CreationWithMetadata {data, ..}) => {
                 *op = ModificationWithMetadata{data, metadata: metadata.clone()}
             },
             (Creation(_) | CreationWithMetadata {..}, Deletion | DeletionWithMetadata {..}) => {

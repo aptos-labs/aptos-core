@@ -8,7 +8,7 @@ You can install the Aptos CLI as a pre-compiled binary:
 
 - [Install the Aptos CLI with Homebrew](./install-from-brew.md) - Recommended for MacOS.
 - [Install the Aptos CLI by script](./automated-install.md) - Recommended for Linux and Windows.
-- [Download the prebuilt Aptos CLI binaries](./download-cli-binaries.md) - Ensures you get a stable version of the Aptos CLI built on a regular cadence from the `main` upstream development branch.
+- [Download the prebuilt Aptos CLI binaries](./download-cli-binaries.md) - Generally not recommended, but useful if you prefer not to use an automated installation method.
 
 You can also [build the Aptos CLI from source code](./build-from-source.md). This allows you to build from any of the Aptos branches, including `devnet`, `testnet`, `mainnet`, and the latest code in `main`, the development branch.
 

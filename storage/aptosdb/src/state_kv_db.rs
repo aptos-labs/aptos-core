@@ -6,6 +6,7 @@
 use crate::{
     db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     db_options::{gen_state_kv_cfds, state_kv_db_column_families},
+    metrics::OTHER_TIMERS_SECONDS,
     utils::truncation_helper::{get_state_kv_commit_progress, truncate_state_kv_db_shards},
     NUM_STATE_SHARDS,
 };
@@ -100,7 +101,13 @@ impl StateKvDb {
         state_kv_metadata_batch: SchemaBatch,
         sharded_state_kv_batches: [SchemaBatch; NUM_STATE_SHARDS],
     ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["state_kv_db__commit"])
+            .start_timer();
         THREAD_MANAGER.get_io_pool().scope(|s| {
+            let _timer = OTHER_TIMERS_SECONDS
+                .with_label_values(&["state_kv_db__commit_shards"])
+                .start_timer();
             let mut batches = sharded_state_kv_batches.into_iter();
             for shard_id in 0..NUM_STATE_SHARDS {
                 let state_kv_batch = batches
@@ -114,8 +121,13 @@ impl StateKvDb {
             }
         });
 
-        self.state_kv_metadata_db
-            .write_schemas(state_kv_metadata_batch)?;
+        {
+            let _timer = OTHER_TIMERS_SECONDS
+                .with_label_values(&["state_kv_db__commit_metadata"])
+                .start_timer();
+            self.state_kv_metadata_db
+                .write_schemas(state_kv_metadata_batch)?;
+        }
 
         self.write_progress(version)
     }

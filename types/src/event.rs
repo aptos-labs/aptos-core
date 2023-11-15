@@ -50,45 +50,7 @@ impl EventKey {
     pub fn size(&self) -> usize {
         8 /* u64 */ + 32 /* address */
     }
-
-    /*
-    pub fn from_hex<T: AsRef<[u8]>>(hex: T) -> Result<Self, EventKeyParseError> {
-        <[u8; Self::LENGTH]>::from_hex(hex)
-            .map_err(|_| EventKeyParseError)
-            .map(Self)
-    }
-
-    pub fn from_bytes<T: AsRef<[u8]>>(bytes: T) -> Result<Self, EventKeyParseError> {
-        <[u8; Self::LENGTH]>::try_from(bytes.as_ref())
-            .map_err(|_| EventKeyParseError)
-            .map(Self)
-    }
-    */
 }
-
-/*
-impl FromStr for EventKey {
-    type Err = EventKeyParseError;
-
-    fn from_str(s: &str) -> Result<Self, EventKeyParseError> {
-        EventKey::from_hex(s)
-    }
-}
-*/
-
-/*
-impl From<EventKey> for [u8; EventKey::LENGTH] {
-    fn from(event_key: EventKey) -> Self {
-        event_key.0
-    }
-}
-
-impl From<&EventKey> for [u8; EventKey::LENGTH] {
-    fn from(event_key: &EventKey) -> Self {
-        event_key.0
-    }
-}
-*/
 
 impl fmt::LowerHex for EventKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -109,17 +71,6 @@ impl fmt::Display for EventKey {
         write!(f, "{:x}", self)
     }
 }
-
-/*
-impl TryFrom<&[u8]> for EventKey {
-    type Error = EventKeyParseError;
-
-    /// Tries to convert the provided byte array into Event Key.
-    fn try_from(bytes: &[u8]) -> Result<EventKey, EventKeyParseError> {
-        Self::from_bytes(bytes)
-    }
-}
-*/
 
 #[derive(Clone, Copy, Debug)]
 pub struct EventKeyParseError;

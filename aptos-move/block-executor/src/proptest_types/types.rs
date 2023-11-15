@@ -16,8 +16,7 @@ use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    contract_event::ReadWriteEvent,
-    event::EventKey,
+    contract_event::TransactionEvent,
     executable::ModulePath,
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,
@@ -31,7 +30,7 @@ use aptos_types::{
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
 use bytes::Bytes;
 use claims::{assert_ge, assert_le, assert_ok};
-use move_core_types::{language_storage::TypeTag, value::MoveTypeLayout};
+use move_core_types::value::MoveTypeLayout;
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
@@ -447,7 +446,7 @@ impl<K, E> MockTransaction<K, E> {
 
 impl<
         K: Debug + Hash + Ord + Clone + Send + Sync + ModulePath + 'static,
-        E: Debug + Clone + Send + Sync + ReadWriteEvent + 'static,
+        E: Debug + Clone + Send + Sync + TransactionEvent + 'static,
     > Transaction for MockTransaction<K, E>
 {
     type Event = E;
@@ -568,7 +567,10 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             .collect()
     }
 
-    fn new_mock_write_txn<K: Clone + Hash + Debug + Eq + Ord, E: Debug + Clone + ReadWriteEvent>(
+    fn new_mock_write_txn<
+        K: Clone + Hash + Debug + Eq + Ord,
+        E: Debug + Clone + TransactionEvent,
+    >(
         self,
         universe: &[K],
         module_read_fn: &dyn Fn(usize) -> bool,
@@ -605,7 +607,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
     pub(crate) fn materialize<
         K: Clone + Hash + Debug + Eq + Ord,
-        E: Send + Sync + Debug + Clone + ReadWriteEvent,
+        E: Send + Sync + Debug + Clone + TransactionEvent,
     >(
         self,
         universe: &[K],
@@ -631,7 +633,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
     // operations. Last 3 keys of the universe are used as group keys.
     pub(crate) fn materialize_groups<
         K: Clone + Hash + Debug + Eq + Ord,
-        E: Send + Sync + Debug + Clone + ReadWriteEvent,
+        E: Send + Sync + Debug + Clone + TransactionEvent,
     >(
         self,
         universe: &[K],
@@ -738,7 +740,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
     pub(crate) fn materialize_with_deltas<
         K: Clone + Hash + Debug + Eq + Ord,
-        E: Send + Sync + Debug + Clone + ReadWriteEvent,
+        E: Send + Sync + Debug + Clone + TransactionEvent,
     >(
         self,
         universe: &[K],
@@ -776,7 +778,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
     pub(crate) fn materialize_disjoint_module_rw<
         K: Clone + Hash + Debug + Eq + Ord,
-        E: Send + Sync + Debug + Clone + ReadWriteEvent,
+        E: Send + Sync + Debug + Clone + TransactionEvent,
     >(
         self,
         universe: &[K],
@@ -821,7 +823,7 @@ impl<K, E> MockTask<K, E> {
 impl<K, E> ExecutorTask for MockTask<K, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
-    E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
+    E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
     type Argument = ();
     type Error = usize;
@@ -962,6 +964,10 @@ where
             MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
         }
     }
+
+    fn is_transaction_dynamic_change_set_capable(_txn: &Self::Txn) -> bool {
+        true
+    }
 }
 
 pub(crate) fn raw_metadata(v: u64) -> StateValueMetadataKind {
@@ -986,7 +992,7 @@ pub(crate) struct MockOutput<K, E> {
 impl<K, E> TransactionOutput for MockOutput<K, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
-    E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
+    E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
     type Txn = MockTransaction<K, E>;
 
@@ -1040,18 +1046,36 @@ where
         BTreeMap::new()
     }
 
+    fn group_reads_needing_delayed_field_exchange(
+        &self,
+    ) -> BTreeMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value> {
+        // TODO[agg_v2](tests): add aggregators V2 to the proptest?
+        BTreeMap::new()
+    }
+
     // TODO[agg_v2](tests): Currently, appending None to all events, which means none of the
     // events have aggregators. Test it with aggregators as well.
     fn get_events(&self) -> Vec<(E, Option<MoveTypeLayout>)> {
         self.events.iter().map(|e| (e.clone(), None)).collect()
     }
 
-    fn resource_group_write_set(&self) -> Vec<(K, ValueType, BTreeMap<u32, ValueType>)> {
+    // TODO[agg_v2](fix) Using the concrete type layout here. Should we find a way to use generics?
+    fn resource_group_write_set(
+        &self,
+    ) -> Vec<(
+        K,
+        ValueType,
+        BTreeMap<u32, (ValueType, Option<Arc<MoveTypeLayout>>)>,
+    )> {
         self.group_writes
             .iter()
             .cloned()
             .map(|(group_key, metadata_v, inner_ops)| {
-                (group_key, metadata_v, inner_ops.into_iter().collect())
+                (
+                    group_key,
+                    metadata_v,
+                    inner_ops.into_iter().map(|(k, v)| (k, (v, None))).collect(),
+                )
             })
             .collect()
     }
@@ -1087,6 +1111,10 @@ where
         // to take &mut self as input
     }
 
+    fn set_txn_output_for_non_dynamic_change_set(&self) {
+        // TODO[agg_v2](tests): anything to be added here for tests?
+    }
+
     fn fee_statement(&self) -> FeeStatement {
         // First argument is supposed to be total (not important for the test though).
         // Next two arguments are different kinds of execution gas that are counted
@@ -1104,23 +1132,15 @@ where
 
 #[derive(Clone, Debug)]
 pub(crate) struct MockEvent {
-    key: EventKey,
-    sequence_number: u64,
-    type_tag: TypeTag,
     event_data: Vec<u8>,
 }
 
-impl ReadWriteEvent for MockEvent {
-    fn get_event_data(&self) -> (EventKey, u64, &TypeTag, &[u8]) {
-        (
-            self.key,
-            self.sequence_number,
-            &self.type_tag,
-            &self.event_data,
-        )
+impl TransactionEvent for MockEvent {
+    fn get_event_data(&self) -> &[u8] {
+        &self.event_data
     }
 
-    fn update_event_data(&mut self, event_data: Vec<u8>) {
+    fn set_event_data(&mut self, event_data: Vec<u8>) {
         self.event_data = event_data;
     }
 }

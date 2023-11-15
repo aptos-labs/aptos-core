@@ -37,6 +37,10 @@ impl<A: GasAlgebra> GasAlgebra for CalibrationAlgebra<A> {
         self.base.balance_internal()
     }
 
+    fn check_consistency(&self) -> PartialVMResult<()> {
+        self.base.check_consistency()
+    }
+
     fn charge_execution(
         &mut self,
         abstract_amount: impl GasExpression<VMGasParameters, Unit = InternalGasUnit>,

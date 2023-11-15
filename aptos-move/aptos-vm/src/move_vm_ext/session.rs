@@ -39,6 +39,8 @@ use std::{
     ops::{Deref, DerefMut},
     sync::Arc,
 };
+use aptos_types::block_metadata::BlockMetadata;
+use aptos_types::block_metadata_ext::BlockMetadataExt;
 
 pub(crate) enum ResourceGroupChangeSet {
     // Merged resource groups op.
@@ -77,6 +79,9 @@ pub enum SessionId {
     },
     // For those runs that are not a transaction and the output of which won't be committed.
     Void,
+    BlockMetaExt {
+        id: HashValue,
+    },
 }
 
 impl SessionId {
@@ -96,9 +101,15 @@ impl SessionId {
         Self::Genesis { id }
     }
 
-    pub fn block_meta(block_id: HashValue) -> Self {
+    pub fn block_meta(block_meta: &BlockMetadata) -> Self {
         Self::BlockMeta {
-            id: block_id,
+            id: block_meta.id(),
+        }
+    }
+
+    pub fn block_meta_ext(block_meta: &BlockMetadataExt) -> Self {
+        Self::BlockMetaExt {
+            id: block_meta.id(),
         }
     }
 
@@ -478,6 +489,12 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             .filter(|(state_key, _)| !resource_write_set.contains_key(state_key))
             .collect();
 
+        let group_reads_needing_change = aggregator_change_set
+            .group_reads_needing_exchange
+            .into_iter()
+            .filter(|(state_key, _)| !resource_group_write_set.contains_key(state_key))
+            .collect();
+
         VMChangeSet::new(
             resource_write_set,
             resource_group_write_set,
@@ -486,6 +503,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             aggregator_v1_delta_set,
             aggregator_change_set.delayed_field_changes,
             reads_needing_exchange,
+            group_reads_needing_change,
             events,
             configs,
         )

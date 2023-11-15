@@ -9,6 +9,7 @@ use http::header::{HeaderValue, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYP
 use hyper::{Body, Request, Response, StatusCode};
 use lazy_static::lazy_static;
 use pprof::protos::Message;
+use regex::Regex;
 use std::{collections::HashMap, time::Duration};
 
 lazy_static! {
@@ -100,6 +101,7 @@ async fn start_cpu_profiling(
     let mut body = Vec::new();
     let report = guard
         .report()
+        .frames_post_processor(frames_post_processor())
         .build()
         .map_err(|e| anyhow!("Failed to generate cpu profiling report: {e:?}."))?;
 
@@ -116,4 +118,14 @@ async fn start_cpu_profiling(
     }
 
     Ok(body)
+}
+
+fn frames_post_processor() -> impl Fn(&mut pprof::Frames) {
+    let regex = Regex::new(r"^(.*)-(\d*)$").unwrap();
+
+    move |frames| {
+        if let Some((_, [name, _])) = regex.captures(&frames.thread_name).map(|c| c.extract()) {
+            frames.thread_name = name.to_string();
+        }
+    }
 }

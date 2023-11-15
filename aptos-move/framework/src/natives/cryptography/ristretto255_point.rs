@@ -4,11 +4,11 @@
 //! A crate which extends Move with a RistrettoPoint struct that points to a Rust-native
 //! curve25519_dalek::ristretto::RistrettoPoint.
 
-use crate::natives::{
-    cryptography::ristretto255::{
+use crate::natives::cryptography::{
+    helpers::log2_floor,
+    ristretto255::{
         pop_64_byte_slice, pop_scalar_from_bytes, scalar_from_struct, COMPRESSED_POINT_NUM_BYTES,
     },
-    helpers::log2_floor,
 };
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{

@@ -1,10 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::TChainHealthBackoff;
 use crate::{
+    counters::CHAIN_HEALTH_BACKOFF_TRIGGERED,
     dag::{anchor_election::AnchorElection, storage::CommitEvent},
     liveness::{
         leader_reputation::{LeaderReputation, MetadataBackend, ReputationHeuristic},
+        proposal_generator::ChainHealthBackoffConfig,
         proposer_election::ProposerElection,
     },
 };
@@ -17,6 +20,7 @@ use move_core_types::account_address::AccountAddress;
 use std::{
     collections::{HashMap, VecDeque},
     sync::Arc,
+    time::Duration,
 };
 
 pub struct MetadataBackendAdapter {
@@ -96,6 +100,7 @@ impl MetadataBackend for MetadataBackendAdapter {
 pub struct LeaderReputationAdapter {
     reputation: LeaderReputation,
     data_source: Arc<MetadataBackendAdapter>,
+    chain_health_backoff_config: ChainHealthBackoffConfig,
 }
 
 impl LeaderReputationAdapter {
@@ -106,6 +111,7 @@ impl LeaderReputationAdapter {
         backend: Arc<MetadataBackendAdapter>,
         heuristic: Box<dyn ReputationHeuristic>,
         window_for_chain_health: usize,
+        chain_health_backoff_config: ChainHealthBackoffConfig,
     ) -> Self {
         Self {
             reputation: LeaderReputation::new(
@@ -119,7 +125,20 @@ impl LeaderReputationAdapter {
                 window_for_chain_health,
             ),
             data_source: backend,
+            chain_health_backoff_config,
         }
+    }
+
+    fn get_chain_health_backoff(
+        &self,
+        round: u64,
+    ) -> (f64, Option<&aptos_config::config::ChainHealthBackoffValues>) {
+        let voting_power_ratio = self.reputation.get_voting_power_participation_ratio(round);
+
+        let chain_health_backoff = self
+            .chain_health_backoff_config
+            .get_backoff(voting_power_ratio);
+        (voting_power_ratio, chain_health_backoff)
     }
 }
 
@@ -128,7 +147,32 @@ impl AnchorElection for LeaderReputationAdapter {
         self.reputation.get_valid_proposer(round)
     }
 
-    fn update_reputation(&mut self, commit_event: CommitEvent) {
+    fn update_reputation(&self, commit_event: CommitEvent) {
         self.data_source.push(commit_event)
+    }
+}
+
+impl TChainHealthBackoff for LeaderReputationAdapter {
+    fn get_round_backoff(&self, round: Round) -> (f64, Option<Duration>) {
+        let (voting_power_ratio, chain_health_backoff) = self.get_chain_health_backoff(round);
+        let backoff_duration = if let Some(value) = chain_health_backoff {
+            CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(1.0);
+            Some(Duration::from_millis(value.backoff_proposal_delay_ms))
+        } else {
+            CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(0.0);
+            None
+        };
+        (voting_power_ratio, backoff_duration)
+    }
+
+    fn get_round_payload_limits(&self, round: Round) -> (f64, Option<(u64, u64)>) {
+        let (voting_power_ratio, chain_health_backoff) = self.get_chain_health_backoff(round);
+        let backoff_limits = chain_health_backoff.map(|value| {
+            (
+                value.max_sending_block_txns_override,
+                value.max_sending_block_bytes_override,
+            )
+        });
+        (voting_power_ratio, backoff_limits)
     }
 }

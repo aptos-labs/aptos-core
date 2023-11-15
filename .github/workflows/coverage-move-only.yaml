@@ -1,0 +1,52 @@
+name: "Test Coverage For Move"
+on:
+  # Trigger if any of the conditions
+  #   Any changes to the directory `third_party/move/`
+  push:
+    branches:
+      - 'main'
+    paths:
+      - 'third_party/move/**'
+      - 'aptos-move/e2e-move-tests/**'
+  pull_request:
+    paths:
+      - 'third_party/move/**'
+      - 'aptos-move/e2e-move-tests/**'
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
+# cancel redundant builds
+concurrency:
+  # cancel redundant builds on PRs (only on PR, not on branches)
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  rust-move-unit-coverage:
+    timeout-minutes: 60
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      - run: rustup component add llvm-tools-preview
+      - uses: taiki-e/install-action@6f1ebcd9e21315fc37d7f7bc851dfcc8356d7da3 # pin@v1.5.6
+        with:
+          tool: nextest,cargo-llvm-cov
+      - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+      - run: cargo llvm-cov --ignore-run-fail -p "move*" -p e2e-move-tests --lcov --jobs 32 --output-path lcov_unit.info
+        env:
+          INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+      - uses: actions/upload-artifact@v3
+        with:
+          name: lcov_unit
+          path: lcov_unit.info
+      - uses: actions/download-artifact@v3
+        with:
+          name: lcov_unit
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@d9f34f8cd5cb3b3eb79b3e4b5dae3a16df499a70 # pin@v3
+        with:
+          files: lcov_unit.info
+          fail_ci_if_error: true

@@ -83,7 +83,12 @@ impl TryIntoMoveValue for DelayedFieldID {
         Ok(match layout {
             MoveTypeLayout::U64 => Value::u64(self.as_u64()),
             MoveTypeLayout::U128 => Value::u128(self.as_u64() as u128),
-            layout if is_string_layout(layout) => bytes_to_string(to_utf8_bytes(self.as_u64())),
+            layout if is_string_layout(layout) => {
+                // Here, we make sure we convert identifiers to fixed-size Move
+                // values. This is needed because we charge gas based on the resource
+                // size with identifiers inside, and so it has to be deterministic.
+                bytes_to_string(u64_to_fixed_size_utf8_bytes(self.as_u64()))
+            },
             _ => {
                 return Err(code_invariant_error(format!(
                     "Failed to convert {:?} into a Move value with {} layout",
@@ -164,8 +169,11 @@ fn string_to_bytes(value: Struct) -> Result<Vec<u8>, PanicError> {
         )
 }
 
-fn to_utf8_bytes(value: impl ToString) -> Vec<u8> {
-    value.to_string().into_bytes()
+fn u64_to_fixed_size_utf8_bytes(value: u64) -> Vec<u8> {
+    // Maximum u64 identifier size is 20 characters. We need a fixed size to
+    // ensure identifiers have the same size all the time for all validators,
+    // to ensure consistent and deterministic gas charging.
+    format!("{:0>20}", value).to_string().into_bytes()
 }
 
 fn from_utf8_bytes<T: FromStr>(bytes: Vec<u8>) -> Result<T, PanicError> {
@@ -177,4 +185,49 @@ fn from_utf8_bytes<T: FromStr>(bytes: Vec<u8>) -> Result<T, PanicError> {
 
 fn u128_to_u64(value: u128) -> Result<u64, PanicError> {
     u64::try_from(value).map_err(|_| code_invariant_error("Cannot cast u128 into u64".to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use claims::{assert_ok, assert_ok_eq};
+
+    #[test]
+    fn test_fixed_string_id_1() {
+        let encoded = u64_to_fixed_size_utf8_bytes(7);
+        assert_eq!(encoded.len(), 20);
+
+        let decoded_string = assert_ok!(String::from_utf8(encoded.clone()));
+        assert_eq!(decoded_string, "00000000000000000007");
+
+        let decoded = assert_ok!(decoded_string.parse::<u64>());
+        assert_eq!(decoded, 7);
+        assert_ok_eq!(from_utf8_bytes::<u64>(encoded), 7);
+    }
+
+    #[test]
+    fn test_fixed_string_id_2() {
+        let encoded = u64_to_fixed_size_utf8_bytes(u64::MAX);
+        assert_eq!(encoded.len(), 20);
+
+        let decoded_string = assert_ok!(String::from_utf8(encoded.clone()));
+        assert_eq!(decoded_string, "18446744073709551615");
+
+        let decoded = assert_ok!(decoded_string.parse::<u64>());
+        assert_eq!(decoded, u64::MAX);
+        assert_ok_eq!(from_utf8_bytes::<u64>(encoded), u64::MAX);
+    }
+
+    #[test]
+    fn test_fixed_string_id_3() {
+        let encoded = u64_to_fixed_size_utf8_bytes(0);
+        assert_eq!(encoded.len(), 20);
+
+        let decoded_string = assert_ok!(String::from_utf8(encoded.clone()));
+        assert_eq!(decoded_string, "00000000000000000000");
+
+        let decoded = assert_ok!(decoded_string.parse::<u64>());
+        assert_eq!(decoded, 0);
+        assert_ok_eq!(from_utf8_bytes::<u64>(encoded), 0);
+    }
 }

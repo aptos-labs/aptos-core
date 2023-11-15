@@ -8,7 +8,9 @@ use async_trait::async_trait;
 use bollard::API_DEFAULT_VERSION;
 use bollard::{
     container::{RemoveContainerOptions, StopContainerOptions},
+    errors::Error as BollardError,
     image::CreateImageOptions,
+    network::CreateNetworkOptions,
     volume::{CreateVolumeOptions, RemoveVolumeOptions},
     Docker,
 };
@@ -18,6 +20,8 @@ use tracing::{info, warn};
 use version_compare::Version;
 
 const ERROR_MESSAGE: &str = "Docker is not available, confirm it is installed and running. See https://aptos.dev/guides/local-development-network#faq for assistance.";
+
+pub const CONTAINER_NETWORK_NAME: &str = "aptos-local-testnet-network";
 
 /// This function returns a Docker client. Before returning, it confirms that it can
 /// actually query the API and checks that the API version is sufficient. It first
@@ -189,6 +193,39 @@ pub async fn pull_docker_image(image_name: &str) -> Result<()> {
     info!("Pulled docker image {}", image_name);
 
     Ok(())
+}
+
+/// Create a network. If the network already exists, that's fine, just move on.
+pub async fn create_network(network_name: &str) -> Result<()> {
+    let docker = get_docker().await?;
+
+    info!("Creating network {}", network_name);
+
+    let config = CreateNetworkOptions {
+        name: network_name,
+        internal: false,
+        check_duplicate: true,
+        ..Default::default()
+    };
+    let response = docker.create_network(config).await;
+
+    match response {
+        Ok(_) => {
+            info!("Created volume {}", network_name);
+            Ok(())
+        },
+        Err(err) => match err {
+            BollardError::DockerResponseServerError { status_code, .. } => {
+                if status_code == 409 {
+                    info!("Network {} already exists, not creating it", network_name);
+                    Ok(())
+                } else {
+                    Err(err.into())
+                }
+            },
+            wildcard => Err(wildcard.into()),
+        },
+    }
 }
 
 pub async fn create_volume(volume_name: &str) -> Result<()> {

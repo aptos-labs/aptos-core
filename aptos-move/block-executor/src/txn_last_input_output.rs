@@ -8,7 +8,7 @@ use crate::{
     task::{ExecutionStatus, TransactionOutput},
 };
 use aptos_aggregator::types::PanicOr;
-use aptos_mvhashmap::types::TxnIndex;
+use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
 use aptos_types::{
     fee_statement::FeeStatement, transaction::BlockExecutableTransaction as Transaction,
     write_set::WriteOp,
@@ -57,7 +57,9 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: 
     // Set once when the group outputs are committed sequentially, to be processed later by
     // concurrent materialization / output preparation.
     finalized_groups: Vec<
-        CachePadded<ExplicitSyncWrapper<Vec<(T::Key, T::Value, Vec<(T::Tag, Arc<T::Value>)>)>>>,
+        CachePadded<
+            ExplicitSyncWrapper<Vec<(T::Key, T::Value, Vec<(T::Tag, ValueWithLayout<T::Value>)>)>>,
+        >,
     >,
 
     outputs: Vec<CachePadded<ArcSwapOption<TxnOutput<O, E>>>>, // txn_idx -> output.
@@ -304,6 +306,24 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             })
     }
 
+    pub(crate) fn group_reads_needing_delayed_field_exchange(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Option<BTreeMap<T::Key, T::Value>> {
+        self.outputs[txn_idx as usize]
+            .load()
+            .as_ref()
+            .and_then(|txn_output| match &txn_output.output_status {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+                    Some(t.group_reads_needing_delayed_field_exchange())
+                },
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
+            })
+    }
+
     pub(crate) fn aggregator_v1_delta_keys(&self, txn_idx: TxnIndex) -> Vec<T::Key> {
         self.outputs[txn_idx as usize].load().as_ref().map_or(
             vec![],
@@ -358,7 +378,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn record_finalized_group(
         &self,
         txn_idx: TxnIndex,
-        finalized_groups: Vec<(T::Key, T::Value, Vec<(T::Tag, Arc<T::Value>)>)>,
+        finalized_groups: Vec<(T::Key, T::Value, Vec<(T::Tag, ValueWithLayout<T::Value>)>)>,
     ) {
         *self.finalized_groups[txn_idx as usize].acquire() = finalized_groups;
     }
@@ -366,7 +386,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn take_finalized_group(
         &self,
         txn_idx: TxnIndex,
-    ) -> Vec<(T::Key, T::Value, Vec<(T::Tag, Arc<T::Value>)>)> {
+    ) -> Vec<(T::Key, T::Value, Vec<(T::Tag, ValueWithLayout<T::Value>)>)> {
         std::mem::take(&mut self.finalized_groups[txn_idx as usize].acquire())
     }
 

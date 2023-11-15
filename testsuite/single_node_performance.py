@@ -73,7 +73,9 @@ NUM_ACCOUNTS = max(
 MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 
 # numbers are based on the machine spec used by github action
-# Calibrate from https://gist.github.com/igor-aptos/7b12ca28de03894cddda8e415f37889e
+# Calibrate using median value from
+# Axiom: https://app.axiom.co/aptoslabs-hghf/explorer?qid=88fegG0H1si-s3x8pv&relative=1
+# Humio: https://gist.github.com/igor-aptos/7b12ca28de03894cddda8e415f37889e
 # Local machine numbers will be higher.
 # fmt: off
 TESTS = [
@@ -95,11 +97,19 @@ TESTS = [
     RunGroupConfig(expected_tps=365, key=RunGroupKey("batch100-transfer"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=1100, key=RunGroupKey("batch100-transfer", executor_type="native"), included_in=Flow.CONTINUOUS),
 
+    RunGroupConfig(expected_tps=160, key=RunGroupKey("vector-picture40"), included_in=Flow(0), waived=True),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("vector-picture40", module_working_set_size=20), included_in=Flow(0), waived=True),
     RunGroupConfig(expected_tps=160, key=RunGroupKey("vector-picture30k"), included_in=LAND_BLOCKING_AND_C, waived=True),
     RunGroupConfig(expected_tps=1000, key=RunGroupKey("vector-picture30k", module_working_set_size=20), included_in=Flow.CONTINUOUS, waived=True),
+    RunGroupConfig(expected_tps=20, key=RunGroupKey("smart-table-picture30-k-with200-change"), included_in=LAND_BLOCKING_AND_C, waived=True),
+    RunGroupConfig(expected_tps=50, key=RunGroupKey("smart-table-picture30-k-with200-change", module_working_set_size=20), included_in=Flow.CONTINUOUS, waived=True),
+    RunGroupConfig(expected_tps=5, key=RunGroupKey("smart-table-picture1-m-with1-k-change"), included_in=LAND_BLOCKING_AND_C, waived=True),
+    RunGroupConfig(expected_tps=10, key=RunGroupKey("smart-table-picture1-m-with1-k-change", module_working_set_size=20), included_in=Flow.CONTINUOUS, waived=True),
+    RunGroupConfig(expected_tps=5, key=RunGroupKey("smart-table-picture1-b-with1-k-change"), included_in=Flow(0), waived=True),
+    RunGroupConfig(expected_tps=10, key=RunGroupKey("smart-table-picture1-b-with1-k-change", module_working_set_size=20), included_in=Flow(0), waived=True),
 
-    RunGroupConfig(expected_tps=1890, key=RunGroupKey("token-v1ft-mint-and-transfer"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=8800, key=RunGroupKey("token-v1ft-mint-and-transfer", module_working_set_size=20), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=1890, key=RunGroupKey("token-v1ft-mint-and-transfer"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=8800, key=RunGroupKey("token-v1ft-mint-and-transfer", module_working_set_size=20), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=1100, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=5900, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential", module_working_set_size=20), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=1300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
@@ -214,6 +224,7 @@ class RunResults:
     io_gps: float
     execution_gps: float
     gpt: float
+    output_bps: float
     fraction_in_execution: float
     fraction_of_execution_in_vm: float
     fraction_in_commit: float
@@ -248,6 +259,9 @@ def extract_run_results(
         gpt = float(
             re.findall(r"Overall execution GPT: (\d+\.?\d*) gas/txn", output)[-1]
         )
+        output_bps = float(
+            re.findall(r"Overall execution output: (\d+\.?\d*) bytes/s", output)[-1]
+        )
     elif create_db:
         tps = float(
             get_only(
@@ -261,6 +275,7 @@ def extract_run_results(
         io_gps = 0
         execution_gps = 0
         gpt = 0
+        output_bps = 0
     else:
         tps = float(get_only(re.findall(r"Overall TPS: (\d+\.?\d*) txn/s", output)))
         gps = float(get_only(re.findall(r"Overall GPS: (\d+\.?\d*) gas/s", output)))
@@ -271,6 +286,9 @@ def extract_run_results(
             get_only(re.findall(r"Overall executionGPS: (\d+\.?\d*) gas/s", output))
         )
         gpt = float(get_only(re.findall(r"Overall GPT: (\d+\.?\d*) gas/txn", output)))
+        output_bps = float(
+            re.findall(r"Overall output: (\d+\.?\d*) bytes/s", output)[-1]
+        )
 
     if create_db:
         fraction_in_execution = 0
@@ -295,6 +313,7 @@ def extract_run_results(
         io_gps=io_gps,
         execution_gps=execution_gps,
         gpt=gpt,
+        output_bps=output_bps,
         fraction_in_execution=fraction_in_execution,
         fraction_of_execution_in_vm=fraction_of_execution_in_vm,
         fraction_in_commit=fraction_in_commit,
@@ -334,6 +353,7 @@ def print_table(
                 "io g/s",
                 "exe g/s",
                 "g/t",
+                "out B/s",
             ]
         )
 
@@ -366,6 +386,7 @@ def print_table(
             row.append(int(round(result.single_node_result.io_gps)))
             row.append(int(round(result.single_node_result.execution_gps)))
             row.append(int(round(result.single_node_result.gpt)))
+            row.append(int(round(result.single_node_result.output_bps)))
         rows.append(row)
 
     print(tabulate(rows, headers=headers))

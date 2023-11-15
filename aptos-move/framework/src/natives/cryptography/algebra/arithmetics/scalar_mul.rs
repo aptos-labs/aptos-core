@@ -2,8 +2,8 @@
 
 use crate::{
     abort_unless_feature_flag_enabled,
-    natives::{
-        cryptography::algebra::{
+    natives::cryptography::{
+        algebra::{
             abort_invariant_violated, AlgebraContext, Structure, E_TOO_MUCH_MEMORY_USED,
             MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING,
             MOVE_ABORT_CODE_NOT_IMPLEMENTED,

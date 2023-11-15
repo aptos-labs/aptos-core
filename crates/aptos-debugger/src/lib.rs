@@ -11,7 +11,10 @@ pub enum Cmd {
 
     Decode(aptos_move_debugger::bcs_txn_decoder::Command),
 
-    Move(aptos_move_debugger::aptos_debugger::Command),
+    DumpPendingTxns(aptos_consensus::util::db_tool::Command),
+
+    #[clap(subcommand)]
+    Move(aptos_move_debugger::common::Command),
 }
 
 impl Cmd {
@@ -19,6 +22,7 @@ impl Cmd {
         match self {
             Cmd::AptosDb(cmd) => cmd.run().await,
             Cmd::Decode(cmd) => cmd.run().await,
+            Cmd::DumpPendingTxns(cmd) => cmd.run().await,
             Cmd::Move(cmd) => cmd.run().await,
         }
     }

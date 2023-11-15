@@ -15,8 +15,8 @@ use move_compiler::{
 };
 use move_coverage::coverage_map::{output_map_to_file, CoverageMap};
 use move_package::{
-    compilation::{build_plan::BuildPlan, compiled_package::unimplemented_v2_driver},
-    BuildConfig, CompilerConfig,
+    compilation::{build_plan::BuildPlan, compiled_package::build_and_report_v2_driver},
+    BuildConfig,
 };
 use move_unit_test::UnitTestingConfig;
 use move_vm_runtime::tracing::{LOGGING_FILE_WRITER, TRACING_ENABLED};
@@ -168,7 +168,9 @@ pub fn run_move_unit_tests<W: Write + Send>(
 
     // Build the resolution graph (resolution graph diagnostics are only needed for CLI commands so
     // ignore them by passing a vector as the writer)
-    let resolution_graph = build_config.resolution_graph_for_package(pkg_path, &mut Vec::new())?;
+    let resolution_graph = build_config
+        .clone()
+        .resolution_graph_for_package(pkg_path, &mut Vec::new())?;
 
     // Note: unit_test_config.named_address_values is always set to vec![] (the default value) before
     // being passed in.
@@ -207,7 +209,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
     // control back to the Move package system.
     let (_, model_opt) = build_plan.compile_with_driver(
         writer,
-        &CompilerConfig::default(),
+        &build_config.compiler_config,
         |compiler| {
             let (files, comments_and_compiler_res) = compiler.run::<PASS_CFGIR>().unwrap();
             let (_, compiler) =
@@ -231,7 +233,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
             test_plan = Some((built_test_plan, files.clone(), units.clone()));
             Ok((files, units))
         },
-        unimplemented_v2_driver,
+        build_and_report_v2_driver,
     )?;
 
     // If configured, run extra validation

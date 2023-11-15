@@ -6,10 +6,7 @@ use aptos_gas_schedule::VMGasParameters;
 use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
 };
-use aptos_vm_types::{
-    change_set::{GroupWrite, VMChangeSet},
-    storage::StorageGasParameters,
-};
+use aptos_vm_types::{change_set::VMChangeSet, storage::StorageGasParameters};
 use move_binary_format::errors::{Location, PartialVMResult, VMResult};
 use move_core_types::gas_algebra::{InternalGas, InternalGasUnit, NumBytes};
 use move_vm_types::gas::GasMeter as MoveGasMeter;
@@ -29,6 +26,9 @@ pub trait GasAlgebra {
 
     /// Returns the current balance, measured in internal gas units.
     fn balance_internal(&self) -> InternalGas;
+
+    /// Checks if the internal states (counters) are consistent.
+    fn check_consistency(&self) -> PartialVMResult<()>;
 
     /// Charges gas under the execution category.
     ///
@@ -115,7 +115,8 @@ pub trait AptosGasMeter: MoveGasMeter {
     fn charge_io_gas_for_group_write(
         &mut self,
         key: &StateKey,
-        group_write: &GroupWrite,
+        metadata_op: &WriteOp,
+        maybe_group_size: Option<u64>,
     ) -> VMResult<()>;
 
     /// Calculates the storage fee for a state slot allocation.
@@ -188,7 +189,8 @@ pub trait AptosGasMeter: MoveGasMeter {
             Self::maybe_record_storage_deposit(group_metadata_op, slot_fee);
             total_refund += refund;
 
-            let bytes_fee = self.storage_fee_for_state_bytes(key, group_write.encoded_group_size());
+            let bytes_fee =
+                self.storage_fee_for_state_bytes(key, group_write.maybe_group_op_size());
 
             write_fee += slot_fee + bytes_fee;
         }

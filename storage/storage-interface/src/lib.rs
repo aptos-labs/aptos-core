@@ -239,6 +239,9 @@ pub trait DbReader: Send + Sync {
 
         fn get_next_block_event(&self, version: Version) -> Result<(Version, NewBlockEvent)>;
 
+        /// See [AptosDB::get_latest_block_events].
+        fn get_latest_block_events(&self, num_events: usize) -> Result<Vec<EventWithVersion>>;
+
         /// Returns the start_version, end_version and NewBlockEvent of the block containing the input
         /// transaction version.
         fn get_block_info_by_version(

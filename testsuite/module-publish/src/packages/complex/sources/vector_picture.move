@@ -5,7 +5,7 @@ module 0xABCD::vector_picture {
     use std::error;
     use std::signer;
     use std::vector;
-    use aptos_std::object::{Self, Object};
+    use aptos_std::object;
 
     /// The caller tried to mutate an item outside the bounds of the vector.
     const E_INDEX_OUT_OF_BOUNDS: u64 = 1;

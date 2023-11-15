@@ -256,7 +256,7 @@ impl CliCommand<()> for RunLocalTestnet {
                 &self,
                 processor_preqrequisite_healthcheckers,
                 node_manager.get_data_service_url(),
-                self.postgres_args.get_connection_string(None),
+                self.postgres_args.get_connection_string(None, true),
             )
             .context("Failed to build processor service managers")?;
 
@@ -275,7 +275,7 @@ impl CliCommand<()> for RunLocalTestnet {
                 &self,
                 processor_health_checkers,
                 test_dir.clone(),
-                self.postgres_args.get_connection_string(None),
+                self.postgres_args.get_connection_string(None, false),
             )
             .context("Failed to build indexer API service manager")?;
             managers.push(Box::new(indexer_api_manager));

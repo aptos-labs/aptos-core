@@ -91,7 +91,7 @@ fn test_resource_in_storage() {
         )
         .unwrap();
     let actual_value = Value::simple_deserialize(&blob.unwrap(), &TEST_LAYOUT).unwrap();
-    let expected_value = test_struct!(100, 0, 300, 1, "foo", "2");
+    let expected_value = test_struct!(100, 0, 300, 1, "foo", "00000000000000000002");
     assert!(actual_value.equals(&expected_value).unwrap());
     view.assert_mapping_equal_at(0, Value::u64(200));
     view.assert_mapping_equal_at(1, Value::u128(400));
@@ -123,7 +123,7 @@ fn test_table_item_in_storage() {
         )
         .unwrap();
     let actual_value = Value::simple_deserialize(&blob.unwrap(), &TEST_LAYOUT).unwrap();
-    let expected_value = test_struct!(100, 0, 300, 1, "foo", "2");
+    let expected_value = test_struct!(100, 0, 300, 1, "foo", "00000000000000000002");
     assert!(actual_value.equals(&expected_value).unwrap());
     view.assert_mapping_equal_at(0, Value::u64(200));
     view.assert_mapping_equal_at(1, Value::u128(400));
@@ -133,7 +133,7 @@ fn test_table_item_in_storage() {
 #[test]
 fn test_resource_in_memory_cache() {
     let mut view = MockStateView::default();
-    let test_struct = test_struct!(100, 0, 300, 1, "foo", "2");
+    let test_struct = test_struct!(100, 0, 300, 1, "foo", "00000000000000000002");
     view.add_to_in_memory_cache(
         (*TEST_RESOURCE_STATE_KEY).clone(),
         test_struct,
@@ -150,7 +150,7 @@ fn test_resource_in_memory_cache() {
         .get_resource_bytes_with_metadata_and_layout(&TEST_ADDRESS, &TEST_RESOURCE_TAG, &[], None)
         .unwrap();
     let actual_value = Value::simple_deserialize(&blob.unwrap(), &TEST_LAYOUT).unwrap();
-    let expected_value = test_struct!(100, 0, 300, 1, "foo", "2");
+    let expected_value = test_struct!(100, 0, 300, 1, "foo", "00000000000000000002");
     assert!(actual_value.equals(&expected_value).unwrap());
 
     let (blob, _) = view
@@ -162,14 +162,14 @@ fn test_resource_in_memory_cache() {
         )
         .unwrap();
     let actual_value = Value::simple_deserialize(&blob.unwrap(), &TEST_LAYOUT).unwrap();
-    let expected_value = test_struct!(100, 0, 300, 1, "foo", "2");
+    let expected_value = test_struct!(100, 0, 300, 1, "foo", "00000000000000000002");
     assert!(actual_value.equals(&expected_value).unwrap());
 }
 
 #[test]
 fn test_table_item_in_memory_cache() {
     let mut view = MockStateView::default();
-    let test_struct = test_struct!(100, 0, 300, 1, "foo", "2");
+    let test_struct = test_struct!(100, 0, 300, 1, "foo", "00000000000000000002");
     view.add_to_in_memory_cache(
         (*TEST_TABLE_ITEM_STATE_KEY).clone(),
         test_struct,
@@ -186,7 +186,7 @@ fn test_table_item_in_memory_cache() {
         .resolve_table_entry_bytes_with_layout(&TEST_TABLE_HANDLE, &TEST_TABLE_KEY, None)
         .unwrap();
     let actual_value = Value::simple_deserialize(&blob.unwrap(), &TEST_LAYOUT).unwrap();
-    let expected_value = test_struct!(100, 0, 300, 1, "foo", "2");
+    let expected_value = test_struct!(100, 0, 300, 1, "foo", "00000000000000000002");
     assert!(actual_value.equals(&expected_value).unwrap());
 
     let blob = view
@@ -197,6 +197,6 @@ fn test_table_item_in_memory_cache() {
         )
         .unwrap();
     let actual_value = Value::simple_deserialize(&blob.unwrap(), &TEST_LAYOUT).unwrap();
-    let expected_value = test_struct!(100, 0, 300, 1, "foo", "2");
+    let expected_value = test_struct!(100, 0, 300, 1, "foo", "00000000000000000002");
     assert!(actual_value.equals(&expected_value).unwrap());
 }

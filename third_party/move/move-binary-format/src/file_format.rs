@@ -1928,6 +1928,7 @@ impl Bytecode {
 /// A CompiledScript defines the constant pools (string, address, signatures, etc.), the handle
 /// tables (external code references) and it has a `main` definition.
 #[derive(Clone, Default, Eq, PartialEq, Debug)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct CompiledScript {
     /// Version number found during deserialization
     pub version: u32,

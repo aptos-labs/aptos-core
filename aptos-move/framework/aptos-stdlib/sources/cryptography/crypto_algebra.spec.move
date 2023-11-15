@@ -1,4 +1,10 @@
 spec aptos_std::crypto_algebra {
+
+    spec handles_from_elements<S>(elements: &vector<Element<S>>): vector<u64> {
+        aborts_if false;
+        ensures forall i in 0..len(elements): result[i] == elements[i].handle;
+    }
+
     spec add_internal<S>(handle_1: u64, handle_2: u64): u64 {
         pragma opaque;
     }

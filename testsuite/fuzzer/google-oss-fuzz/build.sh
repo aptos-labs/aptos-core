@@ -5,7 +5,7 @@ NIGHTLY_VERSION="nightly-2023-01-01"  # bitvec does not compile with latest nigh
 rustup install $NIGHTLY_VERSION
 cd testsuite/fuzzer
 
-RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" cargo +$NIGHTLY_VERSION fuzz build -O -a
+RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" cargo +$NIGHTLY_VERSION fuzz build -Ztarget-applies-to-host -Zhost-config move_value_deserialize -O -a
 for fuzzer in $(cat fuzz/Cargo.toml | grep "name = " | grep -v "fuzzer-fuzz" | cut -d'"' -f2); do
   cp ../../target/x86_64-unknown-linux-gnu/release/$fuzzer $OUT/
 done

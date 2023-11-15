@@ -9,6 +9,10 @@ module 0x42::fields {
         h: u64
     }
 
+    struct G<X> {
+        f: X
+    }
+
     fun read_val(x: S): u64 {
         x.g.h
     }
@@ -37,5 +41,13 @@ module 0x42::fields {
         let x = S { f: 0, g: T { h: 0 } };
         x.g.h = 42;
         x
+    }
+
+    fun read_generic_val(x: G<u64>): u64 {
+        x.f
+    }
+
+    fun write_generic_val(x: &mut G<u64>, v: u64) {
+        x.f = v
     }
 }

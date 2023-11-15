@@ -38,7 +38,9 @@ module tic_tac_toe::ttt {
     const EOUT_OF_TURN_MOVE: u64 = 9;
 
 
+    #[event]
     struct GameOverEvent has drop, store {
+        game_address: address,
         is_game_over: bool,
     }
 
@@ -53,7 +55,6 @@ module tic_tac_toe::ttt {
         col: u64,
     }
 
-    //// TODO: event handle should be stored in permanent struct, if we want
     //// to access game records after games are over.
     struct Game has key, store {
         board: Board,
@@ -61,7 +62,6 @@ module tic_tac_toe::ttt {
         player_o: Option<Player>,
         is_player_x_turn: bool,
         is_game_over: bool,
-        game_over_events: event::EventHandle<GameOverEvent>,
     }
 
     /*
@@ -140,13 +140,7 @@ module tic_tac_toe::ttt {
 
         game.is_game_over = true;
 
-        let game_events = borrow_global_mut<Game>(game_addr);
-        event::emit_event(
-            &mut game_events.game_over_events,
-            GameOverEvent {
-                is_game_over: true,
-            },
-        );
+        event::emit(GameOverEvent { game_address: game_addr, is_game_over: true, });
     }
 
     /*
@@ -170,7 +164,6 @@ module tic_tac_toe::ttt {
             player_o: option::none(),
             is_player_x_turn: true,
             is_game_over: false,
-            game_over_events: account::new_event_handle<GameOverEvent>(creator),
         }
     }
 
@@ -301,7 +294,7 @@ module tic_tac_toe::ttt {
      */
     fun cleanup_game(game: Game) {
         let Game {
-            board: Board{
+            board: Board {
                 vec,
                 row: _,
                 col: _,
@@ -310,14 +303,12 @@ module tic_tac_toe::ttt {
             player_o,
             is_player_x_turn: _,
             is_game_over: _,
-            game_over_events,
         } = game;
         option::destroy_some(player_x);
         option::destroy_some(player_o);
-        while(!vector::is_empty(&vec)) {
+        while (!vector::is_empty(&vec)) {
             vector::pop_back(&mut vec);
         };
-        event::destroy_handle(game_over_events);
     }
 
 

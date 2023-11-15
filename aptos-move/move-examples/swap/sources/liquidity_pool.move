@@ -13,8 +13,7 @@
 /// required so that fees are correctly updated for LPs. fungible_asset::transfer and primary_fungible_store::transfer
 /// are not supported
 module swap::liquidity_pool {
-    use aptos_framework::account;
-    use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::event;
     use aptos_framework::fungible_asset::{
         Self, FungibleAsset, FungibleStore, Metadata,
         BurnRef, MintRef, TransferRef,
@@ -76,7 +75,6 @@ module swap::liquidity_pool {
         pending_pauser: address,
         stable_fee_bps: u64,
         volatile_fee_bps: u64,
-        create_pool_events: EventHandle<CreatePoolEvent>,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -88,7 +86,6 @@ module swap::liquidity_pool {
         lp_token_refs: LPTokenRefs,
         swap_fee_bps: u64,
         is_stable: bool,
-        swap_events: EventHandle<SwapEvent>,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -101,16 +98,18 @@ module swap::liquidity_pool {
         claimable_2: SmartTable<address, u128>,
     }
 
+    #[event]
     /// Event emitted when a pool is created.
-    struct CreatePoolEvent has drop, store {
+    struct CreatePool has drop, store {
         pool: Object<LiquidityPool>,
         token_1: Object<Metadata>,
         token_2: Object<Metadata>,
         is_stable: bool,
     }
 
+    #[event]
     /// Event emitted when a swap happens.
-    struct SwapEvent has drop, store {
+    struct Swap has drop, store {
         pool: address,
         from_token: Object<Metadata>,
         amount_in: u64,
@@ -132,7 +131,6 @@ module swap::liquidity_pool {
             pending_pauser: @0x0,
             stable_fee_bps: 10, // 0.1%
             volatile_fee_bps: 20, // 0.2%
-            create_pool_events: account::new_event_handle<CreatePoolEvent>(swap_signer),
         });
     }
 
@@ -294,7 +292,6 @@ module swap::liquidity_pool {
             lp_token_refs: create_lp_token_refs(pool_constructor_ref),
             swap_fee_bps: if (is_stable) { configs.stable_fee_bps } else { configs.volatile_fee_bps },
             is_stable,
-            swap_events: object::new_event_handle<SwapEvent>(pool_signer),
         });
         move_to(pool_signer, FeesAccounting {
             total_fees_1: 0,
@@ -307,7 +304,7 @@ module swap::liquidity_pool {
         let pool = object::convert(lp_token);
         smart_vector::push_back(&mut configs.all_pools, pool);
 
-        event::emit_event(&mut configs.create_pool_events, CreatePoolEvent { pool, token_1, token_2, is_stable });
+        event::emit(CreatePool { pool, token_1, token_2, is_stable });
         pool
     }
 
@@ -378,10 +375,7 @@ module swap::liquidity_pool {
         let k_after = calculate_constant_k(pool_data);
         assert!(k_before <= k_after, EK_BEFORE_SWAP_GREATER_THAN_EK_AFTER_SWAP);
 
-        event::emit_event(
-            &mut unchecked_mut_liquidity_pool_data(&pool).swap_events,
-            SwapEvent { pool: object::object_address(&pool), from_token, amount_in },
-        );
+        event::emit(Swap { pool: object::object_address(&pool), from_token, amount_in }, );
         out
     }
 
@@ -666,8 +660,9 @@ module swap::liquidity_pool {
     }
 
     inline fun get_pool_seeds(token_1: Object<Metadata>, token_2: Object<Metadata>, is_stable: bool): vector<u8> {
-        let token_symbol = lp_token_name(token_1, token_2);
-        let seeds = *string::bytes(&token_symbol);
+        let seeds = vector[];
+        vector::append(&mut seeds, bcs::to_bytes(&object::object_address(&token_1)));
+        vector::append(&mut seeds, bcs::to_bytes(&object::object_address(&token_2)));
         vector::append(&mut seeds, bcs::to_bytes(&is_stable));
         seeds
     }

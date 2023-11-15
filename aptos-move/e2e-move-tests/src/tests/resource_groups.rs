@@ -6,6 +6,7 @@ use aptos_package_builder::PackageBuilder;
 use aptos_types::{account_address::AccountAddress, on_chain_config::FeatureFlag};
 use move_core_types::{identifier::Identifier, language_storage::StructTag, vm_status::StatusCode};
 use serde::Deserialize;
+use test_case::test_case;
 
 #[derive(Debug, Deserialize, Eq, PartialEq)]
 struct Primary {
@@ -17,9 +18,20 @@ struct Secondary {
     value: u32,
 }
 
-#[test]
-fn test_resource_groups() {
+#[test_case(true)]
+#[test_case(false)]
+fn test_resource_groups(resource_group_charge_as_sum_enabled: bool) {
     let mut h = MoveHarness::new();
+    if resource_group_charge_as_sum_enabled {
+        h.enable_features(
+            vec![FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM],
+            vec![],
+        );
+    } else {
+        h.enable_features(vec![], vec![
+            FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM,
+        ]);
+    }
 
     let primary_addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
     let primary_account = h.new_account_at(primary_addr);

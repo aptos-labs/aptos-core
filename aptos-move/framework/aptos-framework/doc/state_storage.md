@@ -65,7 +65,7 @@
 
 ## Resource `StateStorageUsage`
 
-This is updated at the begining of each opoch, reflecting the storage
+This is updated at the beginning of each opoch, reflecting the storage
 usage after the last txn of the previous epoch is committed.
 
 

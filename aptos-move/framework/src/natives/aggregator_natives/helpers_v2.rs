@@ -3,6 +3,7 @@
 
 use super::helpers_v1::{get_aggregator_field, set_aggregator_field};
 use aptos_aggregator::{
+    resolver::DelayedFieldResolver,
     types::{DelayedFieldID, SnapshotValue},
     utils::{from_utf8_bytes, u128_to_u64},
 };
@@ -14,16 +15,24 @@ use move_vm_types::values::{StructRef, Value};
 const VALUE_FIELD_INDEX: usize = 0;
 const LIMIT_FIELD_INDEX: usize = 1;
 
-pub(crate) fn aggregator_value_field_as_id(value: u128) -> PartialVMResult<DelayedFieldID> {
-    u128_to_u64(value).map(DelayedFieldID::new)
+pub(crate) fn aggregator_value_field_as_id(
+    value: u128,
+    resolver: &dyn DelayedFieldResolver,
+) -> PartialVMResult<DelayedFieldID> {
+    let value_u64 = u128_to_u64(value)?;
+    Ok(resolver.validate_and_convert_delayed_field_id(value_u64)?)
 }
 
 pub(crate) fn aggregator_snapshot_value_field_as_id(
     value: SnapshotValue,
+    resolver: &dyn DelayedFieldResolver,
 ) -> PartialVMResult<DelayedFieldID> {
     match value {
-        SnapshotValue::Integer(v) => aggregator_value_field_as_id(v),
-        SnapshotValue::String(v) => Ok(from_utf8_bytes(v)?).map(DelayedFieldID::new),
+        SnapshotValue::Integer(v) => aggregator_value_field_as_id(v, resolver),
+        SnapshotValue::String(v) => {
+            let value_u64: u64 = from_utf8_bytes(v)?;
+            Ok(resolver.validate_and_convert_delayed_field_id(value_u64)?)
+        },
     }
 }
 

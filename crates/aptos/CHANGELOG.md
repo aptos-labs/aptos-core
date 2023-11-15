@@ -4,6 +4,11 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 
+## [2.3.1] - 2023/11/07
+### Updated
+- Updated processor code from https://github.com/aptos-labs/aptos-indexer-processors for the local testnet to 2d5cb211a89a8705674e9e1e741c841dd899c558. 
+- Improved reliability of inter-container networking with local testnet.
+
 ## [2.3.0] - 2023/10/25
 ### Added
 - Added `--node-api-key`. This lets you set an API key for the purpose of not being ratelimited.

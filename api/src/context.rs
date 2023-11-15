@@ -10,7 +10,7 @@ use crate::{
         ForbiddenError, InternalError, NotFoundError, ServiceUnavailableError, StdApiError,
     },
 };
-use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
+use anyhow::{anyhow, bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{
     AptosErrorCode, AsConverter, BcsBlock, GasEstimation, LedgerInfo, ResourceGroup,
     TransactionOnChainData,
@@ -28,9 +28,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     access_path::{AccessPath, Path},
     account_address::AccountAddress,
-    account_config::NewBlockEvent,
-    account_state::AccountState,
-    account_view::AccountView,
+    account_config::{AccountResource, NewBlockEvent},
     chain_id::ChainId,
     contract_event::EventWithVersion,
     event::EventKey,
@@ -48,6 +46,7 @@ use aptos_vm::data_cache::AsMoveResolver;
 use futures::{channel::oneshot, SinkExt};
 use move_core_types::{
     language_storage::{ModuleId, StructTag},
+    move_resource::MoveResource,
     resolver::ModuleResolver,
 };
 use std::{
@@ -292,6 +291,52 @@ impl Context {
             .map_err(|e| E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info))
     }
 
+    pub fn get_resource<T: MoveResource>(
+        &self,
+        address: AccountAddress,
+        version: Version,
+    ) -> Result<Option<T>> {
+        let access_path = AccessPath::resource_access_path(address, T::struct_tag())?;
+        let bytes_opt = self.get_state_value(&StateKey::access_path(access_path), version)?;
+        bytes_opt
+            .map(|bytes| bcs::from_bytes(&bytes))
+            .transpose()
+            .map_err(|err| anyhow!(format!("Failed to deserialize resource: {}", err)))
+    }
+
+    pub fn get_resource_poem<T: MoveResource, E: InternalError>(
+        &self,
+        address: AccountAddress,
+        version: Version,
+        latest_ledger_info: &LedgerInfo,
+    ) -> Result<Option<T>, E> {
+        self.get_resource(address, version)
+            .context("Failed to read account resource.")
+            .map_err(|err| {
+                E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
+            })
+    }
+
+    pub fn expect_resource_poem<T: MoveResource, E: InternalError + NotFoundError>(
+        &self,
+        address: AccountAddress,
+        version: Version,
+        latest_ledger_info: &LedgerInfo,
+    ) -> Result<T, E> {
+        self.get_resource_poem(address, version, latest_ledger_info)?
+            .ok_or_else(|| {
+                E::not_found_with_code(
+                    format!(
+                        "{} not found under address {}",
+                        T::struct_identifier(),
+                        address,
+                    ),
+                    AptosErrorCode::ResourceNotFound,
+                    latest_ledger_info,
+                )
+            })
+    }
+
     pub fn get_state_values(
         &self,
         address: AccountAddress,
@@ -451,26 +496,6 @@ impl Context {
             ))
         });
         Ok((kvs, next_key))
-    }
-
-    // This function should be deprecated. DO NOT USE it.
-    // Instead, call either `get_modules_by_pagination` or `get_modules_by_pagination`.
-    pub fn get_account_state<E: InternalError>(
-        &self,
-        address: AccountAddress,
-        version: u64,
-        latest_ledger_info: &LedgerInfo,
-    ) -> Result<Option<AccountState>, E> {
-        AccountState::from_access_paths_and_values(
-            address,
-            &self.get_state_values(address, version).map_err(|err| {
-                E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
-            })?,
-        )
-        .context("Failed to read account state at requested version")
-        .map_err(|err| {
-            E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
-        })
     }
 
     pub fn get_block_timestamp<E: InternalError>(
@@ -707,35 +732,13 @@ impl Context {
         let start_seq_number = if let Some(start_seq_number) = start_seq_number {
             start_seq_number
         } else {
-            // Get the current account state, and get the sequence number to get the limit most
-            // recent transactions
-            let account_state = self
-                .get_account_state(address, ledger_info.version(), ledger_info)?
-                .ok_or_else(|| {
-                    E::not_found_with_code(
-                        "Account not found",
-                        AptosErrorCode::AccountNotFound,
-                        ledger_info,
-                    )
-                })?;
-            let resource = account_state
-                .get_account_resource()
-                .map_err(|err| {
-                    E::internal_with_code(
-                        format!("Failed to get account resource {}", err),
-                        AptosErrorCode::InternalError,
-                        ledger_info,
-                    )
-                })?
-                .ok_or_else(|| {
-                    E::not_found_with_code(
-                        "Account not found",
-                        AptosErrorCode::AccountNotFound,
-                        ledger_info,
-                    )
-                })?;
-
-            resource.sequence_number().saturating_sub(limit as u64)
+            self.expect_resource_poem::<AccountResource, E>(
+                address,
+                ledger_info.version(),
+                ledger_info,
+            )?
+            .sequence_number()
+            .saturating_sub(limit as u64)
         };
 
         let txns = self

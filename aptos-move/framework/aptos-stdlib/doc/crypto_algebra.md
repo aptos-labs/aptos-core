@@ -91,6 +91,7 @@ See <code>*_algebra.<b>move</b></code> for currently implemented algebraic struc
 -  [Function `upcast_internal`](#0x1_crypto_algebra_upcast_internal)
 -  [Function `zero_internal`](#0x1_crypto_algebra_zero_internal)
 -  [Specification](#@Specification_1)
+    -  [Function `handles_from_elements`](#@Specification_1_handles_from_elements)
     -  [Function `add_internal`](#@Specification_1_add_internal)
     -  [Function `deserialize_internal`](#@Specification_1_deserialize_internal)
     -  [Function `div_internal`](#@Specification_1_div_internal)
@@ -876,7 +877,13 @@ NOTE: some hashing methods do not accept a <code>dst</code> and will abort if a 
     <b>let</b> num_elements = std::vector::length(elements);
     <b>let</b> element_handles = std::vector::empty();
     <b>let</b> i = 0;
-    <b>while</b> (i &lt; num_elements) {
+    <b>while</b> ({
+        <b>spec</b> {
+            <b>invariant</b> len(element_handles) == i;
+            <b>invariant</b> <b>forall</b> k in 0..i: element_handles[k] == elements[k].handle;
+        };
+        i &lt; num_elements
+    }) {
         std::vector::push_back(&<b>mut</b> element_handles, std::vector::borrow(elements, i).handle);
         i = i + 1;
     };
@@ -1375,6 +1382,23 @@ NOTE: some hashing methods do not accept a <code>dst</code> and will abort if a 
 <a name="@Specification_1"></a>
 
 ## Specification
+
+
+<a name="@Specification_1_handles_from_elements"></a>
+
+### Function `handles_from_elements`
+
+
+<pre><code><b>fun</b> <a href="crypto_algebra.md#0x1_crypto_algebra_handles_from_elements">handles_from_elements</a>&lt;S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="crypto_algebra.md#0x1_crypto_algebra_Element">crypto_algebra::Element</a>&lt;S&gt;&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> <b>forall</b> i in 0..len(elements): result[i] == elements[i].handle;
+</code></pre>
+
 
 
 <a name="@Specification_1_add_internal"></a>

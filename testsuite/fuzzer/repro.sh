@@ -25,7 +25,7 @@ FUZZER_NAME="$2"
 TESTCASE="$3"
 
 # Common command prefix
-CMD_PREFIX="cargo +nightly fuzz"
+CMD_PREFIX="cargo +nightly fuzz -Ztarget-applies-to-host -Zhost-config move_value_deserialize"
 
 # Set environment variable
 export RUSTFLAGS="--cfg tokio_unstable"

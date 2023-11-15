@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::anchor_election::TChainHealthBackoff;
 use crate::dag::{
     observability::tracing::{observe_round, RoundStage},
     types::NodeCertificate,
@@ -113,6 +114,7 @@ pub struct AdaptiveResponsive {
     minimal_wait_time: Duration,
     event_sender: tokio::sync::mpsc::Sender<Round>,
     state: State,
+    chain_backoff: Arc<dyn TChainHealthBackoff>,
 }
 
 impl AdaptiveResponsive {
@@ -120,6 +122,7 @@ impl AdaptiveResponsive {
         event_sender: tokio::sync::mpsc::Sender<Round>,
         epoch_state: Arc<EpochState>,
         minimal_wait_time: Duration,
+        chain_backoff: Arc<dyn TChainHealthBackoff>,
     ) -> Self {
         Self {
             epoch_state,
@@ -127,6 +130,7 @@ impl AdaptiveResponsive {
             minimal_wait_time,
             event_sender,
             state: State::Initial,
+            chain_backoff,
         }
     }
 }
@@ -151,10 +155,18 @@ impl ResponsiveCheck for AdaptiveResponsive {
             .verifier
             .sum_voting_power(strong_links.iter().map(|cert| cert.metadata().author()))
             .expect("Unable to sum voting power from strong links");
+
+        let (_, backoff_duration) = self.chain_backoff.get_round_backoff(new_round);
+        let wait_time = if let Some(duration) = backoff_duration {
+            duration.max(self.minimal_wait_time)
+        } else {
+            self.minimal_wait_time
+        };
+
         // voting power == 3f+1 or pass minimal wait time
         let duration_since_start = duration_since_epoch().saturating_sub(self.start_time);
         if voting_power == self.epoch_state.verifier.total_voting_power()
-            || duration_since_start >= self.minimal_wait_time
+            || duration_since_start >= wait_time
         {
             let _ = self.event_sender.send(new_round).await;
             if let State::Scheduled(handle) = std::mem::replace(&mut self.state, State::Sent) {
@@ -163,7 +175,7 @@ impl ResponsiveCheck for AdaptiveResponsive {
         } else if matches!(self.state, State::Initial) {
             // wait until minimal time reaches before sending
             let sender = self.event_sender.clone();
-            let wait_time = self.minimal_wait_time.saturating_sub(duration_since_start);
+            let wait_time = wait_time.saturating_sub(duration_since_start);
             let handle = tokio::spawn(async move {
                 tokio::time::sleep(wait_time).await;
                 let _ = sender.send(new_round).await;

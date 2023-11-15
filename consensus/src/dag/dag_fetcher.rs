@@ -3,14 +3,15 @@
 
 use super::DAGRpcResult;
 use crate::dag::{
-    dag_network::{RpcWithFallback, TDAGNetworkSender},
+    dag_network::{RpcResultWithResponder, TDAGNetworkSender},
     dag_store::Dag,
-    errors::{DAGError, FetchRequestHandleError},
+    errors::FetchRequestHandleError,
     observability::logging::{LogEvent, LogSchema},
     types::{CertifiedNode, FetchResponse, Node, NodeMetadata, RemoteFetchRequest},
-    RpcHandler,
+    RpcHandler, RpcWithFallback,
 };
 use anyhow::{anyhow, ensure};
+use aptos_bitvec::BitVec;
 use aptos_config::config::DagFetcherConfig;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
@@ -21,7 +22,6 @@ use async_trait::async_trait;
 use futures::{stream::FuturesUnordered, Stream, StreamExt};
 use std::{
     collections::HashMap,
-    ops::Deref,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
@@ -279,8 +279,8 @@ impl TDagFetcher for DagFetcher {
             self.config.max_concurrent_responders,
         );
 
-        while let Some(response) = rpc.next().await {
-            match response {
+        while let Some(RpcResultWithResponder { responder, result }) = rpc.next().await {
+            match result {
                 Ok(DAGRpcResult(Ok(response))) => {
                     match FetchResponse::try_from(response).and_then(|response| {
                         response.verify(&remote_request, &self.epoch_state.verifier)
@@ -292,7 +292,7 @@ impl TDagFetcher for DagFetcher {
                                 let mut dag_writer = dag.write();
                                 for node in certified_nodes.into_iter().rev() {
                                     if let Err(e) = dag_writer.add_node(node) {
-                                        error!("Failed to add node {}", e);
+                                        error!(error = ?e, "failed to add node");
                                     }
                                 }
                             }
@@ -302,33 +302,15 @@ impl TDagFetcher for DagFetcher {
                             }
                         },
                         Err(err) => {
-                            info!(error = ?err, "unable to parse fetch response");
+                            info!(error = ?err, "failure parsing/verifying fetch response from {}", responder);
                         },
                     };
                 },
                 Ok(DAGRpcResult(Err(dag_rpc_error))) => {
-                    info!(error = ?dag_rpc_error, "responder returned error");
-                    if let DAGError::FetchRequestHandleError(err) = dag_rpc_error.deref() {
-                        match err {
-                            FetchRequestHandleError::TargetsMissing => {
-                                // TODO: add who the responder is
-                                info!("responder is missing target nodes to serve")
-                            },
-                            FetchRequestHandleError::GarbageCollected(
-                                requested_round,
-                                lowest_round,
-                            ) => {
-                                info!(
-                                    "fetch error. requested: {}, lowest_round: {}",
-                                    requested_round, lowest_round
-                                )
-                            },
-                        }
-                    }
+                    info!(error = ?dag_rpc_error, responder = responder, "fetch failure: target {} returned error", responder);
                 },
                 Err(err) => {
-                    // TODO: add who responder is
-                    info!(error = ?err, "error issuing RPC");
+                    info!(error = ?err, responder = responder, "rpc failed to {}", responder);
                 },
             }
         }
@@ -369,15 +351,20 @@ impl RpcHandler for FetchRequestHandler {
             target_round = message.target_round(),
         );
         ensure!(
-            dag_reader.all_exists(message.targets()),
-            FetchRequestHandleError::TargetsMissing
-        );
-        ensure!(
             dag_reader.lowest_round() <= message.start_round(),
             FetchRequestHandleError::GarbageCollected(
                 message.start_round(),
                 dag_reader.lowest_round()
             ),
+        );
+
+        let missing_targets: BitVec = message
+            .targets()
+            .map(|node| !dag_reader.exists(node))
+            .collect();
+        ensure!(
+            missing_targets.all_zeros(),
+            FetchRequestHandleError::TargetsMissing(missing_targets)
         );
 
         let certified_nodes: Vec<_> = dag_reader

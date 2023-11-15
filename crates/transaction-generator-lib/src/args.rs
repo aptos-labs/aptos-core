@@ -31,6 +31,10 @@ pub enum TransactionTypeArg {
     TokenV1FTMintAndTransfer,
     TokenV2AmbassadorMint,
     VectorPicture30k,
+    VectorPicture40,
+    SmartTablePicture30KWith200Change,
+    SmartTablePicture1MWith1KChange,
+    SmartTablePicture1BWith1KChange,
 }
 
 impl TransactionTypeArg {
@@ -162,6 +166,41 @@ impl TransactionTypeArg {
                 entry_point: EntryPoints::VectorPicture { length: 30 * 1024 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::VectorPicture40 => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::VectorPicture { length: 40 },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::SmartTablePicture30KWith200Change => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::SmartTablePicture {
+                        length: 30 * 1024,
+                        num_points_per_txn: 200,
+                    },
+                    num_modules: module_working_set_size,
+                    use_account_pool: sender_use_account_pool,
+                }
+            },
+            TransactionTypeArg::SmartTablePicture1MWith1KChange => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::SmartTablePicture {
+                        length: 1024 * 1024,
+                        num_points_per_txn: 1024,
+                    },
+                    num_modules: module_working_set_size,
+                    use_account_pool: sender_use_account_pool,
+                }
+            },
+            TransactionTypeArg::SmartTablePicture1BWith1KChange => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::SmartTablePicture {
+                        length: 1024 * 1024 * 1024,
+                        num_points_per_txn: 1024,
+                    },
+                    num_modules: module_working_set_size,
+                    use_account_pool: sender_use_account_pool,
+                }
             },
         }
     }

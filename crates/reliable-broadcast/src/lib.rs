@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_consensus_types::common::Author;
+use aptos_logger::info;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use async_trait::async_trait;
 use futures::{stream::FuturesUnordered, Future, StreamExt};
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
 
 pub trait RBMessage: Send + Sync + Clone {}
 
@@ -61,7 +62,10 @@ where
         &self,
         message: S::Message,
         mut aggregating: S,
-    ) -> impl Future<Output = S::Aggregated> {
+    ) -> impl Future<Output = S::Aggregated>
+    where
+        <<S as BroadcastStatus<Req, Res>>::Ack as TryFrom<Res>>::Error: Debug,
+    {
         let receivers: Vec<_> = self.validators.clone();
         let network_sender = self.network_sender.clone();
         let time_service = self.time_service.clone();
@@ -94,15 +98,16 @@ where
                 fut.push(send_message(receiver, message.clone(), None));
             }
             while let Some((receiver, result)) = fut.next().await {
-                match result {
-                    Ok(msg) => {
-                        if let Ok(ack) = msg.try_into() {
-                            if let Ok(Some(aggregated)) = aggregating.add(receiver, ack) {
-                                return aggregated;
-                            }
+                match result.and_then(|msg| msg.try_into().map_err(|e| anyhow::anyhow!("{:?}", e)))
+                {
+                    Ok(ack) => {
+                        if let Ok(Some(aggregated)) = aggregating.add(receiver, ack) {
+                            return aggregated;
                         }
                     },
-                    Err(_) => {
+                    Err(e) => {
+                        info!(error = ?e, "rpc to {} failed", receiver);
+
                         let backoff_strategy = backoff_policies
                             .get_mut(&receiver)
                             .expect("should be present");

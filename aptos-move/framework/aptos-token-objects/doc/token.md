@@ -202,7 +202,7 @@ a small optimization to support either and take a fixed amount of 34-bytes.
 
 ## Struct `MutatorRef`
 
-This enables mutating descritpion and URI by higher level services.
+This enables mutating description and URI by higher level services.
 
 
 <pre><code><b>struct</b> <a href="token.md#0x4_token_MutatorRef">MutatorRef</a> <b>has</b> drop, store

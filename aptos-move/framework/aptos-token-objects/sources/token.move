@@ -82,7 +82,7 @@ module aptos_token_objects::token {
         self: Option<address>,
     }
 
-    /// This enables mutating descritpion and URI by higher level services.
+    /// This enables mutating description and URI by higher level services.
     struct MutatorRef has drop, store {
         self: address,
     }

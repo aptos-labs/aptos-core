@@ -40,7 +40,7 @@ use aptos_vm_types::{
     storage::{ChangeSetConfigs, StorageGasParameters, StoragePricing},
 };
 use fail::fail_point;
-use move_binary_format::{errors::VMResult, CompiledModule};
+use move_binary_format::errors::VMResult;
 use move_core_types::{
     gas_algebra::NumArgs,
     language_storage::ModuleId,
@@ -654,14 +654,6 @@ impl AptosVMImpl {
         session_id: SessionId,
     ) -> SessionExt<'r, '_> {
         self.move_vm.new_session(resolver, session_id)
-    }
-
-    pub fn load_module(
-        &self,
-        module_id: &ModuleId,
-        resolver: &impl AptosMoveResolver,
-    ) -> VMResult<Arc<CompiledModule>> {
-        self.move_vm.load_module(module_id, resolver)
     }
 }
 

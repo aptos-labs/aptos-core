@@ -3,8 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::types::PanicOr;
+use aptos_types::aggregator::PanicError;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum IntentionalFallbackToSequential {
     /// The same module access path for module was both read & written during speculative executions.
     /// This may trigger a race due to the Move-VM loader cache implementation, and mitigation requires
@@ -12,13 +13,8 @@ pub enum IntentionalFallbackToSequential {
     /// TODO: (short-mid term) relax the limitation, and (mid-long term) provide proper multi-versioning
     /// for code (like data) for the cache.
     ModulePathReadWrite,
-    // WriteSetPayload::Direct cannot be handled in mode where delayed_field_optimization is enabled,
-    // because delayed fields do value->identifier exchange on reads, and identifier->value exhcange
-    // on writes. WriteSetPayload::Direct cannot be processed to do so, as we get outputs directly.
-    // We communicate to the executor to retry with capability disabled.
-    DirectWriteSetTransaction,
     /// We defensively check certain resource group related invariant violations.
-    ResourceGroupError,
+    ResourceGroupError(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -30,3 +26,15 @@ pub enum Error<E> {
 }
 
 pub type Result<T, E> = ::std::result::Result<T, Error<E>>;
+
+impl<E> From<PanicOr<IntentionalFallbackToSequential>> for Error<E> {
+    fn from(err: PanicOr<IntentionalFallbackToSequential>) -> Self {
+        Error::FallbackToSequential(err)
+    }
+}
+
+impl<E> From<PanicError> for Error<E> {
+    fn from(err: PanicError) -> Self {
+        Error::FallbackToSequential(err.into())
+    }
+}

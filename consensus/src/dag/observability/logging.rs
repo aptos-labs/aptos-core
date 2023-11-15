@@ -14,7 +14,8 @@ pub struct LogSchema {
 
 #[derive(Serialize)]
 pub enum LogEvent {
-    Start,
+    EpochStart,
+    ModeTransition,
     BroadcastNode,
     ReceiveNode,
     Vote,
@@ -26,7 +27,10 @@ pub enum LogEvent {
     NewRound,
     FetchNodes,
     ReceiveFetchNodes,
-    StateSync,
+    ActiveMode,
+    SyncMode,
+    SyncOutcome,
+    Shutdown,
 }
 
 impl LogSchema {

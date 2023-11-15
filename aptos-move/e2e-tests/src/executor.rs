@@ -81,6 +81,8 @@ static RNG_SEED: [u8; 32] = [9u8; 32];
 
 const ENV_TRACE_DIR: &str = "TRACE";
 
+// Enables running parallel, in addition to sequential, in a
+// BothComparison mode.
 const ENV_ENABLE_PARALLEL: &str = "E2E_PARALLEL_EXEC";
 
 /// Directory structure of the trace dir
@@ -592,9 +594,9 @@ impl FakeExecutor {
         let log_context = AdapterLogSchema::new(self.data_store.id(), 0);
 
         // TODO(Gas): revisit this.
-        let vm = AptosVM::new_from_state_view(&self.data_store);
-
         let resolver = self.data_store.as_move_resolver();
+        let vm = AptosVM::new(&resolver);
+
         let (_status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(
             &resolver,
             &txn,
@@ -664,7 +666,7 @@ impl FakeExecutor {
 
     /// Verifies the given transaction by running it through the VM verifier.
     pub fn verify_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
-        let vm = AptosVM::new_from_state_view(self.get_state_view());
+        let vm = AptosVM::new(&self.get_state_view().as_move_resolver());
         vm.validate_transaction(txn, &self.data_store)
     }
 

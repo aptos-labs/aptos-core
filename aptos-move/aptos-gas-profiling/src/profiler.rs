@@ -10,7 +10,7 @@ use aptos_gas_meter::AptosGasMeter;
 use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
 };
-use aptos_vm_types::change_set::{GroupWrite, VMChangeSet};
+use aptos_vm_types::change_set::VMChangeSet;
 use move_binary_format::{
     errors::{Location, PartialVMResult, VMResult},
     file_format::CodeOffset,
@@ -519,16 +519,18 @@ where
     fn charge_io_gas_for_group_write(
         &mut self,
         key: &StateKey,
-        group_write: &GroupWrite,
+        metadata_op: &WriteOp,
+        maybe_group_size: Option<u64>,
     ) -> VMResult<()> {
-        let (cost, res) =
-            self.delegate_charge(|base| base.charge_io_gas_for_group_write(key, group_write));
+        let (cost, res) = self.delegate_charge(|base| {
+            base.charge_io_gas_for_group_write(key, metadata_op, maybe_group_size)
+        });
 
         self.total_exec_io += cost;
         self.write_set_transient.push(WriteTransient {
             key: key.clone(),
             cost,
-            op_type: write_op_type(group_write.metadata_op()),
+            op_type: write_op_type(metadata_op),
         });
 
         res
@@ -585,7 +587,8 @@ where
             Self::maybe_record_storage_deposit(group_metadata_op, slot_fee);
             total_refund += refund;
 
-            let bytes_fee = self.storage_fee_for_state_bytes(key, group_write.encoded_group_size());
+            let bytes_fee =
+                self.storage_fee_for_state_bytes(key, group_write.maybe_group_op_size());
 
             let fee = slot_fee + bytes_fee;
             // TODO: should we distringuish group writes.

@@ -40,10 +40,16 @@ This module has the exact same interface as the Ed25519 module.
     -  [Function `new_validated_public_key_from_bytes`](#@Specification_1_new_validated_public_key_from_bytes)
     -  [Function `new_validated_public_key_from_bytes_v2`](#@Specification_1_new_validated_public_key_from_bytes_v2)
     -  [Function `new_signature_from_bytes`](#@Specification_1_new_signature_from_bytes)
+    -  [Function `unvalidated_public_key_num_sub_pks`](#@Specification_1_unvalidated_public_key_num_sub_pks)
+    -  [Function `unvalidated_public_key_threshold`](#@Specification_1_unvalidated_public_key_threshold)
+    -  [Function `validated_public_key_num_sub_pks`](#@Specification_1_validated_public_key_num_sub_pks)
+    -  [Function `validated_public_key_threshold`](#@Specification_1_validated_public_key_threshold)
+    -  [Function `check_and_get_threshold`](#@Specification_1_check_and_get_threshold)
     -  [Function `public_key_bytes_to_authentication_key`](#@Specification_1_public_key_bytes_to_authentication_key)
     -  [Function `public_key_validate_internal`](#@Specification_1_public_key_validate_internal)
     -  [Function `public_key_validate_v2_internal`](#@Specification_1_public_key_validate_v2_internal)
     -  [Function `signature_verify_strict_internal`](#@Specification_1_signature_verify_strict_internal)
+    -  [Helper functions](#@Helper_functions_2)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
@@ -1062,6 +1068,105 @@ Returns <code><b>false</b></code> if either:
 
 
 
+<a name="@Specification_1_unvalidated_public_key_num_sub_pks"></a>
+
+### Function `unvalidated_public_key_num_sub_pks`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_unvalidated_public_key_num_sub_pks">unvalidated_public_key_num_sub_pks</a>(pk: &<a href="multi_ed25519.md#0x1_multi_ed25519_UnvalidatedPublicKey">multi_ed25519::UnvalidatedPublicKey</a>): u8
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> bytes = pk.bytes;
+<b>include</b> <a href="multi_ed25519.md#0x1_multi_ed25519_PkDivision">PkDivision</a>;
+</code></pre>
+
+
+
+<a name="@Specification_1_unvalidated_public_key_threshold"></a>
+
+### Function `unvalidated_public_key_threshold`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_unvalidated_public_key_threshold">unvalidated_public_key_threshold</a>(pk: &<a href="multi_ed25519.md#0x1_multi_ed25519_UnvalidatedPublicKey">multi_ed25519::UnvalidatedPublicKey</a>): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="multi_ed25519.md#0x1_multi_ed25519_spec_check_and_get_threshold">spec_check_and_get_threshold</a>(pk.bytes);
+</code></pre>
+
+
+
+<a name="@Specification_1_validated_public_key_num_sub_pks"></a>
+
+### Function `validated_public_key_num_sub_pks`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_validated_public_key_num_sub_pks">validated_public_key_num_sub_pks</a>(pk: &<a href="multi_ed25519.md#0x1_multi_ed25519_ValidatedPublicKey">multi_ed25519::ValidatedPublicKey</a>): u8
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> bytes = pk.bytes;
+<b>include</b> <a href="multi_ed25519.md#0x1_multi_ed25519_PkDivision">PkDivision</a>;
+</code></pre>
+
+
+
+<a name="@Specification_1_validated_public_key_threshold"></a>
+
+### Function `validated_public_key_threshold`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_validated_public_key_threshold">validated_public_key_threshold</a>(pk: &<a href="multi_ed25519.md#0x1_multi_ed25519_ValidatedPublicKey">multi_ed25519::ValidatedPublicKey</a>): u8
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> len(pk.bytes) == 0;
+<b>ensures</b> result == pk.bytes[len(pk.bytes) - 1];
+</code></pre>
+
+
+
+<a name="@Specification_1_check_and_get_threshold"></a>
+
+### Function `check_and_get_threshold`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_check_and_get_threshold">check_and_get_threshold</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="multi_ed25519.md#0x1_multi_ed25519_spec_check_and_get_threshold">spec_check_and_get_threshold</a>(bytes);
+</code></pre>
+
+
+
+
+<a name="0x1_multi_ed25519_PkDivision"></a>
+
+
+<pre><code><b>schema</b> <a href="multi_ed25519.md#0x1_multi_ed25519_PkDivision">PkDivision</a> {
+    bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+    result: u8;
+    <b>aborts_if</b> len(bytes) / <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a> &gt; MAX_U8;
+    <b>ensures</b> result == len(bytes) / <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a>;
+}
+</code></pre>
+
+
+
 <a name="@Specification_1_public_key_bytes_to_authentication_key"></a>
 
 ### Function `public_key_bytes_to_authentication_key`
@@ -1076,19 +1181,6 @@ Returns <code><b>false</b></code> if either:
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
 <b>ensures</b> [abstract] result == <a href="multi_ed25519.md#0x1_multi_ed25519_spec_public_key_bytes_to_authentication_key">spec_public_key_bytes_to_authentication_key</a>(pk_bytes);
-</code></pre>
-
-
-
-
-<a name="0x1_multi_ed25519_spec_signature_verify_strict_internal"></a>
-
-
-<pre><code><b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_spec_signature_verify_strict_internal">spec_signature_verify_strict_internal</a>(
-   multisignature: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-   public_key: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-   message: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
-): bool;
 </code></pre>
 
 
@@ -1143,6 +1235,49 @@ Returns <code><b>false</b></code> if either:
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
 <b>ensures</b> result == <a href="multi_ed25519.md#0x1_multi_ed25519_spec_signature_verify_strict_internal">spec_signature_verify_strict_internal</a>(multisignature, public_key, message);
+</code></pre>
+
+
+
+<a name="@Helper_functions_2"></a>
+
+### Helper functions
+
+
+
+<a name="0x1_multi_ed25519_spec_check_and_get_threshold"></a>
+
+
+<pre><code><b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_spec_check_and_get_threshold">spec_check_and_get_threshold</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;u8&gt; {
+   <b>let</b> len = len(bytes);
+   <b>if</b> (len == 0) {
+       <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>&lt;u8&gt;()
+   } <b>else</b> {
+       <b>let</b> threshold_num_of_bytes = len % <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a>;
+       <b>let</b> num_of_keys = len / <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a>;
+       <b>let</b> threshold_byte = bytes[len - 1];
+       <b>if</b> (num_of_keys == 0 || num_of_keys &gt; <a href="multi_ed25519.md#0x1_multi_ed25519_MAX_NUMBER_OF_PUBLIC_KEYS">MAX_NUMBER_OF_PUBLIC_KEYS</a> || len % <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a> != 1) {
+           <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>&lt;u8&gt;()
+       } <b>else</b> <b>if</b> (threshold_byte == 0 || threshold_byte &gt; (num_of_keys <b>as</b> u8)) {
+           <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>&lt;u8&gt;()
+       } <b>else</b> {
+           <a href="../../move-stdlib/doc/option.md#0x1_option_spec_some">option::spec_some</a>(threshold_byte)
+       }
+   }
+}
+</code></pre>
+
+
+
+
+<a name="0x1_multi_ed25519_spec_signature_verify_strict_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_spec_signature_verify_strict_internal">spec_signature_verify_strict_internal</a>(
+   multisignature: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+   public_key: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+   message: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+): bool;
 </code></pre>
 
 
