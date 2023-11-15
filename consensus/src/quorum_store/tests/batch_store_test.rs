@@ -165,7 +165,7 @@ async fn test_extend_expiration_vs_save() {
                 }
             }
 
-            block_on(batch_store_clone2.update_certified_timestamp(i as u64 + 30));
+            batch_store_clone2.update_certified_timestamp(i as u64 + 30);
             start_clone2.fetch_add(1, Ordering::Relaxed);
         }
     });
@@ -188,9 +188,7 @@ async fn test_extend_expiration_vs_save() {
 
     // Expire everything, call for higher times as well.
     for i in 35..50 {
-        batch_store
-            .update_certified_timestamp((i + num_experiments) as u64)
-            .await;
+        batch_store.update_certified_timestamp((i + num_experiments) as u64);
     }
 }
 
@@ -248,7 +246,7 @@ fn test_get_local_batch() {
     // Should be stored in memory and DB.
     assert!(!store.persist(vec![request_1]).is_empty());
 
-    block_on(store.update_certified_timestamp(40));
+    store.update_certified_timestamp(40);
 
     let digest_2 = HashValue::random();
     assert!(digest_2 != digest_1);
@@ -269,7 +267,7 @@ fn test_get_local_batch() {
 
     assert_ok!(store.get_batch_from_local(&digest_1));
     assert_ok!(store.get_batch_from_local(&digest_2));
-    block_on(store.update_certified_timestamp(51));
+    store.update_certified_timestamp(51);
     // Expired value w. digest_1.
     assert_err!(store.get_batch_from_local(&digest_1));
     assert_ok!(store.get_batch_from_local(&digest_2));
@@ -280,16 +278,16 @@ fn test_get_local_batch() {
     assert!(!store.persist(vec![request_3]).is_empty());
     assert_ok!(store.get_batch_from_local(&digest_3));
 
-    block_on(store.update_certified_timestamp(52));
+    store.update_certified_timestamp(52);
     assert_ok!(store.get_batch_from_local(&digest_2));
     assert_ok!(store.get_batch_from_local(&digest_3));
 
-    block_on(store.update_certified_timestamp(55));
+    store.update_certified_timestamp(55);
     // Expired value w. digest_2
     assert_err!(store.get_batch_from_local(&digest_2));
     assert_ok!(store.get_batch_from_local(&digest_3));
 
-    block_on(store.update_certified_timestamp(56));
+    store.update_certified_timestamp(56);
     // Expired value w. digest_3
     assert_err!(store.get_batch_from_local(&digest_1));
     assert_err!(store.get_batch_from_local(&digest_2));
