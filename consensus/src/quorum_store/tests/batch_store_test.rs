@@ -18,7 +18,6 @@ use aptos_types::{
     validator_verifier::random_validator_verifier,
 };
 use claims::{assert_err, assert_ok, assert_ok_eq};
-use futures::executor::block_on;
 use once_cell::sync::Lazy;
 use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},

@@ -38,7 +38,7 @@ impl QuorumStoreSender for MockQuorumStoreSender {
         _request: BatchRequest,
         _recipient: Author,
         _timeout: Duration,
-    ) -> anyhow::Result<Batch> {
+    ) -> anyhow::Result<Option<Batch>> {
         unimplemented!();
     }
 

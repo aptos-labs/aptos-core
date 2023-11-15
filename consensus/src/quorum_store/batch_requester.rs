@@ -159,12 +159,19 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
                             }
                         }
                         Some(response) = futures.next() => {
-                            if let Ok(batch) = response {
-                                counters::RECEIVED_BATCH_RESPONSE_COUNT.inc();
-                                let digest = *batch.digest();
-                                let payload = batch.into_transactions();
-                                request_state.serve_request(digest, Some(payload));
-                                return;
+                            match response {
+                                Ok(Some(batch)) => {
+                                    counters::RECEIVED_BATCH_RESPONSE_COUNT.inc();
+                                    let digest = *batch.digest();
+                                    let payload = batch.into_transactions();
+                                    request_state.serve_request(digest, Some(payload));
+                                    return;
+                                }
+                                Ok(None) => {
+                                    request_state.serve_request(digest, None);
+                                    return;
+                                }
+                                _ => (),
                             }
                         },
                     }

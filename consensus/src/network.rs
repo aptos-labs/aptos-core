@@ -133,7 +133,7 @@ pub trait QuorumStoreSender: Send + Clone {
         request: BatchRequest,
         recipient: Author,
         timeout: Duration,
-    ) -> anyhow::Result<Batch>;
+    ) -> anyhow::Result<Option<Batch>>;
 
     async fn send_batch(&self, batch: Batch, recipients: Vec<Author>);
 
@@ -400,7 +400,7 @@ impl QuorumStoreSender for NetworkSender {
         request: BatchRequest,
         recipient: Author,
         timeout: Duration,
-    ) -> anyhow::Result<Batch> {
+    ) -> anyhow::Result<Option<Batch>> {
         let request_digest = request.digest();
         let msg = ConsensusMsg::BatchRequestMsg(Box::new(request));
         let response = self
@@ -410,7 +410,15 @@ impl QuorumStoreSender for NetworkSender {
         match response {
             ConsensusMsg::BatchResponse(batch) => {
                 batch.verify_with_digest(request_digest)?;
-                Ok(*batch)
+                Ok(Some(*batch))
+            },
+            ConsensusMsg::BatchResponseV2(maybe_batch) => {
+                if let Some(batch) = *maybe_batch {
+                    batch.verify_with_digest(request_digest)?;
+                    Ok(Some(batch))
+                } else {
+                    Ok(None)
+                }
             },
             _ => Err(anyhow!("Invalid batch response")),
         }
