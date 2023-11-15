@@ -66,6 +66,11 @@ pub struct ConsensusConfig {
     pub window_for_chain_health: usize,
     pub chain_health_backoff: Vec<ChainHealthBackoffValues>,
     pub qc_aggregator_type: QcAggregatorType,
+    // Max blocks allowed for block retrieval requests
+    pub max_blocks_per_sending_request: u64,
+    pub max_blocks_per_sending_request_quorum_store_override: u64,
+    pub max_blocks_per_receiving_request: u64,
+    pub max_blocks_per_receiving_request_quorum_store_override: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -184,6 +189,12 @@ impl Default for ConsensusConfig {
             chain_health_backoff: vec![],
 
             qc_aggregator_type: QcAggregatorType::default(),
+            // This needs to fit into the network message size, so with quorum store it can be much bigger
+            max_blocks_per_sending_request: 10,
+            // TODO: this is for release compatibility, after release we can configure it to match the receiving max
+            max_blocks_per_sending_request_quorum_store_override: 100,
+            max_blocks_per_receiving_request: 10,
+            max_blocks_per_receiving_request_quorum_store_override: 100,
         }
     }
 }
@@ -191,6 +202,22 @@ impl Default for ConsensusConfig {
 impl ConsensusConfig {
     pub fn set_data_dir(&mut self, data_dir: PathBuf) {
         self.safety_rules.set_data_dir(data_dir);
+    }
+
+    pub fn max_blocks_per_sending_request(&self, quorum_store_enabled: bool) -> u64 {
+        if quorum_store_enabled {
+            self.max_blocks_per_sending_request_quorum_store_override
+        } else {
+            self.max_blocks_per_sending_request
+        }
+    }
+
+    pub fn max_blocks_per_receiving_request(&self, quorum_store_enabled: bool) -> u64 {
+        if quorum_store_enabled {
+            self.max_blocks_per_receiving_request_quorum_store_override
+        } else {
+            self.max_blocks_per_receiving_request
+        }
     }
 
     pub fn max_sending_block_txns(&self, quorum_store_enabled: bool) -> u64 {

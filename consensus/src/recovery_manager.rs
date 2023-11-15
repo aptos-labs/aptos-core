@@ -30,6 +30,7 @@ pub struct RecoveryManager {
     storage: Arc<dyn PersistentLivenessStorage>,
     state_computer: Arc<dyn StateComputer>,
     last_committed_round: Round,
+    max_blocks_to_request: u64,
 }
 
 impl RecoveryManager {
@@ -39,6 +40,7 @@ impl RecoveryManager {
         storage: Arc<dyn PersistentLivenessStorage>,
         state_computer: Arc<dyn StateComputer>,
         last_committed_round: Round,
+        max_blocks_to_request: u64,
     ) -> Self {
         RecoveryManager {
             epoch_state,
@@ -46,6 +48,7 @@ impl RecoveryManager {
             storage,
             state_computer,
             last_committed_round,
+            max_blocks_to_request,
         }
     }
 
@@ -81,6 +84,7 @@ impl RecoveryManager {
                 .verifier
                 .get_ordered_account_addresses_iter()
                 .collect(),
+            self.max_blocks_to_request,
         );
         let recovery_data = BlockStore::fast_forward_sync(
             sync_info.highest_ordered_cert(),
