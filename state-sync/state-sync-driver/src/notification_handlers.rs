@@ -38,14 +38,14 @@ pub enum CommitNotification {
 /// A commit notification for the new state snapshot
 #[derive(Clone, Debug)]
 pub struct CommittedStateSnapshot {
-    pub committed_transaction: CommittedTransactions,
+    pub committed_transactions_and_events: CommittedTransactionsAndEvents,
     pub last_committed_state_index: u64,
     pub version: Version,
 }
 
 /// A commit notification for new transactions
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CommittedTransactions {
+pub struct CommittedTransactionsAndEvents {
     pub events: Vec<ContractEvent>,
     pub transactions: Vec<Transaction>,
 }
@@ -57,12 +57,12 @@ impl CommitNotification {
         last_committed_state_index: u64,
         version: Version,
     ) -> Self {
-        let committed_transaction = CommittedTransactions {
+        let committed_transactions_and_events = CommittedTransactionsAndEvents {
             events,
             transactions,
         };
         let committed_states = CommittedStateSnapshot {
-            committed_transaction,
+            committed_transactions_and_events,
             last_committed_state_index,
             version,
         };
@@ -75,8 +75,7 @@ impl CommitNotification {
         M: MempoolNotificationSender,
         S: StorageServiceNotificationSender,
     >(
-        events: Vec<ContractEvent>,
-        transactions: Vec<Transaction>,
+        committed_transactions_and_events: CommittedTransactionsAndEvents,
         latest_synced_version: Version,
         latest_synced_ledger_info: LedgerInfoWithSignatures,
         mut mempool_notification_handler: MempoolNotificationHandler<M>,
@@ -100,15 +99,16 @@ impl CommitNotification {
         // Notify mempool of the committed transactions
         mempool_notification_handler
             .notify_mempool_of_committed_transactions(
-                transactions.clone(),
+                committed_transactions_and_events.transactions,
                 blockchain_timestamp_usecs,
             )
             .await?;
 
         // Notify the event subscription service of the events
-        event_subscription_service
-            .lock()
-            .notify_events(latest_synced_version, events.clone())?;
+        event_subscription_service.lock().notify_events(
+            latest_synced_version,
+            committed_transactions_and_events.events,
+        )?;
 
         Ok(())
     }

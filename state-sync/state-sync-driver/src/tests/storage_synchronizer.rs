@@ -5,7 +5,7 @@ use crate::{
     error::Error,
     metadata_storage::PersistentMetadataStorage,
     notification_handlers::{
-        CommitNotification, CommitNotificationListener, CommittedTransactions,
+        CommitNotification, CommitNotificationListener, CommittedTransactionsAndEvents,
         ErrorNotificationListener, MempoolNotificationHandler, StorageServiceNotificationHandler,
     },
     storage_synchronizer::{StorageSynchronizer, StorageSynchronizerInterface},
@@ -643,13 +643,13 @@ async fn test_save_states_completion() {
 
     // Verify we get a commit notification
     let expected_transaction = output_list_with_proof.transactions_and_outputs[0].0.clone();
-    let expected_committed_transactions = CommittedTransactions {
+    let expected_transactions_and_events = CommittedTransactionsAndEvents {
         events: vec![expected_event.clone()],
         transactions: vec![expected_transaction.clone()],
     };
     verify_snapshot_commit_notification(
         &mut commit_listener,
-        expected_committed_transactions.clone(),
+        expected_transactions_and_events.clone(),
     )
     .await;
 
@@ -830,13 +830,13 @@ fn create_storage_synchronizer(
 /// Verifies that the expected snapshot commit notification is received by the listener
 async fn verify_snapshot_commit_notification(
     commit_listener: &mut CommitNotificationListener,
-    expected_committed_transactions: CommittedTransactions,
+    expected_transactions_and_events: CommittedTransactionsAndEvents,
 ) {
     let CommitNotification::CommittedStateSnapshot(committed_snapshot) =
         commit_listener.select_next_some().await;
     assert_eq!(
-        committed_snapshot.committed_transaction,
-        expected_committed_transactions
+        committed_snapshot.committed_transactions_and_events,
+        expected_transactions_and_events
     );
 }
 

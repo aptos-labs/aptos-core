@@ -8,7 +8,7 @@ use crate::{
     logging::{LogEntry, LogSchema},
     metrics,
     notification_handlers::{
-        CommitNotification, CommittedTransactions, MempoolNotificationHandler,
+        CommitNotification, CommittedTransactionsAndEvents, MempoolNotificationHandler,
         StorageServiceNotificationHandler,
     },
     storage_synchronizer::StorageSynchronizerInterface,
@@ -313,7 +313,7 @@ pub async fn handle_committed_transactions<
     M: MempoolNotificationSender,
     S: StorageServiceNotificationSender,
 >(
-    committed_transactions: CommittedTransactions,
+    committed_transactions_and_events: CommittedTransactionsAndEvents,
     storage: Arc<dyn DbReader>,
     mempool_notification_handler: MempoolNotificationHandler<M>,
     event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
@@ -341,8 +341,7 @@ pub async fn handle_committed_transactions<
 
     // Handle the commit notification
     if let Err(error) = CommitNotification::handle_transaction_notification(
-        committed_transactions.events,
-        committed_transactions.transactions,
+        committed_transactions_and_events,
         latest_synced_version,
         latest_synced_ledger_info,
         mempool_notification_handler,

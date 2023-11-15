@@ -8,8 +8,8 @@ use crate::{
     metadata_storage::MetadataStorageInterface,
     metrics,
     notification_handlers::{
-        CommitNotification, CommittedTransactions, ErrorNotification, MempoolNotificationHandler,
-        StorageServiceNotificationHandler,
+        CommitNotification, CommittedTransactionsAndEvents, ErrorNotification,
+        MempoolNotificationHandler, StorageServiceNotificationHandler,
     },
     utils,
 };
@@ -659,12 +659,12 @@ fn spawn_committer<
                     // Handle the committed transaction notification (e.g., notify mempool).
                     // We do this here due to synchronization issues with mempool and
                     // storage. See: https://github.com/aptos-labs/aptos-core/issues/553
-                    let committed_transactions = CommittedTransactions {
+                    let committed_transactions_and_events = CommittedTransactionsAndEvents {
                         events: notification.committed_events,
                         transactions: notification.committed_transactions,
                     };
                     utils::handle_committed_transactions(
-                        committed_transactions,
+                        committed_transactions_and_events,
                         storage.clone(),
                         mempool_notification_handler.clone(),
                         event_subscription_service.clone(),

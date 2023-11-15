@@ -12,7 +12,7 @@ use crate::{
     metrics,
     metrics::ExecutingComponent,
     notification_handlers::{
-        CommitNotification, CommitNotificationListener, CommittedTransactions,
+        CommitNotification, CommitNotificationListener, CommittedTransactionsAndEvents,
         ConsensusNotificationHandler, ErrorNotification, ErrorNotificationListener,
         MempoolNotificationHandler, StorageServiceNotificationHandler,
     },
@@ -307,12 +307,12 @@ impl<
         // TODO(joshlind): can we get consensus to forward the events?
 
         // Handle the commit notification
-        let committed_transactions = CommittedTransactions {
+        let committed_transactions_and_events = CommittedTransactionsAndEvents {
             events: consensus_commit_notification.reconfiguration_events.clone(),
             transactions: consensus_commit_notification.transactions.clone(),
         };
         utils::handle_committed_transactions(
-            committed_transactions,
+            committed_transactions_and_events,
             self.storage.clone(),
             self.mempool_notification_handler.clone(),
             self.event_subscription_service.clone(),
@@ -428,7 +428,7 @@ impl<
 
         // Handle the committed transactions and events
         utils::handle_committed_transactions(
-            committed_snapshot.committed_transaction,
+            committed_snapshot.committed_transactions_and_events,
             self.storage.clone(),
             self.mempool_notification_handler.clone(),
             self.event_subscription_service.clone(),
