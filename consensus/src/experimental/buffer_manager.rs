@@ -41,7 +41,7 @@ use futures::{
 };
 use once_cell::sync::OnceCell;
 use std::sync::{
-    atomic::{AtomicU64, Ordering},
+    atomic::{AtomicBool, AtomicU64, Ordering},
     Arc,
 };
 use tokio::time::{Duration, Instant};
@@ -118,9 +118,11 @@ pub struct BufferManager {
     // being updated on-chain.
     end_epoch_timestamp: OnceCell<u64>,
     previous_commit_time: Instant,
+    reset_flag: Arc<AtomicBool>,
 }
 
 impl BufferManager {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         author: Author,
         execution_schedule_phase_tx: Sender<CountedRequest<ExecutionRequest>>,
@@ -139,6 +141,7 @@ impl BufferManager {
         reset_rx: UnboundedReceiver<ResetRequest>,
         verifier: ValidatorVerifier,
         ongoing_tasks: Arc<AtomicU64>,
+        reset_flag: Arc<AtomicBool>,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 
@@ -181,6 +184,7 @@ impl BufferManager {
             ongoing_tasks,
             end_epoch_timestamp: OnceCell::new(),
             previous_commit_time: Instant::now(),
+            reset_flag,
         }
     }
 
@@ -375,6 +379,7 @@ impl BufferManager {
         self.execution_root = None;
         self.signing_root = None;
         self.previous_commit_time = Instant::now();
+        self.commit_proof_rb_handle.take();
         // purge the incoming blocks queue
         while let Ok(Some(_)) = self.block_rx.try_next() {}
         // Wait for ongoing tasks to finish before sending back ack.
@@ -387,10 +392,12 @@ impl BufferManager {
     async fn process_reset_request(&mut self, request: ResetRequest) {
         let ResetRequest { tx, stop } = request;
         info!("Receive reset");
+        self.reset_flag.store(true, Ordering::SeqCst);
 
         self.stop = stop;
         self.reset().await;
         tx.send(ResetAck::default()).unwrap();
+        self.reset_flag.store(false, Ordering::SeqCst);
         info!("Reset finishes");
     }
 
