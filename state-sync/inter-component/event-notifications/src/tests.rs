@@ -384,7 +384,7 @@ fn test_event_v2_subscription_by_tag() {
     let event_key_1 = create_random_event_key();
     let event_tag_2 = "0x0::module1::Event2";
 
-    // Subscribe to the various events (except event_key_5)
+    // Subscribe to the various events.
     let mut listener_1 = event_service
         .subscribe_to_events(vec![event_key_1], vec![event_tag_2.to_string()])
         .unwrap();
@@ -412,6 +412,7 @@ fn test_event_v2_subscription_by_tag() {
     verify_event_notification_received(vec![&mut listener_2], version, vec![event_1]);
     verify_no_event_notifications(vec![&mut listener_2]);
 }
+
 /// Defines a new on-chain config for test purposes.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct TestOnChainConfig {

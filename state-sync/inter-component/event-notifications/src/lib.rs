@@ -149,6 +149,7 @@ impl EventSubscriptionService {
                 .or_insert_with(|| HashSet::from_iter([subscription_id].iter().cloned()));
         }
 
+        // Update the event v2 tag subscriptions to include the new subscription
         for event_tag in event_v2_tags {
             self.event_v2_tag_subscriptions
                 .entry(event_tag)
