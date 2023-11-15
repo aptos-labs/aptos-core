@@ -63,7 +63,7 @@ function build() {
     info "Target directory: $target_dir"
     mkdir -p $target_dir
     info "Building $fuzz_target"
-    cargo_fuzz build -O --target-dir $target_dir $fuzz_target
+    cargo_fuzz build --verbose -O --target-dir $target_dir $fuzz_target
 }
 
 function build-oss-fuzz() {
