@@ -14,7 +14,7 @@ use aptos_types::validator_verifier::random_validator_verifier;
 use async_trait::async_trait;
 use claims::{assert_err, assert_ok};
 use futures::StreamExt;
-use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 #[derive(Clone)]
 enum TestPeerState {
@@ -127,9 +127,9 @@ async fn test_send_rpc_with_fallback() {
         )
         .await;
 
-    assert_ok!(rpc.next().await.unwrap().unwrap().deref());
-    assert_err!(rpc.next().await.unwrap());
-    assert_ok!(rpc.next().await.unwrap().unwrap().deref());
-    assert_err!(rpc.next().await.unwrap());
-    assert_ok!(rpc.next().await.unwrap().unwrap().deref());
+    assert_ok!(rpc.next().await.unwrap().result.unwrap().0);
+    assert_err!(rpc.next().await.unwrap().result);
+    assert_ok!(rpc.next().await.unwrap().result.unwrap().0);
+    assert_err!(rpc.next().await.unwrap().result);
+    assert_ok!(rpc.next().await.unwrap().result.unwrap().0);
 }

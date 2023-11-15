@@ -108,21 +108,34 @@ impl VMOutput {
         resolver: &impl AggregatorV1Resolver,
     ) -> anyhow::Result<TransactionOutput, VMStatus> {
         let materialized_output = self.try_materialize(resolver)?;
-        debug_assert!(
+        Self::convert_to_transaction_output(materialized_output)
+    }
+
+    /// Same as `try_materialize` but also constructs `TransactionOutput`.
+    pub fn into_transaction_output(self) -> anyhow::Result<TransactionOutput, VMStatus> {
+        let (change_set, fee_statement, status) = self.unpack_with_fee_statement();
+        let materialized_output = VMOutput::new(change_set, fee_statement, status);
+        Self::convert_to_transaction_output(materialized_output)
+    }
+
+    fn convert_to_transaction_output(
+        materialized_output: VMOutput,
+    ) -> anyhow::Result<TransactionOutput, VMStatus> {
+        assert!(
             materialized_output
                 .change_set()
                 .aggregator_v1_delta_set()
                 .is_empty(),
             "Aggregator deltas must be empty after materialization."
         );
-        debug_assert!(
+        assert!(
             materialized_output
                 .change_set()
                 .delayed_field_change_set()
                 .is_empty(),
             "Delayed fields must be empty after materialization."
         );
-        debug_assert!(
+        assert!(
             materialized_output
                 .change_set()
                 .resource_group_write_set()
@@ -170,6 +183,10 @@ impl VMOutput {
         // TODO[agg_v2](cleanup) move drain to happen when getting what to materialize.
         let _ = self.change_set.drain_delayed_field_change_set();
         let _ = self.change_set.drain_reads_needing_delayed_field_exchange();
+        let _ = self
+            .change_set
+            .drain_group_reads_needing_delayed_field_exchange();
+        let _ = self.change_set.drain_resource_group_write_set();
 
         let (vm_change_set, gas_used, status) = self.unpack();
         let (write_set, events) = vm_change_set

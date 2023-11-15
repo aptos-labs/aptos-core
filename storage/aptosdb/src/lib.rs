@@ -46,6 +46,7 @@ pub mod fast_sync_storage_wrapper;
 use crate::state_store::buffered_state::BufferedState;
 use crate::{
     backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler, restore_utils},
+    block_index::BlockIndexSchema,
     db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     db_options::{
         event_db_column_families, ledger_db_column_families, ledger_metadata_db_column_families,
@@ -70,7 +71,7 @@ use crate::{
     state_store::StateStore,
     transaction_store::TransactionStore,
 };
-use anyhow::{bail, ensure, Result};
+use anyhow::{anyhow, bail, ensure, Result};
 use aptos_config::config::{
     PrunerConfig, RocksdbConfig, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
 };
@@ -84,7 +85,7 @@ use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGE
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     cached_state_view::ShardedStateCache, state_delta::StateDelta, state_view::DbStateView,
@@ -98,6 +99,7 @@ use aptos_types::{
     epoch_state::EpochState,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
+    on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
     proof::{
         accumulator::InMemoryAccumulator, AccumulatorConsistencyProof, SparseMerkleProofExt,
         TransactionAccumulatorRangeProof, TransactionAccumulatorSummary,
@@ -1020,9 +1022,29 @@ impl AptosDB {
             &ledger_metadata_batch,
             &sharded_state_kv_batches,
             &state_kv_metadata_batch,
-            self.state_store.state_kv_db.enabled_sharding() && !skip_index_and_usage,
+            // Always put in state value index for now.
+            // TODO(grao): remove after APIs migrated off the DB to the indexer.
+            self.state_store.state_kv_db.enabled_sharding(),
             skip_index_and_usage,
         )?;
+
+        // Write block index if event index is skipped.
+        if skip_index_and_usage {
+            for (i, txn) in txns_to_commit.iter().enumerate() {
+                for event in txn.events() {
+                    if let Some(event_key) = event.event_key() {
+                        if *event_key == new_block_event_key() {
+                            let version = first_version + i as Version;
+                            let new_block_event =
+                                NewBlockEvent::try_from_bytes(event.event_data())?;
+                            let block_height = new_block_event.height();
+                            ledger_metadata_batch
+                                .put::<BlockIndexSchema>(&block_height, &version)?;
+                        }
+                    }
+                }
+            }
+        }
 
         let last_version = first_version + txns_to_commit.len() as u64 - 1;
         ledger_metadata_batch
@@ -1215,6 +1237,19 @@ impl AptosDB {
             .with_label_values(&["commit_write_sets___commit"])
             .start_timer();
         self.ledger_db.write_set_db().write_schemas(batch)
+    }
+
+    pub fn commit_genesis_ledger_info(&self, genesis_li: &LedgerInfoWithSignatures) -> Result<()> {
+        let ledger_batch = SchemaBatch::new();
+        let current_epoch = self
+            .ledger_store
+            .get_latest_ledger_info_option()
+            .map_or(0, |li| li.ledger_info().next_block_epoch());
+        ensure!(genesis_li.ledger_info().epoch() == current_epoch && current_epoch == 0);
+        self.ledger_store
+            .put_ledger_info(genesis_li, &ledger_batch)?;
+
+        self.ledger_db.metadata_db().write_schemas(ledger_batch)
     }
 
     fn commit_ledger_info(
@@ -1840,8 +1875,24 @@ impl DbReader for AptosDB {
             self.error_if_ledger_pruned("NewBlockEvent", version)?;
             ensure!(version <= self.get_latest_version()?);
 
-            let (_first_version, new_block_event) = self.event_store.get_block_metadata(version)?;
-            Ok(new_block_event.proposed_time())
+            match self.event_store.get_block_metadata(version) {
+                Ok((_first_version, new_block_event)) => Ok(new_block_event.proposed_time()),
+                Err(err) => {
+                    // when event index is disabled, we won't be able to search the NewBlock event stream.
+                    // TODO(grao): evaluate adding dedicated block_height_by_version index
+                    warn!(
+                        error = ?err,
+                        "Failed to fetch block timestamp, falling back to on-chain config.",
+                    );
+                    let ts = self
+                        .get_state_value_by_version(
+                            &StateKey::access_path(CurrentTimeMicroseconds::access_path()?),
+                            version,
+                        )?
+                        .ok_or_else(|| anyhow!("Timestamp not found at version {}", version))?;
+                    Ok(bcs::from_bytes::<CurrentTimeMicroseconds>(ts.bytes())?.microseconds)
+                },
+            }
         })
     }
 
@@ -1859,6 +1910,49 @@ impl DbReader for AptosDB {
                     version
                 )
             }
+        })
+    }
+
+    // Returns latest `num_events` NewBlockEvents and their versions.
+    // TODO(grao): Consider adding block_height as parameter.
+    fn get_latest_block_events(&self, num_events: usize) -> Result<Vec<EventWithVersion>> {
+        gauged_api("get_latest_block_events", || {
+            if !self.skip_index_and_usage {
+                return self.get_events(
+                    &new_block_event_key(),
+                    u64::max_value(),
+                    Order::Descending,
+                    num_events as u64,
+                    self.get_latest_version().unwrap_or(0),
+                );
+            }
+
+            let mut iter = self
+                .ledger_db
+                .metadata_db()
+                .rev_iter::<BlockIndexSchema>(ReadOptions::default())?;
+            iter.seek_to_last();
+
+            let mut events = Vec::with_capacity(num_events);
+            for item in iter.take(num_events) {
+                let (block_height, version) = item?;
+                let event = self
+                    .event_store
+                    .get_events_by_version(version)?
+                    .into_iter()
+                    .find(|event| {
+                        if let Some(key) = event.event_key() {
+                            if *key == new_block_event_key() {
+                                return true;
+                            }
+                        }
+                        false
+                    })
+                    .ok_or_else(|| anyhow!("Event for block_height {block_height} at version {version} is not found."))?;
+                events.push(EventWithVersion::new(version, event));
+            }
+
+            Ok(events)
         })
     }
 

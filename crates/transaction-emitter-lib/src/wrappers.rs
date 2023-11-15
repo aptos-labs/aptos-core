@@ -120,7 +120,9 @@ pub async fn emit_transactions_with_cluster(
     if let Some(expected_gas_per_txn) = args.expected_gas_per_txn {
         emit_job_request = emit_job_request.expected_gas_per_txn(expected_gas_per_txn);
     }
-    if !cluster.coin_source_is_root {
+    if cluster.coin_source_is_root {
+        emit_job_request = emit_job_request.set_mint_to_root();
+    } else {
         emit_job_request = emit_job_request.prompt_before_spending();
     }
 
@@ -130,6 +132,11 @@ pub async fn emit_transactions_with_cluster(
 
     if let Some(coins) = args.coins_per_account_override {
         emit_job_request = emit_job_request.coins_per_account_override(coins);
+    }
+
+    if let Some(latency_polling_interval_s) = args.latency_polling_interval_s {
+        emit_job_request = emit_job_request
+            .latency_polling_interval(Duration::from_secs_f32(latency_polling_interval_s));
     }
 
     let stats = emitter

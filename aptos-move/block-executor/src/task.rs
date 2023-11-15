@@ -76,6 +76,8 @@ pub trait ExecutorTask: Sync {
         txn_idx: TxnIndex,
         materialize_deltas: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
+
+    fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool;
 }
 
 /// Trait for execution result of a single transaction.
@@ -121,6 +123,10 @@ pub trait TransactionOutput: Send + Sync + Debug {
         (<Self::Txn as Transaction>::Value, Arc<MoveTypeLayout>),
     >;
 
+    fn group_reads_needing_delayed_field_exchange(
+        &self,
+    ) -> BTreeMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+
     /// Get the events of a transaction from its output.
     fn get_events(&self) -> Vec<(<Self::Txn as Transaction>::Event, Option<MoveTypeLayout>)>;
 
@@ -129,7 +135,13 @@ pub trait TransactionOutput: Send + Sync + Debug {
     ) -> Vec<(
         <Self::Txn as Transaction>::Key,
         <Self::Txn as Transaction>::Value,
-        BTreeMap<<Self::Txn as Transaction>::Tag, <Self::Txn as Transaction>::Value>,
+        BTreeMap<
+            <Self::Txn as Transaction>::Tag,
+            (
+                <Self::Txn as Transaction>::Value,
+                Option<Arc<MoveTypeLayout>>,
+            ),
+        >,
     )>;
 
     fn resource_group_metadata_ops(
@@ -163,6 +175,8 @@ pub trait TransactionOutput: Send + Sync + Debug {
             <Self::Txn as Transaction>::Value,
         )>,
     );
+
+    fn set_txn_output_for_non_dynamic_change_set(&self);
 
     /// Return the fee statement of the transaction.
     fn fee_statement(&self) -> FeeStatement;

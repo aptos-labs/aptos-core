@@ -3,8 +3,8 @@
 
 use super::{
     docker::{
-        create_volume, delete_container, delete_volume, get_docker, pull_docker_image,
-        setup_docker_logging, StopContainerShutdownStep,
+        create_network, create_volume, delete_container, delete_volume, get_docker,
+        pull_docker_image, setup_docker_logging, StopContainerShutdownStep, CONTAINER_NETWORK_NAME,
     },
     health_checker::HealthChecker,
     traits::{ServiceManager, ShutdownStep},
@@ -23,7 +23,7 @@ use maplit::{hashmap, hashset};
 use std::{collections::HashSet, path::PathBuf};
 use tracing::{info, warn};
 
-const POSTGRES_CONTAINER_NAME: &str = "local-testnet-postgres";
+pub const POSTGRES_CONTAINER_NAME: &str = "local-testnet-postgres";
 const POSTGRES_VOLUME_NAME: &str = "local-testnet-postgres-data";
 const POSTGRES_IMAGE: &str = "postgres:14.9";
 const DATA_PATH_IN_CONTAINER: &str = "/var/lib/mydata";
@@ -67,16 +67,24 @@ pub struct PostgresArgs {
 }
 
 impl PostgresArgs {
-    pub fn get_postgres_port(&self) -> u16 {
-        match self.use_host_postgres {
-            true => self.host_postgres_port,
-            false => self.postgres_port,
+    pub fn get_postgres_port(&self, external: bool) -> u16 {
+        match external {
+            true => match self.use_host_postgres {
+                true => self.host_postgres_port,
+                false => self.postgres_port,
+            },
+            // If connecting from inside the container network, just use the default
+            // postgres port, since we run postgres on 5432 inside the container.
+            false => POSTGRES_DEFAULT_PORT,
         }
     }
 
     /// Get the connection string for the postgres database. If `database` is specified
-    /// we will use that rather than `self.postgres_database`.
-    pub fn get_connection_string(&self, database: Option<&str>) -> String {
+    /// we will use that rather than `self.postgres_database`. If `external` is true,
+    /// it will give you the string for connecting from the host. If it is false, it
+    /// will give you the string for connecting from another container in the network
+    /// we create for all containers in the local testnet.
+    pub fn get_connection_string(&self, database: Option<&str>, external: bool) -> String {
         let password = match self.use_host_postgres {
             true => match &self.host_postgres_password {
                 Some(password) => format!(":{}", password),
@@ -84,14 +92,21 @@ impl PostgresArgs {
             },
             false => "".to_string(),
         };
-        let port = self.get_postgres_port();
+        let port = self.get_postgres_port(external);
         let database = match database {
             Some(database) => database,
             None => &self.postgres_database,
         };
+        let host = match self.use_host_postgres {
+            true => "127.0.0.1",
+            false => match external {
+                true => "127.0.0.1",
+                false => POSTGRES_CONTAINER_NAME,
+            },
+        };
         format!(
-            "postgres://{}{}@127.0.0.1:{}/{}",
-            self.postgres_user, password, port, database,
+            "postgres://{}{}@{}:{}/{}",
+            self.postgres_user, password, host, port, database,
         )
     }
 }
@@ -123,7 +138,7 @@ impl PostgresManager {
     /// we'll actually use (since you can't drop a database you're connected to).
     async fn recreate_host_database(&self) -> Result<()> {
         info!("Dropping database {}", self.args.postgres_database);
-        let connection_string = self.args.get_connection_string(Some("postgres"));
+        let connection_string = self.args.get_connection_string(Some("postgres"), true);
 
         // Open a connection to the DB.
         let mut connection = AsyncPgConnection::establish(&connection_string)
@@ -171,6 +186,9 @@ impl ServiceManager for PostgresManager {
             // Pull the image here so it is not subject to the startup timeout for
             // `run_service`.
             pull_docker_image(POSTGRES_IMAGE).await?;
+
+            // Create a network for the containers to talk to each other.
+            create_network(CONTAINER_NETWORK_NAME).await?;
         }
 
         Ok(())
@@ -178,7 +196,7 @@ impl ServiceManager for PostgresManager {
 
     fn get_health_checkers(&self) -> HashSet<HealthChecker> {
         hashset! {HealthChecker::Postgres(
-            self.args.get_connection_string(None),
+            self.args.get_connection_string(None, true),
         )}
     }
 
@@ -214,9 +232,13 @@ impl ServiceManager for PostgresManager {
             ..Default::default()
         });
 
-        let port = self.args.get_postgres_port().to_string();
+        let port = self.args.get_postgres_port(true).to_string();
         let exposed_ports = Some(hashmap! {POSTGRES_DEFAULT_PORT.to_string() => hashmap!{}});
         let host_config = Some(HostConfig {
+            // Bind the container to the network we created in the pre_run. This does
+            // not prevent the binary in the container from exposing itself to the host
+            // on 127.0.0.1. See more here: https://stackoverflow.com/a/77432636/3846032.
+            network_mode: Some(CONTAINER_NETWORK_NAME.to_string()),
             port_bindings: Some(hashmap! {
                 POSTGRES_DEFAULT_PORT.to_string() => Some(vec![PortBinding {
                     host_ip: Some("127.0.0.1".to_string()),

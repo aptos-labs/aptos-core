@@ -23,7 +23,7 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    contract_event::ReadWriteEvent,
+    contract_event::TransactionEvent,
     executable::{ExecutableTestType, ModulePath},
 };
 use claims::assert_matches;
@@ -36,7 +36,7 @@ use std::{
 fn run_and_assert<K, E>(transactions: Vec<MockTransaction<K, E>>)
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
-    E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
+    E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
     let data_view = DeltaDataView::<K> {
         phantom: PhantomData,
