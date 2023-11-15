@@ -19,7 +19,7 @@ use anyhow::{anyhow, bail, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
-    block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, MAX_BLOCKS_PER_REQUEST},
+    block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     common::Author,
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg},
@@ -675,14 +675,6 @@ impl NetworkTask {
                                 "{}",
                                 request
                             );
-                            if request.num_blocks() > MAX_BLOCKS_PER_REQUEST {
-                                warn!(
-                                    remote_peer = peer_id,
-                                    "Ignore block retrieval with too many blocks: {}",
-                                    request.num_blocks()
-                                );
-                                continue;
-                            }
                             IncomingRpcRequest::BlockRetrieval(IncomingBlockRetrievalRequest {
                                 req: *request,
                                 protocol,
