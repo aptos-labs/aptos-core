@@ -518,8 +518,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         Ok(())
     }
 
-    fn spawn_block_retrieval_task(&mut self, epoch: u64, block_store: Arc<BlockStore>) {
-        let (request_tx, mut request_rx) = aptos_channel::new(
+    fn spawn_block_retrieval_task(
+        &mut self,
+        epoch: u64,
+        block_store: Arc<BlockStore>,
+        max_blocks_allowed: u64,
+    ) {
+        let (request_tx, mut request_rx) = aptos_channel::new::<_, IncomingBlockRetrievalRequest>(
             QueueStyle::LIFO,
             1,
             Some(&counters::BLOCK_RETRIEVAL_TASK_MSGS),
@@ -527,6 +532,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let task = async move {
             info!(epoch = epoch, "Block retrieval task starts");
             while let Some(request) = request_rx.next().await {
+                if request.req.num_blocks() > max_blocks_allowed {
+                    warn!(
+                        "Ignore block retrieval with too many blocks: {}",
+                        request.req.num_blocks()
+                    );
+                    continue;
+                }
                 if let Err(e) = monitor!(
                     "process_block_retrieval",
                     block_store.process_block_retrieval(request).await
@@ -656,6 +668,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     async fn start_recovery_manager(
         &mut self,
         ledger_data: LedgerRecoveryData,
+        onchain_consensus_config: OnChainConsensusConfig,
         epoch_state: EpochState,
         network_sender: NetworkSender,
     ) {
@@ -673,6 +686,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.storage.clone(),
             self.commit_state_computer.clone(),
             ledger_data.committed_round(),
+            self.config
+                .max_blocks_per_sending_request(onchain_consensus_config.quorum_store_enabled()),
         );
         tokio::spawn(recovery_manager.start(recovery_manager_rx, close_rx));
     }
@@ -892,6 +907,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         );
         self.round_manager_tx = Some(round_manager_tx.clone());
         self.buffered_proposal_tx = Some(buffered_proposal_tx.clone());
+        let max_blocks_allowed = self
+            .config
+            .max_blocks_per_receiving_request(onchain_consensus_config.quorum_store_enabled());
 
         let mut round_manager = RoundManager::new(
             epoch_state,
@@ -918,7 +936,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             close_rx,
         ));
 
-        self.spawn_block_retrieval_task(epoch, block_store);
+        self.spawn_block_retrieval_task(epoch, block_store, max_blocks_allowed);
     }
 
     fn start_quorum_store(&mut self, quorum_store_builder: QuorumStoreBuilder) {
@@ -1030,8 +1048,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             },
             LivenessStorageData::PartialRecoveryData(ledger_data) => {
                 self.recovery_mode = true;
-                self.start_recovery_manager(ledger_data, epoch_state, network_sender)
-                    .await
+                self.start_recovery_manager(
+                    ledger_data,
+                    consensus_config,
+                    epoch_state,
+                    network_sender,
+                )
+                .await
             },
         }
     }
