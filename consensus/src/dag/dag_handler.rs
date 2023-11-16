@@ -14,6 +14,7 @@ use crate::{
         types::{DAGMessage, DAGRpcResult},
         CertifiedNode, Node,
     },
+    monitor,
     network::{IncomingDAGRequest, TConsensusMsg},
 };
 use aptos_channels::aptos_channel;
@@ -121,7 +122,10 @@ impl NetworkHandler {
         );
 
         let response: Result<DAGMessage, DAGError> = {
-            match dag_message.verify(rpc_request.sender, &self.epoch_state.verifier) {
+            match monitor!(
+                "dag_message_verify",
+                dag_message.verify(rpc_request.sender, &self.epoch_state.verifier)
+            ) {
                 Ok(_) => match dag_message {
                     DAGMessage::NodeMsg(node) => self
                         .node_receiver
