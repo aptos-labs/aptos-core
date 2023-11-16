@@ -1078,6 +1078,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             payload_client,
             state_computer,
             block_tx,
+            onchain_consensus_config.quorum_store_enabled(),
         );
 
         let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);

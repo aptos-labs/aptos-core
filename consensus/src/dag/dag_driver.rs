@@ -57,6 +57,7 @@ pub(crate) struct DagDriver {
     window_size_config: Round,
     payload_config: DagPayloadConfig,
     chain_backoff: Arc<dyn TChainHealthBackoff>,
+    quorum_store_enabled: bool,
 }
 
 impl DagDriver {
@@ -76,6 +77,7 @@ impl DagDriver {
         window_size_config: Round,
         payload_config: DagPayloadConfig,
         chain_backoff: Arc<dyn TChainHealthBackoff>,
+        quorum_store_enabled: bool,
     ) -> Self {
         let pending_node = storage
             .get_pending_node()
@@ -99,6 +101,7 @@ impl DagDriver {
             window_size_config,
             payload_config,
             chain_backoff,
+            quorum_store_enabled,
         };
 
         // If we were broadcasting the node for the round already, resume it
@@ -207,7 +210,7 @@ impl DagDriver {
             Ok(payload) => payload,
             Err(e) => {
                 error!("error pulling payload: {}", e);
-                Payload::empty(false)
+                Payload::empty(self.quorum_store_enabled)
             },
         };
         // TODO: need to wait to pass median of parents timestamp

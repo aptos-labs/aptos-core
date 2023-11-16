@@ -188,6 +188,7 @@ fn setup(
         TEST_DAG_WINDOW as Round,
         DagPayloadConfig::default(),
         Arc::new(MockChainHealthBackoff {}),
+        false,
     )
 }
 
