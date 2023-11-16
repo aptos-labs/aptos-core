@@ -33,9 +33,11 @@ mod storage_config;
 mod utils;
 
 // All public usage statements should be declared below
+pub use admin_service_config::*;
 pub use api_config::*;
 pub use base_config::*;
 pub use consensus_config::*;
+pub use dag_consensus_config::*;
 pub use error::*;
 pub use execution_config::*;
 pub use gas_estimation_config::*;
@@ -45,6 +47,7 @@ pub use indexer_grpc_config::*;
 pub use inspection_service_config::*;
 pub use logger_config::*;
 pub use mempool_config::*;
+pub use netbench::*;
 pub use network_config::*;
 pub use node_config::*;
 pub use node_config_loader::sanitize_node_config;

@@ -64,4 +64,5 @@ num_cpus = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
+reqwest = { workspace = true }
 serde_yaml = { workspace = true }
