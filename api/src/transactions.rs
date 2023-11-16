@@ -8,7 +8,7 @@ use crate::{
     bcs_payload::Bcs,
     context::{api_spawn_blocking, Context},
     failpoint::fail_point_poem,
-    generate_error_response, generate_success_response,
+    generate_error_response, generate_success_response, metrics,
     page::Page,
     response::{
         api_disabled, api_forbidden, transaction_not_found_by_hash,
@@ -565,6 +565,22 @@ impl TransactionsApi {
         api_spawn_blocking(move || api.get_signing_message(&accept_type, data.0)).await
     }
 
+    fn log_gas_estimation(gas_estimation: &GasEstimation) {
+        metrics::GAS_ESTIMATE
+            .with_label_values(&[metrics::GAS_ESTIMATE_CURRENT])
+            .observe(gas_estimation.gas_estimate as f64);
+        if let Some(deprioritized) = gas_estimation.deprioritized_gas_estimate {
+            metrics::GAS_ESTIMATE
+                .with_label_values(&[metrics::GAS_ESTIMATE_DEPRIORITIZED])
+                .observe(deprioritized as f64);
+        }
+        if let Some(prioritized) = gas_estimation.prioritized_gas_estimate {
+            metrics::GAS_ESTIMATE
+                .with_label_values(&[metrics::GAS_ESTIMATE_PRIORITIZED])
+                .observe(prioritized as f64);
+        }
+    }
+
     /// Estimate gas price
     ///
     /// Gives an estimate of the gas unit price required to get a transaction on chain in a
@@ -593,6 +609,7 @@ impl TransactionsApi {
         api_spawn_blocking(move || {
             let latest_ledger_info = context.get_latest_ledger_info()?;
             let gas_estimation = context.estimate_gas_price(&latest_ledger_info)?;
+            Self::log_gas_estimation(&gas_estimation);
 
             match accept_type {
                 AcceptType::Json => BasicResponse::try_from_json((
