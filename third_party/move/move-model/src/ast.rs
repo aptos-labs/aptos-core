@@ -1025,8 +1025,8 @@ impl ExpData {
         .rewrite_exp(exp)
     }
 
-    /// A function which can be used for `Exp::rewrite_node_id` to instantiate types in
-    /// an expression based on a type parameter instantiation.
+    /// A function which can be used by a `node_rewriter` argument to `ExpData::rewrite_node_id` to
+    /// instantiate types in an expression based on a type parameter instantiation.
     pub fn instantiate_node(env: &GlobalEnv, id: NodeId, targs: &[Type]) -> Option<NodeId> {
         if targs.is_empty() {
             // shortcut
@@ -1045,6 +1045,30 @@ impl ExpData {
             Some(new_id)
         } else {
             None
+        }
+    }
+
+    /// A function which can be used by a `node_rewriter` argument to `ExpData::rewrite_node_id` to
+    /// update node location (`Loc`), in addition to instantiating types.
+    pub fn instantiate_node_new_loc(
+        env: &GlobalEnv,
+        id: NodeId,
+        targs: &[Type],
+        new_loc: &Loc,
+    ) -> Option<NodeId> {
+        let loc = env.get_node_loc(id);
+        if loc != *new_loc {
+            let node_ty = env.get_node_type(id);
+            let new_node_ty = node_ty.instantiate(targs);
+            let node_inst = env.get_node_instantiation_opt(id);
+            let new_node_inst = node_inst.clone().map(|i| Type::instantiate_vec(i, targs));
+            let new_id = env.new_node(new_loc.clone(), new_node_ty);
+            if let Some(inst) = new_node_inst {
+                env.set_node_instantiation(new_id, inst);
+            }
+            Some(new_id)
+        } else {
+            ExpData::instantiate_node(env, id, targs)
         }
     }
 

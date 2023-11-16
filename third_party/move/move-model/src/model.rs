@@ -102,6 +102,7 @@ pub const GHOST_MEMORY_PREFIX: &str = "Ghost$";
 pub struct Loc {
     file_id: FileId,
     span: Span,
+    inlined_from_loc: Option<Box<Loc>>,
 }
 
 impl AsRef<Loc> for Loc {
@@ -112,7 +113,31 @@ impl AsRef<Loc> for Loc {
 
 impl Loc {
     pub fn new(file_id: FileId, span: Span) -> Loc {
-        Loc { file_id, span }
+        Loc {
+            file_id,
+            span,
+            inlined_from_loc: None,
+        }
+    }
+
+    pub fn inlined_from(&self, inlined_from: &Loc) -> Loc {
+        Loc {
+            file_id: self.file_id,
+            span: self.span,
+            inlined_from_loc: Some(Box::new(match &self.inlined_from_loc {
+                None => inlined_from.clone(),
+                Some(locbox) => (*locbox.clone()).inlined_from(inlined_from),
+            })),
+        }
+    }
+
+    fn inline_if_needed(&self, loc: Loc) -> Loc {
+        if let Some(locbox) = &self.inlined_from_loc {
+            let source_loc = &**locbox;
+            loc.inlined_from(source_loc)
+        } else {
+            loc
+        }
     }
 
     pub fn span(&self) -> Span {
@@ -126,10 +151,10 @@ impl Loc {
     // Delivers a location pointing to the end of this one.
     pub fn at_end(&self) -> Loc {
         if self.span.end() > ByteIndex(0) {
-            Loc::new(
+            self.inline_if_needed(Loc::new(
                 self.file_id,
                 Span::new(self.span.end() - ByteOffset(1), self.span.end()),
-            )
+            ))
         } else {
             self.clone()
         }
@@ -137,10 +162,10 @@ impl Loc {
 
     // Delivers a location pointing to the start of this one.
     pub fn at_start(&self) -> Loc {
-        Loc::new(
+        self.inline_if_needed(Loc::new(
             self.file_id,
             Span::new(self.span.start(), self.span.start() + ByteOffset(1)),
-        )
+        ))
     }
 
     /// Creates a location which encloses all the locations in the provided slice,
@@ -156,12 +181,14 @@ impl Loc {
                 end = std::cmp::max(end, l.span().end());
             }
         }
-        Loc::new(loc.file_id(), Span::new(start, end))
+        loc.inline_if_needed(Loc::new(loc.file_id(), Span::new(start, end)))
     }
 
     /// Returns true if the other location is enclosed by this location.
     pub fn is_enclosing(&self, other: &Loc) -> bool {
-        self.file_id == other.file_id && GlobalEnv::enclosing_span(self.span, other.span)
+        self.file_id == other.file_id
+            && self.inlined_from_loc == other.inlined_from_loc
+            && GlobalEnv::enclosing_span(self.span, other.span)
     }
 }
 
@@ -798,21 +825,36 @@ impl GlobalEnv {
         self.diag_with_notes(Severity::Error, loc, msg, notes)
     }
 
+    fn add_inlined_from_labels(labels: &mut Vec<Label<FileId>>, inlined_from: &Option<Box<Loc>>) {
+        let mut inlined_from = inlined_from;
+        while let Some(boxed_loc) = inlined_from {
+            let loc = &**boxed_loc;
+            let new_label = Label::secondary(loc.file_id, loc.span)
+                .with_message("in a call inlined at this callsite");
+            labels.push(new_label);
+            inlined_from = &loc.inlined_from_loc;
+        }
+    }
+
     /// Adds a diagnostic of given severity to this environment.
     pub fn diag(&self, severity: Severity, loc: &Loc, msg: &str) {
         let new_msg = Self::add_backtrace(msg, severity == Severity::Bug);
+        let mut labels = vec![Label::primary(loc.file_id, loc.span)];
+        GlobalEnv::add_inlined_from_labels(&mut labels, &loc.inlined_from_loc);
         let diag = Diagnostic::new(severity)
             .with_message(new_msg)
-            .with_labels(vec![Label::primary(loc.file_id, loc.span)]);
+            .with_labels(labels);
         self.add_diag(diag);
     }
 
     /// Adds a diagnostic of given severity to this environment, with notes.
     pub fn diag_with_notes(&self, severity: Severity, loc: &Loc, msg: &str, notes: Vec<String>) {
         let new_msg = Self::add_backtrace(msg, severity == Severity::Bug);
+        let mut labels = vec![Label::primary(loc.file_id, loc.span)];
+        GlobalEnv::add_inlined_from_labels(&mut labels, &loc.inlined_from_loc);
         let diag = Diagnostic::new(severity)
             .with_message(new_msg)
-            .with_labels(vec![Label::primary(loc.file_id, loc.span)]);
+            .with_labels(labels);
         let diag = diag.with_notes(notes);
         self.add_diag(diag);
     }
@@ -843,10 +885,11 @@ impl GlobalEnv {
             .with_labels(vec![
                 Label::primary(loc.file_id, loc.span).with_message(primary)
             ]);
-        let labels = labels
+        let mut labels = labels
             .into_iter()
             .map(|(l, m)| Label::secondary(l.file_id, l.span).with_message(m))
             .collect_vec();
+        GlobalEnv::add_inlined_from_labels(&mut labels, &loc.inlined_from_loc);
         let diag = diag.with_labels(labels);
         self.add_diag(diag);
     }
@@ -891,6 +934,7 @@ impl GlobalEnv {
         Loc {
             file_id,
             span: Span::new(loc.start(), loc.end()),
+            inlined_from_loc: None, // move-compiler doesn't use "inlined from"
         }
     }
 
@@ -1445,12 +1489,15 @@ impl GlobalEnv {
         let field_name = self.symbol_pool.make("v");
         let mut field_data = BTreeMap::new();
         let field_id = FieldId::new(field_name);
-        field_data.insert(field_id, FieldData {
-            name: field_name,
-            loc: loc.clone(),
-            offset: 0,
-            ty,
-        });
+        field_data.insert(
+            field_id,
+            FieldData {
+                name: field_name,
+                loc: loc.clone(),
+                offset: 0,
+                ty,
+            },
+        );
         StructData {
             name: self.ghost_memory_name(var_name),
             loc,

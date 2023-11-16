@@ -11,3 +11,6 @@ error: Invalid call target: currently indirect call must be a parameter to an in
   │
 3 │     f(b)
   │     ^
+  ·
+7 │     inline_apply(f, b)
+  │     ------------------ in a call inlined at this callsite

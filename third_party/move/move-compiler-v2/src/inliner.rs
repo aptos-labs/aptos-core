@@ -618,6 +618,7 @@ struct InlinedRewriter<'env, 'rewriter> {
 
     /// Track loop nesting, 0 outside a loop
     in_loop: usize,
+    call_site_loc: &'rewriter Loc,
 }
 
 impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
@@ -627,6 +628,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         inlined_formal_params: Vec<Parameter>,
         lambda_param_map: BTreeMap<Symbol, &'rewriter Exp>,
         lambda_free_vars: BTreeSet<Symbol>,
+        call_site_loc: &'rewriter Loc,
     ) -> Self {
         let shadow_stack = ShadowStack::new(env, &lambda_free_vars);
         Self {
@@ -636,6 +638,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             inlined_formal_params,
             shadow_stack,
             in_loop: 0,
+            call_site_loc,
         }
     }
 
@@ -706,6 +709,8 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             })
             .collect();
 
+        let call_site_loc = env.get_node_loc(call_node_id);
+
         // rewrite body with type_args, lambda params, and var renames to keep lambda free vars
         // free.
         let mut rewriter = InlinedRewriter::new(
@@ -714,6 +719,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             parameters.clone(),
             lambda_param_map,
             all_lambda_free_vars,
+            &call_site_loc,
         );
 
         // For now, just copy the actuals.  If FreezeRef is needed, we'll do it in
@@ -722,7 +728,8 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
 
         // Turn list of parameters into a pattern.  Also rewrite types as needed.
         // Shadow param vars as if we are in a let.
-        let params_pattern = rewriter.parameter_list_to_pattern(env, func_loc, regular_params);
+        let params_pattern =
+            rewriter.parameter_list_to_pattern(env, func_loc, &call_site_loc, regular_params);
 
         // Enter the scope defined by the params.
         rewriter.shadowing_enter_scope(regular_params_overlapping_free_vars);
@@ -730,11 +737,9 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         // Rewrite body types, shadowed vars, replace invoked lambda params, etc.
         let rewritten_body = rewriter.rewrite_exp(body.clone());
 
-        let call_loc = env.get_node_loc(call_node_id);
-
         InlinedRewriter::construct_inlined_call_expression(
             env,
-            &call_loc,
+            &call_site_loc,
             rewritten_body,
             params_pattern,
             rewritten_actuals,
@@ -794,6 +799,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         &mut self,
         env: &'env GlobalEnv,
         function_loc: &Loc,
+        call_site_loc: &Loc,
         parameters: Vec<&Parameter>,
     ) -> Pattern {
         let tuple_args: Vec<Pattern> = parameters
@@ -803,7 +809,8 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                 // TODO(10731): ideally, each Parameter has its own loc.  For now, we use the
                 // function location.  body should have types rewritten, other inlining complete,
                 // lambdas inlined, etc.
-                let id = env.new_node(function_loc.clone(), ty.instantiate(self.type_args));
+                let id = env.new_node(function_loc.clone().inlined_from(call_site_loc),
+                                      ty.instantiate(self.type_args));
                 if let Some(new_sym) = self.shadow_stack.get_shadow_symbol(*sym, true) {
                     Pattern::Var(id, new_sym)
                 } else {
@@ -816,7 +823,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             .map(|param| param.1.instantiate(self.type_args))
             .collect();
         let tuple_type: Type = Type::Tuple(tuple_type_list);
-        let id = env.new_node(function_loc.clone(), tuple_type);
+        let id = env.new_node(function_loc.clone().inlined_from(call_site_loc), tuple_type);
         Pattern::Tuple(id, tuple_args)
     }
 
@@ -829,7 +836,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
     /// types).
     fn construct_inlined_call_expression(
         env: &'env GlobalEnv,
-        invocation_loc: &Loc,
+        call_site_loc: &Loc,
         body: Exp,
         pattern: Pattern,
         args: Vec<Exp>,
@@ -837,7 +844,10 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         // Process Body
         let body_node_id = body.as_ref().node_id();
         let body_type = env.get_node_type(body_node_id);
-        let body_loc = env.get_node_loc(body_node_id);
+        let body_loc = env
+            .get_node_loc(body_node_id)
+            .clone()
+            .inlined_from(call_site_loc);
 
         let new_body_id = env.new_node(body_loc, body_type.clone());
 
@@ -891,7 +901,16 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
 
             let args_type = Type::Tuple(args_types);
 
-            let args_loc = invocation_loc.clone();
+            // TODO: try to find a more precise source code location corresponding to set of actual arguments.
+            // E.g.,:
+            //   let args_locs: Vec<Loc> = args_node_ids.iter().map(|node_id| env.get_node_loc(*node_id)).collect();
+            //   let args_loc: Loc = Loc::merge(Vec<Loc>); or something  similar
+            // For now, we just use the location of the first arg for the entire list.
+            let args_loc = args_node_ids
+                .first()
+                .map(|node_id| env.get_node_loc(*node_id))
+                .unwrap_or_else(|| call_site_loc.clone());
+
             let new_args_id = env.new_node(args_loc, args_type);
             let new_args_expr =
                 ExpData::Call(new_args_id, Operation::Tuple, rewritten_args).into_exp();
@@ -1040,7 +1059,9 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
 
     /// Instantiates `self.type_args` on every node in the inlined function
     fn rewrite_node_id(&mut self, id: NodeId) -> Option<NodeId> {
-        ExpData::instantiate_node(self.env, id, self.type_args)
+        let loc = self.env.get_node_loc(id);
+        let new_loc = loc.inlined_from(self.call_site_loc);
+        ExpData::instantiate_node_new_loc(self.env, id, self.type_args, &new_loc)
     }
 
     /// Replaces symbol uses that are shadowed with the shadow symbol.
