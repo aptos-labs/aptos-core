@@ -59,6 +59,11 @@ impl BootstrappingMode {
             BootstrappingMode::ExecuteOrApplyFromGenesis => "execute_or_apply_from_genesis",
         }
     }
+
+    /// Returns true iff the bootstrapping mode is fast sync
+    pub fn is_fast_sync(&self) -> bool {
+        *self == BootstrappingMode::DownloadLatestStates
+    }
 }
 
 /// The continuous syncing mode determines how the node will stay up-to-date
@@ -298,10 +303,35 @@ impl Default for AptosDataClientConfig {
 
 impl ConfigSanitizer for StateSyncConfig {
     fn sanitize(
-        _node_config: &mut NodeConfig,
+        node_config: &NodeConfig,
+        node_type: NodeType,
+        chain_id: ChainId,
+    ) -> Result<(), Error> {
+        // Sanitize the state sync driver config
+        StateSyncDriverConfig::sanitize(node_config, node_type, chain_id)
+    }
+}
+
+impl ConfigSanitizer for StateSyncDriverConfig {
+    fn sanitize(
+        node_config: &NodeConfig,
         _node_type: NodeType,
         _chain_id: ChainId,
     ) -> Result<(), Error> {
+        let sanitizer_name = Self::get_sanitizer_name();
+        let state_sync_driver_config = &node_config.state_sync.state_sync_driver;
+
+        // Verify that auto-bootstrapping is not enabled for
+        // nodes that are fast syncing.
+        let fast_sync_enabled = state_sync_driver_config.bootstrapping_mode.is_fast_sync();
+        if state_sync_driver_config.enable_auto_bootstrapping && fast_sync_enabled {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "Auto-bootstrapping should not be enabled for nodes that are fast syncing!"
+                    .to_string(),
+            ));
+        }
+
         Ok(())
     }
 }
@@ -583,6 +613,29 @@ mod tests {
             data_streaming_service_config.max_concurrent_state_requests,
             100
         );
+    }
+
+    #[test]
+    fn test_sanitize_auto_bootstrapping_fast_sync() {
+        // Create a node config with fast sync and
+        // auto bootstrapping enabled.
+        let node_config = NodeConfig {
+            state_sync: StateSyncConfig {
+                state_sync_driver: StateSyncDriverConfig {
+                    bootstrapping_mode: BootstrappingMode::DownloadLatestStates,
+                    enable_auto_bootstrapping: true,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Verify that sanitization fails
+        let error =
+            StateSyncConfig::sanitize(&node_config, NodeType::Validator, ChainId::testnet())
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
 
     /// Creates and returns a node config with the syncing modes set to execution
