@@ -983,6 +983,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     processor_statuses,
     proposal_votes,
     signatures,
+    system_transactions,
     table_items,
     table_metadatas,
     token_activities,

@@ -1,3 +1,6 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::common::{Author, Payload, Round};
 use aptos_types::system_txn::SystemTransaction;
 use serde::{Deserialize, Serialize};
