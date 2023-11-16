@@ -168,7 +168,6 @@ pub struct ProposalGenerator {
     // Last round that a proposal was generated
     last_round_generated: Round,
     quorum_store_enabled: bool,
-    sys_txn_enabled: bool,
 }
 
 impl ProposalGenerator {
@@ -184,7 +183,6 @@ impl ProposalGenerator {
         pipeline_backpressure_config: PipelineBackpressureConfig,
         chain_health_backoff_config: ChainHealthBackoffConfig,
         quorum_store_enabled: bool,
-        sys_txn_enabled: bool,
     ) -> Self {
         Self {
             author,
@@ -199,7 +197,6 @@ impl ProposalGenerator {
             chain_health_backoff_config,
             last_round_generated: 0,
             quorum_store_enabled,
-            sys_txn_enabled,
         }
     }
 
@@ -338,26 +335,14 @@ impl ProposalGenerator {
             proposer_election,
         );
 
-        if self.sys_txn_enabled {
-            Ok(BlockData::new_proposal_ext(
-                vec![], // TODO: make it real
-                payload,
-                self.author,
-                failed_authors,
-                round,
-                timestamp,
-                quorum_cert,
-            ))
-        } else {
-            Ok(BlockData::new_proposal(
-                payload,
-                self.author,
-                failed_authors,
-                round,
-                timestamp,
-                quorum_cert,
-            ))
-        }
+        Ok(BlockData::new_proposal(
+            payload,
+            self.author,
+            failed_authors,
+            round,
+            timestamp,
+            quorum_cert,
+        ))
     }
 
     async fn calculate_max_block_sizes(

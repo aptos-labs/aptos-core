@@ -93,7 +93,6 @@ pub enum FeatureFlag {
     VMBinaryFormatV7,
     ResourceGroupsChargeAsSizeSum,
     CommissionChangeDelegationPool,
-    SystemTransaction,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
