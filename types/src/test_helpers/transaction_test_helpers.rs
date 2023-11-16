@@ -6,7 +6,6 @@ use crate::{
     account_address::AccountAddress,
     block_executor::config::BlockExecutorConfigFromOnchain,
     chain_id::ChainId,
-    on_chain_config::BlockGasLimitType,
     transaction::{
         authenticator::AccountAuthenticator,
         signature_verified_transaction::{
@@ -23,9 +22,7 @@ const TEST_GAS_PRICE: u64 = 100;
 
 // The block executor onchain config (gas limit parameters) for executor tests
 pub const TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG: BlockExecutorConfigFromOnchain =
-    BlockExecutorConfigFromOnchain {
-        block_gas_limit_type: BlockGasLimitType::Limit(1000),
-    };
+    BlockExecutorConfigFromOnchain::on_but_large_for_test();
 
 static EMPTY_SCRIPT: &[u8] = include_bytes!("empty_script.mv");
 

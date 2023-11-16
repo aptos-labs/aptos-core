@@ -580,7 +580,7 @@ impl StateApi {
                         "StateKey({}) and Ledger version({})",
                         request.key, ledger_version
                     ),
-                    AptosErrorCode::StateValueNotFound,
+                    AptosErrorCode::TableItemNotFound,
                     &ledger_info,
                 )
             })?;

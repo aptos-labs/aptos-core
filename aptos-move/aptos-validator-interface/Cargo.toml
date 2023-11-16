@@ -27,7 +27,6 @@ async-recursion = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 itertools = { workspace = true }
-log = "0.4.17"
 lru = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }

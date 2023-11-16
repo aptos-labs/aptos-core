@@ -459,3 +459,41 @@ proptest! {
         );
     }
 }
+
+#[test]
+fn test_aggregator_overflow_single() {
+    let test_env = TestEnvConfig {
+        executor_mode: ExecutorMode::SequentialOnly,
+        aggregator_execution_enabled: true,
+        block_split: BlockSplit::Whole,
+    };
+    println!("Testing test_aggregator_snapshot {:?}", test_env);
+    let element_type = ElementType::U64;
+    let use_type = UseType::UseResourceType;
+
+    let mut h = setup(
+        test_env.executor_mode,
+        test_env.aggregator_execution_enabled,
+        9,
+    );
+
+    let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+    let snap_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+    let derived_snap_loc =
+        AggregatorLocation::new(*h.account.address(), ElementType::String, use_type, 0);
+
+    let txns = vec![
+        (SUCCESS, h.init(None, use_type, element_type, true)),
+        (SUCCESS, h.init(None, use_type, element_type, false)),
+        (SUCCESS, h.init(None, use_type, ElementType::String, false)),
+        (SUCCESS, h.new_add(&agg_loc, 400, 100)),
+        (SUCCESS, h.snapshot(&agg_loc, &snap_loc)),
+        (SUCCESS, h.check_snapshot(&snap_loc, 100)),
+        (SUCCESS, h.read_snapshot(&agg_loc)),
+        (SUCCESS, h.add_and_read_snapshot_u128(&agg_loc, 100)),
+        (SUCCESS, h.concat(&snap_loc, &derived_snap_loc, "12", "13")),
+        (SUCCESS, h.check_snapshot(&derived_snap_loc, 1210013)),
+    ];
+
+    h.run_block_in_parts_and_check(test_env.block_split, txns);
+}

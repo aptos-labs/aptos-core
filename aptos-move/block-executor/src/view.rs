@@ -4,6 +4,7 @@
 use crate::{
     captured_reads::{
         CapturedReads, DataRead, DelayedFieldRead, DelayedFieldReadKind, GroupRead, ReadKind,
+        UnsyncReadSet,
     },
     counters,
     scheduler::{DependencyResult, DependencyStatus, Scheduler, TWaitForDependency},
@@ -744,8 +745,7 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
 
 pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
     pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-    pub(crate) resource_with_layout_read_set: RefCell<HashSet<T::Key>>,
-    pub(crate) group_read_set: RefCell<HashSet<T::Key>>,
+    pub(crate) read_set: RefCell<UnsyncReadSet<T>>,
     pub(crate) start_counter: u32,
     pub(crate) counter: &'a RefCell<u32>,
     pub(crate) dynamic_change_set_optimizations_enabled: bool,
@@ -761,8 +761,7 @@ impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
     ) -> Self {
         Self {
             unsync_map,
-            resource_with_layout_read_set: RefCell::new(HashSet::new()),
-            group_read_set: RefCell::new(HashSet::new()),
+            read_set: RefCell::new(UnsyncReadSet::default()),
             start_counter,
             counter,
             dynamic_change_set_optimizations_enabled,
@@ -822,14 +821,12 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for SequentialState<'a,
 
                 if let Some(ret) = ReadResult::from_value_with_layout(value, target_kind.clone()) {
                     if target_kind == ReadKind::Value {
-                        if let ReadResult::Value(v, l) = &ret {
-                            if v.is_some() && l.is_some() {
-                                self.resource_with_layout_read_set
-                                    .borrow_mut()
-                                    .insert(key.clone());
-                            }
-                        }
+                        self.read_set
+                            .borrow_mut()
+                            .resource_reads
+                            .insert(key.clone());
                     }
+
                     ret
                 } else {
                     *self.incorrect_use.borrow_mut() = true;
@@ -883,9 +880,12 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for SequentialStat
 
                 if let ValueWithLayout::Exchanged(v, l) = value {
                     let bytes = v.extract_raw_bytes();
-                    if bytes.is_some() && l.is_some() {
-                        self.group_read_set.borrow_mut().insert(group_key.clone());
-                    }
+                    self.read_set
+                        .borrow_mut()
+                        .group_reads
+                        .entry(group_key.clone())
+                        .or_default()
+                        .insert(resource_tag.clone());
                     Ok(GroupReadResult::Value(bytes, l.clone()))
                 } else {
                     *self.incorrect_use.borrow_mut() = true;
@@ -896,7 +896,15 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for SequentialStat
                 }
             },
             Err(UnsyncGroupError::Uninitialized) => Ok(GroupReadResult::Uninitialized),
-            Err(UnsyncGroupError::TagNotFound) => Ok(GroupReadResult::Value(None, None)),
+            Err(UnsyncGroupError::TagNotFound) => {
+                self.read_set
+                    .borrow_mut()
+                    .group_reads
+                    .entry(group_key.clone())
+                    .or_default()
+                    .insert(resource_tag.clone());
+                Ok(GroupReadResult::Value(None, None))
+            },
         }
     }
 }
@@ -952,17 +960,27 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             ViewState::Sync(_) => {
                 unreachable!("Get resource read set called in parallel setting")
             },
-            ViewState::Unsync(state) => state.resource_with_layout_read_set.borrow().clone(),
+            ViewState::Unsync(state) => state.read_set.borrow().resource_reads.clone(),
         }
     }
 
-    /// Drains the captured reads.
-    pub(crate) fn take_reads(&self) -> CapturedReads<T> {
+    /// Drains the parallel captured reads.
+    pub(crate) fn take_parallel_reads(&self) -> CapturedReads<T> {
         match &self.latest_view {
             ViewState::Sync(state) => state.captured_reads.take(),
             ViewState::Unsync(_) => {
                 unreachable!("Take reads called in sequential setting (not captured)")
             },
+        }
+    }
+
+    /// Drains the unsync read set.
+    pub(crate) fn take_sequential_reads(&self) -> UnsyncReadSet<T> {
+        match &self.latest_view {
+            ViewState::Sync(_) => {
+                unreachable!("Take unsync reads called in parallel setting")
+            },
+            ViewState::Unsync(state) => state.read_set.take(),
         }
     }
 
@@ -1249,26 +1267,30 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
     fn get_group_reads_needing_exchange_sequential(
         &self,
-        group_read_set: &HashSet<T::Key>,
+        group_read_set: &HashMap<T::Key, HashSet<T::Tag>>,
         unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         delayed_write_set_keys: &HashSet<T::Identifier>,
         skip: &HashSet<T::Key>,
     ) -> Result<BTreeMap<T::Key, (T::Value, u64)>, PanicError> {
         group_read_set
             .iter()
-            .filter(|key| !skip.contains(key))
-            .flat_map(|key| {
+            .filter(|(key, _tags)| !skip.contains(key))
+            .flat_map(|(key, tags)| {
                 if let Some(value_vec) = unsync_map.fetch_group_data(key) {
                     let mut resources_needing_delayed_field_exchange = false;
-                    for (_, value_with_layout) in value_vec {
-                        if let ValueWithLayout::Exchanged(value, Some(layout)) = value_with_layout {
-                            if let Some(bytes) = value.bytes() {
-                                let identifiers_in_read = self
-                                    .extract_identifiers_from_value(bytes, layout.as_ref())
-                                    .unwrap();
-                                if !delayed_write_set_keys.is_disjoint(&identifiers_in_read) {
-                                    resources_needing_delayed_field_exchange = true;
-                                    break;
+                    for (tag, value_with_layout) in value_vec {
+                        if tags.contains(&tag) {
+                            if let ValueWithLayout::Exchanged(value, Some(layout)) =
+                                value_with_layout
+                            {
+                                if let Some(bytes) = value.bytes() {
+                                    let identifiers_in_read = self
+                                        .extract_identifiers_from_value(bytes, layout.as_ref())
+                                        .unwrap();
+                                    if !delayed_write_set_keys.is_disjoint(&identifiers_in_read) {
+                                        resources_needing_delayed_field_exchange = true;
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -1563,10 +1585,17 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
                     Err(NotFound) => self.get_raw_base_value(state_key),
                 }
             },
-            ViewState::Unsync(state) => state.unsync_map.fetch_module_data(state_key).map_or_else(
-                || self.get_raw_base_value(state_key),
-                |v| Ok(v.as_state_value()),
-            ),
+            ViewState::Unsync(state) => {
+                state
+                    .read_set
+                    .borrow_mut()
+                    .module_reads
+                    .insert(state_key.clone());
+                state.unsync_map.fetch_module_data(state_key).map_or_else(
+                    || self.get_raw_base_value(state_key),
+                    |v| Ok(v.as_state_value()),
+                )
+            },
         }
     }
 }
@@ -1621,10 +1650,19 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
         id: &Self::Identifier,
     ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
         match &self.latest_view {
-            ViewState::Sync(state) => get_delayed_field_value_impl(&state.captured_reads, state.versioned_map.delayed_fields(), state.scheduler, id, self.txn_idx),
-            ViewState::Unsync(state) => Ok(state.unsync_map.fetch_delayed_field(id).ok_or_else(|| {
-                code_invariant_error(format!("DelayedField {:?} not found in get_delayed_field_value in sequential execution", id))
-            })?),
+            ViewState::Sync(state) => get_delayed_field_value_impl(
+                &state.captured_reads,
+                state.versioned_map.delayed_fields(),
+                state.scheduler,
+                id,
+                self.txn_idx,
+            ),
+            ViewState::Unsync(state) => {
+                state.read_set.borrow_mut().delayed_field_reads.insert(*id);
+                Ok(state.unsync_map.fetch_delayed_field(id).ok_or_else(|| {
+                    code_invariant_error(format!("DelayedField {:?} not found in get_delayed_field_value in sequential execution", id))
+                })?)
+            },
         }
     }
 
@@ -1731,9 +1769,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
                 )
             },
             ViewState::Unsync(state) => {
-                let resource_with_layout_read_set = state.resource_with_layout_read_set.borrow();
+                let read_set = state.read_set.borrow();
                 self.get_reads_needing_exchange_sequential(
-                    &resource_with_layout_read_set,
+                    &read_set.resource_reads,
                     state.unsync_map,
                     delayed_write_set_keys,
                     skip,
@@ -1752,9 +1790,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
                 self.get_group_reads_needing_exchange_parallel(state, delayed_write_set_keys, skip)
             },
             ViewState::Unsync(state) => {
-                let group_read_set = state.group_read_set.borrow();
+                let read_set = state.read_set.borrow();
                 self.get_group_reads_needing_exchange_sequential(
-                    &group_read_set,
+                    &read_set.group_reads,
                     state.unsync_map,
                     delayed_write_set_keys,
                     skip,
@@ -3005,7 +3043,7 @@ mod test {
             Some(state_value_4.clone())
         );
 
-        let captured_reads = latest_view.take_reads();
+        let captured_reads = latest_view.take_parallel_reads();
         assert!(captured_reads.validate_data_reads(versioned_map.data(), 1));
         let read_set_with_delayed_fields = captured_reads.get_read_values_with_delayed_fields();
 
