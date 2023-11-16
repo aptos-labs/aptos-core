@@ -118,8 +118,8 @@ const config = {
               to: "releases/aptos-releases",
             },
             {
-              label: "Deployments",
-              to: "nodes/deployments",
+              label: "Networks",
+              to: "nodes/networks",
             },
             {
               label: "Integrate with Aptos",
@@ -134,7 +134,7 @@ const config = {
           position: "left",
           items: [
             {
-              label: "Start with Onboarding Tutorials",
+              label: "Tutorials",
               to: "tutorials",
               activeBaseRegex: "^/tutorials$|^/tutorials$",
             },
@@ -143,8 +143,12 @@ const config = {
               to: "move/move-on-aptos",
             },
             {
-              label: "Embrace the Aptos Standards",
+              label: "Aptos Standards",
               to: "standards",
+            },
+            {
+              label: "Aptos APIs",
+              to: "apis",
             },
             {
               label: "Integrate with Aptos",
@@ -155,21 +159,12 @@ const config = {
               to: "/category/environment",
             },
             {
-              label: "Create NFTs on Aptos",
+              label: "Create NFTs",
               to: "/category/nft",
-            },
-            {
-              label: "Examples",
-              to: "/category/examples",
             },
             {
               label: "Build E2E Dapp on Aptos",
               to: "tutorials/build-e2e-dapp/e2e-dapp-index",
-            },
-            {
-              type: "doc",
-              label: "Advanced Builder Guides",
-              docId: "/category/advanced-builders",
             },
           ],
         },
@@ -210,6 +205,10 @@ const config = {
             {
               label: "Aptos REST API Spec",
               to: "nodes/aptos-api-spec",
+            },
+            {
+              label: "Aptos Errors Codes",
+              to: "reference/error-codes",
             },
             {
               label: "Aptos Move Framework",
@@ -329,48 +328,60 @@ const config = {
             from: "/releases/sdk-release",
           },
           {
-            to: "/indexer/indexer-landing",
             from: "/integration/indexing",
-          },
-          {
             to: "/indexer/indexer-landing",
+          },
+          {
             from: "/nodes/indexer-fullnode",
+            to: "/indexer/indexer-landing",
           },
           {
-            to: "/integration/creating-a-signed-transaction",
             from: "/tutorials/your-first-transaction-sdk",
+            to: "/integration/creating-a-signed-transaction",
           },
           {
-            to: "/nodes/full-node/run-a-fullnode-on-gcp",
             from: "/tutorials/run-a-fullnode-on-gcp",
+            to: "/nodes/full-node/run-a-fullnode-on-gcp",
           },
           {
-            to: "/aptos-white-paper",
             from: "/aptos-white-paper/aptos-white-paper-index/",
+            to: "/aptos-white-paper",
           },
           {
-            to: "/guides/local-development-network",
             from: "/guides/local-testnet-dev-flow",
-          },
-          {
             to: "/guides/local-development-network",
+          },
+          {
             from: "/nodes/local-testnet/using-cli-to-run-a-local-testnet",
+            to: "/guides/local-development-network",
           },
           {
-            to: "/guides/system-integrators-guide",
             from: "/guides/getting-started",
+            to: "/guides/system-integrators-guide",
           },
           {
-            to: "/concepts/accounts",
             from: "/basics/basics-accounts/",
+            to: "/concepts/accounts",
           },
           {
-            to: "/move/move-on-aptos",
             from: "/guides/move-guides/aptos-move-guides",
+            to: "/move/move-on-aptos",
           },
           {
-            to: "/tools/aptos-cli/install-cli",
             from: "/tools/install-cli",
+            to: "/tools/aptos-cli/install-cli",
+          },
+          {
+            from: "/integration/handle-aptos-errors",
+            to: "/reference/error-codes",
+          },
+          {
+            from: "/integration/aptos-api",
+            to: "/apis/fullnode-rest-api",
+          },
+          {
+            from: "/nodes/deployments",
+            to: "/nodes/networks",
           },
         ],
         createRedirects(existingPath) {
