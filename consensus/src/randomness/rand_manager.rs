@@ -22,7 +22,7 @@ use aptos_crypto::HashValue;
 use aptos_dkg::weighted_vuf::traits::WeightedVUF;
 use aptos_logger::prelude::*;
 use aptos_network::protocols::network::RpcError;
-use aptos_reliable_broadcast::{ReliableBroadcast, RBNetworkSender};
+use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_time_service::TimeService;
 use aptos_types::{
     account_address::AccountAddress, validator_verifier::ValidatorVerifier, randomness::{RandDecision, RandConfig, Mode, RandMetadata, Delta, WVUF},
@@ -35,14 +35,13 @@ use futures::{
 use tokio::time::{Duration, Instant};
 use tokio_retry::strategy::ExponentialBackoff;
 
-use super::{block_queue::{OrderedBlocks, RandReadyBlocks}, types::{RandMessage, RandShare, ShareAckState}, rand_store::{RandStore, AddDecisionResult}};
+use super::{block_queue::{OrderedBlocks, RandReadyBlocks}, types::{RandMessage, RandShare, ShareAckState, DeltaAckState}, rand_store::{RandStore, AddDecisionResult}};
 
 // rand todo: parameters. These parameters can sometimes pass smoke test.
 pub const RAND_SHARE_BROADCAST_INTERVAL_MS: u64 = 1_000;
 pub const RAND_SHARE_REBROADCAST_INTERVAL_MS: u64 = 3_000;
 pub const REBROADCAST_LOOP_INTERVAL_MS: u64 = 1_000;
 pub const GARBAGE_COLLECT_LOOP_INTERVAL_MS: u64 = 10_000;
-pub const DELTA_SENDING_TIMEOUT: u64 = 3_000;
 
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
@@ -79,14 +78,11 @@ pub struct RandManager {
     stop: bool,
 
     // channels for randomness messages
-    network_sender: Arc<NetworkSender>,
     rand_msg_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, IncomingRandRequest>,
 
     // local channels
     acked_rand_decision_tx: Sender<RandDecision>,
     acked_rand_decision_rx: Receiver<RandDecision>,
-    send_delta_request_tx: Sender<Author>,
-    send_delta_request_rx: Receiver<Author>,
 
     reliable_broadcast: Arc<ReliableBroadcast<RandMessage, ExponentialBackoff>>,
 }
@@ -106,8 +102,6 @@ impl RandManager {
         network_sender: Arc<NetworkSender>,
         rand_msg_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, IncomingRandRequest>,
     ) -> Self {
-        let rand_store = RandStore::new(author, rand_config, gc_gap_below, gc_gap_above);
-
         // rand todo: parameters
         let rb_backoff_policy = ExponentialBackoff::from_millis(2).factor(50).max_delay(Duration::from_secs(5));
         let reliable_broadcast = ReliableBroadcast::new(
@@ -121,7 +115,22 @@ impl RandManager {
         let (acked_rand_decision_tx, acked_rand_decision_rx) =
             create_channel::<RandDecision>();
 
-        let (send_delta_request_tx, send_delta_request_rx) = create_channel::<Author>();
+        // reliable broadcast my delta
+        let delta_rb_drop_guard = match &rand_config {
+            Some(rand_config) => {
+                let apk_delta: Delta = rand_config.get_delta(&author, &Mode::Fallback).cloned().unwrap();
+                let (abort_handle, abort_registration) = AbortHandle::new_pair();
+                let task = reliable_broadcast.broadcast(
+                    DeltaMsg::new(author, apk_delta),
+                    DeltaAckState::new(verifier.get_ordered_account_addresses_iter()),
+                );
+                tokio::spawn(Abortable::new(task, abort_registration));
+                Some(DropGuard::new(abort_handle))
+            },
+            None => None,
+        };
+
+        let rand_store = RandStore::new(author, rand_config, delta_rb_drop_guard, gc_gap_below, gc_gap_above);
 
         Self {
             author,
@@ -134,12 +143,9 @@ impl RandManager {
             buffer_manager_rx,
             reset_rx,
             stop: false,
-            network_sender,
             rand_msg_rx,
             acked_rand_decision_tx,
             acked_rand_decision_rx,
-            send_delta_request_tx,
-            send_delta_request_rx,
             reliable_broadcast: Arc::new(reliable_broadcast),
         }
     }
@@ -148,7 +154,7 @@ impl RandManager {
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let task = self.reliable_broadcast.broadcast(
             shares,
-            ShareAckState::new(self.verifier.get_ordered_account_addresses_iter(), self.rand_store.rand_config().unwrap().clone(), self.acked_rand_decision_tx.clone(), self.send_delta_request_tx.clone()),
+            ShareAckState::new(self.verifier.get_ordered_account_addresses_iter(), self.rand_store.rand_config().unwrap().clone(), self.acked_rand_decision_tx.clone()),
         );
         tokio::spawn(Abortable::new(task, abort_registration));
         DropGuard::new(abort_handle)
@@ -178,13 +184,6 @@ impl RandManager {
         self.process_decision(decision).await;
     }
 
-    async fn send_apk_delta(&mut self, peer: Author) -> anyhow::Result<()> {
-        debug!("[RandManager] Sending delta to peer {:?}", peer);
-        let delta = self.rand_store.rand_config().unwrap().get_delta(&self.author, &Mode::Fallback).cloned().expect("[RandManager] No local delta to send to peer!");
-        let delta_msg = DeltaMsg::new(self.author, delta);
-        self.network_sender.send_rb_rpc(peer, RandMessage::Delta(delta_msg), Duration::from_millis(DELTA_SENDING_TIMEOUT)).await.map(|_| ())
-    }
-
     fn process_apk_delta(&mut self, peer: &AccountAddress, delta: Delta) -> anyhow::Result<()> {
         if let Some(rand_config) = self.rand_store.rand_config.as_mut() {
             rand_config.add_delta(peer, delta, &Mode::Fallback)
@@ -196,9 +195,6 @@ impl RandManager {
     async fn process_share(&mut self, share: RandShare) -> anyhow::Result<RandMessage> {
         log_rand_event(LogEvent::ReceiveRandShare, self.author, Some(*share.author()), share.id(), share.round());
 
-        if share.apk_delta().is_some() {
-            self.process_apk_delta(share.author(), share.apk_delta().clone().unwrap())?;
-        }
         match self.rand_store.add_share(share.clone()) {
             Ok((maybe_decision, result)) => {
                 // Ack back decision if available
@@ -299,13 +295,7 @@ impl RandManager {
                 let ask = &rand_config.keys_f.ask;
                 let metadata = RandMetadata::new(block.epoch(), block.round(), block.id(), block.timestamp_usecs());
                 let proof = <WVUF as WeightedVUF>::create_share(&ask, metadata.to_bytes().as_slice());
-                let mut apk_delta = None;
-                if block.round() <= 1 {
-                    // Sending apk_delta along with the share for the first round
-                    // If a node has no apk_delta, it will send MissingDelta in ShareAck
-                    apk_delta = rand_config.get_delta(&rand_config.author, &Mode::Fallback).cloned();
-                }
-                let share = RandShare::new(self.author, Mode::Fallback, metadata, proof, apk_delta);
+                let share = RandShare::new(self.author, Mode::Fallback, metadata, proof);
 
                 observe_block(share.timestamp(), BlockStage::RAND_BC_SHARE);
                 log_rand_event(LogEvent::BroadcastRandShare, self.author, None, share.id(), share.round());
@@ -464,13 +454,6 @@ impl RandManager {
                     rand_decision = self.acked_rand_decision_rx.select_next_some() => {
                         monitor!("rand_manager_process_rand_decision", {
                             self.process_acked_decision(rand_decision).await;
-                        });
-                    },
-                    peer = self.send_delta_request_rx.select_next_some() => {
-                        monitor!("rand_manager_send_apk_delta", {
-                            if let Err(e) = self.send_apk_delta(peer.clone()).await {
-                                warn!(error = ?e, "[RandManager] error sending apk delta to peer {:?}", peer);
-                            }
                         });
                     },
                     buffer_manager_event = self.buffer_manager_rx.select_next_some() => {

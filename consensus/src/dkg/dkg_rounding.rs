@@ -9,11 +9,19 @@ use aptos_logger::{debug, error, trace};
 pub const WEIGHT_PER_VALIDATOR_MIN : usize = 1;
 pub const WEIGHT_PER_VALIDATOR_MAX : usize = 30;
 pub const STEPS : usize = 1_000;
+pub const HARDCODED_BEST_ROUNDING_THRESHOLD : f64 = 0.5;
 pub const STAKE_GAP_THRESHOLD : f64 = 0.1; // dkg todo: decide threshold
+pub const FALLBACK_RECONSTRUCT_THRESHOLD : f64 = 1.0 / 3.0;  // dkg todo: decide threshold
+pub const OPTIMISTIC_RECONSTRUCT_THRESHOLD : f64 = 2.0 / 3.0;
+
 
 #[derive(Clone)]
 pub struct DKGRoundingProfile {
+    // calculated weights for each validator after rounding
     pub validator_weights: Vec<usize>,
+    // The extra percentage of stake that is needed to reconstruct the randomness due to rounding,
+    // i.e., fallback path needs (1/3 + stake_gap) honest stakes to reconstruct the randomness,
+    // optimistic path needs (2/3 + stake_gap) honest stakes to reconstruct the randomness.
     pub stake_gap: f64,
     pub threshold_f: usize,
     pub threshold_o: usize,
@@ -45,8 +53,10 @@ impl DKGRounding {
         weight_per_validator_min: usize,
         weight_per_validator_max: usize,
         steps: usize,
+        fallback_reconstruct_threshold: f64,
+        optimistic_reconstruct_threshold: f64,
     ) -> Self {
-        let profile = DKGRoundingProfile::new(validator_stakes.clone(), stake_gap_threshold, weight_per_validator_min, weight_per_validator_max, steps);
+        let profile = DKGRoundingProfile::new(validator_stakes.clone(), stake_gap_threshold, weight_per_validator_min, weight_per_validator_max, steps, fallback_reconstruct_threshold, optimistic_reconstruct_threshold);
 
         if profile.stake_gap > stake_gap_threshold {
             // dkg todo: add alert here
@@ -73,6 +83,8 @@ impl DKGRoundingProfile {
         weight_per_validator_min: usize,
         weight_per_validator_max: usize,
         steps: usize,
+        fallback_reconstruct_threshold: f64,
+        optimistic_reconstruct_threshold: f64,
     ) -> Self {
         let validator_num = validator_stakes.len();
         let total_weight_min = weight_per_validator_min * validator_num;
@@ -87,7 +99,7 @@ impl DKGRoundingProfile {
         for step in 0..steps {
             let total_weight = total_weight_min + (total_weight_max - total_weight_min) * step / steps;
         
-            let profile = compute_profile(validator_stakes.clone(), total_weight);
+            let profile = compute_profile(validator_stakes.clone(), total_weight, fallback_reconstruct_threshold, optimistic_reconstruct_threshold);
 
             assert!(profile.stake_gap < 1.0);
 
@@ -120,6 +132,8 @@ impl DKGRoundingProfile {
 pub fn compute_profile(
     validator_stakes: Vec<u64>,
     weights_sum: usize,
+    fallback_reconstruct_threshold: f64,
+    optimistic_reconstruct_threshold: f64,
 ) -> DKGRoundingProfile {
     let stake_sum = validator_stakes.iter().sum::<u64>();
     let stake_per_weight = stake_sum / weights_sum as u64;
@@ -127,28 +141,27 @@ pub fn compute_profile(
         .iter()
         .map(|stake| (*stake as f64 / stake_per_weight as f64) - ((stake / stake_per_weight) as f64))
         .collect::<Vec<f64>>();
-    let c = 0.5;
-    let mut delta_d = 0.0;
-    let mut delta_u = 0.0;
+    let mut delta_down = 0.0;
+    let mut delta_up = 0.0;
     for j in 0..fractions.len() {
-        if fractions[j] + c >= 1.0 {
-            delta_u += 1.0 - fractions[j];
+        if fractions[j] + HARDCODED_BEST_ROUNDING_THRESHOLD >= 1.0 {
+            delta_up += 1.0 - fractions[j];
         } else {
-            delta_d += fractions[j];
+            delta_down += fractions[j];
         }
     }
-    let delta = delta_d + delta_u;
+    let delta_total = delta_down + delta_up;
 
     let validator_weights = validator_stakes
         .iter()
-        .map(|stake| (*stake as f64 / stake_per_weight as f64 + c) as usize)
+        .map(|stake| (*stake as f64 / stake_per_weight as f64 + HARDCODED_BEST_ROUNDING_THRESHOLD) as usize)
         .collect::<Vec<usize>>();
 
-    let threshold_f = ((stake_sum as f64) / (3.0 * stake_per_weight as f64) + delta_u).ceil() as usize;
-    let threshold_o = ((2.0 * stake_sum as f64) / (3.0 * stake_per_weight as f64) + delta_u).ceil() as usize; 
+    let threshold_f = ((stake_sum as f64) / (stake_per_weight as f64) * fallback_reconstruct_threshold + delta_up).ceil() as usize;
+    let threshold_o = ((stake_sum as f64) / (stake_per_weight as f64) * optimistic_reconstruct_threshold + delta_up).ceil() as usize; 
     //dkg todo - productionize - double check if float number operations are deterministic across platform
 
-    let stake_gap = stake_per_weight as f64 * delta / stake_sum as f64;
+    let stake_gap = stake_per_weight as f64 * delta_total / stake_sum as f64;
 
     let profile = DKGRoundingProfile {
         validator_weights,
@@ -197,7 +210,7 @@ pub const MAINNET_STAKES: [u64; 112] = [
 fn compute_mainnet_rounding() {
     for stake_gap in (5..=100).step_by(1) {
         let stake_gap = stake_gap as f64 / 1000.0;
-        let mainnet_dkg_rounding = DKGRounding::new(MAINNET_STAKES.to_vec(), stake_gap, WEIGHT_PER_VALIDATOR_MIN, WEIGHT_PER_VALIDATOR_MAX, STEPS);
+        let mainnet_dkg_rounding = DKGRounding::new(MAINNET_STAKES.to_vec(), stake_gap, WEIGHT_PER_VALIDATOR_MIN, WEIGHT_PER_VALIDATOR_MAX, STEPS, FALLBACK_RECONSTRUCT_THRESHOLD, OPTIMISTIC_RECONSTRUCT_THRESHOLD);
         println!("{:?}", mainnet_dkg_rounding.profile);
     }
 }

@@ -33,9 +33,13 @@ impl MoveStructType for StartDKGEvent {
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct DKGPvssConfig {
     pub epoch: u64,
+    // weighted config for randomness fallback path
     pub wc_f: SSConfig,
+    // weighted config for randomness optimistic path
     pub wc_o: SSConfig,
+    // DKG public parameters
     pub pp: DkgPP,
+    // DKG encryption public keys
     pub eks: Vec<EncPK>,
 }
 
@@ -64,7 +68,9 @@ impl DKGPvssConfig {
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct DKGTranscriptWrapper {
+    // DKG weighted transcript for randomness fallback path
     pub trx_f: WTrx,
+    // DKG weighted transcript for randomness optimistic path
     pub trx_o: WTrx,
 }
 

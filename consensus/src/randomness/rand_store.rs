@@ -130,6 +130,7 @@ pub enum AddDecisionResult {
 pub struct RandStore {
     pub author: Author,
     pub rand_config: Option<RandConfig>,
+    pub delta_rb_drop_guard: Option<DropGuard>,
     // all block items
     pub block_queue: BlockQueue,
     // rand todo: persist rand_map
@@ -145,10 +146,11 @@ pub struct RandStore {
 }
 
 impl RandStore {
-    pub fn new(author: Author, rand_config: Option<RandConfig>, gc_gap_below: Round, gc_gap_above: Round) -> Self {
+    pub fn new(author: Author, rand_config: Option<RandConfig>, delta_rb_drop_guard: Option<DropGuard>, gc_gap_below: Round, gc_gap_above: Round) -> Self {
         Self {
             author,
             rand_config,
+            delta_rb_drop_guard,
             block_queue: BlockQueue::new(),
             rand_map: HashMap::new(),
             rand_round_min: 0,
@@ -249,7 +251,7 @@ impl RandStore {
         self.block_queue.push_back(item);
 
         let add_decision_results: Vec<AddDecisionResult> = metadata_objs.into_iter().map(|metadata| {
-            let maybe_decision = self.try_aggregate_shares(metadata.round, Some(metadata)).unwrap();
+            let maybe_decision = self.try_aggregate_shares(metadata.round(), Some(metadata)).unwrap();
             if maybe_decision.is_none() { return AddDecisionResult::None; }
             let decision = maybe_decision.unwrap();
             self.add_decision(decision).unwrap()
@@ -293,7 +295,7 @@ impl RandStore {
         let missing_apk = rand_config.get_apk(share.author(), &Mode::Fallback).is_none();
 
         if missing_apk {
-            return Ok((ShareAck::new(None, missing_apk), AddDecisionResult::None));
+            bail!("[RandStore] missing apk for {:?}", share.author());
         }
 
         self.check_rounds(share.round())?;
@@ -301,12 +303,12 @@ impl RandStore {
         let rand_item = self.rand_map.entry(share.round()).or_insert_with(RandItem::new);
 
         if let Some(decision) = rand_item.decision() {
-            return Ok((ShareAck::new(Some(decision.clone()), missing_apk), AddDecisionResult::None));
+            return Ok((ShareAck::new(Some(decision.clone())), AddDecisionResult::None));
         }
 
         if rand_item.contain_author(share.author()) {
             if *share.author() == self.author {
-                return Ok((ShareAck::new(None, missing_apk), AddDecisionResult::None));
+                return Ok((ShareAck::new(None), AddDecisionResult::None));
             }
             bail!("[RandStore] duplicate share from the same author {:?}", share.author());
         }
@@ -319,12 +321,12 @@ impl RandStore {
 
         match self.try_aggregate_shares(share.round(), None)? {
             Some(decision) => {
-                let ack = ShareAck::new(Some(decision.clone()), missing_apk);
+                let ack = ShareAck::new(Some(decision.clone()));
                 let add_decision_result = self.add_decision(decision)?;
                 Ok((ack, add_decision_result))
             },
             None => {
-                Ok((ShareAck::new(None, missing_apk), AddDecisionResult::None))
+                Ok((ShareAck::new(None), AddDecisionResult::None))
             },
         }
     }

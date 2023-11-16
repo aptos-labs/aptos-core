@@ -19,12 +19,11 @@ pub struct RandShare {
     mode: Mode,
     metadata: RandMetadata,
     share: ProofShare,
-    apk_delta: Option<Delta>,
 }
 
 impl RandShare {
-    pub fn new(author: Author, mode: Mode, metadata: RandMetadata, share: ProofShare, apk_delta: Option<Delta>) -> Self {
-        Self { author, mode, metadata, share, apk_delta }
+    pub fn new(author: Author, mode: Mode, metadata: RandMetadata, share: ProofShare) -> Self {
+        Self { author, mode, metadata, share }
     }
 
     pub fn author(&self) -> &Author {
@@ -44,11 +43,11 @@ impl RandShare {
     }
 
     pub fn round(&self) -> Round {
-        self.metadata.round
+        self.metadata.round()
     }
 
     pub fn epoch(&self) -> u64 {
-        self.metadata.epoch
+        self.metadata.epoch()
     }
 
     pub fn timestamp(&self) -> u64 {
@@ -57,10 +56,6 @@ impl RandShare {
 
     pub fn share(&self) -> &ProofShare {
         &self.share
-    }
-
-    pub fn apk_delta(&self) -> &Option<Delta> {
-        &self.apk_delta
     }
 }
 
@@ -84,12 +79,11 @@ impl RandShare {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ShareAck {
     pub maybe_decision: Option<RandDecision>,
-    pub missing_apk: bool,
 }
 
 impl ShareAck {
-    pub fn new(maybe_decision: Option<RandDecision>, missing_apk: bool) -> Self {
-        Self { maybe_decision, missing_apk }
+    pub fn new(maybe_decision: Option<RandDecision>) -> Self {
+        Self { maybe_decision }
     }
 }
 
@@ -137,16 +131,14 @@ pub struct ShareAckState {
     validators: HashSet<Author>,
     rand_config: RandConfig,
     rand_decision_tx: UnboundedSender<RandDecision>,
-    send_delta_request_tx: UnboundedSender<Author>,
 }
 
 impl ShareAckState {
-    pub fn new(validators: impl Iterator<Item = Author>, rand_config: RandConfig, rand_decision_tx: UnboundedSender<RandDecision>, send_delta_request_tx: UnboundedSender<Author>) -> Self {
+    pub fn new(validators: impl Iterator<Item = Author>, rand_config: RandConfig, rand_decision_tx: UnboundedSender<RandDecision>) -> Self {
         Self {
             validators: validators.collect(),
             rand_config,
             rand_decision_tx,
-            send_delta_request_tx,
         }
     }
 }
@@ -158,10 +150,6 @@ impl BroadcastStatus<RandMessage> for ShareAckState {
 
     fn add(&mut self, peer: Author, ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
         if self.validators.remove(&peer) {
-            if ack.missing_apk {
-                // send delta to peer if missing
-                let _ = self.send_delta_request_tx.unbounded_send(peer);
-            }
             // If receive a decision, verify it and send it to the randomness manager and stop the reliable broadcast
             if let Some(decision) = ack.maybe_decision {
                 match decision.verify(&self.rand_config) {
@@ -174,6 +162,37 @@ impl BroadcastStatus<RandMessage> for ShareAckState {
                     },
                 }
             }
+            // If receive from all validators, stop the reliable broadcast
+            if self.validators.is_empty() {
+                Ok(Some(()))
+            } else {
+                Ok(None)
+            }
+        } else {
+            bail!("[RandMessage] Unknown author: {}", peer);
+        }
+    }
+}
+
+pub struct DeltaAckState {
+    validators: HashSet<Author>,
+}
+
+impl DeltaAckState {
+    pub fn new(validators: impl Iterator<Item = Author>) -> Self {
+        Self {
+            validators: validators.collect()
+        }
+    }
+}
+
+impl BroadcastStatus<RandMessage> for DeltaAckState {
+    type Ack = ();
+    type Aggregated = ();
+    type Message = DeltaMsg;
+
+    fn add(&mut self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
+        if self.validators.remove(&peer) {
             // If receive from all validators, stop the reliable broadcast
             if self.validators.is_empty() {
                 Ok(Some(()))

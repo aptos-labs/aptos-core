@@ -22,25 +22,42 @@ pub type Proof = <WVUF as WeightedVUF>::Proof;
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum Mode {
+    // randomness optimistic path
     Optimistic,
+    // randomness fallback path
     Fallback,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct RandMetadata {
+pub struct RandMetadataToSign {
     pub epoch: u64,
     pub round: Round,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub struct RandMetadata {
+    pub metadata_to_sign: RandMetadataToSign,
+    // not used for signing
     pub block_id: HashValue,
     pub timestamp: u64,
 }
 
 impl RandMetadata {
     pub fn new(epoch: u64, round: Round, block_id: HashValue, timestamp: u64) -> Self {
-        Self { epoch, round, block_id, timestamp }
+        Self { metadata_to_sign: RandMetadataToSign { epoch, round}, block_id, timestamp }
     }
     
     pub fn to_bytes(&self) -> Vec<u8> {
-        bcs::to_bytes(self).expect("[RandMessage] RandMetadata serialization failed!")
+        // only sign (epoch, round) to produce randomness
+        bcs::to_bytes(&self.metadata_to_sign).expect("[RandMessage] RandMetadata serialization failed!")
+    }
+
+    pub fn round(&self) -> Round {
+        self.metadata_to_sign.round
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.metadata_to_sign.epoch
     }
 }
 
@@ -67,23 +84,15 @@ impl Randomness {
     }
 
     pub fn epoch(&self) -> u64 {
-        self.metadata.epoch
+        self.metadata.metadata_to_sign.epoch
     }
 
     pub fn round(&self) -> Round {
-        self.metadata.round
-    }
-
-    pub fn block_id(&self) -> HashValue {
-        self.metadata.block_id
+        self.metadata.metadata_to_sign.round
     }
 
     pub fn randomness(&self) -> &[u8] {
         &self.randomness
-    }
-
-    pub fn timestamp(&self) -> u64 {
-        self.metadata.timestamp
     }
 }
 
@@ -124,11 +133,11 @@ impl RandDecision {
     }
 
     pub fn block_id(&self) -> HashValue {
-        self.randomness.block_id()
+        self.metadata().block_id
     }
 
     pub fn timestamp(&self) -> u64 {
-        self.randomness.timestamp()
+        self.metadata().timestamp
     }
 
     pub fn verify(&self, rand_config: &RandConfig) -> anyhow::Result<()> {
@@ -139,8 +148,12 @@ impl RandDecision {
 
 #[derive(Clone)]
 pub struct RandKeys {
+    // augmented secret key share of this validator, obtained from the DKG transcript of last epoch
     pub ask: ASK,
+    // augmented public key share of all validators, obtained from all validators in the new epoch
+    // necessary for verifying randomness shares
     pub apks: Vec<Option<APK>>,
+    // public key share of all validators, obtained from the DKG transcript of last epoch
     pub pk_shares: Vec<PKShare>,
 }
 
@@ -162,11 +175,17 @@ impl RandKeys {
 pub struct RandConfig {
     pub author: AccountAddress,
     pub validator: ValidatorVerifier,
+    // public parameters of the weighted VUF
     pub vuf_pp: WvufPP,
+    // public key for the weighted VUF
     pub pk: PK,
+    // key shares for randomness fallback path
     pub keys_f: RandKeys,
+    // key shares for randomness optimistic path
     pub keys_o: RandKeys,
+    // weighted config for randomness fallback path
     pub wc_f: WeightedConfig,
+    // weighted config for randomness optimistic path
     pub wc_o: WeightedConfig,
 }
 

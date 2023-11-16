@@ -35,6 +35,8 @@ pub fn build_dkg_pvss_config(
         dkg_rounding::WEIGHT_PER_VALIDATOR_MIN,
         dkg_rounding::WEIGHT_PER_VALIDATOR_MAX,
         dkg_rounding::STEPS,
+        dkg_rounding::FALLBACK_RECONSTRUCT_THRESHOLD,
+        dkg_rounding::OPTIMISTIC_RECONSTRUCT_THRESHOLD,
     );
 
     debug!(
