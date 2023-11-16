@@ -244,7 +244,6 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::CommissionChangeDelegationPool => {
                 AptosFeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL
             },
-            FeatureFlag::SystemTransaction => AptosFeatureFlag::SYSTEM_TRANSACTION,
         }
     }
 }
@@ -319,7 +318,6 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL => {
                 FeatureFlag::CommissionChangeDelegationPool
             },
-            AptosFeatureFlag::SYSTEM_TRANSACTION => FeatureFlag::SystemTransaction,
         }
     }
 }
