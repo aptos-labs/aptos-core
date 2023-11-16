@@ -13,10 +13,10 @@ error: invalid call of `+`: expected `integer` but found `&integer` for argument
    │                                     ^
 
 error: expected `()` but found `integer`
-   ┌─ tests/checking/typing/lambda.move:73:44
+   ┌─ tests/checking/typing/lambda.move:73:43
    │
 73 │         foreach(&v, |e| { sum = sum + *e; *e }) // expected to have wrong result type of lambda
-   │                                            ^
+   │                                           ^^
 
 error: expected `(&T, u64)` but found `&T`
    ┌─ tests/checking/typing/lambda.move:40:13
