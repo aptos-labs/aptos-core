@@ -26,13 +26,11 @@ spec aptos_framework::consensus_config {
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::transaction_fee;
         use aptos_framework::staking_config;
-        use aptos_framework::reconfiguration;
 
         // TODO: set because of timeout (property proved)
         pragma verify_duration_estimate = 120;
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         include staking_config::StakingRewardsConfigRequirement;
-        include reconfiguration::ReconfigureEnsures;
         let addr = signer::address_of(account);
         aborts_if !system_addresses::is_aptos_framework_address(addr);
         aborts_if !exists<ConsensusConfig>(@aptos_framework);

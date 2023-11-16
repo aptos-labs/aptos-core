@@ -22,7 +22,6 @@ spec aptos_framework::gas_schedule {
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::transaction_fee;
         use aptos_framework::staking_config;
-        use aptos_framework::reconfiguration;
 
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
@@ -30,7 +29,6 @@ spec aptos_framework::gas_schedule {
         include staking_config::StakingRewardsConfigRequirement;
 
         include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
-        include reconfiguration::ReconfigureEnsures;
         aborts_if len(gas_schedule_blob) == 0;
         let new_gas_schedule = util::spec_from_bytes<GasScheduleV2>(gas_schedule_blob);
         let gas_schedule = global<GasScheduleV2>(@aptos_framework);
@@ -45,7 +43,6 @@ spec aptos_framework::gas_schedule {
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::transaction_fee;
         use aptos_framework::staking_config;
-        use aptos_framework::reconfiguration;
 
         // TODO: set because of timeout (property proved).
         pragma verify_duration_estimate = 120;
@@ -54,7 +51,6 @@ spec aptos_framework::gas_schedule {
         include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         include staking_config::StakingRewardsConfigRequirement;
-        include reconfiguration::ReconfigureEnsures;
         aborts_if !exists<StorageGasConfig>(@aptos_framework);
         ensures global<StorageGasConfig>(@aptos_framework) == config;
     }

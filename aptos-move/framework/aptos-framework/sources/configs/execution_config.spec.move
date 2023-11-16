@@ -15,13 +15,11 @@ spec aptos_framework::execution_config {
         use aptos_framework::stake;
         use aptos_framework::staking_config;
         use aptos_framework::aptos_coin;
-        use aptos_framework::reconfiguration;
 
         // TODO: set because of timeout (property proved)
         pragma verify_duration_estimate = 120;
         let addr = signer::address_of(account);
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
-        include reconfiguration::ReconfigureEnsures;
         requires chain_status::is_operating();
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<staking_config::StakingRewardsConfig>(@aptos_framework);

@@ -114,7 +114,7 @@ spec aptos_framework::staking_config {
         aborts_if minimum_stake > maximum_stake || maximum_stake <= 0;
         aborts_if !exists<StakingConfig>(@aptos_framework);
         ensures global<StakingConfig>(@aptos_framework).minimum_stake == minimum_stake &&
-             global<StakingConfig>(@aptos_framework).maximum_stake == maximum_stake;
+            global<StakingConfig>(@aptos_framework).maximum_stake == maximum_stake;
     }
 
     /// Caller must be @aptos_framework.

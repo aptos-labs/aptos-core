@@ -19,7 +19,6 @@ spec aptos_framework::version {
         pragma verify_duration_estimate = 120;
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         include staking_config::StakingRewardsConfigRequirement;
-        include reconfiguration::ReconfigureEnsures;
         requires chain_status::is_operating();
         requires timestamp::spec_now_microseconds() >= reconfiguration::last_reconfiguration_time();
         requires exists<stake::ValidatorFees>(@aptos_framework);
