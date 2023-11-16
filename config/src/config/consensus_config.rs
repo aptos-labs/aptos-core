@@ -156,7 +156,7 @@ impl Default for ConsensusConfig {
                 .max(2 * MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE),
             max_receiving_block_bytes: 3 * 1024 * 1024, // 3MB
             max_receiving_block_bytes_quorum_store_override: 6 * 1024 * 1024, // 6MB
-            max_pruned_blocks_in_mem: 100,
+            max_pruned_blocks_in_mem: 1000,
             mempool_executed_txn_timeout_ms: 1000,
             mempool_txn_pull_timeout_ms: 1000,
             round_initial_timeout_ms: 1500,
