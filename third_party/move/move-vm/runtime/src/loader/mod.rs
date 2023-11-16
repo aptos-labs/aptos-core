@@ -28,7 +28,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::loaded_data::runtime_types::{
-    AbilityInfo, DepthFormula, StructIdentifier, StructNameIndex, StructType, Type,
+    AbilityInfo, DepthFormula, StructIdentifier, StructNameIndex, StructType, Type, TypeStack,
 };
 use parking_lot::RwLock;
 use sha3::{Digest, Sha3_256};
@@ -459,7 +459,7 @@ impl Loader {
             | (Type::MutableReference(ret_inner), Type::MutableReference(expected_inner)) => {
                 Self::match_return_type(ret_inner, expected_inner, map)
             },
-            (Type::Vector(ret_inner), Type::Vector(expected_inner))=> {
+            (Type::Vector(ret_inner), Type::Vector(expected_inner)) => {
                 Self::match_return_type(ret_inner, expected_inner, map)
             },
             // Abilities should not contribute to the equality check as they just serve for caching computations.
@@ -517,6 +517,7 @@ impl Loader {
             | (Type::Vector(_), _)
             | (Type::MutableReference(_), _)
             | (Type::Reference(_), _) => false,
+            (Type::Instantiated(_, _), _) => unimplemented!()
         }
     }
 
@@ -1146,6 +1147,7 @@ impl Loader {
             | Type::Bool
             | Type::Signer
             | Type::Struct { .. }
+            | Type::Instantiated(_, _)
             | Type::TyParam(_)
             | Type::U8
             | Type::U16
@@ -1305,7 +1307,7 @@ impl<'a> Resolver<'a> {
     pub(crate) fn instantiate_generic_function(
         &self,
         idx: FunctionInstantiationIndex,
-        type_params: &[Type],
+        ty_stack: &TypeStack,
     ) -> PartialVMResult<Vec<Type>> {
         let func_inst = match &self.binary {
             BinaryType::Module(module) => module.function_instantiation_at(idx.0),
@@ -1313,17 +1315,18 @@ impl<'a> Resolver<'a> {
         };
         let mut instantiation = vec![];
         for ty in &func_inst.instantiation {
-            instantiation.push(self.subst(ty, type_params)?);
+            instantiation.push(ty_stack.instantiate_type(ty));
         }
         // Check if the function instantiation over all generics is larger
         // than MAX_TYPE_INSTANTIATION_NODES.
-        let mut sum_nodes = 1u64;
-        for ty in type_params.iter().chain(instantiation.iter()) {
-            sum_nodes = sum_nodes.saturating_add(self.loader.count_type_nodes(ty));
-            if sum_nodes > MAX_TYPE_INSTANTIATION_NODES {
-                return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
-            }
-        }
+        // TODO: Is this still needed?
+        // let mut sum_nodes = 1u64;
+        // for ty in type_params.iter().chain(instantiation.iter()) {
+        //     sum_nodes = sum_nodes.saturating_add(self.loader.count_type_nodes(ty));
+        //     if sum_nodes > MAX_TYPE_INSTANTIATION_NODES {
+        //         return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
+        //     }
+        // }
         Ok(instantiation)
     }
 
@@ -1354,7 +1357,7 @@ impl<'a> Resolver<'a> {
     pub(crate) fn get_struct_type_generic(
         &self,
         idx: StructDefInstantiationIndex,
-        ty_args: &[Type],
+        ty_stack: &TypeStack,
     ) -> PartialVMResult<Type> {
         let struct_inst = match &self.binary {
             BinaryType::Module(module) => module.struct_instantiation_at(idx.0),
@@ -1365,13 +1368,14 @@ impl<'a> Resolver<'a> {
         // existing type instantiation.
         // If that number is larger than MAX_TYPE_INSTANTIATION_NODES, refuse to construct this type.
         // This prevents constructing larger and larger types via struct instantiation.
-        let mut sum_nodes = 1u64;
-        for ty in ty_args.iter().chain(struct_inst.instantiation.iter()) {
-            sum_nodes = sum_nodes.saturating_add(self.loader.count_type_nodes(ty));
-            if sum_nodes > MAX_TYPE_INSTANTIATION_NODES {
-                return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
-            }
-        }
+        // TODO: Is it still needed?
+        // let mut sum_nodes = 1u64;
+        // for ty in ty_args.iter().chain(struct_inst.instantiation.iter()) {
+        //     sum_nodes = sum_nodes.saturating_add(ty_stack.count_type_nodes(ty));
+        //     if sum_nodes > MAX_TYPE_INSTANTIATION_NODES {
+        //         return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
+        //     }
+        // }
 
         let struct_ = &struct_inst.definition_struct_type;
         Ok(Type::StructInstantiation {
@@ -1380,8 +1384,8 @@ impl<'a> Resolver<'a> {
                 struct_inst
                     .instantiation
                     .iter()
-                    .map(|ty| self.subst(ty, ty_args))
-                    .collect::<PartialVMResult<_>>()?,
+                    .map(|ty| ty_stack.instantiate_type(ty))
+                    .collect::<Vec<_>>(),
             ),
             ability: AbilityInfo::generic_struct(
                 struct_.abilities,
@@ -1404,7 +1408,7 @@ impl<'a> Resolver<'a> {
     pub(crate) fn get_field_type_generic(
         &self,
         idx: FieldInstantiationIndex,
-        ty_args: &[Type],
+        ty_stack: &mut TypeStack,
     ) -> PartialVMResult<Type> {
         let field_instantiation = match &self.binary {
             BinaryType::Module(module) => &module.field_instantiations[idx.0 as usize],
@@ -1414,10 +1418,14 @@ impl<'a> Resolver<'a> {
         let instantiation_types = field_instantiation
             .instantiation
             .iter()
-            .map(|inst_ty| inst_ty.subst(ty_args))
-            .collect::<PartialVMResult<Vec<_>>>()?;
-        field_instantiation.definition_struct_type.fields[field_instantiation.offset]
-            .subst(&instantiation_types)
+            .map(|inst_ty| ty_stack.instantiate_type(inst_ty))
+            .collect::<Vec<_>>();
+
+        let context = ty_stack.push_instantiation(Arc::new(instantiation_types));
+        Ok(ty_stack.instantiate_type_at(
+            &field_instantiation.definition_struct_type.fields[field_instantiation.offset],
+            context
+        ))
     }
 
     pub(crate) fn get_struct_fields(
@@ -1433,7 +1441,7 @@ impl<'a> Resolver<'a> {
     pub(crate) fn instantiate_generic_struct_fields(
         &self,
         idx: StructDefInstantiationIndex,
-        ty_args: &[Type],
+        ty_stack: &mut TypeStack,
     ) -> PartialVMResult<Vec<Type>> {
         let struct_inst = match &self.binary {
             BinaryType::Module(module) => module.struct_instantiation_at(idx.0),
@@ -1444,13 +1452,14 @@ impl<'a> Resolver<'a> {
         let instantiation_types = struct_inst
             .instantiation
             .iter()
-            .map(|inst_ty| inst_ty.subst(ty_args))
-            .collect::<PartialVMResult<Vec<_>>>()?;
-        struct_type
+            .map(|inst_ty| ty_stack.instantiate_type(inst_ty))
+            .collect::<Vec<_>>();
+        let depth = ty_stack.push_instantiation(Arc::new(instantiation_types));
+        Ok(struct_type
             .fields
             .iter()
-            .map(|ty| ty.subst(&instantiation_types))
-            .collect::<PartialVMResult<Vec<_>>>()
+            .map(|ty| ty_stack.instantiate_type_at(ty, depth))
+            .collect::<Vec<_>>())
     }
 
     fn single_type_at(&self, idx: SignatureIndex) -> &Type {
@@ -1463,14 +1472,10 @@ impl<'a> Resolver<'a> {
     pub(crate) fn instantiate_single_type(
         &self,
         idx: SignatureIndex,
-        ty_args: &[Type],
+        ty_stack: &TypeStack,
     ) -> PartialVMResult<Type> {
         let ty = self.single_type_at(idx);
-        if !ty_args.is_empty() {
-            self.subst(ty, ty_args)
-        } else {
-            Ok(ty.clone())
-        }
+        Ok(ty_stack.instantiate_type(ty))
     }
 
     pub(crate) fn subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<Type> {
@@ -1525,7 +1530,7 @@ impl<'a> Resolver<'a> {
     pub(crate) fn field_instantiation_to_struct(
         &self,
         idx: FieldInstantiationIndex,
-        args: &[Type],
+        ty_stack: &TypeStack,
     ) -> PartialVMResult<Type> {
         match &self.binary {
             BinaryType::Module(module) => {
@@ -1536,8 +1541,8 @@ impl<'a> Resolver<'a> {
                         module.field_instantiations[idx.0 as usize]
                             .instantiation
                             .iter()
-                            .map(|ty| ty.subst(args))
-                            .collect::<PartialVMResult<Vec<_>>>()?,
+                            .map(|ty| ty_stack.instantiate_type(ty))
+                            .collect::<Vec<_>>(),
                     ),
                     ability: AbilityInfo::generic_struct(
                         struct_.abilities,
@@ -1918,7 +1923,7 @@ impl Loader {
                 ty_args,
                 gas_context,
             )?)),
-            Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
+            Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) | Type::Instantiated(_, _) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!("no type tag for {:?}", ty)),
@@ -1932,7 +1937,7 @@ impl Loader {
         let mut result = 0;
         while let Some(ty) = todo.pop() {
             match ty {
-                Type::Vector(ty)  => {
+                Type::Vector(ty) => {
                     result += 1;
                     todo.push(ty);
                 },
@@ -2128,7 +2133,7 @@ impl Loader {
                     self.struct_name_to_type_layout(*name, ty_args, count, depth)?;
                 (MoveTypeLayout::Struct(layout), has_identifier_mappings)
             },
-            Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
+            Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) | Type::Instantiated(_, _) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!("no type layout for {:?}", ty)),
@@ -2234,7 +2239,7 @@ impl Loader {
             } => MoveTypeLayout::Struct(
                 self.struct_name_to_fully_annotated_layout(*name, ty_args, count, depth)?,
             ),
-            Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
+            Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) | Type::Instantiated(_, _) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!("no type layout for {:?}", ty)),
@@ -2277,6 +2282,7 @@ impl Loader {
 
     fn calculate_depth_of_type(&self, ty: &Type) -> PartialVMResult<DepthFormula> {
         Ok(match ty {
+            Type::Instantiated(_, _) => unimplemented!(),
             Type::Bool
             | Type::U8
             | Type::U64

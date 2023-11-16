@@ -28,7 +28,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::runtime_types::Type,
+    loaded_data::runtime_types::{Type, TypeStack},
     values::{Locals, Reference, VMValueCast, Value},
 };
 use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
@@ -186,7 +186,7 @@ impl VMRuntime {
                 self.loader.mark_as_invalid();
             }
             data_store.publish_module(&module.self_id(), blob, is_republishing)?;
-        }
+    }
         Ok(())
     }
 
@@ -318,11 +318,11 @@ impl VMRuntime {
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<SerializedReturnValues> {
+        let type_stack = TypeStack::new(Arc::new(ty_args));
         let arg_types = param_types
             .into_iter()
-            .map(|ty| ty.subst(&ty_args))
-            .collect::<PartialVMResult<Vec<_>>>()
-            .map_err(|err| err.finish(Location::Undefined))?;
+            .map(|ty| type_stack.canonicalize(&type_stack.instantiate_type(&ty)))
+            .collect::<Vec<_>>();
         let mut_ref_args = arg_types
             .iter()
             .enumerate()
@@ -336,13 +336,12 @@ impl VMRuntime {
             .map_err(|e| e.finish(Location::Undefined))?;
         let return_types = return_types
             .into_iter()
-            .map(|ty| ty.subst(&ty_args))
-            .collect::<PartialVMResult<Vec<_>>>()
-            .map_err(|err| err.finish(Location::Undefined))?;
+            .map(|ty| type_stack.canonicalize(&type_stack.instantiate_type(&ty)))
+            .collect::<Vec<_>>();
 
         let return_values = Interpreter::entrypoint(
             func,
-            ty_args,
+            type_stack,
             deserialized_args,
             data_store,
             gas_meter,

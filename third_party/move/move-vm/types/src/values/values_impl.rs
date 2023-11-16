@@ -1943,6 +1943,7 @@ fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
 
         (Type::Struct { .. }, Container::Vec(_))
         | (Type::Signer, Container::Vec(_))
+        | (Type::Instantiated(_, _), Container::Vec(_))
         | (Type::StructInstantiation { .. }, Container::Vec(_)) => Ok(()),
 
         (Type::Reference(_), _) | (Type::MutableReference(_), _) | (Type::TyParam(_), _) => Err(
@@ -1961,7 +1962,8 @@ fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
         | (Type::Signer, _)
         | (Type::Vector(_), _)
         | (Type::Struct { .. }, _)
-        | (Type::StructInstantiation { .. }, _) => Err(PartialVMError::new(
+        | (Type::StructInstantiation { .. }, _)
+        | (Type::Instantiated(_, _), _) => Err(PartialVMError::new(
             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
         )
         .with_message(format!(
@@ -2176,9 +2178,10 @@ impl Vector {
             | Type::Struct { .. }
             | Type::StructInstantiation {
                 idx: _, ty_args: _, ..
-            } => Value(ValueImpl::Container(Container::Vec(Rc::new(RefCell::new(
-                elements.into_iter().map(|v| v.0).collect(),
-            ))))),
+            }
+            | Type::Instantiated(_, _) => Value(ValueImpl::Container(Container::Vec(Rc::new(
+                RefCell::new(elements.into_iter().map(|v| v.0).collect()),
+            )))),
 
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
