@@ -18,6 +18,16 @@ impl Default for Options {
 }
 
 impl Options {
+    /// Creates options from toml configuration source.
+    pub fn create_from_toml(toml_source: &str) -> anyhow::Result<Options> {
+        Ok(toml::from_str(toml_source)?)
+    }
+
+    /// Creates options from toml configuration file.
+    pub fn create_from_toml_file(toml_file: &str) -> anyhow::Result<Options> {
+        Self::create_from_toml(&std::fs::read_to_string(toml_file)?)
+    }
+
     /// Creates Options struct from command line arguments.
     pub fn create_from_args(args: &[String]) -> anyhow::Result<Options> {
         let cli = Command::new("mutate")
