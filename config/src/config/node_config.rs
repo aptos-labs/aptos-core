@@ -4,11 +4,11 @@
 use crate::{
     config::{
         admin_service_config::AdminServiceConfig, dag_consensus_config::DagConsensusConfig,
-        node_config_loader::NodeConfigLoader, persistable_config::PersistableConfig,
-        utils::RootPath, ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig,
-        IndexerConfig, IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig,
-        NetworkConfig, PeerMonitoringServiceConfig, SafetyRulesTestConfig, StateSyncConfig,
-        StorageConfig,
+        netbench::NetbenchConfig, node_config_loader::NodeConfigLoader,
+        persistable_config::PersistableConfig, utils::RootPath, ApiConfig, BaseConfig,
+        ConsensusConfig, Error, ExecutionConfig, IndexerConfig, IndexerGrpcConfig,
+        InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
+        PeerMonitoringServiceConfig, SafetyRulesTestConfig, StateSyncConfig, StorageConfig,
     },
     network_id::NetworkId,
 };
@@ -55,6 +55,8 @@ pub struct NodeConfig {
     pub logger: LoggerConfig,
     #[serde(default)]
     pub mempool: MempoolConfig,
+    #[serde(default)]
+    pub netbench: Option<NetbenchConfig>,
     #[serde(default)]
     pub peer_monitoring_service: PeerMonitoringServiceConfig,
     #[serde(default)]

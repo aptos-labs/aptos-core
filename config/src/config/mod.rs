@@ -19,6 +19,7 @@ mod indexer_grpc_config;
 mod inspection_service_config;
 mod logger_config;
 mod mempool_config;
+mod netbench;
 mod network_config;
 mod node_config;
 mod node_config_loader;
