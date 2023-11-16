@@ -4,6 +4,7 @@
 use crate::config::{
     admin_service_config::AdminServiceConfig,
     dag_consensus_config::DagConsensusConfig,
+    netbench::NetbenchConfig,
     node_config_loader::NodeType,
     utils::{are_failpoints_enabled, get_config_name},
     ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig, InspectionServiceConfig,
@@ -55,6 +56,7 @@ impl ConfigSanitizer for NodeConfig {
         InspectionServiceConfig::sanitize(node_config, node_type, chain_id)?;
         LoggerConfig::sanitize(node_config, node_type, chain_id)?;
         MempoolConfig::sanitize(node_config, node_type, chain_id)?;
+        NetbenchConfig::sanitize(node_config, node_type, chain_id)?;
         PeerMonitoringServiceConfig::sanitize(node_config, node_type, chain_id)?;
         StateSyncConfig::sanitize(node_config, node_type, chain_id)?;
         StorageConfig::sanitize(node_config, node_type, chain_id)?;
