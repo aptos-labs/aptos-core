@@ -130,7 +130,7 @@ impl Default for DagRoundStateConfig {
     fn default() -> Self {
         Self {
             round_event_channel_size: 1024,
-            adaptive_responsive_minimum_wait_time_ms: 1200,
+            adaptive_responsive_minimum_wait_time_ms: 500,
         }
     }
 }

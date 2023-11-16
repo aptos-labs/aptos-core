@@ -144,14 +144,8 @@ impl OrderedNotifier for OrderedNotifierAdapter {
 
         NUM_NODES_PER_BLOCK.observe(ordered_nodes.len() as f64);
         let rounds_between = {
-            let anchor_node = ordered_nodes
-                .first()
-                .map(|node| node.round())
-                .unwrap_or_default();
-            let lowest_round_node = ordered_nodes
-                .last()
-                .map(|node| node.round())
-                .unwrap_or_default();
+            let anchor_node = ordered_nodes.first().map_or(0, |node| node.round());
+            let lowest_round_node = ordered_nodes.last().map_or(0, |node| node.round());
             anchor_node.saturating_sub(lowest_round_node)
         };
         NUM_ROUNDS_PER_BLOCK.observe((rounds_between + 1) as f64);
