@@ -17,7 +17,10 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorResult, StateComputeResult};
-use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
+use aptos_types::{
+    block_executor::config::BlockExecutorOnchainConfig, epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
+};
 use futures::future::BoxFuture;
 use std::{sync::Arc, time::Duration};
 
@@ -91,7 +94,7 @@ pub trait StateComputer: Send + Sync {
         epoch_state: &EpochState,
         payload_manager: Arc<PayloadManager>,
         transaction_shuffler: Arc<dyn TransactionShuffler>,
-        block_gas_limit: Option<u64>,
+        block_executor_onchain_config: BlockExecutorOnchainConfig,
         transaction_deduper: Arc<dyn TransactionDeduper>,
     );
 

@@ -13,7 +13,7 @@ use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{deposit::DepositEvent, withdraw::WithdrawEvent},
-    block_executor::partitioner::ExecutableTransactions,
+    block_executor::{config::BlockExecutorOnchainConfig, partitioner::ExecutableTransactions},
     contract_event::ContractEvent,
     event::EventKey,
     state_store::state_key::StateKey,
@@ -339,7 +339,7 @@ impl TransactionBlockExecutor for NativeExecutor {
     fn execute_transaction_block(
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
-        _maybe_block_gas_limit: Option<u64>,
+        _onchain_config: BlockExecutorOnchainConfig,
     ) -> Result<ChunkOutput> {
         let transactions = match transactions {
             ExecutableTransactions::Unsharded(txns) => txns,

@@ -33,11 +33,15 @@ use aptos_types::{
         new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource, NewBlockEvent,
         CORE_CODE_ADDRESS,
     },
+    block_executor::config::{
+        BlockExecutorConfig, BlockExecutorLocalConfig, BlockExecutorOnchainConfig,
+    },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
     on_chain_config::{
-        Features, OnChainConfig, TimedFeatureOverride, TimedFeaturesBuilder, ValidatorSet, Version,
+        BlockGasLimitType, Features, OnChainConfig, TimedFeatureOverride, TimedFeaturesBuilder,
+        ValidatorSet, Version,
     },
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
@@ -465,13 +469,18 @@ impl FakeExecutor {
     pub fn execute_transaction_block_parallel(
         &self,
         txn_block: &[SignatureVerifiedTransaction],
+        onchain_config: BlockExecutorOnchainConfig,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
             self.executor_thread_pool.clone(),
             txn_block,
             &self.data_store,
-            usize::min(4, num_cpus::get()),
-            None,
+            BlockExecutorConfig {
+                local: BlockExecutorLocalConfig {
+                    concurrency_level: usize::min(4, num_cpus::get()),
+                },
+                onchain: onchain_config,
+            },
             None,
         )
     }
@@ -503,18 +512,23 @@ impl FakeExecutor {
             }
         });
 
+        let onchain_config = BlockExecutorOnchainConfig {
+            // TODO fetch values from state?
+            block_gas_limit_type: BlockGasLimitType::Limit(30000),
+        };
+
         let sequential_output = if mode != ExecutorMode::ParallelOnly {
             Some(AptosVM::execute_block(
                 &sig_verified_block,
                 &self.data_store,
-                None,
+                onchain_config.clone(),
             ))
         } else {
             None
         };
 
         let parallel_output = if mode != ExecutorMode::SequentialOnly {
-            Some(self.execute_transaction_block_parallel(&sig_verified_block))
+            Some(self.execute_transaction_block_parallel(&sig_verified_block, onchain_config))
         } else {
             None
         };

@@ -18,8 +18,9 @@ use crate::{
 use aptos_logger::{info, trace};
 use aptos_state_view::StateView;
 use aptos_types::{
-    block_executor::partitioner::{
-        ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies,
+    block_executor::{
+        config::{BlockExecutorConfig, BlockExecutorLocalConfig, BlockExecutorOnchainConfig},
+        partitioner::{ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies},
     },
     transaction::{
         analyzed_transaction::AnalyzedTransaction,
@@ -71,7 +72,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         round: usize,
         state_view: &S,
         concurrency_level: usize,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorOnchainConfig,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         disable_speculative_logging();
         trace!(
@@ -90,7 +91,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             round,
             state_view,
             concurrency_level,
-            maybe_block_gas_limit,
+            onchain_config,
         )
     }
 
@@ -103,7 +104,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         round: usize,
         state_view: &S,
         concurrency_level: usize,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorOnchainConfig,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let (callback, callback_receiver) = oneshot::channel();
 
@@ -139,8 +140,10 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     executor_thread_pool,
                     &signature_verified_transactions,
                     aggr_overridden_state_view.as_ref(),
-                    concurrency_level,
-                    maybe_block_gas_limit,
+                    BlockExecutorConfig {
+                        local: BlockExecutorLocalConfig { concurrency_level },
+                        onchain: onchain_config,
+                    },
                     cross_shard_commit_sender,
                 );
                 if let Some(shard_id) = shard_id {
@@ -176,7 +179,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         transactions: SubBlocksForShard<AnalyzedTransaction>,
         state_view: &S,
         concurrency_level: usize,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorOnchainConfig,
     ) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
         let mut result = vec![];
         for (round, sub_block) in transactions.into_sub_blocks().into_iter().enumerate() {
@@ -197,7 +200,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 round,
                 state_view,
                 concurrency_level,
-                maybe_block_gas_limit,
+                onchain_config.clone(),
             )?);
             trace!(
                 "Finished executing sub block for shard {} and round {}",
@@ -222,7 +225,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     state_view,
                     transactions,
                     concurrency_level_per_shard,
-                    maybe_block_gas_limit,
+                    onchain_config,
                 ) => {
                     num_txns += transactions.num_txns();
                     trace!(
@@ -237,7 +240,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         transactions,
                         state_view.as_ref(),
                         concurrency_level_per_shard,
-                        maybe_block_gas_limit,
+                        onchain_config,
                     );
                     drop(state_view);
                     drop(exe_timer);

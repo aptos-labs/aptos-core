@@ -19,7 +19,7 @@ use aptos_types::{
     account_view::AccountView,
     block_metadata::BlockMetadata,
     state_store::state_key::StateKey,
-    test_helpers::transaction_test_helpers::BLOCK_GAS_LIMIT,
+    test_helpers::transaction_test_helpers::TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
     transaction::{
         signature_verified_transaction::into_signature_verified_block, Transaction, WriteSetPayload,
     },
@@ -148,7 +148,7 @@ fn test_reconfiguration() {
         .execute_block(
             (block_id, txn_block.clone()).into(),
             parent_block_id,
-            BLOCK_GAS_LIMIT,
+            TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         )
         .unwrap();
 
