@@ -3,6 +3,7 @@
 
 use crate::{
     config::{
+        admin_service_config::AdminServiceConfig, dag_consensus_config::DagConsensusConfig,
         node_config_loader::NodeConfigLoader, persistable_config::PersistableConfig,
         utils::RootPath, ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig,
         IndexerConfig, IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig,
@@ -29,11 +30,15 @@ use std::{
 #[serde(deny_unknown_fields)]
 pub struct NodeConfig {
     #[serde(default)]
+    pub admin_service: AdminServiceConfig,
+    #[serde(default)]
     pub api: ApiConfig,
     #[serde(default)]
     pub base: BaseConfig,
     #[serde(default)]
     pub consensus: ConsensusConfig,
+    #[serde(default)]
+    pub dag_consensus: DagConsensusConfig,
     #[serde(default)]
     pub execution: ExecutionConfig,
     #[serde(default)]

@@ -3,11 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // All modules should be declared below
+mod admin_service_config;
 mod api_config;
 mod base_config;
 mod config_optimizer;
 mod config_sanitizer;
 mod consensus_config;
+mod dag_consensus_config;
 mod error;
 mod execution_config;
 mod gas_estimation_config;
