@@ -460,7 +460,6 @@ impl VMChangeSet {
             .collect::<anyhow::Result<BTreeMap<StateKey, WriteOp>, VMStatus>>()?;
         self.aggregator_v1_write_set
             .extend(materialized_aggregator_delta_set);
-
         Ok(())
     }
 
