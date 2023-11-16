@@ -112,17 +112,6 @@ impl ConfigSanitizer for SafetyRulesConfig {
             }
         }
 
-        // Verify that the initial safety rules config is set for validators
-        if node_type.is_validator() {
-            if let InitialSafetyRulesConfig::None = safety_rules_config.initial_safety_rules_config
-            {
-                return Err(Error::ConfigSanitizerFailed(
-                    sanitizer_name,
-                    "The initial safety rules config must be set for validators!".to_string(),
-                ));
-            }
-        }
-
         Ok(())
     }
 }
@@ -305,30 +294,6 @@ mod tests {
 
     #[test]
     fn test_sanitize_test_config_on_mainnet() {
-        // Create a node config with a test config
-        let node_config = NodeConfig {
-            consensus: ConsensusConfig {
-                safety_rules: SafetyRulesConfig {
-                    test: Some(SafetyRulesTestConfig::new(PeerId::random())),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-
-        // Verify that the config sanitizer fails
-        let error = SafetyRulesConfig::sanitize(
-            &node_config,
-            NodeType::Validator,
-            Some(ChainId::mainnet()),
-        )
-        .unwrap_err();
-        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
-    }
-
-    #[test]
-    fn test_sanitize_missing_initial_safety_rules() {
         // Create a node config with a test config
         let node_config = NodeConfig {
             consensus: ConsensusConfig {
