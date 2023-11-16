@@ -130,7 +130,7 @@ impl ExecutionConfig {
 
 impl ConfigSanitizer for ExecutionConfig {
     fn sanitize(
-        node_config: &mut NodeConfig,
+        node_config: &NodeConfig,
         _node_type: NodeType,
         chain_id: ChainId,
     ) -> Result<(), Error> {
@@ -169,7 +169,7 @@ mod test {
     #[test]
     fn test_sanitize_valid_execution_config() {
         // Create a node config with a valid execution config
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             execution: ExecutionConfig {
                 paranoid_hot_potato_verification: true,
                 paranoid_type_verification: true,
@@ -179,14 +179,13 @@ mod test {
         };
 
         // Sanitize the config and verify that it succeeds
-        ExecutionConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::mainnet())
-            .unwrap();
+        ExecutionConfig::sanitize(&node_config, NodeType::Validator, ChainId::mainnet()).unwrap();
     }
 
     #[test]
     fn test_sanitize_hot_potato_mainnet() {
         // Create a node config with missing paranoid_hot_potato_verification on mainnet
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             execution: ExecutionConfig {
                 paranoid_hot_potato_verification: false,
                 paranoid_type_verification: true,
@@ -197,7 +196,7 @@ mod test {
 
         // Sanitize the config and verify that it fails
         let error =
-            ExecutionConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::mainnet())
+            ExecutionConfig::sanitize(&node_config, NodeType::Validator, ChainId::mainnet())
                 .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
@@ -205,7 +204,7 @@ mod test {
     #[test]
     fn test_sanitize_paranoid_type_mainnet() {
         // Create a node config with missing paranoid_type_verification on mainnet
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             execution: ExecutionConfig {
                 paranoid_hot_potato_verification: true,
                 paranoid_type_verification: false,
@@ -216,7 +215,7 @@ mod test {
 
         // Sanitize the config and verify that it fails
         let error =
-            ExecutionConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::mainnet())
+            ExecutionConfig::sanitize(&node_config, NodeType::Validator, ChainId::mainnet())
                 .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }

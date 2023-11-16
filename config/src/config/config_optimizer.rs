@@ -3,9 +3,9 @@
 
 use crate::{
     config::{
-        node_config_loader::NodeType, utils::get_config_name, Error, InspectionServiceConfig,
-        LoggerConfig, MempoolConfig, NodeConfig, Peer, PeerMonitoringServiceConfig, PeerRole,
-        PeerSet, StateSyncConfig,
+        node_config_loader::NodeType, utils::get_config_name, Error, IndexerConfig,
+        IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig, NodeConfig, Peer,
+        PeerMonitoringServiceConfig, PeerRole, PeerSet, StateSyncConfig,
     },
     network_id::NetworkId,
 };
@@ -17,6 +17,7 @@ use std::{collections::HashMap, str::FromStr};
 
 // Useful optimizer constants
 const OPTIMIZER_STRING: &str = "Optimizer";
+const ALL_NETWORKS_OPTIMIZER_NAME: &str = "AllNetworkConfigOptimizer";
 const PUBLIC_NETWORK_OPTIMIZER_NAME: &str = "PublicNetworkConfigOptimizer";
 const VALIDATOR_NETWORK_OPTIMIZER_NAME: &str = "ValidatorNetworkConfigOptimizer";
 
@@ -96,6 +97,12 @@ impl ConfigOptimizer for NodeConfig {
     ) -> Result<bool, Error> {
         // Optimize only the relevant sub-configs
         let mut optimizers_with_modifications = vec![];
+        if IndexerConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
+            optimizers_with_modifications.push(IndexerConfig::get_optimizer_name());
+        }
+        if IndexerGrpcConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
+            optimizers_with_modifications.push(IndexerGrpcConfig::get_optimizer_name());
+        }
         if InspectionServiceConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(InspectionServiceConfig::get_optimizer_name());
         }
@@ -116,6 +123,9 @@ impl ConfigOptimizer for NodeConfig {
         if StateSyncConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(StateSyncConfig::get_optimizer_name());
         }
+        if optimize_all_network_configs(node_config, local_config_yaml, node_type, chain_id)? {
+            optimizers_with_modifications.push(ALL_NETWORKS_OPTIMIZER_NAME.to_string());
+        }
         if optimize_public_network_config(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(PUBLIC_NETWORK_OPTIMIZER_NAME.to_string());
         }
@@ -126,6 +136,30 @@ impl ConfigOptimizer for NodeConfig {
         // Return true iff any config modifications were made
         Ok(!optimizers_with_modifications.is_empty())
     }
+}
+
+/// Optimizes all network configs according to the node type and chain ID
+fn optimize_all_network_configs(
+    node_config: &mut NodeConfig,
+    _local_config_yaml: &Value,
+    _node_type: NodeType,
+    _chain_id: ChainId,
+) -> Result<bool, Error> {
+    let mut modified_config = false;
+
+    // Set the listener address and prepare the node identities for the validator network
+    if let Some(validator_network) = &mut node_config.validator_network {
+        validator_network.set_listen_address_and_prepare_identity()?;
+        modified_config = true;
+    }
+
+    // Set the listener address and prepare the node identities for the fullnode networks
+    for fullnode_network in &mut node_config.full_node_networks {
+        fullnode_network.set_listen_address_and_prepare_identity()?;
+        modified_config = true;
+    }
+
+    Ok(modified_config)
 }
 
 /// Optimize the public network config according to the node type and chain ID
