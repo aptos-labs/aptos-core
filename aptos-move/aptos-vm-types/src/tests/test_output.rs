@@ -47,7 +47,8 @@ fn test_ok_output_equality_no_deltas() {
     //   2. `try_into_transaction_output` changes the type and returns a result.
     //   3. `into_transaction_output_with_materialized_write_set` changes the type and
     //       simply merges writes for materialized deltas & combined groups.
-    let materialized_vm_output = assert_ok!(vm_output.clone().try_materialize(&state_view));
+    let mut materialized_vm_output = vm_output.clone();
+    assert_ok!(materialized_vm_output.try_materialize(&state_view));
     let txn_output_1 = assert_ok!(vm_output.clone().try_into_transaction_output(&state_view));
     let txn_output_2 = vm_output
         .clone()
@@ -80,7 +81,8 @@ fn test_ok_output_equality_with_deltas() {
         vec![],
     );
 
-    let materialized_vm_output = assert_ok!(vm_output.clone().try_materialize(&state_view));
+    let mut materialized_vm_output = vm_output.clone();
+    assert_ok!(materialized_vm_output.try_materialize(&state_view));
     let txn_output_1 = assert_ok!(vm_output.clone().try_into_transaction_output(&state_view));
     let txn_output_2 = vm_output
         .clone()

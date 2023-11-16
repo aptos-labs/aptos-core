@@ -9,12 +9,13 @@ use crate::{
     counters::{BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS},
 };
 use aptos_aggregator::{
-    delayed_change::DelayedChange, delta_change_set::DeltaOp, types::DelayedFieldID,
+    delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
+    types::DelayedFieldID,
 };
 use aptos_block_executor::{
     errors::Error, executor::BlockExecutor,
     task::TransactionOutput as BlockExecutorTransactionOutput,
-    txn_commit_hook::TransactionCommitHook,
+    txn_commit_hook::TransactionCommitHook, types::InputOutputKey,
 };
 use aptos_infallible::Mutex;
 use aptos_state_view::{StateView, StateViewId};
@@ -35,7 +36,10 @@ use aptos_vm_types::output::VMOutput;
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::VMStatus};
 use once_cell::sync::OnceCell;
 use rayon::ThreadPool;
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashSet},
+    sync::Arc,
+};
 
 /// Output type wrapper used by block executor. VM output is stored first, then
 /// transformed into TransactionOutput type that is returned.
@@ -234,6 +238,18 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .to_vec()
     }
 
+    fn materialize_agg_v1(
+        &self,
+        view: &impl TAggregatorV1View<Identifier = <Self::Txn as BlockExecutableTransaction>::Key>,
+    ) {
+        self.vm_output
+            .lock()
+            .as_mut()
+            .expect("Output must be set to incorporate materialized data")
+            .try_materialize(view)
+            .expect("Delta materialization failed");
+    }
+
     fn incorporate_materialized_txn_output(
         &self,
         aggregator_v1_writes: Vec<(<Self::Txn as BlockExecutableTransaction>::Key, WriteOp)>,
@@ -291,6 +307,40 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .as_ref()
             .expect("Output to be set to get fee statement")
             .fee_statement()
+    }
+
+    fn get_write_summary(
+        &self,
+    ) -> HashSet<
+        InputOutputKey<
+            <Self::Txn as BlockExecutableTransaction>::Key,
+            <Self::Txn as BlockExecutableTransaction>::Tag,
+            <Self::Txn as BlockExecutableTransaction>::Identifier,
+        >,
+    > {
+        let vm_output = self.vm_output.lock();
+        let change_set = vm_output
+            .as_ref()
+            .expect("Output to be set to get write summary")
+            .change_set();
+
+        let mut writes = HashSet::new();
+
+        for (state_key, _) in change_set.write_set_iter() {
+            writes.insert(InputOutputKey::Resource(state_key.clone()));
+        }
+
+        for (state_key, write) in change_set.resource_group_write_set() {
+            for tag in write.inner_ops().keys() {
+                writes.insert(InputOutputKey::Group(state_key.clone(), tag.clone()));
+            }
+        }
+
+        for identifier in change_set.delayed_field_change_set().keys() {
+            writes.insert(InputOutputKey::DelayedField(*identifier));
+        }
+
+        writes
     }
 }
 

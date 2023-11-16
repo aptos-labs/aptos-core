@@ -77,9 +77,9 @@ impl VMOutput {
     /// has an empty delta set.
     /// TODO[agg_v2](fix) organize materialization paths better.
     pub fn try_materialize(
-        self,
+        &mut self,
         resolver: &impl AggregatorV1Resolver,
-    ) -> anyhow::Result<Self, VMStatus> {
+    ) -> anyhow::Result<(), VMStatus> {
         // First, check if output of transaction should be discarded or delta
         // change set is empty. In both cases, we do not need to apply any
         // deltas and can return immediately.
@@ -87,28 +87,30 @@ impl VMOutput {
             || (self.change_set().aggregator_v1_delta_set().is_empty()
                 && self.change_set().delayed_field_change_set().is_empty())
         {
-            return Ok(self);
+            return Ok(());
         }
 
-        let (change_set, fee_statement, status) = self.unpack_with_fee_statement();
-        let materialized_change_set =
-            change_set.try_materialize_aggregator_v1_delta_set(resolver)?;
-        // TODO[agg_v2](fix) shouldn't be needed when reorganized
-        //     .try_materialize_aggregator_v2_changes(state_view)?;
-        Ok(VMOutput::new(
-            materialized_change_set,
-            fee_statement,
-            status,
-        ))
+        // let (change_set, fee_statement, status) = self.unpack_with_fee_statement();
+        self.change_set
+            .try_materialize_aggregator_v1_delta_set(resolver)?;
+
+        Ok(())
+        // *self.fee_statement = fee_statement;
+        // *self.status = status;
+        // Ok(VMOutput::new(
+        //     materialized_change_set,
+        //     fee_statement,
+        //     status,
+        // ))
     }
 
     /// Same as `try_materialize` but also constructs `TransactionOutput`.
     pub fn try_into_transaction_output(
-        self,
+        mut self,
         resolver: &impl AggregatorV1Resolver,
     ) -> anyhow::Result<TransactionOutput, VMStatus> {
-        let materialized_output = self.try_materialize(resolver)?;
-        Self::convert_to_transaction_output(materialized_output)
+        self.try_materialize(resolver)?;
+        Self::convert_to_transaction_output(self)
     }
 
     /// Same as `try_materialize` but also constructs `TransactionOutput`.

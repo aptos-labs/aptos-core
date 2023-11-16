@@ -26,34 +26,6 @@ impl Mode {
     pub const SEQUENTIAL: &'static str = "sequential";
 }
 
-/// Record the block gas during parallel execution.
-fn observe_parallel_execution_block_gas(cost: u64, gas_type: &'static str) {
-    BLOCK_GAS
-        .with_label_values(&[Mode::PARALLEL, gas_type])
-        .observe(cost as f64);
-}
-
-/// Record the txn gas during parallel execution.
-fn observe_parallel_execution_txn_gas(cost: u64, gas_type: &'static str) {
-    TXN_GAS
-        .with_label_values(&[Mode::PARALLEL, gas_type])
-        .observe(cost as f64);
-}
-
-/// Record the block gas during sequential execution.
-fn observe_sequential_execution_block_gas(cost: u64, gas_type: &'static str) {
-    BLOCK_GAS
-        .with_label_values(&[Mode::SEQUENTIAL, gas_type])
-        .observe(cost as f64);
-}
-
-/// Record the txn gas during sequential execution.
-fn observe_sequential_execution_txn_gas(cost: u64, gas_type: &'static str) {
-    TXN_GAS
-        .with_label_values(&[Mode::SEQUENTIAL, gas_type])
-        .observe(cost as f64);
-}
-
 /// Count of times the module publishing fallback was triggered in parallel execution.
 pub static MODULE_PUBLISHING_FALLBACK_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
@@ -166,6 +138,16 @@ pub static BLOCK_GAS: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static EFFECTIVE_BLOCK_GAS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_execution_effective_block_gas",
+        "Histogram for different effective block gas costs - used for evaluating block gas limit. \
+        This can be different from actual gas consumed in a block, due to applied adjustements",
+        &["mode"]
+    )
+    .unwrap()
+});
+
 pub static TXN_GAS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_execution_txn_gas",
@@ -185,100 +167,62 @@ pub static BLOCK_COMMITTED_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub(crate) fn update_parallel_block_gas_counters(
-    accumulated_fee_statement: &FeeStatement,
-    num_committed: usize,
-) {
-    observe_parallel_execution_block_gas(accumulated_fee_statement.gas_used(), GasType::TOTAL_GAS);
-    observe_parallel_execution_block_gas(
-        accumulated_fee_statement.execution_gas_used(),
-        GasType::EXECUTION_GAS,
-    );
-    observe_parallel_execution_block_gas(accumulated_fee_statement.io_gas_used(), GasType::IO_GAS);
-    observe_parallel_execution_block_gas(
-        accumulated_fee_statement.execution_gas_used() + accumulated_fee_statement.io_gas_used(),
-        GasType::NON_STORAGE_GAS,
-    );
-    observe_parallel_execution_block_gas(
-        accumulated_fee_statement.storage_fee_used(),
-        GasType::STORAGE_FEE,
-    );
-    observe_parallel_execution_block_gas(
-        accumulated_fee_statement.storage_fee_refund(),
-        GasType::STORAGE_FEE_REFUND,
-    );
-    BLOCK_COMMITTED_TXNS
-        .with_label_values(&[Mode::PARALLEL])
-        .observe(num_committed as f64);
+fn observe_gas(counter: &Lazy<HistogramVec>, mode_str: &str, fee_statement: &FeeStatement) {
+    counter
+        .with_label_values(&[mode_str, GasType::TOTAL_GAS])
+        .observe(fee_statement.gas_used() as f64);
+
+    counter
+        .with_label_values(&[mode_str, GasType::EXECUTION_GAS])
+        .observe(fee_statement.execution_gas_used() as f64);
+
+    counter
+        .with_label_values(&[mode_str, GasType::IO_GAS])
+        .observe(fee_statement.io_gas_used() as f64);
+
+    counter
+        .with_label_values(&[mode_str, GasType::NON_STORAGE_GAS])
+        .observe((fee_statement.execution_gas_used() + fee_statement.io_gas_used()) as f64);
+
+    counter
+        .with_label_values(&[mode_str, GasType::STORAGE_FEE])
+        .observe(fee_statement.storage_fee_used() as f64);
+
+    counter
+        .with_label_values(&[mode_str, GasType::STORAGE_FEE_REFUND])
+        .observe(fee_statement.storage_fee_refund() as f64);
 }
 
-pub(crate) fn update_parallel_txn_gas_counters(txn_fee_statements: &Vec<FeeStatement>) {
+pub(crate) fn update_block_gas_counters(
+    accumulated_fee_statement: &FeeStatement,
+    accumulated_effective_gas: u64,
+    num_committed: usize,
+    is_parallel: bool,
+) {
+    let mode_str = if is_parallel {
+        Mode::PARALLEL
+    } else {
+        Mode::SEQUENTIAL
+    };
+
+    observe_gas(&BLOCK_GAS, mode_str, accumulated_fee_statement);
+    BLOCK_COMMITTED_TXNS
+        .with_label_values(&[mode_str])
+        .observe(num_committed as f64);
+
+    EFFECTIVE_BLOCK_GAS
+        .with_label_values(&[mode_str])
+        .observe(accumulated_effective_gas as f64);
+}
+
+pub(crate) fn update_txn_gas_counters(txn_fee_statements: &Vec<FeeStatement>, is_parallel: bool) {
+    let mode_str = if is_parallel {
+        Mode::PARALLEL
+    } else {
+        Mode::SEQUENTIAL
+    };
+
     for fee_statement in txn_fee_statements {
-        observe_parallel_execution_txn_gas(fee_statement.gas_used(), GasType::TOTAL_GAS);
-        observe_parallel_execution_txn_gas(
-            fee_statement.execution_gas_used(),
-            GasType::EXECUTION_GAS,
-        );
-        observe_parallel_execution_txn_gas(fee_statement.io_gas_used(), GasType::IO_GAS);
-        observe_parallel_execution_txn_gas(
-            fee_statement.execution_gas_used() + fee_statement.io_gas_used(),
-            GasType::NON_STORAGE_GAS,
-        );
-        observe_parallel_execution_txn_gas(fee_statement.storage_fee_used(), GasType::STORAGE_FEE);
-        observe_parallel_execution_txn_gas(
-            fee_statement.storage_fee_refund(),
-            GasType::STORAGE_FEE_REFUND,
-        );
+        observe_gas(&TXN_GAS, mode_str, fee_statement);
     }
-}
-
-pub(crate) fn update_sequential_block_gas_counters(
-    accumulated_fee_statement: &FeeStatement,
-    num_committed: usize,
-) {
-    observe_sequential_execution_block_gas(
-        accumulated_fee_statement.gas_used(),
-        GasType::TOTAL_GAS,
-    );
-    observe_sequential_execution_block_gas(
-        accumulated_fee_statement.execution_gas_used(),
-        GasType::EXECUTION_GAS,
-    );
-    observe_sequential_execution_block_gas(
-        accumulated_fee_statement.io_gas_used(),
-        GasType::IO_GAS,
-    );
-    observe_sequential_execution_block_gas(
-        accumulated_fee_statement.execution_gas_used() + accumulated_fee_statement.io_gas_used(),
-        GasType::NON_STORAGE_GAS,
-    );
-    observe_sequential_execution_block_gas(
-        accumulated_fee_statement.storage_fee_used(),
-        GasType::STORAGE_FEE,
-    );
-    observe_sequential_execution_block_gas(
-        accumulated_fee_statement.storage_fee_refund(),
-        GasType::STORAGE_FEE_REFUND,
-    );
-    BLOCK_COMMITTED_TXNS
-        .with_label_values(&[Mode::PARALLEL])
-        .observe(num_committed as f64);
-}
-
-pub(crate) fn update_sequential_txn_gas_counters(fee_statement: &FeeStatement) {
-    observe_sequential_execution_txn_gas(fee_statement.gas_used(), GasType::TOTAL_GAS);
-    observe_sequential_execution_txn_gas(
-        fee_statement.execution_gas_used(),
-        GasType::EXECUTION_GAS,
-    );
-    observe_sequential_execution_txn_gas(fee_statement.io_gas_used(), GasType::IO_GAS);
-    observe_sequential_execution_txn_gas(
-        fee_statement.execution_gas_used() + fee_statement.io_gas_used(),
-        GasType::NON_STORAGE_GAS,
-    );
-    observe_sequential_execution_txn_gas(fee_statement.storage_fee_used(), GasType::STORAGE_FEE);
-    observe_sequential_execution_txn_gas(
-        fee_statement.storage_fee_refund(),
-        GasType::STORAGE_FEE_REFUND,
-    );
 }

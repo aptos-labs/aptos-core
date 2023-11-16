@@ -180,6 +180,11 @@ where
                     executed
                 );
                 info!(
+                    "Overall execution effectiveGPS: {} gas/s (over {} txns)",
+                    delta_gas.effective_block_gas / elapsed,
+                    executed
+                );
+                info!(
                     "Overall execution ioGPS: {} gas/s (over {} txns)",
                     delta_gas.io_gas / elapsed,
                     executed

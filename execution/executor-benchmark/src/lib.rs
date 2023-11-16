@@ -268,6 +268,10 @@ pub fn run_benchmark<V>(
     );
     info!("Overall TPS: {} txn/s", delta_v / elapsed);
     info!("Overall GPS: {} gas/s", delta_gas.gas / elapsed);
+    info!(
+        "Overall effectiveGPS: {} gas/s",
+        delta_gas.effective_block_gas / elapsed
+    );
     info!("Overall ioGPS: {} gas/s", delta_gas.io_gas / elapsed);
     info!(
         "Overall executionGPS: {} gas/s",
@@ -506,6 +510,7 @@ fn add_accounts_impl<V>(
 
 struct GasMeasurement {
     pub gas: f64,
+    pub effective_block_gas: f64,
 
     pub io_gas: f64,
     pub execution_gas: f64,
@@ -535,8 +540,16 @@ impl GasMeasurement {
         let gas_count = Self::sequential_gas_counter(GasType::NON_STORAGE_GAS).get_sample_count()
             + Self::parallel_gas_counter(GasType::NON_STORAGE_GAS).get_sample_count();
 
+        let effective_block_gas = block_executor_counters::EFFECTIVE_BLOCK_GAS
+            .with_label_values(&[block_executor_counters::Mode::SEQUENTIAL])
+            .get_sample_sum()
+            + block_executor_counters::EFFECTIVE_BLOCK_GAS
+                .with_label_values(&[block_executor_counters::Mode::PARALLEL])
+                .get_sample_sum();
+
         Self {
             gas,
+            effective_block_gas,
             io_gas,
             execution_gas,
             gas_count,
@@ -560,6 +573,7 @@ impl GasMeasuring {
 
         GasMeasurement {
             gas: end.gas - self.start.gas,
+            effective_block_gas: end.effective_block_gas - self.start.effective_block_gas,
             io_gas: end.io_gas - self.start.io_gas,
             execution_gas: end.execution_gas - self.start.execution_gas,
             gas_count: end.gas_count - self.start.gas_count,

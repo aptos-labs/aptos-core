@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::types::InputOutputKey;
 use anyhow::bail;
 use aptos_aggregator::{
     delta_math::DeltaHistory,
@@ -334,8 +335,6 @@ impl<T: Transaction> CapturedReads<T> {
         &'a self,
         skip: &'a HashSet<T::Key>,
     ) -> impl Iterator<Item = (&T::Key, &GroupRead<T>)> {
-        // TODO[agg_v2](optimize) - We could potentially filter out inner_reads
-        // to only contain those that have Some(layout)
         self.group_reads.iter().filter(|(key, group_read)| {
             !skip.contains(key)
                 && group_read
@@ -661,12 +660,79 @@ impl<T: Transaction> CapturedReads<T> {
         Ok(true)
     }
 
+    pub(crate) fn get_read_summary(
+        &self,
+    ) -> HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>> {
+        let mut ret = HashSet::new();
+        for (key, read) in &self.data_reads {
+            if let DataRead::Versioned(_, _, _) = read {
+                ret.insert(InputOutputKey::Resource(key.clone()));
+            }
+        }
+
+        for (key, group_reads) in &self.group_reads {
+            for (tag, read) in &group_reads.inner_reads {
+                if let DataRead::Versioned(_, _, _) = read {
+                    ret.insert(InputOutputKey::Group(key.clone(), tag.clone()));
+                }
+            }
+        }
+
+        for key in &self.module_reads {
+            ret.insert(InputOutputKey::Resource(key.clone()));
+        }
+
+        for (key, read) in &self.delayed_field_reads {
+            if let DelayedFieldRead::Value { .. } = read {
+                ret.insert(InputOutputKey::DelayedField(*key));
+            }
+        }
+
+        ret
+    }
+
     pub(crate) fn mark_failure(&mut self) {
         self.speculative_failure = true;
     }
 
     pub(crate) fn mark_incorrect_use(&mut self) {
         self.incorrect_use = true;
+    }
+}
+
+#[derive(Derivative)]
+#[derivative(Default(bound = "", new = "true"))]
+pub(crate) struct UnsyncReadSet<T: Transaction> {
+    pub(crate) resource_reads: HashSet<T::Key>,
+    pub(crate) module_reads: HashSet<T::Key>,
+    pub(crate) group_reads: HashMap<T::Key, HashSet<T::Tag>>,
+    pub(crate) delayed_field_reads: HashSet<T::Identifier>,
+}
+
+impl<T: Transaction> UnsyncReadSet<T> {
+    pub(crate) fn get_read_summary(
+        &self,
+    ) -> HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>> {
+        let mut ret = HashSet::new();
+        for key in &self.resource_reads {
+            ret.insert(InputOutputKey::Resource(key.clone()));
+        }
+
+        for (key, group_reads) in &self.group_reads {
+            for tag in group_reads {
+                ret.insert(InputOutputKey::Group(key.clone(), tag.clone()));
+            }
+        }
+
+        for key in &self.module_reads {
+            ret.insert(InputOutputKey::Resource(key.clone()));
+        }
+
+        for key in &self.delayed_field_reads {
+            ret.insert(InputOutputKey::DelayedField(*key));
+        }
+
+        ret
     }
 }
 

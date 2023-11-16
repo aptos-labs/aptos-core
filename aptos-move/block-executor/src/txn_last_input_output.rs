@@ -6,6 +6,7 @@ use crate::{
     errors::{Error, IntentionalFallbackToSequential},
     explicit_sync_wrapper::ExplicitSyncWrapper,
     task::{ExecutionStatus, TransactionOutput},
+    types::InputOutputKey,
 };
 use aptos_aggregator::types::PanicOr;
 use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
@@ -18,7 +19,7 @@ use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
 use move_core_types::value::MoveTypeLayout;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     fmt::Debug,
     iter::{empty, Iterator},
     sync::{
@@ -419,6 +420,23 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             | ExecutionStatus::SpeculativeExecutionAbortError(_)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {},
         };
+    }
+
+    pub(crate) fn get_write_summary(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>> {
+        match &self.outputs[txn_idx as usize]
+            .load_full()
+            .expect("Output must exist")
+            .output_status
+        {
+            ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t.get_write_summary(),
+            ExecutionStatus::Abort(_)
+            | ExecutionStatus::DirectWriteSetTransactionNotCapableError
+            | ExecutionStatus::SpeculativeExecutionAbortError(_)
+            | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => HashSet::new(),
+        }
     }
 
     // Must be executed after parallel execution is done, grabs outputs. Will panic if
