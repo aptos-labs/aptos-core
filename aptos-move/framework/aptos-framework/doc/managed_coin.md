@@ -8,17 +8,34 @@ It contains scripts you will need to initialize, mint, burn, transfer coins.
 By utilizing this current module, a developer can create his own coin and care less about mint and burn capabilities,
 
 
+<a name="@High-Level_Properties_0"></a>
+
+### High-Level Properties
+
+
+
+| No. | Property                                                                                                              | Criticality | Implementation                                                                                                                                                           | Enforcement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+|-----|-----------------------------------------------------------------------------------------------------------------------|-------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1   | The initializing account should hold the capabilities to operate the coin.                                            | Critical    | The capabilities are stored under the initializing account under the Capabilities resource, which is distinct for a distinct type of coin.                               | Enforced via: [initialize](https://github.com/aptos-labs/aptos-core/blob/cdb1f27868890a49075356d626e91d73f8ee3170/aptos-move/framework/aptos-framework/sources/managed_coin.spec.move#L60)                                                                                                                                                                                                                                                                                                                                                  |
+| 2   | A new coin should be properly initialized.                                                                            | High        | In the initialize function, a new coin is initialized via the coin module with the specified properties.                                                                 | Enforced via: [initialize\_internal](https://github.com/aptos-labs/aptos-core/blob/37d7a428eaadf6ff99eb9fd302a689405b20c2c5/aptos-move/framework/aptos-framework/sources/coin.spec.move#L305).                                                                                                                                                                                                                                                                                                                                              |
+| 3   | Minting/Burning should only be done by the account who hold the valid capabilities.                                   | High        | The mint and burn capabilities are moved under the initializing account and retrieved, while minting/burning                                                             | Enforced via: [initialize](https://github.com/aptos-labs/aptos-core/blob/cdb1f27868890a49075356d626e91d73f8ee3170/aptos-move/framework/aptos-framework/sources/managed_coin.spec.move#L60), [burn](https://github.com/aptos-labs/aptos-core/blob/cdb1f27868890a49075356d626e91d73f8ee3170/aptos-move/framework/aptos-framework/sources/managed_coin.spec.move#L24), [mint](https://github.com/aptos-labs/aptos-core/blob/cdb1f27868890a49075356d626e91d73f8ee3170/aptos-move/framework/aptos-framework/sources/managed_coin.spec.move#L71). |
+| 4   | If the total supply of coins is being monitored, burn and mint operations will appropriately adjust the total supply. | High        | The coin::burn and coin::mint functions, when tracking the supply, adjusts the total coin supply accordingly.                                                            | Formally Verified: [TotalSupplyNoChange](https://github.com/aptos-labs/aptos-core/blob/005aca2ae22a1200871c4679b606c84210fdfb94/aptos-move/framework/aptos-framework/sources/coin.spec.move#L8).                                                                                                                                                                                                                                                                                                                                            |
+| 5   | Before burning coins, exact amount of coins are withdrawn.                                                            | High        | After utilizing the coin::withdraw function to withdraw coins, they are then burned, and the function ensures the precise return of the initially specified coin amount. | Enforced via: [burn\_from](https://github.com/aptos-labs/aptos-core/blob/37d7a428eaadf6ff99eb9fd302a689405b20c2c5/aptos-move/framework/aptos-framework/sources/coin.spec.move#L179).                                                                                                                                                                                                                                                                                                                                                        |
+| 6   | Minted coins are deposited to the provided destination address.                                                       | High        | After the coins are minted via coin::mint they are deposited into the coinstore of the destination address.                                                              | _This should be formally verified via a post condition to ensure that coins are deposited to the destination address._                                                                                                                                                                                                                                                                                                                                                                                                                      |
+
+
+    -  [High-Level Properties](#@High-Level_Properties_0)
 -  [Resource `Capabilities`](#0x1_managed_coin_Capabilities)
--  [Constants](#@Constants_0)
+-  [Constants](#@Constants_1)
 -  [Function `burn`](#0x1_managed_coin_burn)
 -  [Function `initialize`](#0x1_managed_coin_initialize)
 -  [Function `mint`](#0x1_managed_coin_mint)
 -  [Function `register`](#0x1_managed_coin_register)
--  [Specification](#@Specification_1)
-    -  [Function `burn`](#@Specification_1_burn)
-    -  [Function `initialize`](#@Specification_1_initialize)
-    -  [Function `mint`](#@Specification_1_mint)
-    -  [Function `register`](#@Specification_1_register)
+-  [Specification](#@Specification_2)
+    -  [Function `burn`](#@Specification_2_burn)
+    -  [Function `initialize`](#@Specification_2_initialize)
+    -  [Function `mint`](#@Specification_2_mint)
+    -  [Function `register`](#@Specification_2_register)
 
 
 <pre><code><b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
@@ -70,7 +87,7 @@ The resource is stored on the account that initialized coin <code>CoinType</code
 
 </details>
 
-<a name="@Constants_0"></a>
+<a name="@Constants_1"></a>
 
 ## Constants
 
@@ -231,7 +248,7 @@ Required if user wants to start accepting deposits of <code>CoinType</code> in h
 
 </details>
 
-<a name="@Specification_1"></a>
+<a name="@Specification_2"></a>
 
 ## Specification
 
@@ -243,7 +260,7 @@ Required if user wants to start accepting deposits of <code>CoinType</code> in h
 
 
 
-<a name="@Specification_1_burn"></a>
+<a name="@Specification_2_burn"></a>
 
 ### Function `burn`
 
@@ -271,7 +288,7 @@ Required if user wants to start accepting deposits of <code>CoinType</code> in h
 
 
 
-<a name="@Specification_1_initialize"></a>
+<a name="@Specification_2_initialize"></a>
 
 ### Function `initialize`
 
@@ -296,7 +313,7 @@ The Capabilities<CoinType> should be under the signer after creating;
 
 
 
-<a name="@Specification_1_mint"></a>
+<a name="@Specification_2_mint"></a>
 
 ### Function `mint`
 
@@ -323,7 +340,7 @@ The <code>dst_addr</code> should not be frozen.
 
 
 
-<a name="@Specification_1_register"></a>
+<a name="@Specification_2_register"></a>
 
 ### Function `register`
 
