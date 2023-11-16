@@ -395,6 +395,7 @@ dependencies = [
  "aptos-framework",
  "aptos-gas-meter",
  "aptos-gas-schedule",
+ "aptos-global-constants",
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
