@@ -16,7 +16,7 @@ Important There is no upgrade mechanism for the staking contract from staking po
 :::
 
 :::tip Testnet vs Mainnet
-The below Aptos CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Deployments](../../deployments.md) to see how profiles can be configured based on the network.
+The below Aptos CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Networks](../../networks.md) to see how profiles can be configured based on the network.
 :::
 
 ## Initialize a staking pool
@@ -121,7 +121,7 @@ To check the details of your stake pool, run the below CLI command with the `get
 The below command is for an example owner address `e7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb`. 
 
 :::tip
-For testnet or devnet `--url` field values, see [Aptos Blockchain Deployments](../../deployments.md).
+For testnet or devnet `--url` field values, see [Aptos Blockchain Networks](../../networks.md).
 :::
 
 ```bash
@@ -292,4 +292,4 @@ aptos node analyze-validator-performance \
 
 ## Tracking rewards
 
-`DistributeEvent` is emitted when there is a transfer from staking_contract to the operator or staker (owner). Rewards can be tracked either by listening to `DistributeEvent` or by using the [View function](../../../integration/aptos-apis.md#reading-state-with-the-view-function) to call `staking_contract_amounts`. This will return `accumulated_rewards` and `commission_amount`.
+`DistributeEvent` is emitted when there is a transfer from staking_contract to the operator or staker (owner). Rewards can be tracked either by listening to `DistributeEvent` or by using the [View function](../../../apis/fullnode-rest-api.md#reading-state-with-the-view-function) to call `staking_contract_amounts`. This will return `accumulated_rewards` and `commission_amount`.
