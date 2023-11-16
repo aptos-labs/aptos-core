@@ -3,6 +3,7 @@
 
 use crate::config::{
     admin_service_config::AdminServiceConfig,
+    dag_consensus_config::DagConsensusConfig,
     node_config_loader::NodeType,
     utils::{are_failpoints_enabled, get_config_name},
     ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig, InspectionServiceConfig,
@@ -47,6 +48,7 @@ impl ConfigSanitizer for NodeConfig {
         ApiConfig::sanitize(node_config, node_type, chain_id)?;
         BaseConfig::sanitize(node_config, node_type, chain_id)?;
         ConsensusConfig::sanitize(node_config, node_type, chain_id)?;
+        DagConsensusConfig::sanitize(node_config, node_type, chain_id)?;
         ExecutionConfig::sanitize(node_config, node_type, chain_id)?;
         sanitize_failpoints_config(node_config, node_type, chain_id)?;
         sanitize_fullnode_network_configs(node_config, node_type, chain_id)?;
