@@ -1,0 +1,19 @@
+[package]
+name = "move-mutator"
+version = "0.1.0"
+authors = ["Eiger <hello@eiger.co>"]
+
+description = "Move mutation tool"
+
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.3", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.5"
