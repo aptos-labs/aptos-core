@@ -7,7 +7,6 @@ use aptos_gas_schedule::gas_params::{instr::*, txn::*};
 use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
 };
-use aptos_vm_types::change_set::GroupWrite;
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::CodeOffset,
@@ -500,12 +499,13 @@ where
     fn charge_io_gas_for_group_write(
         &mut self,
         key: &StateKey,
-        group_write: &GroupWrite,
+        _metadata_op: &WriteOp,
+        maybe_group_size: Option<u64>,
     ) -> VMResult<()> {
         let cost = self
             .storage_gas_params()
             .pricing
-            .io_gas_per_group_write(key, group_write);
+            .io_gas_per_group_write(key, maybe_group_size);
 
         self.algebra
             .charge_io(cost)
