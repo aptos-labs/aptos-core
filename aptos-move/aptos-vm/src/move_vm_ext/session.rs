@@ -78,9 +78,6 @@ pub enum SessionId {
     },
     // For those runs that are not a transaction and the output of which won't be committed.
     Void,
-    SysTxn {
-        script_hash: Vec<u8>,
-    }
 }
 
 impl SessionId {

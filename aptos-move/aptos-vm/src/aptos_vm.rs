@@ -1784,7 +1784,7 @@ impl AptosVM {
                 (VMStatus::Executed, output, Some("state_checkpoint".into()))
             },
             Transaction::SystemTransaction(txn) => {
-                fail_point!("aptos_vm::execution::block_metadata");
+                fail_point!("aptos_vm::execution::system_transaction");
                 let (vm_status, output) =
                     self.process_system_transaction(resolver, txn.clone(), log_context);
                 (vm_status, output, Some("system_transaction".to_string()))
