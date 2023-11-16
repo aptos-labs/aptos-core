@@ -4,7 +4,10 @@
 
 use crate::{FullNode, HealthCheckError, LocalVersion, Node, NodeExt, Validator, Version};
 use anyhow::{anyhow, ensure, Context, Result};
-use aptos_config::{config::NodeConfig, keys::ConfigKey};
+use aptos_config::{
+    config::{NodeConfig, SECURE_STORAGE_FILENAME},
+    keys::ConfigKey,
+};
 use aptos_db::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
 use aptos_logger::{debug, info};
 use aptos_sdk::{
@@ -293,7 +296,7 @@ impl Node for LocalNode {
         let node_config = self.config();
         let ledger_db_path = node_config.storage.dir().join(LEDGER_DB_NAME);
         let state_db_path = node_config.storage.dir().join(STATE_MERKLE_DB_NAME);
-        let secure_storage_path = node_config.get_working_dir().join("secure_storage.json");
+        let secure_storage_path = node_config.get_working_dir().join(SECURE_STORAGE_FILENAME);
         let state_sync_db_path = node_config.storage.dir().join(STATE_SYNC_DB_NAME);
 
         debug!(
@@ -309,10 +312,10 @@ impl Node for LocalNode {
         assert!(ledger_db_path.as_path().exists() && state_db_path.as_path().exists());
         assert!(state_sync_db_path.as_path().exists());
         if self.config.base.role.is_validator() {
-            assert!(secure_storage_path.as_path().exists(),);
+            assert!(secure_storage_path.as_path().exists());
         }
 
-        // Remove the files
+        // Remove the primary DB files
         fs::remove_dir_all(ledger_db_path)
             .map_err(anyhow::Error::from)
             .context("Failed to delete ledger_db_path")?;
@@ -322,6 +325,8 @@ impl Node for LocalNode {
         fs::remove_dir_all(state_sync_db_path)
             .map_err(anyhow::Error::from)
             .context("Failed to delete state_sync_db_path")?;
+
+        // Remove the secure storage file
         if self.config.base.role.is_validator() {
             fs::remove_file(secure_storage_path)
                 .map_err(anyhow::Error::from)

@@ -20,8 +20,8 @@ aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
 aptos-consensus = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-debugger = { workspace = true }
 aptos-db = { workspace = true }
+aptos-debugger = { workspace = true }
 aptos-faucet-core = { workspace = true }
 aptos-forge = { workspace = true }
 aptos-framework = { workspace = true }
