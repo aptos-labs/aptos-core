@@ -39,6 +39,8 @@ module coin_listing {
     const EAUCTION_ENDED: u64 = 5;
     /// The entity is not the seller.
     const ENOT_SELLER: u64 = 6;
+    /// Update with the same price
+    const ESAME_PRICE: u64 = 7;
 
     // Core data structures
     const FIXED_PRICE_TYPE: vector<u8> = b"fixed price";
@@ -119,6 +121,35 @@ module coin_listing {
         );
 
         listing
+    }
+
+    public entry fun update_fixed_price<CoinType>(
+        seller: &signer,
+        object: Object<Listing>,
+        price: u64,
+    ) acquires FixedPriceListing {
+        let listing_addr = object::object_address(&object);
+
+        if (!exists<FixedPriceListing<CoinType>>(listing_addr)) {
+            abort (error::not_found(ENO_LISTING))
+        };
+
+        let fixedPriceListing = borrow_global_mut<FixedPriceListing<CoinType>>(listing_addr);
+
+        if (fixedPriceListing.price == price) {
+            abort (error::invalid_argument(ESAME_PRICE))
+        };
+
+        fixedPriceListing.price = price;
+
+        events::emit_listing_placed(
+            listing::fee_schedule(object),
+            string::utf8(FIXED_PRICE_TYPE),
+            object::object_address(&object),
+            signer::address_of(seller),
+            price,
+            listing::token_metadata(object),
+        );
     }
 
     public entry fun init_fixed_price_for_tokenv1<CoinType>(
