@@ -110,7 +110,8 @@ fn type_with_context_msg(context: &mut Context, ty: &mut Type, msg_uninferred: &
             let replacement = unfold_type_or_last_var(&context.subst, ty_tvar);
             let replacement = match replacement {
                 Err(sp!(loc, last_tvar)) => {
-                    // avoid duplicate error messages
+                    // this is to avoid duplicate error messages for uninferred type variables
+                    // in the first time they are resolved to Err(_), and to Anything for all following queries
                     context.subst.insert(last_tvar, sp(ty.loc, Type_::Anything));
                     context
                         .env
@@ -141,6 +142,7 @@ fn type_with_context_msg(context: &mut Context, ty: &mut Type, msg_uninferred: &
     }
 }
 
+// Try to expand the type of ty, warning with msg_uninferred if type cannot be inferred.
 pub fn type_(context: &mut Context, ty: &mut Type) {
     type_with_context_msg(
         context,
