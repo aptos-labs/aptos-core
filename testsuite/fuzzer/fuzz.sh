@@ -72,7 +72,8 @@ function build-oss-fuzz() {
     fi
     oss_fuzz_out=$1
     mkdir -p $oss_fuzz_out
-    if ! build all $oss_fuzz_out; then
+    mkdir -p ./target
+    if ! build all ./target; then
         env
         error "Build failed. Exiting."
     fi
