@@ -668,6 +668,8 @@ module listing_tests {
     use marketplace::listing::{Self, Listing};
     use marketplace::test_utils;
 
+    struct DummyToken has key {}
+
     fun test_fixed_price(
         aptos_framework: &signer,
         marketplace: &signer,
@@ -721,6 +723,57 @@ module listing_tests {
         assert!(coin::balance<AptosCoin>(marketplace_addr) == 1, 0);
         assert!(coin::balance<AptosCoin>(seller_addr) == 10499, 0);
         assert!(coin::balance<AptosCoin>(purchaser_addr) == 9500, 0);
+    }
+
+    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[expected_failure(abort_code = 65543, location = marketplace::coin_listing)]
+    fun test_update_fixed_price_same_price(
+        aptos_framework: &signer,
+        marketplace: &signer,
+        seller: &signer,
+        purchaser: &signer,
+    ) {
+        let (marketplace_addr, seller_addr, _purchaser_addr) =
+            test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+
+        let (token, _fee_schedule, listing) = fixed_price_listing(marketplace, seller);
+
+        coin_listing::update_fixed_price<AptosCoin>(seller, listing, 500);
+    }
+
+    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[expected_failure(abort_code = 393217, location = marketplace::coin_listing)]
+    fun test_update_fixed_price_listing_not_found(
+        aptos_framework: &signer,
+        marketplace: &signer,
+        seller: &signer,
+        purchaser: &signer,
+    ) {
+        let (marketplace_addr, seller_addr, _purchaser_addr) =
+            test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+
+        let (token, _fee_schedule, listing) = fixed_price_listing(marketplace, seller);
+
+        coin_listing::update_fixed_price<DummyToken>(seller, listing, 1000);
+    }
+
+    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    fun test_update_fixed_price(
+        aptos_framework: &signer,
+        marketplace: &signer,
+        seller: &signer,
+        purchaser: &signer,
+    ) {
+        let (marketplace_addr, seller_addr, _purchaser_addr) =
+            test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+
+        let (token, _fee_schedule, listing) = fixed_price_listing(marketplace, seller);
+
+        assert!(coin_listing::price<AptosCoin>(listing) == option::some(500), 0);
+
+        coin_listing::update_fixed_price<AptosCoin>(seller, listing, 1000);
+
+        assert!(coin_listing::price<AptosCoin>(listing) == option::some(1000), 0);
     }
 
     #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
