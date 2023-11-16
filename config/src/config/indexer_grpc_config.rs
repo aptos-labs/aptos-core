@@ -41,7 +41,7 @@ impl ConfigOptimizer for IndexerGrpcConfig {
         node_config: &mut NodeConfig,
         _local_config_yaml: &Value,
         _node_type: NodeType,
-        _chain_id: ChainId,
+        _chain_id: Option<ChainId>,
     ) -> Result<bool, Error> {
         let indexer_grpc_config = &mut node_config.indexer_grpc;
 

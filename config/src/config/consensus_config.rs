@@ -353,7 +353,7 @@ impl ConfigSanitizer for ConsensusConfig {
     fn sanitize(
         node_config: &NodeConfig,
         node_type: NodeType,
-        chain_id: ChainId,
+        chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
 
@@ -362,11 +362,13 @@ impl ConfigSanitizer for ConsensusConfig {
         QuorumStoreConfig::sanitize(node_config, node_type, chain_id)?;
 
         // Verify that the consensus-only feature is not enabled in mainnet
-        if chain_id.is_mainnet() && is_consensus_only_perf_test_enabled() {
-            return Err(Error::ConfigSanitizerFailed(
-                sanitizer_name,
-                "consensus-only-perf-test should not be enabled in mainnet!".to_string(),
-            ));
+        if let Some(chain_id) = chain_id {
+            if chain_id.is_mainnet() && is_consensus_only_perf_test_enabled() {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name,
+                    "consensus-only-perf-test should not be enabled in mainnet!".to_string(),
+                ));
+            }
         }
 
         // Sender block limits must be <= receiver block limits
