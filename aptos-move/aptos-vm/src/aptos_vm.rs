@@ -85,6 +85,8 @@ use std::{
         Arc,
     },
 };
+use aptos_types::system_txn::SystemTransaction;
+use aptos_types::transaction::Transaction;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -1172,6 +1174,19 @@ impl AptosVM {
         )
     }
 
+    fn process_system_transaction(
+        &self,
+        _resolver: &impl AptosMoveResolver,
+        txn: SystemTransaction,
+        _log_context: &AdapterLogSchema,
+    ) -> (VMStatus, VMOutput) {
+        match txn {
+            SystemTransaction::Void => {
+                (VMStatus::Executed, VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)))
+            }
+        }
+    }
+
     fn execute_user_transaction_impl(
         &self,
         resolver: &impl AptosMoveResolver,
@@ -1768,6 +1783,12 @@ impl AptosVM {
                 let output = VMOutput::empty_with_status(status);
                 (VMStatus::Executed, output, Some("state_checkpoint".into()))
             },
+            Transaction::SystemTransaction(txn) => {
+                fail_point!("aptos_vm::execution::block_metadata");
+                let (vm_status, output) =
+                    self.process_system_transaction(resolver, txn.clone(), log_context);
+                (vm_status, output, Some("system_transaction".to_string()))
+            }
         })
     }
 }

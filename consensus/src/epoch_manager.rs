@@ -102,6 +102,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use aptos_types::on_chain_config::{FeatureFlag, Features};
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -783,6 +784,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         recovery_data: RecoveryData,
         epoch_state: EpochState,
+        onchain_features: Features,
         onchain_consensus_config: OnChainConsensusConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
@@ -863,6 +865,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
+            onchain_features.is_enabled(FeatureFlag::SYSTEM_TRANSACTION),
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::LIFO,
@@ -933,6 +936,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             verifier: (&validator_set).into(),
         };
 
+        let onchain_features: anyhow::Result<Features> = payload.get();
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
         if let Err(error) = &onchain_consensus_config {
@@ -964,6 +968,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         } else {
             self.start_new_epoch_with_joltean(
                 epoch_state,
+                onchain_features.unwrap(),
                 consensus_config,
                 network_sender,
                 payload_client,
@@ -994,6 +999,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     async fn start_new_epoch_with_joltean(
         &mut self,
         epoch_state: EpochState,
+        onchain_features: Features,
         consensus_config: OnChainConsensusConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
@@ -1005,6 +1011,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.start_round_manager(
                     initial_data,
                     epoch_state,
+                    onchain_features,
                     consensus_config,
                     network_sender,
                     payload_client,

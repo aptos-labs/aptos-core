@@ -17,6 +17,8 @@ use aptos_types::{
 };
 use mirai_annotations::*;
 use serde::{Deserialize, Serialize};
+use aptos_types::system_txn::SystemTransaction;
+use crate::proposal_ext::ProposalExt;
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum BlockType {
@@ -43,6 +45,10 @@ pub enum BlockType {
     /// from the previous epoch.  The genesis block is used as the first root block of the
     /// BlockTree for all epochs.
     Genesis,
+
+    /// Extended block proposal.
+    ProposalExt(ProposalExt),
+
     /// A virtual block that's constructed by nodes from DAG, this is purely a local thing so
     /// we hide it from serde
     #[serde(skip_deserializing)]
@@ -165,6 +171,7 @@ impl BlockData {
             | BlockType::NilBlock { failed_authors, .. }
             | BlockType::DAGBlock { failed_authors, .. } => Some(failed_authors),
             BlockType::Genesis => None,
+            BlockType::ProposalExt(proposal_ext) => Some(proposal_ext.failed_authors()),
         }
     }
 
@@ -292,6 +299,29 @@ impl BlockData {
                 author,
                 failed_authors,
             },
+        }
+    }
+
+    pub fn new_proposal_ext(
+        sys_txns: Vec<SystemTransaction>,
+        payload: Payload,
+        author: Author,
+        failed_authors: Vec<(Round, Author)>,
+        round: Round,
+        timestamp_usecs: u64,
+        quorum_cert: QuorumCert,
+    ) -> Self {
+        Self {
+            epoch: quorum_cert.certified_block().epoch(),
+            round,
+            timestamp_usecs,
+            quorum_cert,
+            block_type: BlockType::ProposalExt(ProposalExt::V0 {
+                sys_txns,
+                payload,
+                author,
+                failed_authors,
+            }),
         }
     }
 

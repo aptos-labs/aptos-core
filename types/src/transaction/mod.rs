@@ -65,6 +65,7 @@ pub use script::{
 };
 use serde::de::DeserializeOwned;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
+use crate::system_txn::SystemTransaction;
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
@@ -1793,6 +1794,8 @@ pub enum Transaction {
     /// in the TransactionInfo
     /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
     StateCheckpoint(HashValue),
+
+    SystemTransaction(SystemTransaction),
 }
 
 impl Transaction {
@@ -1821,6 +1824,8 @@ impl Transaction {
             Transaction::BlockMetadata(_block_metadata) => String::from("block_metadata"),
             // TODO: display proper information for client
             Transaction::StateCheckpoint(_) => String::from("state_checkpoint"),
+            // TODO: display proper information for client
+            Transaction::SystemTransaction(_) => String::from("system_transaction"),
         }
     }
 }

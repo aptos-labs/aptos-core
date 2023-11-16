@@ -172,6 +172,7 @@ pub enum Transaction {
     GenesisTransaction(GenesisTransaction),
     BlockMetadataTransaction(BlockMetadataTransaction),
     StateCheckpointTransaction(StateCheckpointTransaction),
+    SystemTransaction(SystemTransaction),
 }
 
 impl Transaction {
@@ -182,6 +183,7 @@ impl Transaction {
             Transaction::PendingTransaction(_) => 0,
             Transaction::GenesisTransaction(_) => 0,
             Transaction::StateCheckpointTransaction(txn) => txn.timestamp.0,
+            Transaction::SystemTransaction(txn) => txn.timestamp.0,
         }
     }
 
@@ -192,6 +194,7 @@ impl Transaction {
             Transaction::PendingTransaction(_) => None,
             Transaction::GenesisTransaction(txn) => Some(txn.info.version.into()),
             Transaction::StateCheckpointTransaction(txn) => Some(txn.info.version.into()),
+            Transaction::SystemTransaction(txn) => Some(txn.info.version.into()),
         }
     }
 
@@ -202,6 +205,7 @@ impl Transaction {
             Transaction::PendingTransaction(_txn) => false,
             Transaction::GenesisTransaction(txn) => txn.info.success,
             Transaction::StateCheckpointTransaction(txn) => txn.info.success,
+            Transaction::SystemTransaction(txn) => txn.info.success,
         }
     }
 
@@ -216,6 +220,7 @@ impl Transaction {
             Transaction::PendingTransaction(_txn) => "pending".to_owned(),
             Transaction::GenesisTransaction(txn) => txn.info.vm_status.clone(),
             Transaction::StateCheckpointTransaction(txn) => txn.info.vm_status.clone(),
+            Transaction::SystemTransaction(txn) => txn.info.vm_status.clone(),
         }
     }
 
@@ -226,6 +231,7 @@ impl Transaction {
             Transaction::GenesisTransaction(_) => "genesis_transaction",
             Transaction::BlockMetadataTransaction(_) => "block_metadata_transaction",
             Transaction::StateCheckpointTransaction(_) => "state_checkpoint_transaction",
+            Transaction::SystemTransaction(_) => "system_transaction",
         }
     }
 
@@ -238,6 +244,7 @@ impl Transaction {
             },
             Transaction::GenesisTransaction(txn) => &txn.info,
             Transaction::StateCheckpointTransaction(txn) => &txn.info,
+            Transaction::SystemTransaction(txn) => &txn.info,
         })
     }
 }
@@ -316,6 +323,17 @@ impl From<(&SignedTransaction, TransactionPayload)> for UserTransactionRequest {
             signature: Some(txn.authenticator().into()),
             payload,
         }
+    }
+}
+
+impl From<(&aptos_types::system_txn::SystemTransaction, TransactionInfo, Vec<Event>, u64)> for Transaction {
+    fn from((txn, info, events, timestamp): (&aptos_types::system_txn::SystemTransaction, TransactionInfo, Vec<Event>, u64)) -> Self {
+        Transaction::SystemTransaction(SystemTransaction {
+            info,
+            events,
+            timestamp: timestamp.into(),
+            txn_serialized: bcs::to_bytes(txn).unwrap(),
+        })
     }
 }
 
@@ -521,6 +539,16 @@ pub struct BlockMetadataTransaction {
     /// The indices of the proposers who failed to propose
     pub failed_proposer_indices: Vec<u32>,
     pub timestamp: U64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct SystemTransaction {
+    #[serde(flatten)]
+    #[oai(flatten)]
+    pub info: TransactionInfo,
+    pub events: Vec<Event>,
+    pub timestamp: U64,
+    pub txn_serialized: Vec<u8>,
 }
 
 /// An event from a transaction

@@ -288,6 +288,14 @@ impl Block {
                 validator.verify(*author, &self.block_data, signature)?;
                 self.quorum_cert().verify(validator)
             },
+            BlockType::ProposalExt(proposal_ext) => {
+                let signature = self
+                    .signature
+                    .as_ref()
+                    .ok_or_else(|| format_err!("Missing signature in Proposal"))?;
+                validator.verify(*proposal_ext.author(), &self.block_data, signature)?;
+                self.quorum_cert().verify(validator)
+            },
             BlockType::DAGBlock { .. } => bail!("We should not accept DAG block from others"),
         }
     }
