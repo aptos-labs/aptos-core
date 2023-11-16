@@ -58,7 +58,16 @@ pub struct Diagnostics {
 pub fn report_diagnostics(files: &FilesSourceText, diags: Diagnostics) -> ! {
     let should_exit = true;
     report_diagnostics_impl(files, diags, should_exit);
-    std::process::exit(1)
+    unreachable!()
+}
+
+// report diagnostics, but do not exit if diags are all warnings
+pub fn report_diagnostics_exit_on_error(files: &FilesSourceText, diags: Diagnostics) {
+    let should_exit = diags
+        .diagnostics
+        .iter()
+        .any(|diag| diag.info.severity() > Severity::Warning);
+    report_diagnostics_impl(files, diags, should_exit);
 }
 
 pub fn report_warnings(files: &FilesSourceText, warnings: Diagnostics) {
