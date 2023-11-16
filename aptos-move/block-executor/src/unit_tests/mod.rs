@@ -23,6 +23,7 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
+    block_executor::config::BlockExecutorConfig,
     contract_event::TransactionEvent,
     executable::{ExecutableTestType, ModulePath},
 };
@@ -55,7 +56,11 @@ where
         DeltaDataView<K>,
         NoOpTransactionCommitHook<MockOutput<K, E>, usize>,
         ExecutableTestType,
-    >::new(num_cpus::get(), executor_thread_pool, None, None)
+    >::new(
+        BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+        executor_thread_pool,
+        None,
+    )
     .execute_transactions_parallel((), &transactions, &data_view);
 
     let baseline = BaselineOutput::generate(&transactions, None);

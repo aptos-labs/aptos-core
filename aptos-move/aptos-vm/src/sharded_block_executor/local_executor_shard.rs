@@ -15,8 +15,12 @@ use crate::sharded_block_executor::{
 use aptos_logger::trace;
 use aptos_state_view::StateView;
 use aptos_types::{
-    block_executor::partitioner::{
-        PartitionedTransactions, RoundId, ShardId, GLOBAL_ROUND_ID, MAX_ALLOWED_PARTITIONING_ROUNDS,
+    block_executor::{
+        config::BlockExecutorOnchainConfig,
+        partitioner::{
+            PartitionedTransactions, RoundId, ShardId, GLOBAL_ROUND_ID,
+            MAX_ALLOWED_PARTITIONING_ROUNDS,
+        },
     },
     transaction::TransactionOutput,
 };
@@ -181,7 +185,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
         state_view: Arc<S>,
         transactions: PartitionedTransactions,
         concurrency_level_per_shard: usize,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorOnchainConfig,
     ) -> Result<ShardedExecutionOutput, VMStatus> {
         assert_eq!(transactions.num_shards(), self.num_shards());
         let (sub_blocks, global_txns) = transactions.into();
@@ -191,7 +195,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
                     state_view.clone(),
                     sub_blocks_for_shard,
                     concurrency_level_per_shard,
-                    maybe_block_gas_limit,
+                    onchain_config.clone(),
                 ))
                 .unwrap();
         }
@@ -203,7 +207,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
         let mut global_output = self.global_executor.execute_global_txns(
             global_txns,
             state_view.as_ref(),
-            maybe_block_gas_limit,
+            onchain_config,
         )?;
 
         let mut sharded_output = self.get_output_from_shards()?;
