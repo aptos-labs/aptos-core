@@ -1,5 +1,4 @@
 // Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 // Overview of approach:
@@ -11,7 +10,7 @@
 //   - holds the map recording inlined function bodies so that we don't need to modify the program until the end.
 //   - `try_inlining_in` function is the entry point for each function needing inlining.
 //
-// - struct `OutlerInlinerRewriter` uses trait `ExpRewriterFunctions` to rewrite each call in the target.
+// - struct `OuterInlinerRewriter` uses trait `ExpRewriterFunctions` to rewrite each call in the target.
 //   - `rewrite_call` recognizes inline functions and rewrites them using `InlinedRewriter::inline_call`
 //
 // - struct `InlinedRewriter` uses trait `ExpRewriterFunctions` to rewrite the inlined function body.
@@ -77,11 +76,15 @@ use std::{
     vec::Vec,
 };
 
+type QualifiedFunId = QualifiedId<FunId>;
+type CallSiteLocations = BTreeMap<(QualifiedFunId, QualifiedFunId), BTreeSet<NodeId>>;
+
 // ======================================================================================
 // Entry
 
 // Run inlining on current program's AST.  For each function which is target of the compilation,
 // visit that function body and inline any calls to functions marked as "inline".
+// debug flag is temporary until we sort out a way to attach debug to GlobalEnv.
 pub fn run_inlining(env: &mut GlobalEnv, debug: bool) {
     // Start with targets.
     let mut todo = BTreeSet::new();
@@ -93,7 +96,7 @@ pub fn run_inlining(env: &mut GlobalEnv, debug: bool) {
                 let id = func.get_qualified_id();
                 if func.is_inline() {
                     let func_def = func.get_def();
-                    if !func_def.deref().is_some() {
+                    if func_def.deref().is_none() {
                         has_error = true;
                         let func_loc = func.get_loc();
                         let func_name = func.get_name_str();
@@ -121,35 +124,30 @@ pub fn run_inlining(env: &mut GlobalEnv, debug: bool) {
     let mut function_callees: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
     let mut all_functions = BTreeSet::new();
 
-    // Record for all call sites from function a to B (for error messages)
-    let mut call_site_locations: BTreeMap<
-        (QualifiedId<FunId>, QualifiedId<FunId>),
-        BTreeSet<NodeId>,
-    > = BTreeMap::new();
+    // Record for each pair of (caller, callee) functions, all the call site locations (for error
+    // messages)
+    let mut call_site_locations: CallSiteLocations = CallSiteLocations::new();
 
     // Update function_callees and call_site_locations for all reachable calls.
     while let Some(id) = todo.pop_first() {
         if all_functions.insert(id) {
-            let func_env = env.get_function(id);
-            let func_env_def = func_env.get_def();
-            let func_env_def_deref = func_env_def.deref();
-            if let Some(def) = func_env_def_deref {
-                let callees_with_sites = def.deref().called_funs_with_callsites();
+            if let Some(def) = env.get_function(id).get_def().deref() {
+                let callees_with_sites = def.called_funs_with_callsites();
                 for (callee, sites) in callees_with_sites {
                     todo.insert(callee);
                     function_callees.entry(id).or_default().insert(callee);
-                    call_site_locations.insert((id, callee), sites.clone());
+                    call_site_locations.insert((id, callee), sites);
                 }
             }
         }
     }
 
     // Get a list of all reachable functions calling inlined functions, in bottom-up order.
-    let functions_needing_inlining =
-        match functions_needing_inlining_in_order(env, &function_callees, call_site_locations) {
-            Err(_) => return, // just return on an error, it is already recorded in diag
-            Ok(v) => v,
-        };
+    let Ok(functions_needing_inlining) =
+        functions_needing_inlining_in_order(env, &function_callees, call_site_locations)
+    else {
+        return; // just return on an error, it is already recorded in diag
+    };
 
     // We inline functions bottom-up, so that any inlined function which itself has calls to
     // inlined functions has already had its stuff inlined.
@@ -184,7 +182,7 @@ pub fn run_inlining(env: &mut GlobalEnv, debug: bool) {
             }
         }
     }
-    env.filter_functions(|fun_id: &QualifiedId<FunId>| inline_funs.contains(fun_id));
+    env.filter_functions(|fun_id: &QualifiedFunId| inline_funs.contains(fun_id));
 }
 
 /// Helper functions for inlining driver
@@ -193,11 +191,11 @@ pub fn run_inlining(env: &mut GlobalEnv, debug: bool) {
 /// so that any inline function will be processed before any function calling it.
 fn functions_needing_inlining_in_order(
     env: &GlobalEnv,
-    function_callees: &BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedId<FunId>>>,
-    call_site_locations: BTreeMap<(QualifiedId<FunId>, QualifiedId<FunId>), BTreeSet<NodeId>>,
-) -> Result<Vec<QualifiedId<FunId>>, ()> {
+    function_callees: &BTreeMap<QualifiedFunId, BTreeSet<QualifiedFunId>>,
+    call_site_locations: CallSiteLocations,
+) -> Result<Vec<QualifiedFunId>, ()> {
     // Restrict attention to inline functions calling inline functions.
-    let inline_functions_with_callees: BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedId<FunId>>> =
+    let inline_functions_with_callees: BTreeMap<QualifiedFunId, BTreeSet<QualifiedFunId>> =
         function_callees
             .iter()
             .filter(|&(fnid, _)| env.get_function(*fnid).is_inline())
@@ -206,18 +204,18 @@ fn functions_needing_inlining_in_order(
                     *fnid,
                     callees
                         .iter()
-                        .filter(|&fnid| env.get_function(*fnid).is_inline())
+                        .filter(|&caller_fnid| env.get_function(*caller_fnid).is_inline())
                         .cloned()
                         .collect(),
                 )
             })
             .collect();
 
-    // Further limit the list to inline functions which are called by other inline fucntions.
-    let inline_functions_calling_others: Vec<QualifiedId<FunId>> = inline_functions_with_callees
+    // Calculate the list of inline functions which call at least one other inline function.
+    let inline_functions_calling_others: Vec<QualifiedFunId> = inline_functions_with_callees
         .iter()
-        .filter(|(_fnid, callees)| !callees.is_empty())
-        .map(|(fnid, _callees)| fnid)
+        .filter(|(_, callees)| !callees.is_empty())
+        .map(|(caller_fnid, _)| caller_fnid)
         .cloned()
         .collect();
 
@@ -246,7 +244,7 @@ fn functions_needing_inlining_in_order(
                 })
                 .collect();
             let msg = format!(
-                "Error: recursion during function inlining not allowed: {} -> {}",
+                "recursion during function inlining not allowed: {} -> {}",
                 path_string,
                 func_env.get_name_str()
             );
@@ -263,7 +261,7 @@ fn functions_needing_inlining_in_order(
     );
 
     // Identify subset of non-inline functions which call inline functions.  Order doesn't matter here.
-    let non_inline_functions_needing_inlining: Vec<QualifiedId<FunId>> = function_callees
+    let non_inline_functions_needing_inlining: Vec<QualifiedFunId> = function_callees
         .iter()
         .filter(|(fnid, callees)| {
             !env.get_function(**fnid).is_inline()
@@ -275,12 +273,12 @@ fn functions_needing_inlining_in_order(
         .cloned()
         .collect();
 
-    let result: Vec<QualifiedId<FunId>> =
+    let result: Vec<QualifiedFunId> =
         chain(po_inline_functions, non_inline_functions_needing_inlining).collect();
     Ok(result)
 }
 
-// Calculate a bottom-up traversal for entries, given the provded callee map.
+// Calculate a bottom-up traversal for entries, given the provided callee map.
 fn postorder<T: Ord + Copy + Debug>(
     entries: &Vec<T>,
     callee_map: &BTreeMap<T, BTreeSet<T>>,
@@ -383,7 +381,7 @@ struct Inliner<'env> {
     /// Functions already processed all get an entry here, with a new function body after inline
     /// calls are substituted here.  Functions which are unchanged (likely no calls to inline functions)
     /// bind to None.
-    funexprs_after_inlining: BTreeMap<QualifiedId<FunId>, Option<Exp>>,
+    funexprs_after_inlining: BTreeMap<QualifiedFunId, Option<Exp>>,
 }
 
 impl<'env> Inliner<'env> {
@@ -404,7 +402,7 @@ impl<'env> Inliner<'env> {
     /// the resulting function.
     ///
     /// If `self.funxprs_after_inlining` already has an entry, then returns the empty set.
-    fn try_inlining_in(&mut self, func_id: QualifiedId<FunId>) {
+    fn try_inlining_in(&mut self, func_id: QualifiedFunId) {
         assert!(!self.funexprs_after_inlining.contains_key(&func_id));
         let func_env = self.env.get_function(func_id);
 
