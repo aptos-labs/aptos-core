@@ -4,6 +4,7 @@
 
 use crate::{
     common::{Author, Payload, Round},
+    proposal_ext::ProposalExt,
     quorum_cert::QuorumCert,
     vote_data::VoteData,
 };
@@ -14,11 +15,10 @@ use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    system_txn::SystemTransaction,
 };
 use mirai_annotations::*;
 use serde::{Deserialize, Serialize};
-use aptos_types::system_txn::SystemTransaction;
-use crate::proposal_ext::ProposalExt;
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum BlockType {

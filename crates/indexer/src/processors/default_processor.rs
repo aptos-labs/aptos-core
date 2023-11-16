@@ -16,6 +16,7 @@ use crate::{
         move_resources::MoveResource,
         move_tables::{CurrentTableItem, TableItem, TableMetadata},
         signatures::Signature,
+        system_transactions::SystemTransactionModel,
         transactions::{TransactionDetail, TransactionModel},
         user_transactions::UserTransactionModel,
         v2_objects::{CurrentObject, Object},
@@ -58,6 +59,7 @@ fn insert_to_db_impl(
         &[UserTransactionModel],
         &[Signature],
         &[BlockMetadataTransactionModel],
+        &[SystemTransactionModel],
     ),
     events: &[EventModel],
     wscs: &[WriteSetChangeModel],
@@ -70,7 +72,8 @@ fn insert_to_db_impl(
     ),
     object_core: (&[Object], &[CurrentObject]),
 ) -> Result<(), diesel::result::Error> {
-    let (user_transactions, signatures, block_metadata_transactions) = txn_details;
+    let (user_transactions, signatures, block_metadata_transactions, system_transactions) =
+        txn_details;
     let (move_modules, move_resources, table_items, current_table_items, table_metadata) =
         wsc_details;
     let (objects, current_objects) = object_core;
@@ -78,6 +81,7 @@ fn insert_to_db_impl(
     insert_user_transactions(conn, user_transactions)?;
     insert_signatures(conn, signatures)?;
     insert_block_metadata_transactions(conn, block_metadata_transactions)?;
+    insert_system_transactions(conn, system_transactions)?;
     insert_events(conn, events)?;
     insert_write_set_changes(conn, wscs)?;
     insert_move_modules(conn, move_modules)?;
@@ -100,6 +104,7 @@ fn insert_to_db(
         Vec<UserTransactionModel>,
         Vec<Signature>,
         Vec<BlockMetadataTransactionModel>,
+        Vec<SystemTransactionModel>,
     ),
     events: Vec<EventModel>,
     wscs: Vec<WriteSetChangeModel>,
@@ -118,7 +123,8 @@ fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    let (user_transactions, signatures, block_metadata_transactions) = txn_details;
+    let (user_transactions, signatures, block_metadata_transactions, system_transactions) =
+        txn_details;
     let (move_modules, move_resources, table_items, current_table_items, table_metadata) =
         wsc_details;
     let (objects, current_objects) = object_core;
@@ -133,6 +139,7 @@ fn insert_to_db(
                     &user_transactions,
                     &signatures,
                     &block_metadata_transactions,
+                    &system_transactions,
                 ),
                 &events,
                 &wscs,
@@ -152,6 +159,7 @@ fn insert_to_db(
             let user_transactions = clean_data_for_db(user_transactions, true);
             let signatures = clean_data_for_db(signatures, true);
             let block_metadata_transactions = clean_data_for_db(block_metadata_transactions, true);
+            let system_transactions = clean_data_for_db(system_transactions, true);
             let events = clean_data_for_db(events, true);
             let wscs = clean_data_for_db(wscs, true);
             let move_modules = clean_data_for_db(move_modules, true);
@@ -172,6 +180,7 @@ fn insert_to_db(
                             &user_transactions,
                             &signatures,
                             &block_metadata_transactions,
+                            &system_transactions,
                         ),
                         &events,
                         &wscs,
@@ -264,6 +273,25 @@ fn insert_block_metadata_transactions(
         execute_with_better_error(
             conn,
             diesel::insert_into(schema::block_metadata_transactions::table)
+                .values(&items_to_insert[start_ind..end_ind])
+                .on_conflict(version)
+                .do_nothing(),
+            None,
+        )?;
+    }
+    Ok(())
+}
+
+fn insert_system_transactions(
+    conn: &mut PgConnection,
+    items_to_insert: &[SystemTransactionModel],
+) -> Result<(), diesel::result::Error> {
+    use schema::system_transactions::dsl::*;
+    let chunks = get_chunks(items_to_insert.len(), SystemTransactionModel::field_count());
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::system_transactions::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict(version)
                 .do_nothing(),
@@ -489,6 +517,7 @@ impl TransactionProcessor for DefaultTransactionProcessor {
         let mut signatures = vec![];
         let mut user_transactions = vec![];
         let mut block_metadata_transactions = vec![];
+        let mut system_transactions = vec![];
         for detail in txn_details {
             match detail {
                 TransactionDetail::User(user_txn, sigs) => {
@@ -498,6 +527,7 @@ impl TransactionProcessor for DefaultTransactionProcessor {
                 TransactionDetail::BlockMetadata(bmt) => {
                     block_metadata_transactions.push(bmt.clone())
                 },
+                TransactionDetail::System(st) => system_transactions.push(st.clone()),
             }
         }
         let mut move_modules = vec![];
@@ -596,7 +626,12 @@ impl TransactionProcessor for DefaultTransactionProcessor {
             start_version,
             end_version,
             txns,
-            (user_transactions, signatures, block_metadata_transactions),
+            (
+                user_transactions,
+                signatures,
+                block_metadata_transactions,
+                system_transactions,
+            ),
             events,
             write_set_changes,
             (

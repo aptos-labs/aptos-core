@@ -33,10 +33,11 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     fee_statement::FeeStatement,
     on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
+    system_txn::SystemTransaction,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction,
         EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
-        MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction,
+        MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
         Transaction::{
             BlockMetadata as BlockMetadataTransaction, GenesisTransaction, StateCheckpoint,
             UserTransaction,
@@ -85,8 +86,6 @@ use std::{
         Arc,
     },
 };
-use aptos_types::system_txn::SystemTransaction;
-use aptos_types::transaction::Transaction;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -1181,9 +1180,10 @@ impl AptosVM {
         _log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
         match txn {
-            SystemTransaction::Void => {
-                (VMStatus::Executed, VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)))
-            }
+            SystemTransaction::Void => (
+                VMStatus::Executed,
+                VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)),
+            ),
         }
     }
 
@@ -1788,7 +1788,7 @@ impl AptosVM {
                 let (vm_status, output) =
                     self.process_system_transaction(resolver, txn.clone(), log_context);
                 (vm_status, output, Some("system_transaction".to_string()))
-            }
+            },
         })
     }
 }

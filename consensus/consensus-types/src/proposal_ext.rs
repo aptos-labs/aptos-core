@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
-use aptos_types::system_txn::SystemTransaction;
 use crate::common::{Author, Payload, Round};
+use aptos_types::system_txn::SystemTransaction;
+use serde::{Deserialize, Serialize};
 
 /// Extended block proposal.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]

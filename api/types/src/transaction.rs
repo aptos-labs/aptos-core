@@ -326,8 +326,22 @@ impl From<(&SignedTransaction, TransactionPayload)> for UserTransactionRequest {
     }
 }
 
-impl From<(&aptos_types::system_txn::SystemTransaction, TransactionInfo, Vec<Event>, u64)> for Transaction {
-    fn from((txn, info, events, timestamp): (&aptos_types::system_txn::SystemTransaction, TransactionInfo, Vec<Event>, u64)) -> Self {
+impl
+    From<(
+        &aptos_types::system_txn::SystemTransaction,
+        TransactionInfo,
+        Vec<Event>,
+        u64,
+    )> for Transaction
+{
+    fn from(
+        (txn, info, events, timestamp): (
+            &aptos_types::system_txn::SystemTransaction,
+            TransactionInfo,
+            Vec<Event>,
+            u64,
+        ),
+    ) -> Self {
         Transaction::SystemTransaction(SystemTransaction {
             info,
             events,

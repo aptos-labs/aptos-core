@@ -151,9 +151,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     timestamp: timestamp.into(),
                 })
             },
-            SystemTransaction(txn) => {
-                (&txn, info, events, timestamp).into()
-            }
+            SystemTransaction(txn) => (&txn, info, events, timestamp).into(),
         })
     }
 

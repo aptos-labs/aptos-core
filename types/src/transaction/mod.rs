@@ -51,7 +51,8 @@ pub mod signature_verified_transaction;
 
 use crate::{
     contract_event::TransactionEvent, executable::ModulePath, fee_statement::FeeStatement,
-    proof::accumulator::InMemoryEventAccumulator, write_set::TransactionWrite,
+    proof::accumulator::InMemoryEventAccumulator, system_txn::SystemTransaction,
+    write_set::TransactionWrite,
 };
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
@@ -65,7 +66,6 @@ pub use script::{
 };
 use serde::de::DeserializeOwned;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
-use crate::system_txn::SystemTransaction;
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;

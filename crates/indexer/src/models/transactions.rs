@@ -14,6 +14,7 @@ use super::{
 };
 use crate::{
     database::PgPoolConnection,
+    models::system_transactions::SystemTransaction,
     schema::{block_metadata_transactions, transactions, user_transactions},
     util::u64_to_bigdecimal,
 };
@@ -219,6 +220,33 @@ impl Transaction {
             APITransaction::PendingTransaction(..) => {
                 unreachable!()
             },
+            APITransaction::SystemTransaction(sys_txn) => {
+                let (wsc, wsc_detail) = WriteSetChangeModel::from_write_set_changes(
+                    &sys_txn.info.changes,
+                    sys_txn.info.version.0 as i64,
+                    block_height,
+                );
+                (
+                    Self::from_transaction_info(
+                        &sys_txn.info,
+                        None,
+                        transaction.type_str().to_string(),
+                        0,
+                        block_height,
+                        epoch,
+                    ),
+                    Some(TransactionDetail::System(
+                        SystemTransaction::from_transaction(sys_txn, block_height),
+                    )),
+                    EventModel::from_events(
+                        &sys_txn.events,
+                        sys_txn.info.version.0 as i64,
+                        block_height,
+                    ),
+                    wsc,
+                    wsc_detail,
+                )
+            },
         }
     }
 
@@ -408,6 +436,7 @@ impl TransactionQuery {
 pub enum TransactionDetail {
     User(UserTransaction, Vec<Signature>),
     BlockMetadata(BlockMetadataTransaction),
+    System(SystemTransaction),
 }
 
 // Prevent conflicts with other things named `Transaction`
