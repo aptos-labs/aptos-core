@@ -725,7 +725,6 @@ pub fn convert_transaction(
             transaction::transaction::TransactionType::StateCheckpoint
         },
         Transaction::PendingTransaction(_) => panic!("PendingTransaction is not supported"),
-        Transaction::SystemTransaction(_) => todo!(),
     };
 
     let txn_data = match &transaction {
@@ -776,7 +775,6 @@ pub fn convert_transaction(
             )
         },
         Transaction::PendingTransaction(_) => panic!("PendingTransaction not supported"),
-        Transaction::SystemTransaction(_) => todo!(),
     };
 
     transaction::Transaction {

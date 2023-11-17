@@ -50,7 +50,7 @@ pub use transaction::{
     FeePayerSignature, GasEstimation, GasEstimationBcs, GenesisPayload, GenesisTransaction,
     ModuleBundlePayload, MultiAgentSignature, MultiEd25519Signature, MultiKeySignature,
     MultisigPayload, MultisigTransactionPayload, PendingTransaction, PublicKey, ScriptPayload,
-    ScriptWriteSet, Signature, SingleKeySignature, SubmitTransactionRequest, SystemTransaction,
+    ScriptWriteSet, Signature, SingleKeySignature, SubmitTransactionRequest,
     Transaction, TransactionData, TransactionId, TransactionInfo, TransactionOnChainData,
     TransactionPayload, TransactionSignature, TransactionSigningMessage,
     TransactionsBatchSingleSubmissionFailure, TransactionsBatchSubmissionResult,

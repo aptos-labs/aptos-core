@@ -283,9 +283,6 @@ async fn fetch_nexts(
                         sct.info.block_height = Some(block_height_bcs);
                         sct.info.epoch = Some(epoch_bcs);
                     },
-                    Transaction::SystemTransaction(ref mut _st) => {
-                        todo!()
-                    },
                 };
                 txn
             }) {

@@ -1335,18 +1335,6 @@ impl From<&Transaction> for TransactionSummary {
                 pending: None,
                 sequence_number: None,
             },
-            Transaction::SystemTransaction(txn) => TransactionSummary {
-                transaction_hash: txn.info.hash,
-                gas_used: None,
-                gas_unit_price: None,
-                pending: None,
-                sender: None,
-                sequence_number: None,
-                success: Some(txn.info.success),
-                timestamp_us: Some(txn.timestamp.0),
-                version: Some(txn.info.version.0),
-                vm_status: Some(txn.info.vm_status.clone()),
-            },
         }
     }
 }
