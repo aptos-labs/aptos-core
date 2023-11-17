@@ -168,6 +168,7 @@ impl TDagMode for SyncMode {
             bootstrapper.time_service.clone(),
             bootstrapper.state_computer.clone(),
             bootstrapper.storage.clone(),
+            bootstrapper.payload_manager.clone(),
             bootstrapper
                 .onchain_config
                 .dag_ordering_causal_history_window as Round,
@@ -290,9 +291,11 @@ pub struct DagBootstrapper {
     payload_client: Arc<dyn PayloadClient>,
     state_computer: Arc<dyn StateComputer>,
     ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
+    quorum_store_enabled: bool,
 }
 
 impl DagBootstrapper {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         self_peer: Author,
         config: DagConsensusConfig,
@@ -308,6 +311,7 @@ impl DagBootstrapper {
         payload_client: Arc<dyn PayloadClient>,
         state_computer: Arc<dyn StateComputer>,
         ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
+        quorum_store_enabled: bool,
     ) -> Self {
         Self {
             self_peer,
@@ -324,6 +328,7 @@ impl DagBootstrapper {
             payload_client,
             state_computer,
             ordered_nodes_tx,
+            quorum_store_enabled,
         }
     }
 
@@ -402,6 +407,7 @@ impl DagBootstrapper {
         let dag = Arc::new(RwLock::new(Dag::new(
             self.epoch_state.clone(),
             self.storage.clone(),
+            self.payload_manager.clone(),
             initial_round,
             dag_window_size_config,
         )));
@@ -487,7 +493,6 @@ impl DagBootstrapper {
             self.self_peer,
             self.epoch_state.clone(),
             dag_store.clone(),
-            self.payload_manager.clone(),
             self.payload_client.clone(),
             rb,
             self.time_service.clone(),
@@ -499,6 +504,7 @@ impl DagBootstrapper {
             self.onchain_config.dag_ordering_causal_history_window as Round,
             self.config.node_payload_config.clone(),
             leader_reputation_adapter.clone(),
+            self.quorum_store_enabled,
         );
         let rb_handler = NodeBroadcastHandler::new(
             dag_store.clone(),
@@ -612,6 +618,7 @@ pub(super) fn bootstrap_dag_for_test(
         payload_client,
         state_computer,
         ordered_nodes_tx,
+        false,
     );
 
     let (_base_state, handler, fetch_service) = bootstraper.full_bootstrap();

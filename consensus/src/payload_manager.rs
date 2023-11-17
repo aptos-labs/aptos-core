@@ -22,11 +22,21 @@ use futures::{channel::mpsc::Sender, SinkExt};
 use std::sync::Arc;
 use tokio::sync::oneshot;
 
+pub trait TPayloadManager: Send + Sync {
+    fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64);
+}
+
 /// Responsible to extract the transactions out of the payload and notify QuorumStore about commits.
 /// If QuorumStore is enabled, has to ask BatchReader for the transaction behind the proofs of availability in the payload.
 pub enum PayloadManager {
     DirectMempool,
     InQuorumStore(Arc<BatchStore<NetworkSender>>, Sender<CoordinatorCommand>),
+}
+
+impl TPayloadManager for PayloadManager {
+    fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64) {
+        self.prefetch_payload_data(payload, timestamp);
+    }
 }
 
 impl PayloadManager {
