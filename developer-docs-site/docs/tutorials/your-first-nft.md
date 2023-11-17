@@ -392,7 +392,7 @@ To read a token's metadata:
 :!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_8
 ```
 
-Here's how `getTokenData` queries the token metadata using the [indexer client](../sdks/ts-sdk/typescript-sdk-indexer-client-class):
+Here's how `getTokenData` queries the token metadata using the [indexer client](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/providers/indexer.ts):
 ```ts
 :!: static/sdks/typescript/src/providers/indexer.ts getTokenData
 ```
