@@ -21,9 +21,10 @@ In order to create an Aptos Labs developer account simply go to https://develope
 Currently the following rate limits apply:
 
 1. GRPC Transaction Stream: 20 concurrent streams per user
-2. Fullnode API: 5000 requests per 5 minutes window
-3. GraphQL API: 5000 requests per 5 minutes window
-   Note that requests for the Fullnode API / GraphQL API are counted separately, so you can make 5000 Fullnode API requests AND 5000 GraphQL API requests in the same 5 window minutes.
+2. Fullnode API: 5000 requests per 5 minutes sliding window.
+3. GraphQL API: 5000 requests per 5 minutes sliding window.
+
+   Note that requests for the Fullnode API / GraphQL API are counted separately, so you can make 5000 Fullnode API requests AND 5000 GraphQL API requests in the same 5 minutes window. The rate limit is applied as a continuous sliding window.
 
 Rate limits are customizable per user upon request. If you have a use-case that requires higher rate limits than the default, please open a support case through one of the supported channels in the portal.
 
