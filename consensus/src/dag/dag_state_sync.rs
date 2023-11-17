@@ -8,7 +8,10 @@ use super::{
     types::{CertifiedNodeMessage, RemoteFetchRequest},
     ProofNotifier,
 };
-use crate::{dag::DAGMessage, network::IncomingDAGRequest, state_replication::StateComputer};
+use crate::{
+    dag::DAGMessage, network::IncomingDAGRequest, payload_manager::TPayloadManager,
+    state_replication::StateComputer,
+};
 use anyhow::ensure;
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::{Author, Round};
@@ -158,6 +161,7 @@ pub(super) struct DagStateSynchronizer {
     time_service: TimeService,
     state_computer: Arc<dyn StateComputer>,
     storage: Arc<dyn DAGStorage>,
+    payload_manager: Arc<dyn TPayloadManager>,
     dag_window_size_config: Round,
 }
 
@@ -167,6 +171,7 @@ impl DagStateSynchronizer {
         time_service: TimeService,
         state_computer: Arc<dyn StateComputer>,
         storage: Arc<dyn DAGStorage>,
+        payload_manager: Arc<dyn TPayloadManager>,
         dag_window_size_config: Round,
     ) -> Self {
         Self {
@@ -174,6 +179,7 @@ impl DagStateSynchronizer {
             time_service,
             state_computer,
             storage,
+            payload_manager,
             dag_window_size_config,
         }
     }
@@ -210,6 +216,7 @@ impl DagStateSynchronizer {
         let sync_dag_store = Arc::new(RwLock::new(Dag::new_empty(
             self.epoch_state.clone(),
             self.storage.clone(),
+            self.payload_manager.clone(),
             start_round,
             self.dag_window_size_config,
         )));
