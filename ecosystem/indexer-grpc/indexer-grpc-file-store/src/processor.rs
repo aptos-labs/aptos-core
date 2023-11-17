@@ -16,7 +16,7 @@ use aptos_indexer_grpc_utils::{
     file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
     storage::StorageFormat,
     time_diff_since_pb_timestamp_in_secs,
-    types::RedisUrl,
+    types::RedisUrl, timestamp_to_iso, timestamp_to_unixtime,
 };
 use aptos_moving_average::MovingAverage;
 use aptos_protos::transaction::v1::Transaction;
@@ -192,20 +192,11 @@ impl Processor {
             tps_calculator.tick_now(process_size as u64);
             let end_version = current_file_store_version + process_size as u64 - 1_u64;
             let num_transactions = end_version - current_file_store_version + 1;
-            let start_version_txn_latency =
-                time_diff_since_pb_timestamp_in_secs(&first_transaction_pb_timestamp);
-            let end_version_txn_latency =
-                time_diff_since_pb_timestamp_in_secs(&last_transaction_pb_timestamp);
             info!(
                 start_version = current_file_store_version,
                 end_version = end_version,
-                start_txn_timestamp_iso = start_version_timestamp
-                    .clone()
-                    .map(|t| timestamp_to_iso(&t))
-                    .unwrap_or_default(),
-                end_txn_timestamp_iso = end_version_timestamp
-                    .map(|t| timestamp_to_iso(&t))
-                    .unwrap_or_default(),
+                start_txn_timestamp_iso = timestamp_to_iso(&first_transaction_pb_timestamp),
+                end_txn_timestamp_iso = timestamp_to_iso(&last_transaction_pb_timestamp),
                 num_of_transactions = num_transactions,
                 duration_in_secs = file_store_upload_batch_start.elapsed().as_secs_f64(),
                 tps = (tps_calculator.avg() * 1000.0) as u64,
@@ -229,9 +220,7 @@ impl Processor {
                     IndexerGrpcStep::FilestoreUploadTxns.get_label(),
                 ])
                 .set(
-                    start_version_timestamp
-                        .map(|t| timestamp_to_unixtime(&t))
-                        .unwrap_or_default(),
+                    timestamp_to_unixtime(&first_transaction_pb_timestamp),
                 );
             NUM_TRANSACTIONS_COUNT
                 .with_label_values(&[
