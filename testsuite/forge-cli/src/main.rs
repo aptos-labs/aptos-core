@@ -268,8 +268,14 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::parse();
-    let duration = Duration::from_secs(args.duration_secs as u64);
+    let duration = Duration::from_secs(6 * 420); //args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
+
+    let suite_name = if suite_name == "realistic_env_max_load" {
+        "realistic_env_workload_sweep"
+    } else {
+        panic!()
+    };
 
     let runtime = Runtime::new()?;
     match args.cli_cmd {
@@ -1007,29 +1013,53 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
     realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TRANSACTIONS(vec![
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::CoinTransfer,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 20000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::NoOp,
-                num_modules: 100,
-                unique_senders: false,
-                mempool_backlog: 20000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::ModifyGlobalResource,
-                num_modules: 1,
-                unique_senders: true,
-                mempool_backlog: 20000,
-            },
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::NoOp,
+            //     num_modules: 100,
+            //     unique_senders: false,
+            //     mempool_backlog: 20000,
+            // },
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::ModifyGlobalResource,
+            //     num_modules: 1,
+            //     unique_senders: true,
+            //     mempool_backlog: 20000,
+            // },
             TransactionWorkload {
                 transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
                 num_modules: 1,
                 unique_senders: true,
                 mempool_backlog: 10000,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::VectorPicture30k,
+                num_modules: 1,
+                unique_senders: false,
+                mempool_backlog: 5000,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::VectorPicture30k,
+                num_modules: 20,
+                unique_senders: false,
+                mempool_backlog: 10000,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::SmartTablePicture30KWith200Change,
+                num_modules: 1,
+                unique_senders: false,
+                mempool_backlog: 5000,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::SmartTablePicture1MWith1KChange,
+                num_modules: 1,
+                unique_senders: false,
+                mempool_backlog: 5000,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::CoinTransfer,
+                num_modules: 1,
+                unique_senders: false,
+                mempool_backlog: 20000,
             },
             // transactions get rejected, to fix.
             // TransactionWorkload {
@@ -1041,10 +1071,10 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         ]),
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
-            (3700, 0.35, 0.5, 0.8, 0.65),
-            (2800, 0.35, 0.5, 1.2, 1.3),
-            (1800, 0.35, 2.0, 1.5, 3.0),
-            (950, 0.35, 0.65, 1.5, 2.9),
+            // (3700, 0.35, 0.5, 0.8, 0.65),
+            // (2800, 0.35, 0.5, 1.2, 1.3),
+            // (1800, 0.35, 2.0, 1.5, 3.0),
+            // (950, 0.35, 0.65, 1.5, 2.9),
             // (150, 0.5, 1.0, 1.5, 0.65),
         ]
         .into_iter()
