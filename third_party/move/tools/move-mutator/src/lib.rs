@@ -25,7 +25,7 @@ impl Options {
 
     /// Creates options from the TOML configuration file.
     pub fn from_toml_file(toml_file: &str) -> anyhow::Result<Options> {
-        Self::create_from_toml(&std::fs::read_to_string(toml_file)?)
+        Self::from_toml(&std::fs::read_to_string(toml_file)?)
     }
 
     /// Creates Options struct from command line arguments.

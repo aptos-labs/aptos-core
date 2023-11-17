@@ -28,6 +28,7 @@ move-disassembler = { path = "../move-disassembler" }
 move-docgen = { path = "../../move-prover/move-docgen" }
 move-errmapgen = { path = "../../move-prover/move-errmapgen" }
 move-model = { path = "../../move-model" }
+move-mutator = { path = "../move-mutator" }
 move-package = { path = "../move-package" }
 move-prover = { path = "../../move-prover" }
 move-stdlib = { path = "../../move-stdlib" }
