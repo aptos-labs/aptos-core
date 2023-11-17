@@ -14,8 +14,8 @@ use aptos_indexer_grpc_utils::{
         TRANSACTION_UNIX_TIMESTAMP,
     },
     file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
-    time_diff_since_pb_timestamp_in_secs,
     storage::StorageFormat,
+    time_diff_since_pb_timestamp_in_secs,
     types::RedisUrl,
 };
 use aptos_moving_average::MovingAverage;
@@ -168,8 +168,22 @@ impl Processor {
                 transactions_buffer.drain(..process_size).collect();
             // Hack: Though the copy is expensive here but we want to inspect the transaction timestamp in the log without
             // lifetime issue.
-            let first_transaction_pb_timestamp = current_batch.as_slice().first().unwrap().timestamp.as_ref().unwrap().clone();
-            let last_transaction_pb_timestamp = current_batch.as_slice().last().unwrap().timestamp.as_ref().unwrap().clone();
+            let first_transaction_pb_timestamp = current_batch
+                .as_slice()
+                .first()
+                .unwrap()
+                .timestamp
+                .as_ref()
+                .unwrap()
+                .clone();
+            let last_transaction_pb_timestamp = current_batch
+                .as_slice()
+                .last()
+                .unwrap()
+                .timestamp
+                .as_ref()
+                .unwrap()
+                .clone();
             self.file_store_operator
                 .upload_transactions(cache_chain_id, current_batch)
                 .await
@@ -178,9 +192,10 @@ impl Processor {
             tps_calculator.tick_now(process_size as u64);
             let end_version = current_file_store_version + process_size as u64 - 1_u64;
             let num_transactions = end_version - current_file_store_version + 1;
-
-            let start_version_txn_latency = time_diff_since_pb_timestamp_in_secs(&first_transaction_pb_timestamp);
-            let end_version_txn_latency = time_diff_since_pb_timestamp_in_secs(&last_transaction_pb_timestamp);
+            let start_version_txn_latency =
+                time_diff_since_pb_timestamp_in_secs(&first_transaction_pb_timestamp);
+            let end_version_txn_latency =
+                time_diff_since_pb_timestamp_in_secs(&last_transaction_pb_timestamp);
             info!(
                 start_version = current_file_store_version,
                 end_version = end_version,

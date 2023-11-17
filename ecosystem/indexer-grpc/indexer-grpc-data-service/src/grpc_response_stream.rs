@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::response_dispatcher::{GrpcResponseDispatcher, ResponseDispatcher};
+use crate::{
+    response_dispatcher::{GrpcResponseDispatcher, ResponseDispatcher},
+    RequestMetadata,
+};
 use aptos_indexer_grpc_data_access::StorageClient;
 use aptos_protos::indexer::v1::TransactionsResponse;
 use futures::Stream;
@@ -13,6 +16,7 @@ use tonic::Status;
 pub struct GrpcResponseStream {
     /// The channel for receiving responses from upstream clients.
     inner: tokio_stream::wrappers::ReceiverStream<Result<TransactionsResponse, Status>>,
+    pub request_metadata: RequestMetadata,
 }
 
 impl GrpcResponseStream {
@@ -21,27 +25,33 @@ impl GrpcResponseStream {
         transaction_count: Option<u64>,
         buffer_size: Option<usize>,
         storages: &[StorageClient],
+        request_metadata: RequestMetadata,
     ) -> anyhow::Result<Self> {
         let (channel_sender, channel_receiver) = channel(buffer_size.unwrap_or(12));
         let response_stream = Self {
             inner: tokio_stream::wrappers::ReceiverStream::new(channel_receiver),
+            request_metadata: request_metadata.clone(),
         };
         let storages = storages.to_vec();
         // Start a separate thread to generate the response for the stream.
-        tokio::spawn(async move {
-            let mut response_dispatcher = GrpcResponseDispatcher::new(
-                starting_version,
-                transaction_count,
-                channel_sender,
-                storages.as_slice(),
-            );
-            match response_dispatcher.run().await {
-                Ok(_) => {
-                    tracing::info!("Response dispatcher finished successfully.");
-                },
-                Err(e) => {
-                    tracing::error!("Response dispatcher failed: {}", e);
-                },
+        tokio::spawn({
+            let request_metadata = request_metadata.clone();
+            async move {
+                let mut response_dispatcher = GrpcResponseDispatcher::new(
+                    starting_version,
+                    transaction_count,
+                    channel_sender,
+                    storages.as_slice(),
+                    request_metadata,
+                );
+                match response_dispatcher.run().await {
+                    Ok(_) => {
+                        tracing::info!("Response dispatcher finished successfully.");
+                    },
+                    Err(e) => {
+                        tracing::error!("Response dispatcher failed: {}", e);
+                    },
+                }
             }
         });
         Ok(response_stream)

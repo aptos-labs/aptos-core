@@ -28,8 +28,8 @@ use aptos_protos::{
     },
     util::timestamp::Timestamp,
 };
-use prost::Message;
 use futures::{self, StreamExt};
+use prost::Message;
 use tracing::{error, info};
 use url::Url;
 
@@ -206,10 +206,24 @@ async fn process_transactions_from_node_response(
                 .map(|t| time_diff_since_pb_timestamp_in_secs(t.timestamp.as_ref().unwrap()));
             let transactions = data.transactions;
             let transaction_len = transactions.len();
-            let first_transaction_version = transactions.first().context("Empty transaction response found")?.version;
-            let last_transaction_version = transactions.last().context("Empty transaction response found")?.version;
-            let first_transaction_pb_timestamp = transactions.first().context("Empty transaction response found")?.timestamp.clone();
-            let last_transaction_pb_timestamp = transactions.last().context("Empty transaction response found")?.timestamp.clone();
+            let first_transaction_version = transactions
+                .first()
+                .context("Empty transaction response found")?
+                .version;
+            let last_transaction_version = transactions
+                .last()
+                .context("Empty transaction response found")?
+                .version;
+            let first_transaction_pb_timestamp = transactions
+                .first()
+                .context("Empty transaction response found")?
+                .timestamp
+                .clone();
+            let last_transaction_pb_timestamp = transactions
+                .last()
+                .context("Empty transaction response found")?
+                .timestamp
+                .clone();
             // Push to cache.
             match cache_operator.update_cache_transactions(transactions).await {
                 Ok(_) => {},
@@ -233,7 +247,7 @@ async fn process_transactions_from_node_response(
             Ok(GrpcDataStatus::ChunkDataOk {
                 num_of_transactions: transaction_len as u64,
                 start_version: first_transaction_version,
-                end_version:  last_transaction_version,
+                end_version: last_transaction_version,
                 start_version_txn_timestamp: first_transaction_pb_timestamp,
                 end_version_txn_timestamp: last_transaction_pb_timestamp,
             })

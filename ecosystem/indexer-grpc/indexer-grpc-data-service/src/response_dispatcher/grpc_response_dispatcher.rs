@@ -1,12 +1,13 @@
 // Copyright © Aptos Foundation
 
-use crate::response_dispatcher::ResponseDispatcher;
+use crate::{response_dispatcher::ResponseDispatcher, RequestMetadata, SERVICE_TYPE};
 use aptos_indexer_grpc_data_access::{
     access_trait::{StorageReadError, StorageReadStatus, StorageTransactionRead},
     StorageClient,
 };
-use aptos_indexer_grpc_utils::{chunk_transactions, constants::MESSAGE_SIZE_LIMIT};
-use aptos_logger::prelude::{sample, SampleRate};
+use aptos_indexer_grpc_utils::{
+    chunk_transactions, constants::MESSAGE_SIZE_LIMIT, time_diff_since_pb_timestamp_in_secs,
+};
 use aptos_protos::indexer::v1::TransactionsResponse;
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
@@ -28,15 +29,18 @@ pub struct GrpcResponseDispatcher {
     sender: Sender<Result<TransactionsResponse, Status>>,
     storages: Vec<StorageClient>,
     sender_capacity: usize,
+    request_metadata: RequestMetadata,
 }
 
 impl GrpcResponseDispatcher {
     // Fetches the next batch of responses from storage.
     // This is a stateless function that only fetches from storage based on current state.
-    async fn fetch_from_storages(&self) -> Result<Vec<TransactionsResponse>, StorageReadError> {
+    async fn fetch_from_storages(
+        &self,
+    ) -> Result<(Vec<TransactionsResponse>, usize), StorageReadError> {
         if let Some(transaction_count) = self.transaction_count {
             if transaction_count == 0 {
-                return Ok(vec![]);
+                return Ok((vec![], 0));
             }
         }
         // Loop to wait for the next storage to be available.
@@ -48,7 +52,7 @@ impl GrpcResponseDispatcher {
                     anyhow::anyhow!("Sender is closed."),
                 ));
             }
-            for storage in self.storages.as_slice() {
+            for (index, storage) in self.storages.as_slice().iter().enumerate() {
                 let metadata = storage.get_metadata().await?;
                 match storage
                     .get_transactions(self.next_version_to_process, None)
@@ -56,13 +60,16 @@ impl GrpcResponseDispatcher {
                 {
                     Ok(StorageReadStatus::Ok(transactions)) => {
                         let responses = chunk_transactions(transactions, MESSAGE_SIZE_LIMIT);
-                        return Ok(responses
-                            .into_iter()
-                            .map(|transactions| TransactionsResponse {
-                                transactions,
-                                chain_id: Some(metadata.chain_id),
-                            })
-                            .collect());
+                        return Ok((
+                            responses
+                                .into_iter()
+                                .map(|transactions| TransactionsResponse {
+                                    transactions,
+                                    chain_id: Some(metadata.chain_id),
+                                })
+                                .collect(),
+                            index,
+                        ));
                     },
                     Ok(StorageReadStatus::NotAvailableYet) => {
                         // This is fatal; it means previous storage evicts the data before the current storage has it.
@@ -102,7 +109,8 @@ impl GrpcResponseDispatcher {
     // Based on the response from fetch_from_storages, verify and dispatch the response, and update the state.
     async fn fetch_internal(&mut self) -> Result<Vec<TransactionsResponse>, StorageReadError> {
         // TODO: add retry to TransientError.
-        let responses = self.fetch_from_storages().await?;
+        let start_time = std::time::Instant::now();
+        let (responses, index) = self.fetch_from_storages().await?;
         // Verify no empty response.
         if responses.iter().any(|v| v.transactions.is_empty()) {
             return Err(StorageReadError::TransientError(
@@ -110,8 +118,31 @@ impl GrpcResponseDispatcher {
                 anyhow::anyhow!("Empty responses from storages."),
             ));
         }
+        let start_version_txn_latency = time_diff_since_pb_timestamp_in_secs(
+            responses
+                .first()
+                .unwrap()
+                .transactions
+                .first()
+                .unwrap()
+                .timestamp
+                .as_ref()
+                .unwrap(),
+        );
+        let end_version_txn_latency = time_diff_since_pb_timestamp_in_secs(
+            responses
+                .last()
+                .unwrap()
+                .transactions
+                .last()
+                .unwrap()
+                .timestamp
+                .as_ref()
+                .unwrap(),
+        );
         // Verify responses are consecutive and sequential.
         let mut version = self.next_version_to_process;
+        let starting_version = version;
         for response in responses.iter() {
             for transaction in response.transactions.iter() {
                 if transaction.version != version {
@@ -160,6 +191,24 @@ impl GrpcResponseDispatcher {
             .map(|v| v.transactions.len())
             .sum::<usize>() as u64;
         self.next_version_to_process += processed_transactions_count;
+        let storage_type = match index {
+            0 => "in memory",
+            1 => "file store",
+            _ => "unknown",
+        };
+        tracing::info!(
+            start_version = starting_version,
+            end_version = starting_version + processed_transactions_count - 1,
+            start_version_txn_latency,
+            end_version_txn_latency,
+            num_of_transactions = processed_transactions_count,
+            duration_in_secs = start_time.elapsed().as_secs_f64(),
+            connection_id = self.request_metadata.connection_id.as_str(),
+            service_type = SERVICE_TYPE,
+            step = 2.0 + (index as f64 / 10.0),
+            "[Data Service] Data fetched from {}.",
+            storage_type
+        );
         Ok(processed_responses)
     }
 }
@@ -171,6 +220,7 @@ impl ResponseDispatcher for GrpcResponseDispatcher {
         transaction_count: Option<u64>,
         sender: Sender<Result<TransactionsResponse, Status>>,
         storages: &[StorageClient],
+        request_metadata: RequestMetadata,
     ) -> Self {
         let sender_capacity = sender.capacity();
         Self {
@@ -179,6 +229,7 @@ impl ResponseDispatcher for GrpcResponseDispatcher {
             sender,
             sender_capacity,
             storages: storages.to_vec(),
+            request_metadata,
         }
     }
 
@@ -243,25 +294,66 @@ impl ResponseDispatcher for GrpcResponseDispatcher {
         response: Result<TransactionsResponse, Status>,
     ) -> anyhow::Result<()> {
         let start_time = std::time::Instant::now();
+        let first_version_opt = response
+            .as_ref()
+            .ok()
+            .map(|v| v.transactions.first().unwrap().version);
+        let end_version_opt = response
+            .as_ref()
+            .ok()
+            .map(|v| v.transactions.last().unwrap().version);
+        let start_version_txn_latency = response.as_ref().ok().map(|v| {
+            time_diff_since_pb_timestamp_in_secs(
+                v.transactions.first().unwrap().timestamp.as_ref().unwrap(),
+            )
+        });
+        let end_version_txn_latency = response.as_ref().ok().map(|v| {
+            time_diff_since_pb_timestamp_in_secs(
+                v.transactions.last().unwrap().timestamp.as_ref().unwrap(),
+            )
+        });
+        let num_of_transactions_opt = response.as_ref().ok().map(|v| v.transactions.len());
         match self
             .sender
             .send_timeout(response, RESPONSE_CHANNEL_SEND_TIMEOUT)
             .await
         {
-            Ok(_) => {},
+            Ok(_) => {
+                if let Some(first_version) = first_version_opt {
+                    tracing::info!(
+                        start_version = first_version,
+                        end_version = end_version_opt.unwrap(),
+                        start_version_txn_latency = start_version_txn_latency.unwrap(),
+                        end_version_txn_latency = end_version_txn_latency.unwrap(),
+                        num_of_transactions = num_of_transactions_opt.unwrap(),
+                        duration_in_secs = start_time.elapsed().as_secs_f64(),
+                        connection_id = self.request_metadata.connection_id.as_str(),
+                        service_type = SERVICE_TYPE,
+                        step = 3,
+                        "[Data Service] One chunk of transactions sent to GRPC response channel."
+                    );
+                }
+            },
             Err(e) => {
                 tracing::warn!("Failed to send response to downstream: {:#}", e);
                 return Err(anyhow::anyhow!("Failed to send response to downstream."));
             },
         };
-        sample!(
-            SampleRate::Duration(Duration::from_secs(60)),
-            tracing::info!(
-                "[GrpcResponseDispatch] response waiting time in seconds: {}",
-                start_time.elapsed().as_secs_f64()
-            );
-        );
         Ok(())
+    }
+}
+
+impl Drop for GrpcResponseDispatcher {
+    fn drop(&mut self) {
+        tracing::info!(
+            request_email = self.request_metadata.request_email.as_str(),
+            request_api_key_name = self.request_metadata.request_api_key_name.as_str(),
+            processor_name = self.request_metadata.processor_name.as_str(),
+            connection_id = self.request_metadata.connection_id.as_str(),
+            request_user_classification = self.request_metadata.user_classification.as_str(),
+            service_type = SERVICE_TYPE,
+            "[Data Service] Client disconnected."
+        );
     }
 }
 
@@ -293,8 +385,13 @@ mod tests {
                 StorageClient::MockClient(MockStorageClient::new(2, second_storage_transactions)),
                 StorageClient::MockClient(MockStorageClient::new(3, third_storage_transactions)),
             ];
-            let mut dispatcher =
-                GrpcResponseDispatcher::new(0, Some(40), sender, storages.as_slice());
+            let mut dispatcher = GrpcResponseDispatcher::new(
+                0,
+                Some(40),
+                sender,
+                storages.as_slice(),
+                RequestMetadata::default(),
+            );
             let run_result = dispatcher.run().await;
             assert!(run_result.is_ok());
         });
@@ -322,8 +419,13 @@ mod tests {
                 StorageClient::MockClient(MockStorageClient::new(1, first_storage_transactions)),
                 StorageClient::MockClient(MockStorageClient::new(2, second_storage_transactions)),
             ];
-            let mut dispatcher =
-                GrpcResponseDispatcher::new(15, Some(30), sender, storages.as_slice());
+            let mut dispatcher = GrpcResponseDispatcher::new(
+                15,
+                Some(30),
+                sender,
+                storages.as_slice(),
+                RequestMetadata::default(),
+            );
             let run_result = dispatcher.run().await;
             assert!(run_result.is_err());
         });
@@ -351,7 +453,13 @@ mod tests {
                 StorageClient::MockClient(MockStorageClient::new(2, second_storage_transactions)),
                 StorageClient::MockClient(MockStorageClient::new(3, third_storage_transactions)),
             ];
-            let mut dispatcher = GrpcResponseDispatcher::new(0, None, sender, storages.as_slice());
+            let mut dispatcher = GrpcResponseDispatcher::new(
+                0,
+                None,
+                sender,
+                storages.as_slice(),
+                RequestMetadata::default(),
+            );
             dispatcher.run().await
         });
         // Let the dispatcher run for 1 second.
@@ -395,8 +503,13 @@ mod tests {
                 1,
                 first_storage_transactions,
             ))];
-            let mut dispatcher =
-                GrpcResponseDispatcher::new(0, Some(40), sender, storages.as_slice());
+            let mut dispatcher = GrpcResponseDispatcher::new(
+                0,
+                Some(40),
+                sender,
+                storages.as_slice(),
+                RequestMetadata::default(),
+            );
             let run_result = dispatcher.run().await;
             assert!(run_result.is_err());
         });
@@ -416,7 +529,13 @@ mod tests {
                 StorageClient::MockClient(MockStorageClient::new(1, first_storage_transactions)),
                 StorageClient::MockClient(MockStorageClient::new(1, second_storage_transactions)),
             ];
-            let mut dispatcher = GrpcResponseDispatcher::new(0, None, sender, storages.as_slice());
+            let mut dispatcher = GrpcResponseDispatcher::new(
+                0,
+                None,
+                sender,
+                storages.as_slice(),
+                RequestMetadata::default(),
+            );
             let run_result = dispatcher.run().await;
             assert!(run_result.is_err());
         });

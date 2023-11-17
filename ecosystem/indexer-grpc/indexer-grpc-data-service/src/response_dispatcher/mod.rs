@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use crate::RequestMetadata;
 use aptos_indexer_grpc_data_access::StorageClient;
 use aptos_protos::indexer::v1::TransactionsResponse;
 use tokio::sync::mpsc::Sender;
@@ -19,6 +20,7 @@ pub trait ResponseDispatcher {
         // if it fails to fetch from the first storage, it will try the second one, etc.
         // StorageClient is expected to be *cheap to clone*.
         storage_clients: &[StorageClient],
+        request_metadata: RequestMetadata,
     ) -> Self;
     // Dispatch a single response to the channel.
     async fn dispatch(
