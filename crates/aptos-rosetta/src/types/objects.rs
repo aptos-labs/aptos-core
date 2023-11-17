@@ -854,7 +854,6 @@ pub enum TransactionType {
     Genesis,
     BlockMetadata,
     StateCheckpoint,
-    System,
 }
 
 impl Display for TransactionType {
@@ -865,7 +864,6 @@ impl Display for TransactionType {
             Genesis => "Genesis",
             BlockMetadata => "BlockResource",
             StateCheckpoint => "StateCheckpoint",
-            System => "System",
         })
     }
 }
@@ -883,7 +881,6 @@ impl Transaction {
             GenesisTransaction(_) => (TransactionType::Genesis, None, txn.info, txn.events),
             BlockMetadata(_) => (TransactionType::BlockMetadata, None, txn.info, txn.events),
             StateCheckpoint(_) => (TransactionType::StateCheckpoint, None, txn.info, vec![]),
-            SystemTransaction(_) => (TransactionType::System, None, txn.info, txn.events),
         };
 
         // Operations must be sequential and operation index must always be in the same order

@@ -334,7 +334,7 @@ impl ProposalGenerator {
             false,
             proposer_election,
         );
-
+        // create block proposal
         Ok(BlockData::new_proposal(
             payload,
             self.author,

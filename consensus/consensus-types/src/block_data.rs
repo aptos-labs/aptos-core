@@ -43,7 +43,6 @@ pub enum BlockType {
     /// from the previous epoch.  The genesis block is used as the first root block of the
     /// BlockTree for all epochs.
     Genesis,
-
     /// A virtual block that's constructed by nodes from DAG, this is purely a local thing so
     /// we hide it from serde
     #[serde(skip_deserializing)]

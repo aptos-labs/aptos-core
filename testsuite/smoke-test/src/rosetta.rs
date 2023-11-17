@@ -1095,13 +1095,6 @@ async fn parse_block_transactions(
                 ));
                 assert!(transaction.operations.is_empty());
             },
-            TransactionType::System => {
-                assert!(matches!(
-                    actual_txn.transaction,
-                    aptos_types::transaction::Transaction::SystemTransaction(_)
-                ));
-                assert!(transaction.operations.is_empty());
-            },
         }
 
         parse_operations(
