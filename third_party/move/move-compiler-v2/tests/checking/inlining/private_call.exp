@@ -27,3 +27,11 @@ module 0x42::n {
         Tuple()
     }
 } // end 0x42::n
+
+
+Diagnostics:
+error: function `0x42::m::bar` cannot be called here because it is private to module `0x42::m`
+  ┌─ tests/checking/inlining/private_call.move:4:9
+  │
+4 │         bar()
+  │         ^^^^^

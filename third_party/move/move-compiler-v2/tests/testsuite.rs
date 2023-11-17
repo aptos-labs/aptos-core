@@ -78,7 +78,17 @@ impl TestConfig {
     fn get_config_from_path(path: &Path) -> TestConfig {
         let path = path.to_string_lossy();
         let mut pipeline = FunctionTargetPipeline::default();
-        if path.contains("/checking/") {
+        if path.contains("/checking/inlining/") {
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(VisibilityChecker {}));
+            Self {
+                type_check_only: false,
+                dump_ast: true,
+                pipeline,
+                generate_file_format: false,
+                dump_annotated_targets: false,
+            }
+        } else if path.contains("/checking/") {
             Self {
                 type_check_only: true,
                 dump_ast: true,
