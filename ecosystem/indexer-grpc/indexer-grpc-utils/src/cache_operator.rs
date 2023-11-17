@@ -174,6 +174,17 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
         Ok(chain_id)
     }
 
+    pub async fn get_dbsize(&mut self) -> anyhow::Result<i64> {
+        let dbsize = match redis::cmd("DBSIZE")
+            .query_async::<T, i64>(&mut self.conn)
+            .await
+        {
+            Ok(v) => v,
+            Err(err) => return Err(err.into()),
+        };
+        Ok(dbsize)
+    }
+
     // Internal function to get the latest version from cache.
     pub(crate) async fn check_cache_coverage_status(
         &mut self,
@@ -230,7 +241,18 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
             redis_pipeline.query_async::<_, _>(&mut self.conn).await;
 
         match redis_result {
-            Ok(_) => Ok(()),
+            Ok(_) => {
+                let latest_version = self.get_latest_version().await?;
+                let db_size = self.get_dbsize().await?;
+
+                tracing::info!(
+                    start_version = (latest_version as i64) - db_size + 1,
+                    end_version = latest_version,
+                    num_of_transactions = db_size,
+                    "[Cache worker] Cache updated with transactions."
+                );
+                Ok(())
+            },
             Err(err) => Err(err.into()),
         }
     }

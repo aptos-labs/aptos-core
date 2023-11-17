@@ -4,6 +4,7 @@
 pub mod cache_operator;
 pub mod config;
 pub mod constants;
+pub mod counters;
 pub mod file_store_operator;
 pub mod types;
 
@@ -18,6 +19,9 @@ use std::time::Duration;
 use url::Url;
 
 pub type GrpcClientType = FullnodeDataClient<tonic::transport::Channel>;
+
+// 9999-12-31 23:59:59, this is the max supported by Google BigQuery
+pub const MAX_TIMESTAMP_SECS: i64 = 253_402_300_799;
 
 /// Create a gRPC client with exponential backoff.
 pub async fn create_grpc_client(address: Url) -> GrpcClientType {
@@ -104,6 +108,30 @@ pub fn time_diff_since_pb_timestamp_in_secs(timestamp: &Timestamp) -> f64 {
         .as_secs_f64();
     let transaction_time = timestamp.seconds as f64 + timestamp.nanos as f64 * 1e-9;
     current_timestamp - transaction_time
+}
+
+/// Convert the protobuf timestamp to ISO format
+pub fn timestamp_to_iso(timestamp: &Timestamp) -> String {
+    let dt = parse_timestamp(timestamp, 0);
+    dt.format("%Y-%m-%dT%H:%M:%S%.9fZ").to_string()
+}
+
+/// Convert the protobuf timestamp to unixtime
+pub fn timestamp_to_unixtime(timestamp: &Timestamp) -> f64 {
+    timestamp.seconds as f64 + timestamp.nanos as f64 * 1e-9
+}
+
+pub fn parse_timestamp(ts: &Timestamp, version: i64) -> chrono::NaiveDateTime {
+    let final_ts = if ts.seconds >= MAX_TIMESTAMP_SECS {
+        Timestamp {
+            seconds: MAX_TIMESTAMP_SECS,
+            nanos: 0,
+        }
+    } else {
+        ts.clone()
+    };
+    chrono::NaiveDateTime::from_timestamp_opt(final_ts.seconds, final_ts.nanos as u32)
+        .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
 }
 
 /// Chunk transactions into chunks with chunk size less than or equal to chunk_size.

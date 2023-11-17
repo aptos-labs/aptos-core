@@ -1,20 +1,31 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::{LATEST_PROCESSED_VERSION, PROCESSED_VERSIONS_COUNT};
+use crate::metrics::{
+    LATEST_PROCESSED_VERSION as LATEST_PROCESSED_VERSION_OLD, PROCESSED_VERSIONS_COUNT,
+};
 use anyhow::{bail, Context, Result};
 use aptos_indexer_grpc_utils::{
     build_protobuf_encoded_transaction_wrappers,
     cache_operator::{CacheBatchGetStatus, CacheOperator},
     config::IndexerGrpcFileStoreConfig,
     constants::BLOB_STORAGE_SIZE,
+    counters::{
+        IndexerGrpcStep, DURATION_IN_SECS, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_COUNT,
+        TRANSACTION_UNIX_TIMESTAMP,
+    },
     file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
+    timestamp_to_iso, timestamp_to_unixtime,
     types::RedisUrl,
     EncodedTransactionWithVersion,
 };
 use aptos_moving_average::MovingAverage;
+use aptos_protos::transaction::v1::Transaction;
+use prost::Message;
 use std::time::Duration;
 use tracing::info;
+
+const SERVICE_TYPE: &str = "file_worker";
 
 // If the version is ahead of the cache head, retry after a short sleep.
 const AHEAD_OF_CACHE_SLEEP_DURATION_IN_MILLIS: u64 = 100;
@@ -105,6 +116,7 @@ impl Processor {
                 bail!("File store version is not a multiple of BLOB_STORAGE_SIZE.");
             }
 
+            let file_store_upload_batch_start = std::time::Instant::now();
             let batch_get_result = self
                 .cache_operator
                 .batch_get_encoded_proto_data(current_cache_version)
@@ -141,21 +153,90 @@ impl Processor {
             }
             // Drain the transactions buffer and upload to file store in size of multiple of BLOB_STORAGE_SIZE.
             let process_size = transactions_buffer.len() / BLOB_STORAGE_SIZE * BLOB_STORAGE_SIZE;
-            let current_batch = transactions_buffer.drain(..process_size).collect();
-
+            let current_batch: Vec<EncodedTransactionWithVersion> =
+                transactions_buffer.drain(..process_size).collect();
+            // Hack: Though the copy is expensive here but we want to inspect the transaction timestamp in the log without
+            // lifetime issue.
+            let first_transaction = current_batch.as_slice().first().unwrap().clone();
+            let last_transaction = current_batch.as_slice().last().unwrap().clone();
             self.file_store_operator
                 .upload_transactions(cache_chain_id, current_batch)
                 .await
                 .context("Uploading transactions to file store failed.")?;
             PROCESSED_VERSIONS_COUNT.inc_by(process_size as u64);
             tps_calculator.tick_now(process_size as u64);
+            let end_version = current_file_store_version + process_size as u64 - 1_u64;
+            let num_transactions = end_version - current_file_store_version + 1;
+            let start_version_timestamp = {
+                let encoded_transaction = first_transaction.0;
+                let decoded_transaction =
+                    base64::decode(encoded_transaction).expect("Failed to decode base64.");
+                let transaction =
+                    Transaction::decode(&*decoded_transaction).expect("Failed to decode protobuf.");
+                transaction.timestamp
+            };
+            let end_version_timestamp = {
+                let encoded_transaction = last_transaction.0;
+                let decoded_transaction =
+                    base64::decode(encoded_transaction).expect("Failed to decode base64.");
+                let transaction =
+                    Transaction::decode(&*decoded_transaction).expect("Failed to decode protobuf.");
+                transaction.timestamp
+            };
             info!(
+                start_version = current_file_store_version,
+                end_version = end_version,
+                start_txn_timestamp_iso = start_version_timestamp
+                    .clone()
+                    .map(|t| timestamp_to_iso(&t))
+                    .unwrap_or_default(),
+                end_txn_timestamp_iso = end_version_timestamp
+                    .map(|t| timestamp_to_iso(&t))
+                    .unwrap_or_default(),
+                num_of_transactions = num_transactions,
+                duration_in_secs = file_store_upload_batch_start.elapsed().as_secs_f64(),
                 tps = (tps_calculator.avg() * 1000.0) as u64,
                 current_file_store_version = current_file_store_version,
-                "Upload transactions to file store."
+                service_type = SERVICE_TYPE,
+                step = IndexerGrpcStep::FilestoreUploadTxns.get_step(),
+                "{}",
+                IndexerGrpcStep::FilestoreUploadTxns.get_label(),
             );
+            LATEST_PROCESSED_VERSION
+                .with_label_values(&[
+                    SERVICE_TYPE,
+                    IndexerGrpcStep::FilestoreUploadTxns.get_step(),
+                    IndexerGrpcStep::FilestoreUploadTxns.get_label(),
+                ])
+                .set(end_version as i64);
+            TRANSACTION_UNIX_TIMESTAMP
+                .with_label_values(&[
+                    SERVICE_TYPE,
+                    IndexerGrpcStep::FilestoreUploadTxns.get_step(),
+                    IndexerGrpcStep::FilestoreUploadTxns.get_label(),
+                ])
+                .set(
+                    start_version_timestamp
+                        .map(|t| timestamp_to_unixtime(&t))
+                        .unwrap_or_default(),
+                );
+            NUM_TRANSACTIONS_COUNT
+                .with_label_values(&[
+                    SERVICE_TYPE,
+                    IndexerGrpcStep::FilestoreUploadTxns.get_step(),
+                    IndexerGrpcStep::FilestoreUploadTxns.get_label(),
+                ])
+                .set(num_transactions as i64);
+            DURATION_IN_SECS
+                .with_label_values(&[
+                    SERVICE_TYPE,
+                    IndexerGrpcStep::FilestoreUploadTxns.get_step(),
+                    IndexerGrpcStep::FilestoreUploadTxns.get_label(),
+                ])
+                .set(file_store_upload_batch_start.elapsed().as_secs_f64());
+
             current_file_store_version += process_size as u64;
-            LATEST_PROCESSED_VERSION.set(current_file_store_version as i64);
+            LATEST_PROCESSED_VERSION_OLD.set(current_file_store_version as i64);
         }
     }
 }
