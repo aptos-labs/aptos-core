@@ -18,6 +18,7 @@ aptos-indexer-grpc-server-framework = { workspace = true }
 aptos-indexer-grpc-utils = { workspace = true }
 aptos-metrics-core  =   { workspace = true }
 aptos-moving-average = { workspace = true }
+aptos-protos = { workspace = true }
 aptos-runtimes = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }

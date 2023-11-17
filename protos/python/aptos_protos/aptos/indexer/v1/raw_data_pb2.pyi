@@ -26,6 +26,22 @@ class GetTransactionsRequest(_message.Message):
         batch_size: _Optional[int] = ...,
     ) -> None: ...
 
+class TransactionsInStorage(_message.Message):
+    __slots__ = ["transactions", "starting_version"]
+    TRANSACTIONS_FIELD_NUMBER: _ClassVar[int]
+    STARTING_VERSION_FIELD_NUMBER: _ClassVar[int]
+    transactions: _containers.RepeatedCompositeFieldContainer[
+        _transaction_pb2.Transaction
+    ]
+    starting_version: int
+    def __init__(
+        self,
+        transactions: _Optional[
+            _Iterable[_Union[_transaction_pb2.Transaction, _Mapping]]
+        ] = ...,
+        starting_version: _Optional[int] = ...,
+    ) -> None: ...
+
 class TransactionsResponse(_message.Message):
     __slots__ = ["transactions", "chain_id"]
     TRANSACTIONS_FIELD_NUMBER: _ClassVar[int]

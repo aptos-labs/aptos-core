@@ -3,8 +3,7 @@
 
 use anyhow::Result;
 use aptos_indexer_grpc_post_processor::{
-    file_storage_verifier::FileStorageVerifier, metrics::TASK_FAILURE_COUNT,
-    pfn_ledger_checker::PfnLedgerChecker,
+    metrics::TASK_FAILURE_COUNT, pfn_ledger_checker::PfnLedgerChecker,
 };
 use aptos_indexer_grpc_server_framework::{RunnableConfig, ServerArgs};
 use aptos_indexer_grpc_utils::config::IndexerGrpcFileStoreConfig;
@@ -69,23 +68,6 @@ impl RunnableConfig for IndexerGrpcPostProcessorConfig {
                                     .inc();
                             },
                         };
-                    }
-                }
-            }));
-        }
-
-        if let Some(config) = &self.file_storage_verifier {
-            tasks.push(tokio::spawn({
-                let config = config.clone();
-                async move {
-                    let checker =
-                        FileStorageVerifier::new(config.file_store_config.clone(), config.chain_id);
-                    info!("Starting FileStorageVerifier");
-                    if let Err(err) = checker.run().await {
-                        tracing::error!("FileStorageVerifier failed: {:?}", err);
-                        TASK_FAILURE_COUNT
-                            .with_label_values(&["file_storage_verifier"])
-                            .inc();
                     }
                 }
             }));

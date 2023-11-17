@@ -2,30 +2,34 @@
 
 use crate::{
     access_trait::{AccessMetadata, StorageReadError, StorageReadStatus, StorageTransactionRead},
-    get_transactions_file_name, FileMetadata, TransactionsFile,
+    FileMetadata,
 };
-use aptos_protos::transaction::v1::Transaction;
+use aptos_indexer_grpc_utils::storage::{FileEntry, FileEntryKey, StorageFormat};
+use aptos_protos::{indexer::v1::TransactionsInStorage, transaction::v1::Transaction};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 const LOCAL_FILE_STORAGE_NAME: &str = "Local File";
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct LocalFileClientConfig {
     // The absolute path to the folder that contains the transactions files.
     path: String,
+    storage_format: StorageFormat,
 }
 
 #[derive(Clone)]
 pub struct LocalFileClient {
     pub file_path: PathBuf,
+    pub storage_format: StorageFormat,
 }
 
 impl LocalFileClient {
-    pub fn new(config: LocalFileClientConfig) -> anyhow::Result<Self> {
+    pub async fn new(config: LocalFileClientConfig) -> anyhow::Result<Self> {
         Ok(Self {
             file_path: PathBuf::from(config.path),
+            storage_format: config.storage_format,
         })
     }
 }
@@ -50,10 +54,8 @@ impl StorageTransactionRead for LocalFileClient {
         batch_starting_version: u64,
         _size_hint: Option<usize>,
     ) -> Result<StorageReadStatus, StorageReadError> {
-        let file_path = self
-            .file_path
-            .clone()
-            .join(get_transactions_file_name(batch_starting_version));
+        let file_name = FileEntryKey::new(batch_starting_version, self.storage_format).to_string();
+        let file_path = self.file_path.clone().join(file_name);
         let file = match tokio::fs::read(file_path.clone()).await {
             Ok(file) => file,
             Err(e) => {
@@ -75,11 +77,21 @@ impl StorageTransactionRead for LocalFileClient {
                 }
             },
         };
-        let transactions_file = TransactionsFile::from(file);
-        let all_transactions: Vec<Transaction> = transactions_file.into();
+        let file_entry = match self.storage_format {
+            StorageFormat::JsonBase64UncompressedProto => {
+                FileEntry::JsonBase64UncompressedProto(file)
+            },
+            StorageFormat::Bz2CompressedProto => FileEntry::Bz2CompressedProto(file),
+            StorageFormat::GzipCompressionProto => FileEntry::GzipCompressionProto(file),
+            _ => panic!("Unsupported storage format: {:?}", self.storage_format),
+        };
+        let transactions_in_storage: TransactionsInStorage = file_entry
+            .try_into()
+            .expect("FileEntry to TransactionsInStorage failed");
+        let all_transactions: Vec<Transaction> = transactions_in_storage.transactions;
         let transactions = all_transactions
             .into_iter()
-            .skip((batch_starting_version % 1000) as usize)
+            .filter(|transaction| transaction.version >= batch_starting_version)
             .collect::<Vec<Transaction>>();
         Ok(StorageReadStatus::Ok(transactions))
     }
@@ -97,6 +109,7 @@ impl StorageTransactionRead for LocalFileClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aptos_indexer_grpc_utils::storage::TransactionsLegacyFile;
     use aptos_protos::transaction::v1::Transaction;
     use prost::Message;
     use std::{
@@ -112,9 +125,9 @@ mod tests {
             .collect()
     }
 
-    fn create_transactions_file(starting_version: u64) -> TransactionsFile {
-        TransactionsFile {
-            transactions: create_transactions(starting_version)
+    fn create_transactions_file(starting_version: u64) -> TransactionsLegacyFile {
+        TransactionsLegacyFile {
+            transactions_in_base64: create_transactions(starting_version)
                 .into_iter()
                 .map(|transaction| {
                     let mut buf = Vec::new();
@@ -158,7 +171,9 @@ mod tests {
 
         let local_file_client = LocalFileClient::new(LocalFileClientConfig {
             path: dir.path().to_path_buf().to_str().unwrap().to_string(),
+            storage_format: StorageFormat::JsonBase64UncompressedProto,
         })
+        .await
         .unwrap();
         let transactions = local_file_client.get_transactions(0, None).await.unwrap();
         let access_metadata = local_file_client.get_metadata().await.unwrap();
@@ -200,7 +215,9 @@ mod tests {
 
         let local_file_client = LocalFileClient::new(LocalFileClientConfig {
             path: dir.path().to_path_buf().to_str().unwrap().to_string(),
+            storage_format: StorageFormat::JsonBase64UncompressedProto,
         })
+        .await
         .unwrap();
         let transactions = local_file_client.get_transactions(500, None).await.unwrap();
         let access_metadata = local_file_client.get_metadata().await.unwrap();
@@ -224,7 +241,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let local_file_client = LocalFileClient::new(LocalFileClientConfig {
             path: dir.path().to_path_buf().to_str().unwrap().to_string(),
+            storage_format: StorageFormat::JsonBase64UncompressedProto,
         })
+        .await
         .unwrap();
         let access_metadata = local_file_client.get_metadata().await;
         assert!(access_metadata.is_err());
@@ -258,7 +277,9 @@ mod tests {
 
         let local_file_client = LocalFileClient::new(LocalFileClientConfig {
             path: dir.path().to_path_buf().to_str().unwrap().to_string(),
+            storage_format: StorageFormat::JsonBase64UncompressedProto,
         })
+        .await
         .unwrap();
         let transactions = local_file_client.get_transactions(0, None).await;
         let access_metadata = local_file_client.get_metadata().await.unwrap();

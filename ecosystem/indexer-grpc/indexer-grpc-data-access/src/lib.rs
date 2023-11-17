@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 
 use aptos_protos::transaction::v1::Transaction;
-use prost::Message;
 use serde::{Deserialize, Serialize};
 
 pub mod access_trait;
@@ -20,17 +19,37 @@ use crate::access_trait::{
 pub enum StorageClient {
     InMemory(in_memory::InMemoryStorageClient),
     Redis(redis::RedisClient),
-    GCS(gcs::GcsClient),
+    LocalFile(local_file::LocalFileClient),
+    Gcs(gcs::GcsClient),
     MockClient(MockStorageClient),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "storage_type")]
-pub enum ReadOnlyStorageType {
+pub enum IndexerStorageClientConfig {
     InMemory(in_memory::InMemoryStorageClientConfig),
     Redis(redis::RedisClientConfig),
-    GCS(gcs::GcsClientConfig),
+    Gcs(gcs::GcsClientConfig),
     LocalFile(local_file::LocalFileClientConfig),
+}
+
+impl IndexerStorageClientConfig {
+    pub async fn create_client(&self) -> anyhow::Result<StorageClient> {
+        match self {
+            IndexerStorageClientConfig::InMemory(config) => Ok(StorageClient::InMemory(
+                in_memory::InMemoryStorageClient::new(config.clone()).await?,
+            )),
+            IndexerStorageClientConfig::Redis(config) => Ok(StorageClient::Redis(
+                redis::RedisClient::new(config.clone()).await?,
+            )),
+            IndexerStorageClientConfig::Gcs(config) => Ok(StorageClient::Gcs(
+                gcs::GcsClient::new(config.clone()).await?,
+            )),
+            IndexerStorageClientConfig::LocalFile(config) => Ok(StorageClient::LocalFile(
+                local_file::LocalFileClient::new(config.clone()).await?,
+            )),
+        }
+    }
 }
 
 const REDIS_ENDING_VERSION_EXCLUSIVE_KEY: &str = "latest_version";
@@ -47,38 +66,6 @@ impl From<Vec<u8>> for FileMetadata {
     fn from(bytes: Vec<u8>) -> Self {
         serde_json::from_slice(bytes.as_slice()).expect("Failed to deserialize FileMetadata.")
     }
-}
-
-type Based64EncodedSerializedTransactionProtobuf = String;
-
-#[derive(Debug, Serialize, Deserialize)]
-struct TransactionsFile {
-    pub transactions: Vec<Based64EncodedSerializedTransactionProtobuf>,
-    pub starting_version: u64,
-}
-
-impl From<Vec<u8>> for TransactionsFile {
-    fn from(bytes: Vec<u8>) -> Self {
-        serde_json::from_slice(bytes.as_slice()).expect("Failed to deserialize Transactions file.")
-    }
-}
-impl From<TransactionsFile> for Vec<Transaction> {
-    fn from(transactions_file: TransactionsFile) -> Self {
-        transactions_file
-            .transactions
-            .into_iter()
-            .map(|transaction| {
-                let bytes = base64::decode(transaction).expect("Failed to decode base64.");
-                Transaction::decode(bytes.as_slice()).expect("Failed to decode protobuf.")
-            })
-            .collect()
-    }
-}
-
-#[inline]
-fn get_transactions_file_name(version: u64) -> String {
-    // This assumes that the transactions are stored in file of 1000 versions.
-    format!("files/{}.json", version / 1000 * 1000)
 }
 
 pub struct MockStorageClient {
