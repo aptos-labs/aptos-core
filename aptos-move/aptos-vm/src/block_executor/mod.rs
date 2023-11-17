@@ -35,6 +35,7 @@ use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_sta
 use once_cell::sync::OnceCell;
 use rayon::ThreadPool;
 use std::{collections::BTreeMap, sync::Arc};
+use aptos_block_executor::transaction_provider::TxnProvider;
 
 /// Output type wrapper used by block executor. VM output is stored first, then
 /// transformed into TransactionOutput type that is returned.
@@ -260,16 +261,17 @@ impl BlockAptosVM {
     pub fn execute_block<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
+        TP: TxnProvider<SignatureVerifiedTransaction> + Sync,
     >(
         executor_thread_pool: Arc<ThreadPool>,
-        signature_verified_block: &[SignatureVerifiedTransaction],
+        signature_verified_block: &TP,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
         transaction_commit_listener: Option<L>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
-        let num_txns = signature_verified_block.len();
+        let num_txns = signature_verified_block.num_txns();
         if state_view.id() != StateViewId::Miscellaneous {
             // Speculation is disabled in Miscellaneous context, which is used by testing and
             // can even lead to concurrent execute_block invocations, leading to errors on flush.
@@ -283,6 +285,7 @@ impl BlockAptosVM {
             S,
             L,
             ExecutableTestType,
+            TP
         >::new(
             concurrency_level,
             executor_thread_pool,

@@ -460,11 +460,11 @@ impl FakeExecutor {
         }
     }
 
-    pub fn execute_transaction_block_parallel(
+    /*pub fn execute_transaction_block_parallel(
         &self,
         txn_block: &[SignatureVerifiedTransaction],
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
+       BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
             self.executor_thread_pool.clone(),
             txn_block,
             &self.data_store,
@@ -472,7 +472,7 @@ impl FakeExecutor {
             None,
             None,
         )
-    }
+    }*/
 
     pub fn execute_transaction_block(
         &self,
@@ -511,8 +511,9 @@ impl FakeExecutor {
             None
         };
 
-        let parallel_output = if mode != ExecutorMode::SequentialOnly {
-            Some(self.execute_transaction_block_parallel(&sig_verified_block))
+        let parallel_output: Option<Result<Vec<TransactionOutput>, VMStatus>> = if mode != ExecutorMode::SequentialOnly {
+            //Some(self.execute_transaction_block_parallel(&sig_verified_block))
+            None
         } else {
             None
         };

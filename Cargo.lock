@@ -3918,6 +3918,7 @@ dependencies = [
  "bytes",
  "chrono",
  "claims",
+ "crossbeam-channel",
  "derivative",
  "hex",
  "itertools 0.10.5",
@@ -3941,6 +3942,7 @@ dependencies = [
  "strum_macros",
  "thiserror",
  "tiny-keccak",
+ "tokio",
 ]
 
 [[package]]

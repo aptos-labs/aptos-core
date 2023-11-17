@@ -12,7 +12,7 @@ use crate::{
     move_vm_ext::{
         get_max_binary_format_version, AptosMoveResolver, RespawnedSession, SessionExt, SessionId,
     },
-    sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
+    sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor, streamed_transactions_provider::StreamedTransactionsProvider},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     verifier, VMExecutor, VMValidator,
@@ -86,6 +86,7 @@ use std::{
         Arc,
     },
 };
+use aptos_block_executor::transaction_provider::TxnProvider;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -1592,12 +1593,17 @@ impl VMExecutor for AptosVM {
         );
 
         let count = transactions.len();
+        let streamed_transactions_provider = StreamedTransactionsProvider::from_slice(transactions);
+        //let null_output: Vec<TransactionOutput> = vec![];
+        //let null_ret = Ok(null_output);
+
         let ret = BlockAptosVM::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+            StreamedTransactionsProvider,
         >(
             Arc::clone(&RAYON_EXEC_POOL),
-            transactions,
+            &streamed_transactions_provider,
             state_view,
             Self::get_concurrency_level(),
             maybe_block_gas_limit,

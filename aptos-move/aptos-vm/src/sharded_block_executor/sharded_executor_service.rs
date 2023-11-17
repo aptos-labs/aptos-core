@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use std::collections::HashSet;
 use crate::{AptosVM, block_executor::BlockAptosVM, sharded_block_executor::{
     aggr_overridden_state_view::{AggregatorOverriddenStateView, TOTAL_SUPPLY_AGGR_BASE_VAL},
     coordinator_client::CoordinatorClient,
@@ -11,6 +12,7 @@ use crate::{AptosVM, block_executor::BlockAptosVM, sharded_block_executor::{
     cross_shard_state_view::CrossShardStateView,
     messages::CrossShardMsg,
     ExecutorShardCommand,
+    streamed_transactions_provider::StreamedTransactionsProvider,
 }};
 use aptos_logger::{info, trace};
 use aptos_state_view::StateView;
@@ -109,9 +111,13 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let (callback, callback_receiver) = oneshot::channel();
 
-        let cross_shard_state_view = Arc::new(CrossShardStateView::create_cross_shard_state_view(
+        /*let cross_shard_state_view = Arc::new(CrossShardStateView::create_cross_shard_state_view(
             state_view,
             &transactions,
+        ));*/
+        let cross_shard_state_view = Arc::new(CrossShardStateView::new(
+            HashSet::new(),
+            state_view,
         ));
 
         let cross_shard_state_view_clone = cross_shard_state_view.clone();
@@ -126,6 +132,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             .into_iter()
             .map(|txn| txn.into_txn().into_txn())
             .collect();
+        let streamed_transactions_provider = StreamedTransactionsProvider::new(signature_verified_transactions);
         let executor_thread_pool_clone = executor_thread_pool.clone();
 
         executor_thread_pool.clone().scope(|s| {
@@ -139,7 +146,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             s.spawn(move |_| {
                 let ret = BlockAptosVM::execute_block(
                     executor_thread_pool,
-                    &signature_verified_transactions,
+                    &streamed_transactions_provider,
                     aggr_overridden_state_view.as_ref(),
                     concurrency_level,
                     maybe_block_gas_limit,
@@ -165,7 +172,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 callback.send(ret).unwrap();
                 executor_thread_pool_clone.spawn(move || {
                     // Explicit async drop
-                    drop(signature_verified_transactions);
+                    drop(streamed_transactions_provider);
                 });
             });
         });

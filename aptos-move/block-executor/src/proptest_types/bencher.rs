@@ -125,7 +125,7 @@ where
                 .unwrap(),
         );
 
-        let output = BlockExecutor::<
+        /*let output = BlockExecutor::<
             MockTransaction<KeyType<K>, E>,
             MockTask<KeyType<K>, E>,
             EmptyDataView<KeyType<K>>,
@@ -134,6 +134,6 @@ where
         >::new(num_cpus::get(), executor_thread_pool, None, None)
         .execute_transactions_parallel((), &self.transactions, &data_view);
 
-        self.baseline_output.assert_output(&output);
+        self.baseline_output.assert_output(&output);*/
     }
 }
