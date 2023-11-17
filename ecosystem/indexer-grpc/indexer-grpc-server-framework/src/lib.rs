@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use anyhow::{Context, Ok, Result};
+use anyhow::{Context, Result};
 use backtrace::Backtrace;
 use clap::Parser;
 use prometheus::{Encoder, TextEncoder};
@@ -38,28 +38,50 @@ pub async fn run_server_with_config<C>(config: GenericConfig<C>) -> Result<()>
 where
     C: RunnableConfig,
 {
-    let runtime = aptos_runtimes::spawn_named_runtime(config.get_server_name(), None);
     let health_port = config.health_check_port;
     // Start liveness and readiness probes.
-    let task_handler = runtime.spawn(async move {
+    let task_handler: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         register_probes_and_metrics_handler(health_port).await;
-        Ok(())
+        anyhow::bail!("Liveness and readiness probes finished accidentally.");
     });
-    let main_task_handler = runtime.spawn(async move { config.run().await });
+    let main_task_handler: tokio::task::JoinHandle<anyhow::Result<()>> =
+        tokio::spawn(async move { config.run().await });
     tokio::select! {
         res = task_handler => {
-            if let Err(e) = res {
-                error!("Probes and metrics handler panicked or was shutdown: {:?}", e);
-                process::exit(1);
+            match res {
+                Ok(task_res) => {
+                    match task_res {
+                        Ok(_) => unreachable!("Liveness and readiness probes should not exit."),
+                        Err(e) => {
+                            error!("Liveness and readiness probes failed: {:?}", e);
+                            anyhow::bail!("Liveness and readiness probes failed: {:?}", e);
+                        },
+                    }
+                },
+                Err(e) => {
+                    error!("Liveness and readiness probes task panicked or was shutdown: {:?}", e);
+                    anyhow::bail!("Liveness and readiness probes failed: {:?}", e);
+                },
             }
-            Ok(())
         },
         res = main_task_handler => {
-            if let Err(e) = res {
-                error!("Main task panicked or was shutdown: {:?}", e);
-                process::exit(1);
+            match res {
+                Ok(task_res) => {
+                    match task_res {
+                        Ok(_) => {
+                            tracing::info!("Main task finished successfully.");
+                            Ok(())
+                        },
+                        Err(e) => {
+                            anyhow::bail!("Main task failed: {:?}", e);
+                        },
+                    }
+                },
+                Err(e) => {
+                    error!("Main task panicked or was shutdown: {:?}", e);
+                    anyhow::bail!("Main task failed: {:?}", e);
+                },
             }
-            Ok(())
         },
     }
 }

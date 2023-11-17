@@ -6,7 +6,6 @@ use crate::metrics::{
 };
 use anyhow::{bail, Context, Result};
 use aptos_indexer_grpc_utils::{
-    build_protobuf_encoded_transaction_wrappers,
     cache_operator::{CacheBatchGetStatus, CacheOperator},
     config::IndexerGrpcFileStoreConfig,
     constants::BLOB_STORAGE_SIZE,
@@ -15,13 +14,12 @@ use aptos_indexer_grpc_utils::{
         TRANSACTION_UNIX_TIMESTAMP,
     },
     file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
+    storage::StorageFormat,
     timestamp_to_iso, timestamp_to_unixtime,
     types::RedisUrl,
-    EncodedTransactionWithVersion,
 };
 use aptos_moving_average::MovingAverage;
 use aptos_protos::transaction::v1::Transaction;
-use prost::Message;
 use std::time::Duration;
 use tracing::info;
 
@@ -34,12 +32,19 @@ pub struct Processor {
     cache_operator: CacheOperator<redis::aio::ConnectionManager>,
     file_store_operator: Box<dyn FileStoreOperator>,
     cache_chain_id: u64,
+
+    #[allow(dead_code)]
+    cache_storage_format: StorageFormat,
+    #[allow(dead_code)]
+    file_storage_format: StorageFormat,
 }
 
 impl Processor {
     pub async fn new(
         redis_main_instance_address: RedisUrl,
         file_store_config: IndexerGrpcFileStoreConfig,
+        cache_storage_format: StorageFormat,
+        file_storage_format: StorageFormat,
     ) -> Result<Self> {
         // Connection to redis is a hard dependency for file store processor.
         let conn = redis::Client::open(redis_main_instance_address.0.clone())
@@ -58,7 +63,7 @@ impl Processor {
                 )
             })?;
 
-        let mut cache_operator = CacheOperator::new(conn);
+        let mut cache_operator = CacheOperator::new(conn, cache_storage_format);
         let cache_chain_id = cache_operator
             .get_chain_id()
             .await
@@ -71,11 +76,15 @@ impl Processor {
                     gcs_file_store
                         .gcs_file_store_service_account_key_path
                         .clone(),
+                    file_storage_format,
                 ))
             },
-            IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => Box::new(
-                LocalFileStoreOperator::new(local_file_store.local_file_store_path.clone()),
-            ),
+            IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => {
+                Box::new(LocalFileStoreOperator::new(
+                    local_file_store.local_file_store_path.clone(),
+                    file_storage_format,
+                ))
+            },
         };
         file_store_operator.verify_storage_bucket_existence().await;
 
@@ -83,6 +92,8 @@ impl Processor {
             cache_operator,
             file_store_operator,
             cache_chain_id,
+            cache_storage_format,
+            file_storage_format,
         })
     }
 
@@ -106,7 +117,7 @@ impl Processor {
         let mut current_cache_version = metadata.version;
         let mut current_file_store_version = current_cache_version;
         // The transactions buffer to store the transactions fetched from cache.
-        let mut transactions_buffer: Vec<EncodedTransactionWithVersion> = vec![];
+        let mut transactions_buffer: Vec<Transaction> = vec![];
         let mut tps_calculator = MovingAverage::new(10_000);
         loop {
             // 0. Data verfiication.
@@ -118,24 +129,24 @@ impl Processor {
             let file_store_upload_batch_start = std::time::Instant::now();
             let batch_get_result = self
                 .cache_operator
-                .batch_get_encoded_proto_data(current_cache_version)
+                .batch_get_transactions(current_cache_version)
                 .await;
 
-            let batch_get_result =
-                fullnode_grpc_status_handling(batch_get_result, current_cache_version)?;
-
             let current_transactions = match batch_get_result {
-                Some(transactions) => transactions,
-                None => {
-                    // Cache is not ready yet, i.e., ahead of current head. Wait.
+                Ok(CacheBatchGetStatus::Ok(transactions)) => transactions,
+                Ok(CacheBatchGetStatus::NotReady) => {
+                    // If the cache is not ready, we sleep for a short time and retry.
                     tokio::time::sleep(Duration::from_millis(
                         AHEAD_OF_CACHE_SLEEP_DURATION_IN_MILLIS,
                     ))
                     .await;
                     continue;
                 },
+                Ok(CacheBatchGetStatus::EvictedFromCache) => {
+                    bail!("Evicted from cache.")
+                },
+                Err(err) => bail!("Error when fetching transactions from cache: {}", err),
             };
-
             let hit_head = current_transactions.len() != BLOB_STORAGE_SIZE;
             // Update the current cache version.
             current_cache_version += current_transactions.len() as u64;
@@ -152,7 +163,7 @@ impl Processor {
             }
             // Drain the transactions buffer and upload to file store in size of multiple of BLOB_STORAGE_SIZE.
             let process_size = transactions_buffer.len() / BLOB_STORAGE_SIZE * BLOB_STORAGE_SIZE;
-            let current_batch: Vec<EncodedTransactionWithVersion> =
+            let current_batch: Vec<Transaction> =
                 transactions_buffer.drain(..process_size).collect();
             let last_transaction = current_batch.as_slice().last().unwrap().clone();
             let first_transaction = current_batch.as_slice().first().unwrap().clone();
@@ -164,36 +175,14 @@ impl Processor {
             tps_calculator.tick_now(process_size as u64);
             let end_version = current_file_store_version + process_size as u64 - 1_u64;
             let num_transactions = end_version - current_file_store_version + 1;
-            // This decoding may be inefficient, but this is the file store so we don't have to be overly
-            // concerned with efficiency.
-            let start_version_timestamp = {
-                let encoded_transaction = first_transaction.0;
-                let decoded_transaction =
-                    base64::decode(encoded_transaction).expect("Failed to decode base64.");
-                let transaction =
-                    Transaction::decode(&*decoded_transaction).expect("Failed to decode protobuf.");
-                transaction.timestamp
-            };
-            let end_version_timestamp = {
-                let encoded_transaction = last_transaction.0;
-                let decoded_transaction =
-                    base64::decode(encoded_transaction).expect("Failed to decode base64.");
-                let transaction =
-                    Transaction::decode(&*decoded_transaction).expect("Failed to decode protobuf.");
-                transaction.timestamp
-            };
+            let start_version_timestamp = first_transaction.timestamp.as_ref().unwrap().clone();
+            let end_version_timestamp = last_transaction.timestamp.as_ref().unwrap().clone();
 
             info!(
                 start_version = current_file_store_version,
                 end_version = end_version,
-                start_txn_timestamp_iso = start_version_timestamp
-                    .clone()
-                    .map(|t| timestamp_to_iso(&t))
-                    .unwrap_or_default(),
-                end_txn_timestamp_iso = end_version_timestamp
-                    .clone()
-                    .map(|t| timestamp_to_iso(&t))
-                    .unwrap_or_default(),
+                start_txn_timestamp_iso = timestamp_to_iso(&start_version_timestamp),
+                end_txn_timestamp_iso = timestamp_to_iso(&end_version_timestamp),
                 num_of_transactions = num_transactions,
                 duration_in_secs = file_store_upload_batch_start.elapsed().as_secs_f64(),
                 tps = (tps_calculator.avg() * 1000.0) as u64,
@@ -217,11 +206,7 @@ impl Processor {
                     IndexerGrpcStep::FilestoreUploadTxns.get_step(),
                     IndexerGrpcStep::FilestoreUploadTxns.get_label(),
                 ])
-                .set(
-                    end_version_timestamp
-                        .map(|t| timestamp_to_unixtime(&t))
-                        .unwrap_or_default(),
-                );
+                .set(timestamp_to_unixtime(&end_version_timestamp));
             NUM_TRANSACTIONS_COUNT
                 .with_label_values(&[
                     SERVICE_TYPE,
@@ -240,76 +225,5 @@ impl Processor {
             current_file_store_version += process_size as u64;
             LATEST_PROCESSED_VERSION_OLD.set(current_file_store_version as i64);
         }
-    }
-}
-
-fn fullnode_grpc_status_handling(
-    fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus>,
-    batch_start_version: u64,
-) -> Result<Option<Vec<EncodedTransactionWithVersion>>> {
-    match fullnode_rpc_status {
-        Ok(CacheBatchGetStatus::Ok(encoded_transactions)) => Ok(Some(
-            build_protobuf_encoded_transaction_wrappers(encoded_transactions, batch_start_version),
-        )),
-        Ok(CacheBatchGetStatus::NotReady) => Ok(None),
-        Ok(CacheBatchGetStatus::EvictedFromCache) => {
-            bail!(
-                "[indexer file] Cache evicted from cache. For file store worker, this is not expected."
-            );
-        },
-        Err(err) => {
-            bail!("Batch get encoded proto data failed: {}", err);
-        },
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn verify_the_grpc_status_handling_ahead_of_cache() {
-        let fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus> =
-            Ok(CacheBatchGetStatus::NotReady);
-        let batch_start_version = 0;
-        assert!(
-            fullnode_grpc_status_handling(fullnode_rpc_status, batch_start_version)
-                .unwrap()
-                .is_none()
-        );
-    }
-
-    #[test]
-    fn verify_the_grpc_status_handling_evicted_from_cache() {
-        let fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus> =
-            Ok(CacheBatchGetStatus::EvictedFromCache);
-        let batch_start_version = 0;
-        assert!(fullnode_grpc_status_handling(fullnode_rpc_status, batch_start_version).is_err());
-    }
-
-    #[test]
-    fn verify_the_grpc_status_handling_error() {
-        let fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus> =
-            Err(anyhow::anyhow!("Error"));
-        let batch_start_version = 0;
-        assert!(fullnode_grpc_status_handling(fullnode_rpc_status, batch_start_version).is_err());
-    }
-
-    #[test]
-    fn verify_the_grpc_status_handling_ok() {
-        let batch_start_version = 2000;
-        let transactions: Vec<String> = std::iter::repeat("txn".to_string()).take(1000).collect();
-        let transactions_with_version: Vec<EncodedTransactionWithVersion> = transactions
-            .iter()
-            .enumerate()
-            .map(|(index, txn)| (txn.clone(), batch_start_version + index as u64))
-            .collect();
-        let fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus> =
-            Ok(CacheBatchGetStatus::Ok(transactions));
-        let actual_transactions =
-            fullnode_grpc_status_handling(fullnode_rpc_status, batch_start_version).unwrap();
-        assert!(actual_transactions.is_some());
-        let actual_transactions = actual_transactions.unwrap();
-        assert_eq!(actual_transactions, transactions_with_version);
     }
 }

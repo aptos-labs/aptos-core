@@ -16,7 +16,6 @@ pub struct GrpcResponseStream {
 }
 
 impl GrpcResponseStream {
-    #[allow(dead_code)]
     pub fn new(
         starting_version: u64,
         transaction_count: Option<u64>,
