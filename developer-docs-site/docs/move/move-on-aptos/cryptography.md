@@ -17,7 +17,7 @@ Move, through the Aptos adapter, encompasses several fundamental cryptographic t
 
 Three fundamental principles guide the design and integration of the Aptos cryptographic extensions into Move:
 
-1. **Economic Gas Usage** – Striving to minimize gas costs for Move developers by implementing key primitives as [Move native functions](./move/book/functions#native-functions). For example, see the module for [BLS signatures over BLS12-381 elliptic curves](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381.move).
+1. **Economic Gas Usage** – Striving to minimize gas costs for Move developers by implementing key primitives as [Move native functions](https://github.com/aptos-labs/aptos-core/blob/main/developer-docs-site/docs/move/book/functions.md#native-functions). For example, see the module for [BLS signatures over BLS12-381 elliptic curves](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381.move).
 2. **Type-Safe APIs** – Ensuring that APIs are resistant to common mistakes, type-safety enhances code reliability and promotes an efficient development process. For an example, see the [Ed25519 signature module](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/ed25519.move).
 3. **Empowerment of Developers** – In instances where native functions are unavailable, we empower developers to build their own cryptographic primitives on top of abstract cryptographic building blocks such as _finite fields_ and _Abelian groups_. Refer to the [`aptos_std::crypto_algebra`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/cryptography/crypto_algebra.move) module for more insights.
 
@@ -99,7 +99,7 @@ Our [`aptos_std::bls12381`](https://github.com/aptos-labs/aptos-core/blob/main/a
 ## Elliptic curve arithmetic
 
 While the [hash function](#cryptographic-hash-functions) and [digital signature](#digital-signature-verification) modules should provide enough functionality for most applications, some applications will require more powerful cryptography.
-Normally, developers of such applications would have to wait until their desired crytographic functionality is implemented efficiently as a [Move native function](./move/book/functions#native-functions) in the [Aptos Move framework](/reference/move).
+Normally, developers of such applications would have to wait until their desired cryptographic functionality is implemented efficiently as a [Move native function](https://github.com/aptos-labs/aptos-core/blob/main/developer-docs-site/docs/move/book/functions.md#native-functions) in the [Aptos Move framework](/reference/move).
 Instead, we expose basic building blocks that developers can use to implement their own cryptographic primitives directly in the Move language and do so **efficiently**.  
 
 Specifically, we currently expose low-level arithmetic operations on two popular elliptic curve groups and their associated finite fields:
