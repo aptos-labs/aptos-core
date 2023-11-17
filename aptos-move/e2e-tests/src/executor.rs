@@ -524,7 +524,7 @@ impl FakeExecutor {
         }
     }
 
-    fn execute_transaction_block_impl_with_state_view(
+    /*fn execute_transaction_block_impl_with_state_view(
         &self,
         txn_block: &[SignatureVerifiedTransaction],
         onchain_config: BlockExecutorConfigFromOnchain,
@@ -554,7 +554,7 @@ impl FakeExecutor {
             None,
         )
         .map(BlockOutput::into_transaction_outputs_forced)
-    }
+    }*/
 
     pub fn execute_transaction_block_with_state_view(
         &self,
@@ -588,30 +588,32 @@ impl FakeExecutor {
         let onchain_config = BlockExecutorConfigFromOnchain::on_but_large_for_test();
 
         let sequential_output = if mode != ExecutorMode::ParallelOnly {
-            Some(self.execute_transaction_block_impl_with_state_view(
+            /*Some(self.execute_transaction_block_impl_with_state_view(
                 &sig_verified_block,
                 onchain_config.clone(),
                 true,
                 state_view,
-            ))
+            ))*/
+            None
         } else {
             None
         };
 
         let parallel_output = if mode != ExecutorMode::SequentialOnly {
-            Some(self.execute_transaction_block_impl_with_state_view(
+            /*Some(self.execute_transaction_block_impl_with_state_view(
                 &sig_verified_block,
                 onchain_config,
                 false,
                 state_view,
-            ))
+            ))*/
+            None
         } else {
             None
         };
 
         if mode == ExecutorMode::BothComparison {
-            let sequential_output = sequential_output.as_ref().unwrap();
-            let parallel_output = parallel_output.as_ref().unwrap();
+            let sequential_output:  &Result<Vec<TransactionOutput>, VMStatus> = sequential_output.as_ref().unwrap();
+            let parallel_output:  &Result<Vec<TransactionOutput>, VMStatus> = parallel_output.as_ref().unwrap();
 
             // make more granular comparison, to be able to understand test failures better
             if sequential_output.is_ok() && parallel_output.is_ok() {

@@ -4,3 +4,4 @@
 
 pub mod config;
 pub mod partitioner;
+pub mod concurrent_blocking_vector;

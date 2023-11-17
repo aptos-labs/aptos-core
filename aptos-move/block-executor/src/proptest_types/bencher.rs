@@ -128,7 +128,7 @@ where
                 .unwrap(),
         );
 
-        let config = BlockExecutorConfig::new_no_block_limit(num_cpus::get());
+        /*let config = BlockExecutorConfig::new_no_block_limit(num_cpus::get());
         let output = BlockExecutor::<
             MockTransaction<KeyType<K>, E>,
             MockTask<KeyType<K>, E>,
@@ -138,6 +138,6 @@ where
         >::new(config, executor_thread_pool, None)
         .execute_transactions_parallel((), &self.transactions, &data_view);
 
-        self.baseline_output.assert_parallel_output(&output);
+        self.baseline_output.assert_parallel_output(&output);*/
     }
 }

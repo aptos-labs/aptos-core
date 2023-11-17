@@ -157,3 +157,4 @@ pub mod types;
 mod unit_tests;
 mod value_exchange;
 pub mod view;
+pub mod transaction_provider;

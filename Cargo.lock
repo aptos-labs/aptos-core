@@ -4013,6 +4013,7 @@ dependencies = [
  "claims",
  "coset",
  "criterion",
+ "crossbeam-channel",
  "derivative",
  "fixed",
  "fxhash",

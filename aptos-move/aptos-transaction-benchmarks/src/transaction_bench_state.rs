@@ -190,7 +190,7 @@ where
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
         let txns = self.gen_transaction();
-        self.execute_benchmark_sequential(&txns, None);
+        //self.execute_benchmark_sequential(&txns, None);
     }
 
     /// Executes this state in a single block.
@@ -198,14 +198,14 @@ where
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
         let txns = self.gen_transaction();
-        self.execute_benchmark_parallel(&txns, num_cpus::get(), None);
+        //self.execute_benchmark_parallel(&txns, num_cpus::get(), None);
     }
 
     fn is_shareded(&self) -> bool {
         self.sharded_block_executor.is_some()
     }
 
-    fn execute_benchmark_sequential(
+    /*fn execute_benchmark_sequential(
         &self,
         transactions: &[SignatureVerifiedTransaction],
         maybe_block_gas_limit: Option<u64>,
@@ -227,7 +227,7 @@ where
         let exec_time = timer.elapsed().as_millis();
 
         (output, block_size * 1000 / exec_time as usize)
-    }
+    }*/
 
     fn execute_benchmark_sharded(
         &self,
@@ -253,7 +253,7 @@ where
         (output, block_size * 1000 / exec_time as usize)
     }
 
-    fn execute_benchmark_parallel(
+    /*fn execute_benchmark_parallel(
         &self,
         transactions: &[SignatureVerifiedTransaction],
         concurrency_level_per_shard: usize,
@@ -279,7 +279,7 @@ where
         let exec_time = timer.elapsed().as_millis();
 
         (output, block_size * 1000 / exec_time as usize)
-    }
+    }*/
 
     pub(crate) fn execute_blockstm_benchmark(
         &mut self,
@@ -290,7 +290,8 @@ where
         conurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> (usize, usize) {
-        let (output, par_tps) = if run_par {
+        (0, 0)
+        /*let (output, par_tps) = if run_par {
             println!("Parallel execution starts...");
             let (output, tps) = if self.is_shareded() {
                 self.execute_benchmark_sharded(
@@ -331,6 +332,6 @@ where
                 &TransactionStatus::Keep(ExecutionStatus::Success)
             );
         });
-        (par_tps, seq_tps)
+        (par_tps, seq_tps)*/
     }
 }

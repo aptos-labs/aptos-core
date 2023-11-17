@@ -34,6 +34,7 @@ pub mod messages;
 pub mod remote_state_value;
 pub mod sharded_aggregator_service;
 pub mod sharded_executor_service;
+pub mod streamed_transactions_provider;
 
 /// Coordinator for sharded block executors that manages multiple shards and aggregates the results.
 pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> {
