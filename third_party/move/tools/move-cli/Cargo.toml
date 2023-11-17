@@ -42,6 +42,7 @@ move-docgen = { path = "../../move-prover/move-docgen" }
 move-errmapgen = { path = "../../move-prover/move-errmapgen" }
 move-ir-types = { path = "../../move-ir/types" }
 move-model = { path = "../../move-model" }
+move-mutator = { path = "../move-mutator" }
 move-package = { path = "../move-package" }
 move-prover = { path = "../../move-prover" }
 move-resource-viewer = { path = "../move-resource-viewer" }
