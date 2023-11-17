@@ -7,6 +7,11 @@ use std::fmt::Debug;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub enum SystemTransaction {
-    Void,
+    DummyTopic(DummySystemTransaction),
     // to be populated...
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+pub struct DummySystemTransaction {
+    pub nonce: u64,
 }

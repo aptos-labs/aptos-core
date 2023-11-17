@@ -56,6 +56,7 @@ use std::{
     convert::TryFrom,
     iter::Iterator,
 };
+use crate::system_txn::DummySystemTransaction;
 
 impl WriteOp {
     pub fn value_strategy() -> impl Strategy<Value = Self> {
@@ -1221,7 +1222,7 @@ impl Arbitrary for SystemTransaction {
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         Just(Value::Null)
-            .prop_map(|_| SystemTransaction::Void)
+            .prop_map(|_| SystemTransaction::DummyTopic(DummySystemTransaction { nonce: 0 }))
             .boxed()
     }
 }

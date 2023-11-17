@@ -1180,7 +1180,7 @@ impl AptosVM {
         _log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
         match txn {
-            SystemTransaction::Void => (
+            SystemTransaction::DummyTopic(_) => (
                 VMStatus::Executed,
                 VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)),
             ),

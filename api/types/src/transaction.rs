@@ -556,21 +556,23 @@ pub struct BlockMetadataTransaction {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
-pub struct Dummy {
+pub struct DummySystemTransaction {
     nonce: u64,
 }
 
 /// A system transaction.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 pub enum SystemTransactionInner {
-    Dummy(Dummy),
+    DummyTopic(DummySystemTransaction),
     // more coming...
 }
 
 impl From<&aptos_types::system_txn::SystemTransaction> for SystemTransactionInner {
     fn from(txn: &aptos_types::system_txn::SystemTransaction) -> Self {
         match txn {
-            aptos_types::system_txn::SystemTransaction::Void => SystemTransactionInner::Dummy(Dummy { nonce: 0 })
+            aptos_types::system_txn::SystemTransaction::DummyTopic(dummy) => {
+                SystemTransactionInner::DummyTopic(DummySystemTransaction { nonce: dummy.nonce })
+            }
         }
     }
 }
