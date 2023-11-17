@@ -572,7 +572,7 @@ impl From<&aptos_types::system_txn::SystemTransaction> for SystemTransactionInne
         match txn {
             aptos_types::system_txn::SystemTransaction::DummyTopic(dummy) => {
                 SystemTransactionInner::DummyTopic(DummySystemTransaction { nonce: dummy.nonce })
-            }
+            },
         }
     }
 }

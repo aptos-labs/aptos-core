@@ -78,8 +78,8 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     on_chain_config::{
-        LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider,
-        OnChainConsensusConfig, OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
+        LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
+        OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
     },
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,

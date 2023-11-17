@@ -283,7 +283,7 @@ impl IndexerStreamCoordinator {
                         },
                         APITransaction::SystemTransaction(ref mut _st) => {
                             todo!()
-                        }
+                        },
                     };
                     txn
                 }) {

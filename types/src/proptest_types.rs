@@ -20,7 +20,7 @@ use crate::{
     on_chain_config::ValidatorSet,
     proof::TransactionInfoListWithProof,
     state_store::{state_key::StateKey, state_value::StateValue},
-    system_txn::SystemTransaction,
+    system_txn::{DummySystemTransaction, SystemTransaction},
     transaction::{
         ChangeSet, ExecutionStatus, Module, ModuleBundle, RawTransaction, Script,
         SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
@@ -56,7 +56,6 @@ use std::{
     convert::TryFrom,
     iter::Iterator,
 };
-use crate::system_txn::DummySystemTransaction;
 
 impl WriteOp {
     pub fn value_strategy() -> impl Strategy<Value = Self> {

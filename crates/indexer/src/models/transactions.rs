@@ -219,6 +219,9 @@ impl Transaction {
             APITransaction::PendingTransaction(..) => {
                 unreachable!()
             },
+            APITransaction::SystemTransaction(_) => {
+                todo!()
+            },
         }
     }
 
