@@ -4,6 +4,7 @@
 
 pub mod compatibility_test;
 pub mod consensus_reliability_tests;
+pub mod dag_onchain_enable_test;
 pub mod forge_setup_test;
 pub mod framework_upgrade;
 pub mod fullnode_reboot_stress_test;
