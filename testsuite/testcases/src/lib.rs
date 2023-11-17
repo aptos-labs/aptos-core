@@ -37,7 +37,10 @@ use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use futures::future::join_all;
 use rand::{rngs::StdRng, SeedableRng};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::{
+    fmt::Write,
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+};
 use tokio::runtime::Runtime;
 
 const WARMUP_DURATION_FRACTION: f32 = 0.07;
@@ -506,4 +509,22 @@ impl Test for CompositeNetworkTest {
     fn name(&self) -> &'static str {
         "CompositeNetworkTest"
     }
+}
+
+pub(crate) fn generate_onchain_config_blob(data: &[u8]) -> String {
+    let mut buf = String::new();
+
+    write!(buf, "vector[").unwrap();
+    for (i, b) in data.iter().enumerate() {
+        if i % 20 == 0 {
+            if i > 0 {
+                writeln!(buf).unwrap();
+            }
+        } else {
+            write!(buf, " ").unwrap();
+        }
+        write!(buf, "{}u8,", b).unwrap();
+    }
+    write!(buf, "]").unwrap();
+    buf
 }

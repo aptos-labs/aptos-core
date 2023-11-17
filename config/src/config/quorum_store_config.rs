@@ -107,6 +107,11 @@ impl Default for QuorumStoreConfig {
 }
 
 impl QuorumStoreConfig {
+    /// Since every validator can contribute to every round, the quorum store
+    /// batches should be small enough to fit in a DAG node. And, since proof
+    /// broadcasting is disabled, Quorum Store needs to create only enough
+    /// batches to fit the self proposed nodes. These configs below reflect
+    /// this behavior.
     pub fn default_for_dag() -> Self {
         Self {
             sender_max_batch_txns: 300,
