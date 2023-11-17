@@ -12,7 +12,7 @@ use clap::Parser;
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 fn main() {
-    // Check that we are not including any Move test natives
+    // Check that we are not including any Move test natives (NO OP COMMENT)
     aptos_vm::natives::assert_no_test_natives(ERROR_MSG_BAD_FEATURE_FLAGS);
 
     // Start the node
