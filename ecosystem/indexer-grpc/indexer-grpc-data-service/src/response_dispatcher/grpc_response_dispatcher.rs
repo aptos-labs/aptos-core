@@ -8,7 +8,7 @@ use aptos_indexer_grpc_data_access::{
 use aptos_indexer_grpc_utils::{
     chunk_transactions, constants::MESSAGE_SIZE_LIMIT, time_diff_since_pb_timestamp_in_secs,
 };
-use aptos_protos::indexer::v1::TransactionsResponse;
+use aptos_protos::{indexer::v1::TransactionsResponse, util::timestamp::Timestamp};
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 use tonic::Status;
@@ -118,6 +118,11 @@ impl GrpcResponseDispatcher {
                 anyhow::anyhow!("Empty responses from storages."),
             ));
         }
+        if responses.is_empty() {
+            // End of finite stream.
+            return Ok(responses);
+        }
+
         let start_version_txn_latency = time_diff_since_pb_timestamp_in_secs(
             responses
                 .first()
@@ -127,7 +132,7 @@ impl GrpcResponseDispatcher {
                 .unwrap()
                 .timestamp
                 .as_ref()
-                .unwrap(),
+                .unwrap_or(&Timestamp::default()),
         );
         let end_version_txn_latency = time_diff_since_pb_timestamp_in_secs(
             responses
@@ -138,7 +143,7 @@ impl GrpcResponseDispatcher {
                 .unwrap()
                 .timestamp
                 .as_ref()
-                .unwrap(),
+                .unwrap_or(&Timestamp::default()),
         );
         // Verify responses are consecutive and sequential.
         let mut version = self.next_version_to_process;
@@ -304,12 +309,12 @@ impl ResponseDispatcher for GrpcResponseDispatcher {
             .map(|v| v.transactions.last().unwrap().version);
         let start_version_txn_latency = response.as_ref().ok().map(|v| {
             time_diff_since_pb_timestamp_in_secs(
-                v.transactions.first().unwrap().timestamp.as_ref().unwrap(),
+                v.transactions.first().unwrap().timestamp.as_ref().unwrap_or(&Timestamp::default()),
             )
         });
         let end_version_txn_latency = response.as_ref().ok().map(|v| {
             time_diff_since_pb_timestamp_in_secs(
-                v.transactions.last().unwrap().timestamp.as_ref().unwrap(),
+                v.transactions.last().unwrap().timestamp.as_ref().unwrap_or(&Timestamp::default()),
             )
         });
         let num_of_transactions_opt = response.as_ref().ok().map(|v| v.transactions.len());
