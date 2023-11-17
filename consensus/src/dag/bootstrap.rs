@@ -295,6 +295,7 @@ pub struct DagBootstrapper {
 }
 
 impl DagBootstrapper {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         self_peer: Author,
         config: DagConsensusConfig,

@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use super::helpers::MockPayloadManager;
 use crate::{
     dag::{
         adapter::TLedgerInfoProvider,
@@ -38,8 +39,6 @@ use futures_channel::mpsc::unbounded;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::oneshot;
 use tokio_retry::strategy::ExponentialBackoff;
-
-use super::helpers::MockPayloadManager;
 
 struct MockNetworkSender {
     _drop_notifier: Option<oneshot::Sender<()>>,

@@ -23,7 +23,7 @@ use std::sync::Arc;
 use tokio::sync::oneshot;
 
 pub trait TPayloadManager: Send + Sync {
-    fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64); 
+    fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64);
 }
 
 /// Responsible to extract the transactions out of the payload and notify QuorumStore about commits.
