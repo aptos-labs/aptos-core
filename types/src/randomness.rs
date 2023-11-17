@@ -148,24 +148,43 @@ impl RandDecision {
 
 #[derive(Clone)]
 pub struct RandKeys {
-    // augmented secret key share of this validator, obtained from the DKG transcript of last epoch
+    // augmented secret / public key share of this validator, obtained from the DKG transcript of last epoch
     pub ask: ASK,
-    // augmented public key share of all validators, obtained from all validators in the new epoch
-    // necessary for verifying randomness shares
-    pub apks: Vec<Option<APK>>,
+    pub apk: APK,
+    // deltas of all validators which this validator signed,
+    // needs to be persisted for unequivocation
+    pub signed_deltas: Vec<Option<Delta>>,
+    // certified augmented public key share of all validators,
+    // obtained from all validators in the new epoch,
+    // which necessary for verifying randomness shares
+    pub certified_apks: Vec<Option<APK>>,
     // public key share of all validators, obtained from the DKG transcript of last epoch
     pub pk_shares: Vec<PKShare>,
 }
 
 impl RandKeys {
-    pub fn new(ask: ASK, apk: APK, pk_shares: Vec<PKShare>, my_index: usize, num_validators: usize) -> Self {
-        let apks = (0..num_validators).map(|i| if i == my_index { Some(apk.clone()) } else { None }).collect();
-        Self { ask, apks, pk_shares }
+    pub fn new(ask: ASK, apk: APK, pk_shares: Vec<PKShare>, num_validators: usize) -> Self {
+        let signed_deltas = vec![None; num_validators];
+        let certified_apks = vec![None; num_validators];
+
+        Self { ask, apk, signed_deltas, certified_apks, pk_shares }
     }
 
-    pub fn add_apk(&mut self, index: usize, apk: APK) -> anyhow::Result<()> {
-        assert!(index < self.apks.len());
-        self.apks[index] = Some(apk);
+    pub fn add_signed_delta(&mut self, index: usize, delta: Delta) -> anyhow::Result<()> {
+        assert!(index < self.signed_deltas.len());
+        if self.signed_deltas[index].is_some() {
+            anyhow::bail!("Delta already signed for validator {}!", index);
+        }
+        self.signed_deltas[index] = Some(delta);
+        Ok(())
+    }
+
+    pub fn add_certified_apk(&mut self, index: usize, apk: APK) -> anyhow::Result<()> {
+        assert!(index < self.certified_apks.len());
+        if self.certified_apks[index].is_some() {
+            return Ok(());
+        }
+        self.certified_apks[index] = Some(apk);
         Ok(())
     }
 }
@@ -198,19 +217,48 @@ impl RandConfig {
         self.validator.address_to_validator_index().get(peer).unwrap().clone()
     }
 
-    pub fn add_apk(&mut self, peer: &AccountAddress, apk: APK, mode: &Mode) -> anyhow::Result<()> {
+    pub fn get_signed_delta(&self, peer: &AccountAddress, mode: &Mode) -> Option<&Delta> {
         let index = self.get_id(peer);
         match mode {
-            Mode::Optimistic => self.keys_o.add_apk(index, apk),
-            Mode::Fallback => self.keys_f.add_apk(index, apk),
+            Mode::Optimistic => self.keys_o.signed_deltas[index].as_ref(),
+            Mode::Fallback => self.keys_f.signed_deltas[index].as_ref(),
         }
     }
 
-    pub fn get_apk(&self, peer: &AccountAddress, mode: &Mode) -> Option<&APK> {
+    pub fn add_signed_delta(&mut self, peer: &AccountAddress, delta: Delta, mode: &Mode) -> anyhow::Result<()> {
         let index = self.get_id(peer);
         match mode {
-            Mode::Optimistic => self.keys_o.apks[index].as_ref(),
-            Mode::Fallback => self.keys_f.apks[index].as_ref(),
+            Mode::Optimistic => self.keys_o.add_signed_delta(index, delta),
+            Mode::Fallback => self.keys_f.add_signed_delta(index, delta),
+        }
+    }
+
+    pub fn get_certified_apk(&self, peer: &AccountAddress, mode: &Mode) -> Option<&APK> {
+        let index = self.get_id(peer);
+        match mode {
+            Mode::Optimistic => self.keys_o.certified_apks[index].as_ref(),
+            Mode::Fallback => self.keys_f.certified_apks[index].as_ref(),
+        }
+    }
+
+    pub fn add_certified_apk(&mut self, peer: &AccountAddress, apk: APK, mode: &Mode) -> anyhow::Result<()> {
+        let index = self.get_id(peer);
+        match mode {
+            Mode::Optimistic => self.keys_o.add_certified_apk(index, apk),
+            Mode::Fallback => self.keys_f.add_certified_apk(index, apk),
+        }
+    }
+
+    pub fn add_certified_delta(&mut self, peer: &AccountAddress, delta: Delta, mode: &Mode) -> anyhow::Result<()> {
+        let apk = <WVUF as WeightedVUF>::augment_pubkey(&self.vuf_pp, self.get_pk_share(peer, mode).clone(), delta)?;
+        self.add_certified_apk(peer, apk, mode)?;
+        Ok(())
+    }
+
+    pub fn get_my_delta(&self, mode: &Mode) -> &Delta {
+        match mode {
+            Mode::Optimistic => <WVUF as WeightedVUF>::get_public_delta(&self.keys_o.apk),
+            Mode::Fallback => <WVUF as WeightedVUF>::get_public_delta(&self.keys_f.apk),
         }
     }
 
@@ -220,18 +268,6 @@ impl RandConfig {
             Mode::Optimistic => &self.keys_o.pk_shares[index],
             Mode::Fallback => &self.keys_f.pk_shares[index],
         }
-    }
-
-    pub fn add_delta(&mut self, peer: &AccountAddress, delta: Delta, mode: &Mode) -> anyhow::Result<()> {
-        if self.get_apk(peer, mode).is_none() {
-            let apk = <WVUF as WeightedVUF>::augment_pubkey(&self.vuf_pp, self.get_pk_share(peer, mode).clone(), delta.clone())?;
-            self.add_apk(peer, apk, mode)?;
-        }
-        Ok(())
-    }
-
-    pub fn get_delta(&self, peer: &AccountAddress, mode: &Mode) -> Option<&Delta> {
-        self.get_apk(peer, mode).map(<WVUF as WeightedVUF>::get_public_delta)
     }
 
     pub fn get_peer_weight(&self, peer: &AccountAddress, mode: &Mode) -> usize {

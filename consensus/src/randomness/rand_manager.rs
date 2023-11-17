@@ -25,7 +25,7 @@ use aptos_network::protocols::network::RpcError;
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_address::AccountAddress, validator_verifier::ValidatorVerifier, randomness::{RandDecision, RandConfig, Mode, RandMetadata, Delta, WVUF},
+    account_address::AccountAddress, validator_verifier::ValidatorVerifier, randomness::{RandDecision, RandConfig, Mode, RandMetadata, Delta, WVUF}, validator_signer::ValidatorSigner,
 };
 use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
@@ -35,7 +35,7 @@ use futures::{
 use tokio::time::{Duration, Instant};
 use tokio_retry::strategy::ExponentialBackoff;
 
-use super::{block_queue::{OrderedBlocks, RandReadyBlocks}, types::{RandMessage, RandShare, ShareAckState, DeltaAckState}, rand_store::{RandStore, AddDecisionResult}};
+use super::{block_queue::{OrderedBlocks, RandReadyBlocks}, types::{RandMessage, RandShare, ShareAckState, CertifiedDelta, DeltaAck, SignatureBuilder, CertifiedDeltaAckState}, rand_store::{RandStore, AddDecisionResult}};
 
 // rand todo: parameters. These parameters can sometimes pass smoke test.
 pub const RAND_SHARE_BROADCAST_INTERVAL_MS: u64 = 1_000;
@@ -61,7 +61,9 @@ pub fn log_rand_event(event: LogEvent, author: Author, remote_peer: Option<Autho
 pub struct RandManager {
     author: Author,
     epoch: u64,
-    verifier: ValidatorVerifier,
+    verifier: Arc<ValidatorVerifier>,
+    // for signing delta message
+    signer: Arc<ValidatorSigner>,
 
     rand_store: RandStore,
 
@@ -91,7 +93,8 @@ impl RandManager {
     pub fn new(
         author: Author,
         epoch: u64,
-        verifier: ValidatorVerifier,
+        verifier: Arc<ValidatorVerifier>,
+        signer: Arc<ValidatorSigner>,
         rand_config: Option<RandConfig>,
         gc_gap_below: Round,
         gc_gap_above: Round,
@@ -104,13 +107,13 @@ impl RandManager {
     ) -> Self {
         // rand todo: parameters
         let rb_backoff_policy = ExponentialBackoff::from_millis(2).factor(50).max_delay(Duration::from_secs(5));
-        let reliable_broadcast = ReliableBroadcast::new(
+        let reliable_broadcast = Arc::new(ReliableBroadcast::new(
             verifier.get_ordered_account_addresses(),
             network_sender.clone(),
             rb_backoff_policy,
             TimeService::real(),
             Duration::from_millis(RAND_SHARE_BROADCAST_INTERVAL_MS),
-        );
+        ));
 
         let (acked_rand_decision_tx, acked_rand_decision_rx) =
             create_channel::<RandDecision>();
@@ -118,14 +121,9 @@ impl RandManager {
         // reliable broadcast my delta
         let delta_rb_drop_guard = match &rand_config {
             Some(rand_config) => {
-                let apk_delta: Delta = rand_config.get_delta(&author, &Mode::Fallback).cloned().unwrap();
-                let (abort_handle, abort_registration) = AbortHandle::new_pair();
-                let task = reliable_broadcast.broadcast(
-                    DeltaMsg::new(author, apk_delta),
-                    DeltaAckState::new(verifier.get_ordered_account_addresses_iter()),
-                );
-                tokio::spawn(Abortable::new(task, abort_registration));
-                Some(DropGuard::new(abort_handle))
+                let apk_delta: Delta = rand_config.get_my_delta(&Mode::Fallback).clone();
+                let delta_msg = DeltaMsg::new(epoch, author, apk_delta);
+                Some(Self::reliable_broadcast_delta(delta_msg, reliable_broadcast.clone(), verifier.clone()))
             },
             None => None,
         };
@@ -136,6 +134,7 @@ impl RandManager {
             author,
             epoch,
             verifier,
+            signer,
             rand_store,
             previous_dequeue_time: Instant::now(),
             ordered_block_rx,
@@ -146,8 +145,35 @@ impl RandManager {
             rand_msg_rx,
             acked_rand_decision_tx,
             acked_rand_decision_rx,
-            reliable_broadcast: Arc::new(reliable_broadcast),
+            reliable_broadcast,
         }
+    }
+
+    fn reliable_broadcast_delta(delta_msg: DeltaMsg, reliable_broadcast: Arc<ReliableBroadcast<RandMessage, ExponentialBackoff>>, verifier: Arc<ValidatorVerifier>) -> DropGuard {
+        let rb = reliable_broadcast.clone();
+        let rb2 = reliable_broadcast.clone();
+        let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        let signature_builder =
+            SignatureBuilder::new(delta_msg.metadata().clone(), verifier.clone());
+        let cert_ack_set = CertifiedDeltaAckState::new(verifier.get_ordered_account_addresses_iter());
+
+        let delta_msg_clone = delta_msg.clone();
+        let metadata = delta_msg.metadata().clone();
+        let delta_broadcast = async move {
+            rb.broadcast(delta_msg_clone, signature_builder).await
+        };
+        let core_task = delta_broadcast.then(move |certificate| {
+            let certified_delta =
+                CertifiedDelta::new(delta_msg.clone(), certificate.signatures().to_owned());
+            rb2.broadcast(certified_delta, cert_ack_set)
+        });
+        let task = async move {
+            debug!("[RandManager] Start reliable broadcast delta {:?}", metadata);
+            core_task.await;
+            debug!("[RandManager] Finish reliable broadcast delta {:?}", metadata);
+        };
+        tokio::spawn(Abortable::new(task, abort_registration));
+        DropGuard::new(abort_handle)
     }
 
     fn do_reliable_broadcast(&self, shares: RandShare) -> DropGuard {
@@ -184,13 +210,31 @@ impl RandManager {
         self.process_decision(decision).await;
     }
 
-    fn process_apk_delta(&mut self, peer: &AccountAddress, delta: Delta) -> anyhow::Result<()> {
+    fn process_delta(&mut self, delta_msg: DeltaMsg) -> anyhow::Result<RandMessage> {
         if let Some(rand_config) = self.rand_store.rand_config.as_mut() {
-            rand_config.add_delta(peer, delta, &Mode::Fallback)
+            delta_msg.verify()?;
+            // only sign delta once to avoid equivocation
+            rand_config.add_signed_delta(delta_msg.author(), delta_msg.delta().clone(), &Mode::Fallback)?;
+            let signature = delta_msg.sign_vote(&self.signer)?;
+            let ack = DeltaAck::new(delta_msg.metadata().clone(), signature);
+            Ok(RandMessage::DeltaAck(ack))
         } else {
             bail!("[RandManager] No rand_config!");
         }
     }
+
+    fn process_certified_delta(&mut self, certified_delta: CertifiedDelta) -> anyhow::Result<RandMessage> {
+        if let Some(rand_config) = self.rand_store.rand_config.as_mut() {
+            if rand_config.get_certified_apk(certified_delta.author(), &Mode::Fallback).is_none() {
+                certified_delta.verify(&self.verifier)?;
+                rand_config.add_certified_delta(certified_delta.author(), certified_delta.delta().clone(), &Mode::Fallback)?;
+            }
+            Ok(RandMessage::CertifiedDeltaAck(()))
+        } else {
+            bail!("[RandManager] No rand_config!");
+        }
+    }
+
 
     async fn process_share(&mut self, share: RandShare) -> anyhow::Result<RandMessage> {
         log_rand_event(LogEvent::ReceiveRandShare, self.author, Some(*share.author()), share.id(), share.round());
@@ -221,10 +265,8 @@ impl RandManager {
 
         let rand_msg = match req {
             RandMessage::Share(share) => self.process_share(share).await?,
-            RandMessage::Delta(delta) => {
-                self.process_apk_delta(&delta.author, delta.delta)?;
-                RandMessage::DeltaAck(())
-            },
+            RandMessage::Delta(delta_msg) => self.process_delta(delta_msg)?,
+            RandMessage::CertifiedDelta(certified_delta) => self.process_certified_delta(certified_delta)?,
             _ => {
                 bail!("[RandManager] error unknown rpc message {:?}", req)
             },

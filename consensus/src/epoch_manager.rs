@@ -604,10 +604,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let gc_gap_below = 10 * self.config.vote_back_pressure_limit;
         let gc_gap_above = 10 * self.config.vote_back_pressure_limit;
 
+        let signer = new_signer_from_storage(self.author, &self.config.safety_rules.backend);
+
         let rand_manager = RandManager::new(
             self.author,
             self.epoch(),
-            verifier.clone(),
+            Arc::new(verifier.clone()),
+            signer,
             rand_config,
             gc_gap_below,
             gc_gap_above,
@@ -1098,7 +1101,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                                 let pk_shares_f = (0..epoch_state.verifier.len())
                                     .map(|id| trxs.trx_f.get_public_key_share(&dkg_pvss_config.wc_f, &Player { id }))
                                     .collect::<Vec<_>>();
-                                let keys_f = RandKeys::new(ask_f, apk_f, pk_shares_f, my_index, epoch_state.verifier.len());
+                                let keys_f = RandKeys::new(ask_f, apk_f, pk_shares_f, epoch_state.verifier.len());
 
                                 // keys for randomness optmistic path
                                 let (sk_o, pk_o) = trxs.trx_o.decrypt_own_share(&dkg_pvss_config.wc_o, &Player{id: my_index}, &dk);
@@ -1106,7 +1109,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                                 let pk_shares_o = (0..epoch_state.verifier.len())
                                     .map(|id| trxs.trx_o.get_public_key_share(&dkg_pvss_config.wc_o, &Player { id }))
                                     .collect::<Vec<_>>();
-                                let keys_o = RandKeys::new(ask_o, apk_o, pk_shares_o, my_index, epoch_state.verifier.len());
+                                let keys_o = RandKeys::new(ask_o, apk_o, pk_shares_o, epoch_state.verifier.len());
 
                                 debug!("[DKG] Successfully decrypted randomness keys! threshold_f = {}, threshold_o = {}", dkg_pvss_config.wc_f.get_threshold_weight(), dkg_pvss_config.wc_o.get_threshold_weight());
 

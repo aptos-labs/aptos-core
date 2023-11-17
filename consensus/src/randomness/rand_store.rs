@@ -99,7 +99,7 @@ impl RandItem {
             let mut apks_and_proofs = vec![];
             for share in self.shares.values() {
                 let id = *rand_config.validator.address_to_validator_index().get(share.author()).unwrap();
-                let maybe_apk = rand_config.get_apk(share.author(), &Mode::Fallback);
+                let maybe_apk = rand_config.get_certified_apk(share.author(), &Mode::Fallback);
                 if let Some(apk) = maybe_apk {
                     apks_and_proofs.push((Player{ id }, apk.clone(), share.share().clone()));
                 } else {
@@ -292,7 +292,7 @@ impl RandStore {
 
     pub fn add_share(&mut self, share: RandShare) -> anyhow::Result<(ShareAck, AddDecisionResult)> {
         let rand_config = self.rand_config.as_ref().unwrap();
-        let missing_apk = rand_config.get_apk(share.author(), &Mode::Fallback).is_none();
+        let missing_apk = rand_config.get_certified_apk(share.author(), &Mode::Fallback).is_none();
 
         if missing_apk {
             bail!("[RandStore] missing apk for {:?}", share.author());
