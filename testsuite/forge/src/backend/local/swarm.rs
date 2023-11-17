@@ -427,16 +427,14 @@ impl LocalSwarm {
     }
 
     pub fn validators(&self) -> impl Iterator<Item = &LocalNode> {
-        // sort by id to keep the order consistent:
         let mut validators: Vec<&LocalNode> = self.validators.values().collect();
-        validators.sort_by_key(|v| v.index());
+        validators.sort_by_key(|v| v.index()); // Sort by index for consistent ordering
         validators.into_iter()
     }
 
     pub fn validators_mut(&mut self) -> impl Iterator<Item = &mut LocalNode> {
-        // sort by id to keep the order consistent:
         let mut validators: Vec<&mut LocalNode> = self.validators.values_mut().collect();
-        validators.sort_by_key(|v| v.index());
+        validators.sort_by_key(|v| v.index()); // Sort by index for consistent ordering
         validators.into_iter()
     }
 
@@ -446,6 +444,18 @@ impl LocalSwarm {
 
     pub fn fullnode_mut(&mut self, peer_id: PeerId) -> Option<&mut LocalNode> {
         self.fullnodes.get_mut(&peer_id)
+    }
+
+    pub fn fullnodes(&self) -> impl Iterator<Item = &LocalNode> {
+        let mut fullnodes: Vec<&LocalNode> = self.fullnodes.values().collect();
+        fullnodes.sort_by_key(|v| v.index()); // Sort by index for consistent ordering
+        fullnodes.into_iter()
+    }
+
+    pub fn fullnodes_mut(&mut self) -> impl Iterator<Item = &mut LocalNode> {
+        let mut fullnodes: Vec<&mut LocalNode> = self.fullnodes.values_mut().collect();
+        fullnodes.sort_by_key(|v| v.index()); // Sort by index for consistent ordering
+        fullnodes.into_iter()
     }
 
     pub fn dir(&self) -> &Path {

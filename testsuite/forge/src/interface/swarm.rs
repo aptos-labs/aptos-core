@@ -6,7 +6,7 @@ use crate::{
     AptosPublicInfo, ChainInfo, FullNode, NodeExt, Result, SwarmChaos, Validator, Version,
 };
 use anyhow::{anyhow, bail};
-use aptos_config::config::NodeConfig;
+use aptos_config::{config::NodeConfig, network_id::NetworkId};
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
@@ -153,7 +153,7 @@ pub trait SwarmExt: Swarm {
         while !try_join_all(
             validators
                 .iter()
-                .map(|node| node.check_connectivity(validators.len() - 1))
+                .map(|node| node.check_connectivity(NetworkId::Validator, validators.len() - 1))
                 .chain(full_nodes.iter().map(|node| node.check_connectivity())),
         )
         .await
@@ -488,7 +488,7 @@ pub async fn get_highest_synced_epoch(clients: &[(String, RestClient)]) -> Resul
 }
 
 /// Returns the highest synced version and epoch of the given clients
-async fn get_highest_synced_version_and_epoch(
+pub async fn get_highest_synced_version_and_epoch(
     clients: &[(String, RestClient)],
 ) -> Result<(u64, u64)> {
     let mut latest_version_and_epoch = (0, 0);
