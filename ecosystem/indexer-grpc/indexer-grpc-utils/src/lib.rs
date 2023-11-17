@@ -4,6 +4,7 @@
 pub mod cache_operator;
 pub mod config;
 pub mod constants;
+pub mod counters;
 pub mod file_store_operator;
 pub mod types;
 
@@ -104,6 +105,11 @@ pub fn time_diff_since_pb_timestamp_in_secs(timestamp: &Timestamp) -> f64 {
         .as_secs_f64();
     let transaction_time = timestamp.seconds as f64 + timestamp.nanos as f64 * 1e-9;
     current_timestamp - transaction_time
+}
+
+pub fn proto_timestamp_to_timestamp(timestamp: &Timestamp) -> std::time::SystemTime {
+    let transaction_time = timestamp.seconds as u64 * 1_000_000_000 + timestamp.nanos as u64;
+    std::time::UNIX_EPOCH + std::time::Duration::from_nanos(transaction_time)
 }
 
 /// Chunk transactions into chunks with chunk size less than or equal to chunk_size.

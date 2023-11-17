@@ -26,6 +26,8 @@ use tonic::Status;
 
 type EndVersion = u64;
 
+const SERVICE_TYPE: &str = "indexer_fullnode";
+
 // Basically a handler for a single GRPC stream request
 pub struct IndexerStreamCoordinator {
     pub current_version: u64,
@@ -40,6 +42,7 @@ pub struct IndexerStreamCoordinator {
 // Single batch of transactions to fetch, convert, and stream
 pub struct TransactionBatchInfo {
     pub start_version: u64,
+    pub head_version: u64,
     pub num_transactions_to_fetch: u16,
 }
 
@@ -102,10 +105,14 @@ impl IndexerStreamCoordinator {
                             chain_id: ledger_chain_id as u32,
                         };
                         match transaction_sender.send(Result::<_, Status>::Ok(item)).await {
-                            Ok(_) => {},
+                            Ok(_) => {
+                                // No need to log here; the actual logging is done in service side.
+                            },
                             Err(_) => {
                                 // Client disconnects.
-                                return Err(Status::aborted("Client disconnected"));
+                                return Err(Status::aborted(
+                                    "[Indexer Fullnode] Client disconnected",
+                                ));
                             },
                         }
                     }
@@ -116,7 +123,10 @@ impl IndexerStreamCoordinator {
         }
         match futures::future::try_join_all(tasks).await {
             Ok(res) => res,
-            Err(err) => panic!("Error processing transaction batches: {:?}", err),
+            Err(err) => panic!(
+                "[Indexer Fullnode] Error processing transaction batches: {:?}",
+                err
+            ),
         }
     }
 
@@ -141,15 +151,7 @@ impl IndexerStreamCoordinator {
     /// This will create batches based on the configuration of the request
     async fn get_batches(&mut self) -> Vec<TransactionBatchInfo> {
         self.ensure_highest_known_version().await;
-
-        info!(
-            current_version = self.current_version,
-            highest_known_version = self.highest_known_version,
-            processor_batch_size = self.processor_batch_size,
-            processor_task_count = self.processor_task_count,
-            "Preparing to fetch transactions"
-        );
-
+        // We only care about the state sync time, which is logged at tailing the rocksdb.
         let mut starting_version = self.current_version;
         let mut num_fetches = 0;
         let mut batches = vec![];
@@ -165,6 +167,7 @@ impl IndexerStreamCoordinator {
             batches.push(TransactionBatchInfo {
                 start_version: starting_version,
                 num_transactions_to_fetch,
+                head_version: self.highest_known_version,
             });
             starting_version += num_transactions_to_fetch as u64;
             num_fetches += 1;
@@ -184,28 +187,41 @@ impl IndexerStreamCoordinator {
                 batch.num_transactions_to_fetch,
                 ledger_version,
             ) {
-                Ok(raw_txns) => return raw_txns,
+                Ok(raw_txns) => {
+                    info!(
+                        start_version = batch.start_version,
+                        end_version =
+                            batch.start_version + batch.num_transactions_to_fetch as u64 - 1,
+                        num_of_transactions = batch.num_transactions_to_fetch,
+                        // size_in_bytes may involve serialization, skip here.
+                        service_type = SERVICE_TYPE,
+                        "[Indexer Fullnode] Successfully fetched raw transactions",
+                    );
+                    return raw_txns;
+                },
                 Err(err) => {
                     UNABLE_TO_FETCH_TRANSACTION.inc();
                     retries += 1;
 
                     if retries >= DEFAULT_NUM_RETRIES {
                         error!(
-                            starting_version = batch.start_version,
-                            num_transactions = batch.num_transactions_to_fetch,
+                            start_version = batch.start_version,
+                            num_of_transactions = batch.num_transactions_to_fetch,
+                            service_type = SERVICE_TYPE,
                             error = format!("{:?}", err),
-                            "Could not fetch transactions: retries exhausted",
+                            "[Indexer Fullnode] Could not fetch transactions: retries exhausted",
                         );
                         panic!(
-                            "Could not fetch {} transactions after {} retries, starting at {}: {:?}",
+                            "[Indexer Fullnode] Could not fetch {} transactions after {} retries, starting at {}: {:?}",
                             batch.num_transactions_to_fetch, retries, batch.start_version, err
                         );
                     } else {
                         error!(
-                            starting_version = batch.start_version,
-                            num_transactions = batch.num_transactions_to_fetch,
+                            start_version = batch.start_version,
+                            num_of_transactions = batch.num_transactions_to_fetch,
+                            service_type = SERVICE_TYPE,
                             error = format!("{:?}", err),
-                            "Could not fetch transactions: will retry",
+                            "[Indexer Fullnode] Could not fetch transactions: will retry",
                         );
                     }
                     tokio::time::sleep(Duration::from_millis(300)).await;
@@ -234,7 +250,7 @@ impl IndexerStreamCoordinator {
             .get_block_info_by_version(first_version)
             .unwrap_or_else(|_| {
                 panic!(
-                    "Could not get block_info for start version {}",
+                    "[Indexer Fullnode] Could not get block_info for start version {}",
                     first_version,
                 )
             });
@@ -263,7 +279,9 @@ impl IndexerStreamCoordinator {
                 .map(|mut txn| {
                     match txn {
                         APITransaction::PendingTransaction(_) => {
-                            unreachable!("Indexer should never see pending transactions")
+                            unreachable!(
+                                "[Indexer Fullnode] Indexer should never see pending transactions"
+                            )
                         },
                         APITransaction::UserTransaction(ref mut ut) => {
                             ut.info.block_height = Some(block_height_bcs);
@@ -289,13 +307,14 @@ impl IndexerStreamCoordinator {
                     UNABLE_TO_FETCH_TRANSACTION.inc();
                     error!(
                         version = txn_version,
+                        service_type = SERVICE_TYPE,
                         error = format!("{:?}", err),
-                        "Could not convert from OnChainTransactions",
+                        "[Indexer Fullnode] Could not convert from OnChainTransactions",
                     );
                     // IN CASE WE NEED TO SKIP BAD TXNS
                     // continue;
                     panic!(
-                        "Could not convert txn {} from OnChainTransactions: {:?}",
+                        "[Indexer Fullnode] Could not convert txn {} from OnChainTransactions: {:?}",
                         txn_version, err
                     );
                 },
@@ -303,20 +322,21 @@ impl IndexerStreamCoordinator {
         }
 
         if transactions.is_empty() {
-            panic!("No transactions!");
+            panic!("[Indexer Fullnode] No transactions to convert!");
         }
 
         let fetch_millis = (chrono::Utc::now().naive_utc() - start_millis).num_milliseconds();
 
         info!(
-            first_version = first_version,
-            num_transactions = transactions.len(),
-            time_millis = fetch_millis,
-            actual_last_version = transactions
+            start_version = first_version,
+            end_version = transactions
                 .last()
                 .map(|txn| txn.version().unwrap())
                 .unwrap_or(0),
-            "Fetched transactions",
+            num_of_transactions = transactions.len(),
+            fetch_duration_in_ms = fetch_millis,
+            service_type = SERVICE_TYPE,
+            "[Indexer Fullnode] Successfully converted transactions",
         );
 
         FETCHED_TRANSACTION.inc();
@@ -350,8 +370,9 @@ impl IndexerStreamCoordinator {
             empty_loops += 1;
             if let Err(err) = self.set_highest_known_version() {
                 error!(
+                    service_type = SERVICE_TYPE,
                     error = format!("{:?}", err),
-                    "Failed to set highest known version"
+                    "[Indexer Fullnode] Failed to set highest known version"
                 );
                 continue;
             } else {
@@ -359,7 +380,8 @@ impl IndexerStreamCoordinator {
                     SampleRate::Frequency(10),
                     info!(
                         highest_known_version = self.highest_known_version,
-                        "Found new highest known version",
+                        service_type = SERVICE_TYPE,
+                        "[Indexer Fullnode] Found new highest known version",
                     )
                 );
             }
