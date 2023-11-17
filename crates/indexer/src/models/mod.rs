@@ -13,7 +13,6 @@ pub mod processor_statuses;
 pub mod property_map;
 pub mod signatures;
 pub mod stake_models;
-pub mod system_transactions;
 pub mod token_models;
 pub mod transactions;
 pub mod user_transactions;

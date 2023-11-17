@@ -346,7 +346,7 @@ impl
             info,
             events,
             timestamp: timestamp.into(),
-            txn_serialized: bcs::to_bytes(txn).unwrap(),
+            raw_txn: txn.into(),
         })
     }
 }
@@ -556,13 +556,33 @@ pub struct BlockMetadataTransaction {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct Dummy {
+    nonce: u64,
+}
+
+/// A system transaction.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
+pub enum SystemTransactionInner {
+    Dummy(Dummy),
+    // more coming...
+}
+
+impl From<&aptos_types::system_txn::SystemTransaction> for SystemTransactionInner {
+    fn from(txn: &aptos_types::system_txn::SystemTransaction) -> Self {
+        match txn {
+            aptos_types::system_txn::SystemTransaction::Void => SystemTransactionInner::Dummy(Dummy { nonce: 0 })
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct SystemTransaction {
     #[serde(flatten)]
     #[oai(flatten)]
     pub info: TransactionInfo,
     pub events: Vec<Event>,
     pub timestamp: U64,
-    pub txn_serialized: Vec<u8>,
+    pub raw_txn: SystemTransactionInner,
 }
 
 /// An event from a transaction

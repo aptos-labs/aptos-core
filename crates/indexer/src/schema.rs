@@ -29,16 +29,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    system_transactions (version) {
-        version -> Int8,
-        block_height -> Int8,
-        txn_serialized -> Bytea,
-        timestamp -> Timestamp,
-        inserted_at -> Timestamp,
-    }
-}
-
-diesel::table! {
     coin_activities (transaction_version, event_account_address, event_creation_number, event_sequence_number) {
         transaction_version -> Int8,
         #[max_length = 66]
@@ -983,7 +973,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     processor_statuses,
     proposal_votes,
     signatures,
-    system_transactions,
     table_items,
     table_metadatas,
     token_activities,
