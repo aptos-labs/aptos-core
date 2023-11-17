@@ -18,13 +18,13 @@ impl Default for Options {
 }
 
 impl Options {
-    /// Creates options from toml configuration source.
-    pub fn create_from_toml(toml_source: &str) -> anyhow::Result<Options> {
+    /// Creates options from the TOML configuration source.
+    pub fn from_toml(toml_source: &str) -> anyhow::Result<Options> {
         Ok(toml::from_str(toml_source)?)
     }
 
-    /// Creates options from toml configuration file.
-    pub fn create_from_toml_file(toml_file: &str) -> anyhow::Result<Options> {
+    /// Creates options from the TOML configuration file.
+    pub fn from_toml_file(toml_file: &str) -> anyhow::Result<Options> {
         Self::create_from_toml(&std::fs::read_to_string(toml_file)?)
     }
 
