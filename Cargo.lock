@@ -628,6 +628,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-aggregator",
+ "aptos-drop-helper",
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",

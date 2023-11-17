@@ -21,6 +21,7 @@ use aptos_aggregator::{
     delta_change_set::serialize,
     types::{code_invariant_error, expect_ok, PanicOr},
 };
+use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_logger::{debug, error, info};
 use aptos_mvhashmap::{
     types::{Incarnation, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
@@ -1117,13 +1118,8 @@ where
             }
         });
         drop(timer);
-        self.executor_thread_pool.spawn(move || {
-            // Explicit async drops.
-            drop(last_input_output);
-            drop(scheduler);
-            // TODO: re-use the code cache.
-            drop(versioned_cache);
-        });
+        // Explicit async drops.
+        DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
         let (_, _, maybe_error) = shared_commit_state.into_inner();
         match maybe_error {
             Some(err) => Err(err),
