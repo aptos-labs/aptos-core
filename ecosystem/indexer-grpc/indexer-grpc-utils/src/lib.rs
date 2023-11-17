@@ -6,6 +6,7 @@ pub mod config;
 pub mod constants;
 pub mod counters;
 pub mod file_store_operator;
+pub mod storage;
 pub mod types;
 
 use anyhow::{Context, Result};
@@ -84,21 +85,6 @@ pub async fn create_data_service_grpc_client(
     .await
     .context("Failed to create data service GRPC client")?;
     Ok(client)
-}
-
-// (Protobuf encoded transaction, version)
-pub type EncodedTransactionWithVersion = (String, u64);
-/// Build the EncodedTransactionWithVersion from the encoded transactions and starting version.
-#[inline]
-pub fn build_protobuf_encoded_transaction_wrappers(
-    encoded_transactions: Vec<String>,
-    starting_version: u64,
-) -> Vec<EncodedTransactionWithVersion> {
-    encoded_transactions
-        .into_iter()
-        .enumerate()
-        .map(|(ind, encoded_transaction)| (encoded_transaction, starting_version + ind as u64))
-        .collect()
 }
 
 pub fn time_diff_since_pb_timestamp_in_secs(timestamp: &Timestamp) -> f64 {

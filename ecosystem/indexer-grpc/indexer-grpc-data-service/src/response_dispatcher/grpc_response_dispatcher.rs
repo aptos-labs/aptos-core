@@ -110,7 +110,6 @@ impl GrpcResponseDispatcher {
                 anyhow::anyhow!("Empty responses from storages."),
             ));
         }
-
         // Verify responses are consecutive and sequential.
         let mut version = self.next_version_to_process;
         for response in responses.iter() {
@@ -200,6 +199,7 @@ impl ResponseDispatcher for GrpcResponseDispatcher {
                 },
             }
         }
+        // We don't want to close the channel immediately before all the finite items are sent.s
         if self.transaction_count.is_some() {
             let start_time = std::time::Instant::now();
             loop {
@@ -207,6 +207,7 @@ impl ResponseDispatcher for GrpcResponseDispatcher {
                     break;
                 }
                 if self.sender.capacity() == self.sender_capacity {
+                    // Sender is empty now; no need to wait.
                     break;
                 }
                 tokio::time::sleep(Duration::from_millis(1000)).await;
@@ -283,7 +284,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn test_finite_stream() {
         let (sender, mut receiver) = tokio::sync::mpsc::channel(100);
-        tokio::spawn(async move {
+        let res = tokio::spawn(async move {
             let first_storage_transactions = create_transactions(20, 100);
             let second_storage_transactions = create_transactions(10, 20);
             let third_storage_transactions = create_transactions(0, 15);
@@ -308,12 +309,13 @@ mod tests {
         for (current_version, t) in transactions.into_iter().enumerate() {
             assert_eq!(t.version, current_version as u64);
         }
+        res.await.expect("Dispatch thread should exit.");
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn test_storages_gap() {
         let (sender, mut receiver) = tokio::sync::mpsc::channel(100);
-        tokio::spawn(async move {
+        let res = tokio::spawn(async move {
             let first_storage_transactions = create_transactions(30, 100);
             let second_storage_transactions = create_transactions(10, 10);
             let storages = vec![
@@ -333,6 +335,7 @@ mod tests {
         let second_response = receiver.recv().await.unwrap();
         // Gap is detected.
         assert!(second_response.is_err());
+        res.await.expect("Dispatch thread should exit.");
     }
 
     // This test is to make sure dispatch doesn't leak memory.
@@ -386,7 +389,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn test_not_found_in_all_storages() {
         let (sender, mut receiver) = tokio::sync::mpsc::channel(100);
-        tokio::spawn(async move {
+        let res = tokio::spawn(async move {
             let first_storage_transactions = create_transactions(20, 100);
             let storages = vec![StorageClient::MockClient(MockStorageClient::new(
                 1,
@@ -400,5 +403,28 @@ mod tests {
 
         let first_response = receiver.recv().await.unwrap();
         assert!(first_response.is_err());
+        res.await.expect("Dispatch thread should exit.");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn test_back_pressure_from_client_should_error() {
+        let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+        let res = tokio::spawn(async move {
+            let first_storage_transactions = create_transactions(200, 200);
+            let second_storage_transactions = create_transactions(0, 200);
+            let storages = vec![
+                StorageClient::MockClient(MockStorageClient::new(1, first_storage_transactions)),
+                StorageClient::MockClient(MockStorageClient::new(1, second_storage_transactions)),
+            ];
+            let mut dispatcher = GrpcResponseDispatcher::new(0, None, sender, storages.as_slice());
+            let run_result = dispatcher.run().await;
+            assert!(run_result.is_err());
+        });
+        // Let the dispatcher run for 1 second.
+        tokio::time::sleep(std::time::Duration::from_secs(130)).await;
+        // First the channel is full, then the sender is closed.
+        let first_response = receiver.recv().await.unwrap();
+        assert!(first_response.is_ok());
+        res.await.expect("Dispatch thread should exit.");
     }
 }

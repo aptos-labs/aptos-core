@@ -6,7 +6,9 @@ pub mod processor;
 
 use anyhow::{Context, Result};
 use aptos_indexer_grpc_server_framework::RunnableConfig;
-use aptos_indexer_grpc_utils::{config::IndexerGrpcFileStoreConfig, types::RedisUrl};
+use aptos_indexer_grpc_utils::{
+    config::IndexerGrpcFileStoreConfig, storage::StorageFormat, types::RedisUrl,
+};
 use processor::Processor;
 use serde::{Deserialize, Serialize};
 
@@ -15,6 +17,18 @@ use serde::{Deserialize, Serialize};
 pub struct IndexerGrpcFileStoreWorkerConfig {
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub redis_main_instance_address: RedisUrl,
+    #[serde(default = "default_cache_storage_format")]
+    pub cache_storage_format: StorageFormat,
+    #[serde(default = "default_file_storage_format")]
+    pub file_storage_format: StorageFormat,
+}
+
+fn default_cache_storage_format() -> StorageFormat {
+    StorageFormat::Base64UncompressedProto
+}
+
+fn default_file_storage_format() -> StorageFormat {
+    StorageFormat::JsonBase64UncompressedProto
 }
 
 #[async_trait::async_trait]
@@ -23,6 +37,8 @@ impl RunnableConfig for IndexerGrpcFileStoreWorkerConfig {
         let mut processor = Processor::new(
             self.redis_main_instance_address.clone(),
             self.file_store_config.clone(),
+            self.cache_storage_format,
+            self.file_storage_format,
         )
         .await
         .context("Failed to create processor for file store worker")?;

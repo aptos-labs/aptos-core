@@ -28,8 +28,8 @@ use aptos_protos::{
     },
     util::timestamp::Timestamp,
 };
-use futures::{self, StreamExt};
 use prost::Message;
+use futures::{self, StreamExt};
 use tracing::{error, info};
 use url::Url;
 
@@ -45,6 +45,7 @@ pub struct Worker {
     fullnode_grpc_address: Url,
     /// File store config
     file_store: IndexerGrpcFileStoreConfig,
+    storage_format: StorageFormat,
 }
 
 /// GRPC data status enum is to identify the data frame.
@@ -76,6 +77,7 @@ impl Worker {
         fullnode_grpc_address: Url,
         redis_main_instance_address: RedisUrl,
         file_store: IndexerGrpcFileStoreConfig,
+        storage_format: StorageFormat,
     ) -> Result<Self> {
         let redis_client = redis::Client::open(redis_main_instance_address.0.clone())
             .with_context(|| {
@@ -88,6 +90,7 @@ impl Worker {
             redis_client,
             file_store,
             fullnode_grpc_address,
+            storage_format,
         })
     }
 
@@ -118,11 +121,15 @@ impl Worker {
                         gcs_file_store
                             .gcs_file_store_service_account_key_path
                             .clone(),
+                        self.storage_format,
                     ))
                 },
-                IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => Box::new(
-                    LocalFileStoreOperator::new(local_file_store.local_file_store_path.clone()),
-                ),
+                IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => {
+                    Box::new(LocalFileStoreOperator::new(
+                        local_file_store.local_file_store_path.clone(),
+                        self.storage_format,
+                    ))
+                },
             };
 
             file_store_operator.verify_storage_bucket_existence().await;
@@ -156,7 +163,13 @@ impl Worker {
                 })?;
 
             // 3&4. Infinite streaming until error happens. Either stream ends or worker crashes.
-            process_streaming_response(conn, file_store_metadata, response.into_inner()).await?;
+            process_streaming_response(
+                conn,
+                file_store_metadata,
+                response.into_inner(),
+                self.storage_format,
+            )
+            .await?;
         }
     }
 }
@@ -186,33 +199,17 @@ async fn process_transactions_from_node_response(
             }
         },
         Response::Data(data) => {
-            let transaction_len = data.transactions.len();
-            let transactions = data.transactions.clone();
-            let first_transaction = data
+            let first_transaction_latency = data
                 .transactions
+                .as_slice()
                 .first()
-                .context("There were unexpectedly no transactions in the response")?;
-            let first_transaction_pb_timestamp = first_transaction.timestamp.clone();
-            let last_transaction = data
-                .transactions
-                .last()
-                .context("There were unexpectedly no transactions in the response")?;
-            let last_transaction_pb_timestamp = last_transaction.timestamp.clone();
-            let transactions = transactions
-                .into_iter()
-                .map(|tx| {
-                    let timestamp_in_seconds = match tx.timestamp {
-                        Some(ref timestamp) => timestamp.seconds as u64,
-                        None => 0,
-                    };
-                    let mut encoded_proto_data = vec![];
-                    tx.encode(&mut encoded_proto_data)
-                        .context("Encode transaction failed.")?;
-                    let base64_encoded_proto_data = base64::encode(encoded_proto_data);
-                    Ok((tx.version, base64_encoded_proto_data, timestamp_in_seconds))
-                })
-                .collect::<Result<Vec<(u64, String, u64)>>>()?;
-
+                .map(|t| time_diff_since_pb_timestamp_in_secs(t.timestamp.as_ref().unwrap()));
+            let transactions = data.transactions;
+            let transaction_len = transactions.len();
+            let first_transaction_version = transactions.first().context("Empty transaction response found")?.version;
+            let last_transaction_version = transactions.last().context("Empty transaction response found")?.version;
+            let first_transaction_pb_timestamp = transactions.first().context("Empty transaction response found")?.timestamp.clone();
+            let last_transaction_pb_timestamp = transactions.last().context("Empty transaction response found")?.timestamp.clone();
             // Push to cache.
             match cache_operator.update_cache_transactions(transactions).await {
                 Ok(_) => {},
@@ -235,8 +232,8 @@ async fn process_transactions_from_node_response(
             }
             Ok(GrpcDataStatus::ChunkDataOk {
                 num_of_transactions: transaction_len as u64,
-                start_version: first_transaction.version,
-                end_version: last_transaction.version,
+                start_version: first_transaction_version,
+                end_version:  last_transaction_version,
                 start_version_txn_timestamp: first_transaction_pb_timestamp,
                 end_version_txn_timestamp: last_transaction_pb_timestamp,
             })
@@ -248,6 +245,7 @@ async fn process_transactions_from_node_response(
 async fn setup_cache_with_init_signal(
     conn: redis::aio::ConnectionManager,
     init_signal: TransactionsFromNodeResponse,
+    storage_format: StorageFormat,
 ) -> Result<(
     CacheOperator<redis::aio::ConnectionManager>,
     ChainID,
@@ -272,7 +270,7 @@ async fn setup_cache_with_init_signal(
         },
     };
 
-    let mut cache_operator = CacheOperator::new(conn);
+    let mut cache_operator = CacheOperator::new(conn, storage_format);
     cache_operator.cache_setup_if_needed().await?;
     cache_operator
         .update_or_verify_chain_id(fullnode_chain_id as u64)
@@ -288,6 +286,7 @@ async fn process_streaming_response(
     file_store_metadata: Option<FileStoreMetadata>,
     mut resp_stream: impl futures_core::Stream<Item = Result<TransactionsFromNodeResponse, tonic::Status>>
         + std::marker::Unpin,
+    storage_format: StorageFormat,
 ) -> Result<()> {
     let mut tps_calculator = MovingAverage::new(10_000);
     let mut transaction_count = 0;
@@ -299,7 +298,7 @@ async fn process_streaming_response(
         },
     };
     let (mut cache_operator, fullnode_chain_id, starting_version) =
-        setup_cache_with_init_signal(conn, init_signal)
+        setup_cache_with_init_signal(conn, init_signal, storage_format)
             .await
             .context("[Indexer Cache] Failed to setup cache with init signal from RPC")?;
     // It's required to start the worker with the same version as file store.

@@ -5,6 +5,7 @@ use crate::{
     in_memory_storage::storage::{InMemoryStorageInternal, IN_MEMORY_STORAGE_SIZE_SOFT_LIMIT},
 };
 use anyhow::Context;
+use aptos_indexer_grpc_utils::{storage::StorageFormat, types::RedisUrl};
 use aptos_protos::transaction::v1::Transaction;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -12,11 +13,18 @@ use std::sync::Arc;
 const IN_MEMORY_STORAGE_NAME: &str = "In Memory";
 const IN_MEMORY_STORAGE_READ_SIZE: usize = 1000;
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct InMemoryStorageClientConfig {
     // The source of the transactions.
-    redis_address: String,
+    redis_address: RedisUrl,
+    // The storage format of the transactions.
+    #[serde(default = "default_storage_format")]
+    storage_format: StorageFormat,
+}
+
+fn default_storage_format() -> StorageFormat {
+    StorageFormat::Base64UncompressedProto
 }
 
 #[derive(Clone)]
@@ -27,8 +35,8 @@ pub struct InMemoryStorageClient {
 impl InMemoryStorageClient {
     // For each process, to avoid memory explosion, only create the client once and copy the reference
     // to other threads.
-    pub async fn new(redis_address: String) -> anyhow::Result<Self> {
-        let internal = InMemoryStorageInternal::new(redis_address)
+    pub async fn new(config: InMemoryStorageClientConfig) -> anyhow::Result<Self> {
+        let internal = InMemoryStorageInternal::new(config.redis_address, config.storage_format)
             .await
             .context("Internal storage initialization failed.")?;
         Ok(Self {

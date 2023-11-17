@@ -2,9 +2,12 @@
 
 use crate::{access_trait::AccessMetadata, REDIS_CHAIN_ID, REDIS_ENDING_VERSION_EXCLUSIVE_KEY};
 use anyhow::Context;
+use aptos_indexer_grpc_utils::{
+    storage::{CacheEntry, CacheEntryKey, StorageFormat},
+    types::RedisUrl,
+};
 use aptos_protos::transaction::v1::Transaction;
 use dashmap::DashMap;
-use prost::Message;
 use redis::AsyncCommands;
 use std::{
     sync::{Arc, RwLock},
@@ -38,6 +41,7 @@ impl InMemoryStorageInternal {
     async fn new_with_connection<C>(
         redis_connection: C,
         transaction_map_size: Option<usize>,
+        storage_format: StorageFormat,
     ) -> anyhow::Result<Self>
     where
         C: redis::aio::ConnectionLike + Send + Sync + Clone + 'static,
@@ -58,6 +62,7 @@ impl InMemoryStorageInternal {
                 metadata_clone,
                 cancellation_token_clone,
                 transaction_map_size,
+                storage_format,
             )
             .await;
             let mut storage_status = storage_status_clone.write().unwrap();
@@ -71,14 +76,17 @@ impl InMemoryStorageInternal {
         })
     }
 
-    pub async fn new(redis_address: String) -> anyhow::Result<Self> {
-        let redis_client =
-            redis::Client::open(redis_address).context("Failed to open Redis client.")?;
+    pub async fn new(
+        redis_address: RedisUrl,
+        storage_format: StorageFormat,
+    ) -> anyhow::Result<Self> {
+        let redis_client = redis::Client::open(redis_address.0.to_string())
+            .context("Failed to open Redis client.")?;
         let redis_connection = redis_client
             .get_tokio_connection_manager()
             .await
             .context("Failed to get Redis connection.")?;
-        Self::new_with_connection(redis_connection, None).await
+        Self::new_with_connection(redis_connection, None, storage_format).await
     }
 }
 
@@ -90,6 +98,7 @@ async fn redis_fetch_task<C>(
     metadata: ThreadSafeAccessMetadata,
     cancellation_token: tokio_util::sync::CancellationToken,
     transaction_map_size: Option<usize>,
+    storage_format: StorageFormat,
 ) -> anyhow::Result<()>
 where
     C: redis::aio::ConnectionLike + Send + Sync + Clone + 'static,
@@ -122,50 +131,71 @@ where
 
         let transactions_map_size_hard_limit =
             transaction_map_size.unwrap_or(IN_MEMORY_STORAGE_SIZE_HARD_LIMIT);
-        // 1. Determine the fetch size based on old metadata.
-        let redis_fetch_size = match *metadata.read().unwrap() {
-            Some(ref current_metadata) => {
+        // 1. Determine the fetch size based on old metadata. If new, update the chain id only.
+        let redis_fetch_size = {
+            let mut guard = metadata.write().unwrap();
+            if guard.is_none() {
+                // Update the chain id only.
+                *guard = Some(AccessMetadata {
+                    chain_id: redis_chain_id,
+                    next_version: 0,
+                });
+                std::cmp::min(
+                    transactions_map_size_hard_limit,
+                    redis_ending_version_exclusive as usize,
+                )
+            } else {
+                let current_metadata = guard.as_ref().unwrap();
                 anyhow::ensure!(
                     current_metadata.chain_id == redis_chain_id,
                     "Chain ID mismatch."
                 );
                 redis_ending_version_exclusive.saturating_sub(current_metadata.next_version)
                     as usize
-            },
-            None => std::cmp::min(
-                transactions_map_size_hard_limit,
-                redis_ending_version_exclusive as usize,
-            ),
+            }
         };
         // 2. Use MGET to fetch the transactions in batches.
         let starting_version = redis_ending_version_exclusive - redis_fetch_size as u64;
         let ending_version = redis_ending_version_exclusive;
         // Order doesn't matter here; it'll be available in the map until metadata is updated.
         let keys_batches: Vec<Vec<String>> = (starting_version..ending_version)
-            .map(|version| version.to_string())
+            .map(|version| CacheEntryKey::new(version, storage_format).to_string())
             .collect::<Vec<String>>()
             .chunks(REDIS_FETCH_MGET_BATCH_SIZE)
             .map(|x| x.to_vec())
             .collect();
         for keys in keys_batches {
-            let redis_transactions: Vec<String> = conn
+            let redis_transactions: Vec<Vec<u8>> = conn
                 .mget(keys)
                 .await
                 .context("Failed to MGET from redis.")
-                .expect("lskajdlfkjlaj");
-            let transactions: Vec<Arc<Transaction>> = redis_transactions
+                .expect("Failed to MGET from redis.");
+
+            let cache_entries = redis_transactions
                 .into_iter()
-                .map(|serialized_transaction| {
-                    // TODO: leverage FROM to do conversion.
-                    let serialized_transaction = base64::decode(serialized_transaction.as_bytes())
-                        .expect("Failed to decode base64.");
-                    let transaction = Transaction::decode(serialized_transaction.as_slice())
-                        .expect("Failed to decode transaction protobuf from Redis.");
-                    Arc::new(transaction)
+                .map(|redis_transaction| match storage_format {
+                    StorageFormat::Bz2CompressedProto => {
+                        CacheEntry::Bz2CompressedProto(redis_transaction)
+                    },
+                    StorageFormat::GzipCompressionProto => {
+                        CacheEntry::GzipCompressionProto(redis_transaction)
+                    },
+                    StorageFormat::Base64UncompressedProto => {
+                        CacheEntry::Base64UncompressedProto(redis_transaction)
+                    },
+                    _ => panic!("Unsupported storage format."),
                 })
-                .collect();
+                .collect::<Vec<CacheEntry>>();
+            let transactions = cache_entries
+                .into_iter()
+                .map(|cache_entry| {
+                    // TODO: avoid unwrap here.
+                    Transaction::try_from(cache_entry).expect("Failed to decode transaction.")
+                })
+                .collect::<Vec<Transaction>>();
+
             for transaction in transactions {
-                transactions_map.insert(transaction.version, transaction);
+                transactions_map.insert(transaction.version, Arc::new(transaction));
             }
         }
         // 3. Update the metadata.
@@ -174,7 +204,6 @@ where
             *current_metadata = Some(new_metadata.clone());
         }
         if redis_fetch_size == 0 {
-            tracing::info!("Redis is not ready for current fetch. Wait.");
             continue;
         }
         // Garbage collection. Note, this is *not a thread safe* operation; readers should
@@ -201,6 +230,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aptos_indexer_grpc_utils::storage::CacheEntryBuilder;
     use redis_test::{MockCmd, MockRedisConnection};
 
     fn generate_redis_value_bulk(starting_version: u64, size: usize) -> redis::Value {
@@ -211,10 +241,12 @@ mod tests {
                         version: e,
                         ..Default::default()
                     };
-                    let mut txn_buf = Vec::new();
-                    txn.encode(&mut txn_buf).unwrap();
-                    let encoded = base64::encode(txn_buf);
-                    redis::Value::Data(encoded.as_bytes().to_vec())
+                    let cache_entry_builder =
+                        CacheEntryBuilder::new(txn, StorageFormat::Base64UncompressedProto);
+                    let encoded_bytes = CacheEntry::try_from(cache_entry_builder)
+                        .expect("Failed to build cache entry.")
+                        .into_inner();
+                    redis::Value::Data(encoded_bytes)
                 })
                 .collect(),
         )
@@ -229,9 +261,13 @@ mod tests {
                 Ok(0),
             ),
         ]);
-        let in_memory_storage = InMemoryStorageInternal::new_with_connection(mock_connection, None)
-            .await
-            .unwrap();
+        let in_memory_storage = InMemoryStorageInternal::new_with_connection(
+            mock_connection,
+            None,
+            StorageFormat::Base64UncompressedProto,
+        )
+        .await
+        .unwrap();
         // Wait for the fetch task to finish.
         tokio::time::sleep(std::time::Duration::from_millis(
             REDIS_FETCH_TASK_INTERVAL_IN_MILLIS * 2,
@@ -265,9 +301,13 @@ mod tests {
             ),
         ];
         let mock_connection = MockRedisConnection::new(cmds);
-        let in_memory_storage = InMemoryStorageInternal::new_with_connection(mock_connection, None)
-            .await
-            .unwrap();
+        let in_memory_storage = InMemoryStorageInternal::new_with_connection(
+            mock_connection,
+            None,
+            StorageFormat::Base64UncompressedProto,
+        )
+        .await
+        .unwrap();
         // Wait for the fetch task to finish.
         tokio::time::sleep(std::time::Duration::from_millis(
             REDIS_FETCH_TASK_INTERVAL_IN_MILLIS * 10,
@@ -315,10 +355,13 @@ mod tests {
             ),
         ];
         let mock_connection = MockRedisConnection::new(cmds);
-        let in_memory_storage =
-            InMemoryStorageInternal::new_with_connection(mock_connection, Some(500))
-                .await
-                .unwrap();
+        let in_memory_storage = InMemoryStorageInternal::new_with_connection(
+            mock_connection,
+            Some(500),
+            StorageFormat::Base64UncompressedProto,
+        )
+        .await
+        .unwrap();
         // Wait for the fetch task to finish.
         tokio::time::sleep(std::time::Duration::from_millis(
             REDIS_FETCH_TASK_INTERVAL_IN_MILLIS * 10,

@@ -20,6 +20,14 @@ message GetTransactionsRequest {
   optional uint64 batch_size = 3;
 }
 
+// This is for storage only.
+message TransactionsInStorage {
+    // Required; transactions data.
+    repeated aptos.transaction.v1.Transaction transactions  = 1;
+    // Required; chain id.
+    optional uint64 starting_version = 2;
+}
+
 // TransactionsResponse is a batch of transactions.
 message TransactionsResponse {
     // Required; transactions data.
