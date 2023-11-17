@@ -134,10 +134,8 @@ module coin_listing {
 
         let fixedPriceListing = borrow_global_mut<FixedPriceListing<CoinType>>(listing_addr);
 
-        if (fixedPriceListing.price == price) {
-            abort (error::invalid_argument(ESAME_PRICE))
-        };
-
+        assert!(fixedPriceListing.price != price, error::invalid_argument(ESAME_PRICE))
+        
         fixedPriceListing.price = price;
 
         events::emit_listing_placed(
