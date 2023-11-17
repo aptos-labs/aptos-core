@@ -275,24 +275,43 @@ impl DataStreamEngine for StateStreamEngine {
     ) -> Result<Option<DataNotification>, Error> {
         match client_request {
             StateValuesWithProof(request) => {
+                // Verify the client request indices
                 verify_client_request_indices(
                     self.next_stream_index,
                     request.start_index,
                     request.end_index,
                 )?;
 
-                // Update the local stream notification tracker
-                self.next_stream_index = request.end_index.checked_add(1).ok_or_else(|| {
+                // Identify the last received state index and bound it appropriately
+                let last_received_index = match &client_response_payload {
+                    ResponsePayload::StateValuesWithProof(state_values_with_proof) => {
+                        // Verify that we received at least state value
+                        if state_values_with_proof.raw_values.is_empty() {
+                            return Err(Error::AptosDataClientResponseIsInvalid(format!(
+                                "Received an empty state values response! Request: {:?}",
+                                client_request
+                            )));
+                        }
+
+                        // Get the last received state index
+                        state_values_with_proof.last_index
+                    },
+                    _ => invalid_response_type!(client_response_payload),
+                };
+                let last_received_index =
+                    bound_by_range(last_received_index, request.start_index, request.end_index);
+
+                // Update the next stream index
+                self.next_stream_index = last_received_index.checked_add(1).ok_or_else(|| {
                     Error::IntegerOverflow("Next stream index has overflown!".into())
                 })?;
 
                 // Check if the stream is complete
-                if request.end_index
-                    == self
-                        .get_number_of_states()?
-                        .checked_sub(1)
-                        .ok_or_else(|| Error::IntegerOverflow("End index has overflown!".into()))?
-                {
+                let last_stream_index = self
+                    .get_number_of_states()?
+                    .checked_sub(1)
+                    .ok_or_else(|| Error::IntegerOverflow("End index has overflown!".into()))?;
+                if last_received_index >= last_stream_index {
                     self.stream_is_complete = true;
                 }
 
@@ -446,14 +465,47 @@ impl ContinuousTransactionStreamEngine {
 
     fn create_notification_for_continuous_data(
         &mut self,
-        request_start: Version,
-        request_end: Version,
+        request_start_version: Version,
+        request_end_version: Version,
         client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<DataNotification, Error> {
+        // Check the number of received versions
+        let num_received_versions = match &client_response_payload {
+            ResponsePayload::TransactionsWithProof(transactions_with_proof) => {
+                transactions_with_proof.transactions.len()
+            },
+            ResponsePayload::TransactionOutputsWithProof(outputs_with_proof) => {
+                outputs_with_proof.transactions_and_outputs.len()
+            },
+            _ => invalid_response_type!(client_response_payload),
+        };
+        if num_received_versions == 0 {
+            return Err(Error::AptosDataClientResponseIsInvalid(format!(
+                "Received an empty continuous data response! Request: {:?}",
+                self.request
+            )));
+        }
+
+        // Identify the last received version and bound it appropriately
+        let last_received_version = request_start_version
+            .checked_add(num_received_versions as u64)
+            .and_then(|version| version.checked_sub(1))
+            .ok_or_else(|| Error::IntegerOverflow("Last received version has overflown!".into()))?;
+        let last_received_version = bound_by_range(
+            last_received_version,
+            request_start_version,
+            request_end_version,
+        );
+
         // Update the stream version
         let target_ledger_info = self.get_target_ledger_info()?.clone();
-        self.update_stream_version_and_epoch(request_start, request_end, &target_ledger_info)?;
+        self.update_stream_version_and_epoch(
+            request_start_version,
+            request_end_version,
+            &target_ledger_info,
+            last_received_version,
+        )?;
 
         // Create the data notification
         let data_notification = create_data_notification(
@@ -512,7 +564,12 @@ impl ContinuousTransactionStreamEngine {
 
         // Update the request and stream versions
         self.update_request_version_and_epoch(last_version, &target_ledger_info)?;
-        self.update_stream_version_and_epoch(first_version, last_version, &target_ledger_info)?;
+        self.update_stream_version_and_epoch(
+            first_version,
+            last_version,
+            &target_ledger_info,
+            last_version,
+        )?;
 
         // Create the data notification
         let data_notification = create_data_notification(
@@ -599,7 +656,9 @@ impl ContinuousTransactionStreamEngine {
         request_start_version: Version,
         request_end_version: Version,
         target_ledger_info: &LedgerInfoWithSignatures,
+        last_received_version: Version,
     ) -> Result<(), Error> {
+        // Verify the client request indices
         let (next_stream_version, mut next_stream_epoch) = self.next_stream_version_and_epoch;
         verify_client_request_indices(
             next_stream_version,
@@ -608,46 +667,35 @@ impl ContinuousTransactionStreamEngine {
         )?;
 
         // Update the next stream version and epoch
-        if request_end_version == target_ledger_info.ledger_info().version()
+        if last_received_version == target_ledger_info.ledger_info().version()
             && target_ledger_info.ledger_info().ends_epoch()
         {
             next_stream_epoch = next_stream_epoch
                 .checked_add(1)
                 .ok_or_else(|| Error::IntegerOverflow("Next stream epoch has overflown!".into()))?;
         }
-        let next_stream_version = request_end_version
+        let next_stream_version = last_received_version
             .checked_add(1)
             .ok_or_else(|| Error::IntegerOverflow("Next stream version has overflown!".into()))?;
         self.next_stream_version_and_epoch = (next_stream_version, next_stream_epoch);
 
         // Check if the stream is now complete
-        match &self.request {
-            StreamRequest::ContinuouslyStreamTransactions(request) => {
-                if let Some(target) = &request.target {
-                    if request_end_version == target.ledger_info().version() {
-                        self.stream_is_complete = true;
-                    }
-                }
-            },
-            StreamRequest::ContinuouslyStreamTransactionOutputs(request) => {
-                if let Some(target) = &request.target {
-                    if request_end_version == target.ledger_info().version() {
-                        self.stream_is_complete = true;
-                    }
-                }
-            },
+        let stream_request_target = match &self.request {
+            StreamRequest::ContinuouslyStreamTransactions(request) => request.target.clone(),
+            StreamRequest::ContinuouslyStreamTransactionOutputs(request) => request.target.clone(),
             StreamRequest::ContinuouslyStreamTransactionsOrOutputs(request) => {
-                if let Some(target) = &request.target {
-                    if request_end_version == target.ledger_info().version() {
-                        self.stream_is_complete = true;
-                    }
-                }
+                request.target.clone()
             },
             request => invalid_stream_request!(request),
         };
+        if let Some(target) = stream_request_target {
+            if last_received_version >= target.ledger_info().version() {
+                self.stream_is_complete = true;
+            }
+        }
 
         // Update the current target ledger info if we've hit it
-        if request_end_version == target_ledger_info.ledger_info().version() {
+        if last_received_version >= target_ledger_info.ledger_info().version() {
             self.current_target_ledger_info = None;
         }
 
@@ -1117,19 +1165,42 @@ impl DataStreamEngine for EpochEndingStreamEngine {
     ) -> Result<Option<DataNotification>, Error> {
         match client_request {
             EpochEndingLedgerInfos(request) => {
+                // Verify the client request indices
                 verify_client_request_indices(
                     self.next_stream_epoch,
                     request.start_epoch,
                     request.end_epoch,
                 )?;
 
+                // Identify the last received epoch and bound it appropriately
+                let last_received_epoch = match &client_response_payload {
+                    ResponsePayload::EpochEndingLedgerInfos(ledger_infos) => {
+                        // Verify that we received at least one ledger info
+                        if ledger_infos.is_empty() {
+                            return Err(Error::AptosDataClientResponseIsInvalid(format!(
+                                "Received an empty epoch ending ledger info response! Request: {:?}",
+                                client_request
+                            )));
+                        }
+
+                        // Return the last epoch
+                        ledger_infos
+                            .last()
+                            .map(|ledger_info| ledger_info.ledger_info().epoch())
+                            .unwrap_or(request.start_epoch)
+                    },
+                    _ => invalid_response_type!(client_response_payload),
+                };
+                let last_received_epoch =
+                    bound_by_range(last_received_epoch, request.start_epoch, request.end_epoch);
+
                 // Update the local stream notification tracker
-                self.next_stream_epoch = request.end_epoch.checked_add(1).ok_or_else(|| {
+                self.next_stream_epoch = last_received_epoch.checked_add(1).ok_or_else(|| {
                     Error::IntegerOverflow("Next stream epoch has overflown!".into())
                 })?;
 
                 // Check if the stream is complete
-                if request.end_epoch == self.end_epoch {
+                if last_received_epoch >= self.end_epoch {
                     self.stream_is_complete = true;
                 }
 
@@ -1195,20 +1266,50 @@ impl TransactionStreamEngine {
         request_start_version: Version,
         request_end_version: Version,
         stream_end_version: Version,
+        client_response_payload: &ResponsePayload,
     ) -> Result<(), Error> {
+        // Verify the client request indices
         verify_client_request_indices(
             self.next_stream_version,
             request_start_version,
             request_end_version,
         )?;
 
+        // Check the number of received versions
+        let num_received_versions = match client_response_payload {
+            ResponsePayload::TransactionsWithProof(transactions_with_proof) => {
+                transactions_with_proof.transactions.len()
+            },
+            ResponsePayload::TransactionOutputsWithProof(outputs_with_proof) => {
+                outputs_with_proof.transactions_and_outputs.len()
+            },
+            _ => invalid_response_type!(client_response_payload),
+        };
+        if num_received_versions == 0 {
+            return Err(Error::AptosDataClientResponseIsInvalid(format!(
+                "Received an empty response! Request: {:?}",
+                self.request
+            )));
+        }
+
+        // Identify the last received version and bound it appropriately
+        let last_received_version = request_start_version
+            .checked_add(num_received_versions as u64)
+            .and_then(|version| version.checked_sub(1))
+            .ok_or_else(|| Error::IntegerOverflow("Last received version has overflown!".into()))?;
+        let last_received_version = bound_by_range(
+            last_received_version,
+            request_start_version,
+            request_end_version,
+        );
+
         // Update the local stream notification tracker
-        self.next_stream_version = request_end_version
+        self.next_stream_version = last_received_version
             .checked_add(1)
             .ok_or_else(|| Error::IntegerOverflow("Next stream version has overflown!".into()))?;
 
         // Check if the stream is complete
-        if request_end_version == stream_end_version {
+        if last_received_version >= stream_end_version {
             self.stream_is_complete = true;
         }
 
@@ -1335,42 +1436,42 @@ impl DataStreamEngine for TransactionStreamEngine {
         client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
-        match &self.request {
+        // Identify the version information of the stream and client requests
+        let (stream_end_version, request_start_version, request_end_version) = match &self.request {
             StreamRequest::GetAllTransactions(stream_request) => match client_request {
-                TransactionsWithProof(request) => {
-                    let stream_end_version = stream_request.end_version;
-                    self.update_stream_version(
-                        request.start_version,
-                        request.end_version,
-                        stream_end_version,
-                    )?;
-                },
+                TransactionsWithProof(request) => (
+                    stream_request.end_version,
+                    request.start_version,
+                    request.end_version,
+                ),
                 request => invalid_client_request!(request, self),
             },
             StreamRequest::GetAllTransactionOutputs(stream_request) => match client_request {
-                TransactionOutputsWithProof(request) => {
-                    let stream_end_version = stream_request.end_version;
-                    self.update_stream_version(
-                        request.start_version,
-                        request.end_version,
-                        stream_end_version,
-                    )?;
-                },
+                TransactionOutputsWithProof(request) => (
+                    stream_request.end_version,
+                    request.start_version,
+                    request.end_version,
+                ),
                 request => invalid_client_request!(request, self),
             },
             StreamRequest::GetAllTransactionsOrOutputs(stream_request) => match client_request {
-                TransactionsOrOutputsWithProof(request) => {
-                    let stream_end_version = stream_request.end_version;
-                    self.update_stream_version(
-                        request.start_version,
-                        request.end_version,
-                        stream_end_version,
-                    )?;
-                },
+                TransactionsOrOutputsWithProof(request) => (
+                    stream_request.end_version,
+                    request.start_version,
+                    request.end_version,
+                ),
                 request => invalid_client_request!(request, self),
             },
             request => invalid_stream_request!(request),
-        }
+        };
+
+        // Update the stream version
+        self.update_stream_version(
+            request_start_version,
+            request_end_version,
+            stream_end_version,
+            &client_response_payload,
+        )?;
 
         // Create a new data notification
         let data_notification = create_data_notification(
@@ -1381,6 +1482,13 @@ impl DataStreamEngine for TransactionStreamEngine {
         )?;
         Ok(Some(data_notification))
     }
+}
+
+/// Bounds the given number by the specified min and max values, inclusive.
+/// If the number is less than the min, the min is returned. If the number is
+/// greater than the max, the max is returned. Otherwise, the number is returned.
+pub(crate) fn bound_by_range(number: u64, min: u64, max: u64) -> u64 {
+    cmp::min(cmp::max(number, min), max)
 }
 
 /// Verifies that the `expected_next_index` matches the `start_index` and that
