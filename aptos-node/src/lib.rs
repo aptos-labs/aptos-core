@@ -466,6 +466,9 @@ pub fn setup_environment_and_start_node(
     let peers_and_metadata = network::create_peers_and_metadata(&node_config);
     services::start_node_inspection_service(&node_config, peers_and_metadata.clone());
 
+    // Starts the admin service
+    services::start_admin_service(&node_config);
+
     // Set up the storage database and any RocksDB checkpoints
     let (aptos_db, db_rw, backup_service, genesis_waypoint) =
         storage::initialize_database_and_checkpoints(&mut node_config)?;

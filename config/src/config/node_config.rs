@@ -3,11 +3,10 @@
 
 use crate::{
     config::{
-        admin_service_config::AdminServiceConfig, dag_consensus_config::DagConsensusConfig,
         netbench::NetbenchConfig, node_config_loader::NodeConfigLoader,
-        persistable_config::PersistableConfig, utils::RootPath, ApiConfig, BaseConfig,
-        ConsensusConfig, Error, ExecutionConfig, IndexerConfig, IndexerGrpcConfig,
-        InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
+        persistable_config::PersistableConfig, utils::RootPath, AdminServiceConfig, ApiConfig,
+        BaseConfig, ConsensusConfig, DagConsensusConfig, Error, ExecutionConfig, IndexerConfig,
+        IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
         PeerMonitoringServiceConfig, SafetyRulesTestConfig, StateSyncConfig, StorageConfig,
     },
     network_id::NetworkId,
@@ -141,6 +140,7 @@ impl NodeConfig {
     /// Randomizes the various ports of the node config
     pub fn randomize_ports(&mut self) {
         // Randomize the ports for the services
+        self.admin_service.randomize_ports();
         self.api.randomize_ports();
         self.inspection_service.randomize_ports();
         self.storage.randomize_ports();

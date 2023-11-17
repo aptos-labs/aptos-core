@@ -131,6 +131,11 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
     (mempool, consensus_to_mempool_sender)
 }
 
+/// Spawns a new thread for the admin service
+pub fn start_admin_service(node_config: &NodeConfig) {
+    aptos_admin_service::start_admin_service(node_config)
+}
+
 /// Spawns a new thread for the node inspection service
 pub fn start_node_inspection_service(
     node_config: &NodeConfig,

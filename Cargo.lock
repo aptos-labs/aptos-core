@@ -314,6 +314,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-admin-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-logger",
+ "aptos-profiler",
+ "aptos-runtimes",
+ "async-mutex",
+ "futures",
+ "http",
+ "hyper",
+ "lazy_static 1.4.0",
+ "mime",
+ "pprof",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "aptos-aggregator"
 version = "0.1.0"
 dependencies = [
@@ -2621,6 +2641,7 @@ name = "aptos-node"
 version = "1.8.0"
 dependencies = [
  "anyhow",
+ "aptos-admin-service",
  "aptos-api",
  "aptos-backup-service",
  "aptos-build-info",
@@ -4275,6 +4296,15 @@ name = "async-lock"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e97a171d191782fba31bb902b14ad94e24a68145032b7eedf871ab0bc0d077b6"
+dependencies = [
+ "event-listener",
+]
+
+[[package]]
+name = "async-mutex"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "479db852db25d9dbf6204e6cb6253698f175c15726470f78af0d918e99d6156e"
 dependencies = [
  "event-listener",
 ]
@@ -10904,6 +10934,8 @@ dependencies = [
  "nix",
  "once_cell",
  "parking_lot 0.12.1",
+ "protobuf",
+ "protobuf-codegen-pure",
  "smallvec",
  "symbolic-demangle",
  "tempfile",
@@ -11215,6 +11247,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "213622a1460818959ac1181aaeb2dc9c7f63df720db7d788b3e24eacd1983e13"
 dependencies = [
  "prost",
+]
+
+[[package]]
+name = "protobuf"
+version = "2.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
+
+[[package]]
+name = "protobuf-codegen"
+version = "2.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "033460afb75cf755fcfc16dfaed20b86468082a2ea24e05ac35ab4a099a017d6"
+dependencies = [
+ "protobuf",
+]
+
+[[package]]
+name = "protobuf-codegen-pure"
+version = "2.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "95a29399fc94bcd3eeaa951c715f7bea69409b2445356b00519740bcd6ddd865"
+dependencies = [
+ "protobuf",
+ "protobuf-codegen",
 ]
 
 [[package]]

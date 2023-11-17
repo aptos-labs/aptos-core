@@ -2,14 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::config::{
-    admin_service_config::AdminServiceConfig,
-    dag_consensus_config::DagConsensusConfig,
     netbench::NetbenchConfig,
     node_config_loader::NodeType,
     utils::{are_failpoints_enabled, get_config_name},
-    ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig, InspectionServiceConfig,
-    LoggerConfig, MempoolConfig, NodeConfig, PeerMonitoringServiceConfig, StateSyncConfig,
-    StorageConfig,
+    AdminServiceConfig, ApiConfig, BaseConfig, ConsensusConfig, DagConsensusConfig, Error,
+    ExecutionConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig, NodeConfig,
+    PeerMonitoringServiceConfig, StateSyncConfig, StorageConfig,
 };
 use aptos_types::chain_id::ChainId;
 use std::collections::HashSet;
