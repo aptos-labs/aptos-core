@@ -5,6 +5,7 @@
 mod bytecode_generator;
 mod experiments;
 mod file_format_generator;
+pub mod function_checker;
 pub mod inliner;
 mod options;
 pub mod pipeline;
@@ -48,6 +49,8 @@ pub fn run_move_compiler(
     // Run context check.
     let mut env = run_checker(options.clone())?;
     check_errors(&env, error_writer, "checking errors")?;
+
+    function_checker::check_functions(&mut env);
 
     if options.debug {
         eprintln!("After error check, GlobalEnv={}", env.dump_env());

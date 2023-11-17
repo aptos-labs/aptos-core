@@ -40,31 +40,19 @@ module 0x42::o {
     public inline fun foo(): u64 {
         m::foo();
         m_nonfriend::foo();
-	bar();
-	m::friend_accessible();
-	m_nonfriend::friend_accessible();
-	m::bar();
-	m_nonfriend::bar()
+	bar()
     }
 
     inline fun inaccessible(): u64 {
         m::foo();
         m_nonfriend::foo();
-	bar();
-	m::friend_accessible();
-	m_nonfriend::friend_accessible();
-	m::bar();
-	m_nonfriend::bar()
+	bar()
     }
 
     public(friend) inline fun friend_accessible(): u64 {
         m::foo();
         m_nonfriend::foo();
-	bar();
-	m::friend_accessible();
-	m_nonfriend::friend_accessible();
-	m::bar();
-	m_nonfriend::bar()
+	bar()
     }
 
     fun bar(): u64 { 42 }
@@ -73,35 +61,24 @@ module 0x42::o {
 module 0x42::o_nonfriend {
     use 0x42::m;
     use 0x42::m_nonfriend;
+    friend 0x42::n;
 
     public inline fun foo(): u64 {
         m::foo();
         m_nonfriend::foo();
-	bar();
-	m::friend_accessible();
-	m_nonfriend::friend_accessible();
-	m::bar();
-	m_nonfriend::bar()
+	bar()
     }
 
     inline fun inaccessible(): u64 {
         m::foo();
         m_nonfriend::foo();
-	bar();
-	m::friend_accessible();
-	m_nonfriend::friend_accessible();
-	m::bar();
-	m_nonfriend::bar()
+	bar()
     }
 
     public(friend) inline fun friend_accessible(): u64 {
         m::foo();
         m_nonfriend::foo();
-	bar();
-	m::friend_accessible();
-	m_nonfriend::friend_accessible();
-	m::bar();
-	m_nonfriend::bar()
+	bar()
     }
 
     fun bar(): u64 { 42 }
