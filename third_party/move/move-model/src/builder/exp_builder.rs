@@ -73,6 +73,17 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     pub called_spec_funs: BTreeSet<(ModuleId, SpecFunId)>,
     /// A mapping from SpecId to SpecBlock (expansion ast)
     pub spec_block_map: BTreeMap<EA::SpecId, EA::SpecBlock>,
+    /// A mapping from expression node id to associated specification block info.
+    /// If such an id is found for a Nop expression, that expression serves as a placeholder
+    /// for a spec block. We need to check spec blocks at the end of checking
+    /// the function body such that they do not influence type inference.
+    pub spec_placeholder_map: BTreeMap<NodeId, SpecBlockInfo>,
+}
+
+#[derive(Debug)]
+pub struct SpecBlockInfo {
+    spec_id: EA::SpecId,
+    locals: BTreeMap<Symbol, (Loc, Type)>,
 }
 
 /// Mode of translation
@@ -117,6 +128,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             had_errors: false,
             called_spec_funs: BTreeSet::new(),
             spec_block_map: BTreeMap::new(),
+            spec_placeholder_map: BTreeMap::new(),
         }
     }
 
@@ -1362,16 +1374,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let rt = self.check_type(&loc, &Type::unit(), expected_type, "");
                 let id = self.new_node_id_with_type_loc(&rt, &loc);
                 if self.mode == ExpTranslationMode::Impl {
-                    let spec = if let Some(block) = self.spec_block_map.get(spec_id).cloned() {
-                        self.translate_spec_block(&loc, &block)
-                    } else {
-                        self.bug(&loc, "unresolved spec anchor");
-                        Spec::default()
-                    };
-                    ExpData::SpecBlock(id, spec)
-                } else {
-                    ExpData::Call(id, Operation::NoOp, vec![])
+                    // Remember information about this spec block for deferred checking.
+                    self.spec_placeholder_map.insert(id, SpecBlockInfo {
+                        spec_id: *spec_id,
+                        locals: self.get_locals(),
+                    });
                 }
+                ExpData::Call(id, Operation::NoOp, vec![])
             },
             EA::Exp_::UnresolvedError => {
                 // Error reported
@@ -1380,17 +1389,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
     }
 
-    /// Translates a specification block embedded in an expression, and returns the
-    /// model representation of it.
-    fn translate_spec_block(&mut self, loc: &Loc, block: &EA::SpecBlock) -> Spec {
-        let fun_name = if let Some(name) = &self.fun_name {
-            name.clone()
-        } else {
-            self.bug(loc, "unexpected missing function name");
-            return Spec::default();
-        };
-        // Build a map of all locals visible in the context. This is passed into the `context`
-        // for spec block building.
+    /// Returns a map representing the current locals in scope and their associated declaration
+    /// location and type.
+    fn get_locals(&self) -> BTreeMap<Symbol, (Loc, Type)> {
         let mut locals = BTreeMap::new();
         for scope in &self.local_table {
             for (name, entry) in scope {
@@ -1399,6 +1400,64 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 }
             }
         }
+        locals
+    }
+
+    /// Post processes any spec blocks which have been encountered while translating expressions
+    /// with this builder. This rewrites the given result expression and fills in any spec blocks
+    /// captured in the `self.spec_placeholder_map` which is populated during expression
+    /// translation.
+    pub fn post_process_spec_blocks(&mut self, result_exp: Exp) -> Exp {
+        if self.spec_placeholder_map.is_empty() {
+            // Shortcut case of no spec blocks
+            result_exp
+        } else {
+            ExpData::rewrite(result_exp, &mut |e| {
+                let id = e.node_id();
+                let loc = self.get_node_loc(id);
+                if let Some(info) = self.spec_placeholder_map.get(&id) {
+                    let spec = if let Some(block) = self.spec_block_map.get(&info.spec_id).cloned()
+                    {
+                        // Specializes types of locals in the context. For a type correct program,
+                        // these types are concrete (otherwise there have been inference errors).
+                        // To avoid followup errors, we use specialize_with_defaults which allows
+                        // checking the spec block even with incomplete types.
+                        let locals = info
+                            .locals
+                            .iter()
+                            .map(|(s, (l, t))| {
+                                let t = self.subs.specialize_with_defaults(t);
+                                (*s, (l.clone(), t))
+                            })
+                            .collect();
+                        self.translate_spec_block(&loc, locals, &block)
+                    } else {
+                        self.bug(&loc, "unresolved spec anchor");
+                        Spec::default()
+                    };
+                    Ok(ExpData::SpecBlock(id, spec).into_exp())
+                } else {
+                    Err(e)
+                }
+            })
+        }
+    }
+
+    /// Translates a specification block embedded in an expression context, represented by
+    /// a set of locals defined in this context, and returns the model representation of it.
+    fn translate_spec_block(
+        &mut self,
+        loc: &Loc,
+        locals: BTreeMap<Symbol, (Loc, Type)>,
+        block: &EA::SpecBlock,
+    ) -> Spec {
+        let fun_name = if let Some(name) = &self.fun_name {
+            name.clone()
+        } else {
+            self.bug(loc, "unexpected missing function name");
+            return Spec::default();
+        };
+        // This uses a builder for inlined specification blocks stored in the state.
         let context = SpecBlockContext::FunctionCodeV2(fun_name, locals);
         self.parent.inline_spec_builder = Spec {
             loc: Some(loc.clone()),

@@ -1,0 +1,25 @@
+// ---- Model Dump
+module 0x42::bit_vector_infer {
+    use std::vector;
+    public fun new(length: u64) {
+        {
+          let counter: u64 = 1;
+          if Gt<u64>(counter, 0) {
+            counter: u64 = Sub<u64>(counter, 1);
+            Tuple()
+          } else {
+            Tuple()
+          };
+          {
+            let bit_field: vector<bool> = vector::empty<bool>();
+            vector::push_back<bool>(Borrow(Mutable)(bit_field), false);
+            spec {
+              assert Eq<num>(Len<bool>(bit_field), 0);
+            }
+            ;
+            Tuple()
+          }
+        }
+    }
+    spec fun $new(length: u64);
+} // end 0x42::bit_vector_infer

@@ -39,7 +39,7 @@ use aptos_channels::{
 use aptos_config::config::DagConsensusConfig;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
-use aptos_logger::info;
+use aptos_logger::{debug, info};
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_types::{
     epoch_state::EpochState, on_chain_config::DagConsensusConfigV1,
@@ -47,13 +47,16 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
-use futures::executor::block_on;
 use futures_channel::{
     mpsc::{UnboundedReceiver, UnboundedSender},
     oneshot,
 };
 use std::{collections::HashMap, fmt, sync::Arc, time::Duration};
-use tokio::{select, task::JoinHandle};
+use tokio::{
+    runtime::Handle,
+    select,
+    task::{block_in_place, JoinHandle},
+};
 use tokio_retry::strategy::ExponentialBackoff;
 
 #[derive(Clone)]
@@ -123,8 +126,10 @@ impl TDagMode for ActiveMode {
         let handle = tokio::spawn(self.fetch_service.start());
         defer!({
             // Signal and stop the fetch service
+            debug!("aborting fetch service");
             handle.abort();
-            let _ = block_on(handle);
+            let _ = block_in_place(move || Handle::current().block_on(handle));
+            debug!("aborting fetch service complete");
         });
 
         // Run the network handler until it returns with state sync status.
@@ -163,6 +168,7 @@ impl TDagMode for SyncMode {
             bootstrapper.time_service.clone(),
             bootstrapper.state_computer.clone(),
             bootstrapper.storage.clone(),
+            bootstrapper.payload_manager.clone(),
             bootstrapper
                 .onchain_config
                 .dag_ordering_causal_history_window as Round,
@@ -213,8 +219,10 @@ impl TDagMode for SyncMode {
             let _ = res_tx.send(result);
         });
         defer!({
+            debug!("aborting dag synchronizer");
             handle.abort();
-            let _ = block_on(handle);
+            let _ = block_in_place(move || Handle::current().block_on(handle));
+            debug!("aborting dag synchronizer complete");
         });
 
         let mut buffer = Vec::new();
@@ -283,9 +291,11 @@ pub struct DagBootstrapper {
     payload_client: Arc<dyn PayloadClient>,
     state_computer: Arc<dyn StateComputer>,
     ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
+    quorum_store_enabled: bool,
 }
 
 impl DagBootstrapper {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         self_peer: Author,
         config: DagConsensusConfig,
@@ -301,6 +311,7 @@ impl DagBootstrapper {
         payload_client: Arc<dyn PayloadClient>,
         state_computer: Arc<dyn StateComputer>,
         ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
+        quorum_store_enabled: bool,
     ) -> Self {
         Self {
             self_peer,
@@ -317,6 +328,7 @@ impl DagBootstrapper {
             payload_client,
             state_computer,
             ordered_nodes_tx,
+            quorum_store_enabled,
         }
     }
 
@@ -395,6 +407,7 @@ impl DagBootstrapper {
         let dag = Arc::new(RwLock::new(Dag::new(
             self.epoch_state.clone(),
             self.storage.clone(),
+            self.payload_manager.clone(),
             initial_round,
             dag_window_size_config,
         )));
@@ -480,7 +493,6 @@ impl DagBootstrapper {
             self.self_peer,
             self.epoch_state.clone(),
             dag_store.clone(),
-            self.payload_manager.clone(),
             self.payload_client.clone(),
             rb,
             self.time_service.clone(),
@@ -492,6 +504,7 @@ impl DagBootstrapper {
             self.onchain_config.dag_ordering_causal_history_window as Round,
             self.config.node_payload_config.clone(),
             leader_reputation_adapter.clone(),
+            self.quorum_store_enabled,
         );
         let rb_handler = NodeBroadcastHandler::new(
             dag_store.clone(),
@@ -605,6 +618,7 @@ pub(super) fn bootstrap_dag_for_test(
         payload_client,
         state_computer,
         ordered_nodes_tx,
+        false,
     );
 
     let (_base_state, handler, fetch_service) = bootstraper.full_bootstrap();

@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use super::helpers::MockPayloadManager;
 use crate::{
     dag::{
         adapter::TLedgerInfoProvider,
@@ -19,8 +20,7 @@ use crate::{
         types::{CertifiedAck, DAGMessage, TestAck},
         DAGRpcResult, RpcHandler,
     },
-    payload_manager::PayloadManager,
-    test_utils::MockPayloadManager,
+    test_utils::MockPayloadManager as MockPayloadClient,
 };
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Round};
@@ -136,6 +136,7 @@ fn setup(
     let dag = Arc::new(RwLock::new(Dag::new(
         epoch_state.clone(),
         storage.clone(),
+        Arc::new(MockPayloadManager {}),
         0,
         TEST_DAG_WINDOW,
     )));
@@ -175,8 +176,7 @@ fn setup(
         signers[0].author(),
         epoch_state,
         dag,
-        Arc::new(PayloadManager::DirectMempool),
-        Arc::new(MockPayloadManager::new(None)),
+        Arc::new(MockPayloadClient::new(None)),
         rb,
         time_service,
         storage,
@@ -187,6 +187,7 @@ fn setup(
         TEST_DAG_WINDOW as Round,
         DagPayloadConfig::default(),
         Arc::new(MockChainHealthBackoff {}),
+        false,
     )
 }
 
