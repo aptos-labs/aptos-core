@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::types::{DagSnapshotBitmask, NodeMetadata};
-use crate::dag::{
-    storage::DAGStorage,
-    types::{CertifiedNode, NodeCertificate},
+use crate::{
+    dag::{
+        storage::DAGStorage,
+        types::{CertifiedNode, NodeCertificate},
+    },
+    payload_manager::TPayloadManager,
 };
 use anyhow::{anyhow, ensure};
 use aptos_consensus_types::common::{Author, Round};
@@ -41,6 +44,7 @@ pub struct Dag {
     /// Map between peer id to vector index
     author_to_index: HashMap<Author, usize>,
     storage: Arc<dyn DAGStorage>,
+    payload_manager: Arc<dyn TPayloadManager>,
     start_round: Round,
     epoch_state: Arc<EpochState>,
     /// The window we maintain between highest committed round and initial round
@@ -51,6 +55,7 @@ impl Dag {
     pub fn new(
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
+        payload_manager: Arc<dyn TPayloadManager>,
         start_round: Round,
         window_size: u64,
     ) -> Self {
@@ -58,7 +63,13 @@ impl Dag {
         all_nodes.sort_unstable_by_key(|(_, node)| node.round());
         let mut to_prune = vec![];
         // Reconstruct the continuous dag starting from start_round and gc unrelated nodes
-        let mut dag = Self::new_empty(epoch_state, storage.clone(), start_round, window_size);
+        let mut dag = Self::new_empty(
+            epoch_state,
+            storage.clone(),
+            payload_manager,
+            start_round,
+            window_size,
+        );
         for (digest, certified_node) in all_nodes {
             // TODO: save the storage call in this case
             if let Err(e) = dag.add_node(certified_node) {
@@ -81,6 +92,7 @@ impl Dag {
     pub fn new_empty(
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
+        payload_manager: Arc<dyn TPayloadManager>,
         start_round: Round,
         window_size: u64,
     ) -> Self {
@@ -90,6 +102,7 @@ impl Dag {
             nodes_by_round,
             author_to_index,
             storage,
+            payload_manager,
             start_round,
             epoch_state,
             window_size,
@@ -161,6 +174,8 @@ impl Dag {
         self.storage.save_certified_node(&node)?;
         debug!("Added node {}", node.id());
         round_ref[index] = Some(NodeStatus::Unordered(node.clone()));
+        self.payload_manager
+            .prefetch_payload_data(node.payload(), node.metadata().timestamp());
         Ok(())
     }
 
