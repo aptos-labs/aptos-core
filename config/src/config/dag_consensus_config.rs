@@ -2,7 +2,7 @@
 
 use super::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, ChainHealthBackoffValues,
-    Error, NodeConfig,
+    Error, NodeConfig, QuorumStoreConfig,
 };
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
@@ -143,6 +143,8 @@ pub struct DagConsensusConfig {
     pub fetcher_config: DagFetcherConfig,
     pub round_state_config: DagRoundStateConfig,
     pub chain_backoff_config: Vec<ChainHealthBackoffValues>,
+    #[serde(default = "QuorumStoreConfig::default_for_dag")]
+    pub quorum_store: QuorumStoreConfig,
 }
 
 impl ConfigSanitizer for DagConsensusConfig {
