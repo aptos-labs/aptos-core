@@ -6,7 +6,13 @@ use aptos_indexer_grpc_data_access::{
     StorageClient,
 };
 use aptos_indexer_grpc_utils::{
-    chunk_transactions, constants::MESSAGE_SIZE_LIMIT, time_diff_since_pb_timestamp_in_secs,
+    chunk_transactions,
+    constants::MESSAGE_SIZE_LIMIT,
+    counters::{
+        IndexerGrpcStep, DURATION_IN_SECS, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_COUNT,
+        TRANSACTION_UNIX_TIMESTAMP,
+    },
+    time_diff_since_pb_timestamp_in_secs, timestamp_to_unixtime,
 };
 use aptos_protos::{indexer::v1::TransactionsResponse, util::timestamp::Timestamp};
 use std::time::Duration;
@@ -145,6 +151,14 @@ impl GrpcResponseDispatcher {
                 .as_ref()
                 .unwrap_or(&Timestamp::default()),
         );
+        let start_version_timestamp = responses
+            .first()
+            .unwrap()
+            .transactions
+            .first()
+            .unwrap()
+            .timestamp
+            .clone();
         // Verify responses are consecutive and sequential.
         let mut version = self.next_version_to_process;
         let starting_version = version;
@@ -196,10 +210,16 @@ impl GrpcResponseDispatcher {
             .map(|v| v.transactions.len())
             .sum::<usize>() as u64;
         self.next_version_to_process += processed_transactions_count;
-        let storage_type = match index {
-            0 => "in memory",
-            1 => "file store",
-            _ => "unknown",
+        // Hack: assume we don't directly fetch from redis.
+        let (step, label) = match index {
+            0 => (
+                IndexerGrpcStep::DataServiceDataFetchedMemory.get_step(),
+                IndexerGrpcStep::DataServiceDataFetchedMemory.get_label(),
+            ),
+            _ => (
+                IndexerGrpcStep::DataServiceDataFetchedFilestore.get_step(),
+                IndexerGrpcStep::DataServiceDataFetchedFilestore.get_label(),
+            ),
         };
         tracing::info!(
             start_version = starting_version,
@@ -210,10 +230,28 @@ impl GrpcResponseDispatcher {
             duration_in_secs = start_time.elapsed().as_secs_f64(),
             connection_id = self.request_metadata.connection_id.as_str(),
             service_type = SERVICE_TYPE,
-            step = 2.0 + (index as f64 / 10.0),
-            "[Data Service] Data fetched from {}.",
-            storage_type
+            step,
+            "{}",
+            label
         );
+
+        LATEST_PROCESSED_VERSION
+            .with_label_values(&[SERVICE_TYPE, step, label])
+            .set(self.next_version_to_process as i64);
+        NUM_TRANSACTIONS_COUNT
+            .with_label_values(&[SERVICE_TYPE, step, label])
+            .set(processed_transactions_count as i64);
+        DURATION_IN_SECS
+            .with_label_values(&[SERVICE_TYPE, step, label])
+            .set(start_time.elapsed().as_secs_f64());
+        TRANSACTION_UNIX_TIMESTAMP
+            .with_label_values(&[SERVICE_TYPE, step, label])
+            .set(
+                start_version_timestamp
+                    .map(|t| timestamp_to_unixtime(&t))
+                    .unwrap_or_default(),
+            );
+
         Ok(processed_responses)
     }
 }
@@ -327,7 +365,13 @@ impl ResponseDispatcher for GrpcResponseDispatcher {
                     .unwrap_or(&Timestamp::default()),
             )
         });
+        let first_version_timestamp_opt = response
+            .as_ref()
+            .ok()
+            .map(|v| v.transactions.first().unwrap().timestamp.clone().unwrap());
         let num_of_transactions_opt = response.as_ref().ok().map(|v| v.transactions.len());
+        let step = IndexerGrpcStep::DataServiceChunkSent.get_step();
+        let label = IndexerGrpcStep::DataServiceChunkSent.get_label();
         match self
             .sender
             .send_timeout(response, RESPONSE_CHANNEL_SEND_TIMEOUT)
@@ -344,9 +388,25 @@ impl ResponseDispatcher for GrpcResponseDispatcher {
                         duration_in_secs = start_time.elapsed().as_secs_f64(),
                         connection_id = self.request_metadata.connection_id.as_str(),
                         service_type = SERVICE_TYPE,
-                        step = 3,
-                        "[Data Service] One chunk of transactions sent to GRPC response channel."
+                        step = step,
+                        "{}",
+                        label
                     );
+
+                    DURATION_IN_SECS
+                        .with_label_values(&[SERVICE_TYPE, step, label])
+                        .set(start_time.elapsed().as_secs_f64());
+                    TRANSACTION_UNIX_TIMESTAMP
+                        .with_label_values(&[SERVICE_TYPE, step, label])
+                        .set(timestamp_to_unixtime(
+                            first_version_timestamp_opt.as_ref().unwrap(),
+                        ));
+                    NUM_TRANSACTIONS_COUNT
+                        .with_label_values(&[SERVICE_TYPE, step, label])
+                        .set(num_of_transactions_opt.unwrap() as i64);
+                    LATEST_PROCESSED_VERSION
+                        .with_label_values(&[SERVICE_TYPE, step, label])
+                        .set(end_version_opt.unwrap() as i64);
                 }
             },
             Err(e) => {

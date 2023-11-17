@@ -20,8 +20,8 @@ async-trait = { workspace = true }
 backoff = { workspace = true }
 backtrace = { workspace = true }
 base64 = { workspace = true }
-chrono = { workspace = true }
 bzip2 = { workspace = true }
+chrono = { workspace = true }
 clap = { workspace = true }
 cloud-storage = { workspace = true }
 flate2 = { workspace = true }

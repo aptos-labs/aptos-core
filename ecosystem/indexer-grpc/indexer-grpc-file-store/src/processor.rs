@@ -15,8 +15,8 @@ use aptos_indexer_grpc_utils::{
     },
     file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
     storage::StorageFormat,
-    time_diff_since_pb_timestamp_in_secs,
-    types::RedisUrl, timestamp_to_iso, timestamp_to_unixtime,
+    timestamp_to_iso, timestamp_to_unixtime,
+    types::RedisUrl,
 };
 use aptos_moving_average::MovingAverage;
 use aptos_protos::transaction::v1::Transaction;
@@ -219,9 +219,7 @@ impl Processor {
                     IndexerGrpcStep::FilestoreUploadTxns.get_step(),
                     IndexerGrpcStep::FilestoreUploadTxns.get_label(),
                 ])
-                .set(
-                    timestamp_to_unixtime(&first_transaction_pb_timestamp),
-                );
+                .set(timestamp_to_unixtime(&first_transaction_pb_timestamp));
             NUM_TRANSACTIONS_COUNT
                 .with_label_values(&[
                     SERVICE_TYPE,

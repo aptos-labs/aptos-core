@@ -6,6 +6,7 @@ use once_cell::sync::Lazy;
 
 pub enum IndexerGrpcStep {
     DataServiceNewRequestReceived,   // [Data Service] New request received.
+    DataServiceDataFetchedMemory,    // [Data Service] Fetched data from memory.
     DataServiceDataFetchedCache,     // [Data Service] Fetched data from Redis cache.
     DataServiceDataFetchedFilestore, // [Data Service] Fetched data from Filestore.
     DataServiceChunkSent, // [Data Service] One chunk of transactions sent to GRPC response channel.
@@ -24,6 +25,7 @@ impl IndexerGrpcStep {
         match self {
             // Data service steps
             IndexerGrpcStep::DataServiceNewRequestReceived => "1",
+            IndexerGrpcStep::DataServiceDataFetchedMemory => "2.0",
             IndexerGrpcStep::DataServiceDataFetchedCache => "2.1",
             IndexerGrpcStep::DataServiceDataFetchedFilestore => "2.2",
             IndexerGrpcStep::DataServiceChunkSent => "3",
@@ -45,6 +47,9 @@ impl IndexerGrpcStep {
                 "[Data Service] New request received."
             }
             IndexerGrpcStep::DataServiceDataFetchedCache => "[Data Service] Data fetched from redis cache.",
+            IndexerGrpcStep::DataServiceDataFetchedMemory => {
+                "[Data Service] Data fetched from memory."
+            }
             IndexerGrpcStep::DataServiceDataFetchedFilestore => {
                 "[Data Service] Data fetched from file store."
             }

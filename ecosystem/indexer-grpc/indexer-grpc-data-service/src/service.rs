@@ -3,6 +3,7 @@
 
 use crate::{grpc_response_stream::GrpcResponseStream, SERVICE_TYPE};
 use aptos_indexer_grpc_data_access::StorageClient;
+use aptos_indexer_grpc_utils::counters::IndexerGrpcStep;
 use aptos_protos::indexer::v1::{
     raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse,
 };
@@ -10,6 +11,7 @@ use futures::Stream;
 use std::{pin::Pin, time::Duration};
 use tonic::{Request, Response, Status};
 use tracing::error;
+
 type ResponseStream = Pin<Box<dyn Stream<Item = Result<TransactionsResponse, Status>> + Send>>;
 
 #[allow(dead_code)]
@@ -89,10 +91,9 @@ impl RawData for RawDataServerWrapper {
             service_type = SERVICE_TYPE,
             start_version = starting_version,
             num_of_transactions = ?transactions_count,
-            step = 1,
-            "[Data Service] New request received.",
+            step = IndexerGrpcStep::DataServiceNewRequestReceived.get_step(),
+            "{}", IndexerGrpcStep::DataServiceNewRequestReceived.get_label(),
         );
-
         Ok(Response::new(
             Box::pin(grpc_response_stream) as Self::GetTransactionsStream
         ))

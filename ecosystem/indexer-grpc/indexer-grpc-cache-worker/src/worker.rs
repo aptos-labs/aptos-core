@@ -14,9 +14,8 @@ use aptos_indexer_grpc_utils::{
         TOTAL_SIZE_IN_BYTES, TRANSACTION_UNIX_TIMESTAMP,
     },
     create_grpc_client,
-    file_store_operator::{
-        FileStoreMetadata, FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator,
-    },
+    file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
+    storage::{FileStoreMetadata, StorageFormat},
     time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime,
     types::RedisUrl,
 };
@@ -199,11 +198,6 @@ async fn process_transactions_from_node_response(
             }
         },
         Response::Data(data) => {
-            let first_transaction_latency = data
-                .transactions
-                .as_slice()
-                .first()
-                .map(|t| time_diff_since_pb_timestamp_in_secs(t.timestamp.as_ref().unwrap()));
             let transactions = data.transactions;
             let transaction_len = transactions.len();
             let first_transaction_version = transactions
