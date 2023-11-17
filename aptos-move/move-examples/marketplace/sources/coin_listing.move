@@ -39,7 +39,7 @@ module coin_listing {
     const EAUCTION_ENDED: u64 = 5;
     /// The entity is not the seller.
     const ENOT_SELLER: u64 = 6;
-    /// Update with the same price
+    /// Listing already is set to this price
     const ESAME_PRICE: u64 = 7;
 
     // Core data structures
