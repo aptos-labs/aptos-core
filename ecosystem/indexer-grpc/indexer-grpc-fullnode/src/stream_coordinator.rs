@@ -8,7 +8,12 @@ use crate::{
 };
 use aptos_api::context::Context;
 use aptos_api_types::{AsConverter, Transaction as APITransaction, TransactionOnChainData};
-use aptos_indexer_grpc_utils::{chunk_transactions, constants::MESSAGE_SIZE_LIMIT};
+use aptos_indexer_grpc_utils::{
+    chunk_transactions,
+    constants::MESSAGE_SIZE_LIMIT,
+    counters::{IndexerGrpcStep, TRANSACTION_UNIX_TIMESTAMP},
+    timestamp_to_unixtime,
+};
 use aptos_logger::{error, info, sample, sample::SampleRate};
 use aptos_protos::{
     internal::fullnode::v1::{
@@ -93,10 +98,24 @@ impl IndexerStreamCoordinator {
                 let api_txns = Self::convert_to_api_txns(context, raw_txns).await;
                 api_txns.last().map(record_fetched_transaction_latency);
                 let pb_txns = Self::convert_to_pb_txns(api_txns);
+                let start_txn_timestamp = pb_txns.first().unwrap().timestamp.clone();
+                TRANSACTION_UNIX_TIMESTAMP
+                    .with_label_values(&[
+                        SERVICE_TYPE,
+                        IndexerGrpcStep::FullnodeProcessedBatch.get_step(),
+                        IndexerGrpcStep::FullnodeProcessedBatch.get_label(),
+                    ])
+                    .set(
+                        start_txn_timestamp
+                            .clone()
+                            .map(|t| timestamp_to_unixtime(&t))
+                            .unwrap_or_default(),
+                    );
+
                 // Wrap in stream response object and send to channel
                 for chunk in pb_txns.chunks(output_batch_size as usize) {
                     for chunk in chunk_transactions(chunk.to_vec(), MESSAGE_SIZE_LIMIT) {
-                        let item = TransactionsFromNodeResponse {
+                        let item: TransactionsFromNodeResponse = TransactionsFromNodeResponse {
                             response: Some(transactions_from_node_response::Response::Data(
                                 TransactionsOutput {
                                     transactions: chunk,
@@ -117,6 +136,17 @@ impl IndexerStreamCoordinator {
                         }
                     }
                 }
+                TRANSACTION_UNIX_TIMESTAMP
+                    .with_label_values(&[
+                        SERVICE_TYPE,
+                        IndexerGrpcStep::FullnodeSentBatch.get_step(),
+                        IndexerGrpcStep::FullnodeSentBatch.get_label(),
+                    ])
+                    .set(
+                        start_txn_timestamp
+                            .map(|t| timestamp_to_unixtime(&t))
+                            .unwrap_or_default(),
+                    );
                 Ok(pb_txns.last().unwrap().version)
             });
             tasks.push(task);

@@ -10,9 +10,12 @@ use aptos_indexer_grpc_utils::{
     cache_operator::{CacheBatchGetStatus, CacheOperator},
     config::IndexerGrpcFileStoreConfig,
     constants::BLOB_STORAGE_SIZE,
-    counters::{DURATION_IN_SECS, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_COUNT},
+    counters::{
+        IndexerGrpcStep, DURATION_IN_SECS, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_COUNT,
+        TRANSACTION_UNIX_TIMESTAMP,
+    },
     file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
-    time_diff_since_pb_timestamp_in_secs,
+    timestamp_to_iso, timestamp_to_unixtime,
     types::RedisUrl,
     EncodedTransactionWithVersion,
 };
@@ -164,62 +167,71 @@ impl Processor {
             tps_calculator.tick_now(process_size as u64);
             let end_version = current_file_store_version + process_size as u64 - 1_u64;
             let num_transactions = end_version - current_file_store_version + 1;
-            let start_version_txn_latency = {
+            let start_version_timestamp = {
                 let encoded_transaction = first_transaction.0;
                 let decoded_transaction =
                     base64::decode(encoded_transaction).expect("Failed to decode base64.");
                 let transaction =
                     Transaction::decode(&*decoded_transaction).expect("Failed to decode protobuf.");
-                transaction
-                    .timestamp
-                    .as_ref()
-                    .map(time_diff_since_pb_timestamp_in_secs)
-                    .unwrap()
+                transaction.timestamp
             };
-            let end_version_txn_latency = {
+            let end_version_timestamp = {
                 let encoded_transaction = last_transaction.0;
                 let decoded_transaction =
                     base64::decode(encoded_transaction).expect("Failed to decode base64.");
                 let transaction =
                     Transaction::decode(&*decoded_transaction).expect("Failed to decode protobuf.");
-                transaction
-                    .timestamp
-                    .as_ref()
-                    .map(time_diff_since_pb_timestamp_in_secs)
-                    .unwrap()
+                transaction.timestamp
             };
             info!(
                 start_version = current_file_store_version,
                 end_version = end_version,
-                start_version_txn_latency,
-                end_version_txn_latency,
+                start_txn_timestamp_iso = start_version_timestamp
+                    .clone()
+                    .map(|t| timestamp_to_iso(&t))
+                    .unwrap_or_default(),
+                end_txn_timestamp_iso = end_version_timestamp
+                    .map(|t| timestamp_to_iso(&t))
+                    .unwrap_or_default(),
                 num_of_transactions = num_transactions,
                 duration_in_secs = file_store_upload_batch_start.elapsed().as_secs_f64(),
                 tps = (tps_calculator.avg() * 1000.0) as u64,
                 current_file_store_version = current_file_store_version,
                 service_type = SERVICE_TYPE,
-                step = 1,
-                "[File worker] Upload transactions to file store."
+                step = IndexerGrpcStep::FilestoreUploadTxns.get_step(),
+                "{}",
+                IndexerGrpcStep::FilestoreUploadTxns.get_label(),
             );
             LATEST_PROCESSED_VERSION
                 .with_label_values(&[
                     SERVICE_TYPE,
-                    "1",
-                    "[File worker] Upload transactions to file store.",
+                    IndexerGrpcStep::FilestoreUploadTxns.get_step(),
+                    IndexerGrpcStep::FilestoreUploadTxns.get_label(),
                 ])
                 .set(end_version as i64);
+            TRANSACTION_UNIX_TIMESTAMP
+                .with_label_values(&[
+                    SERVICE_TYPE,
+                    IndexerGrpcStep::FilestoreUploadTxns.get_step(),
+                    IndexerGrpcStep::FilestoreUploadTxns.get_label(),
+                ])
+                .set(
+                    start_version_timestamp
+                        .map(|t| timestamp_to_unixtime(&t))
+                        .unwrap_or_default(),
+                );
             NUM_TRANSACTIONS_COUNT
                 .with_label_values(&[
                     SERVICE_TYPE,
-                    "1",
-                    "[File worker] Upload transactions to file store.",
+                    IndexerGrpcStep::FilestoreUploadTxns.get_step(),
+                    IndexerGrpcStep::FilestoreUploadTxns.get_label(),
                 ])
                 .set(num_transactions as i64);
             DURATION_IN_SECS
                 .with_label_values(&[
                     SERVICE_TYPE,
-                    "1",
-                    "[File worker] Upload transactions to file store.",
+                    IndexerGrpcStep::FilestoreUploadTxns.get_step(),
+                    IndexerGrpcStep::FilestoreUploadTxns.get_label(),
                 ])
                 .set(file_store_upload_batch_start.elapsed().as_secs_f64());
 

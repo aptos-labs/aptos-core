@@ -15,10 +15,11 @@ use aptos_indexer_grpc_utils::{
     config::IndexerGrpcFileStoreConfig,
     constants::{GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER, MESSAGE_SIZE_LIMIT},
     counters::{
-        DURATION_IN_SECS, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_COUNT, TOTAL_SIZE_IN_BYTES,
+        IndexerGrpcStep, DURATION_IN_SECS, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_COUNT,
+        TOTAL_SIZE_IN_BYTES, TRANSACTION_UNIX_TIMESTAMP,
     },
     file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
-    time_diff_since_pb_timestamp_in_secs,
+    time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime,
     types::RedisUrl,
     EncodedTransactionWithVersion,
 };
@@ -168,8 +169,9 @@ impl RawData for RawDataServerWrapper {
             service_type = SERVICE_TYPE,
             start_version = current_version,
             num_of_transactions = ?transactions_count,
-            step = 1,
-            "[Data Service] New request received.",
+            step = IndexerGrpcStep::DataServiceNewRequestReceived.get_step(),
+            "{}",
+            IndexerGrpcStep::DataServiceNewRequestReceived.get_label(),
         );
 
         let redis_client = self.redis_client.clone();
@@ -467,33 +469,29 @@ async fn data_fetch(
                 .sum::<usize>();
             let num_of_transactions = transactions.len();
             let duration_in_secs = start_time.elapsed().as_secs_f64();
-            let start_version_txn_latency = {
+            let start_version_timestamp = {
                 let decoded_transaction = base64::decode(transactions.first().unwrap())
                     .expect("Failed to decode base64.");
                 let transaction =
                     Transaction::decode(&*decoded_transaction).expect("Failed to decode protobuf.");
-                transaction
-                    .timestamp
-                    .as_ref()
-                    .map(time_diff_since_pb_timestamp_in_secs)
-                    .unwrap()
+                transaction.timestamp
             };
-            let end_version_txn_latency = {
+            let end_version_timestamp = {
                 let decoded_transaction =
                     base64::decode(transactions.last().unwrap()).expect("Failed to decode base64.");
                 let transaction =
                     Transaction::decode(&*decoded_transaction).expect("Failed to decode protobuf.");
-                transaction
-                    .timestamp
-                    .as_ref()
-                    .map(time_diff_since_pb_timestamp_in_secs)
-                    .unwrap()
+                transaction.timestamp
             };
             info!(
                 start_version = starting_version,
                 end_version = starting_version + num_of_transactions as u64 - 1,
-                start_version_txn_latency,
-                end_version_txn_latency,
+                start_txn_timestamp_iso = start_version_timestamp
+                    .map(|t| timestamp_to_iso(&t))
+                    .unwrap_or_default(),
+                end_txn_timestamp_iso = end_version_timestamp
+                    .map(|t| timestamp_to_iso(&t))
+                    .unwrap_or_default(),
                 num_of_transactions = transactions.len(),
                 size_in_bytes = size_in_bytes,
                 duration_in_secs = duration_in_secs,
@@ -501,35 +499,36 @@ async fn data_fetch(
                 bytes_per_sec = size_in_bytes as f64 / duration_in_secs,
                 connection_id = request_metadata.request_connection_id.as_str(),
                 service_type = SERVICE_TYPE,
-                step = 2.1,
-                "[Data Service] Data fetched from redis cache."
+                step = IndexerGrpcStep::DataServiceDataFetchedCache.get_step(),
+                "{}",
+                IndexerGrpcStep::DataServiceDataFetchedCache.get_label(),
             );
             LATEST_PROCESSED_VERSION
                 .with_label_values(&[
                     SERVICE_TYPE,
-                    "2.1",
-                    "[Data Service] Data fetched from redis cache.",
+                    IndexerGrpcStep::DataServiceDataFetchedCache.get_step(),
+                    IndexerGrpcStep::DataServiceDataFetchedCache.get_label(),
                 ])
                 .set((starting_version + num_of_transactions as u64 - 1) as i64);
             NUM_TRANSACTIONS_COUNT
                 .with_label_values(&[
                     SERVICE_TYPE,
-                    "2.1",
-                    "[Data Service] Data fetched from redis cache.",
+                    IndexerGrpcStep::DataServiceDataFetchedCache.get_step(),
+                    IndexerGrpcStep::DataServiceDataFetchedCache.get_label(),
                 ])
                 .set(transactions.len() as i64);
             TOTAL_SIZE_IN_BYTES
                 .with_label_values(&[
                     SERVICE_TYPE,
-                    "2.1",
-                    "[Data Service] Data fetched from redis cache.",
+                    IndexerGrpcStep::DataServiceDataFetchedCache.get_step(),
+                    IndexerGrpcStep::DataServiceDataFetchedCache.get_label(),
                 ])
                 .set(size_in_bytes as i64);
             DURATION_IN_SECS
                 .with_label_values(&[
                     SERVICE_TYPE,
-                    "2.1",
-                    "[Data Service] Data fetched from redis cache.",
+                    IndexerGrpcStep::DataServiceDataFetchedCache.get_step(),
+                    IndexerGrpcStep::DataServiceDataFetchedCache.get_label(),
                 ])
                 .set(duration_in_secs);
             Ok(TransactionsDataStatus::Success(
@@ -548,33 +547,30 @@ async fn data_fetch(
                         .sum::<usize>();
                     let num_of_transactions = transactions.len();
                     let duration_in_secs = start_time.elapsed().as_secs_f64();
-                    let start_version_txn_latency = {
+                    let start_version_timestamp = {
                         let decoded_transaction = base64::decode(transactions.first().unwrap())
                             .expect("Failed to decode base64.");
                         let transaction = Transaction::decode(&*decoded_transaction)
                             .expect("Failed to decode protobuf.");
-                        transaction
-                            .timestamp
-                            .as_ref()
-                            .map(time_diff_since_pb_timestamp_in_secs)
-                            .unwrap()
+                        transaction.timestamp
                     };
-                    let end_version_txn_latency = {
+                    let end_version_timestamp = {
                         let decoded_transaction = base64::decode(transactions.last().unwrap())
                             .expect("Failed to decode base64.");
                         let transaction = Transaction::decode(&*decoded_transaction)
                             .expect("Failed to decode protobuf.");
-                        transaction
-                            .timestamp
-                            .as_ref()
-                            .map(time_diff_since_pb_timestamp_in_secs)
-                            .unwrap()
+                        transaction.timestamp
                     };
                     info!(
                         start_version = starting_version,
                         end_version = starting_version + num_of_transactions as u64 - 1,
-                        start_version_txn_latency,
-                        end_version_txn_latency,
+                        start_txn_timestamp_iso = start_version_timestamp
+                            .clone()
+                            .map(|t| timestamp_to_iso(&t))
+                            .unwrap_or_default(),
+                        end_txn_timestamp_iso = end_version_timestamp
+                            .map(|t| timestamp_to_iso(&t))
+                            .unwrap_or_default(),
                         num_of_transactions = transactions.len(),
                         size_in_bytes = size_in_bytes,
                         duration_in_secs = duration_in_secs,
@@ -582,35 +578,47 @@ async fn data_fetch(
                         bytes_per_sec = size_in_bytes as f64 / duration_in_secs,
                         service_type = SERVICE_TYPE,
                         connection_id = request_metadata.request_connection_id.as_str(),
-                        step = 2.2,
-                        "[Data Service] Data fetched from file store."
+                        step = IndexerGrpcStep::DataServiceDataFetchedFilestore.get_step(),
+                        "{}",
+                        IndexerGrpcStep::DataServiceDataFetchedFilestore.get_label(),
                     );
                     LATEST_PROCESSED_VERSION
                         .with_label_values(&[
                             SERVICE_TYPE,
-                            "2.2",
-                            "[Data Service] Data fetched from file store.",
+                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_step(),
+                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_label(),
                         ])
                         .set((starting_version + num_of_transactions as u64 - 1) as i64);
+                    TRANSACTION_UNIX_TIMESTAMP
+                        .with_label_values(&[
+                            SERVICE_TYPE,
+                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_step(),
+                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_label(),
+                        ])
+                        .set(
+                            start_version_timestamp
+                                .map(|t| timestamp_to_unixtime(&t))
+                                .unwrap_or_default(),
+                        );
                     NUM_TRANSACTIONS_COUNT
                         .with_label_values(&[
                             SERVICE_TYPE,
-                            "2.2",
-                            "[Data Service] Data fetched from file store.",
+                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_step(),
+                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_label(),
                         ])
                         .set(transactions.len() as i64);
                     TOTAL_SIZE_IN_BYTES
                         .with_label_values(&[
                             SERVICE_TYPE,
-                            "2.2",
-                            "[Data Service] Data fetched from file store.",
+                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_step(),
+                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_label(),
                         ])
                         .set(size_in_bytes as i64);
                     DURATION_IN_SECS
                         .with_label_values(&[
                             SERVICE_TYPE,
-                            "2.2",
-                            "[Data Service] Data fetched from file store.",
+                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_step(),
+                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_label(),
                         ])
                         .set(duration_in_secs);
                     Ok(TransactionsDataStatus::Success(
@@ -706,20 +714,13 @@ async fn channel_send_multiple_with_timeout(
         .iter()
         .map(|resp_item| resp_item.encoded_len())
         .sum::<usize>();
-    let overall_start_version = resp_items
-        .first()
-        .unwrap()
-        .transactions
-        .first()
-        .unwrap()
-        .version;
-    let overall_end_version = resp_items
-        .last()
-        .unwrap()
-        .transactions
-        .last()
-        .unwrap()
-        .version;
+    let overall_start_txn = resp_items.first().unwrap().transactions.first().unwrap();
+    let overall_end_txn = resp_items.last().unwrap().transactions.last().unwrap();
+    let overall_start_version = overall_start_txn.version;
+    let overall_end_version = overall_end_txn.version;
+    let overall_start_txn_timestamp = overall_start_txn.clone().timestamp;
+    let overall_end_txn_timestamp = overall_end_txn.clone().timestamp;
+
     for resp_item in resp_items {
         let response_size = resp_item.encoded_len();
         let num_of_transactions = resp_item.transactions.len();
@@ -751,12 +752,8 @@ async fn channel_send_multiple_with_timeout(
         info!(
             start_version = start_version,
             end_version = end_version,
-            start_version_txn_timestamp = start_version_txn_timestamp_in_sec,
-            end_version_txn_timestamp = end_version_txn_timestamp_in_sec,
-            start_version_txn_latency =
-                time_diff_since_pb_timestamp_in_secs(start_version_txn_timestamp),
-            end_version_txn_latency =
-                time_diff_since_pb_timestamp_in_secs(end_version_txn_timestamp),
+            start_txn_timestamp_iso = timestamp_to_iso(start_version_txn_timestamp),
+            end_txn_timestamp_iso = timestamp_to_iso(end_version_txn_timestamp),
             duration_in_secs = current_batch_start_time.elapsed().as_secs_f64(),
             size_in_bytes = response_size,
             num_of_transactions = num_of_transactions,
@@ -766,42 +763,54 @@ async fn channel_send_multiple_with_timeout(
             txn_tps = num_of_transactions as f64
                 / (end_version_txn_timestamp_in_sec - start_version_txn_timestamp_in_sec),
             service_type = SERVICE_TYPE,
-            step = 3,
+            step = IndexerGrpcStep::DataServiceChunkSent.get_step(),
             connection_id = request_metadata.request_connection_id.as_str(),
-            "[Data Service] One chunk of transactions sent to GRPC response channel.",
+            "{}",
+            IndexerGrpcStep::DataServiceChunkSent.get_label(),
         );
         LATEST_PROCESSED_VERSION
             .with_label_values(&[
                 SERVICE_TYPE,
-                "3",
-                "[Data Service] One chunk of transactions sent to GRPC response channel.",
+                IndexerGrpcStep::DataServiceChunkSent.get_step(),
+                IndexerGrpcStep::DataServiceChunkSent.get_label(),
             ])
             .set(end_version as i64);
+        TRANSACTION_UNIX_TIMESTAMP
+            .with_label_values(&[
+                SERVICE_TYPE,
+                IndexerGrpcStep::DataServiceChunkSent.get_step(),
+                IndexerGrpcStep::DataServiceChunkSent.get_label(),
+            ])
+            .set(timestamp_to_unixtime(start_version_txn_timestamp));
         NUM_TRANSACTIONS_COUNT
             .with_label_values(&[
                 SERVICE_TYPE,
-                "3",
-                "[Data Service] One chunk of transactions sent to GRPC response channel.",
+                IndexerGrpcStep::DataServiceChunkSent.get_step(),
+                IndexerGrpcStep::DataServiceChunkSent.get_label(),
             ])
             .set(num_of_transactions as i64);
         TOTAL_SIZE_IN_BYTES
             .with_label_values(&[
                 SERVICE_TYPE,
-                "3",
-                "[Data Service] One chunk of transactions sent to GRPC response channel.",
+                IndexerGrpcStep::DataServiceChunkSent.get_step(),
+                IndexerGrpcStep::DataServiceChunkSent.get_label(),
             ])
             .set(response_size as i64);
         DURATION_IN_SECS
             .with_label_values(&[
                 SERVICE_TYPE,
-                "3",
-                "[Data Service] One chunk of transactions sent to GRPC response channel.",
+                IndexerGrpcStep::DataServiceChunkSent.get_step(),
+                IndexerGrpcStep::DataServiceChunkSent.get_label(),
             ])
             .set(current_batch_start_time.elapsed().as_secs_f64());
     }
     info!(
         start_version = overall_start_version,
         end_version = overall_end_version,
+        start_txn_timestamp_iso = overall_start_txn_timestamp
+            .clone()
+            .map(|t| timestamp_to_iso(&t)),
+        end_txn_timestamp_iso = overall_end_txn_timestamp.map(|t| timestamp_to_iso(&t)),
         num_of_transactions = overall_end_version - overall_start_version + 1,
         duration_in_secs = current_batch_start_time.elapsed().as_secs_f64(),
         size_in_bytes = overall_size_in_bytes,
@@ -811,32 +820,47 @@ async fn channel_send_multiple_with_timeout(
             / current_batch_start_time.elapsed().as_secs_f64(),
         service_type = SERVICE_TYPE,
         connection_id = request_metadata.request_connection_id.as_str(),
-        step = 4,
-        "[Data Service] All chunks of transactions sent to GRPC response channel. Current batch finished.",
+        step = IndexerGrpcStep::DataServiceAllChunksSent.get_step(),
+        "{}",
+        IndexerGrpcStep::DataServiceAllChunksSent.get_label(),
     );
     LATEST_PROCESSED_VERSION
         .with_label_values(&[
             SERVICE_TYPE,
-            "4",
-            "[Data Service] All chunks of transactions sent to GRPC response channel. Current batch finished.",
+            IndexerGrpcStep::DataServiceAllChunksSent.get_step(),
+            IndexerGrpcStep::DataServiceAllChunksSent.get_label(),
         ])
         .set(overall_end_version as i64);
+    TRANSACTION_UNIX_TIMESTAMP
+        .with_label_values(&[
+            SERVICE_TYPE,
+            IndexerGrpcStep::DataServiceAllChunksSent.get_step(),
+            IndexerGrpcStep::DataServiceAllChunksSent.get_label(),
+        ])
+        .set(
+            overall_start_txn_timestamp
+                .map(|t| timestamp_to_unixtime(&t))
+                .unwrap_or_default(),
+        );
     NUM_TRANSACTIONS_COUNT
         .with_label_values(&[
-            SERVICE_TYPE,"4",
-            "[Data Service] All chunks of transactions sent to GRPC response channel. Current batch finished.",
+            SERVICE_TYPE,
+            IndexerGrpcStep::DataServiceAllChunksSent.get_step(),
+            IndexerGrpcStep::DataServiceAllChunksSent.get_label(),
         ])
         .set((overall_end_version - overall_start_version + 1) as i64);
     TOTAL_SIZE_IN_BYTES
         .with_label_values(&[
-            SERVICE_TYPE,"4",
-            "[Data Service] All chunks of transactions sent to GRPC response channel. Current batch finished.",
+            SERVICE_TYPE,
+            IndexerGrpcStep::DataServiceAllChunksSent.get_step(),
+            IndexerGrpcStep::DataServiceAllChunksSent.get_label(),
         ])
         .set(overall_size_in_bytes as i64);
     DURATION_IN_SECS
         .with_label_values(&[
-            SERVICE_TYPE,"4",
-            "[Data Service] All chunks of transactions sent to GRPC response channel. Current batch finished.",
+            SERVICE_TYPE,
+            IndexerGrpcStep::DataServiceAllChunksSent.get_step(),
+            IndexerGrpcStep::DataServiceAllChunksSent.get_label(),
         ])
         .set(current_batch_start_time.elapsed().as_secs_f64());
 
