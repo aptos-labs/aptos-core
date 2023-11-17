@@ -130,9 +130,7 @@ module coin_listing {
     ) acquires FixedPriceListing {
         let listing_addr = object::object_address(&object);
 
-        if (!exists<FixedPriceListing<CoinType>>(listing_addr)) {
-            abort (error::not_found(ENO_LISTING))
-        };
+        assert!(exists<FixedPriceListing<CoinType>>(listing_addr), error::not_found(ENO_LISTING));
 
         let fixedPriceListing = borrow_global_mut<FixedPriceListing<CoinType>>(listing_addr);
 
