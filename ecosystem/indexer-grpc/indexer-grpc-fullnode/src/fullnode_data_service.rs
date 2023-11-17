@@ -2,7 +2,7 @@
 
 use crate::{stream_coordinator::IndexerStreamCoordinator, ServiceContext};
 use aptos_indexer_grpc_utils::counters::{
-    DURATION_IN_SECS, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_COUNT,
+    IndexerGrpcStep, DURATION_IN_SECS, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_COUNT,
 };
 use aptos_logger::{error, info};
 use aptos_moving_average::MovingAverage;
@@ -115,29 +115,30 @@ impl FullnodeData for FullnodeDataService {
                     highest_known_version = highest_known_version,
                     service_type = SERVICE_TYPE,
                     duration_in_secs = start_time.elapsed().as_secs_f64(),
-                    step = 1,
-                    "[Indexer Fullnode] Processed batch of transactions from fullnode"
+                    step = IndexerGrpcStep::FullnodeProcessedBatch.get_step(),
+                    "{}",
+                    IndexerGrpcStep::FullnodeProcessedBatch.get_label(),
                 );
 
                 LATEST_PROCESSED_VERSION
                     .with_label_values(&[
                         SERVICE_TYPE,
-                        "1",
-                        "[Indexer Fullnode] Processed batch of transactions from fullnode",
+                        IndexerGrpcStep::FullnodeProcessedBatch.get_step(),
+                        IndexerGrpcStep::FullnodeProcessedBatch.get_label(),
                     ])
                     .set(highest_known_version as i64);
                 NUM_TRANSACTIONS_COUNT
                     .with_label_values(&[
                         SERVICE_TYPE,
-                        "1",
-                        "[Indexer Fullnode] Processed batch of transactions from fullnode",
+                        IndexerGrpcStep::FullnodeProcessedBatch.get_step(),
+                        IndexerGrpcStep::FullnodeProcessedBatch.get_label(),
                     ])
                     .set(ma.sum() as i64);
                 DURATION_IN_SECS
                     .with_label_values(&[
                         SERVICE_TYPE,
-                        "1",
-                        "[Indexer Fullnode] Processed batch of transactions from fullnode",
+                        IndexerGrpcStep::FullnodeProcessedBatch.get_step(),
+                        IndexerGrpcStep::FullnodeProcessedBatch.get_label(),
                     ])
                     .set(start_time.elapsed().as_secs_f64());
 
@@ -167,29 +168,30 @@ impl FullnodeData for FullnodeDataService {
                                 highest_known_version = highest_known_version,
                                 tps = (ma.avg() * 1000.0) as u64,
                                 service_type = SERVICE_TYPE,
-                                step = 2,
-                                "[Indexer Fullnode] Sent batch successfully"
+                                step = IndexerGrpcStep::FullnodeSentBatch.get_step(),
+                                "{}",
+                                IndexerGrpcStep::FullnodeSentBatch.get_label(),
                             );
 
                             LATEST_PROCESSED_VERSION
                                 .with_label_values(&[
                                     SERVICE_TYPE,
-                                    "2",
-                                    "[Indexer Fullnode] Sent batch successfully",
+                                    IndexerGrpcStep::FullnodeSentBatch.get_step(),
+                                    IndexerGrpcStep::FullnodeSentBatch.get_label(),
                                 ])
                                 .set(highest_known_version as i64);
                             NUM_TRANSACTIONS_COUNT
                                 .with_label_values(&[
                                     SERVICE_TYPE,
-                                    "2",
-                                    "[Indexer Fullnode] Sent batch successfully",
+                                    IndexerGrpcStep::FullnodeSentBatch.get_step(),
+                                    IndexerGrpcStep::FullnodeSentBatch.get_label(),
                                 ])
                                 .set(ma.sum() as i64);
                             DURATION_IN_SECS
                                 .with_label_values(&[
                                     SERVICE_TYPE,
-                                    "2",
-                                    "[Indexer Fullnode] Sent batch successfully",
+                                    IndexerGrpcStep::FullnodeSentBatch.get_step(),
+                                    IndexerGrpcStep::FullnodeSentBatch.get_label(),
                                 ])
                                 .set(start_time.elapsed().as_secs_f64());
                         }

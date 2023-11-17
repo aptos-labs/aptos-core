@@ -10,13 +10,14 @@ use aptos_indexer_grpc_utils::{
     cache_operator::CacheOperator,
     config::IndexerGrpcFileStoreConfig,
     counters::{
-        DURATION_IN_SECS, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_COUNT, TOTAL_SIZE_IN_BYTES,
+        IndexerGrpcStep, DURATION_IN_SECS, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_COUNT,
+        TOTAL_SIZE_IN_BYTES, TRANSACTION_UNIX_TIMESTAMP,
     },
     create_grpc_client,
     file_store_operator::{
         FileStoreMetadata, FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator,
     },
-    time_diff_since_pb_timestamp_in_secs,
+    time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime,
     types::RedisUrl,
 };
 use aptos_moving_average::MovingAverage;
@@ -385,47 +386,59 @@ async fn process_streaming_response(
                     info!(
                         start_version = start_version,
                         end_version = start_version + num_of_transactions - 1,
-                        start_version_txn_latency = _batch_start_version_txn_timestamp
-                            .map(|txn_time| time_diff_since_pb_timestamp_in_secs(&txn_time))
-                            .unwrap_or(0.0),
-                        end_version_txn_latency = _batch_end_version_txn_timestamp
-                            .map(|txn_time| time_diff_since_pb_timestamp_in_secs(&txn_time))
-                            .unwrap_or(0.0),
+                        start_txn_timestamp_iso = _batch_start_version_txn_timestamp
+                            .clone()
+                            .map(|txn_time| timestamp_to_iso(&txn_time))
+                            .unwrap_or_default(),
+                        end_txn_timestamp_iso = _batch_end_version_txn_timestamp
+                            .map(|txn_time| timestamp_to_iso(&txn_time))
+                            .unwrap_or_default(),
                         num_of_transactions = num_of_transactions,
                         size_in_bytes = total_size_in_bytes,
                         chain_id = fullnode_chain_id,
                         duration_in_secs = starting_time.elapsed().as_secs_f64(),
                         tps = (tps_calculator.avg() * 1000.0) as u64,
                         service_type = SERVICE_TYPE,
-                        step = 1,
-                        "[Indexer Cache] Successfully process current batch."
+                        step = IndexerGrpcStep::CacheWorkerProcessed.get_step(),
+                        "{}",
+                        IndexerGrpcStep::CacheWorkerProcessed.get_label(),
                     );
                     LATEST_PROCESSED_VERSION
                         .with_label_values(&[
                             SERVICE_TYPE,
-                            "1",
-                            "[Indexer Cache] Successfully process current batch.",
+                            IndexerGrpcStep::CacheWorkerProcessed.get_step(),
+                            IndexerGrpcStep::CacheWorkerProcessed.get_label(),
                         ])
                         .set((start_version + num_of_transactions - 1) as i64);
+                    TRANSACTION_UNIX_TIMESTAMP
+                        .with_label_values(&[
+                            SERVICE_TYPE,
+                            IndexerGrpcStep::CacheWorkerProcessed.get_step(),
+                            IndexerGrpcStep::CacheWorkerProcessed.get_label(),
+                        ])
+                        .set(
+                            _batch_start_version_txn_timestamp
+                                .map(|t| timestamp_to_unixtime(&t))
+                                .unwrap_or_default(),
+                        );
                     NUM_TRANSACTIONS_COUNT
                         .with_label_values(&[
                             SERVICE_TYPE,
-                            "1",
-                            "[Indexer Cache] Successfully process current batch.",
+                            IndexerGrpcStep::CacheWorkerProcessed.get_step(),
+                            IndexerGrpcStep::CacheWorkerProcessed.get_label(),
                         ])
                         .set(num_of_transactions as i64);
                     TOTAL_SIZE_IN_BYTES
                         .with_label_values(&[
-                            SERVICE_TYPE,
-                            "1",
-                            "[Indexer Cache] Successfully process current batch.",
+                            IndexerGrpcStep::CacheWorkerProcessed.get_step(),
+                            IndexerGrpcStep::CacheWorkerProcessed.get_label(),
                         ])
                         .set(total_size_in_bytes as i64);
                     DURATION_IN_SECS
                         .with_label_values(&[
                             SERVICE_TYPE,
-                            "1",
-                            "[Indexer Cache] Successfully process current batch.",
+                            IndexerGrpcStep::CacheWorkerProcessed.get_step(),
+                            IndexerGrpcStep::CacheWorkerProcessed.get_label(),
                         ])
                         .set(starting_time.elapsed().as_secs() as f64);
                     total_size_in_bytes = 0;
