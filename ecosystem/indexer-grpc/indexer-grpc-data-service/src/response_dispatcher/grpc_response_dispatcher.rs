@@ -309,12 +309,22 @@ impl ResponseDispatcher for GrpcResponseDispatcher {
             .map(|v| v.transactions.last().unwrap().version);
         let start_version_txn_latency = response.as_ref().ok().map(|v| {
             time_diff_since_pb_timestamp_in_secs(
-                v.transactions.first().unwrap().timestamp.as_ref().unwrap_or(&Timestamp::default()),
+                v.transactions
+                    .first()
+                    .unwrap()
+                    .timestamp
+                    .as_ref()
+                    .unwrap_or(&Timestamp::default()),
             )
         });
         let end_version_txn_latency = response.as_ref().ok().map(|v| {
             time_diff_since_pb_timestamp_in_secs(
-                v.transactions.last().unwrap().timestamp.as_ref().unwrap_or(&Timestamp::default()),
+                v.transactions
+                    .last()
+                    .unwrap()
+                    .timestamp
+                    .as_ref()
+                    .unwrap_or(&Timestamp::default()),
             )
         });
         let num_of_transactions_opt = response.as_ref().ok().map(|v| v.transactions.len());
