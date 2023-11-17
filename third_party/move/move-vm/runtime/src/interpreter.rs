@@ -1656,7 +1656,7 @@ impl Frame {
                 }
                 interpreter
                     .operand_stack
-                    .push_ty(Type::Vector(Arc::new(ty)))?;
+                    .push_ty(Type::Vector(triomphe::Arc::new(ty)))?;
             },
             Bytecode::VecLen(si) => {
                 let ty = resolver.instantiate_single_type(*si, ty_args)?;

@@ -14,7 +14,8 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use smallbitvec::SmallBitVec;
-use std::{cmp::max, collections::BTreeMap, fmt::Debug, sync::Arc};
+use std::{cmp::max, collections::BTreeMap, fmt::Debug};
+use triomphe::Arc;
 
 pub const TYPE_DEPTH_MAX: usize = 256;
 

@@ -5,7 +5,7 @@ use move_binary_format::{
     binary_views::BinaryIndexedView, errors::PartialVMResult, file_format::SignatureToken,
 };
 use move_vm_types::loaded_data::runtime_types::{AbilityInfo, StructNameIndex, Type};
-use std::sync::Arc;
+use triomphe::Arc;
 
 // `intern_type` converts a signature token into the in memory type representation used by the MoveVM.
 pub fn intern_type(

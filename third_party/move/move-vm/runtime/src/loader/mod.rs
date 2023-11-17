@@ -792,7 +792,9 @@ impl Loader {
             TypeTag::U256 => Type::U256,
             TypeTag::Address => Type::Address,
             TypeTag::Signer => Type::Signer,
-            TypeTag::Vector(tt) => Type::Vector(Arc::new(self.load_type(tt, data_store)?)),
+            TypeTag::Vector(tt) => {
+                Type::Vector(triomphe::Arc::new(self.load_type(tt, data_store)?))
+            },
             TypeTag::Struct(struct_tag) => {
                 let module_id = ModuleId::new(struct_tag.address, struct_tag.module.clone());
                 self.load_module(&module_id, data_store)?;
@@ -816,7 +818,7 @@ impl Loader {
                         .map_err(|e| e.finish(Location::Undefined))?;
                     Type::StructInstantiation {
                         idx: struct_type.idx,
-                        ty_args: Arc::new(type_params),
+                        ty_args: triomphe::Arc::new(type_params),
                         ability: AbilityInfo::generic_struct(
                             struct_type.abilities,
                             struct_type.phantom_ty_args_mask.clone(),
@@ -1384,7 +1386,7 @@ impl<'a> Resolver<'a> {
         let struct_ = &struct_inst.definition_struct_type;
         Ok(Type::StructInstantiation {
             idx: struct_.idx,
-            ty_args: Arc::new(
+            ty_args: triomphe::Arc::new(
                 struct_inst
                     .instantiation
                     .iter()
@@ -1540,7 +1542,7 @@ impl<'a> Resolver<'a> {
                 let struct_ = &module.field_instantiations[idx.0 as usize].definition_struct_type;
                 Ok(Type::StructInstantiation {
                     idx: struct_.idx,
-                    ty_args: Arc::new(
+                    ty_args: triomphe::Arc::new(
                         module.field_instantiations[idx.0 as usize]
                             .instantiation
                             .iter()

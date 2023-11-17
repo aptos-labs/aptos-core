@@ -10449,6 +10449,7 @@ dependencies = [
  "sha3 0.9.1",
  "smallbitvec",
  "tracing",
+ "triomphe",
 ]
 
 [[package]]
@@ -10486,6 +10487,7 @@ dependencies = [
  "serde",
  "smallbitvec",
  "smallvec",
+ "triomphe",
 ]
 
 [[package]]
@@ -15028,6 +15030,10 @@ name = "triomphe"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0eee8098afad3fb0c54a9007aab6804558410503ad676d4633f9c2559a00ac0f"
+dependencies = [
+ "serde",
+ "stable_deref_trait",
+]
 
 [[package]]
 name = "try-lock"
