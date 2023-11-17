@@ -37,6 +37,8 @@ def update_nodes_main(
         new_vfn_config_path = parsed_layout.blueprints[
             pangu_node_blueprint
         ].vfn_config_path
+        new_cpu = parsed_layout.blueprints[pangu_node_blueprint].cpu
+        new_memory = parsed_layout.blueprints[pangu_node_blueprint].memory
 
         vfns_enabled = parsed_layout.blueprints[pangu_node_blueprint].create_vfns
 
@@ -63,6 +65,8 @@ def update_nodes_main(
                     validator_name,
                     validator_image,
                     new_validator_config_path,
+                    new_cpu,
+                    new_memory,
                     system_context,
                 )
 
@@ -83,6 +87,8 @@ def update_nodes_main(
                         vfn_name,
                         vfn_image,
                         new_vfn_config_path,
+                        new_cpu,
+                        new_memory,
                         system_context,
                     )
                     node_futures.append(future)  # type: ignore
@@ -103,6 +109,8 @@ def update_node(
     node_name: str,
     new_image: str,
     new_config: str,
+    new_cpu: str,
+    new_memory: str,
     system_context: SystemContext,
 ):
     """Update a node
@@ -128,6 +136,24 @@ def update_node(
             "value": new_image,
         }
     ]
+
+    # if CPU and memory are specified, update them
+    if new_cpu != "":
+        patch_data_statefulset.append(
+            {
+                "op": "replace",
+                "path": "/spec/template/spec/containers/0/resources/requests/cpu",
+                "value": new_cpu,
+            }
+        )
+    if new_memory != "":
+        patch_data_statefulset.append(
+            {
+                "op": "replace",
+                "path": "/spec/template/spec/containers/0/resources/requests/memory",
+                "value": new_memory,
+            }
+        )
 
     #
     # Patch the statefulset
