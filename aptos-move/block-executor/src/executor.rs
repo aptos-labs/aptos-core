@@ -1118,6 +1118,7 @@ where
             }
         });
         drop(timer);
+        // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
         let (_, _, maybe_error) = shared_commit_state.into_inner();
         match maybe_error {
