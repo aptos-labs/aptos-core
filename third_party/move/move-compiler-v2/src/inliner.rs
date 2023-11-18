@@ -89,41 +89,6 @@ type CallSiteLocations = BTreeMap<(QualifiedFunId, QualifiedFunId), BTreeSet<Nod
 // ======================================================================================
 // Entry
 
-// Get all target functions which are not themselves inline functions.
-// While we're iterating, produce an error on every target inline function lacking a body to
-// inline.
-fn get_targets(env: &mut GlobalEnv) -> BTreeSet<QualifiedFunId> {
-    let mut targets = BTreeSet::new();
-    for module in env.get_modules() {
-        if module.is_target() {
-            for func in module.get_functions() {
-                let id = func.get_qualified_id();
-                if func.is_inline() {
-                    if func.get_def().is_none() {
-                        let func_loc = func.get_loc();
-                        let func_name = func.get_name_str();
-                        if func.is_native() {
-                            let msg = format!("Inline function `{}` must not be native", func_name);
-                            env.error(&func_loc, &msg);
-                        } else {
-                            let msg = format!(
-                                "No body found for non-native inline function `{}`",
-                                func_name
-                            );
-                            env.diag(Severity::Bug, &func_loc, &msg);
-                        }
-                    } else {
-                        eprintln!("Found inline function {:#?}", func.get_name_str());
-                    }
-                } else {
-                    targets.insert(id);
-                }
-            }
-        }
-    }
-    targets
-}
-
 // Run inlining on current program's AST.  For each function which is target of the compilation,
 // visit that function body and inline any calls to functions marked as "inline".
 pub fn run_inlining(env: &mut GlobalEnv) {
@@ -184,7 +149,9 @@ pub fn run_inlining(env: &mut GlobalEnv) {
         }
     }
 
-    // Pick up the qualified names of all inline functions with bodies for deletion.
+    // Delete all inline functions with bodies from the program rep, even if none were inlined,
+    // since (1) they are no longer needed, and (2) they may have code constructs that codegen can't
+    // deal with.
     let mut inline_funs = BTreeSet::new();
     for module in env.get_modules() {
         for func in module.get_functions() {
@@ -193,8 +160,6 @@ pub fn run_inlining(env: &mut GlobalEnv) {
                 if func.get_def().is_some() {
                     // Only delete functions with a body.
                     inline_funs.insert(id);
-                } else {
-                    eprintln!("function `{:#?}` has no body", func.get_full_name_str());
                 }
             }
         }
@@ -203,6 +168,41 @@ pub fn run_inlining(env: &mut GlobalEnv) {
 }
 
 /// Helper functions for inlining driver
+
+// Get all target functions which are not themselves inline functions.
+// While we're iterating, produce an error on every target inline function lacking a body to
+// inline.
+fn get_targets(env: &mut GlobalEnv) -> BTreeSet<QualifiedFunId> {
+    let mut targets = BTreeSet::new();
+    for module in env.get_modules() {
+        if module.is_target() {
+            for func in module.get_functions() {
+                let id = func.get_qualified_id();
+                if func.is_inline() {
+                    if func.get_def().is_none() {
+                        let func_loc = func.get_loc();
+                        let func_name = func.get_name_str();
+                        if func.is_native() {
+                            let msg = format!("Inline function `{}` must not be native", func_name);
+                            env.error(&func_loc, &msg);
+                        } else {
+                            let msg = format!(
+                                "No body found for non-native inline function `{}`",
+                                func_name
+                            );
+                            env.diag(Severity::Bug, &func_loc, &msg);
+                        }
+                    } else {
+                        eprintln!("Found inline function {:#?}", func.get_name_str());
+                    }
+                } else {
+                    targets.insert(id);
+                }
+            }
+        }
+    }
+    targets
+}
 
 /// Return a list of all functions calling inline functions, in bottom-up order,
 /// so that any inline function will be processed before any function calling it.
@@ -431,12 +431,7 @@ impl<'env> Inliner<'env> {
                 self.funexprs_after_inlining.insert(func_id, None);
             }
         } else {
-            let loc = func_env.get_loc();
-            let msg = format!(
-                "No body found for function `{}` in try_inlining_in",
-                func_env.get_full_name_str()
-            );
-            self.env.diag(Severity::Bug, &loc, msg.as_str());
+            // Ignore missing body.  Error is flagged elsewhere.
         }
     }
 }
@@ -535,12 +530,7 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
                         }
                         Some(rewritten)
                     } else {
-                        // No body found
-                        let func_loc = func_env.get_loc();
-                        let func_name = func_env.get_name_str();
-                        let msg =
-                            format!("No body found for called inline function `{}`", func_name);
-                        self.env.diag(Severity::Bug, &func_loc, &msg);
+                        // Ignore missing body.  Error is flagged elsewhere.
                         None
                     }
                 }

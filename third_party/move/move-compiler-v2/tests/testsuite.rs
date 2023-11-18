@@ -156,7 +156,7 @@ impl TestConfig {
             inliner::run_inlining(&mut env);
             ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
 
-            if options.debug {
+            if ok && options.debug {
                 eprint!("After inlining, GlobalEnv={}", env.dump_env());
             }
         }

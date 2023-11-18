@@ -1,15 +1,15 @@
 
 Diagnostics:
-error: recursion during function inlining not allowed: f -> g -> h -> f
+error: recursion during function inlining not allowed: `f` -> `g` -> `h` -> `f`
    ┌─ tests/checking/inlining/recursion.move:4:9
    │
  4 │         g()
    │         ^^^
    │         │
-   │         call from f to g
+   │         call from `f` to `g`
    ·
  8 │         h()
-   │         --- call from g to h
+   │         --- call from `g` to `h`
    ·
 12 │         f()
-   │         --- call from h to f
+   │         --- call from `h` to `f`

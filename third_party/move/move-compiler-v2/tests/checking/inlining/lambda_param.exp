@@ -1,12 +1,12 @@
 
 Diagnostics:
-error: Inlined function-typed parameter currently must be a literal lambda expression
+error: Inline function-typed parameter currently must be a literal lambda expression
   ┌─ tests/checking/inlining/lambda_param.move:7:15
   │
 7 │     inline_apply(f, b)
   │                  ^
 
-error: Invalid call target: currently must be a parameter to an inlined function called with an argument which is a literal lambda expression
+error: Invalid call target: currently indirect call must be a parameter to an inline function called with an argument which is a literal lambda expression
   ┌─ tests/checking/inlining/lambda_param.move:3:2
   │
 3 │     f(b)
