@@ -137,7 +137,7 @@ impl ExecutionPipeline {
             let block_id = block.id();
             let timestamp = block.timestamp_usecs();
             let (input_txns, sig_verified_txns) = monitor!(
-                "prepare_block",
+                "prepare_block_1",
                 tokio::task::spawn_blocking(move || {
                     let input_txns = Self::get_shuffled_txns_to_execute(
                         block_id,
