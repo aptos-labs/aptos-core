@@ -236,6 +236,9 @@ impl SyncMode {
             bootstrapper.epoch_state.clone(),
             request.start_round(),
             request.target_round(),
+            bootstrapper
+                .onchain_config
+                .dag_ordering_causal_history_window as u64,
         );
 
         let (res_tx, res_rx) = oneshot::channel();
