@@ -207,6 +207,10 @@ BlockType:
                   - TYPENAME: AccountAddress
     2:
       Genesis: UNIT
+    3:
+      ProposalExt:
+        NEWTYPE:
+          TYPENAME: ProposalExt
 ChainId:
   NEWTYPESTRUCT: U8
 ChangeSet:
@@ -471,6 +475,23 @@ ProofWithData:
     - proofs:
         SEQ:
           TYPENAME: ProofOfStore
+ProposalExt:
+  ENUM:
+    0:
+      V0:
+        STRUCT:
+          - sys_txns:
+              SEQ:
+                TYPENAME: SystemTransaction
+          - payload:
+              TYPENAME: Payload
+          - author:
+              TYPENAME: AccountAddress
+          - failed_authors:
+              SEQ:
+                TUPLE:
+                  - U64
+                  - TYPENAME: AccountAddress
 ProposalMsg:
   STRUCT:
     - proposal:
