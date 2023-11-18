@@ -30,7 +30,7 @@ See [How Base Gas Works](./base-gas.md) for a detailed description of gas fee ty
 
 ## The Fee Statement
 
-Starting from Aptos Framework release 1.7, the breakdown of fee charges and refunds relevant to a user transaction is represented by struct `0x1::transaction_fee::FeeStatement` and emitted as a module event.
+As of Aptos Framework release 1.7, the breakdown of fee charges and refunds is emitted as a module event represented by struct `0x1::transaction_fee::FeeStatement`.
 
 ```Rust
     #[event]
@@ -84,9 +84,7 @@ However, within a block, the order of transaction execution is determined by the
 When a transaction is submitted to the Aptos blockchain, the transaction must contain the following mandatory gas fields:
 
 - `max_gas_amount`: The maximum number of gas units that the transaction sender is willing to spend to execute the transaction. This determines the maximum computational resources that can be consumed by the transaction.
-- `gas_price`: The gas price the transaction sender is willing to pay. It is expressed in Octa units, where:
-    - 1 Octa = 10<sup>-8</sup> APT and
-    - APT is the Aptos coin.
+- `gas_price`: The gas price the transaction sender is willing to pay. It is expressed in Octa units, where 1 Octa equals 10<sup>-8</sup> Aptos utility token.
 
   During the transaction execution, the total gas amount, expressed as:
   ```
@@ -135,7 +133,6 @@ If a transaction deletes state items, a refund is issued to the transaction paye
 
 The refund amount is denominated in APT and is not converted to gas units or included in the total `gas_used`. Instead, this refund amount is specifically detailed in the `storage_fee_refund_octas` field of the [`FeeStatement`](#the-fee-statement). As a result, the transaction's net effect on the payer's APT balance is determined by `gas_used * gas_unit_price - storage_refund`. If the result is positive, there is a deduction from the account balance; if negative, there is a deposit. 
 
-
 ## Examples
 
 ### Example 1: Account balance vs transaction fee
@@ -180,4 +177,8 @@ The simulation steps for finding the correct amount of gas for a transaction are
 
 :::tip
 Prioritization is based upon buckets of `gas_unit_price`. The buckets are defined in [`mempool_config.rs`](https://github.com/aptos-labs/aptos-core/blob/30b385bf38d3dc8c4e8ee0ff045bc5d0d2f67a85/config/src/config/mempool_config.rs#L8). The current buckets are `[0, 150, 300, 500, 1000, 3000, 5000, 10000, 100000, 1000000]`. Therefore, a `gas_unit_price` of 150 and 299 would be prioritized nearly the same.
+:::
+
+:::tip
+Note that the `safety factor` only takes into consideration changes related to execution and IO. Unexpected creation of storage slots may not be sufficiently coverred.
 :::
