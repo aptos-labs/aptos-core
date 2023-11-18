@@ -7,19 +7,3 @@ error: calling impure function `move_function_in_spec::change` is not allowed
    │                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    = impure function `move_function_in_spec::change(address, address): bool`
-
-error: calling impure function `move_function_in_spec::no_change` is not allowed
-   ┌─ tests/checking/specs/move_function_in_spec.move:22:20
-   │
-22 │             assert no_change(account_address, account_address);
-   │                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   │
-   = impure function `move_function_in_spec::no_change(address, address): bool`
-
-error: calling impure function `move_function_in_spec::type_of` is not allowed
-   ┌─ tests/checking/specs/move_function_in_spec.move:23:39
-   │
-23 │             assert account_address == type_of<T>().account_address;
-   │                                       ^^^^^^^^^^^^
-   │
-   = impure function `move_function_in_spec::type_of(): move_function_in_spec::TypeInfo`
