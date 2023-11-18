@@ -53,7 +53,7 @@ pub fn run_move_compiler(
     }
 
     // Run inlining.
-    inliner::run_inlining(&mut env, options.debug);
+    inliner::run_inlining(&mut env);
     check_errors(&env, error_writer, "inlining")?;
 
     if options.debug {

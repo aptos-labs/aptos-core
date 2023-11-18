@@ -65,6 +65,7 @@
 // - if lambda parameters also may be referred to by temporaries, then `rewrite_invoke` might need
 //   to call yet another `ExpRewriterFunctions` implementation to do that.
 
+use crate::options::Options;
 use codespan_reporting::diagnostic::Severity;
 use itertools::chain;
 use move_model::{
@@ -91,7 +92,7 @@ type CallSiteLocations = BTreeMap<(QualifiedFunId, QualifiedFunId), BTreeSet<Nod
 // Run inlining on current program's AST.  For each function which is target of the compilation,
 // visit that function body and inline any calls to functions marked as "inline".
 // debug flag is temporary until we sort out a way to attach debug to GlobalEnv.
-pub fn run_inlining(env: &mut GlobalEnv, debug: bool) {
+pub fn run_inlining(env: &mut GlobalEnv) {
     // Start with targets.
     let mut todo = BTreeSet::new();
     // While we're iterating, error on any target inline functions lacking a body to inline.
@@ -157,7 +158,7 @@ pub fn run_inlining(env: &mut GlobalEnv, debug: bool) {
 
     // We inline functions bottom-up, so that any inlined function which itself has calls to
     // inlined functions has already had its stuff inlined.
-    let mut inliner = Inliner::new(env, debug);
+    let mut inliner = Inliner::new(env);
     for fid in functions_needing_inlining.iter() {
         inliner.try_inlining_in(*fid);
     }
@@ -376,9 +377,12 @@ struct Inliner<'env> {
 }
 
 impl<'env> Inliner<'env> {
-    fn new(env: &'env GlobalEnv, debug: bool) -> Self {
+    fn new(env: &'env GlobalEnv) -> Self {
         let funexprs_after_inlining = BTreeMap::new();
-
+        let debug = env
+            .get_extension::<Options>()
+            .expect("Options is available")
+            .debug;
         Self {
             env,
             debug,

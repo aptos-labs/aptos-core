@@ -153,7 +153,7 @@ impl TestConfig {
             }
 
             // Run inlining.
-            inliner::run_inlining(&mut env, options.debug);
+            inliner::run_inlining(&mut env);
             ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
 
             if options.debug {
