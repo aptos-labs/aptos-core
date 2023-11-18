@@ -265,6 +265,7 @@ pub(crate) struct SyncModeMessageHandler {
     epoch_state: Arc<EpochState>,
     start_round: Round,
     target_round: Round,
+    window: u64,
 }
 
 impl SyncModeMessageHandler {
@@ -272,11 +273,13 @@ impl SyncModeMessageHandler {
         epoch_state: Arc<EpochState>,
         start_round: Round,
         target_round: Round,
+        window: u64,
     ) -> Self {
         Self {
             epoch_state,
             start_round,
             target_round,
+            window,
         }
     }
 
@@ -321,7 +324,7 @@ impl SyncModeMessageHandler {
                 DAGMessage::CertifiedNodeMsg(ref cert_node_msg) => {
                     if cert_node_msg.round() < self.start_round {
                         debug!("ignoring stale certified node msg");
-                    } else if cert_node_msg.round() > self.target_round * 2 {
+                    } else if cert_node_msg.round() > self.target_round + (2 * self.window) {
                         debug!("cancelling current sync");
                         return Ok(Some(cert_node_msg.clone()));
                     } else {

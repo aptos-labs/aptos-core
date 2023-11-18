@@ -9,22 +9,22 @@ use aptos_logger::info;
 use aptos_sdk::bcs;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
-    on_chain_config::{ConsensusConfigV1, OnChainConsensusConfig},
+    on_chain_config::{DagConsensusConfigV1, OnChainConsensusConfig},
 };
 use std::time::Duration;
 use tokio::runtime::Runtime;
 
 const MAX_NODE_LAG_SECS: u64 = 360;
 
-pub struct QuorumStoreOnChainEnableTest {}
+pub struct DagOnChainEnableTest {}
 
-impl Test for QuorumStoreOnChainEnableTest {
+impl Test for DagOnChainEnableTest {
     fn name(&self) -> &'static str {
-        "quorum-store reconfig enable test"
+        "dag reconfig enable test"
     }
 }
 
-impl NetworkLoadTest for QuorumStoreOnChainEnableTest {
+impl NetworkLoadTest for DagOnChainEnableTest {
     fn test(
         &self,
         swarm: &mut dyn aptos_forge::Swarm,
@@ -66,14 +66,10 @@ impl NetworkLoadTest for QuorumStoreOnChainEnableTest {
             )
             .unwrap();
 
-            let inner = match current_consensus_config {
-                OnChainConsensusConfig::V1(inner) => inner,
-                OnChainConsensusConfig::V2(_) => panic!("Unexpected V2 config"),
-                _ => unimplemented!()
-            };
+            assert!(matches!(current_consensus_config, OnChainConsensusConfig::V2(_)));
 
             // Change to V2
-            let new_consensus_config = OnChainConsensusConfig::V2(ConsensusConfigV1 { ..inner });
+            let new_consensus_config = OnChainConsensusConfig::DagV1(DagConsensusConfigV1::default());
 
             let update_consensus_config_script = format!(
                 r#"
@@ -108,7 +104,7 @@ impl NetworkLoadTest for QuorumStoreOnChainEnableTest {
     }
 }
 
-impl NetworkTest for QuorumStoreOnChainEnableTest {
+impl NetworkTest for DagOnChainEnableTest {
     fn run(&self, ctx: &mut aptos_forge::NetworkContext<'_>) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
