@@ -99,7 +99,7 @@ Our [`aptos_std::bls12381`](https://github.com/aptos-labs/aptos-core/blob/main/a
 ## Elliptic curve arithmetic
 
 While the [hash function](#cryptographic-hash-functions) and [digital signature](#digital-signature-verification) modules should provide enough functionality for most applications, some applications will require more powerful cryptography.
-Normally, developers of such applications would have to wait until their desired cryptographic functionality is implemented efficiently as a [Move native function](https://github.com/aptos-labs/aptos-core/blob/main/developer-docs-site/docs/move/book/functions.md#native-functions) in the [Aptos Move framework](/reference/move).
+Normally, developers of such applications would have to wait until their desired cryptographic functionality is implemented efficiently as a [Move native function](../book/functions.md#native-functions) in the [Aptos Move framework](/reference/move).
 Instead, we expose basic building blocks that developers can use to implement their own cryptographic primitives directly in the Move language and do so **efficiently**.  
 
 Specifically, we currently expose low-level arithmetic operations on two popular elliptic curve groups and their associated finite fields:
