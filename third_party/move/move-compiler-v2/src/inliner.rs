@@ -130,58 +130,56 @@ pub fn run_inlining(env: &mut GlobalEnv) {
     // inline.
     let mut todo = get_targets(env);
 
-    if todo.is_empty() {
-        // Nothing to inline into.
-        return;
-    }
-    // Recursively find callees of each target with a function body.
-    let mut function_callees: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
+    if !todo.is_empty() {
+        // Recursively find callees of each target with a function body.
+        let mut function_callees: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
 
-    // Record for each pair of (caller, callee) functions, all the call site locations (for error
-    // messages).
-    let mut inline_function_call_site_locations: CallSiteLocations = CallSiteLocations::new();
+        // Record for each pair of (caller, callee) functions, all the call site locations (for error
+        // messages).
+        let mut inline_function_call_site_locations: CallSiteLocations = CallSiteLocations::new();
 
-    // Update function_callees and inline_function_call_site_locations for all reachable calls.
-    let mut visited_functions = BTreeSet::new();
-    while let Some(id) = todo.pop_first() {
-        if visited_functions.insert(id) {
-            if let Some(def) = env.get_function(id).get_def().deref() {
-                let callees_with_sites = def.called_funs_with_callsites();
-                for (callee, sites) in callees_with_sites {
-                    todo.insert(callee);
-                    function_callees.entry(id).or_default().insert(callee);
-                    if env.get_function(callee).is_inline() {
-                        inline_function_call_site_locations.insert((id, callee), sites);
+        // Update function_callees and inline_function_call_site_locations for all reachable calls.
+        let mut visited_functions = BTreeSet::new();
+        while let Some(id) = todo.pop_first() {
+            if visited_functions.insert(id) {
+                if let Some(def) = env.get_function(id).get_def().deref() {
+                    let callees_with_sites = def.called_funs_with_callsites();
+                    for (callee, sites) in callees_with_sites {
+                        todo.insert(callee);
+                        function_callees.entry(id).or_default().insert(callee);
+                        if env.get_function(callee).is_inline() {
+                            inline_function_call_site_locations.insert((id, callee), sites);
+                        }
                     }
                 }
             }
         }
-    }
 
-    // Get a list of all reachable functions calling inline functions, in bottom-up order.
-    let Ok(functions_needing_inlining) = functions_needing_inlining_in_order(
-        env,
-        &function_callees,
-        inline_function_call_site_locations,
-    ) else {
-        return; // There was an inlining cycle, already generated an error.
-    };
+        // Get a list of all reachable functions calling inline functions, in bottom-up order.
+        let Ok(functions_needing_inlining) = functions_needing_inlining_in_order(
+            env,
+            &function_callees,
+            inline_function_call_site_locations,
+        ) else {
+            return; // There was an inlining cycle, already generated an error.
+        };
 
-    // We inline functions bottom-up, so that any inline function which itself has calls to
-    // inline functions has already had its stuff inlined.
-    let mut inliner = Inliner::new(env);
-    for fid in functions_needing_inlining.iter() {
-        inliner.try_inlining_in(*fid);
-    }
+        // We inline functions bottom-up, so that any inline function which itself has calls to
+        // inline functions has already had its stuff inlined.
+        let mut inliner = Inliner::new(env);
+        for fid in functions_needing_inlining.iter() {
+            inliner.try_inlining_in(*fid);
+        }
 
-    // Now that all inlining finished, actually update function bodies in env.
-    for (fun_id, funexpr_after_inlining) in inliner.funexprs_after_inlining {
-        if let Some(changed_funexpr) = funexpr_after_inlining {
-            let oldexp = env.get_function(fun_id);
-            // Only record changed cuntion bodies for functions which are targets.
-            if oldexp.module_env.is_target() {
-                let mut old_def = oldexp.get_mut_def();
-                *old_def = Some(changed_funexpr);
+        // Now that all inlining finished, actually update function bodies in env.
+        for (fun_id, funexpr_after_inlining) in inliner.funexprs_after_inlining {
+            if let Some(changed_funexpr) = funexpr_after_inlining {
+                let oldexp = env.get_function(fun_id);
+                // Only record changed cuntion bodies for functions which are targets.
+                if oldexp.module_env.is_target() {
+                    let mut old_def = oldexp.get_mut_def();
+                    *old_def = Some(changed_funexpr);
+                }
             }
         }
     }
