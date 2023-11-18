@@ -351,7 +351,7 @@ impl Default for AptosDataClientConfig {
             min_peer_ratio_for_latency_filtering: 5, // Only filter if we have at least 5 potential peers per request
             min_peers_for_latency_filtering: 10, // Only filter if we have at least 10 total peers
             optimistic_fetch_timeout_ms: 10_000, // 10 seconds
-            response_timeout_ms: 120_000,        // 120 seconds
+            response_timeout_ms: 30_000,         // 30 seconds
             subscription_response_timeout_ms: 60_000, // 60 seconds (must be longer than a regular timeout because of pre-fetching)
             use_compression: true,
         }
