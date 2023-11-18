@@ -23,15 +23,40 @@ use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResul
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    account_address::AccountAddress, contract_event::ContractEvent, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
+    account_address::AccountAddress,
+    contract_event::ContractEvent,
+    epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
+    transaction::{SignedTransaction, Transaction},
 };
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
 use std::{boxed::Box, sync::Arc};
 use tokio::sync::Mutex as AsyncMutex;
 
-pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<StateComputeResult>>;
+pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<PipelineExecutionResult>>;
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct PipelineExecutionResult {
+    pub input_txns: Vec<SignedTransaction>,
+    pub result: StateComputeResult,
+}
+
+impl PipelineExecutionResult {
+    pub fn new(input_txns: Vec<SignedTransaction>, result: StateComputeResult) -> Self {
+        Self { input_txns, result }
+    }
+
+    pub fn new_dummy() -> Self {
+        Self {
+            input_txns: vec![],
+            result: StateComputeResult::new_dummy(),
+        }
+    }
+
+    pub fn into_inner(self) -> (Vec<SignedTransaction>, StateComputeResult) {
+        (self.input_txns, self.result)
+    }
+}
 
 type NotificationType = (
     Box<dyn FnOnce() + Send + Sync>,
@@ -64,7 +89,7 @@ pub struct ExecutionProxy {
     transaction_shuffler: Mutex<Option<Arc<dyn TransactionShuffler>>>,
     maybe_block_gas_limit: Mutex<Option<u64>>,
     transaction_deduper: Mutex<Option<Arc<dyn TransactionDeduper>>>,
-    transaction_filter: TransactionFilter,
+    transaction_filter: Arc<TransactionFilter>,
     execution_pipeline: ExecutionPipeline,
 }
 
@@ -103,7 +128,7 @@ impl ExecutionProxy {
             transaction_shuffler: Mutex::new(None),
             maybe_block_gas_limit: Mutex::new(None),
             transaction_deduper: Mutex::new(None),
-            transaction_filter: txn_filter,
+            transaction_filter: Arc::new(txn_filter),
             execution_pipeline,
         }
     }
@@ -134,28 +159,19 @@ impl StateComputer for ExecutionProxy {
             Err(err) => return Box::pin(async move { Err(err) }),
         };
 
-        let filtered_txns = self
-            .transaction_filter
-            .filter(block_id, block.timestamp_usecs(), txns);
-        let deduped_txns = txn_deduper.dedup(filtered_txns);
-        let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
-
-        let maybe_block_gas_limit = *self.maybe_block_gas_limit.lock();
-
-        // TODO: figure out error handling for the prologue txn
         let timestamp = block.timestamp_usecs();
-        let transactions_to_execute = block.transactions_to_execute(
-            &self.validators.lock(),
-            shuffled_txns.clone(),
-            maybe_block_gas_limit,
-        );
-
+        let maybe_block_gas_limit = *self.maybe_block_gas_limit.lock();
+        let metadata = block.new_block_metadata(&self.validators.lock());
         let fut = self
             .execution_pipeline
             .queue(
-                block_id,
+                block.clone(),
+                metadata,
                 parent_block_id,
-                transactions_to_execute,
+                txns,
+                self.transaction_filter.clone(),
+                txn_deduper,
+                txn_shuffler,
                 maybe_block_gas_limit,
             )
             .await;
@@ -165,24 +181,22 @@ impl StateComputer for ExecutionProxy {
                 block_id = block_id,
                 "Got state compute result, post processing."
             );
-            let compute_result = fut.await?;
+            let pipeline_execution_result = fut.await?;
+            let PipelineExecutionResult { input_txns, result } = pipeline_execution_result.clone();
+
+            //let compute_result = fut.await?;
             observe_block(timestamp, BlockStage::EXECUTED);
 
             // notify mempool about failed transaction
             if let Err(e) = txn_notifier
-                .notify_failed_txn(
-                    shuffled_txns,
-                    &compute_result,
-                    maybe_block_gas_limit.is_some(),
-                )
+                .notify_failed_txn(input_txns, &result, maybe_block_gas_limit.is_some())
                 .await
             {
                 error!(
                     error = ?e, "Failed to notify mempool of rejected txns",
                 );
             }
-
-            Ok(compute_result)
+            Ok(pipeline_execution_result)
         })
     }
 
@@ -204,11 +218,7 @@ impl StateComputer for ExecutionProxy {
             finality_proof.ledger_info().round(),
         );
         let block_timestamp = finality_proof.commit_info().timestamp_usecs();
-
         let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
-        let txn_deduper = self.transaction_deduper.lock().as_ref().unwrap().clone();
-        let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
-
         let block_gas_limit = *self.maybe_block_gas_limit.lock();
 
         for block in blocks {
@@ -218,16 +228,10 @@ impl StateComputer for ExecutionProxy {
                 payloads.push(payload.clone());
             }
 
-            let signed_txns = payload_manager.get_transactions(block.block()).await?;
-            let filtered_txns =
-                self.transaction_filter
-                    .filter(block.id(), block.timestamp_usecs(), signed_txns);
-            let deduped_txns = txn_deduper.dedup(filtered_txns);
-            let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
-
+            let input_txns = block.input_transactions().clone();
             txns.extend(block.transactions_to_commit(
                 &self.validators.lock(),
-                shuffled_txns,
+                input_txns,
                 block_gas_limit,
             ));
             reconfig_events.extend(block.reconfig_event());

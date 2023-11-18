@@ -9,6 +9,7 @@ use crate::{
         errors::Error,
     },
     payload_manager::PayloadManager,
+    state_computer::PipelineExecutionResult,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
     transaction_shuffler::TransactionShuffler,
@@ -16,7 +17,7 @@ use crate::{
 use anyhow::Result;
 use aptos_consensus_types::{block::Block, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
-use aptos_executor_types::{ExecutorResult, StateComputeResult};
+use aptos_executor_types::ExecutorResult;
 use aptos_logger::prelude::*;
 use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
 use async_trait::async_trait;
@@ -61,12 +62,12 @@ impl StateComputer for OrderingStateComputer {
         _block: &Block,
         // The parent block id.
         _parent_block_id: HashValue,
-    ) -> ExecutorResult<StateComputeResult> {
+    ) -> ExecutorResult<PipelineExecutionResult> {
         // Return dummy block and bypass the execution phase.
         // This will break the e2e smoke test (for now because
         // no one is actually handling the next phase) if the
         // decoupled execution feature is turned on.
-        Ok(StateComputeResult::new_dummy())
+        Ok(PipelineExecutionResult::new_dummy())
     }
 
     /// Send ordered blocks to the real execution phase through the channel.
@@ -167,7 +168,7 @@ impl StateComputer for DagStateSyncComputer {
         _block: &Block,
         // The parent block root hash.
         _parent_block_id: HashValue,
-    ) -> ExecutorResult<StateComputeResult> {
+    ) -> ExecutorResult<PipelineExecutionResult> {
         unimplemented!("method not supported")
     }
 
