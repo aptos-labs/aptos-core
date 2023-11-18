@@ -89,75 +89,86 @@ type CallSiteLocations = BTreeMap<(QualifiedFunId, QualifiedFunId), BTreeSet<Nod
 // ======================================================================================
 // Entry
 
-// Run inlining on current program's AST.  For each function which is target of the compilation,
-// visit that function body and inline any calls to functions marked as "inline".
-// debug flag is temporary until we sort out a way to attach debug to GlobalEnv.
-pub fn run_inlining(env: &mut GlobalEnv) {
-    // Start with targets.
-    let mut todo = BTreeSet::new();
-    // While we're iterating, error on any target inline functions lacking a body to inline.
-    let mut has_error: bool = false;
+// Get all target functions which are not themselves inline functions.
+// While we're iterating, produce an error on every target inline functions lacking a body to
+// inline.
+fn get_targets(env: &mut GlobalEnv) -> BTreeSet<QualifiedFunId> {
+    let mut targets = BTreeSet::new();
     for module in env.get_modules() {
         if module.is_target() {
             for func in module.get_functions() {
                 let id = func.get_qualified_id();
                 if func.is_inline() {
-                    let func_def = func.get_def();
-                    if func_def.deref().is_none() {
-                        has_error = true;
+                    if func.get_def().is_none() {
                         let func_loc = func.get_loc();
                         let func_name = func.get_name_str();
                         if func.is_native() {
-                            let msg = format!("Inline function {} must not be native", func_name);
-                            env.diag(Severity::Error, &func_loc, &msg);
+                            let msg = format!("Inline function `{}` must not be native", func_name);
+                            env.error(&func_loc, &msg);
                         } else {
                             let msg = format!(
-                                "ICE: No body found for non-native inline function {}",
+                                "No body found for non-native inline function `{}`",
                                 func_name
                             );
                             env.diag(Severity::Bug, &func_loc, &msg);
                         }
                     }
                 } else {
-                    todo.insert(id);
+                    targets.insert(id);
                 }
             }
         }
     }
-    if has_error {
+    targets
+}
+
+// Run inlining on current program's AST.  For each function which is target of the compilation,
+// visit that function body and inline any calls to functions marked as "inline".
+pub fn run_inlining(env: &mut GlobalEnv) {
+    // Get non-inline function roots for running inlining.
+    // While we're iterating, generate an error for any target inline functions lacking a body to
+    // inline.
+    let mut todo = get_targets(env);
+
+    if todo.is_empty() {
+        // Nothing to inline into.
         return;
     }
     // Recursively find callees of each target with a function body.
     let mut function_callees: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
-    let mut all_functions = BTreeSet::new();
 
     // Record for each pair of (caller, callee) functions, all the call site locations (for error
-    // messages)
-    let mut call_site_locations: CallSiteLocations = CallSiteLocations::new();
+    // messages).
+    let mut inline_function_call_site_locations: CallSiteLocations = CallSiteLocations::new();
 
-    // Update function_callees and call_site_locations for all reachable calls.
+    // Update function_callees and inline_function_call_site_locations for all reachable calls.
+    let mut visited_functions = BTreeSet::new();
     while let Some(id) = todo.pop_first() {
-        if all_functions.insert(id) {
+        if visited_functions.insert(id) {
             if let Some(def) = env.get_function(id).get_def().deref() {
                 let callees_with_sites = def.called_funs_with_callsites();
                 for (callee, sites) in callees_with_sites {
                     todo.insert(callee);
                     function_callees.entry(id).or_default().insert(callee);
-                    call_site_locations.insert((id, callee), sites);
+                    if env.get_function(callee).is_inline() {
+                        inline_function_call_site_locations.insert((id, callee), sites);
+                    }
                 }
             }
         }
     }
 
-    // Get a list of all reachable functions calling inlined functions, in bottom-up order.
-    let Ok(functions_needing_inlining) =
-        functions_needing_inlining_in_order(env, &function_callees, call_site_locations)
-    else {
-        return; // just return on an error, it is already recorded in diag
+    // Get a list of all reachable functions calling inline functions, in bottom-up order.
+    let Ok(functions_needing_inlining) = functions_needing_inlining_in_order(
+        env,
+        &function_callees,
+        inline_function_call_site_locations,
+    ) else {
+        return; // There was an inlining cycle, already generated an error.
     };
 
-    // We inline functions bottom-up, so that any inlined function which itself has calls to
-    // inlined functions has already had its stuff inlined.
+    // We inline functions bottom-up, so that any inline function which itself has calls to
+    // inline functions has already had its stuff inlined.
     let mut inliner = Inliner::new(env);
     for fid in functions_needing_inlining.iter() {
         inliner.try_inlining_in(*fid);
@@ -167,7 +178,7 @@ pub fn run_inlining(env: &mut GlobalEnv) {
     for (fun_id, funexpr_after_inlining) in inliner.funexprs_after_inlining {
         if let Some(changed_funexpr) = funexpr_after_inlining {
             let oldexp = env.get_function(fun_id);
-            // Only record inlining for functions which are targets.
+            // Only record changed cuntion bodies for functions which are targets.
             if oldexp.module_env.is_target() {
                 let mut old_def = oldexp.get_mut_def();
                 *old_def = Some(changed_funexpr);
@@ -175,14 +186,13 @@ pub fn run_inlining(env: &mut GlobalEnv) {
         }
     }
 
-    // Pick up the qualified names of all inlined functions with bodies for deletion.
+    // Pick up the qualified names of all inline functions with bodies for deletion.
     let mut inline_funs = BTreeSet::new();
     for module in env.get_modules() {
         for func in module.get_functions() {
             let id = func.get_qualified_id();
             if func.is_inline() {
-                let func_def = func.get_def();
-                if func_def.deref().is_some() {
+                if func.get_def().is_some() {
                     // Only delete functions with a body.
                     inline_funs.insert(id);
                 }
@@ -194,12 +204,12 @@ pub fn run_inlining(env: &mut GlobalEnv) {
 
 /// Helper functions for inlining driver
 
-/// Return a list of all functions calling inlined functions, in bottom-up order,
+/// Return a list of all functions calling inline functions, in bottom-up order,
 /// so that any inline function will be processed before any function calling it.
 fn functions_needing_inlining_in_order(
     env: &GlobalEnv,
     function_callees: &BTreeMap<QualifiedFunId, BTreeSet<QualifiedFunId>>,
-    call_site_locations: CallSiteLocations,
+    inline_function_call_site_locations: CallSiteLocations,
 ) -> Result<Vec<QualifiedFunId>, ()> {
     // Restrict attention to inline functions calling inline functions.
     let inline_functions_with_callees: BTreeMap<QualifiedFunId, BTreeSet<QualifiedFunId>> =
@@ -241,7 +251,7 @@ fn functions_needing_inlining_in_order(
                 .iter()
                 .zip(cycle.iter().skip(1).chain([*start_fnid].iter()))
                 .flat_map(|(f, g)| {
-                    let sites_ids = call_site_locations.get(&(*f, *g)).unwrap();
+                    let sites_ids = inline_function_call_site_locations.get(&(*f, *g)).unwrap();
                     let f_str = env.get_function(*f).get_name_str();
                     let g_str = env.get_function(*g).get_name_str();
                     let msg = format!("call from `{}` to `{}`", f_str, g_str);
