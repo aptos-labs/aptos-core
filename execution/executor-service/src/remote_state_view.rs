@@ -127,12 +127,11 @@ impl RemoteStateViewClient {
         }
     }
 
-    pub fn init_for_block(&self, state_keys: Vec<StateKey>) {
+    pub fn init_for_block(&self) {
         *self.state_view.write().unwrap() = RemoteStateView::new();
-        REMOTE_EXECUTOR_REMOTE_KV_COUNT
+        /*REMOTE_EXECUTOR_REMOTE_KV_COUNT
             .with_label_values(&[&self.shard_id.to_string(), "prefetch_kv"])
-            .inc_by(state_keys.len() as u64);
-        self.pre_fetch_state_values(state_keys, false);
+            .inc_by(state_keys.len() as u64);*/
     }
 
     fn insert_keys_and_fetch_values(
@@ -163,7 +162,7 @@ impl RemoteStateViewClient {
             });
     }
 
-    fn pre_fetch_state_values(&self, state_keys: Vec<StateKey>, sync_insert_keys: bool) {
+    pub fn pre_fetch_state_values(&self, state_keys: Vec<StateKey>, sync_insert_keys: bool) {
         let state_view_clone = self.state_view.clone();
         let thread_pool_clone = self.thread_pool.clone();
         let kv_tx_clone = self.kv_tx.clone();

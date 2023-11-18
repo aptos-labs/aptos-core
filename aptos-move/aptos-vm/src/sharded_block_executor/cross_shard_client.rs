@@ -107,6 +107,21 @@ impl CrossShardCommitSender {
         }
     }
 
+    pub fn create_cross_shard_commit_sender_with_no_dependent_edges(
+        shard_id: ShardId,
+        cross_shard_client: Arc<dyn CrossShardClient>,
+        shard_txns_start_index: TxnIndex,
+        stream_result_tx: Sender<TransactionIdxAndOutput>,
+    ) -> Self {
+        Self {
+            shard_id,
+            cross_shard_client,
+            dependent_edges: HashMap::new(),
+            index_offset: shard_txns_start_index,
+            stream_result_tx
+        }
+    }
+
     fn send_remote_update_for_success(
         &self,
         txn_idx: TxnIndex,

@@ -49,6 +49,19 @@ pub enum ExecutorShardCommand<S> {
     Stop,
 }
 
+pub enum StreamedExecutorShardCommand<S> {
+    InitBatch(
+        Arc<S>,
+        Vec<(AnalyzedTransaction, usize)>,
+        usize,
+        usize,
+    ),
+    ExecuteBatch(
+        Vec<(AnalyzedTransaction, usize)>,
+    ),
+    Stop,
+}
+
 impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExecutor<S, C> {
     pub fn new(executor_client: C) -> Self {
         info!(

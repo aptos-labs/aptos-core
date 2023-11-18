@@ -12,6 +12,8 @@ use aptos_types::{
 };
 use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;
+use aptos_types::transaction::signature_verified_transaction::SignatureVerifiedTransaction;
+use crate::sharded_block_executor::streamed_transactions_provider::StreamedTransactionsProvider;
 
 pub struct GlobalExecutor<S: StateView + Sync + Send + 'static> {
     global_cross_shard_client: Arc<GlobalCrossShardClient>,
@@ -45,20 +47,26 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         trace!("executing the last round in global executor",);
-        if transactions.is_empty() {
+        return Ok(vec![]);
+        /*if transactions.is_empty() {
             return Ok(vec![]);
         }
+        let signature_verified_transactions: Vec<SignatureVerifiedTransaction> = transactions
+            .into_iter()
+            .map(|txn| txn.into_txn().into_txn())
+            .collect();
+        let streamed_transactions_provider = Arc::new(StreamedTransactionsProvider::new(signature_verified_transactions));
         ShardedExecutorService::execute_transactions_with_dependencies(
             None,
             self.executor_thread_pool.clone(),
-            transactions,
+            streamed_transactions_provider,
             self.global_cross_shard_client.clone(),
             None,
             GLOBAL_ROUND_ID,
             state_view,
             self.concurrency_level,
             maybe_block_gas_limit,
-        )
+        )*/
     }
 
     pub fn get_executor_thread_pool(&self) -> Arc<rayon::ThreadPool> {
