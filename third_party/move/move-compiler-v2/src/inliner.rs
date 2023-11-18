@@ -2,18 +2,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Overview of approach:
-// - We visit function calling inline functions reachable from compilation targets in a bottom-up fashion,
-//   storing rewritten functions in a map to simplify further processing.
+// - We visit function calling inline functions reachable from compilation targets in a bottom-up
+//   fashion, storing rewritten functions in a map to simplify further processing.
 //   - Change to the program happens at the end.
 //
 // - struct `Inliner`
-//   - holds the map recording inlined function bodies so that we don't need to modify the program until the end.
+//   - holds the map recording function bodies which are rewritten due to inlining so that we don't
+//     need to modify the program until the end.
 //   - `try_inlining_in` function is the entry point for each function needing inlining.
 //
-// - struct `OuterInlinerRewriter` uses trait `ExpRewriterFunctions` to rewrite each call in the target.
-//   - `rewrite_call` recognizes inline functions and rewrites them using `InlinedRewriter::inline_call`
+// - struct `OuterInlinerRewriter` uses trait `ExpRewriterFunctions` to rewrite each call in the
+//   target.
+//   - `rewrite_call` recognizes inline functions and rewrites them using
+//     `InlinedRewriter::inline_call`
 //
-// - struct `InlinedRewriter` uses trait `ExpRewriterFunctions` to rewrite the inlined function body.
+// - struct `InlinedRewriter` uses trait `ExpRewriterFunctions` to rewrite the inlined function
+//   body.
 //   - `rewrite_exp` disallows Return expressions
 //
 //   - `rewrite_enter_scope` and `rewrite_exit_scope` record lambda free vars which are shadowed by
@@ -22,7 +26,8 @@
 //   - `rewrite_node_id` instantiates type_args on every node in the inlined function
 //
 //   - `rewrite_local_var` replaces symbol uses that are shadowed with the shadow symbol.
-//   - `rewrite_temporary` replaces references to function parameters with parameter symbols, also shadowing as needed.
+//   - `rewrite_temporary` replaces references to function parameters with parameter symbols, also
+//      shadowing as needed.
 //
 //   - `rewrite_invoke` handles calls to lambda parameters within the inlined function
 //      - Note that lambda bodies are not rewritten during inlining, but are kept intact
@@ -32,12 +37,12 @@
 // - struct `InlinedRewriter` also has various methods to support rewriting a call
 //   - `inline_call` is the entry point for rewriting a call to an inline function.
 //
-//   - `create_shadow_symbols` creates a shadow `Symbol` for each lambda free variable to use if
-//      a local variable conflicts with that variable.  It uses `SymbolPool::shadow` to create
-//      shadow symbols which print out the same but don't conflict.
+//   - `create_shadow_symbols` creates a shadow `Symbol` for each lambda free variable to use if a
+//     local variable conflicts with that variable.  It uses `SymbolPool::shadow` to create shadow
+//     symbols which print out the same but don't conflict.
 //
-//   - `get_shadow_symbol` checks whether a `Symbol` conflicts with lambda free variables, and if so,
-//     returns the shadow symbol to use instead..
+//   - `get_shadow_symbol` checks whether a `Symbol` conflicts with lambda free variables, and if
+//     so, returns the shadow symbol to use instead..
 //
 //   - `parameter_list_to_pattern` is a helper to convert a list of `Parameter` into a `Pattern`,
 //      suitable for use in the body.
@@ -49,15 +54,16 @@
 //
 
 // TODO:
-// - add a InlinedCall() node that represents an inlined call, so that an inlined Return() has a place to go. [later]
+// - add a InlinedCall() node that represents an inlined call, so that an inlined Return() has a
+//   place to go. [later]
 //   - OR: if an inlined fn has a return, then error out.
 // - add a simplifier that simplifies certain code constructs, e.g.
 //   - InlinedCall() with no nested Return() can be flattened.
 //   - others?
 // - do we need to insert FreezeRef in actual args if formal param is &T but arg is &mod T ?
 // - do we need to do anything about abilities?
-// - if lambda parameters also may be referred to by temporaries, then `rewrite_invoke` might need to call yet
-//   another `ExpRewriterFunctions` implementation to do that.
+// - if lambda parameters also may be referred to by temporaries, then `rewrite_invoke` might need
+//   to call yet another `ExpRewriterFunctions` implementation to do that.
 
 use codespan_reporting::diagnostic::Severity;
 use itertools::chain;
@@ -229,7 +235,7 @@ fn functions_needing_inlining_in_order(
                 .iter()
                 .map(|fnid| env.get_function(*fnid).get_name_str())
                 .collect::<Vec<String>>()
-                .join(" -> ");
+                .join("` -> `");
             let mut call_details: Vec<_> = cycle
                 .iter()
                 .zip(cycle.iter().skip(1).chain([*start_fnid].iter()))
@@ -237,14 +243,14 @@ fn functions_needing_inlining_in_order(
                     let sites_ids = call_site_locations.get(&(*f, *g)).unwrap();
                     let f_str = env.get_function(*f).get_name_str();
                     let g_str = env.get_function(*g).get_name_str();
-                    let msg = format!("call from {} to {}", f_str, g_str);
+                    let msg = format!("call from `{}` to `{}`", f_str, g_str);
                     sites_ids
                         .iter()
                         .map(move |node_id| (env.get_node_loc(*node_id), msg.clone()))
                 })
                 .collect();
             let msg = format!(
-                "recursion during function inlining not allowed: {} -> {}",
+                "recursion during function inlining not allowed: `{}` -> `{}`",
                 path_string,
                 func_env.get_name_str()
             );
@@ -254,7 +260,7 @@ fn functions_needing_inlining_in_order(
         return Err(());
     }
 
-    // Compute post-order of inlined_functions which call others.
+    // Compute post-order of inline_functions which call others.
     let po_inline_functions = postorder(
         &inline_functions_calling_others,
         &inline_functions_with_callees,
@@ -360,26 +366,11 @@ fn check_for_cycles<T: Ord + Copy + Debug>(
     cycles
 }
 
-/// Consider doing inlining within the named function.  If there are calls to inline
-/// functions in the function body, then return the new function body.  Inlined function
-/// bodies are not further processed (we assume they are processed in a bottom-up fashion
-/// so each
-
-/// to inlining the function, the inlined function has
-/// Inlined functions will recursively be inlined as encountered and added to
-/// the inline_function_map.
-
-/// Walk the entire call tree for a given entry point fid, looking for calls to inline
-/// functions.  Inline functions are visited as well, before being inlined (so that
-/// inline functions calling other inline functions don't result in multiple visits).
-///
-
 struct Inliner<'env> {
     env: &'env GlobalEnv,
     debug: bool,
-
     /// Functions already processed all get an entry here, with a new function body after inline
-    /// calls are substituted here.  Functions which are unchanged (likely no calls to inline functions)
+    /// calls are substituted here.  Functions which are unchanged (no calls to inline functions)
     /// bind to None.
     funexprs_after_inlining: BTreeMap<QualifiedFunId, Option<Exp>>,
 }
@@ -390,8 +381,8 @@ impl<'env> Inliner<'env> {
 
         Self {
             env,
-            funexprs_after_inlining,
             debug,
+            funexprs_after_inlining,
         }
     }
 
@@ -408,17 +399,17 @@ impl<'env> Inliner<'env> {
 
         if self.debug {
             eprintln!(
-                "try_inlining_in {}:\n{}",
+                "try_inlining_in `{}`:\n{}",
                 func_env.get_full_name_str(),
                 self.env.dump_fun(&func_env)
             );
         }
-        let optional_def_ref = func_env.get_def().deref().clone();
-        if let Some(def) = optional_def_ref {
+        let optional_def_ref = func_env.get_def();
+        if let Some(def) = &*optional_def_ref {
             let mut rewriter = OuterInlinerRewriter::new(self.env, self);
 
             let rewritten = rewriter.rewrite_exp(def.clone());
-            let changed = !ExpData::ptr_eq(&rewritten, &def);
+            let changed = !ExpData::ptr_eq(&rewritten, def);
             if changed {
                 self.funexprs_after_inlining
                     .insert(func_id, Some(rewritten));
@@ -428,16 +419,16 @@ impl<'env> Inliner<'env> {
         } else {
             let loc = func_env.get_loc();
             let msg = format!(
-                "No body found for function {} in try_inlining_in",
+                "No body found for function `{}` in try_inlining_in",
                 func_env.get_full_name_str()
             );
-            self.env.diag(Severity::Error, &loc, msg.as_str());
+            self.env.diag(Severity::Bug, &loc, msg.as_str());
         }
     }
 }
 
-/// Rewriter for processing functions which may have inlined function calls within them.
-/// The only thing it rewrites are calls to inlined functions; we use the ExpRewriterFunctions
+/// Rewriter for processing functions which may have inline function calls within them.
+/// The only thing it rewrites are calls to inline functions; we use the ExpRewriterFunctions
 /// trait to find such calls and reconstruct the outer function to include them after rewriting.
 struct OuterInlinerRewriter<'env, 'inliner> {
     env: &'env GlobalEnv,
@@ -455,10 +446,7 @@ impl<'env, 'inliner> OuterInlinerRewriter<'env, 'inliner> {
 impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inliner> {
     fn rewrite_call(&mut self, call_id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
         if let Operation::MoveFunction(module_id, fun_id) = oper {
-            let fid = QualifiedId {
-                module_id: *module_id,
-                id: *fun_id,
-            };
+            let fid = module_id.qualified(*fun_id);
             let func_env = self.env.get_function(fid);
             if func_env.is_inline() {
                 // inline the function call
@@ -471,7 +459,7 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
                     // inline here
                     if self.inliner.debug {
                         eprintln!(
-                            "inlining (inlined) function {} with args {}",
+                            "inlining (inlined) function `{}` with args `{}`",
                             self.env.dump_fun(&func_env),
                             args.iter()
                                 .map(|exp| format!("{}", exp.as_ref().display(self.env)))
@@ -493,7 +481,7 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
                     );
                     if self.inliner.debug {
                         eprintln!(
-                            "After (inlined) inlining, expr is {}",
+                            "After (inlined) inlining, expr is `{}`",
                             rewritten.display(self.env)
                         );
                     }
@@ -505,7 +493,7 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
                         // inline here
                         if self.inliner.debug {
                             eprintln!(
-                                "inlining function {} with args {}",
+                                "inlining function `{}` with args `{}`",
                                 self.env.dump_fun(&func_env),
                                 args.iter()
                                     .map(|exp| format!("{}", exp.as_ref().display(self.env)))
@@ -527,24 +515,18 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
                         );
                         if self.inliner.debug {
                             eprintln!(
-                                "After inlining, expr is {}",
+                                "After inlining, expr is `{}`",
                                 rewritten.as_ref().display(self.env)
                             );
                         }
                         Some(rewritten)
                     } else {
                         // No body found
-                        let call_loc = self.env.get_node_loc(call_id);
-                        let call_detail_msg = format!("Call to {} here", func_env.get_name_str());
-                        let call_details = Vec::from([(call_loc, call_detail_msg)]);
                         let func_loc = func_env.get_loc();
                         let func_name = func_env.get_name_str();
-                        let msg = format!(
-                            "ICE: No body found for called inline function {}",
-                            func_name
-                        );
-                        self.env
-                            .diag_with_labels(Severity::Bug, &func_loc, &msg, call_details);
+                        let msg =
+                            format!("No body found for called inline function `{}`", func_name);
+                        self.env.diag(Severity::Bug, &func_loc, &msg);
                         None
                     }
                 }
@@ -653,14 +635,13 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         });
 
         for (param, exp) in non_lambda_function_args {
-            env.diag(
-                Severity::Error,
+            env.error(
                 &env.get_node_loc(exp.as_ref().node_id()),
-                "Inlined function-typed parameter currently must be a literal lambda expression",
+                "Inline function-typed parameter currently must be a literal lambda expression",
             );
             if debug {
                 eprintln!(
-                    "bad exp is {:?}, param is {:?}, sym is {} type is {:?}",
+                    "bad exp is {:?}, param is {:?}, sym is `{}` type is `{:?}`",
                     exp,
                     param,
                     param.0.display(env.symbol_pool()),
@@ -677,15 +658,15 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             .collect();
 
         if debug {
-            eprintln!("lambda_param_map is {:#?}", &lambda_param_map);
+            eprintln!("lambda_param_map is `{:#?}`", &lambda_param_map);
         }
 
         let (regular_params, regular_actuals): (Vec<&Parameter>, Vec<&Exp>) =
             regular_args_matched.into_iter().unzip();
 
         if debug {
-            eprintln!("regular_parms are {:#?}", &regular_params);
-            eprintln!("regular_actuals are {:#?}", &regular_actuals);
+            eprintln!("regular_parms are `{:#?}`", &regular_params);
+            eprintln!("regular_actuals are `{:#?}`", &regular_actuals);
         }
 
         // Find free variables in lambda expr.  Perhaps we could minimize changes if we tracked
@@ -710,7 +691,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             .collect();
 
         if debug {
-            eprintln!("lambda_free_vars are {:#?}", &all_lambda_free_vars);
+            eprintln!("lambda_free_vars are `{:#?}`", &all_lambda_free_vars);
         }
 
         // rewrite body with type_args, lambda params, and var renames to keep lambda free vars free.
@@ -739,11 +720,11 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
 
         // Rewrite body types, shadowed vars, replace invoked lambda params, etc.
         if debug {
-            eprintln!("rewriting body {:#?}", &body);
+            eprintln!("rewriting body `{:#?}`", &body);
         }
         let rewritten_body = rewriter.rewrite_exp(body.clone());
         if debug {
-            eprintln!("rewritten body is {:#?}", &rewritten_body);
+            eprintln!("rewritten body is `{:#?}`", &rewritten_body);
         }
 
         let call_loc = env.get_node_loc(call_node_id);
@@ -884,7 +865,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                             let new_type = if let Type::Reference(_refkind, box_type) = exp_type {
                                 Type::Reference(ReferenceKind::Immutable, box_type.clone())
                             } else {
-                                unreachable!("ICE: should have been checked before");
+                                unreachable!("Should have been checked before");
                             };
                             let exp_loc = env.get_node_loc(exp_node);
                             let new_node = env.new_node(exp_loc, new_type.clone());
@@ -1036,8 +1017,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         // Disallow Return expression in an inlined function.
         if let ExpData::Return(id, _val) = exp.as_ref() {
-            self.env.diag(
-                Severity::Error,
+            self.env.error(
                 &self.env.get_node_loc(*id),
                 "Return not currently supported in inline functions",
             );
@@ -1094,10 +1074,9 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
             };
             result
         } else {
-            self.env.diag(
-                Severity::Error,
+            self.env.error(
                 &loc,
-                &format!("Temporary with invalid index {} during inlining of function with {} parameters",
+                &format!("Temporary with invalid index `{}` during inlining of function with `{}` parameters",
                         idx, self.inlined_formal_params.len()),
             );
             None
@@ -1145,7 +1124,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
                 self.env.diag(
                     Severity::Bug,
                     &call_loc,
-                    "ICE: Invalid call target: problem dereferencing target expression",
+                    "Invalid call target: problem dereferencing target expression",
                 );
                 None
             }
@@ -1153,10 +1132,9 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
             let target_loc = target_id
                 .map(|id| self.env.get_node_loc(*id))
                 .unwrap_or(call_loc);
-            self.env.diag(
-                Severity::Error,
+            self.env.error(
                 &target_loc,
-                "Invalid call target: currently must be a parameter to an inlined function called with an argument which is a literal lambda expression",
+                "Invalid call target: currently indirect call must be a parameter to an inline function called with an argument which is a literal lambda expression",
             );
             None
         }
