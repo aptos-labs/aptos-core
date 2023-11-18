@@ -146,14 +146,13 @@ impl ExecutionPipeline {
             );
 
             let execute_block_tx = execute_block_tx.clone();
-            let txns_to_execute_clone = txns_to_execute.clone();
             let sig_verified_txns = monitor!(
                 "prepare_block",
                 tokio::task::spawn_blocking(move || {
                     let sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL
                         .install(|| {
                             let num_txns = txns_to_execute.len();
-                            txns_to_execute_clone
+                            txns_to_execute
                                 .into_par_iter()
                                 .with_min_len(optimal_min_len(num_txns, 32))
                                 .map(|t| t.into())
