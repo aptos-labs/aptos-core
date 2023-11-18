@@ -5,11 +5,11 @@ slug: "aptos-releases"
 
 # Latest Aptos Releases
 
-This section contains details for the latest [Aptos releases](https://github.com/aptos-labs/aptos-core/releases). See the sub-pages for the latest release for each network:
+Each Aptos release can be found on the GitHub site for [Aptos-core releases](https://github.com/aptos-labs/aptos-core/releases). Each release is mirrored by the following git branches:
 
-* [Latest Mainnet Release](./mainnet-release.md)
-* [Latest Testnet Release](./testnet-release.md)
-* [Latest Devnet Release](./devnet-release.md)
+* [Latest Mainnet Release](https://github.com/aptos-labs/aptos-core/tree/mainnet)
+* [Latest Testnet Release](https://github.com/aptos-labs/aptos-core/tree/testnet)
+* [Latest Devnet Release](https://github.com/aptos-labs/aptos-core/tree/devnet)
 
 Aptos typically conducts multiple devnet releases for each testnet and mainnet release. Hence, devnet releases use commit hashes for tracking rather than version numbers. Testnet and mainnet releases usually have a one-to-one correlation, meaning each testnet release rolls into mainnet.
 
