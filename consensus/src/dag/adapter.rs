@@ -162,6 +162,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                 parents_bitvec,
                 node_digests,
             ),
+            vec![],
             StateComputeResult::new_dummy(),
         );
         let block_info = block.block_info();

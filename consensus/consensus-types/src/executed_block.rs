@@ -25,6 +25,8 @@ use std::fmt::{Debug, Display, Formatter};
 pub struct ExecutedBlock {
     /// Block data that cannot be regenerated.
     block: Block,
+    /// Input transactions in the order of execution
+    input_transactions: Vec<SignedTransaction>,
     /// The state_compute_result is calculated for all the pending blocks prior to insertion to
     /// the tree. The execution results are not persisted: they're recalculated again for the
     /// pending blocks upon restart.
@@ -32,8 +34,13 @@ pub struct ExecutedBlock {
 }
 
 impl ExecutedBlock {
-    pub fn replace_result(mut self, result: StateComputeResult) -> Self {
+    pub fn replace_result(
+        mut self,
+        input_transactions: Vec<SignedTransaction>,
+        result: StateComputeResult,
+    ) -> Self {
         self.state_compute_result = result;
+        self.input_transactions = input_transactions;
         self
     }
 }
@@ -51,9 +58,14 @@ impl Display for ExecutedBlock {
 }
 
 impl ExecutedBlock {
-    pub fn new(block: Block, state_compute_result: StateComputeResult) -> Self {
+    pub fn new(
+        block: Block,
+        input_transactions: Vec<SignedTransaction>,
+        state_compute_result: StateComputeResult,
+    ) -> Self {
         Self {
             block,
+            input_transactions,
             state_compute_result,
         }
     }
@@ -64,6 +76,10 @@ impl ExecutedBlock {
 
     pub fn id(&self) -> HashValue {
         self.block().id()
+    }
+
+    pub fn input_transactions(&self) -> &Vec<SignedTransaction> {
+        &self.input_transactions
     }
 
     pub fn epoch(&self) -> u64 {

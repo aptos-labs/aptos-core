@@ -373,30 +373,36 @@ impl Block {
         Ok(())
     }
 
+    pub fn transactions_to_execute_for_metadata(
+        block_id: HashValue,
+        txns: Vec<SignedTransaction>,
+        metadata: BlockMetadata,
+        block_gas_limit: Option<u64>,
+    ) -> Vec<Transaction> {
+        if block_gas_limit.is_some() {
+            // After the per-block gas limit change, StateCheckpoint txn
+            // is inserted after block execution
+            once(Transaction::BlockMetadata(metadata))
+                .chain(txns.into_iter().map(Transaction::UserTransaction))
+                .collect()
+        } else {
+            // Before the per-block gas limit change, StateCheckpoint txn
+            // is inserted here for compatibility.
+            once(Transaction::BlockMetadata(metadata))
+                .chain(txns.into_iter().map(Transaction::UserTransaction))
+                .chain(once(Transaction::StateCheckpoint(block_id)))
+                .collect()
+        }
+    }
+
     pub fn transactions_to_execute(
         &self,
         validators: &[AccountAddress],
         txns: Vec<SignedTransaction>,
         block_gas_limit: Option<u64>,
     ) -> Vec<Transaction> {
-        if block_gas_limit.is_some() {
-            // After the per-block gas limit change, StateCheckpoint txn
-            // is inserted after block execution
-            once(Transaction::BlockMetadata(
-                self.new_block_metadata(validators),
-            ))
-            .chain(txns.into_iter().map(Transaction::UserTransaction))
-            .collect()
-        } else {
-            // Before the per-block gas limit change, StateCheckpoint txn
-            // is inserted here for compatibility.
-            once(Transaction::BlockMetadata(
-                self.new_block_metadata(validators),
-            ))
-            .chain(txns.into_iter().map(Transaction::UserTransaction))
-            .chain(once(Transaction::StateCheckpoint(self.id)))
-            .collect()
-        }
+        let metadata = self.new_block_metadata(validators);
+        Self::transactions_to_execute_for_metadata(self.id, txns, metadata, block_gas_limit)
     }
 
     fn previous_bitvec(&self) -> BitVec {
@@ -407,7 +413,7 @@ impl Block {
         }
     }
 
-    fn new_block_metadata(&self, validators: &[AccountAddress]) -> BlockMetadata {
+    pub fn new_block_metadata(&self, validators: &[AccountAddress]) -> BlockMetadata {
         BlockMetadata::new(
             self.id(),
             self.epoch(),
