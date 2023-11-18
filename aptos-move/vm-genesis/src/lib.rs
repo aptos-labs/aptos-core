@@ -435,7 +435,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION,
         FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
         FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
-        FeatureFlag::SYSTEM_TRANSACTION,
+        FeatureFlag::PROPOSE_SYSTEM_TRANSACTION,
     ]
 }
 

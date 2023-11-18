@@ -93,7 +93,7 @@ pub enum FeatureFlag {
     VMBinaryFormatV7,
     ResourceGroupsChargeAsSizeSum,
     CommissionChangeDelegationPool,
-    SystemTransaction,
+    ProposeSystemTransaction,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -245,7 +245,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::CommissionChangeDelegationPool => {
                 AptosFeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL
             },
-            FeatureFlag::SystemTransaction => AptosFeatureFlag::SYSTEM_TRANSACTION,
+            FeatureFlag::ProposeSystemTransaction => AptosFeatureFlag::PROPOSE_SYSTEM_TRANSACTION,
         }
     }
 }
@@ -320,7 +320,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL => {
                 FeatureFlag::CommissionChangeDelegationPool
             },
-            AptosFeatureFlag::SYSTEM_TRANSACTION => FeatureFlag::SystemTransaction,
+            AptosFeatureFlag::PROPOSE_SYSTEM_TRANSACTION => FeatureFlag::ProposeSystemTransaction,
         }
     }
 }

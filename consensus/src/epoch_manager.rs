@@ -872,7 +872,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             chain_health_backoff_config,
             self.quorum_store_enabled,
             self.sys_txn_providers.clone(),
-            features.is_enabled(FeatureFlag::SYSTEM_TRANSACTION),
+            features.is_enabled(FeatureFlag::PROPOSE_SYSTEM_TRANSACTION),
 
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
