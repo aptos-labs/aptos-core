@@ -90,7 +90,7 @@ type CallSiteLocations = BTreeMap<(QualifiedFunId, QualifiedFunId), BTreeSet<Nod
 // Entry
 
 // Get all target functions which are not themselves inline functions.
-// While we're iterating, produce an error on every target inline functions lacking a body to
+// While we're iterating, produce an error on every target inline function lacking a body to
 // inline.
 fn get_targets(env: &mut GlobalEnv) -> BTreeSet<QualifiedFunId> {
     let mut targets = BTreeSet::new();
@@ -112,6 +112,8 @@ fn get_targets(env: &mut GlobalEnv) -> BTreeSet<QualifiedFunId> {
                             );
                             env.diag(Severity::Bug, &func_loc, &msg);
                         }
+                    } else {
+                        eprintln!("Found inline function {:#?}", func.get_name_str());
                     }
                 } else {
                     targets.insert(id);
@@ -156,29 +158,27 @@ pub fn run_inlining(env: &mut GlobalEnv) {
         }
 
         // Get a list of all reachable functions calling inline functions, in bottom-up order.
-        let Ok(functions_needing_inlining) = functions_needing_inlining_in_order(
+        if let Ok(functions_needing_inlining) = functions_needing_inlining_in_order(
             env,
             &function_callees,
             inline_function_call_site_locations,
-        ) else {
-            return; // There was an inlining cycle, already generated an error.
-        };
+        ) {
+            // We inline functions bottom-up, so that any inline function which itself has calls to
+            // inline functions has already had its stuff inlined.
+            let mut inliner = Inliner::new(env);
+            for fid in functions_needing_inlining.iter() {
+                inliner.try_inlining_in(*fid);
+            }
 
-        // We inline functions bottom-up, so that any inline function which itself has calls to
-        // inline functions has already had its stuff inlined.
-        let mut inliner = Inliner::new(env);
-        for fid in functions_needing_inlining.iter() {
-            inliner.try_inlining_in(*fid);
-        }
-
-        // Now that all inlining finished, actually update function bodies in env.
-        for (fun_id, funexpr_after_inlining) in inliner.funexprs_after_inlining {
-            if let Some(changed_funexpr) = funexpr_after_inlining {
-                let oldexp = env.get_function(fun_id);
-                // Only record changed cuntion bodies for functions which are targets.
-                if oldexp.module_env.is_target() {
-                    let mut old_def = oldexp.get_mut_def();
-                    *old_def = Some(changed_funexpr);
+            // Now that all inlining finished, actually update function bodies in env.
+            for (fun_id, funexpr_after_inlining) in inliner.funexprs_after_inlining {
+                if let Some(changed_funexpr) = funexpr_after_inlining {
+                    let oldexp = env.get_function(fun_id);
+                    // Only record changed cuntion bodies for functions which are targets.
+                    if oldexp.module_env.is_target() {
+                        let mut old_def = oldexp.get_mut_def();
+                        *old_def = Some(changed_funexpr);
+                    }
                 }
             }
         }
@@ -193,6 +193,8 @@ pub fn run_inlining(env: &mut GlobalEnv) {
                 if func.get_def().is_some() {
                     // Only delete functions with a body.
                     inline_funs.insert(id);
+                } else {
+                    eprintln!("function `{:#?}` has no body", func.get_full_name_str());
                 }
             }
         }
