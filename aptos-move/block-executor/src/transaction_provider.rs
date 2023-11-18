@@ -11,7 +11,3 @@ pub trait TxnProvider<T: Transaction> {
 
     fn iter(&self) -> Box<dyn Iterator<Item = Arc<T>> + '_>;
 }
-
-/*pub trait TxnProviderIterator<T: Transaction> {
-
-}*/

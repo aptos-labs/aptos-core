@@ -1,17 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sharded_block_executor::{
-    coordinator_client::CoordinatorClient,
-    counters::WAIT_FOR_SHARDED_OUTPUT_SECONDS,
-    cross_shard_client::CrossShardClient,
-    executor_client::{ExecutorClient, ShardedExecutionOutput},
-    global_executor::GlobalExecutor,
-    messages::CrossShardMsg,
-    sharded_aggregator_service,
-    sharded_executor_service::ShardedExecutorService,
-    ExecutorShardCommand, ShardedBlockExecutor,
-};
+use crate::sharded_block_executor::{coordinator_client::CoordinatorClient, counters::WAIT_FOR_SHARDED_OUTPUT_SECONDS, cross_shard_client::CrossShardClient, executor_client::{ExecutorClient, ShardedExecutionOutput}, global_executor::GlobalExecutor, messages::CrossShardMsg, sharded_aggregator_service, sharded_executor_service::ShardedExecutorService, ExecutorShardCommand, ShardedBlockExecutor, StreamedExecutorShardCommand};
 use aptos_logger::trace;
 use aptos_types::{
     block_executor::{
@@ -265,6 +255,14 @@ impl<S> LocalCoordinatorClient<S> {
 impl<S: StateView + Sync + Send + 'static> CoordinatorClient<S> for LocalCoordinatorClient<S> {
     fn receive_execute_command(&self) -> ExecutorShardCommand<S> {
         self.command_rx.recv().unwrap()
+    }
+
+    fn receive_execute_command_stream(&self) -> StreamedExecutorShardCommand<S> {
+        panic!("Not implemented for LocalCoordinatorClient");
+    }
+
+    fn reset_block_init(&self) {
+
     }
 
     fn send_execution_result(&mut self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>) {

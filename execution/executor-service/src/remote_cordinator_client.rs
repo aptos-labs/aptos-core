@@ -9,17 +9,17 @@ use aptos_types::{
     block_executor::partitioner::ShardId, state_store::state_key::StateKey,
     transaction::TransactionOutput, vm_status::VMStatus,
 };
-use aptos_vm::sharded_block_executor::{
-    coordinator_client::CoordinatorClient, ExecutorShardCommand,
-};
+use aptos_vm::sharded_block_executor::{coordinator_client::CoordinatorClient, ExecutorShardCommand, StreamedExecutorShardCommand};
 use crossbeam_channel::{Receiver, Sender};
 use rayon::prelude::*;
 use std::{net::SocketAddr, sync::Arc};
-use std::sync::atomic::AtomicU64;
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize};
+use std::sync::Mutex;
 use aptos_logger::info;
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::{get_delta_time, REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER};
-use aptos_vm::sharded_block_executor::sharded_executor_service::TransactionIdxAndOutput;
+use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
+use aptos_vm::sharded_block_executor::sharded_executor_service::{CmdsAndMetaData, TransactionIdxAndOutput};
 
 pub struct RemoteCoordinatorClient {
     state_view_client: Arc<RemoteStateViewClient>,
@@ -28,6 +28,7 @@ pub struct RemoteCoordinatorClient {
     result_tx: OutboundRpcHelper,
     shard_id: ShardId,
     cmd_rx_msg_duration_since_epoch: AtomicU64,
+    is_block_init_done: AtomicBool,//Mutex<bool>,
 }
 
 impl RemoteCoordinatorClient {
@@ -51,6 +52,7 @@ impl RemoteCoordinatorClient {
             result_tx,
             shard_id,
             cmd_rx_msg_duration_since_epoch: AtomicU64::new(0),
+            is_block_init_done: AtomicBool::new(false),
         }
     }
 
@@ -82,6 +84,20 @@ impl RemoteCoordinatorClient {
             })
             .collect::<Vec<StateKey>>()
     }
+
+    fn extract_state_keys_from_txns(txns: &Vec<(AnalyzedTransaction, usize)>) -> Vec<StateKey> {
+        let mut state_keys = vec![];
+        for txn in txns {
+            for storage_location in txn.0
+                .read_hints()
+                .iter()
+                .chain(txn.0.write_hints().iter())
+            {
+                state_keys.push(storage_location.state_key().clone());
+            }
+        }
+        state_keys
+    }
 }
 
 impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
@@ -107,7 +123,8 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                             .with_label_values(&[&self.shard_id.to_string(), "init_prefetch"])
                             .start_timer();
                         let state_keys = Self::extract_state_keys(&command);
-                        self.state_view_client.init_for_block(state_keys);
+                        self.state_view_client.init_for_block();
+                        self.state_view_client.pre_fetch_state_values(state_keys, false);
                         drop(init_prefetch_timer);
 
                         let (sub_blocks, concurrency, onchain_config) = command.into();
@@ -122,6 +139,49 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
             },
             Err(_) => ExecutorShardCommand::Stop,
         }
+    }
+
+    fn receive_execute_command_stream(&self) -> StreamedExecutorShardCommand<RemoteStateViewClient> {
+        match self.command_rx.recv() {
+            Ok(message) => {
+                let delta = get_delta_time(message.start_ms_since_epoch.unwrap());
+                REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                    .with_label_values(&["5_cmd_tx_msg_shard_recv"]).observe(delta as f64);
+                self.cmd_rx_msg_duration_since_epoch.store(message.start_ms_since_epoch.unwrap(), std::sync::atomic::Ordering::Relaxed);
+                let _rx_timer = REMOTE_EXECUTOR_TIMER
+                    .with_label_values(&[&self.shard_id.to_string(), "cmd_rx"])
+                    .start_timer();
+                let bcs_deser_timer = REMOTE_EXECUTOR_TIMER
+                    .with_label_values(&[&self.shard_id.to_string(), "cmd_rx_bcs_deser"])
+                    .start_timer();
+                let txns: CmdsAndMetaData = bcs::from_bytes(&message.data).unwrap();
+                drop(bcs_deser_timer);
+
+
+                let init_prefetch_timer = REMOTE_EXECUTOR_TIMER
+                    .with_label_values(&[&self.shard_id.to_string(), "init_prefetch"])
+                    .start_timer();
+
+                if !self.is_block_init_done.load(std::sync::atomic::Ordering::Relaxed) {
+                    self.state_view_client.init_for_block();
+                    let state_keys = Self::extract_state_keys_from_txns(&txns.cmds);
+                    self.state_view_client.pre_fetch_state_values(state_keys, false);
+                    let num_txns = txns.num_txns;
+                    let shard_txns_start_index = txns.shard_txns_start_index;
+                    self.is_block_init_done.store(true, std::sync::atomic::Ordering::Relaxed);
+                    return StreamedExecutorShardCommand::InitBatch(self.state_view_client.clone(), txns.cmds, num_txns, shard_txns_start_index, txns.onchain_config);
+                }
+
+                let state_keys = Self::extract_state_keys_from_txns(&txns.cmds);
+                self.state_view_client.pre_fetch_state_values(state_keys, false);
+                return StreamedExecutorShardCommand::ExecuteBatch(txns.cmds);
+            },
+            Err(_) => StreamedExecutorShardCommand::Stop,
+        }
+    }
+
+    fn reset_block_init(&self) {
+        self.is_block_init_done.store(false, std::sync::atomic::Ordering::Relaxed);
     }
 
     fn send_execution_result(&mut self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>) {

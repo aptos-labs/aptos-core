@@ -40,11 +40,7 @@ impl TxnProvider<SignatureVerifiedTransaction> for StreamedTransactionsProvider 
     }
 }
 
-/*impl TxnProviderIterator<SignatureVerifiedTransaction> for StreamedTransactionsProvider {
-
-}*/
-
-/*pub struct BlockingTransactionsProvider {
+pub struct BlockingTransactionsProvider {
     txns: Vec<(Mutex<CommandValue>, Condvar)>,
 }
 
@@ -83,6 +79,17 @@ impl TxnProvider<SignatureVerifiedTransaction> for BlockingTransactionsProvider 
     fn num_txns(&self) -> usize {
         self.txns.len()
     }
+
+    fn iter(&self) -> Box<dyn Iterator<Item = Arc<SignatureVerifiedTransaction>> + '_> {
+        //Box::new(self.txns.iter().cloned())
+        Box::new(self.txns.iter().map(|(lock, _)| {
+            let status = lock.lock().unwrap();
+            match &*status {
+                CommandValue::Ready(txn) => txn.clone(),
+                CommandValue::Waiting => unreachable!(),
+            }
+        }))
+    }
 }
 
 pub enum CommandValue {
@@ -90,4 +97,4 @@ pub enum CommandValue {
     Ready(Arc<SignatureVerifiedTransaction>),
     /// We are still waiting for remote shard to push the state value
     Waiting,
-}*/
+}
