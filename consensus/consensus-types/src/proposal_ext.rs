@@ -37,4 +37,10 @@ impl ProposalExt {
             ProposalExt::V0 { sys_txns, .. } => Some(sys_txns),
         }
     }
+
+    pub fn payload(&self) -> Option<&Payload> {
+        match self {
+            ProposalExt::V0 { payload, .. } => Some(payload),
+        }
+    }
 }
