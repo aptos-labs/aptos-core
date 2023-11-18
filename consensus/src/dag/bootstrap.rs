@@ -28,6 +28,7 @@ use crate::{
         leader_reputation::{ProposerAndVoterHeuristic, ReputationHeuristic},
         proposal_generator::ChainHealthBackoffConfig,
     },
+    monitor,
     network::IncomingDAGRequest,
     payload_manager::PayloadManager,
     state_replication::{PayloadClient, StateComputer},
@@ -104,6 +105,19 @@ impl TDagMode for ActiveMode {
     async fn run(
         self,
         dag_rpc_rx: &mut Receiver<Author, IncomingDAGRequest>,
+        bootstrapper: &DagBootstrapper,
+    ) -> Option<Mode> {
+        monitor!(
+            "dag_active_mode",
+            self.run_internal(dag_rpc_rx, bootstrapper).await
+        )
+    }
+}
+
+impl ActiveMode {
+    async fn run_internal(
+        self,
+        dag_rpc_rx: &mut Receiver<Author, IncomingDAGRequest>,
         _bootstrapper: &DagBootstrapper,
     ) -> Option<Mode> {
         info!(
@@ -163,6 +177,19 @@ impl TDagMode for SyncMode {
         dag_rpc_rx: &mut Receiver<Author, IncomingDAGRequest>,
         bootstrapper: &DagBootstrapper,
     ) -> Option<Mode> {
+        monitor!(
+            "dag_sync_mode",
+            self.run_internal(dag_rpc_rx, bootstrapper).await
+        )
+    }
+}
+
+impl SyncMode {
+    async fn run_internal(
+        self,
+        dag_rpc_rx: &mut Receiver<Author, IncomingDAGRequest>,
+        bootstrapper: &DagBootstrapper,
+    ) -> Option<Mode> {
         let sync_manager = DagStateSynchronizer::new(
             bootstrapper.epoch_state.clone(),
             bootstrapper.time_service.clone(),
@@ -209,6 +236,9 @@ impl TDagMode for SyncMode {
             bootstrapper.epoch_state.clone(),
             request.start_round(),
             request.target_round(),
+            bootstrapper
+                .onchain_config
+                .dag_ordering_causal_history_window as u64,
         );
 
         let (res_tx, res_rx) = oneshot::channel();
@@ -237,7 +267,7 @@ impl TDagMode for SyncMode {
                             // If the sync task finishes successfully, we can transition to Active mode by
                             // rebootstrapping all components starting from the DAG store.
                             let (new_state, new_handler, new_fetch_service) = bootstrapper.full_bootstrap();
-                            return Some(Mode::Active(ActiveMode {
+                            Some(Mode::Active(ActiveMode {
                                 handler: new_handler,
                                 fetch_service: new_fetch_service,
                                 base_state: new_state,
@@ -248,7 +278,7 @@ impl TDagMode for SyncMode {
                             // If the sync task fails, then continue the DAG in Active Mode with existing state.
                             let (new_handler, new_fetch_service) =
                                 bootstrapper.bootstrap_components(&self.base_state);
-                            return Some(Mode::Active(ActiveMode {
+                            Some(Mode::Active(ActiveMode {
                                 handler: new_handler,
                                 fetch_service: new_fetch_service,
                                 base_state: self.base_state,
@@ -264,10 +294,10 @@ impl TDagMode for SyncMode {
                 // or network handle found a future CertifiedNodeMessage to cancel the
                 // current sync.
                 if let Some(msg) = res {
-                    return Some(Mode::Sync(SyncMode {
+                    Some(Mode::Sync(SyncMode {
                         certified_node_msg: msg,
                         base_state: self.base_state,
-                    }));
+                    }))
                 } else {
                     unreachable!("remote mustn't drop the network message sender until bootstrapper returns");
                 }
