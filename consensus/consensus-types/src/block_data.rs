@@ -97,7 +97,9 @@ pub struct BlockData {
 impl BlockData {
     pub fn author(&self) -> Option<Author> {
         match &self.block_type {
-            BlockType::Proposal { author, .. } | BlockType::DAGBlock { author, .. } => Some(*author),
+            BlockType::Proposal { author, .. } | BlockType::DAGBlock { author, .. } => {
+                Some(*author)
+            },
             BlockType::ProposalExt(p) => Some(*p.author()),
             _ => None,
         }
