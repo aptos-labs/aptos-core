@@ -64,13 +64,14 @@ impl ExecutionPipeline {
     }
 
     fn get_shuffled_txns_to_execute(
-        block: &Block,
+        block_id: HashValue,
+        timestamp: u64,
         txns_to_execute: Vec<SignedTransaction>,
         txn_filter: Arc<TransactionFilter>,
         txn_shuffler: Arc<dyn TransactionShuffler>,
         txn_deduper: Arc<dyn TransactionDeduper>,
     ) -> Vec<SignedTransaction> {
-        let filtered_txns = txn_filter.filter(block.id(), block.timestamp_usecs(), txns_to_execute);
+        let filtered_txns = txn_filter.filter(block_id, timestamp, txns_to_execute);
         let deduped_txns = txn_deduper.dedup(filtered_txns);
         txn_shuffler.shuffle(deduped_txns)
     }
@@ -131,24 +132,27 @@ impl ExecutionPipeline {
         }) = prepare_block_rx.recv().await
         {
             debug!("prepare_block received block {}.", block.id());
-            let input_txns = Self::get_shuffled_txns_to_execute(
-                &block,
-                txns_to_execute,
-                txn_filter,
-                txn_shuffler,
-                txn_deduper,
-            );
-
-            let txns_to_execute = block.transactions_to_execute_for_metadata(
-                input_txns.clone(),
-                metadata,
-                maybe_block_gas_limit,
-            );
 
             let execute_block_tx = execute_block_tx.clone();
-            let sig_verified_txns = monitor!(
+            let block_id = block.id();
+            let timestamp = block.timestamp_usecs();
+            let (input_txns, sig_verified_txns) = monitor!(
                 "prepare_block",
                 tokio::task::spawn_blocking(move || {
+                    let input_txns = Self::get_shuffled_txns_to_execute(
+                        block_id,
+                        timestamp,
+                        txns_to_execute,
+                        txn_filter,
+                        txn_shuffler,
+                        txn_deduper,
+                    );
+                    let txns_to_execute = Block::transactions_to_execute_for_metadata(
+                        block_id,
+                        input_txns.clone(),
+                        metadata,
+                        maybe_block_gas_limit,
+                    );
                     let sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL
                         .install(|| {
                             let num_txns = txns_to_execute.len();
@@ -158,7 +162,7 @@ impl ExecutionPipeline {
                                 .map(|t| t.into())
                                 .collect::<Vec<_>>()
                         });
-                    sig_verified_txns
+                    (input_txns, sig_verified_txns)
                 })
                 .await
             )

@@ -374,7 +374,7 @@ impl Block {
     }
 
     pub fn transactions_to_execute_for_metadata(
-        &self,
+        block_id: HashValue,
         txns: Vec<SignedTransaction>,
         metadata: BlockMetadata,
         block_gas_limit: Option<u64>,
@@ -390,7 +390,7 @@ impl Block {
             // is inserted here for compatibility.
             once(Transaction::BlockMetadata(metadata))
                 .chain(txns.into_iter().map(Transaction::UserTransaction))
-                .chain(once(Transaction::StateCheckpoint(self.id)))
+                .chain(once(Transaction::StateCheckpoint(block_id)))
                 .collect()
         }
     }
@@ -402,7 +402,7 @@ impl Block {
         block_gas_limit: Option<u64>,
     ) -> Vec<Transaction> {
         let metadata = self.new_block_metadata(validators);
-        self.transactions_to_execute_for_metadata(txns, metadata, block_gas_limit)
+        Self::transactions_to_execute_for_metadata(self.id, txns, metadata, block_gas_limit)
     }
 
     fn previous_bitvec(&self) -> BitVec {
