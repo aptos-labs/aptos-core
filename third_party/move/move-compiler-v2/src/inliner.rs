@@ -156,11 +156,9 @@ pub fn run_inlining(env: &mut GlobalEnv) {
     for module in env.get_modules() {
         for func in module.get_functions() {
             let id = func.get_qualified_id();
-            if func.is_inline() {
-                if func.get_def().is_some() {
-                    // Only delete functions with a body.
-                    inline_funs.insert(id);
-                }
+            if func.is_inline() && func.get_def().is_some() {
+                // Only delete functions with a body.
+                inline_funs.insert(id);
             }
         }
     }
@@ -543,6 +541,140 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
     }
 }
 
+/// For a given set of "free" variables, the ShadowStack tracks which variables are
+/// still directly visible, and which variables have been hidden by local variable
+/// declarations with the same symbol.  In the latter case, the ShadowStack provides
+/// a "shadow" symbol which can be used in place of the original.
+///
+/// Operations are
+///       pub fn new<'a, T>(env: &GlobalEnv, free_vars: T) -> Self
+///       pub fn get_shadow_symbol(&mut self, sym: Symbol, entering_scope: bool) -> Option<Symbol> {
+///       pub fn enter_scope<T>(&mut self, entering_vars: T)
+///       pub fn enter_scope_after_renaming<'a>(
+///       pub fn exit_scope(&mut self) {
+
+struct ShadowStack {
+    /// unique shadow var for each "lambda free var", a free variable from any lambda parameter.
+    shadow_symbols: BTreeMap<Symbol, Symbol>,
+
+    /// inverse of shadow_symbols for more efficient scoping
+    shadow_symbols_inverse: BTreeMap<Symbol, Symbol>,
+
+    /// subset of lambda free vars shadowed at each scope
+    scoped_shadowed_vars: Vec<Vec<Symbol>>,
+
+    /// maps each of "lambda free var" to 0 initially, incremented as scopes are entered
+    scoped_shadowed_count: BTreeMap<Symbol, usize>,
+}
+
+impl ShadowStack {
+    pub fn new<'a, T>(env: &GlobalEnv, free_vars: T) -> Self
+    where
+        T: IntoIterator<Item = &'a Symbol>,
+    {
+        let shadow_symbols = Self::create_shadow_symbols(env, free_vars);
+        let shadow_symbols_inverse = shadow_symbols
+            .iter()
+            .map(|(key, value)| (*value, *key))
+            .collect();
+        // Make a counter entry for every shadow symbol.
+        let scoped_shadowed_count = shadow_symbols.keys().map(|sym| (*sym, 0)).collect();
+        Self {
+            shadow_symbols,
+            shadow_symbols_inverse,
+            scoped_shadowed_vars: Vec::new(),
+            scoped_shadowed_count,
+        }
+    }
+
+    // Proactively create a shadow symbol for every free variable, storing them in a map.
+    fn create_shadow_symbols<'a, T>(env: &GlobalEnv, free_vars: T) -> BTreeMap<Symbol, Symbol>
+    where
+        T: IntoIterator<Item = &'a Symbol>,
+    {
+        free_vars
+            .into_iter()
+            .map(|var| (*var, ShadowStack::create_shadow_symbol(env, var)))
+            .collect()
+    }
+
+    /// Returns a shadow symbol sym' for sym which should be distinct from any user-definable vars.
+    fn create_shadow_symbol(env: &GlobalEnv, sym: &Symbol) -> Symbol {
+        let pool = env.symbol_pool();
+        let shadow_name = (*pool.string(*sym)).clone() + "'";
+        pool.make(&shadow_name)
+    }
+
+    // If a var is a free variable which is currently shadowed, then gets the shadow variable,
+    // else None.
+    //
+    // If entering_scope, then the free variable is rewritten even if we're not yet in a scope,
+    // since we are about to enter one.
+    pub fn get_shadow_symbol(&mut self, sym: Symbol, entering_scope: bool) -> Option<Symbol> {
+        if self
+            .scoped_shadowed_count
+            .get(&sym)
+            .map(|count| if entering_scope { *count + 1 } else { *count })
+            .unwrap_or(0)
+            > 0
+        {
+            let new_sym = self
+                .shadow_symbols
+                .get(&sym)
+                .expect("Inconsistency in free-var handling in inlining");
+            Some(*new_sym)
+        } else {
+            None
+        }
+    }
+
+    // Record that the provided symbols have local definitions, so should be shadowed.
+    pub fn enter_scope<T>(&mut self, entering_vars: T)
+    where
+        T: IntoIterator<Item = Symbol>,
+    {
+        let entering_free_vars: Vec<Symbol> = entering_vars
+            .into_iter()
+            .filter(|s| self.shadow_symbols.contains_key(s))
+            .collect();
+        for free_var in &entering_free_vars {
+            *self
+                .scoped_shadowed_count
+                .get_mut(free_var)
+                .expect("shadow counter for free var") += 1;
+        }
+        self.scoped_shadowed_vars.push(entering_free_vars);
+    }
+
+    // Record that the provided symbols have local definitions, so should be shadowed.
+    // In this case, shadowed variables have already been renamed, so they must be mapped back.
+    pub fn enter_scope_after_renaming<'a>(
+        &mut self,
+        entering_vars: impl Iterator<Item = &'a Symbol>,
+    ) {
+        let entering_free_vars: Vec<Symbol> = entering_vars
+            .filter_map(|sym| self.shadow_symbols_inverse.get(sym))
+            .cloned()
+            .collect();
+        self.enter_scope(entering_free_vars);
+    }
+
+    // Unshadow the set of symbols from the most recent scope which has been entered and not exited
+    // yet.
+    pub fn exit_scope(&mut self) {
+        let exiting_free_vars = self
+            .scoped_shadowed_vars
+            .pop()
+            .expect("Scope misalignment in inlining");
+        for free_var in exiting_free_vars {
+            *self
+                .scoped_shadowed_count
+                .get_mut(&free_var)
+                .expect("failed invariant in ShadowStack implementation") -= 1;
+        }
+    }
+}
+
 /// Rewriter for transforming an inlined function call body into an expression to simply evaluate.
 /// This involves just replacing variables and instantiating Lambda calls.
 struct InlinedRewriter<'env, 'rewriter> {
@@ -551,11 +683,8 @@ struct InlinedRewriter<'env, 'rewriter> {
     lambda_param_map: BTreeMap<Symbol, &'rewriter Exp>,
     inlined_formal_params: Vec<Parameter>,
 
-    shadow_symbols: BTreeMap<Symbol, Symbol>, // unique shadow var for each of lambda_free_vars
-    shadow_symbols_inverse: BTreeMap<Symbol, Symbol>, // inverse of shadow_symbols for more efficient scoping
-    // scoped stack of shadowed *free* vars (not shadow vars) showing which shadows are active
-    scoped_shadowed_vars: Vec<Vec<Symbol>>, // subset of lambda_free_vars shadowed at each scope
-    scoped_shadowed_count: BTreeMap<Symbol, usize>, // maps each of lambda_free_vars to 0 initially, incremented as scopes are entered
+    // Shadow stack tracks whether free variables are hidden by local variable declarations.
+    shadow_stack: ShadowStack,
 
     debug: bool,
 }
@@ -569,46 +698,20 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         lambda_free_vars: BTreeSet<Symbol>,
         debug: bool,
     ) -> Self {
-        let shadow_symbols = Self::create_shadow_symbols(env, &lambda_free_vars);
-        let shadow_symbols_inverse = shadow_symbols
-            .iter()
-            .map(|(key, value)| (*value, *key))
-            .collect();
-        let scoped_shadowed_count = shadow_symbols.keys().map(|sym| (*sym, 0)).collect();
+        let shadow_stack = ShadowStack::new(env, &lambda_free_vars);
         Self {
             env,
             type_args,
             lambda_param_map,
             inlined_formal_params,
-            shadow_symbols,
-            shadow_symbols_inverse,
-            scoped_shadowed_count,
-            scoped_shadowed_vars: Vec::new(),
+            shadow_stack,
             debug,
         }
     }
 
-    fn shadowing_enter_scope(&mut self, entering_free_vars: Vec<Symbol>) {
-        if self.debug {
-            eprintln!("entering scope of vars {:#?}", entering_free_vars);
-        };
-        for free_var in &entering_free_vars {
-            *self.scoped_shadowed_count.get_mut(free_var).expect("ICE") += 1;
-        }
-        self.scoped_shadowed_vars.push(entering_free_vars);
-    }
-
-    fn shadowing_exit_scope(&mut self) {
-        let exiting_free_vars = self
-            .scoped_shadowed_vars
-            .pop()
-            .expect("ICE: scope misalignment in inlining");
-        if self.debug {
-            eprintln!("exiting scope of vars {:#?}", exiting_free_vars);
-        };
-        for free_var in exiting_free_vars {
-            *self.scoped_shadowed_count.get_mut(&free_var).expect("ICE") -= 1;
-        }
+    /// Any free var
+    fn shadowing_enter_scope(&mut self, entering_vars: Vec<Symbol>) {
+        self.shadow_stack.enter_scope(entering_vars);
     }
 
     fn inline_call(
@@ -747,45 +850,6 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         // 6. Specs?
     }
 
-    /// Returns a shadow symbol sym' for sym which should be distinct from any user-definable vars.
-    fn create_shadow_symbol(env: &GlobalEnv, sym: &Symbol) -> Symbol {
-        let pool = env.symbol_pool();
-        let shadow_name = (*pool.string(*sym)).clone() + "'";
-        pool.make(&shadow_name)
-    }
-
-    // Proactively create a shadow symbol for every free variable, storing them in a map.
-    fn create_shadow_symbols(
-        env: &GlobalEnv,
-        lambda_free_vars: &BTreeSet<Symbol>,
-    ) -> BTreeMap<Symbol, Symbol> {
-        lambda_free_vars
-            .iter()
-            .map(|var| (*var, Self::create_shadow_symbol(env, var)))
-            .collect()
-    }
-
-    // If a var is a `lambda_free_var` which is currently shadowed, then gets the shadow variable, else None.
-    // Get a canonical shadow `Symbol` for the provided `Symbol`, creating one if necessary.
-    // If entering_scope, then a lambda_free_var is rewritten even if we're not yet in a scope.
-    fn get_shadow_symbol(&mut self, sym: Symbol, entering_scope: bool) -> Option<Symbol> {
-        if self
-            .scoped_shadowed_count
-            .get(&sym)
-            .map(|count| if entering_scope { *count + 1 } else { *count })
-            .unwrap_or(0)
-            > 0
-        {
-            let new_sym = self
-                .shadow_symbols
-                .get(&sym)
-                .expect("ICE: Inconsistency in free-var handling in inlining");
-            Some(*new_sym)
-        } else {
-            None
-        }
-    }
-
     // Convert a list of Parameters into a Pattern.
     // Check for conflits between lambda_free_vars and symbols in Parameters,
     // replacing them by shadow symbols.
@@ -803,7 +867,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                 // TODO: ideally, each Parameter has its own loc.  For now, we use the function location.
                 // body should have types rewritten, other inlining complete, lambdas inlined, etc.
                 let id = env.new_node(function_loc.clone(), ty.instantiate(self.type_args));
-                if let Some(new_sym) = self.get_shadow_symbol(*sym, true) {
+                if let Some(new_sym) = self.shadow_stack.get_shadow_symbol(*sym, true) {
                     Pattern::Var(id, new_sym)
                 } else {
                     Pattern::Var(id, *sym)
@@ -1033,18 +1097,15 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
     // Record that the provided symbols have local definitions, so renaming should be done.
     // Note that incoming vars are from a Pattern *after* renaming, so these are shadowed symbols.
     fn rewrite_enter_scope<'a>(&mut self, vars: impl Iterator<Item = &'a (NodeId, Symbol)>) {
-        let entering_free_vars: Vec<Symbol> = vars
-            .filter_map(|(_, sym)| self.shadow_symbols_inverse.get(sym))
-            .cloned()
-            .collect();
-        self.shadowing_enter_scope(entering_free_vars);
+        self.shadow_stack
+            .enter_scope_after_renaming(vars.map(|(_, sym)| sym));
     }
 
     // On exiting a scope defining some symbols shadowing lambda free vars, record that we have
     // exited the scope so any occurrences of those free vars should be left alone (if there are
     // not further shadowing scopes furter out).
     fn rewrite_exit_scope(&mut self) {
-        self.shadowing_exit_scope();
+        self.shadow_stack.exit_scope();
     }
 
     fn rewrite_node_id(&mut self, id: NodeId) -> Option<NodeId> {
@@ -1053,6 +1114,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
 
     fn rewrite_local_var(&mut self, id: NodeId, sym: Symbol) -> Option<Exp> {
         let result = self
+            .shadow_stack
             .get_shadow_symbol(sym, false)
             .map(|new_sym| ExpData::LocalVar(id, new_sym).into());
         if self.debug {
@@ -1068,15 +1130,11 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
             let sym = param.0;
             let param_type = &param.1;
             let new_node_id = self.env.new_node(loc, param_type.clone());
-            let result = if let Some(new_sym) = self.get_shadow_symbol(sym, false) {
+            if let Some(new_sym) = self.shadow_stack.get_shadow_symbol(sym, false) {
                 Some(ExpData::LocalVar(new_node_id, new_sym).into())
             } else {
                 Some(ExpData::LocalVar(new_node_id, sym).into())
-            };
-            if self.debug {
-                eprintln!("rewriting temporary {} into {:#?}", idx, result);
-            };
-            result
+            }
         } else {
             self.env.error(
                 &loc,
@@ -1147,6 +1205,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
     fn rewrite_pattern(&mut self, pat: &Pattern, entering_scope: bool) -> Option<Pattern> {
         let result = match pat {
             Pattern::Var(node_id, sym) => self
+                .shadow_stack
                 .get_shadow_symbol(*sym, entering_scope)
                 .map(|new_sym| Pattern::Var(*node_id, new_sym)),
             Pattern::Tuple(node_id, pattern_vec) => self
