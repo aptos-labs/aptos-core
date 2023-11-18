@@ -115,6 +115,11 @@ crate::gas_schedule::macros::define_gas_parameters!(
             1024, // 1KB free per state write
         ],
         [
+            free_io_write_bytes_quota: NumBytes,
+            { 12.. => "free_io_write_bytes_quota" },
+            0, // 1KB free for io charge for write
+        ],
+        [
             free_event_bytes_quota: NumBytes,
             { 7.. => "free_event_bytes_quota" },
             1024, // 1KB free event bytes per transaction

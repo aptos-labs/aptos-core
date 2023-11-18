@@ -121,7 +121,8 @@ impl StoragePricingV2 {
             0 => unreachable!("PricingV2 not applicable for feature version 0"),
             1..=2 => 0.into(),
             3..=4 => 1024.into(),
-            5.. => gas_params.vm.txn.free_write_bytes_quota,
+            5..=11 => gas_params.vm.txn.free_write_bytes_quota,
+            12.. => gas_params.vm.txn.free_io_write_bytes_quota,
         }
     }
 
