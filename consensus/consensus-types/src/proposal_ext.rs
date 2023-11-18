@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 
-use serde::{Deserialize, Serialize};
-use aptos_types::system_txn::SystemTransaction;
 use crate::common::{Author, Payload, Round};
+use aptos_types::system_txn::SystemTransaction;
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum ProposalExt {
@@ -34,9 +34,7 @@ impl ProposalExt {
 
     pub fn sys_txns(&self) -> Option<&Vec<SystemTransaction>> {
         match self {
-            ProposalExt::V0 { sys_txns, .. } => {
-                Some(sys_txns)
-            }
+            ProposalExt::V0 { sys_txns, .. } => Some(sys_txns),
         }
     }
 }

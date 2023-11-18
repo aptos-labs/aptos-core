@@ -17,6 +17,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
+    system_txn::SystemTransaction,
     transaction::{SignedTransaction, Transaction, Version},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
@@ -28,7 +29,6 @@ use std::{
     fmt::{self, Display, Formatter},
     iter::once,
 };
-use aptos_types::system_txn::SystemTransaction;
 
 #[path = "block_test_utils.rs"]
 #[cfg(any(test, feature = "fuzzing"))]

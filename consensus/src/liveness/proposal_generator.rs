@@ -13,6 +13,7 @@ use crate::{
         PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
     },
     state_replication::PayloadClient,
+    sys_txn_provider::SysTxnProvider,
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
@@ -26,7 +27,6 @@ use aptos_consensus_types::{
 use aptos_logger::{error, sample, sample::SampleRate, warn};
 use futures::future::BoxFuture;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
-use crate::sys_txn_provider::SysTxnProvider;
 
 #[cfg(test)]
 #[path = "proposal_generator_test.rs"]

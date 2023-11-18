@@ -261,6 +261,8 @@ impl NodeSetup {
             PipelineBackpressureConfig::new_no_backoff(),
             ChainHealthBackoffConfig::new_no_backoff(),
             false,
+            vec![],
+            false,
         );
 
         let round_state = Self::create_round_state(time_service);

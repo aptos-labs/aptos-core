@@ -19,7 +19,7 @@ pub struct DummySystemTransaction {
 impl SystemTransaction {
     pub fn size_in_bytes(&self) -> usize {
         match self {
-            SystemTransaction::DummyTopic(_) => 16 // Better over-claim?
+            SystemTransaction::DummyTopic(_) => 16, // Better over-claim?
         }
     }
 }

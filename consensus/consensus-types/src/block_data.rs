@@ -15,10 +15,10 @@ use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    system_txn::SystemTransaction,
 };
 use mirai_annotations::*;
 use serde::{Deserialize, Serialize};
-use aptos_types::system_txn::SystemTransaction;
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum BlockType {
@@ -132,9 +132,7 @@ impl BlockData {
 
     pub fn sys_txns(&self) -> Option<&Vec<SystemTransaction>> {
         match &self.block_type {
-            BlockType::ProposalExt(proposal_ext) => {
-                proposal_ext.sys_txns()
-            },
+            BlockType::ProposalExt(proposal_ext) => proposal_ext.sys_txns(),
             BlockType::Proposal { .. }
             | BlockType::NilBlock { .. }
             | BlockType::Genesis

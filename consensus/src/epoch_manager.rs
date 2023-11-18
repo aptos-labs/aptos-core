@@ -49,6 +49,7 @@ use crate::{
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
     state_replication::{PayloadClient, StateComputer},
+    sys_txn_provider::SysTxnProvider,
     transaction_deduper::create_transaction_deduper,
     transaction_shuffler::create_transaction_shuffler,
     util::time_service::TimeService,
@@ -78,8 +79,8 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     on_chain_config::{
-        LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
-        OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
+        FeatureFlag, Features, LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider,
+        OnChainConsensusConfig, OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
     },
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
@@ -102,8 +103,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use aptos_types::on_chain_config::{FeatureFlag, Features};
-use crate::sys_txn_provider::SysTxnProvider;
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -873,7 +872,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.quorum_store_enabled,
             self.sys_txn_providers.clone(),
             features.is_enabled(FeatureFlag::PROPOSE_SYSTEM_TRANSACTION),
-
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::LIFO,
