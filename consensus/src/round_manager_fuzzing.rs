@@ -210,6 +210,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         OnChainConsensusConfig::default(),
         round_manager_tx,
         ConsensusConfig::default(),
+        false,
     )
 }
 

@@ -29,6 +29,7 @@ use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
     block::Block,
+    block_data::BlockType,
     common::{Author, Round},
     delayed_qc_msg::DelayedQcMsg,
     proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
@@ -183,6 +184,7 @@ pub struct RoundManager {
     onchain_config: OnChainConsensusConfig,
     buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
     local_config: ConsensusConfig,
+    sys_txn_enabled: bool,
 }
 
 impl RoundManager {
@@ -198,6 +200,7 @@ impl RoundManager {
         onchain_config: OnChainConsensusConfig,
         buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
         local_config: ConsensusConfig,
+        sys_txn_enabled: bool,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -219,6 +222,7 @@ impl RoundManager {
             onchain_config,
             buffered_proposal_tx,
             local_config,
+            sys_txn_enabled,
         }
     }
 
@@ -632,6 +636,16 @@ impl RoundManager {
         let author = proposal
             .author()
             .expect("Proposal should be verified having an author");
+
+        if !self.sys_txn_enabled {
+            ensure!(
+                !matches!(
+                    proposal.block_data().block_type(),
+                    BlockType::ProposalExt(_)
+                ),
+                "ProposalExt unexpected while the feature is disabled."
+            );
+        }
 
         let (num_sys_txns, sys_txns_total_bytes) = {
             let mut num: usize = 0;
