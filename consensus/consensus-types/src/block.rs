@@ -28,6 +28,7 @@ use std::{
     fmt::{self, Display, Formatter},
     iter::once,
 };
+use aptos_types::system_txn::SystemTransaction;
 
 #[path = "block_test_utils.rs"]
 #[cfg(any(test, feature = "fuzzing"))]
@@ -274,6 +275,10 @@ impl Block {
         }
     }
 
+    pub fn sys_txns(&self) -> Option<&Vec<SystemTransaction>> {
+        self.block_data.sys_txns()
+    }
+
     /// Verifies that the proposal and the QC are correctly signed.
     /// If this is the genesis block, we skip these checks.
     pub fn validate_signature(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
@@ -286,6 +291,14 @@ impl Block {
                     .as_ref()
                     .ok_or_else(|| format_err!("Missing signature in Proposal"))?;
                 validator.verify(*author, &self.block_data, signature)?;
+                self.quorum_cert().verify(validator)
+            },
+            BlockType::ProposalExt(proposal_ext) => {
+                let signature = self
+                    .signature
+                    .as_ref()
+                    .ok_or_else(|| format_err!("Missing signature in Proposal"))?;
+                validator.verify(*proposal_ext.author(), &self.block_data, signature)?;
                 self.quorum_cert().verify(validator)
             },
             BlockType::DAGBlock { .. } => bail!("We should not accept DAG block from others"),

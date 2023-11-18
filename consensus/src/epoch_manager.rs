@@ -102,6 +102,8 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use aptos_types::on_chain_config::{FeatureFlag, Features};
+use crate::sys_txn_provider::SysTxnProvider;
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -132,6 +134,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     commit_state_computer: Arc<dyn StateComputer>,
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
+    sys_txn_providers: Vec<Arc<dyn SysTxnProvider>>,
     reconfig_events: ReconfigNotificationListener<P>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingCommitRequest>>,
@@ -174,6 +177,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         reconfig_events: ReconfigNotificationListener<P>,
         bounded_executor: BoundedExecutor,
         aptos_time_service: aptos_time_service::TimeService,
+        sys_txn_providers: Vec<Arc<dyn SysTxnProvider>>,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -195,6 +199,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             commit_state_computer,
             storage,
             safety_rules_manager,
+            sys_txn_providers,
             reconfig_events,
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
@@ -785,6 +790,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         recovery_data: RecoveryData,
         epoch_state: EpochState,
+        features: Features,
         onchain_consensus_config: OnChainConsensusConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
@@ -865,6 +871,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
+            self.sys_txn_providers.clone(),
+            features.is_enabled(FeatureFlag::SYSTEM_TRANSACTION),
+
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::LIFO,
@@ -935,6 +944,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             verifier: (&validator_set).into(),
         };
 
+        let features: anyhow::Result<Features> = payload.get();
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
         if let Err(error) = &onchain_consensus_config {
@@ -966,6 +976,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         } else {
             self.start_new_epoch_with_joltean(
                 epoch_state,
+                features.unwrap_or_default(),
                 consensus_config,
                 network_sender,
                 payload_client,
@@ -996,6 +1007,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     async fn start_new_epoch_with_joltean(
         &mut self,
         epoch_state: EpochState,
+        features: Features,
         consensus_config: OnChainConsensusConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
@@ -1007,6 +1019,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.start_round_manager(
                     initial_data,
                     epoch_state,
+                    features,
                     consensus_config,
                     network_sender,
                     payload_client,

@@ -15,3 +15,11 @@ pub enum SystemTransaction {
 pub struct DummySystemTransaction {
     pub nonce: u64,
 }
+
+impl SystemTransaction {
+    pub fn size_in_bytes(&self) -> usize {
+        match self {
+            SystemTransaction::DummyTopic(_) => 16 // Better over-claim?
+        }
+    }
+}

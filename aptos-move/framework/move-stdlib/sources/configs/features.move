@@ -320,6 +320,16 @@ module std::features {
         is_enabled(COMMISSION_CHANGE_DELEGATION_POOL)
     }
 
+    /// Whether system transactions should be included in blocks.
+    /// Lifetime: transient
+    const SYSTEM_TRANSACTION: u64 = 43;
+
+    public fun get_system_transaction_feature(): u64 { SYSTEM_TRANSACTION }
+
+    public fun system_transaction_enabled(): bool acquires Features {
+        is_enabled(SYSTEM_TRANSACTION)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

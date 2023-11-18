@@ -633,10 +633,21 @@ impl RoundManager {
             .author()
             .expect("Proposal should be verified having an author");
 
+        let (num_sys_txns, sys_txns_total_bytes) = {
+            let mut num: usize = 0;
+            let mut size: usize = 0;
+            if let Some(txns) = proposal.sys_txns() {
+                for txn in txns {
+                    num += 1;
+                    size += txn.size_in_bytes();
+                }
+            }
+            (num, size)
+        };
         let payload_len = proposal.payload().map_or(0, |payload| payload.len());
         let payload_size = proposal.payload().map_or(0, |payload| payload.size());
         ensure!(
-            payload_len as u64
+            num_sys_txns as u64 + payload_len as u64
                 <= self
                     .local_config
                     .max_receiving_block_txns(self.onchain_config.quorum_store_enabled()),
@@ -647,7 +658,7 @@ impl RoundManager {
         );
 
         ensure!(
-            payload_size as u64
+            sys_txns_total_bytes as u64 + payload_size as u64
                 <= self
                     .local_config
                     .max_receiving_block_bytes(self.onchain_config.quorum_store_enabled()),

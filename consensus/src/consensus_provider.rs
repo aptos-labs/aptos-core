@@ -76,6 +76,7 @@ pub fn start_consensus(
         reconfig_events,
         bounded_executor,
         aptos_time_service::TimeService::real(),
+        vec![],
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);
