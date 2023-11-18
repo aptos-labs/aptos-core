@@ -264,10 +264,15 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         global_data_summary: &GlobalDataSummary,
     ) -> Result<(), Error> {
         // Determine how many requests (at most) can be sent to the network
-        let num_sent_requests = self.get_sent_data_requests()?.len() as u64;
+        let num_pending_requests = self.get_sent_data_requests()?.len() as u64;
+        let num_completed_pending_requests = self.get_num_completed_pending_requests()?;
+        let num_requests_to_send =
+            num_pending_requests.saturating_sub(num_completed_pending_requests);
+
+        // Bound the number of requests by the max
         let max_concurrent_requests = self.get_max_concurrent_requests();
         let max_num_requests_to_send = max_concurrent_requests
-            .checked_sub(num_sent_requests)
+            .checked_sub(num_requests_to_send)
             .ok_or_else(|| {
                 Error::IntegerOverflow("Max number of requests to send has overflown!".into())
             })?;
@@ -857,6 +862,17 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         self.sent_data_requests.as_mut().ok_or_else(|| {
             Error::UnexpectedErrorEncountered("Sent data requests should be initialized!".into())
         })
+    }
+
+    /// Returns the number of completed pending requests
+    fn get_num_completed_pending_requests(&mut self) -> Result<u64, Error> {
+        let mut num_completed_pending_requests = 0;
+        for sent_data_request in self.get_sent_data_requests()? {
+            if sent_data_request.lock().client_response.is_some() {
+                num_completed_pending_requests += 1;
+            }
+        }
+        Ok(num_completed_pending_requests)
     }
 
     #[cfg(test)]
