@@ -6,8 +6,8 @@ use crate::{
     ast::{
         AccessSpecifier, Address, Attribute, AttributeValue, Condition, ConditionKind, Exp,
         ExpData, FriendDecl, GlobalInvariant, ModuleName, Operation, PropertyBag, PropertyValue,
-        QualifiedSymbol, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl,
-        Value,
+        QualifiedSymbol, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, TempIndex,
+        UseDecl, Value,
     },
     builder::{
         exp_builder::ExpTranslator,
@@ -1806,8 +1806,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 }
 
                 et.enter_scope();
-                for (sym, (loc, type_)) in locals {
-                    et.define_local(loc, *sym, type_.clone(), None, None)
+                for (sym, (loc, type_, index)) in locals {
+                    et.define_local(loc, *sym, type_.clone(), None, *index)
                 }
                 et
             },

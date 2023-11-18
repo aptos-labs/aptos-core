@@ -1,10 +1,13 @@
-
-Diagnostics:
-error: invalid old(..) expression in inline spec block
-  ┌─ tests/checking/specs/inline_spec_old.move:5:13
-  │
-5 │             assert forall k in 0..len(vec): vec[k] == old(vec)[k];
-  │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  │             │                                             │
-  │             │                                             this expression is not a function parameter
-  │             only a function parameter is allowed in old(..) expressions in inline spec block
+// ---- Model Dump
+module 0x42::m {
+    public fun foo(vec: &mut vector<bool>) {
+        spec {
+          assert forall k: num: Range(0, Len<bool>($t0)): Eq<bool>(Index($t0, k), Index(Old<vector<bool>>($t0), k));
+        }
+        ;
+        Tuple()
+    }
+    spec fun $foo(vec: vector<bool>) {
+        Tuple()
+    }
+} // end 0x42::m

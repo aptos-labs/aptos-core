@@ -5,7 +5,7 @@
 use crate::{
     ast::{
         AccessSpecifier, Address, AddressSpecifier, Exp, ExpData, ModuleName, Operation, Pattern,
-        QualifiedSymbol, QuantKind, ResourceSpecifier, Spec, Value,
+        QualifiedSymbol, QuantKind, ResourceSpecifier, Spec, TempIndex, Value,
     },
     builder::{
         model_builder::{AnyFunEntry, ConstEntry, EntryVisibility, LocalVarEntry, StructEntry},
@@ -1396,7 +1396,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         for scope in &self.local_table {
             for (name, entry) in scope {
                 if !locals.contains_key(name) {
-                    locals.insert(*name, (entry.loc.clone(), entry.type_.clone()));
+                    locals.insert(
+                        *name,
+                        (entry.loc.clone(), entry.type_.clone(), entry.temp_index),
+                    );
                 }
             }
         }
@@ -1425,9 +1428,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         let locals = info
                             .locals
                             .iter()
-                            .map(|(s, (l, t))| {
+                            .map(|(s, (l, t, idx))| {
                                 let t = self.subs.specialize_with_defaults(t);
-                                (*s, (l.clone(), t))
+                                (*s, (l.clone(), t, *idx))
                             })
                             .collect();
                         self.translate_spec_block(&loc, locals, &block)
@@ -1448,7 +1451,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     fn translate_spec_block(
         &mut self,
         loc: &Loc,
-        locals: BTreeMap<Symbol, (Loc, Type)>,
+        locals: BTreeMap<Symbol, (Loc, Type, Option<TempIndex>)>,
         block: &EA::SpecBlock,
     ) -> Spec {
         let fun_name = if let Some(name) = &self.fun_name {
