@@ -322,12 +322,12 @@ module std::features {
 
     /// Whether system transactions should be included in blocks.
     /// Lifetime: transient
-    const PROPOSE_SYSTEM_TRANSACTION: u64 = 43;
+    const PROPOSE_SYSTEM_TRANSACTIONS: u64 = 43;
 
-    public fun get_propose_system_transaction_feature(): u64 { PROPOSE_SYSTEM_TRANSACTION }
+    public fun get_propose_system_transactions_feature(): u64 { PROPOSE_SYSTEM_TRANSACTIONS }
 
-    public fun propose_system_transaction_enabled(): bool acquires Features {
-        is_enabled(PROPOSE_SYSTEM_TRANSACTION)
+    public fun propose_system_transactions_enabled(): bool acquires Features {
+        is_enabled(PROPOSE_SYSTEM_TRANSACTIONS)
     }
 
     // ============================================================================================

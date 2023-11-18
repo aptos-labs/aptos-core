@@ -82,8 +82,8 @@ return true.
 -  [Function `operator_beneficiary_change_enabled`](#0x1_features_operator_beneficiary_change_enabled)
 -  [Function `get_commission_change_delegation_pool_feature`](#0x1_features_get_commission_change_delegation_pool_feature)
 -  [Function `commission_change_delegation_pool_enabled`](#0x1_features_commission_change_delegation_pool_enabled)
--  [Function `get_propose_system_transaction_feature`](#0x1_features_get_propose_system_transaction_feature)
--  [Function `propose_system_transaction_enabled`](#0x1_features_propose_system_transaction_enabled)
+-  [Function `get_propose_system_transactions_feature`](#0x1_features_get_propose_system_transactions_feature)
+-  [Function `propose_system_transactions_enabled`](#0x1_features_propose_system_transactions_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -429,13 +429,13 @@ Lifetime: transient
 
 
 
-<a name="0x1_features_PROPOSE_SYSTEM_TRANSACTION"></a>
+<a name="0x1_features_PROPOSE_SYSTEM_TRANSACTIONS"></a>
 
 Whether system transactions should be included in blocks.
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_PROPOSE_SYSTEM_TRANSACTION">PROPOSE_SYSTEM_TRANSACTION</a>: u64 = 43;
+<pre><code><b>const</b> <a href="features.md#0x1_features_PROPOSE_SYSTEM_TRANSACTIONS">PROPOSE_SYSTEM_TRANSACTIONS</a>: u64 = 43;
 </code></pre>
 
 
@@ -1752,13 +1752,13 @@ Lifetime: transient
 
 </details>
 
-<a name="0x1_features_get_propose_system_transaction_feature"></a>
+<a name="0x1_features_get_propose_system_transactions_feature"></a>
 
-## Function `get_propose_system_transaction_feature`
+## Function `get_propose_system_transactions_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_propose_system_transaction_feature">get_propose_system_transaction_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_propose_system_transactions_feature">get_propose_system_transactions_feature</a>(): u64
 </code></pre>
 
 
@@ -1767,20 +1767,20 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_propose_system_transaction_feature">get_propose_system_transaction_feature</a>(): u64 { <a href="features.md#0x1_features_PROPOSE_SYSTEM_TRANSACTION">PROPOSE_SYSTEM_TRANSACTION</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_propose_system_transactions_feature">get_propose_system_transactions_feature</a>(): u64 { <a href="features.md#0x1_features_PROPOSE_SYSTEM_TRANSACTIONS">PROPOSE_SYSTEM_TRANSACTIONS</a> }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_features_propose_system_transaction_enabled"></a>
+<a name="0x1_features_propose_system_transactions_enabled"></a>
 
-## Function `propose_system_transaction_enabled`
+## Function `propose_system_transactions_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_propose_system_transaction_enabled">propose_system_transaction_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_propose_system_transactions_enabled">propose_system_transactions_enabled</a>(): bool
 </code></pre>
 
 
@@ -1789,8 +1789,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_propose_system_transaction_enabled">propose_system_transaction_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_PROPOSE_SYSTEM_TRANSACTION">PROPOSE_SYSTEM_TRANSACTION</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_propose_system_transactions_enabled">propose_system_transactions_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_PROPOSE_SYSTEM_TRANSACTIONS">PROPOSE_SYSTEM_TRANSACTIONS</a>)
 }
 </code></pre>
 
