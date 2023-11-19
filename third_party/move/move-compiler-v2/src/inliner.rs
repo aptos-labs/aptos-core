@@ -71,7 +71,7 @@ use itertools::chain;
 use move_model::{
     ast::{Exp, ExpData, Operation, Pattern, TempIndex},
     exp_rewriter::ExpRewriterFunctions,
-    model::{FunId, GlobalEnv, Loc, NodeId, Parameter, QualifiedId, TypeParameter},
+    model::{FunId, GlobalEnv, Loc, NodeId, Parameter, QualifiedId},
     symbol::Symbol,
     ty::{ReferenceKind, Type},
 };
@@ -300,10 +300,11 @@ fn functions_needing_inlining_in_order(
     Ok(result)
 }
 
-// Calculate a bottom-up traversal for entries, given the provided callee map.
+/// Calculate a bottom-up traversal for entries, given the provided callgraph,
+/// which maps callers to callees.
 fn postorder<T: Ord + Copy + Debug>(
     entries: &Vec<T>,
-    callee_map: &BTreeMap<T, BTreeSet<T>>,
+    call_graph: &BTreeMap<T, BTreeSet<T>>,
 ) -> Vec<T> {
     let mut stack = Vec::new();
     let mut visited = BTreeSet::new();
@@ -320,7 +321,7 @@ fn postorder<T: Ord + Copy + Debug>(
                 } else {
                     grey.insert(curr);
                     stack.push(curr);
-                    if let Some(children) = callee_map.get(curr) {
+                    if let Some(children) = call_graph.get(curr) {
                         for child in children {
                             if !visited.contains(child) {
                                 visited.insert(child);
@@ -335,13 +336,13 @@ fn postorder<T: Ord + Copy + Debug>(
     postorder_num_to_node
 }
 
-// Check for cycles in a callee_map.
+// Check for cycles in a call_graph, mapping callers to callees..
 // If there is a cycle, return at least one cyclical path.
 fn check_for_cycles<T: Ord + Copy + Debug>(
-    callee_map: &BTreeMap<T, BTreeSet<T>>,
+    call_graph: &BTreeMap<T, BTreeSet<T>>,
 ) -> BTreeSet<Vec<T>> {
     let mut cycles: BTreeSet<Vec<T>> = BTreeSet::new();
-    let mut reachable_from_map: BTreeMap<T, BTreeSet<Vec<T>>> = callee_map
+    let mut reachable_from_map: BTreeMap<T, BTreeSet<Vec<T>>> = call_graph
         .iter()
         .map(|(node, set)| (*node, iter::repeat(vec![*node]).take(set.len()).collect()))
         .collect();
@@ -353,7 +354,7 @@ fn check_for_cycles<T: Ord + Copy + Debug>(
         for (start_node, path_set) in reachable_from_map.iter_mut() {
             for path in path_set.iter() {
                 let path_last = path.last().unwrap();
-                if let Some(succ_set) = callee_map.get(path_last) {
+                if let Some(succ_set) = call_graph.get(path_last) {
                     if succ_set.contains(start_node) {
                         // found a cycle, return it.
                         // TODO: maybe find all cycles?
@@ -464,7 +465,6 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
             let func_env = self.env.get_function(qfid);
             if func_env.is_inline() {
                 // inline the function call
-                let type_parameters = func_env.get_type_parameters();
                 let type_args = self.env.get_node_instantiation(call_id);
                 let parameters = func_env.get_parameters();
                 let func_loc = func_env.get_loc();
@@ -494,7 +494,6 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
                         call_id,
                         &func_loc,
                         &expr,
-                        type_parameters,
                         type_args,
                         parameters,
                         args,
@@ -700,17 +699,13 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         call_node_id: NodeId,
         func_loc: &Loc,
         body: &Exp,
-        _type_parameters: Vec<TypeParameter>,
         type_args: Vec<Type>,
         parameters: Vec<Parameter>,
         args: &[Exp],
         debug: bool,
     ) -> Exp {
-        let args_matched: Vec<(&Parameter, &Exp)> = zip(&parameters, args).collect();
-        let (lambda_args_matched, regular_args_matched): (
-            Vec<(&Parameter, &Exp)>,
-            Vec<(&Parameter, &Exp)>,
-        ) = args_matched
+        let args_matched: Vec<_> = zip(&parameters, args).collect();
+        let (lambda_args_matched, regular_args_matched): (Vec<_>, Vec<_>) = args_matched
             .iter()
             .partition(|(_, arg)| matches!(arg.as_ref(), ExpData::Lambda(..)));
         let non_lambda_function_args =
@@ -741,8 +736,6 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             }
         }
 
-        // let type_param_map: BTreeMap<&TypeParameter, &Type> =
-        //     zip(&type_parameters, &type_args).collect();
         let lambda_param_map: BTreeMap<Symbol, &Exp> = lambda_args_matched
             .iter()
             .map(|(param, arg_exp)| (param.0, *arg_exp))
