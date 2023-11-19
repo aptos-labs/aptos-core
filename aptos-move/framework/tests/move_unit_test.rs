@@ -7,13 +7,11 @@ use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEAT
 use aptos_types::on_chain_config::{Features, TimedFeaturesBuilder};
 use aptos_vm::natives;
 use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
-use move_command_line_common::env::read_env_var;
+use move_command_line_common::{env::read_env_var, testing::ENABLE_V2};
 use move_package::{CompilerConfig, CompilerVersion};
 use move_unit_test::UnitTestingConfig;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use tempfile::tempdir;
-
-const ENABLE_V2: &str = "ENABLE_V2";
 
 fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
     let pkg_path = path_in_crate(path_to_pkg);
