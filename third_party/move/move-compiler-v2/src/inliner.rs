@@ -32,27 +32,48 @@
 //   - `rewrite_invoke` handles calls to lambda parameters within the inlined function
 //      - Note that lambda bodies are not rewritten during inlining, but are kept intact
 //
-//   - `rewrite_pattern` replaces syms in a pattern with shadow symbols as necessary
+//   - `rewrite_pattern` replaces syms in a pattern with shadow symbols as necessary.  Note that
+//      this introduces new var scopes on entry to Block and Lambda expressions, but is also
+//      called for Assign expressions, which does not enter a scope.
+//
+// - a helper struct ShadowStack implements the free variable shadowing stack
+//   - it is initialized with a list of all free variables (from all lambda arguments)
+//     - for each free variable, it creates a shadow symbol which is used in place of any local
+//       variable in the inlined function that might overwrite it.
+//
+//   - `create_shadow_symbols` creates a shadow `Symbol` for each lambda free variable to use if a
+//     local variable conflicts with that variable.  The symbol used adds a single quote to the
+//     original symbol name.
+//
+//   - `get_shadow_symbol` checks whether a `Symbol` use refers to the original free variable
+//     or to a local variable shadowing it, and returns the shadow symbol to use if the free
+//     variable is shadowed here.
+//
+//   - Functions `enter_scope`, and `enter_scope_after_renaming` take lists
+//     of local variable declarations so that we know that a free variable is shadowed.
+//
+//   - Function`exit_scope` exits corresponding local variable scopes.
 //
 // - struct `InlinedRewriter` also has various methods to support rewriting a call
 //   - `inline_call` is the entry point for rewriting a call to an inline function.
 //
-//   - `create_shadow_symbols` creates a shadow `Symbol` for each lambda free variable to use if a
-//     local variable conflicts with that variable.  It uses `SymbolPool::shadow` to create shadow
-//     symbols which print out the same but don't conflict.
-//
-//   - `get_shadow_symbol` checks whether a `Symbol` conflicts with lambda free variables, and if
-//     so, returns the shadow symbol to use instead..
+//   - `shadowing_enter_scope` rewrites formal parameters as needed if they shadow free variables.
 //
 //   - `parameter_list_to_pattern` is a helper to convert a list of `Parameter` into a `Pattern`,
-//      suitable for use in the body.
+//      suitable for use in a `Block` expression replacing the call.
 //
-//   - `construct_inlined_call_expression` is a helper to build the expression corresponding to
-//      { let params=actuals; body } used for both lambda inlining and inline function inlining.
+//   - `construct_inlined_call_expression` is a helper to build the `Block` expression corresponding
+//      to { let params=actuals; body } used for both lambda inlining and inline function inlining.
 //
-//   - rewrite_pattern_vector is a helper for `rewrite_pattern`
+//   - `check_pattern_args_types_need_freezeref` and `check_params_args_types_vectors_need_freezeref`
+//      are helpers to compare formal parameter types with actual argument expression types, to see
+//      if any args require a `Freeze` operation to convert a `&mut` to `&`.
 //
-
+//   - `rewrite_pattern_vector` is a helper for `rewrite_pattern`
+//
+//   - `make_lambda_pattern_a_tuple` ensures that a `Lambda` parameter pattern is a `Tuple`, to match
+//     the vector representing a `Tuple` of actual arguments in generated code.
+//
 // - TODO(10858): add an anchor ast node so we can implement `Return` for inline functions and
 //   `Lambda`.
 // - TODO(10850): add a simplifier that simplifies certain code constructs.
@@ -682,11 +703,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         }
     }
 
-    // Enter a scope for parameters when inlining a call.
-    fn shadowing_enter_scope(&mut self, entering_vars: Vec<Symbol>) {
-        self.shadow_stack.enter_scope(entering_vars);
-    }
-
+    /// Entry point for rewriting a call to an inline function
     fn inline_call(
         env: &'env GlobalEnv,
         call_node_id: NodeId,
@@ -811,6 +828,11 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             params_pattern,
             rewritten_actuals,
         )
+    }
+
+    /// Enter a scope for parameters when inlining a call.
+    fn shadowing_enter_scope(&mut self, entering_vars: Vec<Symbol>) {
+        self.shadow_stack.enter_scope(entering_vars);
     }
 
     /// Convert a list of Parameters into a Pattern.
