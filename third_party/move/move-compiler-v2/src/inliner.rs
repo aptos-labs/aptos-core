@@ -53,17 +53,9 @@
 //   - rewrite_pattern_vector is a helper for `rewrite_pattern`
 //
 
-// TODO:
-// - add a InlinedCall() node that represents an inlined call, so that an inlined Return() has a
-//   place to go. [later]
-//   - OR: if an inlined fn has a return, then error out.
-// - add a simplifier that simplifies certain code constructs, e.g.
-//   - InlinedCall() with no nested Return() can be flattened.
-//   - others?
-// - do we need to insert FreezeRef in actual args if formal param is &T but arg is &mod T ?
-// - do we need to do anything about abilities?
-// - if lambda parameters also may be referred to by temporaries, then `rewrite_invoke` might need
-//   to call yet another `ExpRewriterFunctions` implementation to do that.
+// - TODO(10858): add an anchor ast node so we can implement `Return` for inline functions and
+//   `Lambda`.
+// - TODO(10850): add a simplifier that simplifies certain code constructs.
 
 use crate::options::Options;
 use codespan_reporting::diagnostic::Severity;
@@ -90,8 +82,8 @@ type CallSiteLocations = BTreeMap<(QualifiedFunId, QualifiedFunId), BTreeSet<Nod
 // ======================================================================================
 // Entry
 
-// Run inlining on current program's AST.  For each function which is target of the compilation,
-// visit that function body and inline any calls to functions marked as "inline".
+/// Run inlining on current program's AST.  For each function which is target of the compilation,
+/// visit that function body and inline any calls to functions marked as "inline".
 pub fn run_inlining(env: &mut GlobalEnv) {
     // Get non-inline function roots for running inlining.
     // Also generate an error for any target inline functions lacking a body to inline.
@@ -176,9 +168,9 @@ pub fn run_inlining(env: &mut GlobalEnv) {
 
 /// Helper functions for inlining driver
 
-// Get all target functions which are not themselves inline functions.
-// While we're iterating, produce an error on every target inline function lacking a body to
-// inline.
+/// Get all target functions which are not themselves inline functions.
+/// While we're iterating, produce an error on every target inline function lacking a body to
+/// inline.
 fn get_targets(env: &mut GlobalEnv) -> BTreeSet<QualifiedFunId> {
     let mut targets = BTreeSet::new();
     for module in env.get_modules() {
@@ -282,7 +274,8 @@ fn functions_needing_inlining_in_order(
         &inline_function_call_graph,
     );
 
-    // Identify subset of non-inline functions which call inline functions.  Order doesn't matter here.
+    // Identify subset of non-inline functions which call inline functions.  Order doesn't matter
+    // here.
     let non_inline_functions_needing_inlining: Vec<QualifiedFunId> = call_graph
         .iter()
         .filter(|(caller_fnid, callees)| {
@@ -336,8 +329,8 @@ fn postorder<T: Ord + Copy + Debug>(
     postorder_num_to_node
 }
 
-// Check for cycles in a call_graph, mapping callers to callees..
-// If there is a cycle, return at least one cyclical path.
+/// Check for cycles in a call_graph, mapping callers to callees..
+/// If there is a cycle, return at least one cyclical path.
 fn check_for_cycles<T: Ord + Copy + Debug>(
     call_graph: &BTreeMap<T, BTreeSet<T>>,
 ) -> BTreeSet<Vec<T>> {
@@ -357,7 +350,7 @@ fn check_for_cycles<T: Ord + Copy + Debug>(
                 if let Some(succ_set) = call_graph.get(path_last) {
                     if succ_set.contains(start_node) {
                         // found a cycle, return it.
-                        // TODO: maybe find all cycles?
+                        // TODO(10983): maybe find all cycles?
                         cycles.insert(path.to_vec());
                         return cycles;
                     }
@@ -530,8 +523,8 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
 ///       pub fn enter_scope_after_renaming<'a>(&mut self,
 ///                                             entering_vars: Iteratator<Item = &'a Symbol>T);
 ///       pub fn exit_scope(&mut self);
-/// For details, see descriptions on the definitions below.
-
+/// For details, see descriptions on the definitions in the impl block below.
+///
 struct ShadowStack {
     /// Unique shadow var for each "free" var, immutable for the life of the ShadowStack.
     shadow_symbols: BTreeMap<Symbol, Symbol>,
@@ -568,7 +561,7 @@ impl ShadowStack {
         }
     }
 
-    // Proactively create a shadow symbol for every free variable, storing them in a map.
+    /// Proactively create a shadow symbol for every free variable, storing them in a map.
     fn create_shadow_symbols<'a, T>(env: &GlobalEnv, free_vars: T) -> BTreeMap<Symbol, Symbol>
     where
         T: IntoIterator<Item = &'a Symbol>,
@@ -586,11 +579,11 @@ impl ShadowStack {
         pool.make(&shadow_name)
     }
 
-    // If a var is a free variable which is currently shadowed, then gets the shadow variable;
-    // otherwise (not a free variable or not shadowed) returns None.
-    //
-    // If entering_scope, then the free variable is rewritten even if we're not yet in a scope,
-    // since we are about to enter one.
+    /// If a var is a free variable which is currently shadowed, then gets the shadow variable;
+    /// otherwise (not a free variable or not shadowed) returns None.
+    ///
+    /// If entering_scope, then the free variable is rewritten even if we're not yet in a scope,
+    /// since we are about to enter one.
     pub fn get_shadow_symbol(&mut self, sym: Symbol, entering_scope: bool) -> Option<Symbol> {
         if self
             .scoped_shadowed_count
@@ -608,7 +601,7 @@ impl ShadowStack {
         }
     }
 
-    // Record that the provided symbols have local definitions, so should be shadowed.
+    /// Record that the provided symbols have local definitions, so should be shadowed.
     pub fn enter_scope<T>(&mut self, entering_vars: T)
     where
         T: IntoIterator<Item = Symbol>,
@@ -626,8 +619,8 @@ impl ShadowStack {
         self.scoped_shadowed_vars.push(entering_free_vars);
     }
 
-    // Record that the provided symbols have local definitions, so should be shadowed.
-    // In this case, shadowed variables have already been renamed, so they must be mapped back.
+    /// Record that the provided symbols have local definitions, so should be shadowed.
+    /// In this case, shadowed variables have already been renamed, so they must be mapped back.
     pub fn enter_scope_after_renaming<'a>(
         &mut self,
         entering_vars: impl Iterator<Item = &'a Symbol>,
@@ -639,8 +632,8 @@ impl ShadowStack {
         self.enter_scope(entering_free_vars);
     }
 
-    // Unshadow the set of symbols from the most recent scope which has been entered and not exited
-    // yet.
+    /// Unshadow the set of symbols from the most recent scope which has been entered and not exited
+    /// yet.
     pub fn exit_scope(&mut self) {
         let exiting_free_vars = self
             .scoped_shadowed_vars
@@ -663,7 +656,7 @@ struct InlinedRewriter<'env, 'rewriter> {
     lambda_param_map: BTreeMap<Symbol, &'rewriter Exp>,
     inlined_formal_params: Vec<Parameter>,
 
-    // Shadow stack tracks whether free variables are hidden by local variable declarations.
+    /// Shadow stack tracks whether free variables are hidden by local variable declarations.
     shadow_stack: ShadowStack,
 
     debug: bool,
@@ -689,7 +682,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         }
     }
 
-    /// Any free var
+    // Enter a scope for parameters when inlining a call.
     fn shadowing_enter_scope(&mut self, entering_vars: Vec<Symbol>) {
         self.shadow_stack.enter_scope(entering_vars);
     }
@@ -710,7 +703,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             .partition(|(_, arg)| matches!(arg.as_ref(), ExpData::Lambda(..)));
         let non_lambda_function_args =
             regular_args_matched.iter().filter_map(|(param, arg_exp)| {
-                if let Type::Fun(_, _) = param.1 {
+                if matches!(param.1, Type::Fun(..)) {
                     Some((param, arg_exp))
                 } else {
                     None
@@ -753,10 +746,10 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             eprintln!("regular_actuals are `{:#?}`", &regular_actuals);
         }
 
-        // Find free variables in lambda expr.  Perhaps we could minimize changes if we tracked
-        // each lambda arg individually in the inlined method and only rewrite the context of each
-        // inlined lambda, but that seems quite difficult.  Instead, just group all the free vars together
-        // and shadow them all.
+        // Find free variables in lambda expr.  Perhaps we could minimize changes if we tracked each
+        // lambda arg individually in the inlined method and only rewrite the context of each
+        // inlined lambda, but that seems quite difficult.  Instead, just group all the free vars
+        // together and shadow them all.
         let all_lambda_free_vars: BTreeSet<_> = lambda_args_matched
             .iter()
             .flat_map(|(_, exp)| exp.free_vars().into_iter())
@@ -778,7 +771,8 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             eprintln!("lambda_free_vars are `{:#?}`", &all_lambda_free_vars);
         }
 
-        // rewrite body with type_args, lambda params, and var renames to keep lambda free vars free.
+        // rewrite body with type_args, lambda params, and var renames to keep lambda free vars
+        // free.
         let mut rewriter = InlinedRewriter::new(
             env,
             &type_args,
@@ -817,15 +811,12 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             params_pattern,
             rewritten_actuals,
         )
-
-        // TODO
-        // 6. Specs?
     }
 
-    // Convert a list of Parameters into a Pattern.
-    // Check for conflicts between lambda_free_vars and symbols in Parameters,
-    // replacing them by shadow symbols.
-    // Also remap types according to type_param_map as needed.
+    /// Convert a list of Parameters into a Pattern.
+    /// Check for conflicts between lambda_free_vars and symbols in Parameters,
+    /// replacing them by shadow symbols.
+    /// Also remap types according to type_param_map as needed.
     fn parameter_list_to_pattern(
         &mut self,
         env: &'env GlobalEnv,
@@ -836,8 +827,9 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             .iter()
             .map(|param| {
                 let Parameter(sym, ty) = *param;
-                // TODO: ideally, each Parameter has its own loc.  For now, we use the function location.
-                // body should have types rewritten, other inlining complete, lambdas inlined, etc.
+                // TODO(10731): ideally, each Parameter has its own loc.  For now, we use the
+                // function location.  body should have types rewritten, other inlining complete,
+                // lambdas inlined, etc.
                 let id = env.new_node(function_loc.clone(), ty.instantiate(self.type_args));
                 if let Some(new_sym) = self.shadow_stack.get_shadow_symbol(*sym, true) {
                     Pattern::Var(id, new_sym)
@@ -855,12 +847,13 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         Pattern::Tuple(id, tuple_args)
     }
 
-    // Build an expression corresponding to an inlined function (either lambda or inline function),
-    // essentially equivalent to { let pattern=args; body }.
-    //
-    // body should already have types rewritten, other inlining complete, lambdas inlined, etc.
-    // all types in args, body, parameters should also be rewritten (type params instantiated) as necessary.
-    // parameters and args should be only non-lambda regular ordinary values (not types).
+    /// Build an expression corresponding to an inlined function (either lambda or inline function),
+    /// essentially equivalent to { let pattern=args; body }.
+    ///
+    /// Body should already have types rewritten, other inlining complete, lambdas inlined, etc.  All
+    /// types in args, body, parameters should also be rewritten (type params instantiated) as
+    /// necessary.  parameters and args should be only non-lambda regular ordinary values (not
+    /// types).
     fn construct_inlined_call_expression(
         env: &'env GlobalEnv,
         invocation_loc: &Loc,
@@ -907,7 +900,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                             };
                             let exp_loc = env.get_node_loc(exp_node);
                             let new_node = env.new_node(exp_loc, new_type.clone());
-                            let new_exp_vec: Vec<Exp> = [exp.clone()].to_vec();
+                            let new_exp_vec: Vec<Exp> = vec![exp.clone()];
                             (
                                 Exp::from(ExpData::Call(new_node, Operation::Freeze, new_exp_vec)),
                                 new_type,
@@ -925,16 +918,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
 
             let args_type = Type::Tuple(args_types);
 
-            // TODO: try to find a more precise source code location corresponding to set of actual arguments.
-            // E.g.,:
-            //   let args_locs: Vec<Loc> = args_node_ids.iter().map(|node_id| env.get_node_loc(*node_id)).collect();
-            //   let args_loc: Loc = Loc::merge(Vec<Loc>); or something  similar
-            // For now, we just use the location of the first arg for the entire list.
-            let args_loc = args_node_ids
-                .first()
-                .map(|node_id| env.get_node_loc(*node_id))
-                .unwrap_or_else(|| invocation_loc.clone());
-
+            let args_loc = invocation_loc.clone();
             let new_args_id = env.new_node(args_loc, args_type);
             let new_args_expr =
                 ExpData::Call(new_args_id, Operation::Tuple, rewritten_args).into_exp();
@@ -945,14 +929,14 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         new_body.into_exp()
     }
 
-    // Helper for construct_inlined_call_expression.
-    //
-    // If `pattern-type` is a tuple of same length as `arg_vec`, and types differ just in mutability of the
-    // reference type, where the param is immutable and the arg is mutable, returns `Some(vec)`
-    // where such corresponding elements are true, indicating that a `FreezeRef` could be inserted
-    // to gain type compatibility.
-    //
-    // If there are no such parameters, returns None.
+    /// Helper for construct_inlined_call_expression.
+    ///
+    /// If `pattern-type` is a tuple of same length as `arg_vec`, and types differ just in mutability
+    /// of the reference type, where the param is immutable and the arg is mutable, returns
+    /// `Some(vec)` where such corresponding elements are true, indicating that a `FreezeRef` could
+    /// be inserted to gain type compatibility.
+    ///
+    /// If there are no such parameters, returns None.
     fn check_pattern_args_types_need_freezeref(
         pattern_type: &Type,
         args_types: &Vec<Type>,
@@ -967,14 +951,14 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         }
     }
 
-    // Helper for check_pattern_args_types_need_freezeref
-    //
-    // If any corresponding elements of `param_vec` and `arg_vec` differ just in mutability of the
-    // reference type, where the param is immutable and the arg is mutable, returns `Some(vec)`
-    // where such corresponding elements are true, indicating that a `FreezeRef` could be inserted
-    // to gain type compatibility.
-    //
-    // If there are no such parameters, returns None.
+    /// Helper for check_pattern_args_types_need_freezeref
+    ///
+    /// If any corresponding elements of `param_vec` and `arg_vec` differ just in mutability of the
+    /// reference type, where the param is immutable and the arg is mutable, returns `Some(vec)`
+    /// where such corresponding elements are true, indicating that a `FreezeRef` could be inserted
+    /// to gain type compatibility.
+    ///
+    /// If there are no such parameters, returns None.
     fn check_params_args_types_vectors_need_freezeref(
         params_types: &Vec<Type>,
         args_types: &Vec<Type>,
@@ -990,14 +974,12 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                 .map(|(t1, t2)| {
                     if *t1 == *t2 {
                         false
-                    } else if let Type::Reference(kind1, box_t1) = t1 {
-                        if let Type::Reference(kind2, box_t2) = t2 {
-                            *box_t1 == *box_t2
-                                && *kind1 == ReferenceKind::Immutable
-                                && *kind2 == ReferenceKind::Mutable
-                        } else {
-                            false
-                        }
+                    } else if let (Type::Reference(kind1, box_t1), Type::Reference(kind2, box_t2)) =
+                        (t1, t2)
+                    {
+                        *box_t1 == *box_t2
+                            && *kind1 == ReferenceKind::Immutable
+                            && *kind2 == ReferenceKind::Mutable
                     } else {
                         false
                     }
@@ -1011,8 +993,8 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         }
     }
 
-    // Helper function for `rewrite_pattern` in trait `ExpRewriterFunctions` below.
-    // If any subpattern gets simplified, replace the whole thing.
+    /// Helper function for `rewrite_pattern` in trait `ExpRewriterFunctions` below.
+    /// If any subpattern gets simplified, replace the whole thing.
     fn rewrite_pattern_vector(
         &mut self,
         pat_vec: &[Pattern],
@@ -1036,14 +1018,14 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         }
     }
 
-    // Convert a single-variable pattern into a tuple if needed.
+    /// Convert a single-variable pattern into a tuple if needed.
     fn make_lambda_pattern_a_tuple(&mut self, pat: &Pattern) -> Pattern {
         if let Pattern::Var(id, _) = pat {
             let new_id = self.env.new_node(
                 self.env.get_node_loc(*id),
-                Type::Tuple([self.env.get_node_type(*id)].to_vec()),
+                Type::Tuple(vec![self.env.get_node_type(*id)]),
             );
-            Pattern::Tuple(new_id, [pat.clone()].to_vec())
+            Pattern::Tuple(new_id, vec![pat.clone()])
         } else {
             pat.clone()
         }
@@ -1051,7 +1033,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
 }
 
 impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> {
-    // Override default implementation to flag an error on an inlined Return expressions.
+    /// Override default implementation to flag an error on an inlined Return expressions.
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         // Disallow Return expression in an inlined function.
         if let ExpData::Return(id, _val) = exp.as_ref() {
@@ -1064,16 +1046,16 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
         self.rewrite_exp_descent(exp)
     }
 
-    // Record that the provided symbols have local definitions, so renaming should be done.
-    // Note that incoming vars are from a Pattern *after* renaming, so these are shadowed symbols.
+    /// Record that the provided symbols have local definitions, so renaming should be done.
+    /// Note that incoming vars are from a Pattern *after* renaming, so these are shadowed symbols.
     fn rewrite_enter_scope<'a>(&mut self, vars: impl Iterator<Item = &'a (NodeId, Symbol)>) {
         self.shadow_stack
             .enter_scope_after_renaming(vars.map(|(_, sym)| sym));
     }
 
-    // On exiting a scope defining some symbols shadowing lambda free vars, record that we have
-    // exited the scope so any occurrences of those free vars should be left alone (if there are
-    // not further shadowing scopes furter out).
+    /// On exiting a scope defining some symbols shadowing lambda free vars, record that we have
+    /// exited the scope so any occurrences of those free vars should be left alone (if there are
+    /// not further shadowing scopes furter out).
     fn rewrite_exit_scope(&mut self) {
         self.shadow_stack.exit_scope();
     }
@@ -1106,10 +1088,17 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
                 Some(ExpData::LocalVar(new_node_id, sym).into())
             }
         } else {
-            self.env.error(
+            self.env.diag(
+                Severity::Bug,
                 &loc,
-                &format!("Temporary with invalid index `{}` during inlining of function with `{}` parameters",
-                        idx, self.inlined_formal_params.len()),
+                &format!(
+                    concat!(
+                        "Temporary with invalid index `{}` during inlining",
+                        " of function with `{}` parameters"
+                    ),
+                    idx,
+                    self.inlined_formal_params.len()
+                ),
             );
             None
         }
@@ -1161,7 +1150,11 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
                 .unwrap_or(call_loc);
             self.env.error(
                 &target_loc,
-                "Invalid call target: currently indirect call must be a parameter to an inline function called with an argument which is a literal lambda expression",
+                concat!(
+                    "Invalid call target: currently indirect call must be",
+                    " a parameter to an inline function called with an argument",
+                    " which is a literal lambda expression"
+                ),
             );
             None
         }

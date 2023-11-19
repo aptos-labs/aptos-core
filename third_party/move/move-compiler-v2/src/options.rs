@@ -19,40 +19,32 @@ pub struct Options {
         num_args = 0..
     )]
     pub dependencies: Vec<String>,
-
     /// Named address mapping.
     #[clap(
         short,
         num_args = 0..
     )]
     pub named_address_mapping: Vec<String>,
-
     /// Output directory.
     #[clap(short, long, default_value = "")]
     pub output_dir: String,
-
     /// Debug compiler by printing out internal information
     #[clap(long = cli::DEBUG_FLAG, default_value=debug_compiler_env_var_str())]
     pub debug: bool,
-
     /// Whether to dump intermediate bytecode for debugging.
     #[clap(long = "dump-bytecode")]
     pub dump_bytecode: bool,
-
     /// Do not complain about unknown attributes in Move code.
     #[clap(long, default_value = "false")]
     pub skip_attribute_checks: bool,
-
     /// Known attributes for this dialect of move; if empty, assumes third-party Move.
     /// Only used if skip_attribute_checks is false.
     #[clap(skip)]
     pub known_attributes: BTreeSet<String>,
-
     /// Whether we generate code for tests. This specifically guarantees stable output
     /// for baseline testing.
     #[clap(long)]
     pub testing: bool,
-
     /// Active experiments. Experiments alter default behavior of the compiler.
     /// See `Experiment` struct.
     #[clap(short)]
@@ -61,7 +53,6 @@ pub struct Options {
         num_args = 0..
     )]
     pub experiments: Vec<String>,
-
     /// Sources to compile (positional arg, therefore last)
     pub sources: Vec<String>,
 }

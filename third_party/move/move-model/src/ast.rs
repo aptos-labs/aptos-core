@@ -451,29 +451,22 @@ pub enum ExpData {
     /// some other source into expressions. Consumers of expressions should assume this
     /// variant is not present and can panic when seeing it.
     Invalid(NodeId),
-
     /// Represents a value.
     Value(NodeId, Value),
-
     /// Represents a reference to a local variable introduced in the AST.
     LocalVar(NodeId, Symbol),
-
     /// Represents a reference to a temporary used in bytecode, if this expression is associated
     /// with bytecode.
     /// Seems to also be used to represent a parameter to a function, where TempIndex indicates the
     /// index into the list of function parameters.
     Temporary(NodeId, TempIndex),
-
     /// Represents a call to an operation. The `Operation` enum covers all builtin functions
     /// (including operators, constants, ...) as well as user functions.
     Call(NodeId, Operation, Vec<Exp>),
-
     /// Represents an invocation of a function value, as a lambda.
     Invoke(NodeId, Exp, Vec<Exp>),
-
     /// Represents a lambda.
     Lambda(NodeId, Pattern, Exp),
-
     /// Represents a quantified formula over multiple variables and ranges.
     Quant(
         NodeId,
@@ -487,11 +480,9 @@ pub enum ExpData {
         /// Body
         Exp,
     ),
-
     /// Represents a block `Block(id, pattern, optional_binding, scope)` which binds
     /// a pattern, making the bound variables available in scope.
     Block(NodeId, Pattern, Option<Exp>, Exp),
-
     /// Represents a conditional.
     IfElse(NodeId, Exp, Exp, Exp),
 
@@ -499,25 +490,19 @@ pub enum ExpData {
     // Subsequent expressions only appear in imperative context
     /// Represents the return from a function
     Return(NodeId, Exp),
-
     /// Represents a sequence of effects, the last value also being the result.
     Sequence(NodeId, Vec<Exp>),
-
     /// Represents a loop, with a body expression.
     Loop(NodeId, Exp),
-
     /// Represents a loop continuation for the enclosing loop. The bool indicates whether the
     /// loop is continued (true) or broken (false).
     LoopCont(NodeId, bool),
-
     /// Assignment to a pattern. Can be a tuple pattern and a tuple expression.  Note that Assign
     /// does *not* introduce new variables; they apparently be introduced by a Block or Lambda, or
     /// as a function formal parameter.
     Assign(NodeId, Pattern, Exp),
-
     /// Mutation of a lhs reference, as in `*lhs = rhs`.
     Mutate(NodeId, Exp, Exp),
-
     /// Represents a specification block, type is ().
     SpecBlock(NodeId, Spec),
 }
