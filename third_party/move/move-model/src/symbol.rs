@@ -65,17 +65,14 @@ impl SymbolPool {
     /// pool. The implementation uses internally a RefCell for storing symbols, so the pool
     /// does not need to be mutable.
     pub fn make(&self, s: &str) -> Symbol {
+        let mut pool = self.inner.borrow_mut();
         let key = Rc::new(s.to_string());
-        {
-            let pool = self.inner.borrow();
-            if let Some(n) = pool.lookup.get(&key) {
-                return Symbol(*n);
-            }
+        if let Some(n) = pool.lookup.get(&key) {
+            return Symbol(*n);
         }
-        let mut mut_pool = self.inner.borrow_mut();
-        let new_sym = mut_pool.strings.len();
-        mut_pool.strings.push(key.clone());
-        mut_pool.lookup.insert(key, new_sym);
+        let new_sym = pool.strings.len();
+        pool.strings.push(key.clone());
+        pool.lookup.insert(key, new_sym);
         Symbol(new_sym)
     }
 
