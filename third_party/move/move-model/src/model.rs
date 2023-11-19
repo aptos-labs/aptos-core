@@ -78,7 +78,6 @@ use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     ffi::OsStr,
     fmt::{self, Formatter, Write},
-    ops::Deref,
     rc::Rc,
 };
 
@@ -2050,7 +2049,8 @@ impl GlobalEnv {
             }
             writer.unindent()
         }
-        if let Some(exp) = fun.get_def().deref() {
+        let fun_def = fun.get_def();
+        if let Some(exp) = fun_def.as_deref() {
             emitln!(writer, " {");
             writer.indent();
             emitln!(writer, "{}", exp.display_for_fun(fun.clone()));
@@ -2061,7 +2061,7 @@ impl GlobalEnv {
         }
         let spec = fun.get_spec();
         if !spec.conditions.is_empty() {
-            emitln!(writer, "{}", self.display(spec.deref()))
+            emitln!(writer, "{}", self.display(&*spec))
         }
     }
 
