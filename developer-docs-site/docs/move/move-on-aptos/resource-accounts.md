@@ -5,7 +5,7 @@ slug: "resource-accounts"
 
 # Resource Accounts
 
-A [resource account](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/resource_account.move) is a developer feature used to manage resources independent of an account managed by a user, specifically publishing modules and providing on-chain-only access control, e.g., signers
+A [resource account](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/resource_account.move) is a developer feature used to manage resources independent of an account managed by a user, specifically publishing modules and providing on-chain-only access control, e.g., signers.
 
 Typically, a resource account is used for two main purposes:
 
