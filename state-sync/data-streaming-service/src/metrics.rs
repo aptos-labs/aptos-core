@@ -141,6 +141,15 @@ pub static PENDING_DATA_RESPONSES: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter for the number of complete pending data responses
+pub static COMPLETE_PENDING_DATA_RESPONSES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_data_streaming_service_complete_pending_data_responses",
+        "Counters related to the number of complete pending data responses",
+    )
+    .unwrap()
+});
+
 /// Counter for tracking received data responses
 pub static RECEIVED_DATA_RESPONSE: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
@@ -223,8 +232,13 @@ pub fn set_active_data_streams(value: usize) {
     ACTIVE_DATA_STREAMS.set(value as i64);
 }
 
+/// Sets the number of complete pending data responses
+pub fn set_complete_pending_data_responses(value: u64) {
+    COMPLETE_PENDING_DATA_RESPONSES.set(value as i64);
+}
+
 /// Sets the number of pending data responses
-pub fn set_pending_data_responses(value: usize) {
+pub fn set_pending_data_responses(value: u64) {
     PENDING_DATA_RESPONSES.set(value as i64);
 }
 
