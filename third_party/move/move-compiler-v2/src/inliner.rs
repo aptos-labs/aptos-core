@@ -9,7 +9,7 @@
 // - struct `Inliner`
 //   - holds the map recording function bodies which are rewritten due to inlining so that we don't
 //     need to modify the program until the end.
-//   - `try_inlining_in` function is the entry point for each function needing inlining.
+//   - `do_inlining_in` function is the entry point for each function needing inlining.
 //
 // - struct `OuterInlinerRewriter` uses trait `ExpRewriterFunctions` to rewrite each call in the
 //   target.
@@ -137,7 +137,7 @@ pub fn run_inlining(env: &mut GlobalEnv) {
             // inline functions has already had its stuff inlined.
             let mut inliner = Inliner::new(env);
             for fid in functions_needing_inlining.iter() {
-                inliner.try_inlining_in(*fid);
+                inliner.do_inlining_in(*fid);
             }
 
             // Now that all inlining finished, actually update function bodies in env.
@@ -411,13 +411,14 @@ impl<'env> Inliner<'env> {
     /// Otherwise, stores a mapping from `func_id` to `None` in `self.funexprs_after_inlining`
     ///
     /// This should be called on `func_id` only after all inline functions it calls are processed.
-    fn try_inlining_in(&mut self, func_id: QualifiedFunId) {
+    /// It must not be called more than once for any given `func_id`.
+    fn do_inlining_in(&mut self, func_id: QualifiedFunId) {
         assert!(!self.funexprs_after_inlining.contains_key(&func_id));
         let func_env = self.env.get_function(func_id);
 
         if self.debug {
             eprintln!(
-                "try_inlining_in `{}`:\n{}",
+                "do_inlining_in `{}`:\n{}",
                 func_env.get_full_name_str(),
                 self.env.dump_fun(&func_env)
             );
@@ -459,17 +460,31 @@ impl<'env, 'inliner> OuterInlinerRewriter<'env, 'inliner> {
 impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inliner> {
     fn rewrite_call(&mut self, call_id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
         if let Operation::MoveFunction(module_id, fun_id) = oper {
-            let fid = module_id.qualified(*fun_id);
-            let func_env = self.env.get_function(fid);
+            let qfid = module_id.qualified(*fun_id);
+            let func_env = self.env.get_function(qfid);
             if func_env.is_inline() {
                 // inline the function call
                 let type_parameters = func_env.get_type_parameters();
                 let type_args = self.env.get_node_instantiation(call_id);
                 let parameters = func_env.get_parameters();
-                let result_type = func_env.get_result_type();
                 let func_loc = func_env.get_loc();
-                if let Some(Some(expr)) = self.inliner.funexprs_after_inlining.get(&fid) {
-                    // inline here
+                let body_expr =
+                    if let Some(Some(expr)) = self.inliner.funexprs_after_inlining.get(&qfid) {
+                        // `qfid` was previously inlined into, use the post-inlining copy of body.
+                        Some(expr.clone())
+                    } else {
+                        // `qfid` was not previously inlined into, look for the original body expr.
+                        let func_env_def = func_env.get_def();
+                        if let Some(expr) = &*func_env_def {
+                            Some(expr.clone())
+                        } else {
+                            // `qfid` not found  This program has a problem, but it is flagged
+                            // elsewhere so just ignore it here.
+                            None
+                        }
+                    };
+                // inline here
+                if let Some(expr) = body_expr {
                     if self.inliner.debug {
                         eprintln!(
                             "inlining (inlined) function `{}` with args `{}`",
@@ -484,12 +499,11 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
                         self.env,
                         call_id,
                         &func_loc,
-                        expr,
+                        &expr,
                         type_parameters,
                         type_args,
                         parameters,
                         args,
-                        result_type,
                         self.inliner.debug,
                     );
                     if self.inliner.debug {
@@ -500,42 +514,7 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
                     }
                     Some(rewritten)
                 } else {
-                    let func_env_def = func_env.get_def();
-                    if let Some(expr) = &*func_env_def {
-                        // inline here
-                        if self.inliner.debug {
-                            eprintln!(
-                                "inlining function `{}` with args `{}`",
-                                self.env.dump_fun(&func_env),
-                                args.iter()
-                                    .map(|exp| format!("{}", exp.as_ref().display(self.env)))
-                                    .collect::<Vec<_>>()
-                                    .join(","),
-                            );
-                        }
-                        let rewritten = InlinedRewriter::inline_call(
-                            self.env,
-                            call_id,
-                            &func_loc,
-                            expr,
-                            type_parameters,
-                            type_args,
-                            parameters,
-                            args,
-                            result_type,
-                            self.inliner.debug,
-                        );
-                        if self.inliner.debug {
-                            eprintln!(
-                                "After inlining, expr is `{}`",
-                                rewritten.as_ref().display(self.env)
-                            );
-                        }
-                        Some(rewritten)
-                    } else {
-                        // Ignore missing body.  Error is flagged elsewhere.
-                        None
-                    }
+                    None
                 }
             } else {
                 None
@@ -731,7 +710,6 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         type_args: Vec<Type>,
         parameters: Vec<Parameter>,
         args: &[Exp],
-        result_type: Type,
         debug: bool,
     ) -> Exp {
         let args_matched: Vec<(&Parameter, &Exp)> = zip(&parameters, args).collect();
@@ -741,23 +719,27 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         ) = args_matched
             .iter()
             .partition(|(_, arg)| matches!(arg.as_ref(), ExpData::Lambda(..)));
-        let non_lambda_function_args = regular_args_matched.iter().filter_map(|(param, exp)| {
-            if let Type::Fun(_, _) = param.1 {
-                Some((param, exp))
-            } else {
-                None
-            }
-        });
+        let non_lambda_function_args =
+            regular_args_matched.iter().filter_map(|(param, arg_exp)| {
+                if let Type::Fun(_, _) = param.1 {
+                    Some((param, arg_exp))
+                } else {
+                    None
+                }
+            });
 
-        for (param, exp) in non_lambda_function_args {
+        for (param, arg_exp) in non_lambda_function_args {
             env.error(
-                &env.get_node_loc(exp.as_ref().node_id()),
-                "Inline function-typed parameter currently must be a literal lambda expression",
+                &env.get_node_loc(arg_exp.as_ref().node_id()),
+                concat!(
+                    "Currently, a function-typed parameter to an inline function",
+                    " must be a literal lambda expression",
+                ),
             );
             if debug {
                 eprintln!(
-                    "bad exp is {:?}, param is {:?}, sym is `{}` type is `{:?}`",
-                    exp,
+                    "bad arg_exp is {:?}, param is {:?}, sym is `{}` type is `{:?}`",
+                    arg_exp,
                     param,
                     param.0.display(env.symbol_pool()),
                     param.1
@@ -769,7 +751,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         //     zip(&type_parameters, &type_args).collect();
         let lambda_param_map: BTreeMap<Symbol, &Exp> = lambda_args_matched
             .iter()
-            .map(|(param, exp)| (param.0, *exp))
+            .map(|(param, arg_exp)| (param.0, *arg_exp))
             .collect();
 
         if debug {
@@ -819,9 +801,6 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             debug,
         );
 
-        // Rewrite types in result type.
-        let rewritten_result_type = result_type.instantiate(&type_args);
-
         // For now, just copy the actuals.  If FreezeRef is needed, we'll do it in
         // construct_inlined_call_expression.
         let rewritten_actuals: Vec<Exp> = regular_actuals.into_iter().cloned().collect();
@@ -847,11 +826,9 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         InlinedRewriter::construct_inlined_call_expression(
             env,
             &call_loc,
-            func_loc,
             rewritten_body,
             params_pattern,
             rewritten_actuals,
-            rewritten_result_type,
         )
 
         // TODO
@@ -900,11 +877,9 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
     fn construct_inlined_call_expression(
         env: &'env GlobalEnv,
         invocation_loc: &Loc,
-        _function_loc: &Loc,
         body: Exp,
         pattern: Pattern,
         args: Vec<Exp>,
-        _result_type: Type,
     ) -> Exp {
         // Process Body
         let body_node_id = body.as_ref().node_id();
@@ -1176,19 +1151,14 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
         };
         let call_loc = self.env.get_node_loc(id);
         if let Some(lambda_target) = optional_lambda_target {
-            if let ExpData::Lambda(lambda_id, pat, body) = lambda_target.as_ref() {
-                let lambda_loc = self.env.get_node_loc(*lambda_id);
-                let body_node_id = body.as_ref().node_id();
-                let body_type = self.env.get_node_type(body_node_id);
+            if let ExpData::Lambda(_, pat, body) = lambda_target.as_ref() {
                 let args_vec: Vec<Exp> = args.to_vec();
                 Some(InlinedRewriter::construct_inlined_call_expression(
                     self.env,
                     &call_loc,
-                    &lambda_loc,
                     body.clone(),
                     self.make_lambda_pattern_a_tuple(pat),
                     args_vec,
-                    body_type,
                 ))
             } else {
                 self.env.diag(
