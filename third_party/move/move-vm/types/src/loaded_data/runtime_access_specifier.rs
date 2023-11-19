@@ -85,8 +85,11 @@ pub enum AddressSpecifier {
 /// Represents a well-known function used in an address specifier.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug)]
 pub enum AddressSpecifierFunction {
+    /// Identity function -- just returns the value of the parameter.
     Identity,
+    /// signer::address_of
     SignerAddress,
+    /// object::owner_of
     ObjectAddress,
 }
 
