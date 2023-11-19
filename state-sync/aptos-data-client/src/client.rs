@@ -395,6 +395,7 @@ impl AptosDataClient {
         T: TryFrom<StorageServiceResponse, Error = E>,
         E: Into<Error>,
     {
+        // Select a peer to service the request
         let peer = self.choose_peer_for_request(&request).map_err(|error| {
             debug!(
                 (LogSchema::new(LogEntry::StorageServiceRequest)
@@ -404,7 +405,8 @@ impl AptosDataClient {
             );
             error
         })?;
-        let _timer = start_request_timer(&metrics::REQUEST_LATENCIES, &request.get_label(), peer);
+
+        // Send the request to the peer and transform the response
         self.send_request_to_peer_and_decode(peer, request, request_timeout_ms)
             .await
     }
@@ -420,13 +422,29 @@ impl AptosDataClient {
         T: TryFrom<StorageServiceResponse, Error = E>,
         E: Into<Error>,
     {
+        // Start the timer for the request
+        let timer = start_request_timer(&metrics::REQUEST_LATENCIES, &request.get_label(), peer);
+
+        // Get the response from the peer
         let response = self
             .send_request_to_peer(peer, request.clone(), request_timeout_ms)
-            .await?;
+            .await;
 
-        let (context, storage_response) = response.into_parts();
+        // If an error occurred, stop the timer (without updating the metrics)
+        // and return the error. Otherwise, stop the timer and update the metrics.
+        let storage_response = match response {
+            Ok(storage_response) => {
+                timer.stop_and_record(); // Update the latency metrics
+                storage_response
+            },
+            Err(error) => {
+                timer.stop_and_discard(); // Discard the timer without updating the metrics
+                return Err(error);
+            },
+        };
 
         // Ensure the response obeys the compression requirements
+        let (context, storage_response) = storage_response.into_parts();
         if request.use_compression && !storage_response.is_compressed() {
             return Err(Error::InvalidResponse(format!(
                 "Requested compressed data, but the response was uncompressed! Response: {:?}",
@@ -439,10 +457,10 @@ impl AptosDataClient {
             )));
         }
 
-        // try to convert the storage service enum into the exact variant we're expecting.
+        // Try to convert the storage service enum into the exact variant we're expecting
         match T::try_from(storage_response) {
             Ok(new_payload) => Ok(Response::new(context, new_payload)),
-            // if the variant doesn't match what we're expecting, report the issue.
+            // If the variant doesn't match what we're expecting, report the issue
             Err(err) => {
                 context
                     .response_callback
