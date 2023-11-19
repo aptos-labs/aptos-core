@@ -78,6 +78,7 @@ use move_model::{
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Debug,
+    iter,
     iter::{zip, IntoIterator, Iterator},
     ops::Deref,
     vec::Vec,
@@ -99,13 +100,16 @@ pub fn run_inlining(env: &mut GlobalEnv) {
     // Only look for inlining sites if we have targets to inline into.
     if !todo.is_empty() {
         // Recursively find callees of each target with a function body.
-        let mut function_callees: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
 
-        // Record for each pair of (caller, callee) functions, all the call site locations (for error
-        // messages).
+        // The call graph reachable from targets, represented by a map from each function to the set
+        // of functions it calls.  The domain is limited to functions with function bodies.
+        let mut call_graph: BTreeMap<QualifiedFunId, BTreeSet<QualifiedFunId>> = BTreeMap::new();
+
+        // For each function `caller` calling an inline function `callee`, we record the set of all
+        // call sites where `caller` calls `callee` (for error messages).
         let mut inline_function_call_site_locations: CallSiteLocations = CallSiteLocations::new();
 
-        // Update function_callees and inline_function_call_site_locations for all reachable calls.
+        // Update call_graph and inline_function_call_site_locations for all reachable calls.
         let mut visited_functions = BTreeSet::new();
         while let Some(id) = todo.pop_first() {
             if visited_functions.insert(id) {
@@ -113,7 +117,7 @@ pub fn run_inlining(env: &mut GlobalEnv) {
                     let callees_with_sites = def.called_funs_with_callsites();
                     for (callee, sites) in callees_with_sites {
                         todo.insert(callee);
-                        function_callees.entry(id).or_default().insert(callee);
+                        call_graph.entry(id).or_default().insert(callee);
                         if env.get_function(callee).is_inline() {
                             inline_function_call_site_locations.insert((id, callee), sites);
                         }
@@ -126,7 +130,7 @@ pub fn run_inlining(env: &mut GlobalEnv) {
         // If there are any cycles, this call displays an error to the user and returns None.
         if let Ok(functions_needing_inlining) = functions_needing_inlining_in_order(
             env,
-            &function_callees,
+            &call_graph,
             inline_function_call_site_locations,
         ) {
             // We inline functions bottom-up, so that any inline function which itself has calls to
@@ -209,28 +213,27 @@ fn get_targets(env: &mut GlobalEnv) -> BTreeSet<QualifiedFunId> {
 /// so that any inline function will be processed before any function calling it.
 fn functions_needing_inlining_in_order(
     env: &GlobalEnv,
-    function_callees: &BTreeMap<QualifiedFunId, BTreeSet<QualifiedFunId>>,
+    call_graph: &BTreeMap<QualifiedFunId, BTreeSet<QualifiedFunId>>,
     inline_function_call_site_locations: CallSiteLocations,
 ) -> Result<Vec<QualifiedFunId>, ()> {
-    // Restrict attention to inline functions calling inline functions.
-    let inline_functions_with_callees: BTreeMap<QualifiedFunId, BTreeSet<QualifiedFunId>> =
-        function_callees
-            .iter()
-            .filter(|&(fnid, _)| env.get_function(*fnid).is_inline())
-            .map(|(fnid, callees)| {
-                (
-                    *fnid,
-                    callees
-                        .iter()
-                        .filter(|&caller_fnid| env.get_function(*caller_fnid).is_inline())
-                        .cloned()
-                        .collect(),
-                )
-            })
-            .collect();
+    // Subset of the call graph limited to inline functions.
+    let inline_function_call_graph: BTreeMap<QualifiedFunId, BTreeSet<QualifiedFunId>> = call_graph
+        .iter()
+        .filter(|&(caller_fnid, _)| env.get_function(*caller_fnid).is_inline())
+        .map(|(caller_fnid, callees)| {
+            (
+                *caller_fnid,
+                callees
+                    .iter()
+                    .filter(|&callee_fnid| env.get_function(*callee_fnid).is_inline())
+                    .cloned()
+                    .collect(),
+            )
+        })
+        .collect();
 
-    // Calculate the list of inline functions which call at least one other inline function.
-    let inline_functions_calling_others: Vec<QualifiedFunId> = inline_functions_with_callees
+    // Set of inline functions calling at least one inline function.
+    let inline_functions_calling_others: Vec<QualifiedFunId> = inline_function_call_graph
         .iter()
         .filter(|(_, callees)| !callees.is_empty())
         .map(|(caller_fnid, _)| caller_fnid)
@@ -238,23 +241,23 @@ fn functions_needing_inlining_in_order(
         .collect();
 
     // Check for cycles
-    let cycles = check_for_cycles(&inline_functions_with_callees);
+    let cycles = check_for_cycles(&inline_function_call_graph);
     if !cycles.is_empty() {
         for cycle in cycles {
             let start_fnid = cycle.first().unwrap();
             let func_env = env.get_function(*start_fnid);
             let path_string: String = cycle
                 .iter()
-                .map(|fnid| env.get_function(*fnid).get_name_str())
+                .map(|fnid| env.get_function(*fnid).get_full_name_str())
                 .collect::<Vec<String>>()
                 .join("` -> `");
             let mut call_details: Vec<_> = cycle
                 .iter()
-                .zip(cycle.iter().skip(1).chain([*start_fnid].iter()))
+                .zip(cycle.iter().skip(1).chain(iter::once(start_fnid)))
                 .flat_map(|(f, g)| {
                     let sites_ids = inline_function_call_site_locations.get(&(*f, *g)).unwrap();
-                    let f_str = env.get_function(*f).get_name_str();
-                    let g_str = env.get_function(*g).get_name_str();
+                    let f_str = env.get_function(*f).get_full_name_str();
+                    let g_str = env.get_function(*g).get_full_name_str();
                     let msg = format!("call from `{}` to `{}`", f_str, g_str);
                     sites_ids
                         .iter()
@@ -262,9 +265,9 @@ fn functions_needing_inlining_in_order(
                 })
                 .collect();
             let msg = format!(
-                "recursion during function inlining not allowed: `{}` -> `{}`",
+                "cyclic recursion involving only inline functions is not allowed: `{}` -> `{}`",
                 path_string,
-                func_env.get_name_str()
+                func_env.get_full_name_str()
             );
             let loc = call_details.first_mut().unwrap().0.clone();
             env.diag_with_labels(Severity::Error, &loc, &msg, call_details);
@@ -272,22 +275,23 @@ fn functions_needing_inlining_in_order(
         return Err(());
     }
 
-    // Compute post-order of inline_functions which call others.
+    // Compute post-order of inline_functions which call others.  This lists each function
+    // before any others which call it.
     let po_inline_functions = postorder(
         &inline_functions_calling_others,
-        &inline_functions_with_callees,
+        &inline_function_call_graph,
     );
 
     // Identify subset of non-inline functions which call inline functions.  Order doesn't matter here.
-    let non_inline_functions_needing_inlining: Vec<QualifiedFunId> = function_callees
+    let non_inline_functions_needing_inlining: Vec<QualifiedFunId> = call_graph
         .iter()
-        .filter(|(fnid, callees)| {
-            !env.get_function(**fnid).is_inline()
+        .filter(|(caller_fnid, callees)| {
+            !env.get_function(**caller_fnid).is_inline()
                 && callees
                     .iter()
-                    .any(|fnid2| env.get_function(*fnid2).is_inline())
+                    .any(|callee_fnid| env.get_function(*callee_fnid).is_inline())
         })
-        .map(|(fnid, _callees)| fnid)
+        .map(|(caller_fnid, _)| caller_fnid)
         .cloned()
         .collect();
 
@@ -305,7 +309,6 @@ fn postorder<T: Ord + Copy + Debug>(
     let mut visited = BTreeSet::new();
     let mut grey = BTreeSet::new();
     let mut postorder_num_to_node = Vec::new();
-    let mut node_to_postorder_num = BTreeMap::new();
 
     for entry in entries {
         if !visited.contains(&entry) {
@@ -313,9 +316,7 @@ fn postorder<T: Ord + Copy + Debug>(
             stack.push(entry);
             while let Some(curr) = stack.pop() {
                 if grey.contains(&curr) {
-                    let curr_num = postorder_num_to_node.len();
                     postorder_num_to_node.push(*curr);
-                    node_to_postorder_num.insert(curr, curr_num);
                 } else {
                     grey.insert(curr);
                     stack.push(curr);
@@ -335,14 +336,14 @@ fn postorder<T: Ord + Copy + Debug>(
 }
 
 // Check for cycles in a callee_map.
-// If there is a cycle, return one cyclical path.
+// If there is a cycle, return at least one cyclical path.
 fn check_for_cycles<T: Ord + Copy + Debug>(
     callee_map: &BTreeMap<T, BTreeSet<T>>,
 ) -> BTreeSet<Vec<T>> {
     let mut cycles: BTreeSet<Vec<T>> = BTreeSet::new();
     let mut reachable_from_map: BTreeMap<T, BTreeSet<Vec<T>>> = callee_map
         .iter()
-        .map(|(node, set)| (*node, set.iter().map(|_node2| [*node].to_vec()).collect()))
+        .map(|(node, set)| (*node, iter::repeat(vec![*node]).take(set.len()).collect()))
         .collect();
 
     let mut changed = true;
@@ -401,13 +402,15 @@ impl<'env> Inliner<'env> {
         }
     }
 
-    /// If `self.funxprs_after_inlining` doesn't already have an entry for provided `func_id`, then
-    /// scan the function body for inlining opportunities.  Add an entry to
-    /// `self.funexprs_after_inlining`, mapping to `None` if there are no inlining opportunities,
-    /// or to the function body after inlining.  Return the set of non-inline functions called from
-    /// the resulting function.
+    /// If the body of function `func_id` contains calls to inline functions, then
+    /// - makes a copy of the body with every call to any inline function `callee` replaced by
+    ///   either
+    ///   - the mapping found in `self.funexprs_after_inlining` for `callee`, or
+    ///   - the original body of `callee` (as obtained from `self.env: &GlobalEnv`)
+    /// - stores a mapping from `func_id` to the inlined body `self.funexprs_after_inlining`
+    /// Otherwise, stores a mapping from `func_id` to `None` in `self.funexprs_after_inlining`
     ///
-    /// If `self.funxprs_after_inlining` already has an entry, then returns the empty set.
+    /// This should be called on `func_id` only after all inline functions it calls are processed.
     fn try_inlining_in(&mut self, func_id: QualifiedFunId) {
         assert!(!self.funexprs_after_inlining.contains_key(&func_id));
         let func_env = self.env.get_function(func_id);
@@ -856,7 +859,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
     }
 
     // Convert a list of Parameters into a Pattern.
-    // Check for conflits between lambda_free_vars and symbols in Parameters,
+    // Check for conflicts between lambda_free_vars and symbols in Parameters,
     // replacing them by shadow symbols.
     // Also remap types according to type_param_map as needed.
     fn parameter_list_to_pattern(
@@ -1226,5 +1229,61 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
             eprintln!("rewriting pattern {:#?} into {:#?}", pat, result);
         };
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cycle() {
+        let graph = BTreeMap::from([
+            (1, BTreeSet::from([2])),
+            (2, BTreeSet::from([3])),
+            (3, BTreeSet::from([4])),
+            (4, BTreeSet::from([5, 6])),
+            (5, BTreeSet::from([3])),
+            (6, BTreeSet::new()),
+        ]);
+        let cycle = vec![3, 4, 5];
+        assert!(check_for_cycles(&graph) == BTreeSet::from([cycle]));
+    }
+
+    #[test]
+    fn test_no_cycle() {
+        let graph = BTreeMap::from([
+            (1, BTreeSet::from([2, 3])),
+            (2, BTreeSet::from([4])),
+            (3, BTreeSet::from([4])),
+            (4, BTreeSet::from([5, 6])),
+            (5, BTreeSet::from([7])),
+            (6, BTreeSet::from([7])),
+            (7, BTreeSet::new()),
+        ]);
+        assert!(check_for_cycles(&graph) == BTreeSet::new());
+    }
+
+    #[test]
+    fn test_postorder() {
+        let entries = vec![1, 2, 3, 4, 5, 7];
+        let call_graph = BTreeMap::from([
+            (1, BTreeSet::from([2, 3])),
+            (2, BTreeSet::from([4])),
+            (3, BTreeSet::from([4])),
+            (4, BTreeSet::from([5, 6])),
+            (5, BTreeSet::from([7])),
+            (6, BTreeSet::new()),
+            (7, BTreeSet::from([8])),
+            (9, BTreeSet::new()),
+        ]);
+        let result = postorder(&entries, &call_graph);
+        eprintln!("result is {:#?}", &result);
+        assert!(
+            result == vec![8, 7, 5, 6, 4, 3, 2, 1]
+                || result == vec![8, 7, 6, 5, 4, 3, 2, 1]
+                || result == vec![8, 6, 7, 5, 4, 3, 2, 1]
+                || result == vec![6, 8, 7, 5, 4, 3, 2, 1]
+        );
     }
 }
