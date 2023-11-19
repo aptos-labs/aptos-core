@@ -3322,12 +3322,6 @@ pub struct FunctionData {
     pub(crate) transitive_closure_of_called_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
 }
 
-impl FunctionData {
-    pub fn is_inline(&self) -> bool {
-        self.kind == FunctionKind::Inline
-    }
-}
-
 /// Kind of a function,
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum FunctionKind {
