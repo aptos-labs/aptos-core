@@ -271,7 +271,7 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
-        "integration/sign-a-transaction",
+        "integration/wallet-adapter-concept",
         {
           type: "category",
           label: "Integrate with Wallets",
