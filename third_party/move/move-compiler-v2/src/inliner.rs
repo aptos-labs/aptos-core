@@ -475,13 +475,7 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
                     } else {
                         // `qfid` was not previously inlined into, look for the original body expr.
                         let func_env_def = func_env.get_def();
-                        if let Some(expr) = &*func_env_def {
-                            Some(expr.clone())
-                        } else {
-                            // `qfid` not found  This program has a problem, but it is flagged
-                            // elsewhere so just ignore it here.
-                            None
-                        }
+                        (*func_env_def).as_ref().cloned()
                     };
                 // inline here
                 if let Some(expr) = body_expr {
@@ -772,7 +766,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         // and shadow them all.
         let all_lambda_free_vars: BTreeSet<_> = lambda_args_matched
             .iter()
-            .flat_map(|(_, exp)| exp.get_free_local_vars().into_iter())
+            .flat_map(|(_, exp)| exp.free_vars().into_iter())
             .collect();
 
         // Record free variables in the parameters.

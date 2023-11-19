@@ -1938,7 +1938,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             // Check whether the inclusion is correct regards usage of post state.
 
             // First check for lets.
-            for (name, _) in cond.exp.free_vars(self.parent.env) {
+            for (name, _) in cond.exp.free_vars_with_types(self.parent.env) {
                 if let Some((true, id)) = self.spec_block_lets.get(&name) {
                     let label_cond = (cond.loc.clone(), "not allowed to use post state".to_owned());
                     let label_let = (
@@ -3016,7 +3016,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             // that conflicts with variables defined in the condition, return an error
             for bound_expr in argument_map.values() {
                 let exp_loc = self.parent.env.get_node_loc(bound_expr.node_id());
-                for loc_sym in bound_expr.free_local_vars_with_node_id().keys() {
+                for loc_sym in bound_expr.bound_local_vars_with_node_id().keys() {
                     match kind {
                         ConditionKind::LetPost(name) | ConditionKind::LetPre(name) => {
                             if name == loc_sym {

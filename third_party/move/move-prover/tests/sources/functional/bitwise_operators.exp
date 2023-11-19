@@ -1,3 +1,0 @@
-Move prover returns: [internal] boogie exited with compilation errors:
-bitwise_operators.bpl(3532,23): Error: invalid type for argument 0 in application of $IsEqual'u64': bv64 (expected: int)
-1 type checking errors detected in bitwise_operators.bpl

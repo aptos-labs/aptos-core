@@ -632,6 +632,36 @@ impl ExpData {
         ids
     }
 
+    /// Returns the free local variables, inclusive their types, used in this expression.
+    /// Result is ordered by occurrence.
+    pub fn free_vars_with_types(&self, env: &GlobalEnv) -> Vec<(Symbol, Type)> {
+        let mut vars = vec![];
+        let var_collector = |id: &NodeId, sym: &Symbol| {
+            if !vars.iter().any(|(s, _)| s == sym) {
+                vars.push((*sym, env.get_node_type(*id)));
+            }
+        };
+        self.visit_free_local_vars(var_collector);
+        vars
+    }
+
+    /// Returns the bound local variables with node id in this expression
+    pub fn bound_local_vars_with_node_id(&self) -> BTreeMap<Symbol, NodeId> {
+        let mut vars = BTreeMap::new();
+        let mut visitor = |up: bool, e: &ExpData| {
+            use ExpData::*;
+            if up {
+                if let LocalVar(id, sym) = e {
+                    if !vars.iter().any(|(s, _)| s == sym) {
+                        vars.insert(*sym, *id);
+                    }
+                }
+            }
+        };
+        self.visit_pre_post(&mut visitor);
+        vars
+    }
+
     /// Visits free local variables with node id in this expression.
     fn visit_free_local_vars<F>(&self, mut node_symbol_visitor: F)
     where
@@ -684,31 +714,8 @@ impl ExpData {
         self.visit_pre_post(&mut visitor);
     }
 
-    /// Returns the free local variables, inclusive their types, used in this expression.
-    /// Result is ordered by occurrence.
-    pub fn free_vars(&self, env: &GlobalEnv) -> Vec<(Symbol, Type)> {
-        let mut vars = vec![];
-        let var_collector = |id: &NodeId, sym: &Symbol| {
-            if !vars.iter().any(|(s, _)| s == sym) {
-                vars.push((*sym, env.get_node_type(*id)));
-            }
-        };
-        self.visit_free_local_vars(var_collector);
-        vars
-    }
-
-    /// Returns the free local variables with node id in this expression
-    pub fn free_local_vars_with_node_id(&self) -> BTreeMap<Symbol, NodeId> {
-        let mut vars = BTreeMap::new();
-        let var_to_node_collector = |id: &NodeId, sym: &Symbol| {
-            vars.insert(*sym, *id);
-        };
-        self.visit_free_local_vars(var_to_node_collector);
-        vars
-    }
-
     /// Returns just the free local variables in this expression.
-    pub fn get_free_local_vars(&self) -> BTreeSet<Symbol> {
+    pub fn free_vars(&self) -> BTreeSet<Symbol> {
         let mut vars = BTreeSet::new();
         let just_vars_collector = |_id: &NodeId, sym: &Symbol| {
             vars.insert(*sym);
