@@ -9,10 +9,12 @@ Any transaction execution on the Aptos blockchain requires a processing fee. As 
 1. Execution & IO costs
   - This covers your usage of transient computation resources, such as processing your transactions and propagating the validated record throughout the distributed network of the mainnet.
   - It is measured in Gas Units whose price may fluctuate according to the load of the network. This allows execution & io costs to be low when the network is less busy.
+  - This portion of gas is burned permanently upon the execution of a transaction.
 2. Storage fees
   - This covers the cost to persistently store validated record in the distributed blockchain storage.
   - It is measured in fixed APT prices, so the permanent storage cost stays stable even as the gas unit price fluctuates with the network's transient load.
   - The storage fee can be refunded when the allocated storage space is deleted. The refund amount may be full or partial, based on the size and duration of the storage used.
+  - To keep system implementation simple, this portion of gas is burned and minted again upon refund.
 
 :::tip
 Conceptually, this fee can be thought of as quite similar to how we pay for our home electric or water utilities.
