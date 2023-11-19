@@ -17,6 +17,7 @@ use aptos_types::{
     transaction::{SignedTransaction, Transaction, TransactionStatus},
 };
 use std::fmt::{Debug, Display, Formatter};
+use aptos_types::system_txn::SystemTransaction;
 
 /// ExecutedBlocks are managed in a speculative tree, the committed blocks form a chain. Besides
 /// block data, each executed block also has other derived meta data which could be regenerated from
@@ -84,6 +85,10 @@ impl ExecutedBlock {
 
     pub fn round(&self) -> Round {
         self.block().round()
+    }
+
+    pub fn sys_txns(&self) -> Option<&Vec<SystemTransaction>> {
+        self.block().sys_txns()
     }
 
     pub fn timestamp_usecs(&self) -> u64 {

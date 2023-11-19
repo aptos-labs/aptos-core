@@ -24,9 +24,15 @@ use aptos_consensus_types::{
     common::{Author, Payload, PayloadFilter, Round},
     quorum_cert::QuorumCert,
 };
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::{error, sample, sample::SampleRate, warn};
+use aptos_types::system_txn::SystemTransaction;
 use futures::future::BoxFuture;
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use std::{
+    collections::{BTreeMap, HashSet},
+    sync::Arc,
+    time::Duration,
+};
 
 #[cfg(test)]
 #[path = "proposal_generator_test.rs"]
@@ -299,13 +305,23 @@ impl ProposalGenerator {
                 .await;
 
             let sys_txns = if self.should_propose_sys_txns {
+                let pending_sys_txns: HashSet<HashValue> = pending_blocks
+                    .iter()
+                    .filter_map(|block| block.sys_txns())
+                    .flatten()
+                    .map(SystemTransaction::hash)
+                    .collect();
+
                 // Priority: self.sys_txn_provider[0] > ... > self.sys_txn_provider[-1] > payload.
                 let mut sys_txns = vec![];
                 for provider in self.sys_txn_providers.iter() {
                     if let Some(txn) = provider.get() {
                         let txn_size = txn.size_in_bytes() as u64;
-                        if max_block_txns >= 1 && max_block_bytes >= txn_size {
-                            sys_txns.push(txn);
+                        if !pending_sys_txns.contains(&txn.hash())
+                            && max_block_txns >= 1
+                            && max_block_bytes >= txn_size
+                        {
+                            sys_txns.push(txn.clone());
                             max_block_txns -= 1;
                             max_block_bytes -= txn_size;
                         } else {
