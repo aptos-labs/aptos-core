@@ -93,10 +93,10 @@ type CallSiteLocations = BTreeMap<(QualifiedFunId, QualifiedFunId), BTreeSet<Nod
 // visit that function body and inline any calls to functions marked as "inline".
 pub fn run_inlining(env: &mut GlobalEnv) {
     // Get non-inline function roots for running inlining.
-    // While we're iterating, generate an error for any target inline functions lacking a body to
-    // inline.
+    // Also generate an error for any target inline functions lacking a body to inline.
     let mut todo = get_targets(env);
 
+    // Only look for inlining sites if we have targets to inline into.
     if !todo.is_empty() {
         // Recursively find callees of each target with a function body.
         let mut function_callees: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
@@ -123,6 +123,7 @@ pub fn run_inlining(env: &mut GlobalEnv) {
         }
 
         // Get a list of all reachable functions calling inline functions, in bottom-up order.
+        // If there are any cycles, this call displays an error to the user and returns None.
         if let Ok(functions_needing_inlining) = functions_needing_inlining_in_order(
             env,
             &function_callees,
@@ -139,7 +140,8 @@ pub fn run_inlining(env: &mut GlobalEnv) {
             for (fun_id, funexpr_after_inlining) in inliner.funexprs_after_inlining {
                 if let Some(changed_funexpr) = funexpr_after_inlining {
                     let oldexp = env.get_function(fun_id);
-                    // Only record changed cuntion bodies for functions which are targets.
+                    // TODO/BUGBUG: Is this the right thing to do here?
+                    // Only record changed function bodies for functions which are targets.
                     if oldexp.module_env.is_target() {
                         let mut old_def = oldexp.get_mut_def();
                         *old_def = Some(changed_funexpr);
@@ -152,6 +154,8 @@ pub fn run_inlining(env: &mut GlobalEnv) {
     // Delete all inline functions with bodies from the program rep, even if none were inlined,
     // since (1) they are no longer needed, and (2) they may have code constructs that codegen can't
     // deal with.
+
+    // First construct a list of functions to remove.
     let mut inline_funs = BTreeSet::new();
     for module in env.get_modules() {
         for func in module.get_functions() {
@@ -162,6 +166,7 @@ pub fn run_inlining(env: &mut GlobalEnv) {
             }
         }
     }
+    // Modify the model to delete of the functions and references to them.
     env.filter_functions(|fun_id: &QualifiedFunId| inline_funs.contains(fun_id));
 }
 
@@ -190,8 +195,6 @@ fn get_targets(env: &mut GlobalEnv) -> BTreeSet<QualifiedFunId> {
                             );
                             env.diag(Severity::Bug, &func_loc, &msg);
                         }
-                    } else {
-                        eprintln!("Found inline function {:#?}", func.get_name_str());
                     }
                 } else {
                     targets.insert(id);
@@ -495,8 +498,7 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
                     Some(rewritten)
                 } else {
                     let func_env_def = func_env.get_def();
-                    let func_env_def_deref = func_env_def.deref();
-                    if let Some(expr) = &func_env_def_deref {
+                    if let Some(expr) = &*func_env_def {
                         // inline here
                         if self.inliner.debug {
                             eprintln!(
@@ -546,24 +548,28 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
 /// declarations with the same symbol.  In the latter case, the ShadowStack provides
 /// a "shadow" symbol which can be used in place of the original.
 ///
-/// Operations are
-///       pub fn new<'a, T>(env: &GlobalEnv, free_vars: T) -> Self
-///       pub fn get_shadow_symbol(&mut self, sym: Symbol, entering_scope: bool) -> Option<Symbol> {
-///       pub fn enter_scope<T>(&mut self, entering_vars: T)
-///       pub fn enter_scope_after_renaming<'a>(
-///       pub fn exit_scope(&mut self) {
+/// Operations are summarized here:
+///       pub fn new<'a, T>(env: &GlobalEnv, free_vars: T) -> Self;
+///       pub fn get_shadow_symbol(&mut self, sym: Symbol, entering_scope: bool) -> Option<Symbol>;
+///       pub fn enter_scope<T>(&mut self, entering_vars: T);
+///       pub fn enter_scope_after_renaming<'a>(&mut self,
+///                                             entering_vars: Iteratator<Item = &'a Symbol>T);
+///       pub fn exit_scope(&mut self);
+/// For details, see descriptions on the definitions below.
 
 struct ShadowStack {
-    /// unique shadow var for each "lambda free var", a free variable from any lambda parameter.
+    /// Unique shadow var for each "free" var, immutable for the life of the ShadowStack.
     shadow_symbols: BTreeMap<Symbol, Symbol>,
 
-    /// inverse of shadow_symbols for more efficient scoping
+    /// Inverse of shadow_symbols for more efficient scoping
     shadow_symbols_inverse: BTreeMap<Symbol, Symbol>,
 
-    /// subset of lambda free vars shadowed at each scope
+    /// Subset of free vars shadowed at each scope
     scoped_shadowed_vars: Vec<Vec<Symbol>>,
 
-    /// maps each of "lambda free var" to 0 initially, incremented as scopes are entered
+    /// Maps each of "free var" to a count of shadowing scopes surrounding the current point.
+    /// - Entries are eagerly created to map each var to 0.
+    /// - Entry for var incremented/decremented as each scope shadowing var is entered/exited.
     scoped_shadowed_count: BTreeMap<Symbol, usize>,
 }
 
@@ -605,8 +611,8 @@ impl ShadowStack {
         pool.make(&shadow_name)
     }
 
-    // If a var is a free variable which is currently shadowed, then gets the shadow variable,
-    // else None.
+    // If a var is a free variable which is currently shadowed, then gets the shadow variable;
+    // otherwise (not a free variable or not shadowed) returns None.
     //
     // If entering_scope, then the free variable is rewritten even if we're not yet in a scope,
     // since we are about to enter one.
@@ -615,13 +621,12 @@ impl ShadowStack {
             .scoped_shadowed_count
             .get(&sym)
             .map(|count| if entering_scope { *count + 1 } else { *count })
-            .unwrap_or(0)
+            .unwrap_or(0) // Not a free variable.
             > 0
         {
-            let new_sym = self
-                .shadow_symbols
-                .get(&sym)
-                .expect("Inconsistency in free-var handling in inlining");
+            let new_sym = self.shadow_symbols.get(&sym).expect(
+                "Invariant violation: Shadow symbol not found in ShadowStack::get_shadow_symbol",
+            );
             Some(*new_sym)
         } else {
             None
@@ -641,7 +646,7 @@ impl ShadowStack {
             *self
                 .scoped_shadowed_count
                 .get_mut(free_var)
-                .expect("shadow counter for free var") += 1;
+                .expect("Invariant violation: Free var not found in ShadowStack::enter_scope") += 1;
         }
         self.scoped_shadowed_vars.push(entering_free_vars);
     }
@@ -665,12 +670,12 @@ impl ShadowStack {
         let exiting_free_vars = self
             .scoped_shadowed_vars
             .pop()
-            .expect("Scope misalignment in inlining");
+            .expect("Scope misalignment in inlining (too many scope exits).");
         for free_var in exiting_free_vars {
             *self
                 .scoped_shadowed_count
                 .get_mut(&free_var)
-                .expect("failed invariant in ShadowStack implementation") -= 1;
+                .expect("Invariant violation: Free var not found in ShadowStack::exit_scope") -= 1;
         }
     }
 }
