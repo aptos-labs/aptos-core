@@ -229,7 +229,9 @@ pub struct DataStreamingServiceConfig {
     /// the subscription stream is terminated and a new stream must be created.
     pub max_num_consecutive_subscriptions: u64,
 
-    /// Maximum number of pending requests per data stream.
+    /// Maximum number of pending requests per data stream. This includes the
+    /// requests that have already succeeded but have not yet been consumed
+    /// because they're head-of-line blocked by other requests.
     pub max_pending_requests: u64,
 
     /// Maximum number of retries for a single client request before a data
