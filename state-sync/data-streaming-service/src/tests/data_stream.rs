@@ -49,7 +49,7 @@ use aptos_types::{
 };
 use claims::{assert_err, assert_ge, assert_matches, assert_none, assert_ok, assert_some};
 use futures::{FutureExt, StreamExt};
-use std::{sync::Arc, time::Duration};
+use std::{collections::VecDeque, sync::Arc, time::Duration};
 use tokio::time::timeout;
 
 #[tokio::test]
@@ -393,6 +393,364 @@ async fn test_state_stream_out_of_order_responses() {
         );
     }
     assert_none!(stream_listener.select_next_some().now_or_never());
+}
+
+#[tokio::test]
+async fn test_stream_max_pending_requests() {
+    // Create an epoch ending data stream
+    let max_concurrent_requests = 6;
+    let max_pending_requests = 19;
+    let streaming_service_config = DataStreamingServiceConfig {
+        max_concurrent_requests,
+        max_pending_requests,
+        ..Default::default()
+    };
+    let (mut data_stream, mut stream_listener) = create_epoch_ending_stream(
+        AptosDataClientConfig::default(),
+        streaming_service_config,
+        MIN_ADVERTISED_EPOCH_END,
+    );
+
+    // Initialize the data stream
+    let global_data_summary = create_global_data_summary(1);
+    initialize_data_requests(&mut data_stream, &global_data_summary);
+
+    // Verify that the correct number of client requests have been made
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(
+        sent_requests.as_ref().unwrap().len(),
+        max_concurrent_requests as usize
+    );
+
+    // Set a valid response for each request except the first one
+    set_epoch_ending_response_for_indices(
+        &mut data_stream,
+        max_concurrent_requests,
+        (1..max_concurrent_requests).collect::<Vec<_>>(),
+    );
+
+    // Process the responses and send more client requests
+    process_data_responses(&mut data_stream, &global_data_summary).await;
+    assert_none!(stream_listener.select_next_some().now_or_never());
+
+    // Verify the correct number of requests have been made
+    let num_expected_pending_requests = (max_concurrent_requests * 2) - 1; // The first request failed
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(
+        sent_requests.as_ref().unwrap().len() as u64,
+        num_expected_pending_requests
+    );
+
+    // Verify the state of the pending responses
+    verify_pending_responses_for_indices(
+        sent_requests,
+        num_expected_pending_requests,
+        (1..max_concurrent_requests).collect::<Vec<_>>(),
+    );
+
+    // Set a valid response for each request except the first and last ones
+    set_epoch_ending_response_for_indices(
+        &mut data_stream,
+        num_expected_pending_requests,
+        (1..num_expected_pending_requests - 1).collect::<Vec<_>>(),
+    );
+
+    // Process the responses and send more client requests
+    process_data_responses(&mut data_stream, &global_data_summary).await;
+    assert_none!(stream_listener.select_next_some().now_or_never());
+
+    // Verify the correct number of requests have been made
+    let num_expected_pending_requests = (max_concurrent_requests * 3) - 3;
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(
+        sent_requests.as_ref().unwrap().len() as u64,
+        num_expected_pending_requests
+    );
+
+    // Verify the state of the pending responses
+    verify_pending_responses_for_indices(
+        sent_requests,
+        num_expected_pending_requests,
+        (1..(max_concurrent_requests * 2) - 2).collect::<Vec<_>>(),
+    );
+
+    // Set a valid response for each request except the first one
+    set_epoch_ending_response_for_indices(
+        &mut data_stream,
+        num_expected_pending_requests,
+        (1..num_expected_pending_requests).collect::<Vec<_>>(),
+    );
+
+    // Process the responses and send more client requests
+    process_data_responses(&mut data_stream, &global_data_summary).await;
+    assert_none!(stream_listener.select_next_some().now_or_never());
+
+    // Verify the correct number of requests have been made
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(
+        sent_requests.as_ref().unwrap().len() as u64,
+        max_pending_requests
+    );
+
+    // Verify the state of the pending responses
+    verify_pending_responses_for_indices(
+        sent_requests,
+        num_expected_pending_requests,
+        (1..(max_concurrent_requests * 3) - 3).collect::<Vec<_>>(),
+    );
+
+    // Set a valid response for each request except the first one
+    set_epoch_ending_response_for_indices(
+        &mut data_stream,
+        num_expected_pending_requests,
+        (1..num_expected_pending_requests).collect::<Vec<_>>(),
+    );
+
+    // Process the responses and send more client requests several times
+    for _ in 0..10 {
+        // Process the responses and send more client requests
+        process_data_responses(&mut data_stream, &global_data_summary).await;
+        assert_none!(stream_listener.select_next_some().now_or_never());
+
+        // Verify that no more requests have been made (we're at the max)
+        let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+        assert_eq!(
+            sent_requests.as_ref().unwrap().len() as u64,
+            max_pending_requests
+        );
+    }
+
+    // Set a valid response for every request
+    set_epoch_ending_response_for_indices(
+        &mut data_stream,
+        max_pending_requests,
+        (0..max_pending_requests).collect::<Vec<_>>(),
+    );
+
+    // Process the responses and send more client requests
+    process_data_responses(&mut data_stream, &global_data_summary).await;
+
+    // Verify that more requests have been made (and the entire buffer has been flushed)
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(
+        sent_requests.as_ref().unwrap().len() as u64,
+        max_concurrent_requests
+    );
+
+    // Verify that we received a notification for each flushed response
+    for _ in 0..max_pending_requests {
+        let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
+        assert_matches!(
+            data_notification.data_payload,
+            DataPayload::EpochEndingLedgerInfos(_)
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_stream_max_pending_requests_flushing() {
+    // Create an epoch ending data stream
+    let max_concurrent_requests = 2;
+    let max_pending_requests = 4;
+    let streaming_service_config = DataStreamingServiceConfig {
+        max_concurrent_requests,
+        max_pending_requests,
+        ..Default::default()
+    };
+    let (mut data_stream, mut stream_listener) = create_epoch_ending_stream(
+        AptosDataClientConfig::default(),
+        streaming_service_config,
+        MIN_ADVERTISED_EPOCH_END,
+    );
+
+    // Initialize the data stream
+    let global_data_summary = create_global_data_summary(1);
+    initialize_data_requests(&mut data_stream, &global_data_summary);
+
+    // Verify that the correct number of client requests have been made
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(
+        sent_requests.as_ref().unwrap().len(),
+        max_concurrent_requests as usize
+    );
+
+    // Set a valid response for the second request
+    set_epoch_ending_response_in_queue(&mut data_stream, 1, 0);
+
+    // Process the responses and verify we get no notifications
+    process_data_responses(&mut data_stream, &global_data_summary).await;
+    assert_none!(stream_listener.select_next_some().now_or_never());
+
+    // Verify that the correct number of client requests have been made
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(
+        sent_requests.as_ref().unwrap().len(),
+        (max_concurrent_requests + 1) as usize
+    );
+
+    // Set a valid response for the third request
+    set_epoch_ending_response_in_queue(&mut data_stream, 2, 0);
+
+    // Process the responses and send more client requests
+    process_data_responses(&mut data_stream, &global_data_summary).await;
+    assert_none!(stream_listener.select_next_some().now_or_never());
+
+    // Verify that the correct number of client requests have been made
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(
+        sent_requests.as_ref().unwrap().len(),
+        max_pending_requests as usize
+    );
+
+    // Set a valid response for the first request
+    set_epoch_ending_response_in_queue(&mut data_stream, 0, 0);
+
+    // Process the responses and verify we get three notifications
+    process_data_responses(&mut data_stream, &global_data_summary).await;
+    for _ in 0..3 {
+        assert_some!(stream_listener.select_next_some().now_or_never());
+    }
+    assert_none!(stream_listener.select_next_some().now_or_never());
+
+    // Verify the correct number of client requests have been made
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(
+        sent_requests.as_ref().unwrap().len(),
+        max_concurrent_requests as usize
+    );
+
+    // Set a valid response for the second request
+    set_epoch_ending_response_in_queue(&mut data_stream, 1, 0);
+
+    // Process the responses and verify we get no notifications
+    process_data_responses(&mut data_stream, &global_data_summary).await;
+    assert_none!(stream_listener.select_next_some().now_or_never());
+
+    // Verify the correct number of client requests have been made
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(
+        sent_requests.as_ref().unwrap().len(),
+        (max_concurrent_requests + 1) as usize
+    );
+
+    // Set a valid response for the first request
+    set_epoch_ending_response_in_queue(&mut data_stream, 0, 0);
+
+    // Process the responses and verify we get two notifications
+    process_data_responses(&mut data_stream, &global_data_summary).await;
+    for _ in 0..2 {
+        assert_some!(stream_listener.select_next_some().now_or_never());
+    }
+    assert_none!(stream_listener.select_next_some().now_or_never());
+
+    // Verify the correct number of client requests have been made
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(
+        sent_requests.as_ref().unwrap().len(),
+        max_concurrent_requests as usize
+    );
+
+    // Set an error response for all requests
+    for index in 0..max_concurrent_requests {
+        set_failure_response_in_queue(&mut data_stream, index as usize);
+    }
+
+    // Process the responses and (potentially) send more client requests
+    process_data_responses(&mut data_stream, &global_data_summary).await;
+    assert_none!(stream_listener.select_next_some().now_or_never());
+
+    // Verify no more client requests have been made
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(
+        sent_requests.as_ref().unwrap().len() as u64,
+        max_concurrent_requests
+    );
+
+    // Set a valid response for the first request
+    set_epoch_ending_response_in_queue(&mut data_stream, 0, 0);
+
+    // Process the responses and verify we get one notification
+    process_data_responses(&mut data_stream, &global_data_summary).await;
+    assert_some!(stream_listener.select_next_some().now_or_never());
+    assert_none!(stream_listener.select_next_some().now_or_never());
+
+    // Verify no more client requests have been made
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(
+        sent_requests.as_ref().unwrap().len() as u64,
+        max_concurrent_requests
+    );
+}
+
+#[tokio::test]
+async fn test_stream_max_pending_requests_missing_data() {
+    // Create an epoch ending data stream
+    let max_concurrent_requests = 1;
+    let max_pending_requests = 3;
+    let streaming_service_config = DataStreamingServiceConfig {
+        max_concurrent_requests,
+        max_pending_requests,
+        ..Default::default()
+    };
+    let (mut data_stream, mut stream_listener) = create_epoch_ending_stream(
+        AptosDataClientConfig::default(),
+        streaming_service_config,
+        MIN_ADVERTISED_EPOCH_END,
+    );
+
+    // Initialize the data stream
+    let optimal_epoch_chunk_sizes = 2;
+    let global_data_summary = create_global_data_summary(optimal_epoch_chunk_sizes);
+    initialize_data_requests(&mut data_stream, &global_data_summary);
+
+    // Verify that the correct number of client requests have been made
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(
+        sent_requests.as_ref().unwrap().len(),
+        max_concurrent_requests as usize
+    );
+
+    // Set a valid (but partial) response for the first request
+    set_epoch_ending_response_in_queue(&mut data_stream, 0, 1);
+
+    // Process the responses and verify we get a notification
+    process_data_responses(&mut data_stream, &global_data_summary).await;
+    assert_some!(stream_listener.select_next_some().now_or_never());
+
+    // Verify that the correct number of client requests have been made
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(
+        sent_requests.as_ref().unwrap().len(),
+        max_concurrent_requests as usize
+    );
+
+    // Set a valid (now complete) response for the first request
+    set_epoch_ending_response_in_queue(&mut data_stream, 0, 1);
+
+    // Process the responses and verify we get a notification
+    process_data_responses(&mut data_stream, &global_data_summary).await;
+    assert_some!(stream_listener.select_next_some().now_or_never());
+
+    // Verify that no more client requests have been made
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(
+        sent_requests.as_ref().unwrap().len(),
+        max_concurrent_requests as usize
+    );
+
+    // Set a valid (but partial) response for the first request again
+    set_epoch_ending_response_in_queue(&mut data_stream, 0, 1);
+
+    // Process the responses and verify we get a notification
+    process_data_responses(&mut data_stream, &global_data_summary).await;
+    assert_some!(stream_listener.select_next_some().now_or_never());
+
+    // Verify that the correct number of client requests have been made
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(
+        sent_requests.as_ref().unwrap().len(),
+        max_concurrent_requests as usize
+    );
 }
 
 #[tokio::test]
@@ -1827,6 +2185,28 @@ fn enumerate_continuous_data_streams(
     continuous_data_streams
 }
 
+/// Sets an epoch ending response in the queue at the given set of indices.
+/// For indices that are not specified, either an error response is set,
+/// or nothing (to emulate the request failing or still being in-flight).
+fn set_epoch_ending_response_for_indices(
+    data_stream: &mut DataStream<MockAptosDataClient>,
+    max_queue_length: u64,
+    indices: Vec<u64>,
+) {
+    for index in 0..max_queue_length {
+        let random_number = create_random_u64(100);
+        if indices.contains(&index) {
+            set_epoch_ending_response_in_queue(data_stream, index as usize, 0); // Set a valid response
+        } else if random_number % 3 == 0 {
+            set_timeout_response_in_queue(data_stream, index as usize); // Set a timeout response
+        } else if random_number % 3 == 1 {
+            set_failure_response_in_queue(data_stream, index as usize); // Set a failure response
+        } else {
+            // Do nothing (to emulate the request still being in-flight)
+        }
+    }
+}
+
 /// Sets the client response at the index in the pending queue to contain an
 /// epoch ending data response.
 fn set_epoch_ending_response_in_queue(
@@ -2191,6 +2571,31 @@ fn verify_pending_optimistic_fetch(
         })
     };
     assert_eq!(client_request, expected_request);
+}
+
+/// Verifies that the pending requests are fulfilled for the specified indices
+fn verify_pending_responses_for_indices(
+    sent_requests: &mut Option<VecDeque<Arc<Mutex<Box<PendingClientResponse>>>>>,
+    max_queue_length: u64,
+    indices: Vec<u64>,
+) {
+    for index in 0..max_queue_length {
+        // Get the client response
+        let sent_request = sent_requests.as_ref().unwrap().get(index as usize);
+        let pending_client_response = sent_request.unwrap().lock();
+        let client_response = pending_client_response.client_response.as_ref();
+
+        // Verify the client response
+        if indices.contains(&index) {
+            // Verify the response is present
+            assert_some!(client_response);
+        } else {
+            // Otherwise, if a response is present, it must be an error
+            if let Some(client_response) = client_response {
+                assert_err!(client_response);
+            }
+        }
+    }
 }
 
 /// Verifies that the pending subscription requests are well formed
