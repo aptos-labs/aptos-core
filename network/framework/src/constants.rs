@@ -11,14 +11,14 @@
 /// The timeout for any inbound RPC call before it's cut off
 pub const INBOUND_RPC_TIMEOUT_MS: u64 = 60_000;
 /// Limit on concurrent Outbound RPC requests before backpressure is applied
-pub const MAX_CONCURRENT_OUTBOUND_RPCS: u32 = 100;
+pub const MAX_CONCURRENT_OUTBOUND_RPCS: u32 = 500;
 /// Limit on concurrent Inbound RPC requests before backpressure is applied
-pub const MAX_CONCURRENT_INBOUND_RPCS: u32 = 100;
+pub const MAX_CONCURRENT_INBOUND_RPCS: u32 = 500;
 
 // These are only used in tests
 // TODO: Fix this so the tests and the defaults in config are the same
-pub const NETWORK_CHANNEL_SIZE: usize = 1024;
+pub const NETWORK_CHANNEL_SIZE: usize = 2048;
 pub const MAX_FRAME_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB */
 pub const MAX_MESSAGE_SIZE: usize = 64 * 1024 * 1024; /* 64 MiB */
-pub const MAX_CONCURRENT_NETWORK_REQS: usize = 100;
-pub const MAX_CONCURRENT_NETWORK_NOTIFS: usize = 100;
+pub const MAX_CONCURRENT_NETWORK_REQS: usize = 500;
+pub const MAX_CONCURRENT_NETWORK_NOTIFS: usize = 500;
