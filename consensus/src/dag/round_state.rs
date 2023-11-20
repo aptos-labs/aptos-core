@@ -2,9 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::anchor_election::TChainHealthBackoff;
-use crate::dag::{
-    observability::tracing::{observe_round, RoundStage},
-    types::NodeCertificate,
+use crate::{
+    counters::PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED,
+    dag::{
+        observability::tracing::{observe_round, RoundStage},
+        types::NodeCertificate,
+    },
+    liveness::proposal_generator::PipelineBackpressureConfig,
 };
 use aptos_consensus_types::common::Round;
 use aptos_infallible::duration_since_epoch;
@@ -35,6 +39,7 @@ impl RoundState {
         &mut self,
         highest_strong_links_round: Round,
         strong_links: Vec<NodeCertificate>,
+        pipeline_delay: Duration,
     ) {
         match self.current_round.cmp(&highest_strong_links_round) {
             // we're behind, move forward immediately
@@ -44,7 +49,7 @@ impl RoundState {
             },
             Ordering::Equal => {
                 self.responsive_check
-                    .check_for_new_round(highest_strong_links_round, strong_links)
+                    .check_for_new_round(highest_strong_links_round, strong_links, pipeline_delay)
                     .await
             },
             Ordering::Greater => (),
@@ -68,6 +73,7 @@ pub trait ResponsiveCheck: Send {
         &mut self,
         highest_strong_links_round: Round,
         strong_links: Vec<NodeCertificate>,
+        duration: Duration,
     );
 
     fn reset(&mut self);
@@ -90,6 +96,7 @@ impl ResponsiveCheck for OptimisticResponsive {
         &mut self,
         highest_strong_links_round: Round,
         _strong_links: Vec<NodeCertificate>,
+        _duration: Duration,
     ) {
         let new_round = highest_strong_links_round + 1;
         let _ = self.event_sender.send(new_round).await;
@@ -115,6 +122,7 @@ pub struct AdaptiveResponsive {
     event_sender: tokio::sync::mpsc::Sender<Round>,
     state: State,
     chain_backoff: Arc<dyn TChainHealthBackoff>,
+    pipeline_backpressure_config: PipelineBackpressureConfig,
 }
 
 impl AdaptiveResponsive {
@@ -123,6 +131,7 @@ impl AdaptiveResponsive {
         epoch_state: Arc<EpochState>,
         minimal_wait_time: Duration,
         chain_backoff: Arc<dyn TChainHealthBackoff>,
+        pipeline_backpressure_config: PipelineBackpressureConfig,
     ) -> Self {
         Self {
             epoch_state,
@@ -131,6 +140,7 @@ impl AdaptiveResponsive {
             event_sender,
             state: State::Initial,
             chain_backoff,
+            pipeline_backpressure_config,
         }
     }
 }
@@ -141,6 +151,7 @@ impl ResponsiveCheck for AdaptiveResponsive {
         &mut self,
         highest_strong_links_round: Round,
         strong_links: Vec<NodeCertificate>,
+        pipeline_pending_latency: Duration,
     ) {
         if matches!(self.state, State::Sent) {
             return;
@@ -163,10 +174,22 @@ impl ResponsiveCheck for AdaptiveResponsive {
             self.minimal_wait_time
         };
 
+        let pipeline_backpressure = self
+            .pipeline_backpressure_config
+            .get_backoff(pipeline_pending_latency);
+        let pipeline_delay = if let Some(value) = pipeline_backpressure {
+            PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED.observe(1.0);
+            Duration::from_millis(value.backpressure_proposal_delay_ms)
+        } else {
+            PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED.observe(0.0);
+            Duration::ZERO
+        };
+
         // voting power == 3f+1 or pass minimal wait time
         let duration_since_start = duration_since_epoch().saturating_sub(self.start_time);
-        if voting_power == self.epoch_state.verifier.total_voting_power()
-            || duration_since_start >= wait_time
+        if (voting_power == self.epoch_state.verifier.total_voting_power()
+            || duration_since_start >= wait_time)
+            && duration_since_start > pipeline_delay
         {
             let _ = self.event_sender.send(new_round).await;
             if let State::Scheduled(handle) = std::mem::replace(&mut self.state, State::Sent) {
