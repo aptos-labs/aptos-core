@@ -792,13 +792,15 @@ impl AptosVM {
             txn_data,
         )?;
         respawned_session.execute(|session| {
-            session.execute_function_bypass_visibility(
-                &MULTISIG_ACCOUNT_MODULE,
-                SUCCESSFUL_TRANSACTION_EXECUTION_CLEANUP,
-                vec![],
-                cleanup_args,
-                &mut UnmeteredGasMeter,
-            )
+            session
+                .execute_function_bypass_visibility(
+                    &MULTISIG_ACCOUNT_MODULE,
+                    SUCCESSFUL_TRANSACTION_EXECUTION_CLEANUP,
+                    vec![],
+                    cleanup_args,
+                    &mut UnmeteredGasMeter,
+                )
+                .map_err(|e| e.into_vm_status())
         })?;
         Ok(respawned_session)
     }
@@ -829,13 +831,15 @@ impl AptosVM {
                 .finish(Location::Undefined)
         })?);
         respawned_session.execute(|session| {
-            session.execute_function_bypass_visibility(
-                &MULTISIG_ACCOUNT_MODULE,
-                FAILED_TRANSACTION_EXECUTION_CLEANUP,
-                vec![],
-                cleanup_args,
-                &mut UnmeteredGasMeter,
-            )
+            session
+                .execute_function_bypass_visibility(
+                    &MULTISIG_ACCOUNT_MODULE,
+                    FAILED_TRANSACTION_EXECUTION_CLEANUP,
+                    vec![],
+                    cleanup_args,
+                    &mut UnmeteredGasMeter,
+                )
+                .map_err(|e| e.into_vm_status())
         })?;
         Ok(respawned_session)
     }

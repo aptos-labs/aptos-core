@@ -83,8 +83,18 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         .build())
     }
 
-    pub fn execute<R>(&mut self, fun: impl FnOnce(&mut SessionExt) -> R) -> R {
-        self.with_session_mut(|session| fun(session.as_mut().unwrap()))
+    pub fn execute<T>(
+        &mut self,
+        fun: impl FnOnce(&mut SessionExt) -> Result<T, VMStatus>,
+    ) -> Result<T, VMStatus> {
+        self.with_session_mut(|session| {
+            fun(session.as_mut().ok_or_else(|| {
+                VMStatus::error(
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                    err_msg("VM respawned session has to be set for execution."),
+                )
+            })?)
+        })
     }
 
     pub fn finish(
@@ -92,7 +102,16 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<VMChangeSet, VMStatus> {
         let additional_change_set = self.with_session_mut(|session| {
-            session.take().unwrap().finish(&mut (), change_set_configs)
+            session
+                .take()
+                .ok_or_else(|| {
+                    VMStatus::error(
+                        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                        err_msg("VM session cannot be finished more than once."),
+                    )
+                })?
+                .finish(&mut (), change_set_configs)
+                .map_err(|e| e.into_vm_status())
         })?;
         if additional_change_set.has_creation() {
             // After respawning, for example, in the epilogue, there shouldn't be new slots
