@@ -772,6 +772,11 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             .flat_map(|(_, exp)| exp.free_vars().into_iter())
             .collect();
 
+        // While we're looking at the lambdas, check for Return in their bodies.
+        for (_, lambda_body) in lambda_args_matched {
+            Self::check_for_return_in_lambda(env, lambda_body);
+        }
+
         // Record free variables in the parameters.
         let regular_params_overlapping_free_vars: Vec<_> = regular_params
             .iter()
@@ -833,6 +838,24 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
     /// Enter a scope for parameters when inlining a call.
     fn shadowing_enter_scope(&mut self, entering_vars: Vec<Symbol>) {
         self.shadow_stack.enter_scope(entering_vars);
+    }
+
+    /// Check for and warn about Return inside a lambda
+    fn check_for_return_in_lambda(env: &GlobalEnv, lambda_body: &Exp) {
+        lambda_body.visit_pre_post(&mut |up, e| {
+            if !up {
+                if let ExpData::Return(node_id, _) = e {
+                    let node_loc = env.get_node_loc(*node_id);
+                    env.error(
+                        &node_loc,
+                        concat!(
+                            "Return not currently supported in function-typed arguments",
+                            " (lambda expressions)"
+                        ),
+                    );
+                }
+            }
+        });
     }
 
     /// Convert a list of Parameters into a Pattern.
