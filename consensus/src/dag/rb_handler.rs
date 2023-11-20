@@ -1,27 +1,33 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::dag::{
-    dag_fetcher::TFetchRequester,
-    dag_network::RpcHandler,
-    dag_store::Dag,
-    errors::NodeBroadcastHandleError,
-    observability::{
-        logging::{LogEvent, LogSchema},
-        tracing::{observe_node, NodeStage},
+use super::adapter::TLedgerInfoProvider;
+use crate::{
+    counters::{CONSENSUS_PROPOSAL_PENDING_DURATION, CONSENSUS_PROPOSAL_PENDING_ROUNDS},
+    dag::{
+        dag_fetcher::TFetchRequester,
+        dag_network::RpcHandler,
+        dag_store::Dag,
+        errors::NodeBroadcastHandleError,
+        observability::{
+            logging::{LogEvent, LogSchema},
+            tracing::{observe_node, NodeStage},
+        },
+        storage::DAGStorage,
+        types::{Node, NodeCertificate, Vote},
+        NodeId,
     },
-    storage::DAGStorage,
-    types::{Node, NodeCertificate, Vote},
-    NodeId,
 };
 use anyhow::{bail, ensure};
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
-use aptos_logger::{debug, error};
+use aptos_logger::{debug, error, info};
 use aptos_types::{epoch_state::EpochState, validator_signer::ValidatorSigner};
 use async_trait::async_trait;
-use std::{collections::BTreeMap, mem, sync::Arc};
+use std::{collections::BTreeMap, mem, sync::Arc, time::Duration};
+
+const MAX_ORDERING_PIPELINE_LATENCY_REDUCTION: Duration = Duration::from_secs(1);
 
 pub(crate) struct NodeBroadcastHandler {
     dag: Arc<RwLock<Dag>>,
@@ -31,6 +37,7 @@ pub(crate) struct NodeBroadcastHandler {
     storage: Arc<dyn DAGStorage>,
     fetch_requester: Arc<dyn TFetchRequester>,
     payload_config: DagPayloadConfig,
+    ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
 }
 
 impl NodeBroadcastHandler {
@@ -41,6 +48,7 @@ impl NodeBroadcastHandler {
         storage: Arc<dyn DAGStorage>,
         fetch_requester: Arc<dyn TFetchRequester>,
         payload_config: DagPayloadConfig,
+        ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     ) -> Self {
         let epoch = epoch_state.epoch;
         let votes_by_round_peer = read_votes_from_storage(&storage, epoch);
@@ -53,6 +61,7 @@ impl NodeBroadcastHandler {
             storage,
             fetch_requester,
             payload_config,
+            ledger_info_provider,
         }
     }
 
@@ -126,6 +135,51 @@ impl NodeBroadcastHandler {
 
         Ok(node)
     }
+
+    fn pipeline_pending_latency(&self, proposal_timestamp: Duration) -> Duration {
+        let highest_ordered_anchor = if let Some(node) = self.dag.read().highest_ordered_anchor() {
+            node
+        } else {
+            return Duration::from_secs(0);
+        };
+        let highest_commit_li = self.ledger_info_provider.get_latest_ledger_info();
+
+        let ordered_round = highest_ordered_anchor.round();
+        let commit_round = highest_commit_li.ledger_info().round();
+
+        let pending_rounds = ordered_round.checked_sub(commit_round).unwrap();
+
+        let ordered_timestamp = Duration::from_micros(highest_ordered_anchor.timestamp());
+        let committed_timestamp =
+            Duration::from_micros(highest_commit_li.ledger_info().timestamp_usecs());
+
+        fn latency_from_proposal(proposal_timestamp: Duration, timestamp: Duration) -> Duration {
+            if timestamp.is_zero() {
+                // latency not known without non-genesis blocks
+                Duration::ZERO
+            } else {
+                proposal_timestamp.checked_sub(timestamp).unwrap()
+            }
+        }
+
+        let latency_to_committed = latency_from_proposal(proposal_timestamp, committed_timestamp);
+        let latency_to_ordered = latency_from_proposal(proposal_timestamp, ordered_timestamp);
+
+        info!(
+            pending_rounds = pending_rounds,
+            ordered_round = ordered_round,
+            commit_round = commit_round,
+            latency_to_ordered_ms = latency_to_ordered.as_millis() as u64,
+            latency_to_committed_ms = latency_to_committed.as_millis() as u64,
+            "Pipeline pending latency on proposal creation",
+        );
+
+        CONSENSUS_PROPOSAL_PENDING_ROUNDS.observe(pending_rounds as f64);
+        CONSENSUS_PROPOSAL_PENDING_DURATION.observe(latency_to_committed.as_secs_f64());
+
+        latency_to_committed
+            .saturating_sub(latency_to_ordered.min(MAX_ORDERING_PIPELINE_LATENCY_REDUCTION))
+    }
 }
 
 fn read_votes_from_storage(
@@ -160,6 +214,12 @@ impl RpcHandler for NodeBroadcastHandler {
 
     async fn process(&mut self, node: Self::Request) -> anyhow::Result<Self::Response> {
         let node = self.validate(node)?;
+
+        let pipeline_delay = self.pipeline_pending_latency(Duration::from_micros(node.timestamp()));
+        if pipeline_delay > Duration::from_millis(self.payload_config.pipeline_backpressure_ms) {
+            bail!(NodeBroadcastHandleError::PipelineBackpressure);
+        }
+
         observe_node(node.timestamp(), NodeStage::NodeReceived);
         debug!(LogSchema::new(LogEvent::ReceiveNode)
             .remote_peer(*node.author())

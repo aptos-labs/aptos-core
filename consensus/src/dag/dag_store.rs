@@ -405,6 +405,19 @@ impl Dag {
         None
     }
 
+    pub(super) fn highest_ordered_anchor(&self) -> Option<Arc<CertifiedNode>> {
+        for (_round, round_nodes) in self.nodes_by_round.iter().rev() {
+            for maybe_node_status in round_nodes {
+                if matches!(maybe_node_status, Some(NodeStatus::Ordered(_))) {
+                    return maybe_node_status
+                        .as_ref()
+                        .map(|node_status| node_status.as_node().clone());
+                }
+            }
+        }
+        None
+    }
+
     pub fn is_empty(&self) -> bool {
         self.nodes_by_round.is_empty() && self.start_round > 1
     }

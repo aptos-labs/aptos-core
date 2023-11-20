@@ -3,6 +3,7 @@
 
 use super::anchor_election::TChainHealthBackoff;
 use crate::{
+    counters::{CONSENSUS_PROPOSAL_PENDING_DURATION, CONSENSUS_PROPOSAL_PENDING_ROUNDS},
     dag::{
         adapter::TLedgerInfoProvider,
         dag_fetcher::TFetchRequester,
@@ -28,7 +29,7 @@ use anyhow::bail;
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Payload, PayloadFilter};
 use aptos_infallible::RwLock;
-use aptos_logger::{debug, error};
+use aptos_logger::{debug, error, info};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{block_info::Round, epoch_state::EpochState};
@@ -40,6 +41,8 @@ use futures::{
 };
 use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
+
+const MAX_ORDERING_PIPELINE_LATENCY_REDUCTION: Duration = Duration::from_secs(1);
 
 pub(crate) struct DagDriver {
     author: Author,
@@ -149,8 +152,9 @@ impl DagDriver {
                     .unwrap_or(vec![]),
             )
         };
+        let pipeline_delay = self.pipeline_pending_latency(self.time_service.now_unix_time());
         self.round_state
-            .check_for_new_round(highest_strong_link_round, strong_links)
+            .check_for_new_round(highest_strong_link_round, strong_links, pipeline_delay)
             .await;
         Ok(())
     }
@@ -326,6 +330,51 @@ impl DagDriver {
             .max(1024);
 
         (max_txns, max_txn_size_bytes)
+    }
+
+    fn pipeline_pending_latency(&self, proposal_timestamp: Duration) -> Duration {
+        let highest_ordered_anchor = if let Some(node) = self.dag.read().highest_ordered_anchor() {
+            node
+        } else {
+            return Duration::from_secs(0);
+        };
+        let highest_commit_li = self.ledger_info_provider.get_latest_ledger_info();
+
+        let ordered_round = highest_ordered_anchor.round();
+        let commit_round = highest_commit_li.ledger_info().round();
+
+        let pending_rounds = ordered_round.checked_sub(commit_round).unwrap();
+
+        let ordered_timestamp = Duration::from_micros(highest_ordered_anchor.timestamp());
+        let committed_timestamp =
+            Duration::from_micros(highest_commit_li.ledger_info().timestamp_usecs());
+
+        fn latency_from_proposal(proposal_timestamp: Duration, timestamp: Duration) -> Duration {
+            if timestamp.is_zero() {
+                // latency not known without non-genesis blocks
+                Duration::ZERO
+            } else {
+                proposal_timestamp.checked_sub(timestamp).unwrap()
+            }
+        }
+
+        let latency_to_committed = latency_from_proposal(proposal_timestamp, committed_timestamp);
+        let latency_to_ordered = latency_from_proposal(proposal_timestamp, ordered_timestamp);
+
+        info!(
+            pending_rounds = pending_rounds,
+            ordered_round = ordered_round,
+            commit_round = commit_round,
+            latency_to_ordered_ms = latency_to_ordered.as_millis() as u64,
+            latency_to_committed_ms = latency_to_committed.as_millis() as u64,
+            "Pipeline pending latency on proposal creation",
+        );
+
+        CONSENSUS_PROPOSAL_PENDING_ROUNDS.observe(pending_rounds as f64);
+        CONSENSUS_PROPOSAL_PENDING_DURATION.observe(latency_to_committed.as_secs_f64());
+
+        latency_to_committed
+            .saturating_sub(latency_to_ordered.min(MAX_ORDERING_PIPELINE_LATENCY_REDUCTION))
     }
 }
 

@@ -2,7 +2,7 @@
 
 use super::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, ChainHealthBackoffValues,
-    Error, NodeConfig, QuorumStoreConfig,
+    Error, NodeConfig, PipelineBackpressureValues, QuorumStoreConfig,
 };
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
@@ -16,6 +16,8 @@ pub struct DagPayloadConfig {
     pub max_receiving_size_per_round_bytes: u64,
 
     pub payload_pull_max_poll_time_ms: u64,
+    // Pipeline delay after which the validator will stop voting
+    pub pipeline_backpressure_ms: u64,
 }
 
 impl Default for DagPayloadConfig {
@@ -27,6 +29,7 @@ impl Default for DagPayloadConfig {
             max_receiving_size_per_round_bytes: 20 * 1024 * 1024,
 
             payload_pull_max_poll_time_ms: 1000,
+            pipeline_backpressure_ms: 2 * 60 * 1000,
         }
     }
 }
@@ -135,7 +138,7 @@ impl Default for DagRoundStateConfig {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DagConsensusConfig {
     pub node_payload_config: DagPayloadConfig,
@@ -145,6 +148,7 @@ pub struct DagConsensusConfig {
     pub chain_backoff_config: Vec<ChainHealthBackoffValues>,
     #[serde(default = "QuorumStoreConfig::default_for_dag")]
     pub quorum_store: QuorumStoreConfig,
+    pub pipeline_backpressure: Vec<PipelineBackpressureValues>,
 }
 
 impl ConfigSanitizer for DagConsensusConfig {
@@ -156,6 +160,39 @@ impl ConfigSanitizer for DagConsensusConfig {
         DagPayloadConfig::sanitize(node_config, node_type, chain_id)?;
 
         Ok(())
+    }
+}
+
+impl Default for DagConsensusConfig {
+    fn default() -> Self {
+        Self {
+            node_payload_config: Default::default(),
+            rb_config: Default::default(),
+            fetcher_config: Default::default(),
+            round_state_config: Default::default(),
+            chain_backoff_config: Default::default(),
+            quorum_store: Default::default(),
+            pipeline_backpressure: vec![
+                PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 20000,
+                    max_sending_block_txns_override: 500, // Not used
+                    max_sending_block_bytes_override: 1024 * 1024, // Not used
+                    backpressure_proposal_delay_ms: 60000,
+                },
+                PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 40000,
+                    max_sending_block_txns_override: 500, // Not used
+                    max_sending_block_bytes_override: 1024 * 1024, // Not used
+                    backpressure_proposal_delay_ms: 120000,
+                },
+                PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 80000,
+                    max_sending_block_txns_override: 500, // Not used
+                    max_sending_block_bytes_override: 1024 * 1024, // Not used
+                    backpressure_proposal_delay_ms: 240000,
+                },
+            ],
+        }
     }
 }
 

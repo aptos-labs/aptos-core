@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::dag::{
+    adapter::TLedgerInfoProvider,
     dag_fetcher::TFetchRequester,
     dag_store::Dag,
     errors::NodeBroadcastHandleError,
@@ -15,9 +16,12 @@ use crate::dag::{
     NodeId, RpcHandler, Vote,
 };
 use aptos_config::config::DagPayloadConfig;
+use aptos_consensus_types::common::Round;
 use aptos_infallible::RwLock;
 use aptos_types::{
-    aggregate_signature::PartialSignatures, epoch_state::EpochState,
+    aggregate_signature::PartialSignatures,
+    epoch_state::EpochState,
+    ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     validator_verifier::random_validator_verifier,
 };
 use claims::{assert_ok, assert_ok_eq};
@@ -36,6 +40,20 @@ impl TFetchRequester for MockFetchRequester {
     }
 }
 
+struct MockLedgerInfoProvider {
+    latest_ledger_info: LedgerInfoWithSignatures,
+}
+
+impl TLedgerInfoProvider for MockLedgerInfoProvider {
+    fn get_latest_ledger_info(&self) -> LedgerInfoWithSignatures {
+        self.latest_ledger_info.clone()
+    }
+
+    fn get_highest_committed_anchor_round(&self) -> Round {
+        self.latest_ledger_info.ledger_info().round()
+    }
+}
+
 #[tokio::test]
 async fn test_node_broadcast_receiver_succeed() {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
@@ -43,6 +61,8 @@ async fn test_node_broadcast_receiver_succeed() {
         epoch: 1,
         verifier: validator_verifier.clone(),
     });
+    let mock_ledger_info = LedgerInfo::mock_genesis(None);
+    let mock_ledger_info = generate_ledger_info_with_sig(&signers, mock_ledger_info);
     let signers: Vec<_> = signers.into_iter().map(Arc::new).collect();
 
     // Scenario: Start DAG from beginning
@@ -67,6 +87,9 @@ async fn test_node_broadcast_receiver_succeed() {
         storage.clone(),
         Arc::new(MockFetchRequester {}),
         DagPayloadConfig::default(),
+        Arc::new(MockLedgerInfoProvider {
+            latest_ledger_info: mock_ledger_info,
+        }),
     );
 
     let expected_result = Vote::new(
@@ -91,6 +114,8 @@ async fn test_node_broadcast_receiver_failure() {
         epoch: 1,
         verifier: validator_verifier.clone(),
     });
+    let mock_ledger_info = LedgerInfo::mock_genesis(None);
+    let mock_ledger_info = generate_ledger_info_with_sig(&signers, mock_ledger_info);
     let signers: Vec<_> = signers.into_iter().map(Arc::new).collect();
 
     let mut rb_receivers: Vec<_> = signers
@@ -112,6 +137,9 @@ async fn test_node_broadcast_receiver_failure() {
                 storage,
                 Arc::new(MockFetchRequester {}),
                 DagPayloadConfig::default(),
+                Arc::new(MockLedgerInfoProvider {
+                    latest_ledger_info: mock_ledger_info.clone(),
+                }),
             )
         })
         .collect();
@@ -170,6 +198,8 @@ async fn test_node_broadcast_receiver_failure() {
 #[tokio::test]
 async fn test_node_broadcast_receiver_storage() {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
+    let mock_ledger_info = LedgerInfo::mock_genesis(None);
+    let mock_ledger_info = generate_ledger_info_with_sig(&signers, mock_ledger_info);
     let signers: Vec<_> = signers.into_iter().map(Arc::new).collect();
     let epoch_state = Arc::new(EpochState {
         epoch: 1,
@@ -194,6 +224,9 @@ async fn test_node_broadcast_receiver_storage() {
         storage.clone(),
         Arc::new(MockFetchRequester {}),
         DagPayloadConfig::default(),
+        Arc::new(MockLedgerInfoProvider {
+            latest_ledger_info: mock_ledger_info.clone(),
+        }),
     );
     let sig = rb_receiver.process(node).await.expect("must succeed");
 
@@ -209,6 +242,9 @@ async fn test_node_broadcast_receiver_storage() {
         storage.clone(),
         Arc::new(MockFetchRequester {}),
         DagPayloadConfig::default(),
+        Arc::new(MockLedgerInfoProvider {
+            latest_ledger_info: mock_ledger_info,
+        }),
     );
     assert_ok!(rb_receiver.gc_before_round(2));
     assert_eq!(storage.get_votes().unwrap().len(), 0);

@@ -26,7 +26,7 @@ use crate::{
     experimental::buffer_manager::OrderedBlocks,
     liveness::{
         leader_reputation::{ProposerAndVoterHeuristic, ReputationHeuristic},
-        proposal_generator::ChainHealthBackoffConfig,
+        proposal_generator::{ChainHealthBackoffConfig, PipelineBackpressureConfig},
     },
     monitor,
     network::IncomingDAGRequest,
@@ -509,6 +509,9 @@ impl DagBootstrapper {
         let fetch_requester = Arc::new(fetch_requester);
         let (new_round_tx, new_round_rx) =
             tokio::sync::mpsc::channel(round_state_config.round_event_channel_size);
+
+        let pipeline_backpressure_config =
+            PipelineBackpressureConfig::new(self.config.pipeline_backpressure.clone());
         let round_state = RoundState::new(
             new_round_tx.clone(),
             Box::new(AdaptiveResponsive::new(
@@ -516,6 +519,7 @@ impl DagBootstrapper {
                 self.epoch_state.clone(),
                 Duration::from_millis(round_state_config.adaptive_responsive_minimum_wait_time_ms),
                 leader_reputation_adapter.clone(),
+                pipeline_backpressure_config,
             )),
         );
 
@@ -543,6 +547,7 @@ impl DagBootstrapper {
             self.storage.clone(),
             fetch_requester,
             self.config.node_payload_config.clone(),
+            ledger_info_provider.clone(),
         );
         let fetch_handler = FetchRequestHandler::new(dag_store.clone(), self.epoch_state.clone());
 
