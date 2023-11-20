@@ -105,6 +105,7 @@ pub enum MoveTool {
     Download(DownloadPackage),
     Init(InitPackage),
     List(ListPackage),
+    Mutate(MutatePackage),
     Prove(ProvePackage),
     #[clap(alias = "deploy")]
     Publish(PublishPackage),
@@ -139,6 +140,7 @@ impl MoveTool {
             MoveTool::Download(tool) => tool.execute_serialized().await,
             MoveTool::Init(tool) => tool.execute_serialized_success().await,
             MoveTool::List(tool) => tool.execute_serialized().await,
+            MoveTool::Mutate(tool) => tool.execute_serialized().await,
             MoveTool::Prove(tool) => tool.execute_serialized().await,
             MoveTool::Publish(tool) => tool.execute_serialized().await,
             MoveTool::Run(tool) => tool.execute_serialized().await,
@@ -582,6 +584,46 @@ impl CliCommand<&'static str> for TestPackage {
         match result {
             UnitTestResult::Success => Ok("Success"),
             UnitTestResult::Failure => Err(CliError::MoveTestError),
+        }
+    }
+}
+
+/// Mutate a Move package
+#[derive(Parser)]
+pub struct MutatePackage {
+    #[clap(flatten)]
+    move_options: MovePackageDir,
+
+    #[clap(flatten)]
+    mutator_options: MutatorOptions,
+}
+
+#[derive(Parser)]
+pub struct MutatorOptions {
+    #[clap(long, short)]
+    pub move_sources: Vec<String>,
+}
+
+#[async_trait]
+impl CliCommand<&'static str> for MutatePackage {
+    fn command_name(&self) -> &'static str {
+        "MutatePackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<&'static str> {
+        let MutatePackage {
+            move_options: _,
+            mutator_options,
+        } = self;
+
+        let result = move_mutator::run_move_mutator(move_mutator::Options {
+            move_sources: mutator_options.move_sources,
+        })
+        .map_err(|err| CliError::UnexpectedError(err.to_string()));
+
+        match result {
+            Ok(_) => Ok("Success"),
+            Err(e) => Err(CliError::MoveMutatorError(format!("{:#}", e))),
         }
     }
 }
