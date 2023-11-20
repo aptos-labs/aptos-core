@@ -610,6 +610,56 @@ impl AptosVM {
         RespawnedSession::spawn(self, session_id, resolver, change_set, storage_refund)
     }
 
+    fn simulate_multisig_transaction(
+        &self,
+        multisig: &Multisig,
+        mut session: SessionExt,
+        resolver: &impl AptosMoveResolver,
+        txn_data: &TransactionMetadata,
+        log_context: &AdapterLogSchema,
+        gas_meter: &mut impl AptosGasMeter,
+        new_published_modules_loaded: &mut bool,
+        change_set_configs: &ChangeSetConfigs,
+    ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        match &multisig.transaction_payload {
+            None => Err(VMStatus::error(StatusCode::MISSING_DATA, None)),
+            Some(multisig_payload) => {
+                match multisig_payload {
+                    MultisigTransactionPayload::EntryFunction(entry_function) => {
+                        aptos_try!({
+                            return_on_failure!(self.execute_multisig_entry_function(
+                                &mut session,
+                                gas_meter,
+                                multisig.multisig_address,
+                                entry_function,
+                                new_published_modules_loaded,
+                            ));
+                            // TODO: Deduplicate this against execute_multisig_transaction
+                            // A bit tricky since we need to skip success/failure cleanups,
+                            // which is in the middle. Introducing a boolean would make the code
+                            // messier.
+                            let respawned_session = self.charge_change_set_and_respawn_session(
+                                session,
+                                resolver,
+                                gas_meter,
+                                change_set_configs,
+                                txn_data,
+                            )?;
+
+                            self.success_transaction_cleanup(
+                                respawned_session,
+                                gas_meter,
+                                txn_data,
+                                log_context,
+                                change_set_configs,
+                            )
+                        })
+                    },
+                }
+            },
+        }
+    }
+
     // Execute a multisig transaction:
     // 1. Obtain the payload of the transaction to execute. This could have been stored on chain
     // when the multisig transaction was created.
@@ -1294,7 +1344,18 @@ impl AptosVM {
                     &storage_gas_params.change_set_configs,
                 ),
             TransactionPayload::Multisig(payload) => {
-                if !self.is_simulation {
+                if self.is_simulation {
+                    self.simulate_multisig_transaction(
+                        payload,
+                        session,
+                        resolver,
+                        &txn_data,
+                        log_context,
+                        gas_meter,
+                        &mut new_published_modules_loaded,
+                        &storage_gas_params.change_set_configs,
+                    )
+                } else {
                     self.execute_multisig_transaction(
                         resolver,
                         session,
@@ -1305,42 +1366,6 @@ impl AptosVM {
                         &mut new_published_modules_loaded,
                         &storage_gas_params.change_set_configs,
                     )
-                } else if let Some(multisig_payload) = payload.transaction_payload.clone() {
-                    match multisig_payload {
-                        MultisigTransactionPayload::EntryFunction(entry_function) => {
-                            aptos_try!({
-                                return_on_failure!(self.execute_multisig_entry_function(
-                                    &mut session,
-                                    gas_meter,
-                                    payload.multisig_address,
-                                    &entry_function,
-                                    &mut new_published_modules_loaded,
-                                ));
-                                // TODO: Deduplicate this against execute_multisig_transaction
-                                // A bit tricky since we need to skip success/failure cleanups,
-                                // which is in the middle. Introducing a boolean would make the code
-                                // messier.
-                                let respawned_session = self
-                                    .charge_change_set_and_respawn_session(
-                                        session,
-                                        resolver,
-                                        gas_meter,
-                                        &storage_gas_params.change_set_configs,
-                                        &txn_data,
-                                    )?;
-
-                                self.success_transaction_cleanup(
-                                    respawned_session,
-                                    gas_meter,
-                                    &txn_data,
-                                    log_context,
-                                    &storage_gas_params.change_set_configs,
-                                )
-                            })
-                        },
-                    }
-                } else {
-                    Err(VMStatus::error(StatusCode::MISSING_DATA, None))
                 }
             },
 
