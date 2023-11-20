@@ -7,7 +7,9 @@ use crate::{
     runtime::{DEFAULT_NUM_RETRIES, RETRY_TIME_MILLIS},
 };
 use aptos_api::context::Context;
-use aptos_api_types::{AsConverter, Transaction as APITransaction, TransactionOnChainData};
+use aptos_api_types::{
+    AsConverter, Transaction as APITransaction, Transaction, TransactionOnChainData,
+};
 use aptos_indexer_grpc_utils::{chunk_transactions, constants::MESSAGE_SIZE_LIMIT};
 use aptos_logger::{error, info, sample, sample::SampleRate};
 use aptos_protos::{
@@ -281,6 +283,7 @@ impl IndexerStreamCoordinator {
                             sct.info.block_height = Some(block_height_bcs);
                             sct.info.epoch = Some(epoch_bcs);
                         },
+                        Transaction::SystemTransaction(_) => todo!(),
                     };
                     txn
                 }) {
