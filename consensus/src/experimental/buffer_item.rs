@@ -111,7 +111,7 @@ pub struct SignedItem {
     pub partial_commit_proof: LedgerInfoWithPartialSignatures,
     pub callback: StateComputerCommitCallBackType,
     pub commit_vote: CommitVote,
-    pub rb_handle: Option<(Instant, DropGuard)>,
+    pub rb_handle: Option<(Instant, Option<DropGuard>)>,
 }
 
 pub struct AggregatedItem {
