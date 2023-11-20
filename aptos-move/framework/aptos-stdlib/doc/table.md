@@ -1,5 +1,5 @@
 
-<a name="0x1_table"></a>
+<a id="0x1_table"></a>
 
 # Module `0x1::table`
 
@@ -48,7 +48,7 @@ struct itself, while the operations are implemented as native functions. No trav
 
 
 
-<a name="0x1_table_Table"></a>
+<a id="0x1_table_Table"></a>
 
 ## Struct `Table`
 
@@ -76,7 +76,7 @@ Type of tables
 
 </details>
 
-<a name="0x1_table_Box"></a>
+<a id="0x1_table_Box"></a>
 
 ## Resource `Box`
 
@@ -104,7 +104,7 @@ Wrapper for values. Required for making values appear as resources in the implem
 
 </details>
 
-<a name="0x1_table_new"></a>
+<a id="0x1_table_new"></a>
 
 ## Function `new`
 
@@ -131,7 +131,7 @@ Create a new Table.
 
 </details>
 
-<a name="0x1_table_add"></a>
+<a id="0x1_table_add"></a>
 
 ## Function `add`
 
@@ -158,7 +158,7 @@ table, and cannot be discovered from it.
 
 </details>
 
-<a name="0x1_table_borrow"></a>
+<a id="0x1_table_borrow"></a>
 
 ## Function `borrow`
 
@@ -184,7 +184,7 @@ Aborts if there is no entry for <code>key</code>.
 
 </details>
 
-<a name="0x1_table_borrow_with_default"></a>
+<a id="0x1_table_borrow_with_default"></a>
 
 ## Function `borrow_with_default`
 
@@ -214,7 +214,7 @@ Returns specified default value if there is no entry for <code>key</code>.
 
 </details>
 
-<a name="0x1_table_borrow_mut"></a>
+<a id="0x1_table_borrow_mut"></a>
 
 ## Function `borrow_mut`
 
@@ -240,7 +240,7 @@ Aborts if there is no entry for <code>key</code>.
 
 </details>
 
-<a name="0x1_table_borrow_mut_with_default"></a>
+<a id="0x1_table_borrow_mut_with_default"></a>
 
 ## Function `borrow_mut_with_default`
 
@@ -269,7 +269,7 @@ Insert the pair (<code>key</code>, <code>default</code>) first if there is no en
 
 </details>
 
-<a name="0x1_table_upsert"></a>
+<a id="0x1_table_upsert"></a>
 
 ## Function `upsert`
 
@@ -300,7 +300,7 @@ update the value of the entry for <code>key</code> to <code>value</code> otherwi
 
 </details>
 
-<a name="0x1_table_remove"></a>
+<a id="0x1_table_remove"></a>
 
 ## Function `remove`
 
@@ -327,7 +327,7 @@ Aborts if there is no entry for <code>key</code>.
 
 </details>
 
-<a name="0x1_table_contains"></a>
+<a id="0x1_table_contains"></a>
 
 ## Function `contains`
 
@@ -352,7 +352,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 </details>
 
-<a name="0x1_table_destroy"></a>
+<a id="0x1_table_destroy"></a>
 
 ## Function `destroy`
 
@@ -377,7 +377,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 </details>
 
-<a name="0x1_table_new_table_handle"></a>
+<a id="0x1_table_new_table_handle"></a>
 
 ## Function `new_table_handle`
 
@@ -399,7 +399,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 </details>
 
-<a name="0x1_table_add_box"></a>
+<a id="0x1_table_add_box"></a>
 
 ## Function `add_box`
 
@@ -421,7 +421,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 </details>
 
-<a name="0x1_table_borrow_box"></a>
+<a id="0x1_table_borrow_box"></a>
 
 ## Function `borrow_box`
 
@@ -443,7 +443,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 </details>
 
-<a name="0x1_table_borrow_box_mut"></a>
+<a id="0x1_table_borrow_box_mut"></a>
 
 ## Function `borrow_box_mut`
 
@@ -465,7 +465,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 </details>
 
-<a name="0x1_table_contains_box"></a>
+<a id="0x1_table_contains_box"></a>
 
 ## Function `contains_box`
 
@@ -487,7 +487,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 </details>
 
-<a name="0x1_table_remove_box"></a>
+<a id="0x1_table_remove_box"></a>
 
 ## Function `remove_box`
 
@@ -509,7 +509,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 </details>
 
-<a name="0x1_table_destroy_empty_box"></a>
+<a id="0x1_table_destroy_empty_box"></a>
 
 ## Function `destroy_empty_box`
 
@@ -531,7 +531,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 </details>
 
-<a name="0x1_table_drop_unchecked_box"></a>
+<a id="0x1_table_drop_unchecked_box"></a>
 
 ## Function `drop_unchecked_box`
 
@@ -553,12 +553,12 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 </details>
 
-<a name="@Specification_0"></a>
+<a id="@Specification_0"></a>
 
 ## Specification
 
 
-<a name="@Specification_0_Table"></a>
+<a id="@Specification_0_Table"></a>
 
 ### Struct `Table`
 
@@ -597,7 +597,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="@Specification_0_new"></a>
+<a id="@Specification_0_new"></a>
 
 ### Function `new`
 
@@ -613,7 +613,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="@Specification_0_add"></a>
+<a id="@Specification_0_add"></a>
 
 ### Function `add`
 
@@ -629,7 +629,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="@Specification_0_borrow"></a>
+<a id="@Specification_0_borrow"></a>
 
 ### Function `borrow`
 
@@ -645,7 +645,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="@Specification_0_borrow_mut"></a>
+<a id="@Specification_0_borrow_mut"></a>
 
 ### Function `borrow_mut`
 
@@ -661,7 +661,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="@Specification_0_borrow_mut_with_default"></a>
+<a id="@Specification_0_borrow_mut_with_default"></a>
 
 ### Function `borrow_mut_with_default`
 
@@ -677,7 +677,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="@Specification_0_upsert"></a>
+<a id="@Specification_0_upsert"></a>
 
 ### Function `upsert`
 
@@ -693,7 +693,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="@Specification_0_remove"></a>
+<a id="@Specification_0_remove"></a>
 
 ### Function `remove`
 
@@ -709,7 +709,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="@Specification_0_contains"></a>
+<a id="@Specification_0_contains"></a>
 
 ### Function `contains`
 
@@ -726,7 +726,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="0x1_table_spec_contains"></a>
+<a id="0x1_table_spec_contains"></a>
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_contains">spec_contains</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K): bool;
@@ -735,7 +735,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="0x1_table_spec_remove"></a>
+<a id="0x1_table_spec_remove"></a>
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_remove">spec_remove</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K): <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;;
@@ -744,7 +744,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="0x1_table_spec_set"></a>
+<a id="0x1_table_spec_set"></a>
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_set">spec_set</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K, v: V): <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;;
@@ -753,7 +753,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="0x1_table_spec_get"></a>
+<a id="0x1_table_spec_get"></a>
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_get">spec_get</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K): V;
@@ -761,7 +761,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="@Specification_0_destroy"></a>
+<a id="@Specification_0_destroy"></a>
 
 ### Function `destroy`
 

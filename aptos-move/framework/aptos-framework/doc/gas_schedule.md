@@ -1,5 +1,5 @@
 
-<a name="0x1_gas_schedule"></a>
+<a id="0x1_gas_schedule"></a>
 
 # Module `0x1::gas_schedule`
 
@@ -31,7 +31,7 @@ it costs to execute Move on the network.
 
 
 
-<a name="0x1_gas_schedule_GasEntry"></a>
+<a id="0x1_gas_schedule_GasEntry"></a>
 
 ## Struct `GasEntry`
 
@@ -64,7 +64,7 @@ it costs to execute Move on the network.
 
 </details>
 
-<a name="0x1_gas_schedule_GasSchedule"></a>
+<a id="0x1_gas_schedule_GasSchedule"></a>
 
 ## Resource `GasSchedule`
 
@@ -91,7 +91,7 @@ it costs to execute Move on the network.
 
 </details>
 
-<a name="0x1_gas_schedule_GasScheduleV2"></a>
+<a id="0x1_gas_schedule_GasScheduleV2"></a>
 
 ## Resource `GasScheduleV2`
 
@@ -124,12 +124,12 @@ it costs to execute Move on the network.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_gas_schedule_EINVALID_GAS_FEATURE_VERSION"></a>
+<a id="0x1_gas_schedule_EINVALID_GAS_FEATURE_VERSION"></a>
 
 
 
@@ -138,7 +138,7 @@ it costs to execute Move on the network.
 
 
 
-<a name="0x1_gas_schedule_EINVALID_GAS_SCHEDULE"></a>
+<a id="0x1_gas_schedule_EINVALID_GAS_SCHEDULE"></a>
 
 The provided gas schedule bytes are empty or invalid
 
@@ -148,7 +148,7 @@ The provided gas schedule bytes are empty or invalid
 
 
 
-<a name="0x1_gas_schedule_initialize"></a>
+<a id="0x1_gas_schedule_initialize"></a>
 
 ## Function `initialize`
 
@@ -178,7 +178,7 @@ Only called during genesis.
 
 </details>
 
-<a name="0x1_gas_schedule_set_gas_schedule"></a>
+<a id="0x1_gas_schedule_set_gas_schedule"></a>
 
 ## Function `set_gas_schedule`
 
@@ -224,7 +224,7 @@ This can be called by on-chain governance to update the gas schedule.
 
 </details>
 
-<a name="0x1_gas_schedule_set_storage_gas_config"></a>
+<a id="0x1_gas_schedule_set_storage_gas_config"></a>
 
 ## Function `set_storage_gas_config`
 
@@ -251,7 +251,7 @@ This can be called by on-chain governance to update the gas schedule.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -263,7 +263,7 @@ This can be called by on-chain governance to update the gas schedule.
 
 
 
-<a name="@Specification_1_initialize"></a>
+<a id="@Specification_1_initialize"></a>
 
 ### Function `initialize`
 
@@ -283,7 +283,7 @@ This can be called by on-chain governance to update the gas schedule.
 
 
 
-<a name="@Specification_1_set_gas_schedule"></a>
+<a id="@Specification_1_set_gas_schedule"></a>
 
 ### Function `set_gas_schedule`
 
@@ -310,7 +310,7 @@ This can be called by on-chain governance to update the gas schedule.
 
 
 
-<a name="@Specification_1_set_storage_gas_config"></a>
+<a id="@Specification_1_set_storage_gas_config"></a>
 
 ### Function `set_storage_gas_config`
 

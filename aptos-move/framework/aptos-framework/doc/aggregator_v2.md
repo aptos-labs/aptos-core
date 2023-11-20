@@ -1,5 +1,5 @@
 
-<a name="0x1_aggregator_v2"></a>
+<a id="0x1_aggregator_v2"></a>
 
 # Module `0x1::aggregator_v2`
 
@@ -49,7 +49,7 @@ operation that also reduced parallelism, and should be avoided as much as possib
 
 
 
-<a name="0x1_aggregator_v2_Aggregator"></a>
+<a id="0x1_aggregator_v2_Aggregator"></a>
 
 ## Struct `Aggregator`
 
@@ -86,7 +86,7 @@ Currently supported types for IntElement are u64 and u128.
 
 </details>
 
-<a name="0x1_aggregator_v2_AggregatorSnapshot"></a>
+<a id="0x1_aggregator_v2_AggregatorSnapshot"></a>
 
 ## Struct `AggregatorSnapshot`
 
@@ -116,12 +116,12 @@ while storing snapshot of aggregator state elsewhere.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_aggregator_v2_EAGGREGATOR_OVERFLOW"></a>
+<a id="0x1_aggregator_v2_EAGGREGATOR_OVERFLOW"></a>
 
 The value of aggregator overflows. Raised by uncoditional add() call
 
@@ -131,7 +131,7 @@ The value of aggregator overflows. Raised by uncoditional add() call
 
 
 
-<a name="0x1_aggregator_v2_EAGGREGATOR_UNDERFLOW"></a>
+<a id="0x1_aggregator_v2_EAGGREGATOR_UNDERFLOW"></a>
 
 The value of aggregator underflows (goes below zero). Raised by uncoditional sub() call
 
@@ -141,7 +141,7 @@ The value of aggregator underflows (goes below zero). Raised by uncoditional sub
 
 
 
-<a name="0x1_aggregator_v2_EAGGREGATOR_API_V2_NOT_ENABLED"></a>
+<a id="0x1_aggregator_v2_EAGGREGATOR_API_V2_NOT_ENABLED"></a>
 
 The aggregator api v2 feature flag is not enabled.
 
@@ -151,7 +151,7 @@ The aggregator api v2 feature flag is not enabled.
 
 
 
-<a name="0x1_aggregator_v2_EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED"></a>
+<a id="0x1_aggregator_v2_EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED"></a>
 
 The native aggregator function, that is in the move file, is not yet supported.
 and any calls will raise this error.
@@ -162,7 +162,7 @@ and any calls will raise this error.
 
 
 
-<a name="0x1_aggregator_v2_ECONCAT_STRING_LENGTH_TOO_LARGE"></a>
+<a id="0x1_aggregator_v2_ECONCAT_STRING_LENGTH_TOO_LARGE"></a>
 
 Arguments passed to concat exceed max limit of 256 bytes (for prefix and suffix together).
 
@@ -172,7 +172,7 @@ Arguments passed to concat exceed max limit of 256 bytes (for prefix and suffix 
 
 
 
-<a name="0x1_aggregator_v2_EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE"></a>
+<a id="0x1_aggregator_v2_EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE"></a>
 
 The generic type supplied to the aggregator snapshot is not supported.
 
@@ -182,7 +182,7 @@ The generic type supplied to the aggregator snapshot is not supported.
 
 
 
-<a name="0x1_aggregator_v2_EUNSUPPORTED_AGGREGATOR_TYPE"></a>
+<a id="0x1_aggregator_v2_EUNSUPPORTED_AGGREGATOR_TYPE"></a>
 
 The generic type supplied to the aggregator is not supported.
 
@@ -192,7 +192,7 @@ The generic type supplied to the aggregator is not supported.
 
 
 
-<a name="0x1_aggregator_v2_max_value"></a>
+<a id="0x1_aggregator_v2_max_value"></a>
 
 ## Function `max_value`
 
@@ -217,7 +217,7 @@ Returns <code>max_value</code> exceeding which aggregator overflows.
 
 </details>
 
-<a name="0x1_aggregator_v2_create_aggregator"></a>
+<a id="0x1_aggregator_v2_create_aggregator"></a>
 
 ## Function `create_aggregator`
 
@@ -243,7 +243,7 @@ EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
 
 </details>
 
-<a name="0x1_aggregator_v2_create_unbounded_aggregator"></a>
+<a id="0x1_aggregator_v2_create_unbounded_aggregator"></a>
 
 ## Function `create_unbounded_aggregator`
 
@@ -270,7 +270,7 @@ EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
 
 </details>
 
-<a name="0x1_aggregator_v2_try_add"></a>
+<a id="0x1_aggregator_v2_try_add"></a>
 
 ## Function `try_add`
 
@@ -294,7 +294,7 @@ If addition would exceed the max_value, <code><b>false</b></code> is returned, a
 
 </details>
 
-<a name="0x1_aggregator_v2_add"></a>
+<a id="0x1_aggregator_v2_add"></a>
 
 ## Function `add`
 
@@ -318,7 +318,7 @@ If addition would exceed the max_value, <code><b>false</b></code> is returned, a
 
 </details>
 
-<a name="0x1_aggregator_v2_try_sub"></a>
+<a id="0x1_aggregator_v2_try_sub"></a>
 
 ## Function `try_sub`
 
@@ -342,7 +342,7 @@ If subtraction would result in a negative value, <code><b>false</b></code> is re
 
 </details>
 
-<a name="0x1_aggregator_v2_sub"></a>
+<a id="0x1_aggregator_v2_sub"></a>
 
 ## Function `sub`
 
@@ -366,7 +366,7 @@ If subtraction would result in a negative value, <code><b>false</b></code> is re
 
 </details>
 
-<a name="0x1_aggregator_v2_read"></a>
+<a id="0x1_aggregator_v2_read"></a>
 
 ## Function `read`
 
@@ -392,7 +392,7 @@ or has other read/write conflicts)
 
 </details>
 
-<a name="0x1_aggregator_v2_snapshot"></a>
+<a id="0x1_aggregator_v2_snapshot"></a>
 
 ## Function `snapshot`
 
@@ -416,7 +416,7 @@ Unlike read(), it is fast and avoids sequential dependencies.
 
 </details>
 
-<a name="0x1_aggregator_v2_create_snapshot"></a>
+<a id="0x1_aggregator_v2_create_snapshot"></a>
 
 ## Function `create_snapshot`
 
@@ -440,7 +440,7 @@ Useful for when object is sometimes created via snapshot() or string_concat(), a
 
 </details>
 
-<a name="0x1_aggregator_v2_copy_snapshot"></a>
+<a id="0x1_aggregator_v2_copy_snapshot"></a>
 
 ## Function `copy_snapshot`
 
@@ -463,7 +463,7 @@ NOT YET IMPLEMENTED, always raises EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED.
 
 </details>
 
-<a name="0x1_aggregator_v2_read_snapshot"></a>
+<a id="0x1_aggregator_v2_read_snapshot"></a>
 
 ## Function `read_snapshot`
 
@@ -489,7 +489,7 @@ or has other read/write conflicts)
 
 </details>
 
-<a name="0x1_aggregator_v2_string_concat"></a>
+<a id="0x1_aggregator_v2_string_concat"></a>
 
 ## Function `string_concat`
 
@@ -515,12 +515,12 @@ If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
 
-<a name="@Specification_1_create_aggregator"></a>
+<a id="@Specification_1_create_aggregator"></a>
 
 ### Function `create_aggregator`
 
@@ -536,7 +536,7 @@ If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_
 
 
 
-<a name="@Specification_1_create_unbounded_aggregator"></a>
+<a id="@Specification_1_create_unbounded_aggregator"></a>
 
 ### Function `create_unbounded_aggregator`
 
@@ -552,7 +552,7 @@ If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_
 
 
 
-<a name="@Specification_1_try_add"></a>
+<a id="@Specification_1_try_add"></a>
 
 ### Function `try_add`
 
@@ -568,7 +568,7 @@ If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_
 
 
 
-<a name="@Specification_1_try_sub"></a>
+<a id="@Specification_1_try_sub"></a>
 
 ### Function `try_sub`
 
@@ -584,7 +584,7 @@ If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_
 
 
 
-<a name="@Specification_1_read"></a>
+<a id="@Specification_1_read"></a>
 
 ### Function `read`
 
@@ -600,7 +600,7 @@ If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_
 
 
 
-<a name="@Specification_1_snapshot"></a>
+<a id="@Specification_1_snapshot"></a>
 
 ### Function `snapshot`
 
@@ -616,7 +616,7 @@ If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_
 
 
 
-<a name="@Specification_1_create_snapshot"></a>
+<a id="@Specification_1_create_snapshot"></a>
 
 ### Function `create_snapshot`
 
@@ -632,7 +632,7 @@ If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_
 
 
 
-<a name="@Specification_1_copy_snapshot"></a>
+<a id="@Specification_1_copy_snapshot"></a>
 
 ### Function `copy_snapshot`
 
@@ -648,7 +648,7 @@ If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_
 
 
 
-<a name="@Specification_1_string_concat"></a>
+<a id="@Specification_1_string_concat"></a>
 
 ### Function `string_concat`
 

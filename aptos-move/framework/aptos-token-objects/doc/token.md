@@ -1,5 +1,5 @@
 
-<a name="0x4_token"></a>
+<a id="0x4_token"></a>
 
 # Module `0x4::token`
 
@@ -58,7 +58,7 @@ token are:
 
 
 
-<a name="0x4_token_Token"></a>
+<a id="0x4_token_Token"></a>
 
 ## Resource `Token`
 
@@ -125,7 +125,7 @@ Represents the common fields to all tokens.
 
 </details>
 
-<a name="0x4_token_ConcurrentTokenIdentifiers"></a>
+<a id="0x4_token_ConcurrentTokenIdentifiers"></a>
 
 ## Resource `ConcurrentTokenIdentifiers`
 
@@ -162,7 +162,7 @@ Starts being populated once aggregator_v2_api_enabled is enabled.
 
 </details>
 
-<a name="0x4_token_BurnRef"></a>
+<a id="0x4_token_BurnRef"></a>
 
 ## Struct `BurnRef`
 
@@ -198,7 +198,7 @@ a small optimization to support either and take a fixed amount of 34-bytes.
 
 </details>
 
-<a name="0x4_token_MutatorRef"></a>
+<a id="0x4_token_MutatorRef"></a>
 
 ## Struct `MutatorRef`
 
@@ -226,7 +226,7 @@ This enables mutating description and URI by higher level services.
 
 </details>
 
-<a name="0x4_token_MutationEvent"></a>
+<a id="0x4_token_MutationEvent"></a>
 
 ## Struct `MutationEvent`
 
@@ -267,12 +267,12 @@ directly understand the behavior in a writeset.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x4_token_EURI_TOO_LONG"></a>
+<a id="0x4_token_EURI_TOO_LONG"></a>
 
 The URI is over the maximum length
 
@@ -282,7 +282,7 @@ The URI is over the maximum length
 
 
 
-<a name="0x4_token_MAX_URI_LENGTH"></a>
+<a id="0x4_token_MAX_URI_LENGTH"></a>
 
 
 
@@ -291,7 +291,7 @@ The URI is over the maximum length
 
 
 
-<a name="0x4_token_EDESCRIPTION_TOO_LONG"></a>
+<a id="0x4_token_EDESCRIPTION_TOO_LONG"></a>
 
 The description is over the maximum length
 
@@ -301,7 +301,7 @@ The description is over the maximum length
 
 
 
-<a name="0x4_token_MAX_DESCRIPTION_LENGTH"></a>
+<a id="0x4_token_MAX_DESCRIPTION_LENGTH"></a>
 
 
 
@@ -310,7 +310,7 @@ The description is over the maximum length
 
 
 
-<a name="0x4_token_EFIELD_NOT_MUTABLE"></a>
+<a id="0x4_token_EFIELD_NOT_MUTABLE"></a>
 
 The field being changed is not mutable
 
@@ -320,7 +320,7 @@ The field being changed is not mutable
 
 
 
-<a name="0x4_token_ENOT_CREATOR"></a>
+<a id="0x4_token_ENOT_CREATOR"></a>
 
 The provided signer is not the creator
 
@@ -330,7 +330,7 @@ The provided signer is not the creator
 
 
 
-<a name="0x4_token_ETOKEN_DOES_NOT_EXIST"></a>
+<a id="0x4_token_ETOKEN_DOES_NOT_EXIST"></a>
 
 The token does not exist
 
@@ -340,7 +340,7 @@ The token does not exist
 
 
 
-<a name="0x4_token_ETOKEN_NAME_TOO_LONG"></a>
+<a id="0x4_token_ETOKEN_NAME_TOO_LONG"></a>
 
 The token name is over the maximum length
 
@@ -350,7 +350,7 @@ The token name is over the maximum length
 
 
 
-<a name="0x4_token_MAX_TOKEN_NAME_LENGTH"></a>
+<a id="0x4_token_MAX_TOKEN_NAME_LENGTH"></a>
 
 
 
@@ -359,7 +359,7 @@ The token name is over the maximum length
 
 
 
-<a name="0x4_token_create_common"></a>
+<a id="0x4_token_create_common"></a>
 
 ## Function `create_common`
 
@@ -480,7 +480,7 @@ The token name is over the maximum length
 
 </details>
 
-<a name="0x4_token_create"></a>
+<a id="0x4_token_create"></a>
 
 ## Function `create`
 
@@ -516,7 +516,7 @@ for additional specialization.
 
 </details>
 
-<a name="0x4_token_create_numbered_token"></a>
+<a id="0x4_token_create_numbered_token"></a>
 
 ## Function `create_numbered_token`
 
@@ -556,7 +556,7 @@ creating tokens in parallel, from the same collection, while providing sequentia
 
 </details>
 
-<a name="0x4_token_create_named_token"></a>
+<a id="0x4_token_create_named_token"></a>
 
 ## Function `create_named_token`
 
@@ -594,7 +594,7 @@ additional specialization.
 
 </details>
 
-<a name="0x4_token_create_from_account"></a>
+<a id="0x4_token_create_from_account"></a>
 
 ## Function `create_from_account`
 
@@ -633,7 +633,7 @@ additional specialization.
 
 </details>
 
-<a name="0x4_token_create_token_address"></a>
+<a id="0x4_token_create_token_address"></a>
 
 ## Function `create_token_address`
 
@@ -658,7 +658,7 @@ Generates the token's address based upon the creator's address, the collection's
 
 </details>
 
-<a name="0x4_token_create_token_seed"></a>
+<a id="0x4_token_create_token_seed"></a>
 
 ## Function `create_token_seed`
 
@@ -687,7 +687,7 @@ Named objects are derived from a seed, the token's seed is its name appended to 
 
 </details>
 
-<a name="0x4_token_generate_mutator_ref"></a>
+<a id="0x4_token_generate_mutator_ref"></a>
 
 ## Function `generate_mutator_ref`
 
@@ -713,7 +713,7 @@ Creates a MutatorRef, which gates the ability to mutate any fields that support 
 
 </details>
 
-<a name="0x4_token_generate_burn_ref"></a>
+<a id="0x4_token_generate_burn_ref"></a>
 
 ## Function `generate_burn_ref`
 
@@ -745,7 +745,7 @@ Creates a BurnRef, which gates the ability to burn the given token.
 
 </details>
 
-<a name="0x4_token_address_from_burn_ref"></a>
+<a id="0x4_token_address_from_burn_ref"></a>
 
 ## Function `address_from_burn_ref`
 
@@ -774,7 +774,7 @@ Extracts the tokens address from a BurnRef.
 
 </details>
 
-<a name="0x4_token_borrow"></a>
+<a id="0x4_token_borrow"></a>
 
 ## Function `borrow`
 
@@ -803,7 +803,7 @@ Extracts the tokens address from a BurnRef.
 
 </details>
 
-<a name="0x4_token_creator"></a>
+<a id="0x4_token_creator"></a>
 
 ## Function `creator`
 
@@ -828,7 +828,7 @@ Extracts the tokens address from a BurnRef.
 
 </details>
 
-<a name="0x4_token_collection_name"></a>
+<a id="0x4_token_collection_name"></a>
 
 ## Function `collection_name`
 
@@ -853,7 +853,7 @@ Extracts the tokens address from a BurnRef.
 
 </details>
 
-<a name="0x4_token_collection_object"></a>
+<a id="0x4_token_collection_object"></a>
 
 ## Function `collection_object`
 
@@ -878,7 +878,7 @@ Extracts the tokens address from a BurnRef.
 
 </details>
 
-<a name="0x4_token_description"></a>
+<a id="0x4_token_description"></a>
 
 ## Function `description`
 
@@ -903,7 +903,7 @@ Extracts the tokens address from a BurnRef.
 
 </details>
 
-<a name="0x4_token_name"></a>
+<a id="0x4_token_name"></a>
 
 ## Function `name`
 
@@ -935,7 +935,7 @@ as that would prohibit transactions to be executed in parallel.
 
 </details>
 
-<a name="0x4_token_uri"></a>
+<a id="0x4_token_uri"></a>
 
 ## Function `uri`
 
@@ -960,7 +960,7 @@ as that would prohibit transactions to be executed in parallel.
 
 </details>
 
-<a name="0x4_token_royalty"></a>
+<a id="0x4_token_royalty"></a>
 
 ## Function `royalty`
 
@@ -995,7 +995,7 @@ as that would prohibit transactions to be executed in parallel.
 
 </details>
 
-<a name="0x4_token_index"></a>
+<a id="0x4_token_index"></a>
 
 ## Function `index`
 
@@ -1027,7 +1027,7 @@ as that would prohibit transactions to be executed in parallel.
 
 </details>
 
-<a name="0x4_token_borrow_mut"></a>
+<a id="0x4_token_borrow_mut"></a>
 
 ## Function `borrow_mut`
 
@@ -1055,7 +1055,7 @@ as that would prohibit transactions to be executed in parallel.
 
 </details>
 
-<a name="0x4_token_burn"></a>
+<a id="0x4_token_burn"></a>
 
 ## Function `burn`
 
@@ -1112,7 +1112,7 @@ as that would prohibit transactions to be executed in parallel.
 
 </details>
 
-<a name="0x4_token_set_description"></a>
+<a id="0x4_token_set_description"></a>
 
 ## Function `set_description`
 
@@ -1146,7 +1146,7 @@ as that would prohibit transactions to be executed in parallel.
 
 </details>
 
-<a name="0x4_token_set_name"></a>
+<a id="0x4_token_set_name"></a>
 
 ## Function `set_name`
 
@@ -1192,7 +1192,7 @@ as that would prohibit transactions to be executed in parallel.
 
 </details>
 
-<a name="0x4_token_set_uri"></a>
+<a id="0x4_token_set_uri"></a>
 
 ## Function `set_uri`
 

@@ -1,5 +1,5 @@
 
-<a name="0x1_stake"></a>
+<a id="0x1_stake"></a>
 
 # Module `0x1::stake`
 
@@ -160,7 +160,7 @@ or if their stake drops below the min required, they would get removed at the en
 
 
 
-<a name="0x1_stake_OwnerCapability"></a>
+<a id="0x1_stake_OwnerCapability"></a>
 
 ## Resource `OwnerCapability`
 
@@ -190,7 +190,7 @@ modules to have control over a validator.
 
 </details>
 
-<a name="0x1_stake_StakePool"></a>
+<a id="0x1_stake_StakePool"></a>
 
 ## Resource `StakePool`
 
@@ -336,7 +336,7 @@ Changes in stake for an inactive validator:
 
 </details>
 
-<a name="0x1_stake_ValidatorConfig"></a>
+<a id="0x1_stake_ValidatorConfig"></a>
 
 ## Resource `ValidatorConfig`
 
@@ -382,7 +382,7 @@ Validator info stored in validator address.
 
 </details>
 
-<a name="0x1_stake_ValidatorInfo"></a>
+<a id="0x1_stake_ValidatorInfo"></a>
 
 ## Struct `ValidatorInfo`
 
@@ -422,7 +422,7 @@ Consensus information per validator, stored in ValidatorSet.
 
 </details>
 
-<a name="0x1_stake_ValidatorSet"></a>
+<a id="0x1_stake_ValidatorSet"></a>
 
 ## Resource `ValidatorSet`
 
@@ -483,7 +483,7 @@ Full ValidatorSet, stored in @aptos_framework.
 
 </details>
 
-<a name="0x1_stake_AptosCoinCapabilities"></a>
+<a id="0x1_stake_AptosCoinCapabilities"></a>
 
 ## Resource `AptosCoinCapabilities`
 
@@ -512,7 +512,7 @@ This allows the Stake module to mint rewards to stakers.
 
 </details>
 
-<a name="0x1_stake_IndividualValidatorPerformance"></a>
+<a id="0x1_stake_IndividualValidatorPerformance"></a>
 
 ## Struct `IndividualValidatorPerformance`
 
@@ -545,7 +545,7 @@ This allows the Stake module to mint rewards to stakers.
 
 </details>
 
-<a name="0x1_stake_ValidatorPerformance"></a>
+<a id="0x1_stake_ValidatorPerformance"></a>
 
 ## Resource `ValidatorPerformance`
 
@@ -572,7 +572,7 @@ This allows the Stake module to mint rewards to stakers.
 
 </details>
 
-<a name="0x1_stake_RegisterValidatorCandidateEvent"></a>
+<a id="0x1_stake_RegisterValidatorCandidateEvent"></a>
 
 ## Struct `RegisterValidatorCandidateEvent`
 
@@ -599,7 +599,7 @@ This allows the Stake module to mint rewards to stakers.
 
 </details>
 
-<a name="0x1_stake_SetOperatorEvent"></a>
+<a id="0x1_stake_SetOperatorEvent"></a>
 
 ## Struct `SetOperatorEvent`
 
@@ -638,7 +638,7 @@ This allows the Stake module to mint rewards to stakers.
 
 </details>
 
-<a name="0x1_stake_AddStakeEvent"></a>
+<a id="0x1_stake_AddStakeEvent"></a>
 
 ## Struct `AddStakeEvent`
 
@@ -671,7 +671,7 @@ This allows the Stake module to mint rewards to stakers.
 
 </details>
 
-<a name="0x1_stake_ReactivateStakeEvent"></a>
+<a id="0x1_stake_ReactivateStakeEvent"></a>
 
 ## Struct `ReactivateStakeEvent`
 
@@ -704,7 +704,7 @@ This allows the Stake module to mint rewards to stakers.
 
 </details>
 
-<a name="0x1_stake_RotateConsensusKeyEvent"></a>
+<a id="0x1_stake_RotateConsensusKeyEvent"></a>
 
 ## Struct `RotateConsensusKeyEvent`
 
@@ -743,7 +743,7 @@ This allows the Stake module to mint rewards to stakers.
 
 </details>
 
-<a name="0x1_stake_UpdateNetworkAndFullnodeAddressesEvent"></a>
+<a id="0x1_stake_UpdateNetworkAndFullnodeAddressesEvent"></a>
 
 ## Struct `UpdateNetworkAndFullnodeAddressesEvent`
 
@@ -794,7 +794,7 @@ This allows the Stake module to mint rewards to stakers.
 
 </details>
 
-<a name="0x1_stake_IncreaseLockupEvent"></a>
+<a id="0x1_stake_IncreaseLockupEvent"></a>
 
 ## Struct `IncreaseLockupEvent`
 
@@ -833,7 +833,7 @@ This allows the Stake module to mint rewards to stakers.
 
 </details>
 
-<a name="0x1_stake_JoinValidatorSetEvent"></a>
+<a id="0x1_stake_JoinValidatorSetEvent"></a>
 
 ## Struct `JoinValidatorSetEvent`
 
@@ -860,7 +860,7 @@ This allows the Stake module to mint rewards to stakers.
 
 </details>
 
-<a name="0x1_stake_DistributeRewardsEvent"></a>
+<a id="0x1_stake_DistributeRewardsEvent"></a>
 
 ## Struct `DistributeRewardsEvent`
 
@@ -893,7 +893,7 @@ This allows the Stake module to mint rewards to stakers.
 
 </details>
 
-<a name="0x1_stake_UnlockStakeEvent"></a>
+<a id="0x1_stake_UnlockStakeEvent"></a>
 
 ## Struct `UnlockStakeEvent`
 
@@ -926,7 +926,7 @@ This allows the Stake module to mint rewards to stakers.
 
 </details>
 
-<a name="0x1_stake_WithdrawStakeEvent"></a>
+<a id="0x1_stake_WithdrawStakeEvent"></a>
 
 ## Struct `WithdrawStakeEvent`
 
@@ -959,7 +959,7 @@ This allows the Stake module to mint rewards to stakers.
 
 </details>
 
-<a name="0x1_stake_LeaveValidatorSetEvent"></a>
+<a id="0x1_stake_LeaveValidatorSetEvent"></a>
 
 ## Struct `LeaveValidatorSetEvent`
 
@@ -986,7 +986,7 @@ This allows the Stake module to mint rewards to stakers.
 
 </details>
 
-<a name="0x1_stake_ValidatorFees"></a>
+<a id="0x1_stake_ValidatorFees"></a>
 
 ## Resource `ValidatorFees`
 
@@ -1015,7 +1015,7 @@ at the end of the epoch.
 
 </details>
 
-<a name="0x1_stake_AllowedValidators"></a>
+<a id="0x1_stake_AllowedValidators"></a>
 
 ## Resource `AllowedValidators`
 
@@ -1045,7 +1045,7 @@ security of the testnet. This will NOT be enabled in Mainnet.
 
 </details>
 
-<a name="0x1_stake_Ghost$ghost_valid_perf"></a>
+<a id="0x1_stake_Ghost$ghost_valid_perf"></a>
 
 ## Resource `Ghost$ghost_valid_perf`
 
@@ -1072,7 +1072,7 @@ security of the testnet. This will NOT be enabled in Mainnet.
 
 </details>
 
-<a name="0x1_stake_Ghost$ghost_proposer_idx"></a>
+<a id="0x1_stake_Ghost$ghost_proposer_idx"></a>
 
 ## Resource `Ghost$ghost_proposer_idx`
 
@@ -1099,12 +1099,12 @@ security of the testnet. This will NOT be enabled in Mainnet.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_stake_MAX_U64"></a>
+<a id="0x1_stake_MAX_U64"></a>
 
 
 
@@ -1113,7 +1113,7 @@ security of the testnet. This will NOT be enabled in Mainnet.
 
 
 
-<a name="0x1_stake_MAX_REWARDS_RATE"></a>
+<a id="0x1_stake_MAX_REWARDS_RATE"></a>
 
 Limit the maximum value of <code>rewards_rate</code> in order to avoid any arithmetic overflow.
 
@@ -1123,7 +1123,7 @@ Limit the maximum value of <code>rewards_rate</code> in order to avoid any arith
 
 
 
-<a name="0x1_stake_EALREADY_ACTIVE_VALIDATOR"></a>
+<a id="0x1_stake_EALREADY_ACTIVE_VALIDATOR"></a>
 
 Account is already a validator or pending validator.
 
@@ -1133,7 +1133,7 @@ Account is already a validator or pending validator.
 
 
 
-<a name="0x1_stake_EALREADY_REGISTERED"></a>
+<a id="0x1_stake_EALREADY_REGISTERED"></a>
 
 Account is already registered as a validator candidate.
 
@@ -1143,7 +1143,7 @@ Account is already registered as a validator candidate.
 
 
 
-<a name="0x1_stake_EFEES_TABLE_ALREADY_EXISTS"></a>
+<a id="0x1_stake_EFEES_TABLE_ALREADY_EXISTS"></a>
 
 Table to store collected transaction fees for each validator already exists.
 
@@ -1153,7 +1153,7 @@ Table to store collected transaction fees for each validator already exists.
 
 
 
-<a name="0x1_stake_EINELIGIBLE_VALIDATOR"></a>
+<a id="0x1_stake_EINELIGIBLE_VALIDATOR"></a>
 
 Validator is not defined in the ACL of entities allowed to be validators
 
@@ -1163,7 +1163,7 @@ Validator is not defined in the ACL of entities allowed to be validators
 
 
 
-<a name="0x1_stake_EINVALID_LOCKUP"></a>
+<a id="0x1_stake_EINVALID_LOCKUP"></a>
 
 Cannot update stake pool's lockup to earlier than current lockup.
 
@@ -1173,7 +1173,7 @@ Cannot update stake pool's lockup to earlier than current lockup.
 
 
 
-<a name="0x1_stake_EINVALID_PUBLIC_KEY"></a>
+<a id="0x1_stake_EINVALID_PUBLIC_KEY"></a>
 
 Invalid consensus public key
 
@@ -1183,7 +1183,7 @@ Invalid consensus public key
 
 
 
-<a name="0x1_stake_ELAST_VALIDATOR"></a>
+<a id="0x1_stake_ELAST_VALIDATOR"></a>
 
 Can't remove last validator.
 
@@ -1193,7 +1193,7 @@ Can't remove last validator.
 
 
 
-<a name="0x1_stake_ENOT_OPERATOR"></a>
+<a id="0x1_stake_ENOT_OPERATOR"></a>
 
 Account does not have the right operator capability.
 
@@ -1203,7 +1203,7 @@ Account does not have the right operator capability.
 
 
 
-<a name="0x1_stake_ENOT_VALIDATOR"></a>
+<a id="0x1_stake_ENOT_VALIDATOR"></a>
 
 Account is not a validator.
 
@@ -1213,7 +1213,7 @@ Account is not a validator.
 
 
 
-<a name="0x1_stake_ENO_POST_GENESIS_VALIDATOR_SET_CHANGE_ALLOWED"></a>
+<a id="0x1_stake_ENO_POST_GENESIS_VALIDATOR_SET_CHANGE_ALLOWED"></a>
 
 Validators cannot join or leave post genesis on this test network.
 
@@ -1223,7 +1223,7 @@ Validators cannot join or leave post genesis on this test network.
 
 
 
-<a name="0x1_stake_EOWNER_CAP_ALREADY_EXISTS"></a>
+<a id="0x1_stake_EOWNER_CAP_ALREADY_EXISTS"></a>
 
 An account cannot own more than one owner capability.
 
@@ -1233,7 +1233,7 @@ An account cannot own more than one owner capability.
 
 
 
-<a name="0x1_stake_EOWNER_CAP_NOT_FOUND"></a>
+<a id="0x1_stake_EOWNER_CAP_NOT_FOUND"></a>
 
 Owner capability does not exist at the provided account.
 
@@ -1243,7 +1243,7 @@ Owner capability does not exist at the provided account.
 
 
 
-<a name="0x1_stake_ESTAKE_EXCEEDS_MAX"></a>
+<a id="0x1_stake_ESTAKE_EXCEEDS_MAX"></a>
 
 Total stake exceeds maximum allowed.
 
@@ -1253,7 +1253,7 @@ Total stake exceeds maximum allowed.
 
 
 
-<a name="0x1_stake_ESTAKE_POOL_DOES_NOT_EXIST"></a>
+<a id="0x1_stake_ESTAKE_POOL_DOES_NOT_EXIST"></a>
 
 Stake pool does not exist at the provided pool address.
 
@@ -1263,7 +1263,7 @@ Stake pool does not exist at the provided pool address.
 
 
 
-<a name="0x1_stake_ESTAKE_TOO_HIGH"></a>
+<a id="0x1_stake_ESTAKE_TOO_HIGH"></a>
 
 Too much stake to join validator set.
 
@@ -1273,7 +1273,7 @@ Too much stake to join validator set.
 
 
 
-<a name="0x1_stake_ESTAKE_TOO_LOW"></a>
+<a id="0x1_stake_ESTAKE_TOO_LOW"></a>
 
 Not enough stake to join validator set.
 
@@ -1283,7 +1283,7 @@ Not enough stake to join validator set.
 
 
 
-<a name="0x1_stake_EVALIDATOR_CONFIG"></a>
+<a id="0x1_stake_EVALIDATOR_CONFIG"></a>
 
 Validator Config not published.
 
@@ -1293,7 +1293,7 @@ Validator Config not published.
 
 
 
-<a name="0x1_stake_EVALIDATOR_SET_TOO_LARGE"></a>
+<a id="0x1_stake_EVALIDATOR_SET_TOO_LARGE"></a>
 
 Validator set exceeds the limit
 
@@ -1303,7 +1303,7 @@ Validator set exceeds the limit
 
 
 
-<a name="0x1_stake_EVOTING_POWER_INCREASE_EXCEEDS_LIMIT"></a>
+<a id="0x1_stake_EVOTING_POWER_INCREASE_EXCEEDS_LIMIT"></a>
 
 Voting power increase has exceeded the limit for this current epoch.
 
@@ -1313,7 +1313,7 @@ Voting power increase has exceeded the limit for this current epoch.
 
 
 
-<a name="0x1_stake_MAX_VALIDATOR_SET_SIZE"></a>
+<a id="0x1_stake_MAX_VALIDATOR_SET_SIZE"></a>
 
 Limit the maximum size to u16::max, it's the current limit of the bitvec
 https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-bitvec/src/lib.rs#L20
@@ -1324,7 +1324,7 @@ https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-bitvec/src/lib.r
 
 
 
-<a name="0x1_stake_VALIDATOR_STATUS_ACTIVE"></a>
+<a id="0x1_stake_VALIDATOR_STATUS_ACTIVE"></a>
 
 
 
@@ -1333,7 +1333,7 @@ https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-bitvec/src/lib.r
 
 
 
-<a name="0x1_stake_VALIDATOR_STATUS_INACTIVE"></a>
+<a id="0x1_stake_VALIDATOR_STATUS_INACTIVE"></a>
 
 
 
@@ -1342,7 +1342,7 @@ https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-bitvec/src/lib.r
 
 
 
-<a name="0x1_stake_VALIDATOR_STATUS_PENDING_ACTIVE"></a>
+<a id="0x1_stake_VALIDATOR_STATUS_PENDING_ACTIVE"></a>
 
 Validator status enum. We can switch to proper enum later once Move supports it.
 
@@ -1352,7 +1352,7 @@ Validator status enum. We can switch to proper enum later once Move supports it.
 
 
 
-<a name="0x1_stake_VALIDATOR_STATUS_PENDING_INACTIVE"></a>
+<a id="0x1_stake_VALIDATOR_STATUS_PENDING_INACTIVE"></a>
 
 
 
@@ -1361,7 +1361,7 @@ Validator status enum. We can switch to proper enum later once Move supports it.
 
 
 
-<a name="0x1_stake_initialize_validator_fees"></a>
+<a id="0x1_stake_initialize_validator_fees"></a>
 
 ## Function `initialize_validator_fees`
 
@@ -1392,7 +1392,7 @@ Used by <code><a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</
 
 </details>
 
-<a name="0x1_stake_add_transaction_fee"></a>
+<a id="0x1_stake_add_transaction_fee"></a>
 
 ## Function `add_transaction_fee`
 
@@ -1423,7 +1423,7 @@ Stores the transaction fee collected to the specified validator address.
 
 </details>
 
-<a name="0x1_stake_get_lockup_secs"></a>
+<a id="0x1_stake_get_lockup_secs"></a>
 
 ## Function `get_lockup_secs`
 
@@ -1451,7 +1451,7 @@ This will throw an error if there's no stake pool at <code>pool_address</code>.
 
 </details>
 
-<a name="0x1_stake_get_remaining_lockup_secs"></a>
+<a id="0x1_stake_get_remaining_lockup_secs"></a>
 
 ## Function `get_remaining_lockup_secs`
 
@@ -1484,7 +1484,7 @@ This will throw an error if there's no stake pool at <code>pool_address</code>.
 
 </details>
 
-<a name="0x1_stake_get_stake"></a>
+<a id="0x1_stake_get_stake"></a>
 
 ## Function `get_stake`
 
@@ -1518,7 +1518,7 @@ The returned amounts are for (active, inactive, pending_active, pending_inactive
 
 </details>
 
-<a name="0x1_stake_get_validator_state"></a>
+<a id="0x1_stake_get_validator_state"></a>
 
 ## Function `get_validator_state`
 
@@ -1553,7 +1553,7 @@ Returns the validator's state.
 
 </details>
 
-<a name="0x1_stake_get_current_epoch_voting_power"></a>
+<a id="0x1_stake_get_current_epoch_voting_power"></a>
 
 ## Function `get_current_epoch_voting_power`
 
@@ -1589,7 +1589,7 @@ This is the same as the validator's total active and pending_inactive stake.
 
 </details>
 
-<a name="0x1_stake_get_delegated_voter"></a>
+<a id="0x1_stake_get_delegated_voter"></a>
 
 ## Function `get_delegated_voter`
 
@@ -1616,7 +1616,7 @@ Return the delegated voter of the validator at <code>pool_address</code>.
 
 </details>
 
-<a name="0x1_stake_get_operator"></a>
+<a id="0x1_stake_get_operator"></a>
 
 ## Function `get_operator`
 
@@ -1643,7 +1643,7 @@ Return the operator of the validator at <code>pool_address</code>.
 
 </details>
 
-<a name="0x1_stake_get_owned_pool_address"></a>
+<a id="0x1_stake_get_owned_pool_address"></a>
 
 ## Function `get_owned_pool_address`
 
@@ -1668,7 +1668,7 @@ Return the pool address in <code>owner_cap</code>.
 
 </details>
 
-<a name="0x1_stake_get_validator_index"></a>
+<a id="0x1_stake_get_validator_index"></a>
 
 ## Function `get_validator_index`
 
@@ -1695,7 +1695,7 @@ Return the validator index for <code>pool_address</code>.
 
 </details>
 
-<a name="0x1_stake_get_current_epoch_proposal_counts"></a>
+<a id="0x1_stake_get_current_epoch_proposal_counts"></a>
 
 ## Function `get_current_epoch_proposal_counts`
 
@@ -1723,7 +1723,7 @@ Return the number of successful and failed proposals for the proposal at the giv
 
 </details>
 
-<a name="0x1_stake_get_validator_config"></a>
+<a id="0x1_stake_get_validator_config"></a>
 
 ## Function `get_validator_config`
 
@@ -1751,7 +1751,7 @@ Return the validator's config.
 
 </details>
 
-<a name="0x1_stake_stake_pool_exists"></a>
+<a id="0x1_stake_stake_pool_exists"></a>
 
 ## Function `stake_pool_exists`
 
@@ -1776,7 +1776,7 @@ Return the validator's config.
 
 </details>
 
-<a name="0x1_stake_initialize"></a>
+<a id="0x1_stake_initialize"></a>
 
 ## Function `initialize`
 
@@ -1814,7 +1814,7 @@ Initialize validator set to the core resource account.
 
 </details>
 
-<a name="0x1_stake_store_aptos_coin_mint_cap"></a>
+<a id="0x1_stake_store_aptos_coin_mint_cap"></a>
 
 ## Function `store_aptos_coin_mint_cap`
 
@@ -1841,7 +1841,7 @@ Beyond genesis, no one can create AptosCoin mint/burn capabilities.
 
 </details>
 
-<a name="0x1_stake_remove_validators"></a>
+<a id="0x1_stake_remove_validators"></a>
 
 ## Function `remove_validators`
 
@@ -1894,7 +1894,7 @@ Allow on chain governance to remove validators from the validator set.
 
 </details>
 
-<a name="0x1_stake_initialize_stake_owner"></a>
+<a id="0x1_stake_initialize_stake_owner"></a>
 
 ## Function `initialize_stake_owner`
 
@@ -1945,7 +1945,7 @@ to set later.
 
 </details>
 
-<a name="0x1_stake_initialize_validator"></a>
+<a id="0x1_stake_initialize_validator"></a>
 
 ## Function `initialize_validator`
 
@@ -1989,7 +1989,7 @@ Initialize the validator account and give ownership to the signing account.
 
 </details>
 
-<a name="0x1_stake_initialize_owner"></a>
+<a id="0x1_stake_initialize_owner"></a>
 
 ## Function `initialize_owner`
 
@@ -2040,7 +2040,7 @@ Initialize the validator account and give ownership to the signing account.
 
 </details>
 
-<a name="0x1_stake_extract_owner_cap"></a>
+<a id="0x1_stake_extract_owner_cap"></a>
 
 ## Function `extract_owner_cap`
 
@@ -2067,7 +2067,7 @@ Extract and return owner capability from the signing account.
 
 </details>
 
-<a name="0x1_stake_deposit_owner_cap"></a>
+<a id="0x1_stake_deposit_owner_cap"></a>
 
 ## Function `deposit_owner_cap`
 
@@ -2094,7 +2094,7 @@ staking pool.
 
 </details>
 
-<a name="0x1_stake_destroy_owner_cap"></a>
+<a id="0x1_stake_destroy_owner_cap"></a>
 
 ## Function `destroy_owner_cap`
 
@@ -2119,7 +2119,7 @@ Destroy <code>owner_cap</code>.
 
 </details>
 
-<a name="0x1_stake_set_operator"></a>
+<a id="0x1_stake_set_operator"></a>
 
 ## Function `set_operator`
 
@@ -2147,7 +2147,7 @@ Allows an owner to change the operator of the stake pool.
 
 </details>
 
-<a name="0x1_stake_set_operator_with_cap"></a>
+<a id="0x1_stake_set_operator_with_cap"></a>
 
 ## Function `set_operator_with_cap`
 
@@ -2185,7 +2185,7 @@ Allows an account with ownership capability to change the operator of the stake 
 
 </details>
 
-<a name="0x1_stake_set_delegated_voter"></a>
+<a id="0x1_stake_set_delegated_voter"></a>
 
 ## Function `set_delegated_voter`
 
@@ -2213,7 +2213,7 @@ Allows an owner to change the delegated voter of the stake pool.
 
 </details>
 
-<a name="0x1_stake_set_delegated_voter_with_cap"></a>
+<a id="0x1_stake_set_delegated_voter_with_cap"></a>
 
 ## Function `set_delegated_voter_with_cap`
 
@@ -2241,7 +2241,7 @@ Allows an owner to change the delegated voter of the stake pool.
 
 </details>
 
-<a name="0x1_stake_add_stake"></a>
+<a id="0x1_stake_add_stake"></a>
 
 ## Function `add_stake`
 
@@ -2269,7 +2269,7 @@ Add <code>amount</code> of coins from the <code><a href="account.md#0x1_account"
 
 </details>
 
-<a name="0x1_stake_add_stake_with_cap"></a>
+<a id="0x1_stake_add_stake_with_cap"></a>
 
 ## Function `add_stake_with_cap`
 
@@ -2332,7 +2332,7 @@ Add <code>coins</code> into <code>pool_address</code>. this requires the corresp
 
 </details>
 
-<a name="0x1_stake_reactivate_stake"></a>
+<a id="0x1_stake_reactivate_stake"></a>
 
 ## Function `reactivate_stake`
 
@@ -2360,7 +2360,7 @@ Move <code>amount</code> of coins from pending_inactive to active.
 
 </details>
 
-<a name="0x1_stake_reactivate_stake_with_cap"></a>
+<a id="0x1_stake_reactivate_stake_with_cap"></a>
 
 ## Function `reactivate_stake_with_cap`
 
@@ -2404,7 +2404,7 @@ Move <code>amount</code> of coins from pending_inactive to active.
 
 </details>
 
-<a name="0x1_stake_rotate_consensus_key"></a>
+<a id="0x1_stake_rotate_consensus_key"></a>
 
 ## Function `rotate_consensus_key`
 
@@ -2456,7 +2456,7 @@ Rotate the consensus key of the validator, it'll take effect in next epoch.
 
 </details>
 
-<a name="0x1_stake_update_network_and_fullnode_addresses"></a>
+<a id="0x1_stake_update_network_and_fullnode_addresses"></a>
 
 ## Function `update_network_and_fullnode_addresses`
 
@@ -2506,7 +2506,7 @@ Update the network and full node addresses of the validator. This only takes eff
 
 </details>
 
-<a name="0x1_stake_increase_lockup"></a>
+<a id="0x1_stake_increase_lockup"></a>
 
 ## Function `increase_lockup`
 
@@ -2534,7 +2534,7 @@ Similar to increase_lockup_with_cap but will use ownership capability from the s
 
 </details>
 
-<a name="0x1_stake_increase_lockup_with_cap"></a>
+<a id="0x1_stake_increase_lockup_with_cap"></a>
 
 ## Function `increase_lockup_with_cap`
 
@@ -2577,7 +2577,7 @@ directly inactive if it's not from an active validator.
 
 </details>
 
-<a name="0x1_stake_join_validator_set"></a>
+<a id="0x1_stake_join_validator_set"></a>
 
 ## Function `join_validator_set`
 
@@ -2610,7 +2610,7 @@ This can only called by the operator of the validator/staking pool.
 
 </details>
 
-<a name="0x1_stake_join_validator_set_internal"></a>
+<a id="0x1_stake_join_validator_set_internal"></a>
 
 ## Function `join_validator_set_internal`
 
@@ -2673,7 +2673,7 @@ This internal version can only be called by the Genesis module during Genesis.
 
 </details>
 
-<a name="0x1_stake_unlock"></a>
+<a id="0x1_stake_unlock"></a>
 
 ## Function `unlock`
 
@@ -2701,7 +2701,7 @@ Similar to unlock_with_cap but will use ownership capability from the signing ac
 
 </details>
 
-<a name="0x1_stake_unlock_with_cap"></a>
+<a id="0x1_stake_unlock_with_cap"></a>
 
 ## Function `unlock_with_cap`
 
@@ -2747,7 +2747,7 @@ Unlock <code>amount</code> from the active stake. Only possible if the lockup ha
 
 </details>
 
-<a name="0x1_stake_withdraw"></a>
+<a id="0x1_stake_withdraw"></a>
 
 ## Function `withdraw`
 
@@ -2779,7 +2779,7 @@ Withdraw from <code><a href="account.md#0x1_account">account</a></code>'s inacti
 
 </details>
 
-<a name="0x1_stake_withdraw_with_cap"></a>
+<a id="0x1_stake_withdraw_with_cap"></a>
 
 ## Function `withdraw_with_cap`
 
@@ -2831,7 +2831,7 @@ Withdraw from <code>pool_address</code>'s inactive stake with the corresponding 
 
 </details>
 
-<a name="0x1_stake_leave_validator_set"></a>
+<a id="0x1_stake_leave_validator_set"></a>
 
 ## Function `leave_validator_set`
 
@@ -2909,7 +2909,7 @@ Can only be called by the operator of the validator/staking pool.
 
 </details>
 
-<a name="0x1_stake_is_current_epoch_validator"></a>
+<a id="0x1_stake_is_current_epoch_validator"></a>
 
 ## Function `is_current_epoch_validator`
 
@@ -2938,7 +2938,7 @@ when the epoch starts.
 
 </details>
 
-<a name="0x1_stake_update_performance_statistics"></a>
+<a id="0x1_stake_update_performance_statistics"></a>
 
 ## Function `update_performance_statistics`
 
@@ -3007,7 +3007,7 @@ This function cannot abort.
 
 </details>
 
-<a name="0x1_stake_on_new_epoch"></a>
+<a id="0x1_stake_on_new_epoch"></a>
 
 ## Function `on_new_epoch`
 
@@ -3144,7 +3144,7 @@ power.
 
 </details>
 
-<a name="0x1_stake_update_stake_pool"></a>
+<a id="0x1_stake_update_stake_pool"></a>
 
 ## Function `update_stake_pool`
 
@@ -3233,7 +3233,7 @@ This function shouldn't abort.
 
 </details>
 
-<a name="0x1_stake_calculate_rewards_amount"></a>
+<a id="0x1_stake_calculate_rewards_amount"></a>
 
 ## Function `calculate_rewards_amount`
 
@@ -3279,7 +3279,7 @@ Calculate the rewards amount.
 
 </details>
 
-<a name="0x1_stake_distribute_rewards"></a>
+<a id="0x1_stake_distribute_rewards"></a>
 
 ## Function `distribute_rewards`
 
@@ -3321,7 +3321,7 @@ Mint rewards corresponding to current epoch's <code><a href="stake.md#0x1_stake"
 
 </details>
 
-<a name="0x1_stake_append"></a>
+<a id="0x1_stake_append"></a>
 
 ## Function `append`
 
@@ -3347,7 +3347,7 @@ Mint rewards corresponding to current epoch's <code><a href="stake.md#0x1_stake"
 
 </details>
 
-<a name="0x1_stake_find_validator"></a>
+<a id="0x1_stake_find_validator"></a>
 
 ## Function `find_validator`
 
@@ -3384,7 +3384,7 @@ Mint rewards corresponding to current epoch's <code><a href="stake.md#0x1_stake"
 
 </details>
 
-<a name="0x1_stake_generate_validator_info"></a>
+<a id="0x1_stake_generate_validator_info"></a>
 
 ## Function `generate_validator_info`
 
@@ -3413,7 +3413,7 @@ Mint rewards corresponding to current epoch's <code><a href="stake.md#0x1_stake"
 
 </details>
 
-<a name="0x1_stake_get_next_epoch_voting_power"></a>
+<a id="0x1_stake_get_next_epoch_voting_power"></a>
 
 ## Function `get_next_epoch_voting_power`
 
@@ -3444,7 +3444,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 </details>
 
-<a name="0x1_stake_update_voting_power_increase"></a>
+<a id="0x1_stake_update_voting_power_increase"></a>
 
 ## Function `update_voting_power_increase`
 
@@ -3479,7 +3479,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 </details>
 
-<a name="0x1_stake_assert_stake_pool_exists"></a>
+<a id="0x1_stake_assert_stake_pool_exists"></a>
 
 ## Function `assert_stake_pool_exists`
 
@@ -3503,7 +3503,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 </details>
 
-<a name="0x1_stake_configure_allowed_validators"></a>
+<a id="0x1_stake_configure_allowed_validators"></a>
 
 ## Function `configure_allowed_validators`
 
@@ -3534,7 +3534,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 </details>
 
-<a name="0x1_stake_is_allowed"></a>
+<a id="0x1_stake_is_allowed"></a>
 
 ## Function `is_allowed`
 
@@ -3563,7 +3563,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 </details>
 
-<a name="0x1_stake_assert_owner_cap_exists"></a>
+<a id="0x1_stake_assert_owner_cap_exists"></a>
 
 ## Function `assert_owner_cap_exists`
 
@@ -3587,7 +3587,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 </details>
 
-<a name="0x1_stake_copy_aptos_coin_mint_cap_for_storage_refund"></a>
+<a id="0x1_stake_copy_aptos_coin_mint_cap_for_storage_refund"></a>
 
 ## Function `copy_aptos_coin_mint_cap_for_storage_refund`
 
@@ -3611,7 +3611,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -3622,15 +3622,15 @@ Returns validator's next epoch voting power, including pending_active, active, a
 <b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>&gt;(@aptos_framework);
 <b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework);
 <b>apply</b> <a href="stake.md#0x1_stake_ValidatorOwnerNoChange">ValidatorOwnerNoChange</a> <b>to</b> *;
-<a name="0x1_stake_ghost_valid_perf"></a>
+<a id="0x1_stake_ghost_valid_perf"></a>
 <b>global</b> <a href="stake.md#0x1_stake_ghost_valid_perf">ghost_valid_perf</a>: <a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>;
-<a name="0x1_stake_ghost_proposer_idx"></a>
+<a id="0x1_stake_ghost_proposer_idx"></a>
 <b>global</b> <a href="stake.md#0x1_stake_ghost_proposer_idx">ghost_proposer_idx</a>: Option&lt;u64&gt;;
 </code></pre>
 
 
 
-<a name="@Specification_1_ValidatorSet"></a>
+<a id="@Specification_1_ValidatorSet"></a>
 
 ### Resource `ValidatorSet`
 
@@ -3687,7 +3687,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="0x1_stake_ValidatorOwnerNoChange"></a>
+<a id="0x1_stake_ValidatorOwnerNoChange"></a>
 
 
 <pre><code><b>schema</b> <a href="stake.md#0x1_stake_ValidatorOwnerNoChange">ValidatorOwnerNoChange</a> {
@@ -3699,7 +3699,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="0x1_stake_StakedValueNochange"></a>
+<a id="0x1_stake_StakedValueNochange"></a>
 
 
 <pre><code><b>schema</b> <a href="stake.md#0x1_stake_StakedValueNochange">StakedValueNochange</a> {
@@ -3714,7 +3714,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="0x1_stake_validator_set_is_valid"></a>
+<a id="0x1_stake_validator_set_is_valid"></a>
 
 
 <pre><code><b>fun</b> <a href="stake.md#0x1_stake_validator_set_is_valid">validator_set_is_valid</a>(): bool {
@@ -3729,7 +3729,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_initialize_validator_fees"></a>
+<a id="@Specification_1_initialize_validator_fees"></a>
 
 ### Function `initialize_validator_fees`
 
@@ -3748,7 +3748,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_add_transaction_fee"></a>
+<a id="@Specification_1_add_transaction_fee"></a>
 
 ### Function `add_transaction_fee`
 
@@ -3774,7 +3774,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_get_validator_state"></a>
+<a id="@Specification_1_get_validator_state"></a>
 
 ### Function `get_validator_state`
 
@@ -3800,7 +3800,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_initialize"></a>
+<a id="@Specification_1_initialize"></a>
 
 ### Function `initialize`
 
@@ -3822,7 +3822,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_remove_validators"></a>
+<a id="@Specification_1_remove_validators"></a>
 
 ### Function `remove_validators`
 
@@ -3841,7 +3841,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_initialize_stake_owner"></a>
+<a id="@Specification_1_initialize_stake_owner"></a>
 
 ### Function `initialize_stake_owner`
 
@@ -3857,7 +3857,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_extract_owner_cap"></a>
+<a id="@Specification_1_extract_owner_cap"></a>
 
 ### Function `extract_owner_cap`
 
@@ -3875,7 +3875,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_deposit_owner_cap"></a>
+<a id="@Specification_1_deposit_owner_cap"></a>
 
 ### Function `deposit_owner_cap`
 
@@ -3894,7 +3894,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_set_operator_with_cap"></a>
+<a id="@Specification_1_set_operator_with_cap"></a>
 
 ### Function `set_operator_with_cap`
 
@@ -3914,7 +3914,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_set_delegated_voter_with_cap"></a>
+<a id="@Specification_1_set_delegated_voter_with_cap"></a>
 
 ### Function `set_delegated_voter_with_cap`
 
@@ -3935,7 +3935,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_add_stake"></a>
+<a id="@Specification_1_add_stake"></a>
 
 ### Function `add_stake`
 
@@ -3952,7 +3952,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_add_stake_with_cap"></a>
+<a id="@Specification_1_add_stake_with_cap"></a>
 
 ### Function `add_stake_with_cap`
 
@@ -3970,7 +3970,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_reactivate_stake_with_cap"></a>
+<a id="@Specification_1_reactivate_stake_with_cap"></a>
 
 ### Function `reactivate_stake_with_cap`
 
@@ -3994,7 +3994,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_rotate_consensus_key"></a>
+<a id="@Specification_1_rotate_consensus_key"></a>
 
 ### Function `rotate_consensus_key`
 
@@ -4018,7 +4018,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_update_network_and_fullnode_addresses"></a>
+<a id="@Specification_1_update_network_and_fullnode_addresses"></a>
 
 ### Function `update_network_and_fullnode_addresses`
 
@@ -4042,7 +4042,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_increase_lockup_with_cap"></a>
+<a id="@Specification_1_increase_lockup_with_cap"></a>
 
 ### Function `increase_lockup_with_cap`
 
@@ -4071,7 +4071,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_unlock_with_cap"></a>
+<a id="@Specification_1_unlock_with_cap"></a>
 
 ### Function `unlock_with_cap`
 
@@ -4095,7 +4095,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_is_current_epoch_validator"></a>
+<a id="@Specification_1_is_current_epoch_validator"></a>
 
 ### Function `is_current_epoch_validator`
 
@@ -4113,7 +4113,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_update_performance_statistics"></a>
+<a id="@Specification_1_update_performance_statistics"></a>
 
 ### Function `update_performance_statistics`
 
@@ -4136,7 +4136,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_on_new_epoch"></a>
+<a id="@Specification_1_on_new_epoch"></a>
 
 ### Function `on_new_epoch`
 
@@ -4157,7 +4157,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_update_stake_pool"></a>
+<a id="@Specification_1_update_stake_pool"></a>
 
 ### Function `update_stake_pool`
 
@@ -4213,7 +4213,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="0x1_stake_UpdateStakePoolAbortsIf"></a>
+<a id="0x1_stake_UpdateStakePoolAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="stake.md#0x1_stake_UpdateStakePoolAbortsIf">UpdateStakePoolAbortsIf</a> {
@@ -4232,7 +4232,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_calculate_rewards_amount"></a>
+<a id="@Specification_1_calculate_rewards_amount"></a>
 
 ### Function `calculate_rewards_amount`
 
@@ -4265,7 +4265,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_distribute_rewards"></a>
+<a id="@Specification_1_distribute_rewards"></a>
 
 ### Function `distribute_rewards`
 
@@ -4303,7 +4303,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="0x1_stake_DistributeRewardsAbortsIf"></a>
+<a id="0x1_stake_DistributeRewardsAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="stake.md#0x1_stake_DistributeRewardsAbortsIf">DistributeRewardsAbortsIf</a> {
@@ -4328,7 +4328,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_append"></a>
+<a id="@Specification_1_append"></a>
 
 ### Function `append`
 
@@ -4349,7 +4349,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_find_validator"></a>
+<a id="@Specification_1_find_validator"></a>
 
 ### Function `find_validator`
 
@@ -4370,7 +4370,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_update_voting_power_increase"></a>
+<a id="@Specification_1_update_voting_power_increase"></a>
 
 ### Function `update_voting_power_increase`
 
@@ -4399,7 +4399,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_assert_stake_pool_exists"></a>
+<a id="@Specification_1_assert_stake_pool_exists"></a>
 
 ### Function `assert_stake_pool_exists`
 
@@ -4415,7 +4415,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_configure_allowed_validators"></a>
+<a id="@Specification_1_configure_allowed_validators"></a>
 
 ### Function `configure_allowed_validators`
 
@@ -4434,7 +4434,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="@Specification_1_assert_owner_cap_exists"></a>
+<a id="@Specification_1_assert_owner_cap_exists"></a>
 
 ### Function `assert_owner_cap_exists`
 
@@ -4451,7 +4451,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="0x1_stake_AddStakeWithCapAbortsIfAndEnsures"></a>
+<a id="0x1_stake_AddStakeWithCapAbortsIfAndEnsures"></a>
 
 
 <pre><code><b>schema</b> <a href="stake.md#0x1_stake_AddStakeWithCapAbortsIfAndEnsures">AddStakeWithCapAbortsIfAndEnsures</a> {
@@ -4489,7 +4489,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="0x1_stake_AddStakeAbortsIfAndEnsures"></a>
+<a id="0x1_stake_AddStakeAbortsIfAndEnsures"></a>
 
 
 <pre><code><b>schema</b> <a href="stake.md#0x1_stake_AddStakeAbortsIfAndEnsures">AddStakeAbortsIfAndEnsures</a> {
@@ -4510,7 +4510,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="0x1_stake_spec_is_allowed"></a>
+<a id="0x1_stake_spec_is_allowed"></a>
 
 
 <pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_is_allowed">spec_is_allowed</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>): bool {
@@ -4526,7 +4526,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="0x1_stake_spec_find_validator"></a>
+<a id="0x1_stake_spec_find_validator"></a>
 
 
 <pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_find_validator">spec_find_validator</a>(v: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="stake.md#0x1_stake_ValidatorInfo">ValidatorInfo</a>&gt;, addr: <b>address</b>): Option&lt;u64&gt;;
@@ -4535,7 +4535,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="0x1_stake_spec_validators_are_initialized"></a>
+<a id="0x1_stake_spec_validators_are_initialized"></a>
 
 
 <pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_validators_are_initialized">spec_validators_are_initialized</a>(validators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="stake.md#0x1_stake_ValidatorInfo">ValidatorInfo</a>&gt;): bool {
@@ -4548,7 +4548,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="0x1_stake_spec_validator_indices_are_valid"></a>
+<a id="0x1_stake_spec_validator_indices_are_valid"></a>
 
 
 <pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_validator_indices_are_valid">spec_validator_indices_are_valid</a>(validators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="stake.md#0x1_stake_ValidatorInfo">ValidatorInfo</a>&gt;): bool {
@@ -4560,7 +4560,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="0x1_stake_spec_validator_index_upper_bound"></a>
+<a id="0x1_stake_spec_validator_index_upper_bound"></a>
 
 
 <pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_validator_index_upper_bound">spec_validator_index_upper_bound</a>(): u64 {
@@ -4571,7 +4571,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="0x1_stake_spec_has_stake_pool"></a>
+<a id="0x1_stake_spec_has_stake_pool"></a>
 
 
 <pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_has_stake_pool">spec_has_stake_pool</a>(a: <b>address</b>): bool {
@@ -4582,7 +4582,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="0x1_stake_spec_has_validator_config"></a>
+<a id="0x1_stake_spec_has_validator_config"></a>
 
 
 <pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_has_validator_config">spec_has_validator_config</a>(a: <b>address</b>): bool {
@@ -4593,7 +4593,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="0x1_stake_spec_rewards_amount"></a>
+<a id="0x1_stake_spec_rewards_amount"></a>
 
 
 <pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_rewards_amount">spec_rewards_amount</a>(
@@ -4608,7 +4608,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="0x1_stake_spec_contains"></a>
+<a id="0x1_stake_spec_contains"></a>
 
 
 <pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_contains">spec_contains</a>(validators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="stake.md#0x1_stake_ValidatorInfo">ValidatorInfo</a>&gt;, addr: <b>address</b>): bool {
@@ -4619,7 +4619,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<a name="0x1_stake_spec_is_current_epoch_validator"></a>
+<a id="0x1_stake_spec_is_current_epoch_validator"></a>
 
 
 <pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_is_current_epoch_validator">spec_is_current_epoch_validator</a>(pool_address: <b>address</b>): bool {
