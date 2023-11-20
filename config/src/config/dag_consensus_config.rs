@@ -16,6 +16,8 @@ pub struct DagPayloadConfig {
     pub max_receiving_size_per_round_bytes: u64,
 
     pub payload_pull_max_poll_time_ms: u64,
+    // Pipeline delay after which the validator will stop voting
+    pub pipeline_backpressure_ms: u64,
 }
 
 impl Default for DagPayloadConfig {
@@ -27,6 +29,7 @@ impl Default for DagPayloadConfig {
             max_receiving_size_per_round_bytes: 20 * 1024 * 1024,
 
             payload_pull_max_poll_time_ms: 1000,
+            pipeline_backpressure_ms: 2 * 60 * 1000,
         }
     }
 }

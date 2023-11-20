@@ -547,6 +547,7 @@ impl DagBootstrapper {
             self.storage.clone(),
             fetch_requester,
             self.config.node_payload_config.clone(),
+            ledger_info_provider.clone(),
         );
         let fetch_handler = FetchRequestHandler::new(dag_store.clone(), self.epoch_state.clone());
 

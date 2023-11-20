@@ -14,6 +14,8 @@ pub enum NodeBroadcastHandleError {
     MissingParents,
     #[error("stale round number")]
     StaleRound(Round),
+    #[error("pipeline backpressure")]
+    PipelineBackpressure,
 }
 
 #[derive(Clone, Debug, ThisError, Serialize, Deserialize)]
