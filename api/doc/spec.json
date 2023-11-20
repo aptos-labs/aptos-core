@@ -11594,6 +11594,15 @@
               "schema": {
                 "$ref": "#/components/schemas/ViewRequest"
               }
+            },
+            "application/x.aptos.view_function+bcs": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              }
             }
           },
           "required": true

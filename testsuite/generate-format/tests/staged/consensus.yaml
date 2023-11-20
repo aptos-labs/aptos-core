@@ -334,6 +334,9 @@ DAGNetworkMessage:
   STRUCT:
     - epoch: U64
     - data: BYTES
+DummySystemTransaction:
+  STRUCT:
+    - nonce: U64
 Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
@@ -581,6 +584,12 @@ SyncInfo:
     - highest_2chain_timeout_cert:
         OPTION:
           TYPENAME: TwoChainTimeoutCertificate
+SystemTransaction:
+  ENUM:
+    0:
+      DummyTopic:
+        NEWTYPE:
+          TYPENAME: DummySystemTransaction
 TableHandle:
   NEWTYPESTRUCT:
     TYPENAME: AccountAddress
@@ -602,6 +611,10 @@ Transaction:
       StateCheckpoint:
         NEWTYPE:
           TYPENAME: HashValue
+    4:
+      SystemTransaction:
+        NEWTYPE:
+          TYPENAME: SystemTransaction
 TransactionArgument:
   ENUM:
     0:

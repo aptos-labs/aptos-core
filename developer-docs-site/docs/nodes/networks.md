@@ -1,17 +1,20 @@
 ---
-title: "Deployments"
-slug: "deployments"
+title: "Networks"
+slug: "networks"
 hide_table_of_contents: true
 ---
 
-# Aptos Deployments
+# Aptos Networks
 
 |Description                                 |Mainnet | Testnet | Devnet |
 |--------------------------------------------|---|---|---|
 |**REST API**             | https://fullnode.mainnet.aptoslabs.com/v1 | https://fullnode.testnet.aptoslabs.com/v1 | https://fullnode.devnet.aptoslabs.com/v1 |
 |**REST API Spec**        | <a href="https://fullnode.mainnet.aptoslabs.com/v1/spec#/">Link</a> | <a href="https://fullnode.testnet.aptoslabs.com/v1/spec#/">Link</a> | <a href="https://fullnode.devnet.aptoslabs.com/v1/spec#/">Link</a> |
-|**Indexer API**          | https://indexer.mainnet.aptoslabs.com/v1/graphql | https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql | https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql |
-|**Indexer API Spec**     | <a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql">Link</a> | <a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql">Link</a> | <a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql">Link</a> |
+|**Indexer GraphQL API**          | https://indexer.mainnet.aptoslabs.com/v1/graphql | https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql | https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql |
+|**Indexer GraphQL API Spec**     | <a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql">Link</a> | <a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql">Link</a> | <a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql">Link</a> |
+|**[Dev Portal] Fullnode API**          | https://api.mainnet.aptoslabs.com/v1 | https://api.testnet.aptoslabs.com/v1 | https://api.devnet.aptoslabs.com/v1 |
+|**[Dev Portal] Indexer GraphQL API**          | https://api.mainnet.aptoslabs.com/v1/graphql | https://api.testnet.aptoslabs.com/v1/graphql | https://api.devnet.aptoslabs.com/v1/graphql |
+|**[Dev Portal] GRPC Transaction Stream**          | https://grpc.mainnet.aptoslabs.com | https://grpc.testnet.aptoslabs.com | https://grpc.devnet.aptoslabs.com |
 |**Faucet**               | No Faucet | https://faucet.testnet.aptoslabs.com/ | https://faucet.devnet.aptoslabs.com/ |
 |**Genesis and Waypoint** | https://github.com/aptos-labs/aptos-networks/tree/main/mainnet | https://github.com/aptos-labs/aptos-networks/tree/main/testnet| https://github.com/aptos-labs/aptos-networks/tree/main/devnet |
 |**Chain ID**             | 1 | 2 | [On Aptos Explorer **select Devnet from top right**](https://explorer.aptoslabs.com/?network=Devnet).|

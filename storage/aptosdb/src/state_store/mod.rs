@@ -651,6 +651,7 @@ impl StateStore {
             batch,
             sharded_state_kv_batches,
             /*skip_usage=*/ false,
+            None,
         )?;
 
         self.put_state_values(
@@ -676,6 +677,7 @@ impl StateStore {
         state_kv_metadata_batch: &SchemaBatch,
         put_state_value_indices: bool,
         skip_usage: bool,
+        last_checkpoint_index: Option<usize>,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_value_sets"])
@@ -689,6 +691,7 @@ impl StateStore {
             ledger_batch,
             sharded_state_kv_batches,
             skip_usage,
+            last_checkpoint_index,
         )?;
 
         let _timer = OTHER_TIMERS_SECONDS
@@ -775,6 +778,7 @@ impl StateStore {
         batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
         skip_usage: bool,
+        last_checkpoint_index: Option<usize>,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_stats_and_indices"])
@@ -907,9 +911,11 @@ impl StateStore {
                 (usage.items() as i64 + items_delta) as usize,
                 (usage.bytes() as i64 + bytes_delta) as usize,
             );
-            if !skip_usage || i == num_versions - 1 {
+            let should_write_index_for_version =
+                (i == num_versions - 1) || Some(i) == last_checkpoint_index;
+            if !skip_usage || should_write_index_for_version {
                 let version = first_version + i as u64;
-                if i == num_versions - 1 {
+                if should_write_index_for_version {
                     info!("Write usage at version {version}, {usage:?}, skip_usage: {skip_usage}.");
                 }
                 batch

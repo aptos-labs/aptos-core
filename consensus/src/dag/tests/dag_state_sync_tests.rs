@@ -8,7 +8,10 @@ use crate::{
         dag_state_sync::DagStateSynchronizer,
         dag_store::Dag,
         storage::DAGStorage,
-        tests::{dag_test::MockStorage, helpers::generate_dag_nodes},
+        tests::{
+            dag_test::MockStorage,
+            helpers::{generate_dag_nodes, MockPayloadManager},
+        },
         types::{CertifiedNodeMessage, RemoteFetchRequest},
         CertifiedNode, DAGMessage, DAGRpcResult, RpcHandler, RpcWithFallback, TDAGNetworkSender,
     },
@@ -113,12 +116,14 @@ impl OrderedNotifier for MockNotifier {
 fn setup(epoch_state: Arc<EpochState>, storage: Arc<dyn DAGStorage>) -> DagStateSynchronizer {
     let time_service = TimeService::mock();
     let state_computer = Arc::new(EmptyStateComputer {});
+    let payload_manager = Arc::new(MockPayloadManager {});
 
     DagStateSynchronizer::new(
         epoch_state,
         time_service,
         state_computer,
         storage,
+        payload_manager,
         TEST_DAG_WINDOW as Round,
     )
 }
@@ -147,7 +152,13 @@ async fn test_dag_state_sync() {
         .collect::<Vec<_>>();
     let nodes = generate_dag_nodes(&virtual_dag, &validators);
 
-    let mut fast_dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), 1, 0);
+    let mut fast_dag = Dag::new(
+        epoch_state.clone(),
+        Arc::new(MockStorage::new()),
+        Arc::new(MockPayloadManager {}),
+        1,
+        0,
+    );
     for round_nodes in &nodes {
         for node in round_nodes.iter().flatten() {
             fast_dag.add_node(node.clone()).unwrap();
@@ -155,7 +166,13 @@ async fn test_dag_state_sync() {
     }
     let fast_dag = Arc::new(RwLock::new(fast_dag));
 
-    let mut slow_dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), 1, 0);
+    let mut slow_dag = Dag::new(
+        epoch_state.clone(),
+        Arc::new(MockStorage::new()),
+        Arc::new(MockPayloadManager {}),
+        1,
+        0,
+    );
     for round_nodes in nodes.iter().take(SLOW_DAG_ROUNDS as usize) {
         for node in round_nodes.iter().flatten() {
             slow_dag.add_node(node.clone()).unwrap();
@@ -197,10 +214,19 @@ async fn test_dag_state_sync() {
         epoch_state: epoch_state.clone(),
     };
 
+    let (request, responders, sync_dag_store) =
+        state_sync.build_request(&sync_node_li, slow_dag.clone(), 0);
+
     let sync_result = state_sync
-        .sync_dag_to(&sync_node_li, dag_fetcher, slow_dag.clone(), 0)
+        .sync_dag_to(
+            dag_fetcher,
+            request,
+            responders,
+            sync_dag_store,
+            sync_node_li.ledger_info().clone(),
+        )
         .await;
-    let new_dag = sync_result.unwrap().unwrap();
+    let new_dag = sync_result.unwrap();
 
     assert_eq!(
         new_dag.lowest_round(),

@@ -1376,6 +1376,28 @@ async fn test_gas_estimation_static_override() {
     context.check_golden_output(resp);
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_simulation_failure_error_message() {
+    let mut context = new_test_context(current_function_name!());
+    let admin0 = context.root_account().await;
+
+    // script {
+    //     fun main() {
+    //         1/0;
+    //     }
+    // }
+
+    let resp = context.simulate_transaction(&admin0, json!({
+        "type": "script_payload",
+        "code": {
+            "bytecode": "a11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102",
+        },
+        "type_arguments": [],
+        "arguments": [],
+    }), 500).await;
+    context.check_golden_output(resp);
+}
+
 fn gen_string(len: u64) -> String {
     let mut rng = thread_rng();
     std::iter::repeat(())

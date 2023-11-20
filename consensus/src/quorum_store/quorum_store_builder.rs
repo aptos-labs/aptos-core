@@ -138,6 +138,7 @@ pub struct InnerBuilder {
     remote_batch_coordinator_cmd_tx: Vec<tokio::sync::mpsc::Sender<BatchCoordinatorCommand>>,
     remote_batch_coordinator_cmd_rx: Vec<tokio::sync::mpsc::Receiver<BatchCoordinatorCommand>>,
     batch_store: Option<Arc<BatchStore<NetworkSender>>>,
+    broadcast_proofs: bool,
 }
 
 impl InnerBuilder {
@@ -154,6 +155,7 @@ impl InnerBuilder {
         verifier: ValidatorVerifier,
         backend: SecureBackend,
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
+        broadcast_proofs: bool,
     ) -> Self {
         let (coordinator_tx, coordinator_rx) = futures_channel::mpsc::channel(config.channel_size);
         let (batch_generator_cmd_tx, batch_generator_cmd_rx) =
@@ -206,6 +208,7 @@ impl InnerBuilder {
             remote_batch_coordinator_cmd_tx,
             remote_batch_coordinator_cmd_rx,
             batch_store: None,
+            broadcast_proofs,
         }
     }
 
@@ -323,6 +326,7 @@ impl InnerBuilder {
             self.author,
             self.batch_store.clone().unwrap(),
             self.batch_generator_cmd_tx.clone(),
+            self.broadcast_proofs,
         );
         spawn_named!(
             "proof_coordinator",

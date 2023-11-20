@@ -1,11 +1,11 @@
 ---
-title: "Handle Errors in Aptos"
-slug: "handle-aptos-errors"
+title: "Aptos Error Codes"
+slug: "error-codes"
 ---
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Handle Errors in Aptos
+# Error Codes in Aptos
 
 This page catalogs common errors encountered in the Aptos blockchain and explains how to resolve them wherever possible. As with all software, the code itself is the source of truth for error handling and will always contain entries not found here. Instead, this matrix aims to help you address those errors most typically found, misunderstood, or both.
 

@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    change_set::{GroupWrite, VMChangeSet},
-    check_change_set::CheckChangeSet,
-};
+use crate::{change_set::VMChangeSet, check_change_set::CheckChangeSet};
 use aptos_gas_algebra::GasExpression;
 use aptos_gas_schedule::{
     gas_params::txn::*, AptosGasParameters, VMGasParameters, LATEST_GAS_FEATURE_VERSION,
@@ -213,9 +210,9 @@ impl StoragePricingV3 {
     fn io_gas_per_group_write(
         &self,
         key: &StateKey,
-        group_write: &GroupWrite,
+        maybe_group_size: Option<u64>,
     ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
-        match group_write.encoded_group_size() {
+        match maybe_group_size {
             Some(group_op_size) => Either::Left(
                 STORAGE_IO_PER_STATE_SLOT_WRITE * NumArgs::new(1)
                     + STORAGE_IO_PER_STATE_BYTE_WRITE * self.write_op_size(key, group_op_size),
@@ -299,12 +296,14 @@ impl StoragePricing {
     pub fn io_gas_per_group_write(
         &self,
         key: &StateKey,
-        group_write: &GroupWrite,
+        maybe_group_size: Option<u64>,
     ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
         use StoragePricing::*;
 
         match self {
-            V3(v3) => Either::<InternalGas, _>::Right(v3.io_gas_per_group_write(key, group_write)),
+            V3(v3) => {
+                Either::<InternalGas, _>::Right(v3.io_gas_per_group_write(key, maybe_group_size))
+            },
             V2(_) => unreachable!("Group write handling unreachable for StoragePricing V2"),
             V1(_) => unreachable!("Group write handling unreachable for StoragePricing V1"),
         }
