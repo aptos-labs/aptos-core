@@ -12,7 +12,8 @@ use itertools::Itertools;
 use std::collections::BTreeSet;
 
 /// Rewriter for expressions, allowing to substitute locals by expressions as well as instantiate
-/// types.
+/// types.  Not safe for use to rewrite variables in expressions that may contain an `Assign`
+/// expression.
 pub struct ExpRewriter<'env, 'rewriter> {
     env: &'env GlobalEnv,
     replacer: &'rewriter mut dyn FnMut(NodeId, RewriteTarget) -> Option<Exp>,

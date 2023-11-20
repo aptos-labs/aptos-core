@@ -21,7 +21,7 @@ use move_stackless_bytecode::{
     stackless_bytecode_generator::BytecodeGeneratorContext,
 };
 use num::ToPrimitive;
-use std::{collections::BTreeMap, ops::Deref};
+use std::collections::BTreeMap;
 
 // ======================================================================================
 // Entry
@@ -52,11 +52,11 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         gen.results.push(temp)
     }
     gen.scopes.push(scope);
-    // Need to clone expression because of sharing issues with `gen`. However, because
-    // of interning, clone is cheap.
-    let optional_def = gen.func_env.get_def().deref().clone();
+    let optional_def = gen.func_env.get_def().as_ref().cloned();
     if let Some(def) = optional_def {
         let results = gen.results.clone();
+        // Need to clone expression if present because of sharing issues with `gen`. However, because
+        // of interning, clone is cheap.
         gen.gen(results.clone(), &def);
         gen.emit_with(def.node_id(), |attr| Bytecode::Ret(attr, results))
     }
