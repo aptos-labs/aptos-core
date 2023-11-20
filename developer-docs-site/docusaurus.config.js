@@ -308,7 +308,7 @@ const config = {
     },
     algolia: {
       appId: "HM7UY0NMLG",
-      apiKey: "63c5819714b74e64977337e61a1e3ae6",
+      apiKey: "9e564585ae0eeac4f41758c47c24d27f",
       indexName: "aptos",
       contextualSearch: true,
       debug: false,
