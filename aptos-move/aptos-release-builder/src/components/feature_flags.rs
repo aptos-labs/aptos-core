@@ -92,6 +92,7 @@ pub enum FeatureFlag {
     OperatorBeneficiaryChange,
     VMBinaryFormatV7,
     ResourceGroupsChargeAsSizeSum,
+    CommissionChangeDelegationPool,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -240,6 +241,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::ResourceGroupsChargeAsSizeSum => {
                 AptosFeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM
             },
+            FeatureFlag::CommissionChangeDelegationPool => {
+                AptosFeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL
+            },
         }
     }
 }
@@ -310,6 +314,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::OPERATOR_BENEFICIARY_CHANGE => FeatureFlag::OperatorBeneficiaryChange,
             AptosFeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM => {
                 FeatureFlag::ResourceGroupsChargeAsSizeSum
+            },
+            AptosFeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL => {
+                FeatureFlag::CommissionChangeDelegationPool
             },
         }
     }

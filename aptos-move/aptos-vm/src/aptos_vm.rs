@@ -21,7 +21,7 @@ use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
 use aptos_gas_algebra::Gas;
-use aptos_gas_meter::{AptosGasMeter, StandardGasAlgebra, StandardGasMeter};
+use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::VMGasParameters;
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
@@ -33,10 +33,11 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     fee_statement::FeeStatement,
     on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
+    system_txn::SystemTransaction,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction,
         EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
-        MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction,
+        MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
         Transaction::{
             BlockMetadata as BlockMetadataTransaction, GenesisTransaction, StateCheckpoint,
             UserTransaction,
@@ -306,6 +307,28 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> (VMStatus, VMOutput) {
+        if self.vm_impl.get_gas_feature_version() >= 12 {
+            // Check if the gas meter's internal counters are consistent.
+            //
+            // Since we are already in the failure epilogue, there is not much we can do
+            // other than logging the inconsistency.
+            //
+            // This is a tradeoff. We have to either
+            //   1. Continue to calculate the gas cost based on the numbers we have.
+            //   2. Discard the transaction.
+            //
+            // Option (2) does not work, since it would enable DoS attacks.
+            // Option (1) is not ideal, but optimistically, it should allow the network
+            // to continue functioning, less the transactions that run into this problem.
+            if let Err(err) = gas_meter.algebra().check_consistency() {
+                println!(
+                    "[aptos-vm][gas-meter][failure-epilogue] {}",
+                    err.message()
+                        .unwrap_or("No message found -- this should not happen.")
+                );
+            }
+        }
+
         // Clear side effects: create new session and clear refunds from fee statement.
         let mut session = self
             .vm_impl
@@ -375,6 +398,21 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        if self.vm_impl.get_gas_feature_version() >= 12 {
+            // Check if the gas meter's internal counters are consistent.
+            //
+            // It's better to fail the transaction due to invariant violation than to allow
+            // potentially bogus states to be committed.
+            if let Err(err) = gas_meter.algebra().check_consistency() {
+                println!(
+                    "[aptos-vm][gas-meter][success-epilogue] {}",
+                    err.message()
+                        .unwrap_or("No message found -- this should not happen.")
+                );
+                return Err(err.finish(Location::Undefined).into());
+            }
+        }
+
         let fee_statement = AptosVM::fee_statement_from_gas_meter(
             txn_data,
             gas_meter,
@@ -541,7 +579,17 @@ impl AptosVM {
             gas_meter.charge_io_gas_for_write(key, read_op)?;
         }
         for (key, group_write) in change_set.resource_group_write_set().iter() {
-            gas_meter.charge_io_gas_for_group_write(key, group_write)?;
+            gas_meter.charge_io_gas_for_group_write(
+                key,
+                &group_write.metadata_op,
+                group_write.maybe_group_op_size(),
+            )?;
+        }
+        for (key, (metadata_op, group_size)) in change_set
+            .group_reads_needing_delayed_field_exchange()
+            .iter()
+        {
+            gas_meter.charge_io_gas_for_group_write(key, metadata_op, Some(*group_size))?;
         }
 
         let mut storage_refund = gas_meter.process_storage_fee_for_all(
@@ -1163,6 +1211,20 @@ impl AptosVM {
         }
     }
 
+    fn process_system_transaction(
+        &self,
+        _resolver: &impl AptosMoveResolver,
+        txn: SystemTransaction,
+        _log_context: &AdapterLogSchema,
+    ) -> (VMStatus, VMOutput) {
+        match txn {
+            SystemTransaction::DummyTopic(_) => (
+                VMStatus::Executed,
+                VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)),
+            ),
+        }
+    }
+
     fn execute_user_transaction_impl(
         &self,
         resolver: &impl AptosMoveResolver,
@@ -1427,10 +1489,9 @@ impl AptosVM {
                 .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
         }
         for (state_key, group_write) in change_set.resource_group_write_set().iter() {
-            for tag in group_write.inner_ops().keys() {
-                // TODO: Type layout is set to None. Is this correct?
+            for (tag, (_, maybe_layout)) in group_write.inner_ops() {
                 resource_group_view
-                    .get_resource_from_group(state_key, tag, None)
+                    .get_resource_from_group(state_key, tag, maybe_layout.as_deref())
                     .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
             }
         }
@@ -1758,6 +1819,12 @@ impl AptosVM {
                 let status = TransactionStatus::Keep(ExecutionStatus::Success);
                 let output = VMOutput::empty_with_status(status);
                 (VMStatus::Executed, output, Some("state_checkpoint".into()))
+            },
+            Transaction::SystemTransaction(txn) => {
+                fail_point!("aptos_vm::execution::system_transaction");
+                let (vm_status, output) =
+                    self.process_system_transaction(resolver, txn.clone(), log_context);
+                (vm_status, output, Some("system_transaction".to_string()))
             },
         })
     }

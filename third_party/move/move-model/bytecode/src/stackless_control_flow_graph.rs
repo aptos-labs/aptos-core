@@ -238,7 +238,7 @@ impl StacklessControlFlowGraph {
         self.blocks.len() as u16
     }
 
-    pub fn is_dummmy(&self, block_id: BlockId) -> bool {
+    pub fn is_dummy(&self, block_id: BlockId) -> bool {
         matches!(self.blocks[&block_id].content, BlockContent::Dummy)
     }
 

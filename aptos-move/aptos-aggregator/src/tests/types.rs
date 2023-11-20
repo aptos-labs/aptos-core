@@ -148,4 +148,12 @@ impl TDelayedFieldView for FakeAggregatorView {
     {
         unimplemented!();
     }
+
+    fn get_group_reads_needing_exchange(
+        &self,
+        _delayed_write_set_keys: &HashSet<Self::Identifier>,
+        _skip: &HashSet<Self::ResourceKey>,
+    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+        unimplemented!();
+    }
 }

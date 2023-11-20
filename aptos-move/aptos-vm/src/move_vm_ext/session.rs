@@ -479,6 +479,12 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             .filter(|(state_key, _)| !resource_write_set.contains_key(state_key))
             .collect();
 
+        let group_reads_needing_change = aggregator_change_set
+            .group_reads_needing_exchange
+            .into_iter()
+            .filter(|(state_key, _)| !resource_group_write_set.contains_key(state_key))
+            .collect();
+
         VMChangeSet::new(
             resource_write_set,
             resource_group_write_set,
@@ -487,6 +493,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             aggregator_v1_delta_set,
             aggregator_change_set.delayed_field_changes,
             reads_needing_exchange,
+            group_reads_needing_change,
             events,
             configs,
         )

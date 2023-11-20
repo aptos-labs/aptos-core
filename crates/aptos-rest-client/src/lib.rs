@@ -25,10 +25,10 @@ pub use aptos_api_types::{
 };
 use aptos_api_types::{
     deserialize_from_string,
-    mime_types::{BCS, BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, JSON},
+    mime_types::{BCS, BCS_SIGNED_TRANSACTION, BCS_VIEW_FUNCTION, JSON},
     AptosError, BcsBlock, Block, GasEstimation, HexEncodedBytes, IndexResponse, MoveModuleId,
     TransactionData, TransactionOnChainData, TransactionsBatchSubmissionResult, UserTransaction,
-    VersionedEvent, ViewRequest,
+    VersionedEvent, ViewFunction, ViewRequest,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{debug, info, sample, sample::SampleRate};
@@ -307,6 +307,30 @@ impl Client {
         self.json(response).await
     }
 
+    pub async fn view_bcs<T: DeserializeOwned>(
+        &self,
+        request: &ViewFunction,
+        version: Option<u64>,
+    ) -> AptosResult<Response<T>> {
+        let txn_payload = bcs::to_bytes(request)?;
+        let mut url = self.build_path("view")?;
+        if let Some(version) = version {
+            url.set_query(Some(format!("ledger_version={}", version).as_str()));
+        }
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, BCS_VIEW_FUNCTION)
+            .header(ACCEPT, BCS)
+            .body(txn_payload)
+            .send()
+            .await?;
+
+        let response = self.check_and_parse_bcs_response(response).await?;
+        Ok(response.and_then(|bytes| bcs::from_bytes(&bytes))?)
+    }
+
     pub async fn simulate(
         &self,
         txn: &SignedTransaction,
@@ -317,7 +341,7 @@ impl Client {
         let response = self
             .inner
             .post(url)
-            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
             .body(txn_payload)
             .send()
             .await?;
@@ -341,7 +365,7 @@ impl Client {
         let response = self
             .inner
             .post(url)
-            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
             .body(txn_payload)
             .send()
             .await?;
@@ -359,7 +383,7 @@ impl Client {
         let response = self
             .inner
             .post(url)
-            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
             .header(ACCEPT, BCS)
             .body(txn_payload)
             .send()
@@ -384,7 +408,7 @@ impl Client {
         let response = self
             .inner
             .post(url)
-            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
             .header(ACCEPT, BCS)
             .body(txn_payload)
             .send()
@@ -404,7 +428,7 @@ impl Client {
         let response = self
             .inner
             .post(url)
-            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
             .body(txn_payload)
             .send()
             .await?;
@@ -419,7 +443,7 @@ impl Client {
         let response = self
             .inner
             .post(url)
-            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
             .header(ACCEPT, BCS)
             .body(txn_payload)
             .send()
@@ -439,7 +463,7 @@ impl Client {
         let response = self
             .inner
             .post(url)
-            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
             .body(txn_payload)
             .send()
             .await?;
@@ -456,7 +480,7 @@ impl Client {
         let response = self
             .inner
             .post(url)
-            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
             .header(ACCEPT, BCS)
             .body(txn_payload)
             .send()
