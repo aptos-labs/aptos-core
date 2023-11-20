@@ -23,7 +23,7 @@ pub struct ExpRewriter<'env, 'rewriter> {
 /// A target for expression rewrites of either an `Exp::LocalVar` or an `Exp::Temporary`.
 /// This is used as a parameter to the `replacer` function which defines the behavior of
 /// the rewriter. Notice we use a single function entry point for `replacer` to allow it
-/// to be a function which mutates it's context.
+/// to be a function which mutates its context.
 pub enum RewriteTarget {
     LocalVar(Symbol),
     Temporary(TempIndex),
@@ -49,6 +49,16 @@ impl<'env, 'rewriter> ExpRewriter<'env, 'rewriter> {
         self.type_args = type_args;
         self
     }
+
+    /// Test for shadowing
+    fn is_shadowed(&self, sym: &Symbol) -> bool {
+        for vars in &self.shadowed {
+            if vars.contains(sym) {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 impl<'env, 'rewriter> ExpRewriterFunctions for ExpRewriter<'env, 'rewriter> {
@@ -62,12 +72,18 @@ impl<'env, 'rewriter> ExpRewriterFunctions for ExpRewriter<'env, 'rewriter> {
     }
 
     fn rewrite_local_var(&mut self, id: NodeId, sym: Symbol) -> Option<Exp> {
-        for vars in &self.shadowed {
-            if vars.contains(&sym) {
-                return None;
-            }
+        if self.is_shadowed(&sym) {
+            None
+        } else {
+            (*self.replacer)(id, RewriteTarget::LocalVar(sym))
         }
-        (*self.replacer)(id, RewriteTarget::LocalVar(sym))
+    }
+
+    fn rewrite_pattern(&mut self, _pat: &Pattern, entering_scope: bool) -> Option<Pattern> {
+        if !entering_scope {
+            panic!("ExpRewriter won't work correctly on code with `Assign` operation.");
+        }
+        None
     }
 
     fn rewrite_temporary(&mut self, id: NodeId, idx: TempIndex) -> Option<Exp> {

@@ -457,8 +457,8 @@ pub enum ExpData {
     LocalVar(NodeId, Symbol),
     /// Represents a reference to a temporary used in bytecode, if this expression is associated
     /// with bytecode.
-    /// Seems to also be used to represent a parameter to a function, where TempIndex indicates the
-    /// index into the list of function parameters.
+    /// When compiling from Move source code, represents a parameter to a function: TempIndex
+    /// indicates the index into the list of function parameters.
     Temporary(NodeId, TempIndex),
     /// Represents a call to an operation. The `Operation` enum covers all builtin functions
     /// (including operators, constants, ...) as well as user functions.
