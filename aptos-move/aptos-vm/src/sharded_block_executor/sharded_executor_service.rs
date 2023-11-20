@@ -230,17 +230,19 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         let mut cumulative_txns = 0;
         loop {
             let mut command = self.coordinator_client.lock().unwrap().receive_execute_command_stream();
-            let (state_view, mut transactions, num_txns_in_the_block, shard_txns_start_index, onchain_config) = match command {
+            let (state_view, mut transactions, num_txns_in_the_block, shard_txns_start_index, onchain_config, mut batch_start_index) = match command {
                 StreamedExecutorShardCommand::InitBatch(
                     state_view,
                     transactions,
                     num_txns_in_the_block,
                     shard_txns_start_index,
                     onchain_config,
+                    batch_start_index
                 ) => {
-                    (state_view, transactions, num_txns_in_the_block, shard_txns_start_index, onchain_config)
+                    (state_view, transactions, num_txns_in_the_block, shard_txns_start_index, onchain_config, batch_start_index)
                 },
                 StreamedExecutorShardCommand::ExecuteBatch(
+                    _,
                     _,
                 ) => {
                     panic!("Init Batch must be called before Execute Batch");
@@ -258,16 +260,17 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 let mut num_txns_processed = 0;
                 loop {
                     num_txns_processed += transactions.len();
-                    let _ = transactions.into_iter().for_each(|(txn, idx)| {
-                        blocking_transactions_provider_clone.set_txn(idx, txn);
+                    let _ = transactions.into_iter().enumerate().for_each(|(idx, txn)| {
+                        blocking_transactions_provider_clone.set_txn(idx + batch_start_index, txn);
                     });
                     if num_txns_processed == num_txns_in_the_block {
                         coordinator_client_clone_2.lock().unwrap().reset_block_init();
                         break;
                     }
                     let command2 = coordinator_client_clone_2.lock().unwrap().receive_execute_command_stream();
-                    transactions = match command2 {
+                    let txnsAndStIdx = match command2 {
                         StreamedExecutorShardCommand::InitBatch(
+                            _,
                             _,
                             _,
                             _,
@@ -278,13 +281,16 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         },
                         StreamedExecutorShardCommand::ExecuteBatch(
                             transactions,
+                            batch_start_index,
                         ) => {
-                            transactions
+                            (transactions, batch_start_index)
                         },
                         StreamedExecutorShardCommand::Stop => {
                             break;
                         },
-                    }
+                    };
+                    transactions = txnsAndStIdx.0;
+                    batch_start_index = txnsAndStIdx.1;
                 }
             });
 
@@ -357,18 +363,20 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CmdsAndMetaData {
-    pub cmds: Vec<(AnalyzedTransaction, usize)>,
+    pub cmds: Vec<AnalyzedTransaction>,
     pub num_txns: usize,
     pub shard_txns_start_index: usize,
     pub onchain_config: BlockExecutorConfigFromOnchain,
+    pub batch_start_index: usize,
 }
 
 #[derive(Clone, Debug, Serialize)]
 pub struct CmdsAndMetaDataRef<'a>  {
-    pub cmds: &'a [(&'a AnalyzedTransaction, usize)],
+    pub cmds: &'a [&'a AnalyzedTransaction],
     pub num_txns: usize,
     pub shard_txns_start_index: usize,
     pub onchain_config: &'a BlockExecutorConfigFromOnchain,
+    pub batch_start_index: usize,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

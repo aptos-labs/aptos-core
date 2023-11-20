@@ -55,13 +55,15 @@ pub enum ExecutorShardCommand<S> {
 pub enum StreamedExecutorShardCommand<S> {
     InitBatch(
         Arc<S>,
-        Vec<(AnalyzedTransaction, usize)>,
+        Vec<AnalyzedTransaction>,
         usize,
         usize,
         BlockExecutorConfigFromOnchain,
+        usize,
     ),
     ExecuteBatch(
-        Vec<(AnalyzedTransaction, usize)>,
+        Vec<AnalyzedTransaction>,
+        usize,
     ),
     Stop,
 }

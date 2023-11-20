@@ -28,7 +28,11 @@ use std::sync::atomic::AtomicU64;
 use std::thread::JoinHandle;
 use std::time::SystemTime;
 use itertools::Itertools;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use rayon::slice::ParallelSlice;
+use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::{get_delta_time, REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER};
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
@@ -87,11 +91,12 @@ pub struct RemoteExecutorClient<S: StateView + Sync + Send + 'static> {
     network_controller: NetworkController,
     state_view_service: Arc<RemoteStateViewService<S>>,
     // Channels to send execute block commands to the executor shards.
-    command_txs: Arc<Vec<Mutex<OutboundRpcHelper>>>,
+    command_txs: Arc<Vec<Vec<Mutex<OutboundRpcHelper>>>>,
     // Channels to receive execution results from the executor shards.
     result_rxs: Vec<Receiver<Message>>,
     // Thread pool used to pre-fetch the state values for the block in parallel and create an in-memory state view.
     thread_pool: Arc<rayon::ThreadPool>,
+    cmd_tx_thread_pool: Arc<rayon::ThreadPool>,
 
     phantom: std::marker::PhantomData<S>,
     _join_handle: Option<thread::JoinHandle<()>>,
@@ -119,10 +124,10 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
             .map(|(shard_id, address)| {
                 let execute_command_type = format!("execute_command_{}", shard_id);
                 let execute_result_type = format!("execute_result_{}", shard_id);
-                let command_tx = Mutex::new(
-                    //controller_mut_ref.create_outbound_channel(*address, execute_command_type),
-                    OutboundRpcHelper::new(self_addr, *address),
-                );
+                let mut command_tx = vec![];
+                for _ in 0..num_threads/2 {
+                    command_tx.push(Mutex::new(OutboundRpcHelper::new(self_addr, *address)));
+                }
                 let result_rx = controller_mut_ref.create_inbound_channel(execute_result_type);
                 (command_tx, result_rx)
             })
@@ -143,6 +148,14 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
 
         controller.start();
 
+        let cmd_tx_thread_pool = Arc::new(
+            rayon::ThreadPoolBuilder::new()
+                .thread_name(move |index| format!("rmt-exe-cli-cmd-tx-{}", index))
+                .num_threads(num_cpus::get() / 2)
+                .build()
+                .unwrap(),
+        );
+
         Self {
             network_controller: controller,
             state_view_service,
@@ -150,6 +163,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
             command_txs: Arc::new(command_txs),
             result_rxs,
             thread_pool,
+            cmd_tx_thread_pool,
             phantom: std::marker::PhantomData,
         }
     }
@@ -277,13 +291,6 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
             panic!("Global transactions are not supported yet");
         }
 
-        let thread_pool = Arc::new(
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(self.num_shards())
-                .build()
-                .unwrap(),
-        );
-
         let cmd_tx_timer = REMOTE_EXECUTOR_TIMER
             .with_label_values(&["0", "cmd_tx_async"])
             .start_timer();
@@ -293,16 +300,81 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
             .with_label_values(&["0_cmd_tx_start"]).observe(get_delta_time(duration_since_epoch) as f64);
 
         let mut expected_outputs = vec![0; self.num_shards()];
+        let batch_size = 200;
         for (shard_id, _) in sub_blocks.into_iter().enumerate() {
             expected_outputs[shard_id] = transactions.get_ref().0[shard_id].num_txns() as u64;
-            let senders = self.command_txs.clone();
             // TODO: Check if the function can get Arc<BlockExecutorConfigFromOnchain> instead.
             let onchain_config_clone = onchain_config.clone();
             let transactions_clone = transactions.clone();
-            thread_pool.spawn(move || {
+            let senders = self.command_txs.clone();
+            self.cmd_tx_thread_pool.spawn(move || {
+                let shard_txns = &transactions_clone.get_ref().0[shard_id].sub_blocks[0].transactions;
                 let index_offset = transactions_clone.get_ref().0[shard_id].sub_blocks[0].start_index as usize;
-                let num_txns = transactions_clone.get_ref().0[shard_id].num_txns();
-                let analyzed_txns = &transactions_clone.get_ref().0[shard_id]
+                let num_txns = shard_txns.len();
+
+                let _ = shard_txns
+                    .par_chunks(batch_size)
+                    .enumerate()
+                    .for_each(|(chunk_idx, txns)| {
+                        let analyzed_txns = txns.iter().map(|txn| {
+                            txn.txn()
+                        }).collect::<Vec<&AnalyzedTransaction>>();
+                        let execution_batch_req = CmdsAndMetaDataRef {
+                            cmds: &analyzed_txns,
+                            num_txns,
+                            shard_txns_start_index: index_offset,
+                            onchain_config: &onchain_config_clone,
+                            batch_start_index: chunk_idx * batch_size,
+                        };
+                        let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
+                            .with_label_values(&["0", "cmd_tx_bcs_ser"])
+                            .start_timer();
+                        let msg = Message::create_with_metadata(bcs::to_bytes(&execution_batch_req).unwrap(), duration_since_epoch, 0, 0);
+                        drop(bcs_ser_timer);
+                        REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                            .with_label_values(&["1_cmd_tx_msg_send"]).observe(get_delta_time(duration_since_epoch) as f64);
+                        let execute_command_type = format!("execute_command_{}", shard_id);
+                        let mut rng = StdRng::from_entropy();
+                        let rand_send_thread_idx = rng.gen_range(0, senders[shard_id].len());
+                        senders[shard_id][rand_send_thread_idx]
+                            .lock()
+                            .unwrap()
+                            .send(msg, &MessageType::new(execute_command_type));
+                    });
+                
+                /*let shard_txns = &transactions_clone.get_ref().0[shard_id];
+                let index_offset = shard_txns.sub_blocks[0].start_index as usize;
+                let num_txns = shard_txns.num_txns();
+                let mut batch_start_idx = 0;
+
+                for batch in &shard_txns.iter().chunks(batch_size) {
+                    let senders = self.command_txs.clone();
+                    cmd_tx_thread_pool_clone.spawn(move || {
+                        let analyzed_txns = batch.map(|txn| {
+                            txn.txn()
+                        }).collect::<Vec<&AnalyzedTransaction>>();
+                        let execution_batch_req = CmdsAndMetaDataRef {
+                            cmds: &analyzed_txns,
+                            num_txns,
+                            shard_txns_start_index: index_offset,
+                            batch_start_index: batch_start_idx,
+                        };
+                        let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
+                            .with_label_values(&["0", "cmd_tx_bcs_ser"])
+                            .start_timer();
+                        let msg = Message::create_with_metadata(bcs::to_bytes(&execution_batch_req).unwrap(), duration_since_epoch, 0, 0);
+                        drop(bcs_ser_timer);
+                        REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                            .with_label_values(&["1_cmd_tx_msg_send"]).observe(get_delta_time(duration_since_epoch) as f64);
+                        let execute_command_type = format!("execute_command_{}", shard_id);
+                        senders[shard_id]
+                            .lock()
+                            .unwrap()
+                            .send(msg, &MessageType::new(execute_command_type));
+                    });*/
+
+
+                /*let analyzed_txns = &transactions_clone.get_ref().0[shard_id]
                     .iter()
                     .enumerate()
                     .map(|(idx, txn)| {
@@ -310,7 +382,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                     }).collect::<Vec<(&AnalyzedTransaction, usize)>>();
 
                 let mut st_idx = 0;
-                let batch_size = 200;
+
                 while st_idx < num_txns {
                     let end_idx = std::cmp::min(st_idx + batch_size, num_txns);
                     let execution_batch_req = CmdsAndMetaDataRef {
@@ -334,7 +406,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                     st_idx += batch_size;
                 }
 
-                /*let execution_request = RemoteExecutionRequestRef::ExecuteBlock(ExecuteBlockCommandRef {
+                let execution_request = RemoteExecutionRequestRef::ExecuteBlock(ExecuteBlockCommandRef {
                     sub_blocks: &transactions_clone.get_ref().0[shard_id],
                     concurrency_level: concurrency_level_per_shard,
                     onchain_config: &onchain_config_clone,
@@ -368,6 +440,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         drop(timer);
         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
             .with_label_values(&["9_8_execute_remote_block_done"]).observe(get_delta_time(duration_since_epoch) as f64);
+        DEFAULT_DROPPER.schedule_drop(transactions);
         results
         //Ok(ShardedExecutionOutput::new(execution_results, vec![]))
     }

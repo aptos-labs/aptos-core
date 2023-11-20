@@ -85,13 +85,13 @@ impl RemoteCoordinatorClient {
             .collect::<Vec<StateKey>>()
     }
 
-    fn extract_state_keys_from_txns(txns: &Vec<(AnalyzedTransaction, usize)>) -> Vec<StateKey> {
+    fn extract_state_keys_from_txns(txns: &Vec<AnalyzedTransaction>) -> Vec<StateKey> {
         let mut state_keys = vec![];
         for txn in txns {
-            for storage_location in txn.0
+            for storage_location in txn
                 .read_hints()
                 .iter()
-                .chain(txn.0.write_hints().iter())
+                .chain(txn.write_hints().iter())
             {
                 state_keys.push(storage_location.state_key().clone());
             }
@@ -168,13 +168,15 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                     self.state_view_client.pre_fetch_state_values(state_keys, false);
                     let num_txns = txns.num_txns;
                     let shard_txns_start_index = txns.shard_txns_start_index;
+                    let batch_start_index = txns.batch_start_index;
                     self.is_block_init_done.store(true, std::sync::atomic::Ordering::Relaxed);
-                    return StreamedExecutorShardCommand::InitBatch(self.state_view_client.clone(), txns.cmds, num_txns, shard_txns_start_index, txns.onchain_config);
+                    return StreamedExecutorShardCommand::InitBatch(self.state_view_client.clone(), txns.cmds, num_txns, shard_txns_start_index, txns.onchain_config, batch_start_index);
                 }
 
+                let batch_start_index = txns.batch_start_index;
                 let state_keys = Self::extract_state_keys_from_txns(&txns.cmds);
                 self.state_view_client.pre_fetch_state_values(state_keys, false);
-                return StreamedExecutorShardCommand::ExecuteBatch(txns.cmds);
+                return StreamedExecutorShardCommand::ExecuteBatch(txns.cmds, batch_start_index);
             },
             Err(_) => StreamedExecutorShardCommand::Stop,
         }
