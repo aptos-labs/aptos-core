@@ -21,7 +21,9 @@ use crate::{
     state_replication::StateComputerCommitCallBackType,
 };
 use aptos_consensus_types::{
-    common::Author, executed_block::ExecutedBlock, experimental::commit_decision::CommitDecision,
+    common::Author,
+    executed_block::ExecutedBlock,
+    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -118,6 +120,7 @@ pub struct BufferManager {
     // being updated on-chain.
     end_epoch_timestamp: OnceCell<u64>,
     previous_commit_time: Instant,
+    rebroadcast_rb_handle: Option<DropGuard>,
     reset_flag: Arc<AtomicBool>,
 }
 
@@ -184,6 +187,7 @@ impl BufferManager {
             ongoing_tasks,
             end_epoch_timestamp: OnceCell::new(),
             previous_commit_time: Instant::now(),
+            rebroadcast_rb_handle: None,
             reset_flag,
         }
     }
@@ -515,15 +519,50 @@ impl BufferManager {
                     });
                 } else {
                     let commit_vote = CommitMessage::Vote(commit_vote);
-                    signed_item_mut
-                        .rb_handle
-                        .replace((Instant::now(), self.do_reliable_broadcast(commit_vote)));
+                    signed_item_mut.rb_handle.replace((
+                        Instant::now(),
+                        Some(self.do_reliable_broadcast(commit_vote)),
+                    ));
                 }
                 self.buffer.set(&current_cursor, signed_item);
             } else {
                 self.buffer.set(&current_cursor, item);
             }
         }
+    }
+
+    fn process_commit_vote(&mut self, vote: CommitVote) -> (Option<HashValue>, bool) {
+        let author = vote.author();
+        let commit_info = vote.commit_info().clone();
+        info!("Receive commit vote {} from {}", commit_info, author);
+        let target_block_id = vote.commit_info().id();
+        let current_cursor = self
+            .buffer
+            .find_elem_by_key(*self.buffer.head_cursor(), target_block_id);
+        let mut ack = false;
+        if current_cursor.is_some() {
+            let mut item = self.buffer.take(&current_cursor);
+            let new_item = match item.add_signature_if_matched(vote) {
+                Ok(()) => {
+                    ack = true;
+                    item.try_advance_to_aggregated(&self.verifier)
+                },
+                Err(e) => {
+                    error!(
+                        error = ?e,
+                        author = author,
+                        commit_info = commit_info,
+                        "Failed to add commit vote",
+                    );
+                    item
+                },
+            };
+            self.buffer.set(&current_cursor, new_item);
+            if self.buffer.get(&current_cursor).is_aggregated() {
+                return (Some(target_block_id), ack);
+            }
+        }
+        (None, ack)
     }
 
     /// process the commit vote messages
@@ -542,38 +581,15 @@ impl BufferManager {
         match req {
             CommitMessage::Vote(vote) => {
                 // find the corresponding item
-                let author = vote.author();
-                let commit_info = vote.commit_info().clone();
-                info!("Receive commit vote {} from {}", commit_info, author);
-                let target_block_id = vote.commit_info().id();
-                let current_cursor = self
-                    .buffer
-                    .find_elem_by_key(*self.buffer.head_cursor(), target_block_id);
-                if current_cursor.is_some() {
-                    let mut item = self.buffer.take(&current_cursor);
-                    let new_item = match item.add_signature_if_matched(vote) {
-                        Ok(()) => {
-                            let response =
-                                ConsensusMsg::CommitMessage(Box::new(CommitMessage::Ack(())));
-                            if let Ok(bytes) = protocol.to_bytes(&response) {
-                                let _ = response_sender.send(Ok(bytes.into()));
-                            }
-                            item.try_advance_to_aggregated(&self.verifier)
-                        },
-                        Err(e) => {
-                            error!(
-                                error = ?e,
-                                author = author,
-                                commit_info = commit_info,
-                                "Failed to add commit vote",
-                            );
-                            item
-                        },
-                    };
-                    self.buffer.set(&current_cursor, new_item);
-                    if self.buffer.get(&current_cursor).is_aggregated() {
-                        return Some(target_block_id);
+                let (target_id, ack) = self.process_commit_vote(vote);
+                if ack {
+                    let response = ConsensusMsg::CommitMessage(Box::new(CommitMessage::Ack(())));
+                    if let Ok(bytes) = protocol.to_bytes(&response) {
+                        let _ = response_sender.send(Ok(bytes.into()));
                     }
+                }
+                if let Some(target_block_id) = target_id {
+                    return Some(target_block_id);
                 }
             },
             CommitMessage::Decision(commit_proof) => {
@@ -602,6 +618,20 @@ impl BufferManager {
                     }
                 }
             },
+            CommitMessage::BatchVotes(votes) => {
+                let mut final_target_id = None;
+                for v in votes {
+                    let (target_id, _ack) = self.process_commit_vote(v);
+                    if target_id.is_some() {
+                        final_target_id = target_id;
+                    }
+                }
+                let response = ConsensusMsg::CommitMessage(Box::new(CommitMessage::Ack(())));
+                if let Ok(bytes) = protocol.to_bytes(&response) {
+                    let _ = response_sender.send(Ok(bytes.into()));
+                }
+                return final_target_id;
+            },
             CommitMessage::Ack(_) => {
                 // It should be filtered out by verify, so we log errors here
                 error!("Unexpected ack message");
@@ -619,7 +649,7 @@ impl BufferManager {
             return;
         }
         let mut cursor = *self.buffer.head_cursor();
-        let mut count = 0;
+        let mut votes = vec![];
         while cursor.is_some() {
             {
                 let mut item = self.buffer.take(&cursor);
@@ -638,18 +668,21 @@ impl BufferManager {
                     },
                 };
                 if re_broadcast {
-                    let commit_vote = CommitMessage::Vote(signed_item.commit_vote.clone());
-                    signed_item
-                        .rb_handle
-                        .replace((Instant::now(), self.do_reliable_broadcast(commit_vote)));
-                    count += 1;
+                    if let Some((start_time, maybe_drop_guard)) = signed_item.rb_handle.as_mut() {
+                        *start_time = Instant::now();
+                        maybe_drop_guard.take();
+                    }
+                    let commit_vote = signed_item.commit_vote.clone();
+                    votes.push(commit_vote);
                 }
                 self.buffer.set(&cursor, item);
             }
             cursor = self.buffer.get_next(&cursor);
         }
-        if count > 0 {
-            info!("Start reliable broadcast {} commit votes", count);
+        if votes.len() > 0 {
+            info!("Start reliable broadcast {} commit votes", votes.len());
+            self.rebroadcast_rb_handle =
+                Some(self.do_reliable_broadcast(CommitMessage::BatchVotes(votes)));
         }
     }
 
