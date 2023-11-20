@@ -37,11 +37,16 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     fee_statement::FeeStatement,
+    on_chain_config::{
+        new_epoch_event_key, ApprovedExecutionHashes, ConfigStorage, ConfigurationResource,
+        FeatureFlag, Features, GasSchedule, GasScheduleV2, OnChainConfig, TimedFeatureOverride,
+        TimedFeatures, TimedFeaturesBuilder,
+    },
     system_txn::SystemTransaction,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction,
         AbortInfo, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
-        MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction,
+        MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
         Transaction::{
             BlockMetadata as BlockMetadataTransaction, GenesisTransaction, StateCheckpoint,
             UserTransaction,
@@ -122,15 +127,16 @@ macro_rules! unwrap_or_discard {
     ($res:expr) => {
         match $res {
             Ok(s) => s,
-            Err(e) => return discard_error_vm_status(e),
+            Err(e) => {
+                let o = discarded_output(e.status_code());
+                return (e, o);
+            },
         }
     };
 }
 
-fn discard_error_vm_status(vm_status: VMStatus) -> (VMStatus, VMOutput) {
-    let vm_output =
-        VMOutput::empty_with_status(TransactionStatus::Discard(vm_status.status_code()));
-    (vm_status, vm_output)
+fn discarded_output(status_code: StatusCode) -> VMOutput {
+    VMOutput::empty_with_status(TransactionStatus::Discard(status_code))
 }
 
 fn get_transaction_output(
@@ -181,8 +187,8 @@ pub struct AptosVM {
 
 impl AptosVM {
     pub fn new(resolver: &impl AptosMoveResolver) -> Self {
-        let _timer = TIMER.timer_with(&["impl_new"]);
-        // Get the gas parameters
+        let _timer = TIMER.timer_with(&["AptosVM::new"]);
+        // Get the gas parameters.
         let (mut gas_params, gas_feature_version) = gas_config(resolver);
 
         let storage_gas_params = match &mut gas_params {
@@ -601,7 +607,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> (VMStatus, VMOutput) {
-        if self.vm_impl.get_gas_feature_version() >= 12 {
+        if self.gas_feature_version >= 12 {
             // Check if the gas meter's internal counters are consistent.
             //
             // Since we are already in the failure epilogue, there is not much we can do
@@ -663,16 +669,18 @@ impl AptosVM {
                     txn_data,
                     log_context,
                 ) {
-                    return discard_error_vm_status(e);
+                    let discarded_output = discarded_output(e.status_code());
+                    return (e, discarded_output);
                 }
                 let txn_output =
                     get_transaction_output(session, fee_statement, status, change_set_configs)
-                        .unwrap_or_else(|e| discard_error_vm_status(e).1);
+                        .unwrap_or_else(|e| discarded_output(e.status_code()));
                 (error_code, txn_output)
             },
-            TransactionStatus::Discard(status) => {
-                discard_error_vm_status(VMStatus::error(status, None))
-            },
+            TransactionStatus::Discard(status_code) => (
+                VMStatus::error(status_code, None),
+                discarded_output(status_code),
+            ),
             TransactionStatus::Retry => unreachable!(),
         }
     }
@@ -685,7 +693,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        if self.vm_impl.get_gas_feature_version() >= 12 {
+        if self.gas_feature_version >= 12 {
             // Check if the gas meter's internal counters are consistent.
             //
             // It's better to fail the transaction due to invariant violation than to allow
@@ -1515,7 +1523,8 @@ impl AptosVM {
                 .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
         );
         if txn_status.is_discarded() {
-            discard_error_vm_status(err)
+            let discarded_output = discarded_output(err.status_code());
+            (err, discarded_output)
         } else {
             self.failed_transaction_cleanup_and_keep_vm_status(
                 err,
@@ -1555,7 +1564,8 @@ impl AptosVM {
         if let Err(err) =
             self.validate_signed_transaction(&mut session, resolver, txn, &txn_data, log_context)
         {
-            return discard_error_vm_status(err);
+            let discarded_output = discarded_output(err.status_code());
+            return (err, discarded_output);
         };
 
         if self.gas_feature_version >= 1 {
@@ -1585,7 +1595,9 @@ impl AptosVM {
                     serialize_values(&vec![MoveValue::Address(txn.sender())]),
                     gas_meter,
                 ) {
-                    return discard_error_vm_status(err.into());
+                    let vm_status = err.into_vm_status();
+                    let discarded_output = discarded_output(vm_status.status_code());
+                    return (vm_status, discarded_output);
                 };
             }
         }
@@ -2009,9 +2021,9 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus> {
         if let SignatureVerifiedTransaction::Invalid(_) = txn {
-            let (vm_status, output) =
-                discard_error_vm_status(VMStatus::error(StatusCode::INVALID_SIGNATURE, None));
-            return Ok((vm_status, output, None));
+            let vm_status = VMStatus::error(StatusCode::INVALID_SIGNATURE, None);
+            let discarded_output = discarded_output(vm_status.status_code());
+            return Ok((vm_status, discarded_output, None));
         }
 
         Ok(match txn.expect_valid() {
