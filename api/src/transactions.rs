@@ -1190,7 +1190,7 @@ impl TransactionsApi {
 
         // Simulate transaction
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
-        // TODO: avoid re-initializing the VM.
+
         let vm = AptosVM::new(&state_view.as_move_resolver()).for_simulation();
 
         let output = vm
@@ -1203,6 +1203,7 @@ impl TransactionsApi {
                 )
             })?;
 
+        // let (vm_status, output) = AptosVM::simulate_signed_transaction(&txn, &state_view);
         let version = ledger_info.version();
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)

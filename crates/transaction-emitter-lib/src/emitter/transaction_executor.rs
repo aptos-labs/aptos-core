@@ -99,20 +99,28 @@ impl RestApiReliableTransactionSubmitter {
                 }
             }
 
-            if result.is_ok() {
-                counters
-                    .successes
-                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                if !counters.by_client.is_empty() {
+            match result {
+                Ok(()) => {
                     counters
-                        .by_client
-                        .get(&rest_client.path_prefix_string())
-                        .map(|(successes, _, _)| {
-                            successes.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-                        });
-                }
-                return Ok(());
-            };
+                        .successes
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    if !counters.by_client.is_empty() {
+                        counters
+                            .by_client
+                            .get(&rest_client.path_prefix_string())
+                            .map(|(successes, _, _)| {
+                                successes.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                            });
+                    }
+                    return Ok(());
+                },
+                Err(err) => {
+                    // TODO: we should have a better way to decide if a failure is retryable
+                    if format!("{}", err).contains("SEQUENCE_NUMBER_TOO_OLD") {
+                        break;
+                    }
+                },
+            }
         }
 
         // if submission timeouts, it might still get committed:
@@ -200,7 +208,13 @@ async fn submit_and_check(
             warn_detailed_error("submitting", rest_client, txn, Err(&err)).await
         );
         *failed_submit = true;
-        // even if txn fails submitting, it might get committed, so wait to see if that is the case.
+        if format!("{}", err).contains("SEQUENCE_NUMBER_TOO_OLD") {
+            // There's no point to wait or retry on this error.
+            // TODO: find a better way to propogate this error to the caller.
+            Err(err)?
+        } else {
+            // even if txn fails submitting, it might get committed, so wait to see if that is the case.
+        }
     }
     match rest_client
         .wait_for_transaction_by_hash_bcs(

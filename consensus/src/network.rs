@@ -146,6 +146,8 @@ pub trait QuorumStoreSender: Send + Clone {
     async fn broadcast_batch_msg(&mut self, batches: Vec<Batch>);
 
     async fn broadcast_proof_of_store_msg(&mut self, proof_of_stores: Vec<ProofOfStore>);
+
+    async fn send_proof_of_store_msg_to_self(&mut self, proof_of_stores: Vec<ProofOfStore>);
 }
 
 /// Implements the actual networking support for all consensus messaging.
@@ -443,6 +445,12 @@ impl QuorumStoreSender for NetworkSender {
         fail_point!("consensus::send::proof_of_store", |_| ());
         let msg = ConsensusMsg::ProofOfStoreMsg(Box::new(ProofOfStoreMsg::new(proofs)));
         self.broadcast(msg).await
+    }
+
+    async fn send_proof_of_store_msg_to_self(&mut self, proofs: Vec<ProofOfStore>) {
+        fail_point!("consensus::send::proof_of_store", |_| ());
+        let msg = ConsensusMsg::ProofOfStoreMsg(Box::new(ProofOfStoreMsg::new(proofs)));
+        self.send(msg, vec![self.author]).await
     }
 }
 

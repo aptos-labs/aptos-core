@@ -220,7 +220,7 @@ function createRawTransaction(): RawTransaction {
     function: "transfer",
     ty_args: [],
     args: [
-      BCS.serialize(hexToAccountAddress("0x02")), // receipient of the transfer
+      BCS.serialize(hexToAccountAddress("0x02")), // recipient of the transfer
       BCS.serialize_uint64(2), // amount to transfer
     ],
   };

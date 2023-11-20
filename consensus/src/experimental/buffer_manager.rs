@@ -390,7 +390,7 @@ impl BufferManager {
 
         self.stop = stop;
         self.reset().await;
-        tx.send(ResetAck::default()).unwrap();
+        let _ = tx.send(ResetAck::default());
         info!("Reset finishes");
     }
 
