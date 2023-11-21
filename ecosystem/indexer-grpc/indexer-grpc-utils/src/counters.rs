@@ -8,6 +8,7 @@ pub enum IndexerGrpcStep {
     DataServiceNewRequestReceived,   // [Data Service] New request received.
     DataServiceDataFetchedCache,     // [Data Service] Fetched data from Redis cache.
     DataServiceDataFetchedFilestore, // [Data Service] Fetched data from Filestore.
+    DataServiceTxnsDecoded,          // [Data Service] Decoded transactions.
     DataServiceChunkSent, // [Data Service] One chunk of transactions sent to GRPC response channel.
     DataServiceAllChunksSent, // [Data Service] All chunks of transactions sent to GRPC response channel. Current batch finished.
 
@@ -16,8 +17,10 @@ pub enum IndexerGrpcStep {
 
     FilestoreUploadTxns, // [File worker] Upload transactions to filestore.
 
+    FullnodeFetchedBatch, // [Indexer Fullnode] Fetched batch of transactions from fullnode
+    FullnodeDecodedBatch, // [Indexer Fullnode] Decoded batch of transactions from fullnode
     FullnodeProcessedBatch, // [Indexer Fullnode] Processed batch of transactions from fullnode
-    FullnodeSentBatch,      // [Indexer Fullnode] Sent batch successfully
+    FullnodeSentBatch,    // [Indexer Fullnode] Sent batch successfully
 }
 
 impl IndexerGrpcStep {
@@ -27,7 +30,8 @@ impl IndexerGrpcStep {
             IndexerGrpcStep::DataServiceNewRequestReceived => "1",
             IndexerGrpcStep::DataServiceDataFetchedCache => "2.1",
             IndexerGrpcStep::DataServiceDataFetchedFilestore => "2.2",
-            IndexerGrpcStep::DataServiceChunkSent => "3",
+            IndexerGrpcStep::DataServiceTxnsDecoded => "3.1",
+            IndexerGrpcStep::DataServiceChunkSent => "3.2",
             IndexerGrpcStep::DataServiceAllChunksSent => "4",
             // Cache worker steps
             IndexerGrpcStep::CacheWorkerTxnsProcessed => "1",
@@ -35,8 +39,10 @@ impl IndexerGrpcStep {
             // Filestore worker steps
             IndexerGrpcStep::FilestoreUploadTxns => "1",
             // Fullnode steps
-            IndexerGrpcStep::FullnodeProcessedBatch => "1",
-            IndexerGrpcStep::FullnodeSentBatch => "2",
+            IndexerGrpcStep::FullnodeFetchedBatch => "1",
+            IndexerGrpcStep::FullnodeDecodedBatch => "2",
+            IndexerGrpcStep::FullnodeProcessedBatch => "3",
+            IndexerGrpcStep::FullnodeSentBatch => "4",
         }
     }
 
@@ -50,6 +56,7 @@ impl IndexerGrpcStep {
             IndexerGrpcStep::DataServiceDataFetchedFilestore => {
                 "[Data Service] Data fetched from file store."
             }
+            IndexerGrpcStep::DataServiceTxnsDecoded => "[Data Service] Transactions decoded.",
             IndexerGrpcStep::DataServiceChunkSent => "[Data Service] One chunk of transactions sent to GRPC response channel.",
             IndexerGrpcStep::DataServiceAllChunksSent => "[Data Service] All chunks of transactions sent to GRPC response channel. Current batch finished.",
             // Cache worker steps
@@ -58,6 +65,8 @@ impl IndexerGrpcStep {
             // Filestore worker steps
             IndexerGrpcStep::FilestoreUploadTxns => "[File worker] Upload transactions to filestore.",
             // Fullnode steps
+            IndexerGrpcStep::FullnodeFetchedBatch => "[Indexer Fullnode] Fetched batch of transactions from fullnode",
+            IndexerGrpcStep::FullnodeDecodedBatch => "[Indexer Fullnode] Decoded batch of transactions from fullnode",
             IndexerGrpcStep::FullnodeProcessedBatch => "[Indexer Fullnode] Processed batch of transactions from fullnode",
             IndexerGrpcStep::FullnodeSentBatch => "[Indexer Fullnode] Sent batch successfully",
         }
