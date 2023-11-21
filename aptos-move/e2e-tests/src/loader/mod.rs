@@ -22,6 +22,7 @@ pub struct Node {
     name: ModuleId,
     self_value: u64,
     account_data: AccountData,
+    expected_value: u64,
 }
 
 #[derive(Debug)]
@@ -116,6 +117,7 @@ impl DependencyGraph {
                     name: ModuleId::new(*account_data.address(), module_name),
                     self_value: self_value as u64,
                     account_data,
+                    expected_value: 0,
                 })
             })
             .collect::<Vec<_>>();
@@ -154,17 +156,40 @@ impl DependencyGraph {
         }
     }
 
+    pub fn caculate_expected_values(&mut self) {
+        let accounts = toposort(&self.graph, None).expect("Dep graph should be acyclic");
+        for account_idx in accounts.iter().rev() {
+            let mut result = 0;
+
+            // Calculate the expected result of module entry function
+            for successor in self
+                .graph
+                .neighbors_directed(*account_idx, Direction::Outgoing)
+            {
+                result += self
+                    .graph
+                    .node_weight(successor)
+                    .expect("Topo sort should already compute the value for successor")
+                    .expected_value;
+            }
+            let node = self
+                .graph
+                .node_weight_mut(*account_idx)
+                .expect("Node should exist");
+
+            node.expected_value = result + node.self_value;
+        }
+    }
+
     pub fn execute(&self, executor: &mut FakeExecutor) {
         // Generate a list of modules
         let accounts = toposort(&self.graph, None).expect("Dep graph should be acyclic");
-        let mut expected_values = HashMap::new();
         let mut modules = vec![];
         for account_idx in accounts.iter().rev() {
             let node = self
                 .graph
                 .node_weight(*account_idx)
                 .expect("Node should exist");
-            let mut result = node.self_value;
             let mut deps = vec![];
 
             // Calculate the expected result of module entry function
@@ -172,21 +197,18 @@ impl DependencyGraph {
                 .graph
                 .neighbors_directed(*account_idx, Direction::Outgoing)
             {
-                result += expected_values
-                    .get(&successor)
-                    .expect("Topo sort should already compute the value for successor");
                 deps.push(self.graph.node_weight(successor).unwrap().name.clone());
             }
-            expected_values.insert(*account_idx, result);
 
             let module_str = module_generator::generate_module(
                 &node.name,
                 &deps,
                 node.self_value,
                 |module_id| {
-                    *expected_values
-                        .get(self.address_to_node.get(module_id).unwrap())
+                    self.graph
+                        .node_weight(*self.address_to_node.get(module_id).unwrap())
                         .unwrap()
+                        .expected_value
                 },
             );
             let module = Compiler {
@@ -215,7 +237,7 @@ impl DependencyGraph {
                 &node.name,
                 "foo",
                 vec![],
-                vec![MoveValue::U64(*expected_values.get(account_idx).unwrap())
+                vec![MoveValue::U64(self.graph.node_weight(*account_idx).unwrap().expected_value)
                     .simple_serialize()
                     .unwrap()],
             );

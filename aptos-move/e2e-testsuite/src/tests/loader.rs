@@ -7,9 +7,10 @@ use aptos_language_e2e_tests::{
 use proptest::prelude::*;
 
 /// Run these transactions and verify the expected output.
-pub fn run_and_assert_universe(universe: DependencyGraph) {
+pub fn run_and_assert_universe(mut universe: DependencyGraph) {
     let mut executor = FakeExecutor::from_head_genesis();
     universe.setup(&mut executor);
+    universe.caculate_expected_values();
     universe.execute(&mut executor);
 }
 
