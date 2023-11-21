@@ -385,10 +385,11 @@ async fn test_multisig_transaction_simulation() {
             "0x1::aptos_account::transfer",
             &[],
             &[&owner_account_1.address().to_hex_literal(), "2000"],
-            500,
+            200,
         )
         .await;
-    context.check_golden_output(simulation_resp);
+    let simulation_resp = &simulation_resp.as_array().unwrap()[0];
+    assert!(!simulation_resp["success"].as_bool().unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

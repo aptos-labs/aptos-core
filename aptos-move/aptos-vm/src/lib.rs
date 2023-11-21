@@ -176,5 +176,5 @@ pub trait VMSimulator {
         &self,
         transaction: &SignedTransaction,
         state_view: &impl StateView,
-    ) -> Result<TransactionOutput, VMStatus>;
+    ) -> Result<(VMStatus, TransactionOutput), VMStatus>;
 }

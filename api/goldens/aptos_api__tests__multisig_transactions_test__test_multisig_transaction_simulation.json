@@ -1,5 +1,0 @@
-{
-  "message": "Failed to simulate a transaction: status ABORTED of type Execution with sub status 65542",
-  "error_code": "internal_error",
-  "vm_error_code": null
-}

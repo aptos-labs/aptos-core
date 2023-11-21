@@ -1995,7 +1995,7 @@ impl VMSimulator for AptosVM {
         &self,
         transaction: &SignedTransaction,
         state_view: &impl StateView,
-    ) -> Result<TransactionOutput, VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
         assert!(self.is_simulation, "VM has to be created for simulation");
 
         // The caller must ensure that the signature is not invalid, as otherwise
@@ -2012,9 +2012,6 @@ impl VMSimulator for AptosVM {
 
         let (vm_status, vm_output) =
             self.execute_user_transaction(&resolver, transaction, &log_context);
-        match vm_status {
-            VMStatus::Executed => vm_output.try_into_transaction_output(&resolver),
-            vm_status => Err(vm_status),
-        }
+        Ok((vm_status, vm_output.try_into_transaction_output(&resolver)?))
     }
 }

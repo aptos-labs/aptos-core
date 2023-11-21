@@ -1387,15 +1387,21 @@ async fn test_simulation_failure_error_message() {
     //     }
     // }
 
-    let resp = context.simulate_transaction(&admin0, json!({
+    let output = context.simulate_transaction(&admin0, json!({
         "type": "script_payload",
         "code": {
             "bytecode": "a11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102",
         },
         "type_arguments": [],
         "arguments": [],
-    }), 500).await;
-    context.check_golden_output(resp);
+    }), 200).await;
+    let resp = &output.as_array().unwrap()[0];
+
+    assert!(!resp["success"].as_bool().unwrap());
+    assert!(resp["vm_status"]
+        .as_str()
+        .unwrap()
+        .contains("Division by zero"));
 }
 
 fn gen_string(len: u64) -> String {
