@@ -74,6 +74,9 @@ pub enum TransactionType {
     BatchTransfer {
         batch_size: usize,
     },
+    Tournament {
+        num_tournaments: usize
+    }
 }
 
 impl Default for TransactionType {
@@ -282,6 +285,17 @@ pub async fn create_txn_generator_creator(
                     *use_account_pool,
                     accounts_pool.clone(),
                 ),
+                TransactionType::Tournament {
+                    num_tournaments
+                } => {
+                    Box::new(TournamentTransactionGeneratorCreator::new(
+                            txn_factory.clone(),
+                            source_accounts,
+                            num_tournaments,
+                        )
+                        .await
+                    )
+                },
                 TransactionType::BatchTransfer { batch_size } => {
                     Box::new(BatchTransferTransactionGeneratorCreator::new(
                         txn_factory.clone(),
