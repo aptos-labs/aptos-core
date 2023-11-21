@@ -1,0 +1,12 @@
+[package]
+name = "Tournament"
+version = "0.0.1"
+
+[dependencies]
+AptosFramework = { local = "../../../../../aptos-move/framework/aptos-framework" }
+AptosTokenObjects = { local = "../../../../../aptos-move/framework/aptos-token-objects" }
+MoveStdlib = { local = "../../../../../aptos-move/framework/move-stdlib" }
+AptosToken = { local = "../../../../../aptos-move/framework/aptos-token" }
+
+[addresses]
+tournament = "0x0d17edeafc6393d340df999ca4ca9b33bf35f19ad4d16fbf49e57eaa3da09421"
