@@ -7,7 +7,7 @@ slug: "your-first-dapp"
 
 In this tutorial, you will learn how to build a [dapp](https://en.wikipedia.org/wiki/Decentralized_application)
 on the Aptos blockchain. A dapp usually consists of a graphical user interface, which interacts with one or more Move
-modules.  This dapp will let users publish and share snippets of text on the Aptos blockchain.
+modules. This dapp will let users publish and share snippets of text on the Aptos blockchain.
 
 For this tutorial, we will use the Move module [`hello_blockchain`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/hello_blockchain)
 described in [Your First Move Module](first-move-module.md) and focus on building the user interface around the module.
@@ -16,9 +16,9 @@ For a more comprehensive view of this process, see [Build an End-to-End Dapp on 
 
 We will use the:
 
-* [TypeScript SDK](../sdks/ts-sdk/index.md)
-* [Petra Wallet](https://petra.app)
-* [Aptos CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md)
+- [TypeScript SDK](../sdks/ts-sdk/v1/index.md)
+- [Petra Wallet](https://petra.app)
+- [Aptos CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md)
 
 :::tip Full source code
 
@@ -32,6 +32,7 @@ We recommend becoming familiar with the newer full source code documented in the
 Before starting this tutorial, you'll need a chrome extension wallet to interact with the dapp, such as, the [Petra wallet extension](https://petra.app).
 
 If you haven't installed the Petra wallet extension before:
+
 1. Open the Wallet and click **Create a new wallet**. Then click **Create account** to create an Aptos Account.
 2. Copy the private key. You will need it to set up the Aptos CLI in the next section.
 3. See the [user instructions](https://petra.app/docs/use) on petra.app for help.
@@ -39,6 +40,7 @@ If you haven't installed the Petra wallet extension before:
 5. Click the faucet button to ensure you can receive test tokens.
 
 If you already have the Petra wallet installed, we suggest you create a new wallet for purposes of this tutorial.
+
 1. In the extension, go to settings, switch account, add account, create new account to create a new account.
 2. Switch to the Devnet network by clicking, settings, network, and selecting **devnet**.
 3. Click the faucet button to ensure you can receive test tokens.
@@ -49,7 +51,7 @@ Ensure your account has sufficient funds to perform transactions by clicking the
 
 ### Aptos CLI
 
-We will also be installing the Aptos CLI so that we can publish 
+We will also be installing the Aptos CLI so that we can publish
 
 1. Install the [Aptos CLI](../tools/aptos-cli/install-cli/index.md).
 
@@ -57,7 +59,7 @@ We will also be installing the Aptos CLI so that we can publish
 
 3. Select the network `devnet`
 
-4. When prompted for your private key, paste the private key from the Petra Wallet and press **Return**. 
+4. When prompted for your private key, paste the private key from the Petra Wallet and press **Return**.
    1. You can find the private key by going to settings, manage account, show the private key, and copy that field.
 
 You will see output resembling:
@@ -71,6 +73,7 @@ Aptos CLI is now set up for account <account-number> as profile my-first-nft!  R
   "Result": "Success"
 }
 ```
+
 This initializes the Aptos CLI to use the same account as used by the Aptos Wallet.
 
 5. Run `aptos account list --profile my-first-nft` to verify that it is working. You should see your account address listed in the `addr` field for all events.
@@ -117,18 +120,18 @@ Still in the `first-dapp` directory, open the `src/index.tsx` file and change th
 root.render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>
+  </React.StrictMode>,
 );
 ```
 
 to this:
 
 ```typescript
-window.addEventListener('load', () => {
+window.addEventListener("load", () => {
   root.render(
     <React.StrictMode>
       <App />
-    </React.StrictMode>
+    </React.StrictMode>,
   );
 });
 ```
@@ -143,7 +146,9 @@ If you are using TypeScript, you may also want to inform the compiler of the exi
 
 ```typescript
 declare global {
-  interface Window { aptos: any; }
+  interface Window {
+    aptos: any;
+  }
 }
 ```
 
@@ -154,29 +159,31 @@ This lets us use the `window.aptos` API without having to do `(window as any).ap
 Our app is now ready to use the `window.aptos` API. We will change `src/App.tsx` to retrieve the value of `window.aptos.account()` (the wallet account) on initial render, store it in state, and then display it by replacing the contents in the file with:
 
 ```typescript
-import React from 'react';
-import './App.css';
+import React from "react";
+import "./App.css";
 
 function App() {
   // Retrieve aptos.account on initial render and store it.
   const [address, setAddress] = React.useState<string | null>(null);
-  
+
   /**
    * init function
    */
-  const init = async() => {
+  const init = async () => {
     // connect
     const { address, publicKey } = await window.aptos.connect();
     setAddress(address);
-  }
-  
+  };
+
   React.useEffect(() => {
-     init();
+    init();
   }, []);
 
   return (
     <div className="App">
-      <p>Account Address: <code>{ address }</code></p>
+      <p>
+        Account Address: <code>{address}</code>
+      </p>
     </div>
   );
 }
@@ -191,7 +198,9 @@ Refresh the page and you will see your account address.
 Next, replace the contents of `src/App.css`:
 
 ```css
-a, input, textarea {
+a,
+input,
+textarea {
   display: block;
 }
 
@@ -225,10 +234,10 @@ Now we can import the SDK and create an `AptosClient` to interact with the block
 As our wallet account is on devnet, we will set up the `AptosClient` to interact with devnet as well. Add the following to `src/App.tsx`:
 
 ```typescript
-import { Types, AptosClient } from 'aptos';
+import { Types, AptosClient } from "aptos";
 
 // Create an AptosClient to interact with devnet.
-const client = new AptosClient('https://fullnode.devnet.aptoslabs.com/v1');
+const client = new AptosClient("https://fullnode.devnet.aptoslabs.com/v1");
 
 function App() {
   // ...
@@ -242,8 +251,12 @@ function App() {
 
   return (
     <div className="App">
-      <p>Account Address: <code>{ address }</code></p>
-      <p>Sequence Number: <code>{ account?.sequence_number }</code></p>
+      <p>
+        Account Address: <code>{address}</code>
+      </p>
+      <p>
+        Sequence Number: <code>{account?.sequence_number}</code>
+      </p>
     </div>
   );
 }
@@ -252,7 +265,7 @@ function App() {
 Now, in addition to displaying the account address, the app will also display the account's `sequence_number`. This `sequence_number` represents the next transaction sequence number to prevent replay attacks of transactions. You will see this number increasing as you make transactions with the account.
 
 :::tip
-If the account you're using for this application doesn't exist on-chain, you will not see a sequence number.  You'll need
+If the account you're using for this application doesn't exist on-chain, you will not see a sequence number. You'll need
 to create the account first via a faucet.
 :::
 
@@ -297,7 +310,7 @@ This makes it possible to publish the module for the given account, in this case
 
 Assuming that your account has enough funds to execute the transaction, you can now publish the `hello_blockchain` module in your account. If you refresh the app, you will see that the account sequence number has increased from 0 to 1.
 
-You can also verify the module was published by going to the [Aptos Explorer](https://explorer.aptoslabs.com/) and looking up your account. If you scroll down to the *Account Modules* section, you should see something resembling:
+You can also verify the module was published by going to the [Aptos Explorer](https://explorer.aptoslabs.com/) and looking up your account. If you scroll down to the _Account Modules_ section, you should see something resembling:
 
 ```json
 {
@@ -309,21 +322,14 @@ You can also verify the module was published by going to the [Aptos Explorer](ht
       "name": "get_message",
       "visibility": "public",
       "genericTypeParams": [],
-      "params": [
-        "address"
-      ],
-      "_return": [
-        "0x1::string::String"
-      ]
+      "params": ["address"],
+      "_return": ["0x1::string::String"]
     },
     {
       "name": "set_message",
       "visibility": "script",
       "genericTypeParams": [],
-      "params": [
-        "signer",
-        "vector"
-      ],
+      "params": ["signer", "vector"],
       "_return": []
     }
   ],
@@ -331,10 +337,7 @@ You can also verify the module was published by going to the [Aptos Explorer](ht
     {
       "name": "MessageChangeEvent",
       "isNative": false,
-      "abilities": [
-        "drop",
-        "store"
-      ],
+      "abilities": ["drop", "store"],
       "genericTypeParams": [],
       "fields": [
         {
@@ -350,9 +353,7 @@ You can also verify the module was published by going to the [Aptos Explorer](ht
     {
       "name": "MessageHolder",
       "isNative": false,
-      "abilities": [
-        "key"
-      ],
+      "abilities": ["key"],
       "genericTypeParams": [],
       "fields": [
         {
@@ -370,11 +371,12 @@ You can also verify the module was published by going to the [Aptos Explorer](ht
 ```
 
 Make a note of `"name": "message"; we will use it in the next section.
+
 </details>
 
 <details>
 <summary>Publish the `hello_blockchain` module with the TS SDK</summary>
-We will use the Aptos CLI to compile the `hello_blockchain` module and use the [TypeScript SDK](../sdks/ts-sdk/index.md) to publish the module.
+We will use the Aptos CLI to compile the `hello_blockchain` module and use the [TypeScript SDK](../sdks/ts-sdk/v1/index.md) to publish the module.
 
 1. Download the [`hello_blockchain`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/hello_blockchain) package.
 
@@ -406,46 +408,54 @@ This makes it possible to publish the module for the given account, in this case
 
 The `--save-metadata` argument, if set, generates and saves the package metadata in the package's `build` directory. This metadata can be used to construct a transaction to publish a package.
 
-At this point, we should have a `build` folder in the same directory of our `hello_blockchain` folder. The next step would be to publish the module to the chain. 
+At this point, we should have a `build` folder in the same directory of our `hello_blockchain` folder. The next step would be to publish the module to the chain.
 The TypeScript SDK provides us a `publishPackage()` function where it expects to get both package metadata and the move module as `Uint8Array`. We can supply this by converting both the `package-metadata.bcs` file and the `bytecode_modules/message.mv` module into hex strings (using a command, below), and then to `Uint8Array` (using the SDK).
 
 Convert `package-metadata.bcs` file and the `bytecode_modules/message.mv` module into hex strings:
 
 Navigate to the `hello_blockchain/build/Example` directory:
+
 ```bash
 cd hello_blockchain/build/Example
 ```
 
 Convert `package-metadata.bcs` to a hex string. On macOS and Linux, we can use the command:
+
 ```bash
 cat package-metadata.bcs | od -v -t x1 -A n | tr -d ' \n'
 ```
+
 That will output a hex string we can later use.
 
 Convert `message.mv` to a hex string. On Mac and Linux we can use the command:
+
 ```bash
 cat bytecode_modules/message.mv | od -v -t x1 -A n | tr -d ' \n'
 ```
+
 That will also output a hex string we can later use. Keep both of the hex strings ready!
 
 Back to our react app, let's add a button to click on to publish the module, use the `publishPackage` function TypeScript SDK provides us and display a link to get the account's resources where we can see the published module.
 
-We would need our account's private key to initialize an `AptosAccount` to publish the module with. You can get the private key from the Petra Wallet by going to: **Settings** > **Manage account**, show the private key, and copy that field. Since a private key is *very* sensitive data, we dont want to expose it in the code but rather hold it in an `.env` file and use it from there.
+We would need our account's private key to initialize an `AptosAccount` to publish the module with. You can get the private key from the Petra Wallet by going to: **Settings** > **Manage account**, show the private key, and copy that field. Since a private key is _very_ sensitive data, we dont want to expose it in the code but rather hold it in an `.env` file and use it from there.
 
 1. Create a new `.env` file on the `root` of the project and add to the file:
+
 ```bash
 REACT_APP_ACCOUNT_PK=<account-private-key>
 ```
+
 Make sure to restart the local server so the app will load the new `.env` file.
 
 2. Add the following to `src/App.tsx`, where:
-- `process.env.REACT_APP_ACCOUNT_PK` holds the account private key. 
+
+- `process.env.REACT_APP_ACCOUNT_PK` holds the account private key.
 - `<package-metadata.bcs hex string>` is the `package-metadata.bcs` hex string output we get from the previous step.
 - `<message.mv hex string>` is the `message.mv` hex string output we get from the previous step.
 
 ```typescript
-import { Types, AptosClient, AptosAccount, HexString, TxnBuilderTypes} from "aptos";
-  // ...
+import { Types, AptosClient, AptosAccount, HexString, TxnBuilderTypes } from "aptos";
+// ...
 
 function App() {
   // ...
@@ -456,30 +466,28 @@ function App() {
   const onPublishModule = async () => {
     if (!process.env.REACT_APP_ACCOUNT_PK) return;
     setIsPublishing(true);
-    const aptosAccount = new AptosAccount(
-      new HexString(process.env.REACT_APP_ACCOUNT_PK).toUint8Array()
-    );
-    try{
+    const aptosAccount = new AptosAccount(new HexString(process.env.REACT_APP_ACCOUNT_PK).toUint8Array());
+    try {
       const txnHash = await client.publishPackage(
-      aptosAccount,
-      new HexString(
-        // package-metadata
-        "<package-metadata.bcs hex string>"
-      ).toUint8Array(),
-      [
-        new TxnBuilderTypes.Module(
-          new HexString(
-            // modules
-            "<message.mv hex string>"
-          ).toUint8Array()
-        ),
-      ]
-    );
+        aptosAccount,
+        new HexString(
+          // package-metadata
+          "<package-metadata.bcs hex string>",
+        ).toUint8Array(),
+        [
+          new TxnBuilderTypes.Module(
+            new HexString(
+              // modules
+              "<message.mv hex string>",
+            ).toUint8Array(),
+          ),
+        ],
+      );
       await client.waitForTransaction(txnHash);
       setPublishPackageTxnHash(txnHash);
-    }catch(error: any){
-      console.log("publish error", error)
-    }finally{
+    } catch (error: any) {
+      console.log("publish error", error);
+    } finally {
       setIsPublishing(false);
     }
   };
@@ -494,10 +502,7 @@ function App() {
         {publishPackageTxnHash && (
           <div>
             <p>
-              <a
-                href={`https://fullnode.devnet.aptoslabs.com/v1/accounts/${address}/modules`}
-                target="_blank"
-              >
+              <a href={`https://fullnode.devnet.aptoslabs.com/v1/accounts/${address}/modules`} target="_blank">
                 Account modules
               </a>
             </p>
@@ -508,6 +513,7 @@ function App() {
   );
 }
 ```
+
 We wrap our publishing attempt in a `try / catch` block to catch any potential errors coming from `await client.waitForTransaction(txnHash);`.
 
 `waitForTransaction(txnHash)` waits for a transaction (given a transaction hash) to move past pending state and can end up in one of the 4 states:
@@ -535,21 +541,14 @@ Click the **Publish Package** button. Once the module has been published, we sho
       "name": "get_message",
       "visibility": "public",
       "genericTypeParams": [],
-      "params": [
-        "address"
-      ],
-      "_return": [
-        "0x1::string::String"
-      ]
+      "params": ["address"],
+      "_return": ["0x1::string::String"]
     },
     {
       "name": "set_message",
       "visibility": "script",
       "genericTypeParams": [],
-      "params": [
-        "signer",
-        "vector"
-      ],
+      "params": ["signer", "vector"],
       "_return": []
     }
   ],
@@ -557,10 +556,7 @@ Click the **Publish Package** button. Once the module has been published, we sho
     {
       "name": "MessageChangeEvent",
       "isNative": false,
-      "abilities": [
-        "drop",
-        "store"
-      ],
+      "abilities": ["drop", "store"],
       "genericTypeParams": [],
       "fields": [
         {
@@ -576,9 +572,7 @@ Click the **Publish Package** button. Once the module has been published, we sho
     {
       "name": "MessageHolder",
       "isNative": false,
-      "abilities": [
-        "key"
-      ],
+      "abilities": ["key"],
       "genericTypeParams": [],
       "fields": [
         {
@@ -596,6 +590,7 @@ Click the **Publish Package** button. Once the module has been published, we sho
 ```
 
 Make a note of `"name": "message"`; we will use it in the next section.
+
 </details>
 
 ### Add module publishing instructions to the dapp
@@ -615,13 +610,12 @@ function App() {
     client.getAccountModules(address).then(setModules);
   }, [address]);
 
-  const hasModule = modules.some((m) => m.abi?.name === 'message');
+  const hasModule = modules.some((m) => m.abi?.name === "message");
   const publishInstructions = (
     <pre>
       Run this command to publish the module:
       <br />
-      aptos move publish --package-dir /path/to/hello_blockchain/
-      --named-addresses hello_blockchain={address}
+      aptos move publish --package-dir /path/to/hello_blockchain/ --named-addresses hello_blockchain={address}
     </pre>
   );
 
@@ -646,9 +640,11 @@ function App() {
   return (
     <div className="App">
       // ...
-      {!hasModule && <button onClick={onPublishModule} disabled={isPublishing}>
+      {!hasModule && (
+        <button onClick={onPublishModule} disabled={isPublishing}>
           Publish Package
-        </button>}
+        </button>
+      )}
     </div>
   );
 }
@@ -727,11 +723,12 @@ function App() {
           <textarea ref={ref} />
           <input disabled={isSaving} type="submit" />
         </form>
-      ) : publishInstructions}
+      ) : (
+        publishInstructions
+      )}
     </div>
   );
 }
-
 ```
 
 To test it:
@@ -775,16 +772,16 @@ function App() {
   }, [address]);
   const resourceType = `${address}::message::MessageHolder`;
   const resource = resources.find((r) => r.type === resourceType);
-  const data = resource?.data as {message: string} | undefined;
+  const data = resource?.data as { message: string } | undefined;
   const message = data?.message;
 
   return (
     // ...
-          <textarea defaultValue={message} />
+    <textarea defaultValue={message} />
     // ...
   );
 }
-  ```
+```
 
 To test it:
 
@@ -815,7 +812,7 @@ function App() {
     if (urlAddress) {
       setAddress(urlAddress);
     } else {
-      window.aptos.account().then((data : {address: string}) => setAddress(data.address));
+      window.aptos.account().then((data: { address: string }) => setAddress(data.address));
     }
   }, [urlAddress]);
 
@@ -827,10 +824,12 @@ function App() {
         <form onSubmit={handleSubmit}>
           <p>On-chain message</p>
           <textarea ref={ref} defaultValue={message} readOnly={!isEditable} />
-          {isEditable && (<input disabled={isSaving} type="submit" />)}
-          {isEditable && (<a href={address!}>Get public URL</a>)}
+          {isEditable && <input disabled={isSaving} type="submit" />}
+          {isEditable && <a href={address!}>Get public URL</a>}
         </form>
-      ) : publishInstructions}
+      ) : (
+        publishInstructions
+      )}
     </div>
   );
 }
@@ -840,6 +839,6 @@ This concludes the tutorial.
 
 ## Supporting documentation
 
-* [Aptos CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md)
-* [TypeScript SDK](../sdks/ts-sdk/index.md)
-* [Wallet Standard](../standards/wallets.md)
+- [Aptos CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md)
+- [TypeScript SDK](../sdks/ts-sdk/v1/index.md)
+- [Wallet Standard](../standards/wallets.md)

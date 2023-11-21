@@ -4,6 +4,10 @@ slug: "index"
 hidden: false
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import ThemedImage from '@theme/ThemedImage';
+
 # Aptos TypeScript SDK
 
 :::note
@@ -12,42 +16,108 @@ This documentation is for TypeScript SDK V1, aka `aptos`. For a more robust and 
 
 Aptos provides a fully supported TypeScript SDK with the source code in the [Aptos-core GitHub](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk) repository. Much of the functionality of the TypeScript SDK can be found in the [Rust](../rust-sdk.md) and [Python](../python-sdk.md) SDKs. Nevertheless, Aptos strongly encourages you to use the TypeScript SDK for app development whenever possible.
 
-## Installing the TypeScript SDK
+Looking to migrate to `v2`? check out the [migration guide](./migration-guide.md)
+:::
 
-1. Make sure you [downloaded the latest precompiled binary for the Aptos CLI](../../tools/aptos-cli/install-cli/index.md#download-precompiled-binary).
-2. On a terminal run the below command to install the TypeScript SDK from [npmjs](https://www.npmjs.com/package/aptos):
+## Overview
 
-   ```bash
-   npm i aptos
-   ```
+Aptos provides a fully supported TypeScript SDK with the source code in the [aptos-ts-sdk GitHub](https://github.com/aptos-labs/aptos-ts-sdk) repository.
+The Aptos TypeScript SDK provides a convenient way to interact with the Aptos blockchain using TypeScript. It offers a set of utility functions, classes, and types to simplify the integration process and enhance developer productivity.
 
-   or
+- **Developer experience** Strongly typed APIs and Interfaces, autocomplete, comprehensive documentation.
+- **Stability** Test suite runs against Aptos fullnode and indexer with a local network
+- **Transaction Builder** Intuitive and simplified transaction builder flow
+- **Serialization/deserialization support** Full nested serialization/deserialization support and Move sub-classes to easily serialize and deserialize Move types
 
-   ```bash
-   yarn add aptos
-   ```
+## Installation
 
-   or
+<Tabs groupId="install-sdk">
+  <TabItem value="pnpm" label="pnpm">
 
-   ```bash
-   pnpm add aptos
-   ```
+```bash
+ pnpm i @aptos-labs/ts-sdk
+```
 
-   :::tip
-   The above command installs the TS SDK and should not be confused as installing the Aptos CLI.
-   :::
+  </TabItem>
+  <TabItem value="npm" label="npm">
 
-## Using the TypeScript SDK
+```bash
+ npm i @aptos-labs/ts-sdk
+```
 
-See the [Developer Tutorials](../../tutorials/index.md) for code examples showing how to use the Typescript SDK.
+  </TabItem>
+  <TabItem value="yarn" label="yarn">
 
-## TypeScript SDK Architecture
+```bash
+ yarn add @aptos-labs/ts-sdk
+```
 
-See the [TypeScript SDK Architecture](./typescript-sdk-overview.md) for the components that make up the TypeScript SDK.
+  </TabItem>
+    <TabItem value="bun" label="bun">
 
-## Additional information
+```bash
+ bun i @aptos-labs/ts-sdk
+```
 
-- ### [TypeScript SDK Source code](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk)
-- ### [TypeScript SDK at NPM](https://www.npmjs.com/package/aptos)
-- ### [TypeScript SDK Reference](https://aptos-labs.github.io/ts-sdk-doc/)
-- ### [TypeScript SDK Reference Source](https://github.com/aptos-labs/ts-sdk-doc)
+  </TabItem>
+</Tabs>
+
+## Quick Start
+
+### Set up Aptos
+
+```ts
+const aptos = new Aptos(); // default to devnet
+
+// with custom configuration
+const aptosConfig = new AptosConfig({ network: Network.TESTNET });
+const aptos = new Aptos(aptosConfig);
+```
+
+### Fetch data from chain
+
+```ts
+const ledgerInfo = await aptos.getLedgerInfo();
+const modules = await aptos.getAccountModules({ accountAddress: "0x123" });
+const tokens = await aptos.getAccountOwnedTokens({ accountAddress: "0x123" });
+```
+
+### Transfer APT coin transaction
+
+```ts
+const transaction = await aptos.transferCoinTransaction({
+  sender: alice,
+  recipient: bob.accountAddress,
+  amount: 100,
+});
+const pendingTransaction = await aptos.signAndSubmitTransaction({ signer: alice, transaction });
+```
+
+### Build and submit transaction
+
+```ts
+// generate a new account key pair
+const alice: Account = Account.generate();
+
+// create the account on chain
+await aptos.fundAccount({ accountAddress: alice.accountAddress, amount: 1000 });
+
+// submit transaction to transfer APT coin from Alice to Bob
+const bobAddress = "0xb0b";
+
+const transaction = await aptos.build.transaction({
+  sender: alice.accountAddress,
+  data: {
+    function: "0x1::coin::transfer",
+    typeArguments: ["0x1::aptos_coin::AptosCoin"],
+    functionArguments: [bobAddress, 100],
+  },
+});
+
+// using sign and submit separately
+const senderAuthenticator = aptos.sign.transaction({ signer: alice, transaction });
+const pendingTransaction = await aptos.submit.transaction({ transaction, senderAuthenticator });
+
+// using signAndSubmit combined
+const pendingTransaction = await aptos.signAndSubmitTransaction({ signer: alice, transaction });
+```

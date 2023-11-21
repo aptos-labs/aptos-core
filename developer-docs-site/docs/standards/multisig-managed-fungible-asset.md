@@ -7,11 +7,11 @@ slug: "multisig-managed-fungible-assets"
 
 This tutorial introduces a practical use case that combines Aptos framework multisig account with fungible asset standard to enhance the security margin of the management of fungible assets. Make sure you have understood module publishing and Aptos framework multisig account before moving on to the tutorial. If not, it is highly recommended to try out the following tutorials first:
 
-* [Your First Move Module](../tutorials/first-move-module.md)
+- [Your First Move Module](../tutorials/first-move-module.md)
 
 ## Step 1: Pick an SDK
 
-This tutorial was created for the [TypeScript SDK](../sdks/ts-sdk/index.md).
+This tutorial was created for the [TypeScript SDK](../sdks/ts-sdk/v1/index.md).
 
 Other developers are invited to add support for the [Python SDK](../sdks/python-sdk.md), [Rust SDK](../sdks/rust-sdk.md), and [Unity SDK](../sdks/unity-sdk.md)!
 
@@ -129,4 +129,3 @@ Finally, all the three owners have 1000 meme coins. Let's burn all the coins! Ow
 ## Conclusion
 
 This tutorial shows an e2e flow of using Aptos framework multisig account to administrate fungible asset. Similarly, you can create your own module and leverage our powerful SDK to create the administration schema that fits your needs.
-

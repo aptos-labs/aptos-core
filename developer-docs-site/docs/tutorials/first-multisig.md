@@ -7,9 +7,9 @@ slug: "your-first-multisig"
 
 This tutorial introduces assorted [K-of-N multi-signer authentication](../concepts/accounts.md#multi-signer-authentication) operations and supplements content from the following tutorials:
 
-* [Your First Transaction](./first-transaction.md)
-* [Your First Coin](./first-coin.md)
-* [Your First Move Module](./first-move-module.md)
+- [Your First Transaction](./first-transaction.md)
+- [Your First Coin](./first-coin.md)
+- [Your First Move Module](./first-move-module.md)
 
 :::tip
 Try out the above tutorials (which include dependency installations) before moving on to multisig operations.
@@ -19,7 +19,7 @@ Try out the above tutorials (which include dependency installations) before movi
 
 This tutorial, a community contribution, was created for the [Python SDK](../sdks/python-sdk.md).
 
-Other developers are invited to add support for the [TypeScript SDK](../sdks/ts-sdk/index.md), [Rust SDK](../sdks/rust-sdk.md), and [Unity SDK](../sdks/unity-sdk.md)!
+Other developers are invited to add support for the [TypeScript SDK](../sdks/ts-sdk/v1/index.md), [Rust SDK](../sdks/rust-sdk.md), and [Unity SDK](../sdks/unity-sdk.md)!
 
 ## Step 2: Start the example
 
@@ -125,7 +125,6 @@ Bob:   0x6305101f8f3ad5a75254a8fa74b0d9866756abbf359f9e4f2b54247917caf8c52798a36
 ### Step 6.2: Submit the multisig transaction
 
 Next generate a multisig authenticator and submit the transaction:
-
 
 ```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_5
@@ -292,7 +291,7 @@ This process is almost identical to that of the genesis publication, with the ne
 ```
 
 :::tip
-Modules that `use` other modules must be listed *after* the modules they use.
+Modules that `use` other modules must be listed _after_ the modules they use.
 :::
 
 ```zsh title=Output
@@ -324,7 +323,7 @@ The script accepts as arguments the signature of the account hosting the package
 
 Note that both functions in the script are `public entry fun` functions, which means that everything achieved in the script could be performed without a script.
 However, a non-script approach would require two transactions instead of just one, and would complicate the signature aggregation process:
-in practical terms, Alice, Bob, and/or Chad would likely have to send single-signer transaction signatures around through off-chain communication channels, and a *scribe* for the group would then have to submit a multisig `Authenticator` (for *each* `public entry fun` call).
+in practical terms, Alice, Bob, and/or Chad would likely have to send single-signer transaction signatures around through off-chain communication channels, and a _scribe_ for the group would then have to submit a multisig `Authenticator` (for _each_ `public entry fun` call).
 Hence in a non-script approach, extra operational complexity can quickly introduce opportunities for consensus failure.
 
 A Move script, by contrast, collapses multiple governance function calls into a single transaction; and moreover, Move scripts can be published in a public forum like GitHub so that all signatories can review the actual function calls before they sign the script.
