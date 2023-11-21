@@ -154,7 +154,11 @@ impl Processor {
             let process_size = transactions_buffer.len() / BLOB_STORAGE_SIZE * BLOB_STORAGE_SIZE;
             let current_batch: Vec<EncodedTransactionWithVersion> =
                 transactions_buffer.drain(..process_size).collect();
+<<<<<<< HEAD
             let last_transaction = current_batch.as_slice().last().unwrap().clone();
+=======
+            let first_transaction = current_batch.as_slice().first().unwrap().clone();
+>>>>>>> 0c0f43d9a0 ([indexer grpc] Add metrics)
             self.file_store_operator
                 .upload_transactions(cache_chain_id, current_batch)
                 .await
@@ -165,8 +169,13 @@ impl Processor {
             let num_transactions = end_version - current_file_store_version + 1;
             // This decoding may be inefficient, but this is the file store so we don't have to be overly
             // concerned with efficiency.
+<<<<<<< HEAD
             let end_version_timestamp = {
                 let encoded_transaction = last_transaction.0;
+=======
+            let start_version_timestamp = {
+                let encoded_transaction = first_transaction.0;
+>>>>>>> 0c0f43d9a0 ([indexer grpc] Add metrics)
                 let decoded_transaction =
                     base64::decode(encoded_transaction).expect("Failed to decode base64.");
                 let transaction =
@@ -194,7 +203,11 @@ impl Processor {
                     IndexerGrpcStep::FilestoreUploadTxns.get_label(),
                 ])
                 .set(
+<<<<<<< HEAD
                     end_version_timestamp
+=======
+                    start_version_timestamp
+>>>>>>> 0c0f43d9a0 ([indexer grpc] Add metrics)
                         .map(|t| timestamp_to_unixtime(&t))
                         .unwrap_or_default(),
                 );

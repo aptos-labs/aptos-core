@@ -97,7 +97,11 @@ impl IndexerStreamCoordinator {
                 let api_txns = Self::convert_to_api_txns(context, raw_txns).await;
                 api_txns.last().map(record_fetched_transaction_latency);
                 let pb_txns = Self::convert_to_pb_txns(api_txns);
+<<<<<<< HEAD
                 let end_txn_timestamp = pb_txns.last().unwrap().timestamp.clone();
+=======
+                let start_txn_timestamp = pb_txns.first().unwrap().timestamp.clone();
+>>>>>>> 0c0f43d9a0 ([indexer grpc] Add metrics)
                 TRANSACTION_UNIX_TIMESTAMP
                     .with_label_values(&[
                         SERVICE_TYPE,
@@ -105,7 +109,11 @@ impl IndexerStreamCoordinator {
                         IndexerGrpcStep::FullnodeProcessedBatch.get_label(),
                     ])
                     .set(
+<<<<<<< HEAD
                         end_txn_timestamp
+=======
+                        start_txn_timestamp
+>>>>>>> 0c0f43d9a0 ([indexer grpc] Add metrics)
                             .clone()
                             .map(|t| timestamp_to_unixtime(&t))
                             .unwrap_or_default(),
@@ -138,7 +146,11 @@ impl IndexerStreamCoordinator {
                         IndexerGrpcStep::FullnodeSentBatch.get_label(),
                     ])
                     .set(
+<<<<<<< HEAD
                         end_txn_timestamp
+=======
+                        start_txn_timestamp
+>>>>>>> 0c0f43d9a0 ([indexer grpc] Add metrics)
                             .map(|t| timestamp_to_unixtime(&t))
                             .unwrap_or_default(),
                     );
