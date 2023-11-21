@@ -121,8 +121,12 @@ impl Processor {
                 .batch_get_encoded_proto_data(current_cache_version)
                 .await;
 
+            info!("Got encoded proto data");
+
             let batch_get_result =
                 fullnode_grpc_status_handling(batch_get_result, current_cache_version)?;
+
+            info!("Converted to filestore format");
 
             let current_transactions = match batch_get_result {
                 Some(transactions) => transactions,
@@ -135,6 +139,8 @@ impl Processor {
                     continue;
                 },
             };
+
+            info!("Got current transactions");
 
             let hit_head = current_transactions.len() != BLOB_STORAGE_SIZE;
             // Update the current cache version.
@@ -156,6 +162,7 @@ impl Processor {
                 transactions_buffer.drain(..process_size).collect();
             let first_transaction = current_batch.as_slice().first().unwrap().clone();
             let last_transaction = current_batch.as_slice().last().unwrap().clone();
+            info!("Start transactions upload");
             self.file_store_operator
                 .upload_transactions(cache_chain_id, current_batch)
                 .await
