@@ -180,6 +180,7 @@ pub enum EntryPoints {
         length: u64,
         num_points_per_txn: usize,
     },
+    CreateTournament
 }
 
 impl EntryPoints {
@@ -217,6 +218,7 @@ impl EntryPoints {
             | EntryPoints::VectorPicture { .. }
             | EntryPoints::InitializeSmartTablePicture
             | EntryPoints::SmartTablePicture { .. } => "complex",
+            EntryPoints::CreateTournament => "tournament",
         }
     }
 
@@ -256,6 +258,7 @@ impl EntryPoints {
             EntryPoints::InitializeSmartTablePicture | EntryPoints::SmartTablePicture { .. } => {
                 "smart_table_picture"
             },
+            EntryPoints::CreateTournament => "tournament"
         }
     }
 
@@ -434,6 +437,9 @@ impl EntryPoints {
                     bcs::to_bytes(&colors).unwrap(),  // colors
                 ])
             },
+            EntryPoints::CreateTournament => {
+                
+            }
         }
     }
 
