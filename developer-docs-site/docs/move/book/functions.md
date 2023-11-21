@@ -521,44 +521,58 @@ fun foo() { return () }
 
 ## Inline Functions
 
-Inline functions are functions which are expanded at caller side instead
-of compiled into Move bytecode. This allows to save gas and may lead
-to faster execution. For example, one can define an inline function
+Inline functions are functions whose bodies are expanded in-place at the caller location during compile time.
+Thus, inline functions do not appear in Move bytecode as a separate function: all calls to them are expanded away by the compiler.
+They allow to save gas and may lead to faster execution.
+However, users should be aware that they could lead to larger bytecode size.
+
+One can define an inline function by adding the `inline` keyword to a function declaration as shown below:
 
 ```move=
 inline fun percent(x: u64, y: u64):u64 { x * 100 / y }
 ```
 
-Now, when call `percent(2, 200)` the compiler will inline the function
-definition as if the user has written `2 * 100 / 200`.
+If we call this inline function as `percent(2, 200)`, the compiler will replace this call with the inline function's body, as if the user has written `2 * 100 / 200`.
 
-### Function Parameters
+### Function parameters and lambda expressions
 
-Inline functions support _function parameters_. This allows
-to define higher-order functions in Move which can comprehend common
-programming patterns. As inline functions are expanded at compilation time,
-this feature of function parameters can be supported without direct
-support for it in Move bytecode.
+Inline functions support _function parameters_, which accept lambda expressions (i.e., higher-order functions) as arguments.
+This feature allows writing several common programming patterns elegantly.
+Similar to inline functions, lambda expressions are also expanded at call site.
 
-Consider the following function (from the `vector` module):
+A lambda expression includes a list of parameter names (enclosed within `||`) followed by the body.
+Some simple examples are: `|x| x + 1`, `|x, y| x + y`, `|| 1`, `|| { 1 }`.
+A lambda's body can refer to variables available in the scope where the lambda is defined: this is also known as capturing.
+The type of a function parameter is written as `|<list of parameter types>| <return type>`.
+For example, when the function parameter type is `|u64, u64| bool`, any lambda expression that takes two `u64` parameters and returns a `bool` value can be provided as the argument.
+
+Below is an example that showcases many of these concepts in action (this example is taken from the `std::vector` module):
 
 ```move=
-/// Fold the function over the elements. For example, `fold(vector[1,2,3], 0, f)` will execute
-/// `f(f(f(0, 1), 2), 3)`
+/// Fold the function over the elements. 
+/// E.g, `fold(vector[1,2,3], 0, f)` is the same as `f(f(f(0, 1), 2), 3)`.
 public inline fun fold<Accumulator, Element>(
     v: vector<Element>,
     init: Accumulator,
     f: |Accumulator,Element|Accumulator
 ): Accumulator {
   let accu = init;
-  foreach(v, |elem| accu = g(accu, elem));
+  // Note: `for_each` is an inline function, but is not shown here.
+  for_each(v, |elem| accu = f(accu, elem));
   accu
 }
 ```
 
-Here, `foreach` is itself an inline function.
+The type signature of the elided public inline function `for_each` is `fun for_each<Element>(v: vector<Element>, f: |Element|)`.
+It's second parameter `f` is a function parameter which accepts any lambda expression that consumes an `Element` and returns nothing.
+In the code example, we use the lambda expression `|elem| accu = f(accu, elem)` as an argument to this function parameter.
+Note that this lambda expression captures the variable `accu` from the outer scope.
 
-In general, only lambda expressions can be passed to function parameters.
-Similar as the inline function itself, those lambdas are expanded at caller
-side. Notice that a lambda can access variables in the context, as in the
-example the variable `accu`.
+### Current restrictions
+
+- Only inline functions can have function parameters.
+- Only explicit lambda expressions can be passed as an argument to an inline function's function parameters.
+- Inline functions and lambda expressions cannot have `return` expressions.
+- Inline functions or lambda expressions cannot return lambda expressions.
+- Cyclic recursion involving only inline functions is not allowed.
+- Parameters in lambda expressions should not be type annotated (e.g., `|x: u64| x + 1` is not allowed): their types are inferred.
