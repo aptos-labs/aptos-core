@@ -672,3 +672,9 @@ profiler
 html
 Flamegraphs
 flamegraphs
+namespaces
+typedoc
+MoveVector
+MoveString
+MoveOption
+autocomplete

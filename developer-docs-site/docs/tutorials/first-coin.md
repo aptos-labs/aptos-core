@@ -14,9 +14,9 @@ This tutorial introduces how you can compile, deploy, and mint your own coin, na
 
 Install your preferred SDK from the below list:
 
-* [TypeScript SDK](../sdks/ts-sdk/index.md)
-* [Python SDK](../sdks/python-sdk.md)
-* [Rust SDK](../sdks/rust-sdk.md)
+- [TypeScript SDK](../sdks/ts-sdk/v1/index.md)
+- [Python SDK](../sdks/python-sdk.md)
+- [Rust SDK](../sdks/rust-sdk.md)
 
 ---
 
@@ -131,6 +131,7 @@ Bob's initial MoonCoin balance: 0.
 Alice mints Bob some of the new coin.
 Bob's updated MoonCoin balance: 100.
 ```
+
 ---
 
 ## Step 4: MoonCoin in depth
@@ -299,8 +300,9 @@ There are two separate withdraw and deposit events instead of a single transfer 
 :::
 
 ## Supporting documentation
-* [Aptos CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md)
-* [TypeScript SDK](../sdks/ts-sdk/index.md)
-* [Python SDK](../sdks/python-sdk.md)
-* [Rust SDK](../sdks/rust-sdk.md)
-* [REST API specification](https://aptos.dev/nodes/aptos-api-spec#/)
+
+- [Aptos CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md)
+- [TypeScript SDK](../sdks/ts-sdk/v1/index.md)
+- [Python SDK](../sdks/python-sdk.md)
+- [Rust SDK](../sdks/rust-sdk.md)
+- [REST API specification](https://aptos.dev/nodes/aptos-api-spec#/)

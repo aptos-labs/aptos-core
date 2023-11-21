@@ -14,4 +14,4 @@ When making a query where one of the query params is an account address (e.g. ow
 
 ### TypeScript Client
 
-The Aptos TypeScript SDK provides an IndexerClient for making queries to the Aptos Indexer API. Learn more [here](/sdks/ts-sdk/typescript-sdk-indexer-client-class).
+The Aptos TypeScript SDK provides an IndexerClient for making queries to the Aptos Indexer API. Learn more [here](/sdks/ts-sdk/v1/typescript-sdk-indexer-client-class).
