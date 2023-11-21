@@ -101,7 +101,7 @@ jobs:
   # Run single node execution performance tests
   single-node-performance:
     needs: file_change_determinator
-    timeout-minutes: 60
+    timeout-minutes: 240
     runs-on: ${{ inputs.RUNNER_NAME }}
     steps:
       - uses: actions/checkout@v3

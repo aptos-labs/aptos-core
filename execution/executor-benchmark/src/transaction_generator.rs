@@ -360,15 +360,22 @@ impl TransactionGenerator {
         {
             let transactions: Vec<_> = chunk
                 .iter()
-                .map(|new_account| {
-                    let txn = self.root_account.sign_with_transaction_builder(
+                .flat_map(|new_account| {
+                    let txn_create = self.root_account.sign_with_transaction_builder(
                         self.transaction_factory
                             .implicitly_create_user_account_and_transfer(
                                 new_account.public_key(),
+                                1,
+                            ),
+                    );
+                    let txn_mint = self.root_account.sign_with_transaction_builder(
+                        self.transaction_factory
+                            .mint(
+                                new_account.address(),
                                 seed_account_balance,
                             ),
                     );
-                    Transaction::UserTransaction(txn)
+                    vec![Transaction::UserTransaction(txn_create), Transaction::UserTransaction(txn_mint)]
                 })
                 .chain(
                     (!BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG.has_any_block_gas_limit())
