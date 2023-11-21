@@ -366,7 +366,8 @@ impl Type {
         use Type::*;
         match self {
             Primitive(p) => p.is_spec(),
-            Fun(..) | TypeDomain(..) | ResourceDomain(..) | Error => true,
+            Fun(args, result) => args.is_spec() || result.is_spec(),
+            TypeDomain(..) | ResourceDomain(..) | Error => true,
             Var(..) | TypeParameter(..) => false,
             Tuple(ts) => ts.iter().any(|t| t.is_spec()),
             Struct(_, _, ts) => ts.iter().any(|t| t.is_spec()),
