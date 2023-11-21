@@ -70,7 +70,9 @@ impl OnChainExecutionConfig {
         OnChainExecutionConfig::V4(ExecutionConfigV4 {
             transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
             block_gas_limit_type: BlockGasLimitType::ComplexLimitV1 {
-                block_gas_limit: 35000,
+                effective_block_gas_limit: 70000,
+                execution_gas_effective_multiplier: 1,
+                io_gas_effective_multiplier: 3,
                 block_output_limit: Some(2 * 1024 * 1024),
                 conflict_penalty_window: 8,
             },
@@ -147,10 +149,21 @@ pub enum TransactionDeduperType {
 pub enum BlockGasLimitType {
     NoLimit,
     Limit(u64),
+    /// Provides two separate block limits:
+    /// 1. effective_block_gas_limit
+    /// 2. block_output_limit
     ComplexLimitV1 {
-        block_gas_limit: u64,
-        block_output_limit: Option<u64>,
+        /// Formula for effective block gas limit:
+        /// effective_block_gas_limit <
+        /// (execution_gas_effective_multiplier * execution_gas_used +
+        ///  io_gas_effective_multiplier * io_gas_used
+        /// ) * conflict_multiplier in conflict_penalty_window
+        effective_block_gas_limit: u64,
+        execution_gas_effective_multiplier: u64,
+        io_gas_effective_multiplier: u64,
         conflict_penalty_window: u32,
+        /// Block output limit
+        block_output_limit: Option<u64>,
     },
 }
 
@@ -160,8 +173,31 @@ impl BlockGasLimitType {
             BlockGasLimitType::NoLimit => None,
             BlockGasLimitType::Limit(limit) => Some(*limit),
             BlockGasLimitType::ComplexLimitV1 {
-                block_gas_limit, ..
-            } => Some(*block_gas_limit),
+                effective_block_gas_limit,
+                ..
+            } => Some(*effective_block_gas_limit),
+        }
+    }
+
+    pub fn execution_gas_effective_multiplier(&self) -> u64 {
+        match self {
+            BlockGasLimitType::NoLimit => 1,
+            BlockGasLimitType::Limit(_) => 1,
+            BlockGasLimitType::ComplexLimitV1 {
+                execution_gas_effective_multiplier,
+                ..
+            } => *execution_gas_effective_multiplier,
+        }
+    }
+
+    pub fn io_gas_effective_multiplier(&self) -> u64 {
+        match self {
+            BlockGasLimitType::NoLimit => 1,
+            BlockGasLimitType::Limit(_) => 1,
+            BlockGasLimitType::ComplexLimitV1 {
+                io_gas_effective_multiplier,
+                ..
+            } => *io_gas_effective_multiplier,
         }
     }
 
@@ -182,7 +218,13 @@ impl BlockGasLimitType {
             BlockGasLimitType::ComplexLimitV1 {
                 conflict_penalty_window,
                 ..
-            } => if *conflict_penalty_window > 1 { Some(*conflict_penalty_window) }  else { None },
+            } => {
+                if *conflict_penalty_window > 1 {
+                    Some(*conflict_penalty_window)
+                } else {
+                    None
+                }
+            },
         }
     }
 }

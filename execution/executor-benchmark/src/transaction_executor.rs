@@ -20,7 +20,9 @@ pub const BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG: BlockExecutorOnchainConfig =
     block_gas_limit_type:
         // present, but large to not limit blocks
         aptos_types::on_chain_config::BlockGasLimitType::ComplexLimitV1 {
-            block_gas_limit: 1_000_000_000,
+            effective_block_gas_limit: 1_000_000_000,
+            execution_gas_effective_multiplier: 1,
+            io_gas_effective_multiplier: 1,
             block_output_limit: Some(1_000_000_000_000),
             conflict_penalty_window: 8,
         },

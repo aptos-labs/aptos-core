@@ -22,13 +22,16 @@ const MAX_GAS_AMOUNT: u64 = 1_000_000;
 const TEST_GAS_PRICE: u64 = 100;
 
 // The block executor onchain config (gas limit parameters) for executor tests
-pub const TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG: BlockExecutorOnchainConfig = BlockExecutorOnchainConfig {
-    block_gas_limit_type: BlockGasLimitType::ComplexLimitV1 {
-        block_gas_limit: 1000,
-        block_output_limit: Some(100_000),
-        conflict_penalty_window: 8,
-    },
-};
+pub const TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG: BlockExecutorOnchainConfig =
+    BlockExecutorOnchainConfig {
+        block_gas_limit_type: BlockGasLimitType::ComplexLimitV1 {
+            effective_block_gas_limit: 1000,
+            execution_gas_effective_multiplier: 1,
+            io_gas_effective_multiplier: 1,
+            block_output_limit: Some(100_000),
+            conflict_penalty_window: 8,
+        },
+    };
 
 static EMPTY_SCRIPT: &[u8] = include_bytes!("empty_script.mv");
 

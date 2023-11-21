@@ -90,7 +90,8 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         let conflict_multiplier = if let Some(conflict_overlap_length) =
             self.block_gas_limit_type.conflict_penalty_window()
         {
-            self.txn_read_write_summaries.push(txn_read_write_summary.unwrap());
+            self.txn_read_write_summaries
+                .push(txn_read_write_summary.unwrap());
             self.compute_conflict_multiplier(conflict_overlap_length as usize)
         } else {
             1
@@ -102,15 +103,17 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         // PER_BLOCK_GAS_LIMIT, early halt BlockSTM. Storage fee does not count towards
         // the per block gas limit, as we measure execution related cost here.
         self.accumulated_effective_block_gas += conflict_multiplier
-            * (fee_statement.execution_gas_used() + fee_statement.io_gas_used());
+            * (fee_statement.execution_gas_used()
+                * self
+                    .block_gas_limit_type
+                    .execution_gas_effective_multiplier()
+                + fee_statement.io_gas_used()
+                    * self.block_gas_limit_type.io_gas_effective_multiplier());
 
         self.accumulated_approx_output_size += approx_output_size.unwrap_or(0);
     }
 
-    fn should_end_block(
-        &self,
-        is_parallel: bool,
-    ) -> bool {
+    fn should_end_block(&self, is_parallel: bool) -> bool {
         let mode = if is_parallel {
             counters::Mode::PARALLEL
         } else {
@@ -130,7 +133,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                     is_parallel, accumulated_block_gas, per_block_gas_limit,
                 );
 
-                return true
+                return true;
             }
         }
 
@@ -146,22 +149,18 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                     is_parallel, accumulated_output, per_block_output_limit,
                 );
 
-                return true
+                return true;
             }
         }
 
         false
     }
 
-    fn should_end_block_parallel(
-        &self,
-    ) -> bool {
+    fn should_end_block_parallel(&self) -> bool {
         self.should_end_block(true)
     }
 
-    fn should_end_block_sequential(
-        &self,
-    ) -> bool {
+    fn should_end_block_sequential(&self) -> bool {
         self.should_end_block(false)
     }
 
@@ -677,11 +676,12 @@ where
                 } else {
                     None
                 };
-                let txn_read_write_summary = if block_gas_limit_type.conflict_penalty_window().is_some() {
-                    Some(Self::get_txn_read_write_summary(txn_idx, last_input_output))
-                } else {
-                    None
-                };
+                let txn_read_write_summary =
+                    if block_gas_limit_type.conflict_penalty_window().is_some() {
+                        Some(Self::get_txn_read_write_summary(txn_idx, last_input_output))
+                    } else {
+                        None
+                    };
 
                 // For committed txns with Success status, calculate the accumulated gas costs.
                 accumulator.accumulate_fee_statement(
@@ -1411,13 +1411,25 @@ where
                     // Calculating the accumulated gas costs of the committed txns.
                     let fee_statement = output.fee_statement();
 
-                    let approx_output_size = if self.config.onchain.block_gas_limit_type.block_output_limit().is_some() {
+                    let approx_output_size = if self
+                        .config
+                        .onchain
+                        .block_gas_limit_type
+                        .block_output_limit()
+                        .is_some()
+                    {
                         Some(output.output_approx_size())
                     } else {
                         None
                     };
 
-                    let read_write_summary = if self.config.onchain.block_gas_limit_type.conflict_penalty_window().is_some() {
+                    let read_write_summary = if self
+                        .config
+                        .onchain
+                        .block_gas_limit_type
+                        .conflict_penalty_window()
+                        .is_some()
+                    {
                         Some(ReadWriteSummary::new(
                             latest_view.take_sequential_reads().get_read_summary(),
                             output.get_write_summary(),
@@ -1425,7 +1437,11 @@ where
                     } else {
                         None
                     };
-                    accumulator.accumulate_fee_statement(fee_statement, read_write_summary, approx_output_size);
+                    accumulator.accumulate_fee_statement(
+                        fee_statement,
+                        read_write_summary,
+                        approx_output_size,
+                    );
 
                     output.materialize_agg_v1(&latest_view);
                     assert_eq!(

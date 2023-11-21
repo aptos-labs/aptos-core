@@ -16,11 +16,11 @@ pub struct ReadWriteSummary<T: Transaction> {
 }
 
 impl<T: Transaction> ReadWriteSummary<T> {
-    pub fn new(reads: HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>>, writes: HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>>) -> Self {
-        Self {
-            reads,
-            writes,
-        }
+    pub fn new(
+        reads: HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>>,
+        writes: HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>>,
+    ) -> Self {
+        Self { reads, writes }
     }
 
     pub fn conflicts_with_previous(&self, previous: &Self) -> bool {
