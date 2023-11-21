@@ -14,10 +14,10 @@ use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     contract_event::ContractEvent,
+    system_txn::SystemTransaction,
     transaction::{SignedTransaction, Transaction, TransactionStatus},
 };
 use std::fmt::{Debug, Display, Formatter};
-use aptos_types::system_txn::SystemTransaction;
 
 /// ExecutedBlocks are managed in a speculative tree, the committed blocks form a chain. Besides
 /// block data, each executed block also has other derived meta data which could be regenerated from

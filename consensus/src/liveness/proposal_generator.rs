@@ -304,35 +304,25 @@ impl ProposalGenerator {
                 .calculate_max_block_sizes(voting_power_ratio, timestamp)
                 .await;
 
-            let sys_txns = if self.should_propose_sys_txns {
-                let pending_sys_txns: HashSet<HashValue> = pending_blocks
+            let pending_sys_txns: HashSet<HashValue> = if self.should_propose_sys_txns {
+                pending_blocks
                     .iter()
                     .filter_map(|block| block.sys_txns())
                     .flatten()
                     .map(SystemTransaction::hash)
-                    .collect();
-
-                // Priority: self.sys_txn_provider[0] > ... > self.sys_txn_provider[-1] > payload.
-                let mut sys_txns = vec![];
-                for provider in self.sys_txn_providers.iter() {
-                    if let Some(txn) = provider.get() {
-                        let txn_size = txn.size_in_bytes() as u64;
-                        if !pending_sys_txns.contains(&txn.hash())
-                            && max_block_txns >= 1
-                            && max_block_bytes >= txn_size
-                        {
-                            sys_txns.push(txn.clone());
-                            max_block_txns -= 1;
-                            max_block_bytes -= txn_size;
-                        } else {
-                            break;
-                        }
-                    }
-                }
-                sys_txns
+                    .collect()
             } else {
-                vec![]
+                HashSet::default()
             };
+
+            // Priority: self.sys_txn_provider[0] > ... > self.sys_txn_provider[-1] > payload.
+            let sys_txns = Self::propose_sys_txns(
+                self.should_propose_sys_txns,
+                self.sys_txn_providers.as_slice(),
+                &mut max_block_txns,
+                &mut max_block_bytes,
+                &pending_sys_txns,
+            );
 
             PROPOSER_DELAY_PROPOSAL.set(proposal_delay.as_secs_f64());
             if !proposal_delay.is_zero() {
@@ -490,5 +480,33 @@ impl ProposalGenerator {
         }
 
         failed_authors
+    }
+
+    fn propose_sys_txns(
+        should_propose_sys_txns: bool,
+        sys_txn_providers: &[Arc<dyn SysTxnProvider>],
+        max_block_txns: &mut u64,
+        max_block_bytes: &mut u64,
+        pending_sys_txns: &HashSet<HashValue>,
+    ) -> Vec<SystemTransaction> {
+        if !should_propose_sys_txns {
+            return vec![];
+        }
+
+        let mut sys_txns = vec![];
+        for provider in sys_txn_providers.iter() {
+            if let Some(txn) = provider.get() {
+                let txn_size = txn.size_in_bytes() as u64;
+                if !pending_sys_txns.contains(&txn.hash())
+                    && *max_block_txns >= 1
+                    && *max_block_bytes >= txn_size
+                {
+                    sys_txns.push(txn.as_ref().clone());
+                    *max_block_txns -= 1;
+                    *max_block_bytes -= txn_size;
+                }
+            }
+        }
+        sys_txns
     }
 }

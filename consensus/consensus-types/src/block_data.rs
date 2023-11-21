@@ -46,6 +46,7 @@ pub enum BlockType {
     /// BlockTree for all epochs.
     Genesis,
 
+    /// Proposal with extensions (e.g. system transactions).
     ProposalExt(ProposalExt),
 
     /// A virtual block that's constructed by nodes from DAG, this is purely a local thing so

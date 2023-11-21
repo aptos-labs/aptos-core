@@ -184,7 +184,7 @@ pub struct RoundManager {
     onchain_config: OnChainConsensusConfig,
     buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
     local_config: ConsensusConfig,
-    sys_txn_enabled: bool,
+    should_propose_sys_txns: bool,
 }
 
 impl RoundManager {
@@ -222,7 +222,7 @@ impl RoundManager {
             onchain_config,
             buffered_proposal_tx,
             local_config,
-            sys_txn_enabled,
+            should_propose_sys_txns: sys_txn_enabled,
         }
     }
 
@@ -637,14 +637,14 @@ impl RoundManager {
             .author()
             .expect("Proposal should be verified having an author");
 
-        if !self.sys_txn_enabled {
-            ensure!(
-                !matches!(
-                    proposal.block_data().block_type(),
-                    BlockType::ProposalExt(_)
-                ),
-                "ProposalExt unexpected while the feature is disabled."
-            );
+        if !self.should_propose_sys_txns
+            && matches!(
+                proposal.block_data().block_type(),
+                BlockType::ProposalExt(_)
+            )
+        {
+            counters::UNEXPECTED_PROPOSAL_EXT_COUNT.inc();
+            bail!("ProposalExt unexpected while the feature is disabled.");
         }
 
         let (num_sys_txns, sys_txns_total_bytes) = {
