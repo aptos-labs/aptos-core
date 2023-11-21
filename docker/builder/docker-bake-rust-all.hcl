@@ -115,11 +115,23 @@ target "tools-builder" {
   ]
 }
 
+target "indexer-builder" {
+  dockerfile = "docker/builder/builder.Dockerfile"
+  target     = "indexer-builder"
+  contexts = {
+    builder-base = "target:builder-base"
+  }
+  secret = [
+    "id=GIT_CREDENTIALS"
+  ]
+}
+
 target "_common" {
   contexts = {
     debian-base   = "target:debian-base"
     node-builder  = "target:aptos-node-builder"
     tools-builder = "target:tools-builder"
+    indexer-builder = "target:indexer-builder"
   }
   labels = {
     "org.label-schema.schema-version" = "1.0",
