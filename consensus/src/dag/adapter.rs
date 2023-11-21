@@ -324,15 +324,8 @@ impl DAGStorage for StorageAdapter {
     }
 
     fn get_latest_k_committed_events(&self, k: u64) -> anyhow::Result<Vec<CommitEvent>> {
-        let latest_db_version = self.aptos_db.get_latest_version().unwrap_or(0);
         let mut commit_events = vec![];
-        for event in self.aptos_db.get_events(
-            &new_block_event_key(),
-            u64::MAX,
-            Order::Descending,
-            k,
-            latest_db_version,
-        )? {
+        for event in self.aptos_db.get_latest_block_events(k as usize)? {
             let new_block_event = bcs::from_bytes::<NewBlockEvent>(event.event.event_data())?;
             if self
                 .epoch_to_validators
