@@ -1,12 +1,12 @@
 
 Diagnostics:
-error: constraint `<some struct>{f: ?1}` incompatible with `integer`
+error: struct incompatible with integer
   ┌─ tests/checking/typing/borrow_field_from_non_struct.move:6:10
   │
 6 │         &0.f;
   │          ^
 
-error: constraint `<some struct>{g: ?5}` incompatible with `integer`
+error: struct incompatible with integer
   ┌─ tests/checking/typing/borrow_field_from_non_struct.move:7:10
   │
 7 │         &0.g;

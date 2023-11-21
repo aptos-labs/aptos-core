@@ -196,17 +196,13 @@ impl Constraint {
             Constraint::SomeReference(ty) => {
                 format!("&{}", ty.display(display_context))
             },
-            Constraint::SomeStruct(fields) => {
+            Constraint::SomeStruct(field_map) => {
                 format!(
-                    "<some struct>{{{}}}",
-                    fields
-                        .iter()
-                        .map(|(n, ty)| format!(
-                            "{}: {}",
-                            n.display(display_context.env.symbol_pool()),
-                            ty.display(display_context)
-                        ))
-                        .join(", ")
+                    "struct{{{}}}",
+                    field_map
+                        .keys()
+                        .map(|s| s.display(display_context.env.symbol_pool()).to_string())
+                        .join(",")
                 )
             },
             Constraint::WithDefault(_ty) => "".to_owned(),
@@ -934,12 +930,11 @@ impl Substitution {
         let mut current = self.constraints.remove(&var).unwrap_or_default();
         let mut absorbed = false;
         for (_, o, c) in current.iter_mut() {
-            // If the orders are compatible, try to join constraints
-            if *o == order {
-                absorbed = c.join(context, self, &loc, &ctr)?;
-                if absorbed {
-                    break;
-                }
+            // Join constraints. If join returns true and the orders are the same, the
+            // constraint is absorbed.
+            absorbed = c.join(context, self, &loc, &ctr)? && *o == order;
+            if absorbed {
+                break;
             }
         }
         if !absorbed {
@@ -1014,7 +1009,7 @@ impl Substitution {
             // Transfer constraint on to other variable, which we assert to be free
             debug_assert!(!self.subs.contains_key(other_var));
             self.add_constraint(context, *other_var, loc.clone(), order, c)
-        } else if c.propagate_over_reference() && matches!(ty, Type::Reference(..)) {
+        } else if c.propagate_over_reference() && ty.is_reference() {
             // Propagate constraint to referred type
             self.eval_constraint(context, loc, ty.skip_reference(), order, c)
         } else {
@@ -1032,21 +1027,16 @@ impl Substitution {
                     _ => constraint_unsatisfied_error(),
                 },
                 Constraint::SomeReference(inner_type) => match ty {
-                    Type::Reference(_, target_type) => {
-                        match self.unify(
+                    Type::Reference(_, target_type) => self
+                        .unify(
                             context,
                             Variance::NoVariance,
                             order,
                             target_type,
                             inner_type,
-                        ) {
-                            Ok(_) => Ok(()),
-                            Err(e) => Err(TypeUnificationError::RedirectedError(
-                                loc.clone(),
-                                Box::new(e),
-                            )),
-                        }
-                    },
+                        )
+                        .map(|_| ())
+                        .map_err(|e| e.redirect(loc.clone())),
                     _ => constraint_unsatisfied_error(),
                 },
                 Constraint::SomeStruct(constr_field_map) => {
@@ -1057,19 +1047,15 @@ impl Substitution {
                         // type.
                         for (field_name, field_ty) in constr_field_map {
                             if let Some(declared_field_type) = field_map.get(field_name) {
-                                match self.unify(
+                                self.unify(
                                     context,
                                     Variance::NoVariance,
                                     WideningOrder::RightToLeft,
-                                    &field_ty,
-                                    &declared_field_type,
-                                ) {
-                                    Ok(_) => Ok(()),
-                                    Err(e) => Err(TypeUnificationError::RedirectedError(
-                                        loc.clone(),
-                                        Box::new(e),
-                                    )),
-                                }?
+                                    field_ty,
+                                    declared_field_type,
+                                )
+                                .map(|_| ())
+                                .map_err(|e| e.redirect(loc.clone()))?
                             } else {
                                 return constraint_unsatisfied_error();
                             }
@@ -1579,6 +1565,10 @@ impl TypeUnificationAdapter {
 }
 
 impl TypeUnificationError {
+    pub fn redirect(self, loc: Loc) -> Self {
+        Self::RedirectedError(loc, Box::new(self))
+    }
+
     /// If this error is associated with a specific location, return this.
     pub fn specific_loc(&self) -> Option<Loc> {
         match self {
@@ -1672,8 +1662,18 @@ impl TypeUnificationError {
                         }
                     } else {
                         format!(
-                            "expected a struct with {} but found `{}`",
-                            Self::print_fields(display_context.env, field_map.keys().cloned()),
+                            "expected a struct{} but found `{}`",
+                            if field_map.is_empty() {
+                                "".to_owned()
+                            } else {
+                                format!(
+                                    " with {}",
+                                    Self::print_fields(
+                                        display_context.env,
+                                        field_map.keys().cloned()
+                                    )
+                                )
+                            },
                             ty.display(display_context)
                         )
                     }
@@ -1681,11 +1681,20 @@ impl TypeUnificationError {
                 Constraint::WithDefault(_) => unreachable!("default constraint in error message"),
             },
             TypeUnificationError::ConstraintsIncompatible(_, c1, c2) => {
-                format!(
-                    "constraint `{}` incompatible with `{}`",
-                    c1.display(display_context),
-                    c2.display(display_context)
-                )
+                use Constraint::*;
+                // Abstract details of gross incompatibilities
+                match (c1, c2) {
+                    (SomeStruct(..), SomeNumber(..)) | (SomeNumber(..), SomeStruct(..)) => {
+                        "struct incompatible with integer".to_owned()
+                    },
+                    _ => {
+                        format!(
+                            "constraint `{}` incompatible with `{}`",
+                            c1.display(display_context),
+                            c2.display(display_context)
+                        )
+                    },
+                }
             },
             TypeUnificationError::RedirectedError(_, err) => {
                 err.message(unification_context, display_context)
@@ -1991,41 +2000,15 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                 } else if let Some(ctrs) =
                     self.context.subs_opt.and_then(|s| s.constraints.get(idx))
                 {
-                    let mut out = "".to_owned();
-                    for (_, _, c) in ctrs {
-                        // We assume no inconsistent constraints, so break on the first one
-                        match c {
-                            Constraint::SomeNumber(_) => {
-                                out = "integer".to_owned();
-                                break;
-                            },
-                            Constraint::SomeReference(ty) => {
-                                out = format!("&_{}", ty.display(self.context));
-                                break;
-                            },
-                            Constraint::SomeStruct(field_map) => {
-                                out = format!(
-                                    "<some-struct>{{{}}}",
-                                    field_map
-                                        .iter()
-                                        .map(|(n, ty)| format!(
-                                            "{}: {}",
-                                            n.display(self.context.env.symbol_pool()),
-                                            ty.display(self.context)
-                                        ))
-                                        .join(",")
-                                );
-                                break;
-                            },
-                            Constraint::WithDefault(ty) => {
-                                out = format!("{}/*default*/", ty.display(self.context))
-                            },
-                        }
+                    if ctrs.is_empty() {
+                        write!(f, "?{}", idx)
+                    } else {
+                        let out = ctrs
+                            .iter()
+                            .map(|(_, _, c)| c.display(self.context).to_string())
+                            .join(" & ");
+                        f.write_str(&out)
                     }
-                    if out.is_empty() {
-                        out = format!("?{}", idx)
-                    }
-                    f.write_str(&out)
                 } else {
                     write!(f, "?{}", idx)
                 }

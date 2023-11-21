@@ -2673,9 +2673,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     | Operation::MoveFrom
                     | Operation::MoveTo => {
                         // The instantiation must be a struct
+                        let inst = self.subs.specialize(&instantiation[0]);
                         self.add_constraint_and_report(
                             loc,
-                            &instantiation[0],
+                            &inst,
                             Constraint::SomeStruct(BTreeMap::new()),
                         );
                     },

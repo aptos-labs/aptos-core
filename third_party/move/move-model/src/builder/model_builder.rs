@@ -372,8 +372,8 @@ impl<'env> ModelBuilder<'env> {
     /// Get all the structs which have been build so far.
     pub fn get_struct_ids(&self) -> impl Iterator<Item = QualifiedId<StructId>> + '_ {
         self.struct_table
-            .iter()
-            .map(|(_, e)| e.module_id.qualified(e.struct_id))
+            .values()
+            .map(|e| e.module_id.qualified(e.struct_id))
     }
 
     /// Looks up the StructEntry for a qualified id.
