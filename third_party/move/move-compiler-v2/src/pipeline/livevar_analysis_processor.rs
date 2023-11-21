@@ -5,7 +5,7 @@
 //! Implements a live-variable analysis processor, annotating lifetime information about locals.
 //! See also https://en.wikipedia.org/wiki/Live-variable_analysis
 //!
-//! After transformation, this also also runs copy inference transformation, which inserts
+//! After transformation, this also runs copy inference transformation, which inserts
 //! copies as needed, and reports errors for invalid copies.
 
 use codespan_reporting::diagnostic::Severity;
@@ -301,7 +301,7 @@ impl<'a> CopyTransformation<'a> {
     }
 
     /// Checks whether an implicit copy is needed because the value is used afterwards.
-    /// This produces an error if copie is not allowed.
+    /// This produces an error if copy is not allowed.
     fn check_implicit_copy(
         &self,
         alive: &LiveVarInfoAtCodeOffset,

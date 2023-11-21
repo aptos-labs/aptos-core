@@ -212,9 +212,7 @@ impl<'env> FunctionTarget<'env> {
         if let Some(name) = self.data.local_names.get(&idx) {
             *name
         } else {
-            self.func_env
-                .get_local_name(idx)
-                .expect("should never happen")
+            self.func_env.get_local_name(idx)
         }
     }
 

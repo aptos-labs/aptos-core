@@ -278,7 +278,13 @@ impl<'env> Generator<'env> {
                 return *idx;
             }
         }
-        self.internal_error(id, "local not defined");
+        self.internal_error(
+            id,
+            format!(
+                "local `{}` not defined",
+                sym.display(self.env().symbol_pool())
+            ),
+        );
         0
     }
 
