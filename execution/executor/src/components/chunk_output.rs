@@ -251,6 +251,12 @@ pub fn update_counters_for_processed_chunk(
     }
 
     for (txn, output) in transactions.iter().zip(transaction_outputs.iter()) {
+        if detailed_counters {
+            if let Ok(size) = bcs::serialized_size(output) {
+                metrics::APTOS_PROCESSED_TXNS_OUTPUT_SIZE.observe(size as f64);
+            }
+        }
+
         let (state, reason, error_code) = match output.status() {
             TransactionStatus::Keep(execution_status) => match execution_status {
                 ExecutionStatus::Success => ("keep_success", "", "".to_string()),
