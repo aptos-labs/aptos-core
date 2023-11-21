@@ -1,6 +1,7 @@
 ---
 ignore:
   - "testsuite"
+  - "**/*.md"
 
 coverage:
   # range for color spectrum display, red=50%, green=80%
