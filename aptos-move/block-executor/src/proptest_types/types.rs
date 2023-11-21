@@ -1135,6 +1135,11 @@ where
         )
     }
 
+    fn output_approx_size(&self) -> u64 {
+        // TODO add block output limit testing
+        0
+    }
+
     fn get_write_summary(
         &self,
     ) -> HashSet<

@@ -69,9 +69,10 @@ impl OnChainExecutionConfig {
     pub fn default_for_genesis() -> Self {
         OnChainExecutionConfig::V4(ExecutionConfigV4 {
             transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
-            block_gas_limit_type: BlockGasLimitType::LimitWithConflictAware {
+            block_gas_limit_type: BlockGasLimitType::ComplexLimitV1 {
                 block_gas_limit: 35000,
-                conflict_overlap_window: 8,
+                block_output_limit: Some(2 * 1024 * 1024),
+                conflict_penalty_window: 8,
             },
             transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
         })
@@ -146,9 +147,10 @@ pub enum TransactionDeduperType {
 pub enum BlockGasLimitType {
     NoLimit,
     Limit(u64),
-    LimitWithConflictAware {
+    ComplexLimitV1 {
         block_gas_limit: u64,
-        conflict_overlap_window: u32,
+        block_output_limit: Option<u64>,
+        conflict_penalty_window: u32,
     },
 }
 
@@ -157,20 +159,30 @@ impl BlockGasLimitType {
         match self {
             BlockGasLimitType::NoLimit => None,
             BlockGasLimitType::Limit(limit) => Some(*limit),
-            BlockGasLimitType::LimitWithConflictAware {
+            BlockGasLimitType::ComplexLimitV1 {
                 block_gas_limit, ..
             } => Some(*block_gas_limit),
         }
     }
 
-    pub fn conflict_overlap_window(&self) -> Option<u32> {
+    pub fn block_output_limit(&self) -> Option<u64> {
         match self {
             BlockGasLimitType::NoLimit => None,
             BlockGasLimitType::Limit(_) => None,
-            BlockGasLimitType::LimitWithConflictAware {
-                conflict_overlap_window,
+            BlockGasLimitType::ComplexLimitV1 {
+                block_output_limit, ..
+            } => *block_output_limit,
+        }
+    }
+
+    pub fn conflict_penalty_window(&self) -> Option<u32> {
+        match self {
+            BlockGasLimitType::NoLimit => None,
+            BlockGasLimitType::Limit(_) => None,
+            BlockGasLimitType::ComplexLimitV1 {
+                conflict_penalty_window,
                 ..
-            } => Some(*conflict_overlap_window),
+            } => if *conflict_penalty_window > 1 { Some(*conflict_penalty_window) }  else { None },
         }
     }
 }

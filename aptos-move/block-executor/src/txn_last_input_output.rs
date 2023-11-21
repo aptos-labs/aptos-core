@@ -179,6 +179,19 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         }
     }
 
+    pub(crate) fn output_approx_size(&self, txn_idx: TxnIndex) -> Option<u64> {
+        match &self.outputs[txn_idx as usize]
+            .load_full()
+            .expect("[BlockSTM]: Execution output must be recorded after execution")
+            .output_status
+        {
+            ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
+                Some(output.output_approx_size())
+            },
+            _ => None,
+        }
+    }
+
     /// Does a transaction at txn_idx have SkipRest or Abort status.
     pub(crate) fn block_skips_rest_at_idx(&self, txn_idx: TxnIndex) -> bool {
         matches!(

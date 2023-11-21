@@ -200,6 +200,10 @@ where
                     executed
                 );
                 info!(
+                    "Overall execution approx_output: {} bytes/s",
+                    delta_gas.approx_block_output / elapsed
+                );
+                info!(
                     "Overall execution output: {} bytes/s",
                     delta_output_size as f64 / elapsed
                 );

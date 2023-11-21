@@ -514,9 +514,10 @@ impl FakeExecutor {
 
         let onchain_config = BlockExecutorOnchainConfig {
             // TODO fetch values from state?
-            block_gas_limit_type: BlockGasLimitType::LimitWithConflictAware {
+            block_gas_limit_type: BlockGasLimitType::ComplexLimitV1 {
                 block_gas_limit: 30000,
-                conflict_overlap_window: 4,
+                conflict_penalty_window: 4,
+                block_output_limit: Some(1_000_000),
             },
         };
 

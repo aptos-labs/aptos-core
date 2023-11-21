@@ -90,18 +90,10 @@ impl VMOutput {
             return Ok(());
         }
 
-        // let (change_set, fee_statement, status) = self.unpack_with_fee_statement();
         self.change_set
             .try_materialize_aggregator_v1_delta_set(resolver)?;
 
         Ok(())
-        // *self.fee_statement = fee_statement;
-        // *self.status = status;
-        // Ok(VMOutput::new(
-        //     materialized_change_set,
-        //     fee_statement,
-        //     status,
-        // ))
     }
 
     /// Same as `try_materialize` but also constructs `TransactionOutput`.

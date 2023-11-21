@@ -282,6 +282,10 @@ pub fn run_benchmark<V>(
         delta_gas.gas / (delta_gas.gas_count as f64).max(1.0)
     );
     info!(
+        "Overall approx_output: {} bytes/s",
+        delta_gas.approx_block_output / elapsed
+    );
+    info!(
         "Overall output: {} bytes/s",
         delta_output_size as f64 / elapsed
     );
@@ -515,6 +519,8 @@ struct GasMeasurement {
     pub io_gas: f64,
     pub execution_gas: f64,
 
+    pub approx_block_output: f64,
+
     pub gas_count: u64,
 }
 
@@ -547,11 +553,19 @@ impl GasMeasurement {
                 .with_label_values(&[block_executor_counters::Mode::PARALLEL])
                 .get_sample_sum();
 
+        let approx_block_output = block_executor_counters::APPROX_BLOCK_OUTPUT_SIZE
+            .with_label_values(&[block_executor_counters::Mode::SEQUENTIAL])
+            .get_sample_sum()
+            + block_executor_counters::APPROX_BLOCK_OUTPUT_SIZE
+                .with_label_values(&[block_executor_counters::Mode::PARALLEL])
+                .get_sample_sum();
+
         Self {
             gas,
             effective_block_gas,
             io_gas,
             execution_gas,
+            approx_block_output,
             gas_count,
         }
     }
@@ -576,6 +590,7 @@ impl GasMeasuring {
             effective_block_gas: end.effective_block_gas - self.start.effective_block_gas,
             io_gas: end.io_gas - self.start.io_gas,
             execution_gas: end.execution_gas - self.start.execution_gas,
+            approx_block_output: end.approx_block_output - self.start.approx_block_output,
             gas_count: end.gas_count - self.start.gas_count,
         }
     }

@@ -309,6 +309,27 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .fee_statement()
     }
 
+    fn output_approx_size(&self) -> u64 {
+        let vm_output = self.vm_output.lock();
+        let change_set = vm_output
+            .as_ref()
+            .expect("Output to be set to get write summary")
+            .change_set();
+
+        let mut size = 0;
+        for (state_key, write) in change_set.write_set_iter() {
+            size += state_key.size() as u64 + write.bytes().map_or(0, |b| b.len() as u64);
+        }
+
+        for (event, _) in change_set.events() {
+            size += event.size() as u64;
+        }
+
+        // TODO[agg_v2](fix) - compute the size of resource groups and reads with exchange
+
+        size
+    }
+
     fn get_write_summary(
         &self,
     ) -> HashSet<

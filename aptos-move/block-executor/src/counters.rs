@@ -54,6 +54,16 @@ pub static EXCEED_PER_BLOCK_GAS_LIMIT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| 
     .unwrap()
 });
 
+/// Count of times the BlockSTM is early halted due to exceeding the per-block output size limit.
+pub static EXCEED_PER_BLOCK_OUTPUT_LIMIT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_execution_output_limit_count",
+        "Count of times the BlockSTM is early halted due to exceeding the per-block output size limit",
+        &["mode"]
+    )
+    .unwrap()
+});
+
 pub static PARALLEL_EXECUTION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
@@ -148,6 +158,15 @@ pub static EFFECTIVE_BLOCK_GAS: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static APPROX_BLOCK_OUTPUT_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_execution_approx_block_output_size",
+        "Historgram for different approx block output sizes - used for evaluting block ouptut limit.",
+        &["mode"]
+    )
+    .unwrap()
+});
+
 pub static TXN_GAS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_execution_txn_gas",
@@ -196,6 +215,7 @@ fn observe_gas(counter: &Lazy<HistogramVec>, mode_str: &str, fee_statement: &Fee
 pub(crate) fn update_block_gas_counters(
     accumulated_fee_statement: &FeeStatement,
     accumulated_effective_gas: u64,
+    accumulated_approx_output_size: u64,
     num_committed: usize,
     is_parallel: bool,
 ) {
@@ -213,6 +233,10 @@ pub(crate) fn update_block_gas_counters(
     EFFECTIVE_BLOCK_GAS
         .with_label_values(&[mode_str])
         .observe(accumulated_effective_gas as f64);
+
+    APPROX_BLOCK_OUTPUT_SIZE
+        .with_label_values(&[mode_str])
+        .observe(accumulated_approx_output_size as f64);
 }
 
 pub(crate) fn update_txn_gas_counters(txn_fee_statements: &Vec<FeeStatement>, is_parallel: bool) {

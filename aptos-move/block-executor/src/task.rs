@@ -192,6 +192,8 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// Return the fee statement of the transaction.
     fn fee_statement(&self) -> FeeStatement;
 
+    fn output_approx_size(&self) -> u64;
+
     fn get_write_summary(
         &self,
     ) -> HashSet<

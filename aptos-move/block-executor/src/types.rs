@@ -11,11 +11,18 @@ pub enum InputOutputKey<K, T, I> {
 }
 
 pub struct ReadWriteSummary<T: Transaction> {
-    pub reads: HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>>,
-    pub writes: HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>>,
+    reads: HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>>,
+    writes: HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>>,
 }
 
 impl<T: Transaction> ReadWriteSummary<T> {
+    pub fn new(reads: HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>>, writes: HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>>) -> Self {
+        Self {
+            reads,
+            writes,
+        }
+    }
+
     pub fn conflicts_with_previous(&self, previous: &Self) -> bool {
         !self.reads.is_disjoint(&previous.writes)
     }
