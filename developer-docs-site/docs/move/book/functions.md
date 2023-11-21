@@ -521,10 +521,10 @@ fun foo() { return () }
 
 ## Inline Functions
 
-Inline functions are functions whose bodies are expanded in-place at the caller location during compile time.
-Thus, inline functions do not appear in Move bytecode as a separate function: all calls to them are expanded away by the compiler.
-They allow to save gas and may lead to faster execution.
-However, users should be aware that they could lead to larger bytecode size.
+Inline functions are functions whose bodies are expanded in place at the caller location during compile time.
+Thus, inline functions do not appear in Move bytecode as a separate functions: all calls to them are expanded away by the compiler.
+In certain circumstances, they may lead to faster execution and save gas.
+However, users should be aware that they could lead to larger bytecode size: excessive inlining potentially triggers various size restrictions.
 
 One can define an inline function by adding the `inline` keyword to a function declaration as shown below:
 
@@ -543,6 +543,7 @@ Similar to inline functions, lambda expressions are also expanded at call site.
 A lambda expression includes a list of parameter names (enclosed within `||`) followed by the body.
 Some simple examples are: `|x| x + 1`, `|x, y| x + y`, `|| 1`, `|| { 1 }`.
 A lambda's body can refer to variables available in the scope where the lambda is defined: this is also known as capturing.
+Such variables can be read or written (if mutable) by the lambda expression; since a lambda expression currently can only occur as a direct argument to a call to an inline function, there are no complicated scoping issues as in some other languages.
 The type of a function parameter is written as `|<list of parameter types>| <return type>`.
 For example, when the function parameter type is `|u64, u64| bool`, any lambda expression that takes two `u64` parameters and returns a `bool` value can be provided as the argument.
 
@@ -564,11 +565,13 @@ public inline fun fold<Accumulator, Element>(
 ```
 
 The type signature of the elided public inline function `for_each` is `fun for_each<Element>(v: vector<Element>, f: |Element|)`.
-It's second parameter `f` is a function parameter which accepts any lambda expression that consumes an `Element` and returns nothing.
+Its second parameter `f` is a function parameter which accepts any lambda expression that consumes an `Element` and returns nothing.
 In the code example, we use the lambda expression `|elem| accu = f(accu, elem)` as an argument to this function parameter.
 Note that this lambda expression captures the variable `accu` from the outer scope.
 
 ### Current restrictions
+
+There are plans to loosen some of these restrictions in the future, but for now,
 
 - Only inline functions can have function parameters.
 - Only explicit lambda expressions can be passed as an argument to an inline function's function parameters.
