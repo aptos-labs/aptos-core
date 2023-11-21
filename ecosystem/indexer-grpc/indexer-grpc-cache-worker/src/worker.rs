@@ -17,7 +17,7 @@ use aptos_indexer_grpc_utils::{
     file_store_operator::{
         FileStoreMetadata, FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator,
     },
-    time_diff_since_pb_timestamp_in_secs, timestamp_to_unixtime,
+    time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime,
     types::RedisUrl,
 };
 use aptos_moving_average::MovingAverage;
@@ -80,7 +80,7 @@ impl Worker {
         let redis_client = redis::Client::open(redis_main_instance_address.0.clone())
             .with_context(|| {
                 format!(
-                    "Failed to create redis client for {}",
+                    "[Indexer Cache] Failed to create redis client for {}",
                     redis_main_instance_address
                 )
             })?;
@@ -165,6 +165,7 @@ async fn process_transactions_from_node_response(
     response: TransactionsFromNodeResponse,
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
 ) -> Result<GrpcDataStatus> {
+    let size_in_bytes = response.encoded_len();
     match response.response.unwrap() {
         Response::Status(status) => {
             match StatusType::try_from(status.r#type).expect("[Indexer Cache] Invalid status type.")
@@ -186,6 +187,7 @@ async fn process_transactions_from_node_response(
             }
         },
         Response::Data(data) => {
+            let starting_time = std::time::Instant::now();
             let transaction_len = data.transactions.len();
             let first_transaction = data
                 .transactions
@@ -196,9 +198,11 @@ async fn process_transactions_from_node_response(
                 .last()
                 .context("There were unexpectedly no transactions in the response")?;
             let start_version = first_transaction.version;
+            let first_transaction_pb_timestamp = first_transaction.timestamp.clone();
             let last_transaction_pb_timestamp = last_transaction.timestamp.clone();
             let transactions = data
                 .transactions
+                .clone()
                 .into_iter()
                 .map(|tx| {
                     let timestamp_in_seconds = match tx.timestamp {
@@ -215,7 +219,28 @@ async fn process_transactions_from_node_response(
 
             // Push to cache.
             match cache_operator.update_cache_transactions(transactions).await {
-                Ok(_) => {},
+                Ok(_) => {
+                    info!(
+                        start_version = first_transaction.version,
+                        end_version = last_transaction.version,
+                        start_txn_timestamp_iso = first_transaction_pb_timestamp
+                            .clone()
+                            .map(|txn_time| timestamp_to_iso(&txn_time))
+                            .unwrap_or_default(),
+                        end_txn_timestamp_iso = last_transaction_pb_timestamp
+                            .clone()
+                            .map(|txn_time| timestamp_to_iso(&txn_time))
+                            .unwrap_or_default(),
+                        num_of_transactions =
+                            last_transaction.version - first_transaction.version + 1,
+                        size_in_bytes,
+                        duration_in_secs = starting_time.elapsed().as_secs_f64(),
+                        service_type = SERVICE_TYPE,
+                        step = IndexerGrpcStep::CacheWorkerTxnsProcessed.get_step(),
+                        "{}",
+                        IndexerGrpcStep::CacheWorkerTxnsProcessed.get_label(),
+                    );
+                },
                 Err(e) => {
                     ERROR_COUNT
                         .with_label_values(&["failed_to_update_cache_version"])
@@ -250,20 +275,24 @@ async fn setup_cache_with_init_signal(
     ChainID,
     StartingVersion,
 )> {
-    let (fullnode_chain_id, starting_version) =
-        match init_signal.response.expect("Response type does not exist.") {
-            Response::Status(status_frame) => {
-                match StatusType::try_from(status_frame.r#type).expect("Invalid status type.") {
-                    StatusType::Init => (init_signal.chain_id, status_frame.start_version),
-                    _ => {
-                        bail!("[Indexer Cache] Streaming error: first frame is not INIT signal.");
-                    },
-                }
-            },
-            _ => {
-                bail!("[Indexer Cache] Streaming error: first frame is not siganl frame.");
-            },
-        };
+    let (fullnode_chain_id, starting_version) = match init_signal
+        .response
+        .expect("[Indexer Cache] Response type does not exist.")
+    {
+        Response::Status(status_frame) => {
+            match StatusType::try_from(status_frame.r#type)
+                .expect("[Indexer Cache] Invalid status type.")
+            {
+                StatusType::Init => (init_signal.chain_id, status_frame.start_version),
+                _ => {
+                    bail!("[Indexer Cache] Streaming error: first frame is not INIT signal.");
+                },
+            }
+        },
+        _ => {
+            bail!("[Indexer Cache] Streaming error: first frame is not siganl frame.");
+        },
+    };
 
     let mut cache_operator = CacheOperator::new(conn);
     cache_operator.cache_setup_if_needed().await?;
@@ -295,7 +324,7 @@ async fn process_streaming_response(
     let (mut cache_operator, fullnode_chain_id, starting_version) =
         setup_cache_with_init_signal(conn, init_signal)
             .await
-            .context("Failed to setup cache")?;
+            .context("[Indexer Cache] Failed to setup cache")?;
     // It's required to start the worker with the same version as file store.
     if let Some(file_store_metadata) = file_store_metadata {
         if file_store_metadata.version != starting_version {
@@ -313,7 +342,10 @@ async fn process_streaming_response(
         let received: TransactionsFromNodeResponse = match received {
             Ok(r) => r,
             Err(err) => {
-                error!("[Indexer Cache] Streaming error: {}", err);
+                error!(
+                    service_type = SERVICE_TYPE,
+                    "[Indexer Cache] Streaming error: {}", err
+                );
                 ERROR_COUNT.with_label_values(&["streaming_error"]).inc();
                 break;
             },
@@ -379,10 +411,16 @@ async fn process_streaming_response(
                         .context("Failed to update the latest version in the cache")?;
                     transaction_count = 0;
                     info!(
-                        current_version = current_version,
+                        start_version = start_version,
+                        end_version = start_version + num_of_transactions - 1,
+                        num_of_transactions,
+                        size_in_bytes,
                         chain_id = fullnode_chain_id,
-                        tps = (tps_calculator.avg() * 1000.0) as u64,
-                        "[Indexer Cache] Successfully process current batch."
+                        duration_in_secs = starting_time.elapsed().as_secs_f64(),
+                        service_type = SERVICE_TYPE,
+                        step = IndexerGrpcStep::CacheWorkerBatchProcessed.get_step(),
+                        "{}",
+                        IndexerGrpcStep::CacheWorkerBatchProcessed.get_label(),
                     );
                     LATEST_PROCESSED_VERSION
                         .with_label_values(&[
@@ -417,6 +455,9 @@ async fn process_streaming_response(
             },
             Err(e) => {
                 error!(
+                    start_version = current_version,
+                    chain_id = fullnode_chain_id,
+                    service_type = SERVICE_TYPE,
                     "[Indexer Cache] Process transactions from fullnode failed: {}",
                     e
                 );
