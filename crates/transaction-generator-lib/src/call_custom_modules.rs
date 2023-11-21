@@ -202,7 +202,7 @@ impl CustomModulesDelegationGeneratorCreator {
         package_name: &str,
         publisher_balance: Option<u64>,
     ) -> Vec<(Package, LocalAccount)> {
-        let mut rng = StdRng::from_entropy();
+        let mut rng = StdRng::from_seed([83u8; 32]); // StdRng::from_entropy(); //
         let mut requests_create = Vec::with_capacity(num_modules);
         let mut requests_publish = Vec::with_capacity(num_modules);
         let mut package_handler = PackageHandler::new(package_name);
@@ -219,6 +219,9 @@ impl CustomModulesDelegationGeneratorCreator {
         for _i in 0..num_modules {
             let publisher = LocalAccount::generate(&mut rng);
             let publisher_address = publisher.address();
+            if let Ok(seq_num) = txn_executor.query_sequence_number(publisher_address).await {
+                publisher.set_sequence_number(seq_num);
+            };
             requests_create.push(create_account_transaction(
                 root_account.get_root_account(),
                 publisher_address,

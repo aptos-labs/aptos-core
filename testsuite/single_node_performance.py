@@ -32,6 +32,8 @@ class Flow(Flag):
     # Test resource groups
     RESOURCE_GROUPS = auto()
 
+    TOURNAMENT = auto()
+
 
 # Tests that are run on LAND_BLOCKING and continuously on main
 LAND_BLOCKING_AND_C = Flow.LAND_BLOCKING | Flow.CONTINUOUS
@@ -86,6 +88,8 @@ MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 # https://app.axiom.co/aptoslabs-hghf/explorer?qid=29zYzeVi7FX-s4ukl5&relative=1
 # fmt: off
 TESTS = [
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("tournament10k-by1k"), included_in=Flow.TOURNAMENT),
+
     RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=11500, key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
