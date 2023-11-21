@@ -147,7 +147,7 @@ impl NodeBroadcastHandler {
         let ordered_round = highest_ordered_anchor.round();
         let commit_round = highest_commit_li.ledger_info().round();
 
-        let pending_rounds = ordered_round.checked_sub(commit_round).unwrap();
+        let pending_rounds = ordered_round.checked_sub(commit_round).unwrap_or_default();
 
         let ordered_timestamp = Duration::from_micros(highest_ordered_anchor.timestamp());
         let committed_timestamp =
@@ -158,7 +158,7 @@ impl NodeBroadcastHandler {
                 // latency not known without non-genesis blocks
                 Duration::ZERO
             } else {
-                proposal_timestamp.checked_sub(timestamp).unwrap()
+                proposal_timestamp.checked_sub(timestamp).unwrap_or_default()
             }
         }
 
