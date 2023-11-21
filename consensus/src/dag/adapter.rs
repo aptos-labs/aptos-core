@@ -24,9 +24,9 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::StateComputeResult;
 use aptos_infallible::RwLock;
 use aptos_logger::error;
-use aptos_storage_interface::{DbReader, Order};
+use aptos_storage_interface::DbReader;
 use aptos_types::{
-    account_config::{new_block_event_key, NewBlockEvent},
+    account_config::NewBlockEvent,
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     epoch_change::EpochChangeProof,
