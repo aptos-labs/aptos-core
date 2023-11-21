@@ -97,7 +97,7 @@ pub struct NetworkController {
     inbound_handler: Arc<Mutex<InboundHandler>>,
     outbound_handler: OutboundHandler,
     inbound_rpc_runtime: Runtime,
-    outbound_rpc_runtime: Runtime,
+    outbound_rpc_runtime: Arc<Runtime>,
     inbound_server_shutdown_tx: Option<oneshot::Sender<()>>,
     outbound_task_shutdown_tx: Option<Sender<Message>>,
     listen_addr: SocketAddr,
@@ -116,12 +116,16 @@ impl NetworkController {
             inbound_handler,
             outbound_handler,
             inbound_rpc_runtime: runtime::Builder::new_multi_thread().enable_all().thread_name("inbound_rpc").build().unwrap(),
-            outbound_rpc_runtime: runtime::Builder::new_multi_thread().enable_all().thread_name("outbound_rpc").build().unwrap(),
+            outbound_rpc_runtime: Arc::new(runtime::Builder::new_multi_thread().enable_all().thread_name("outbound_rpc").build().unwrap()),
             // we initialize the shutdown handles when we start the network controller
             inbound_server_shutdown_tx: None,
             outbound_task_shutdown_tx: None,
             listen_addr,
         }
+    }
+
+    pub fn get_outbound_rpc_runtime(&self) -> Arc<Runtime> {
+        self.outbound_rpc_runtime.clone()
     }
 
     pub fn get_self_addr(&self) -> SocketAddr {

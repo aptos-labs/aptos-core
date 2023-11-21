@@ -64,7 +64,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                 //controller.create_outbound_channel(*address, kv_response_type.to_string())
                 let mut command_tx = vec![];
                 for _ in 0..num_kv_req_threads {
-                    command_tx.push(Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), *address)));
+                    command_tx.push(Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), *address, controller.get_outbound_rpc_runtime())));
                 }
                 command_tx
             })
