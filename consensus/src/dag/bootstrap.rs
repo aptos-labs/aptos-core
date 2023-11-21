@@ -140,10 +140,10 @@ impl ActiveMode {
         let handle = tokio::spawn(self.fetch_service.start());
         defer!({
             // Signal and stop the fetch service
-            debug!("aborting fetch service");
+            info!("aborting fetch service");
             handle.abort();
             let _ = block_in_place(move || Handle::current().block_on(handle));
-            debug!("aborting fetch service complete");
+            info!("aborting fetch service complete");
         });
 
         // Run the network handler until it returns with state sync status.
@@ -249,10 +249,10 @@ impl SyncMode {
             let _ = res_tx.send(result);
         });
         defer!({
-            debug!("aborting dag synchronizer");
+            info!("aborting dag synchronizer");
             handle.abort();
             let _ = block_in_place(move || Handle::current().block_on(handle));
-            debug!("aborting dag synchronizer complete");
+            info!("aborting dag synchronizer complete");
         });
 
         let mut buffer = Vec::new();

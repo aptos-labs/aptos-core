@@ -15,7 +15,7 @@ use crate::dag::{
 };
 use aptos_consensus_types::common::Round;
 use aptos_infallible::RwLock;
-use aptos_logger::debug;
+use aptos_logger::{debug, info};
 use aptos_types::epoch_state::EpochState;
 use std::sync::Arc;
 
@@ -203,7 +203,7 @@ impl OrderRule {
         }
         ordered_nodes.reverse();
 
-        debug!(
+        info!(
             LogSchema::new(LogEvent::OrderedAnchor),
             id = anchor.id(),
             lowest_unordered_anchor_round = lowest_unordered_anchor_round,

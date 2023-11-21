@@ -12,7 +12,7 @@ use crate::{
 use anyhow::{anyhow, ensure};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
-use aptos_logger::{debug, error, warn};
+use aptos_logger::{debug, error, warn, info};
 use aptos_types::{epoch_state::EpochState, validator_verifier::ValidatorVerifier};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -371,7 +371,7 @@ impl Dag {
     pub(super) fn prune(&mut self) {
         let to_keep = self.nodes_by_round.split_off(&self.start_round);
         let to_prune = std::mem::replace(&mut self.nodes_by_round, to_keep);
-        debug!(
+        info!(
             "pruning dag. start round {}. pruning from {}",
             self.start_round,
             to_prune.first_key_value().map(|v| v.0).unwrap()
