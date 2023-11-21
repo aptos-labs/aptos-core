@@ -12,13 +12,14 @@ use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
+use std::sync::RwLock;
 use tokio::{runtime::Runtime, sync::oneshot};
 
 pub struct InboundHandler {
     service: String,
     listen_addr: SocketAddr,
     rpc_timeout_ms: u64,
-    inbound_handlers: Arc<Mutex<HashMap<MessageType, Sender<Message>>>>,
+    inbound_handlers: Arc<RwLock<HashMap<MessageType, Sender<Message>>>>,
 }
 
 impl InboundHandler {
@@ -27,22 +28,22 @@ impl InboundHandler {
             service: service.clone(),
             listen_addr,
             rpc_timeout_ms,
-            inbound_handlers: Arc::new(Mutex::new(HashMap::new())),
+            inbound_handlers: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
     pub fn register_handler(&self, message_type: String, sender: Sender<Message>) {
         assert!(!self
             .inbound_handlers
-            .lock()
+            .read()
             .unwrap()
             .contains_key(&MessageType::new(message_type.clone())));
-        let mut inbound_handlers = self.inbound_handlers.lock().unwrap();
+        let mut inbound_handlers = self.inbound_handlers.write().unwrap();
         inbound_handlers.insert(MessageType::new(message_type), sender);
     }
 
     pub fn start(&self, rt: &Runtime) -> Option<oneshot::Sender<()>> {
-        if self.inbound_handlers.lock().unwrap().is_empty() {
+        if self.inbound_handlers.read().unwrap().is_empty() {
             return None;
         }
 
@@ -65,7 +66,7 @@ impl InboundHandler {
     // Helper function to short-circuit the network message not to be sent over the network for self messages
     pub fn send_incoming_message_to_handler(&self, message_type: &MessageType, message: Message) {
         // Check if there is a registered handler for the sender
-        if let Some(handler) = self.inbound_handlers.lock().unwrap().get(message_type) {
+        if let Some(handler) = self.inbound_handlers.read().unwrap().get(message_type) {
             // Send the message to the registered handler
             handler.send(message).unwrap();
         } else {

@@ -16,6 +16,7 @@ use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
+use std::sync::RwLock;
 use std::time::SystemTime;
 use tokio::{runtime::Runtime, sync::oneshot};
 use tonic::{
@@ -27,13 +28,13 @@ use crate::network_controller::metrics::{REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRN
 const MAX_MESSAGE_SIZE: usize = 1024 * 1024 * 80;
 
 pub struct GRPCNetworkMessageServiceServerWrapper {
-    inbound_handlers: Arc<Mutex<HashMap<MessageType, Sender<Message>>>>,
+    inbound_handlers: Arc<RwLock<HashMap<MessageType, Sender<Message>>>>,
     self_addr: SocketAddr,
 }
 
 impl GRPCNetworkMessageServiceServerWrapper {
     pub fn new(
-        inbound_handlers: Arc<Mutex<HashMap<MessageType, Sender<Message>>>>,
+        inbound_handlers: Arc<RwLock<HashMap<MessageType, Sender<Message>>>>,
         self_addr: SocketAddr,
     ) -> Self {
         Self {
@@ -130,7 +131,7 @@ impl NetworkMessageService for GRPCNetworkMessageServiceServerWrapper {
             }
         }
 
-        if let Some(handler) = self.inbound_handlers.lock().unwrap().get(&message_type) {
+        if let Some(handler) = self.inbound_handlers.read().unwrap().get(&message_type) {
             if msg.start_ms_since_epoch.is_some() {
                 let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
                 let mut delta = 0;
