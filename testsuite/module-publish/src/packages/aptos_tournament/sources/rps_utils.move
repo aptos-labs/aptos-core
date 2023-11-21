@@ -11,7 +11,7 @@ module tournament::rps_unit_tests {
 
     use tournament::admin;
     use tournament::aptos_tournament;
-    use tournament::rock_paper_scissor::{Self, RockPaperScissorsGame};
+    use tournament::rock_paper_scissor::{Self, RockPaperScissor, RockPaperScissorsGame};
     use tournament::token_manager;
     use tournament::tournament_manager;
 
@@ -65,6 +65,9 @@ module tournament::rps_unit_tests {
             tournament_address,
             player_name
         );
+        // TODO[fix]: If the same player account is used to 
+        // play multiple tournaments at the same time, this could mess up.
+        // May be store [admin_address] -> [player_token, signer_cap] map instead. 
         move_to(user, PlayerConfig {
             player_token,
             signer_cap
@@ -99,25 +102,29 @@ module tournament::rps_unit_tests {
     fun full_play(
         admin: &signer,
         game_index: u64,
-        player1_address: address,
-        player2_address: address,
+        // TODO: We need to get player1 and player 2 details from game_index instead of supplying them as input here.
+        player1: address,
+        player2: address,
         action1: vector<u8>,
         action2: vector<u8>,
         // 0: no one goes. 1: first goes. 2: second goes. 3: all go
         move_players: u8,
     ): (vector<address>, vector<address>, address) acquires PlayerConfig, TournamentConfig {
-        let player1 = get_signer(player1_address);
-        let player2 = get_signer(player2_address);
         let admin_address = signer::address_of(admin);
         let game_address = *vector::borrow(&borrow_global<TournamentConfig>(admin_address).game_addresses, game_index);
+        // let RockPaperScissor {player1, player2} =  borrow_global<RockPaperScissor>(game_address);
+
+        let player1_signer = get_signer(player1);
+        let player2_signer = get_signer(player2);
+
         let hash_addition1 = b"random uuid 1";
         let hash_addition2 = b"random uuid 2";
 
-        player_commit(&player1, game_address, action1, hash_addition1);
-        player_commit(&player2, game_address, action2, hash_addition2);
+        player_commit(&player1_signer, game_address, action1, hash_addition1);
+        player_commit(&player2_signer, game_address, action2, hash_addition2);
         if (move_players == 1 || move_players == 3) {
             let (is_game_over, _winners, _losers) = rock_paper_scissor::verify_action_returning(
-                &player1,
+                &player1_signer,
                 game_address,
                 action1,
                 hash_addition1
@@ -129,7 +136,7 @@ module tournament::rps_unit_tests {
         let losers = vector[];
         if (move_players == 2 || move_players == 3) {
             let (_is_game_over, winnersi, losersi) = rock_paper_scissor::verify_action_returning(
-                &player2,
+                &player2_signer,
                 game_address,
                 action2,
                 hash_addition2
