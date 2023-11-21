@@ -32,14 +32,17 @@ mod entry_points;
 mod p2p_transaction_generator;
 pub mod publish_modules;
 pub mod publishing;
+mod tournament_generator;
 mod transaction_mix_generator;
 mod workflow_delegator;
+
 use self::{
     account_generator::AccountGeneratorCreator,
     call_custom_modules::CustomModulesDelegationGeneratorCreator,
     p2p_transaction_generator::P2PTransactionGeneratorCreator,
     publish_modules::PublishPackageCreator,
     transaction_mix_generator::PhasedTxnMixGeneratorCreator,
+    tournament_generator::TournamentTransactionGeneratorCreator,
 };
 use crate::{
     accounts_pool_wrapper::AccountsPoolWrapperCreator,
@@ -87,6 +90,7 @@ pub enum TransactionType {
 #[derive(Debug, Copy, Clone)]
 pub enum WorkflowKind {
     CreateThenMint { count: usize, creation_balance: u64 },
+    Tournament,
 }
 
 impl Default for TransactionType {
@@ -305,6 +309,18 @@ pub async fn create_txn_generator_creator(
                     *use_account_pool,
                     &accounts_pool,
                 ),
+                TransactionType::TournamentSetupRound {
+                    num_tournaments
+                } => {
+                    Box::new(TournamentTransactionGeneratorCreator::new(
+                            txn_factory.clone(),
+                            *num_tournaments,
+                            // TODO: Input admin account
+                            addresses_pool.clone()
+                        )
+                        .await
+                    )
+                },
                 TransactionType::BatchTransfer { batch_size } => {
                     Box::new(BatchTransferTransactionGeneratorCreator::new(
                         txn_factory.clone(),
