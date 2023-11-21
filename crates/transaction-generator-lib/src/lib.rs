@@ -291,8 +291,8 @@ pub async fn create_txn_generator_creator(
                     num_tournaments
                 } => Box::new(TournamentTransactionGeneratorCreator::new(
                         txn_factory.clone(),
-                        accounts_pool,
-                        num_tournaments,
+                        *num_tournaments,
+                        accounts_pool.clone(),
                         txn_executor,
                     )
                     .await

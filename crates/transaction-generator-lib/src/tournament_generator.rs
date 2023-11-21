@@ -1,32 +1,28 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use super::{publishing::publish_util::Package, ReliableTransactionSubmitter};
+use super::ReliableTransactionSubmitter;
 use crate::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_infallible::RwLock;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
-    transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{chain_id::ChainId, transaction::SignedTransaction, LocalAccount},
+    transaction_builder::TransactionFactory,
+    types::{transaction::SignedTransaction, LocalAccount},
 };
 use move_core_types::{
     ident_str,
-    language_storage::{ModuleId, TypeTag},
+    language_storage::ModuleId,
 };
-use aptos_types::transaction::TransactionPayload;
+use aptos_types::transaction::{EntryFunction, TransactionPayload};
 use rand::{
-    distributions::{Distribution, Standard},
     prelude::SliceRandom,
     rngs::StdRng,
-    Rng, RngCore, SeedableRng,
+    SeedableRng,
 };
-use std::{
-    cmp::{max, min},
-    sync::Arc,
-};
+use std::sync::Arc;
 
 pub struct TournamentTransactionGenerator {
     rng: StdRng,
-    num_tournaments: u64,
+    num_tournaments: usize,
     txn_factory: TransactionFactory,
     admin_accounts: Arc<RwLock<Vec<LocalAccount>>>,
     player_accounts: Arc<RwLock<Vec<LocalAccount>>>,
@@ -36,7 +32,7 @@ impl TournamentTransactionGenerator {
     pub fn new(
         mut rng: StdRng,
         txn_factory: TransactionFactory,
-        num_tournaments: u64,
+        num_tournaments: usize,
         admin_accounts: Arc<RwLock<Vec<LocalAccount>>>,
         player_accounts: Arc<RwLock<Vec<LocalAccount>>>,
     ) -> Self {
@@ -57,14 +53,14 @@ impl TransactionGenerator for TournamentTransactionGenerator {
         account: &LocalAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
-
+        vec![]
     }
 }
 
 
 pub struct TournamentTransactionGeneratorCreator {
     txn_factory: TransactionFactory,
-    num_tournaments: u64,
+    num_tournaments: usize,
     admin_accounts: Arc<RwLock<Vec<LocalAccount>>>,
     player_accounts: Arc<RwLock<Vec<LocalAccount>>>,
 }
@@ -73,16 +69,16 @@ pub struct TournamentTransactionGeneratorCreator {
 impl TournamentTransactionGeneratorCreator {
     pub async fn new(
         txn_factory: TransactionFactory,
-        num_tournaments: u64,
-        all_accounts: &mut [LocalAccount],
+        num_tournaments: usize,
+        all_accounts: Arc<RwLock<Vec<LocalAccount>>>,
         txn_executor: &dyn ReliableTransactionSubmitter,
     ) -> Self {
         // Split accounts into admins and players.
-        let admin_accounts = Arc::new(RwLock::new(all_accounts.iter().cloned().take(num_tournaments).collect()));
-        let player_accounts = Arc::new(RwLock::new(all_accounts.iter().cloned().skip(num_tournaments).collect()));
+        let admin_accounts = all_accounts.write().iter().take(num_tournaments).collect();
+        let player_accounts = Arc::new(RwLock::new(all_accounts.iter().collect()));
         
         // Setup tournament for each of the admin accounts.
-        let setup_tournament_txns = admin_accounts.iter().map(|admin_account| admin_account.sign_with_transaction_builder(txn_factory.payload(
+        let setup_tournament_txns = admin_accounts.write().iter().map(|admin_account| admin_account.sign_with_transaction_builder(txn_factory.payload(
             TransactionPayload::EntryFunction(EntryFunction::new(
                 ModuleId::new(
                     AccountAddress::from_hex_literal("0x0d17edeafc6393d340df999ca4ca9b33bf35f19ad4d16fbf49e57eaa3da09421")?,
