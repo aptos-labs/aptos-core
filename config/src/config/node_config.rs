@@ -141,6 +141,7 @@ impl NodeConfig {
     /// Randomizes the various ports of the node config
     pub fn randomize_ports(&mut self) {
         // Randomize the ports for the services
+        self.admin_service.randomize_ports();
         self.api.randomize_ports();
         self.inspection_service.randomize_ports();
         self.storage.randomize_ports();

@@ -34,6 +34,7 @@ pub mod transaction_filter_type;
 mod utils;
 
 // All public usage statements should be declared below
+pub use admin_service_config::*;
 pub use api_config::*;
 pub use base_config::*;
 pub use consensus_config::*;

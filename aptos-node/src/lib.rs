@@ -16,6 +16,7 @@ pub mod utils;
 mod tests;
 
 use anyhow::anyhow;
+use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
 use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
@@ -50,7 +51,7 @@ pub struct AptosNodeArgs {
         short = 'f',
         long,
         value_parser,
-        required_unless_present_any = ["test", "info"],
+        required_unless_present_any = ["test", "info", "stacktrace"],
     )]
     config: Option<PathBuf>,
 
@@ -90,11 +91,27 @@ pub struct AptosNodeArgs {
     /// Display information about the build of this node
     #[clap(long)]
     info: bool,
+
+    #[cfg(target_os = "linux")]
+    /// Start as a child process to collect thread dump.
+    /// See rstack-self crate for more details.
+    #[clap(long)]
+    stacktrace: bool,
 }
 
 impl AptosNodeArgs {
     /// Runs an Aptos node based on the given command line arguments and config flags
     pub fn run(self) {
+        #[cfg(target_os = "linux")]
+        // https://sfackler.github.io/rstack/doc/rstack_self/index.html
+        //
+        // TODO(grao): I don't like this way, but I didn't find other existing solution in Rust.
+        // Maybe try to use libc directly?
+        if self.stacktrace {
+            let _ = rstack_self::child();
+            return;
+        }
+
         if self.info {
             let build_information = build_information!();
             println!(
@@ -162,6 +179,7 @@ pub fn load_seed(input: &str) -> Result<[u8; 32], FromHexError> {
 
 /// Runtime handle to ensure that all inner runtimes stay in scope
 pub struct AptosHandle {
+    _admin_service: AdminService,
     _api_runtime: Option<Runtime>,
     _backup_runtime: Option<Runtime>,
     _consensus_runtime: Option<Runtime>,
@@ -450,6 +468,9 @@ fn create_single_node_test_config(
         node_config.consensus.quorum_store_poll_time_ms = 3_600_000;
     }
 
+    // Enable the AdminService.
+    node_config.admin_service.enabled = Some(true);
+
     Ok(node_config)
 }
 
@@ -462,6 +483,9 @@ pub fn setup_environment_and_start_node(
     // Log the node config at node startup
     info!("Using node config {:?}", &node_config);
 
+    // Starts the admin service
+    let admin_service = services::start_admin_service(&node_config);
+
     // Start the node inspection service
     let peers_and_metadata = network::create_peers_and_metadata(&node_config);
     services::start_node_inspection_service(&node_config, peers_and_metadata.clone());
@@ -469,6 +493,8 @@ pub fn setup_environment_and_start_node(
     // Set up the storage database and any RocksDB checkpoints
     let (aptos_db, db_rw, backup_service, genesis_waypoint) =
         storage::initialize_database_and_checkpoints(&mut node_config)?;
+
+    admin_service.set_aptos_db(db_rw.clone().into());
 
     // Set the Aptos VM configurations
     utils::set_aptos_vm_configurations(&node_config);
@@ -549,17 +575,20 @@ pub fn setup_environment_and_start_node(
         debug!("State sync initialization complete.");
 
         // Initialize and start consensus
-        services::start_consensus_runtime(
+        let (runtime, consensus_db, quorum_store_db) = services::start_consensus_runtime(
             &mut node_config,
             db_rw,
             consensus_reconfig_subscription,
             consensus_network_interfaces,
             consensus_notifier,
             consensus_to_mempool_sender,
-        )
+        );
+        admin_service.set_consensus_dbs(consensus_db, quorum_store_db);
+        runtime
     });
 
     Ok(AptosHandle {
+        _admin_service: admin_service,
         _api_runtime: api_runtime,
         _backup_runtime: backup_service,
         _consensus_runtime: consensus_runtime,
