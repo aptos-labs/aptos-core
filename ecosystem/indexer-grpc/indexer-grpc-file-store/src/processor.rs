@@ -15,7 +15,7 @@ use aptos_indexer_grpc_utils::{
         TRANSACTION_UNIX_TIMESTAMP,
     },
     file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
-    timestamp_to_unixtime,
+    timestamp_to_iso, timestamp_to_unixtime,
     types::RedisUrl,
     EncodedTransactionWithVersion,
 };
@@ -154,11 +154,8 @@ impl Processor {
             let process_size = transactions_buffer.len() / BLOB_STORAGE_SIZE * BLOB_STORAGE_SIZE;
             let current_batch: Vec<EncodedTransactionWithVersion> =
                 transactions_buffer.drain(..process_size).collect();
-<<<<<<< HEAD
             let last_transaction = current_batch.as_slice().last().unwrap().clone();
-=======
             let first_transaction = current_batch.as_slice().first().unwrap().clone();
->>>>>>> 0c0f43d9a0 ([indexer grpc] Add metrics)
             self.file_store_operator
                 .upload_transactions(cache_chain_id, current_batch)
                 .await
@@ -169,13 +166,16 @@ impl Processor {
             let num_transactions = end_version - current_file_store_version + 1;
             // This decoding may be inefficient, but this is the file store so we don't have to be overly
             // concerned with efficiency.
-<<<<<<< HEAD
-            let end_version_timestamp = {
-                let encoded_transaction = last_transaction.0;
-=======
             let start_version_timestamp = {
                 let encoded_transaction = first_transaction.0;
->>>>>>> 0c0f43d9a0 ([indexer grpc] Add metrics)
+                let decoded_transaction =
+                    base64::decode(encoded_transaction).expect("Failed to decode base64.");
+                let transaction =
+                    Transaction::decode(&*decoded_transaction).expect("Failed to decode protobuf.");
+                transaction.timestamp
+            };
+            let end_version_timestamp = {
+                let encoded_transaction = last_transaction.0;
                 let decoded_transaction =
                     base64::decode(encoded_transaction).expect("Failed to decode base64.");
                 let transaction =
@@ -184,9 +184,24 @@ impl Processor {
             };
 
             info!(
+                start_version = current_file_store_version,
+                end_version = end_version,
+                start_txn_timestamp_iso = start_version_timestamp
+                    .clone()
+                    .map(|t| timestamp_to_iso(&t))
+                    .unwrap_or_default(),
+                end_txn_timestamp_iso = end_version_timestamp
+                    .clone()
+                    .map(|t| timestamp_to_iso(&t))
+                    .unwrap_or_default(),
+                num_of_transactions = num_transactions,
+                duration_in_secs = file_store_upload_batch_start.elapsed().as_secs_f64(),
                 tps = (tps_calculator.avg() * 1000.0) as u64,
                 current_file_store_version = current_file_store_version,
-                "Upload transactions to file store."
+                service_type = SERVICE_TYPE,
+                step = IndexerGrpcStep::FilestoreUploadTxns.get_step(),
+                "{}",
+                IndexerGrpcStep::FilestoreUploadTxns.get_label(),
             );
 
             LATEST_PROCESSED_VERSION
@@ -203,11 +218,7 @@ impl Processor {
                     IndexerGrpcStep::FilestoreUploadTxns.get_label(),
                 ])
                 .set(
-<<<<<<< HEAD
                     end_version_timestamp
-=======
-                    start_version_timestamp
->>>>>>> 0c0f43d9a0 ([indexer grpc] Add metrics)
                         .map(|t| timestamp_to_unixtime(&t))
                         .unwrap_or_default(),
                 );
