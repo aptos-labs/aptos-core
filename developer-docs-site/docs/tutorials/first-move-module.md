@@ -22,11 +22,11 @@ This tutorial details how to compile, test, publish and interact with Move modul
 
 ---
 
-## Step 2: Create an account and fund it 
+## Step 2: Create an account and fund it
 
-After installing the CLI binary, create and fund an account on the Aptos blockchain. 
+After installing the CLI binary, create and fund an account on the Aptos blockchain.
 
-Start a new terminal and run the following command to initialize a new local account: 
+Start a new terminal and run the following command to initialize a new local account:
 
 ```bash
 aptos init
@@ -64,13 +64,14 @@ Aptos CLI is now set up for account a345dbfb0c94416589721360f207dcc92ecfe4f06d8d
 }
 ```
 
-The account address in the above output  `a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a` is your new account and is aliased as the profile `default`. This account address will be different for you as it is generated randomly. From now on, either `default` or `0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a` are used interchangeably in this document. Of course, substitute your own address as needed.
+The account address in the above output `a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a` is your new account and is aliased as the profile `default`. This account address will be different for you as it is generated randomly. From now on, either `default` or `0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a` are used interchangeably in this document. Of course, substitute your own address as needed.
 
-Now fund this account by running this command: 
+Now fund this account by running this command:
 
 ```bash
 aptos account fund-with-faucet --account default
 ```
+
 You will see output resembling:
 
 ```text
@@ -83,13 +84,13 @@ You will see output resembling:
 
 ## Step 3: Compile and test the module
 
-Several example Move modules are available in the [aptos-core/aptos-move/move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples) directory for your use. Open a terminal and change directories into the [`hello_blockchain`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/hello_blockchain) directory: 
+Several example Move modules are available in the [aptos-core/aptos-move/move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples) directory for your use. Open a terminal and change directories into the [`hello_blockchain`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/hello_blockchain) directory:
 
 ```bash
 cd aptos-core/aptos-move/move-examples/hello_blockchain
 ```
 
-Run the below command to compile the `hello_blockchain` module: 
+Run the below command to compile the `hello_blockchain` module:
 
 ```bash
 aptos move compile --named-addresses hello_blockchain=default
@@ -107,7 +108,7 @@ You will see output resembling:
 
 The `compile` command must contain `--named-addresses` as above because the [`Move.toml`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/hello_blockchain/Move.toml) file leaves this as undefined (see below).
 
-To test the module run: 
+To test the module run:
 
 ```bash
 aptos move test --named-addresses hello_blockchain=default
@@ -172,7 +173,7 @@ At this point, the module is now stored on the account in the Aptos blockchain.
 
 ## Step 5: Interact with the Move module
 
-Move modules expose access points, known as *entry functions*. These entry functions can be called via transactions. The Aptos CLI allows for seamless access to these entry functions. The example Move module `hello_blockchain` exposes a `set_message` entry function that takes in a `string`. This can be called via the CLI:
+Move modules expose access points, known as _entry functions_. These entry functions can be called via transactions. The Aptos CLI allows for seamless access to these entry functions. The example Move module `hello_blockchain` exposes a `set_message` entry function that takes in a `string`. This can be called via the CLI:
 
 ```bash
 aptos move run \
@@ -210,15 +211,15 @@ After the first execution, this should contain:
 
 ```json
 {
-  "type":"0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a::message::MessageHolder",
-  "data":{
-    "message":"hello, blockchain",
-    "message_change_events":{
-      "counter":"0",
-      "guid":{
-        "id":{
-          "addr":"0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a",
-          "creation_num":"3"
+  "type": "0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a::message::MessageHolder",
+  "data": {
+    "message": "hello, blockchain",
+    "message_change_events": {
+      "counter": "0",
+      "guid": {
+        "id": {
+          "addr": "0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a",
+          "creation_num": "3"
         }
       }
     }
@@ -228,22 +229,24 @@ After the first execution, this should contain:
 
 Notice that the `message` field contains `hello, blockchain`.
 
-Each successful call to `set_message` after the first call results in an update to `message_change_events`. The `message_change_events` for a given account can be accessed via the REST API: 
+Each successful call to `set_message` after the first call results in an update to `message_change_events`. The `message_change_events` for a given account can be accessed via the REST API:
 
 ```bash
 https://fullnode.devnet.aptoslabs.com/v1/accounts/0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a/events/0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a::message::MessageHolder/message_change_events
 ```
 
 where, after a call to set the message to `hello, blockchain, again`, the event stream would contain the following:
+
 ```json
 [
   {
-    "version":"8556",
-    "key":"0x0300000000000000a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a",
-    "sequence_number":"0","type":"0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a::message::MessageChangeEvent",
-    "data":{
-      "from_message":"hello, blockchain",
-      "to_message":"hello, blockchain, again"
+    "version": "8556",
+    "key": "0x0300000000000000a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a",
+    "sequence_number": "0",
+    "type": "0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a::message::MessageChangeEvent",
+    "data": {
+      "from_message": "hello, blockchain",
+      "to_message": "hello, blockchain, again"
     }
   }
 ]
@@ -255,8 +258,8 @@ Other accounts can reuse the published module by calling the exact same function
 
 ## Supporting documentation
 
-* [Account basics](../concepts/accounts.md)
-* [TypeScript SDK](../sdks/ts-sdk/index.md)
-* [Python SDK](../sdks/python-sdk.md)
-* [Rust SDK](../sdks/rust-sdk.md)
-* [REST API specification](https://aptos.dev/nodes/aptos-api-spec#/)
+- [Account basics](../concepts/accounts.md)
+- [TypeScript SDK](../sdks/ts-sdk/v1/index.md)
+- [Python SDK](../sdks/python-sdk.md)
+- [Rust SDK](../sdks/rust-sdk.md)
+- [REST API specification](https://aptos.dev/nodes/aptos-api-spec#/)
