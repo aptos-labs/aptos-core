@@ -4,7 +4,7 @@
 
 use crate::{
     account_address::AccountAddress,
-    block_executor::config::BlockExecutorOnchainConfig,
+    block_executor::config::BlockExecutorConfigFromOnchain,
     chain_id::ChainId,
     on_chain_config::BlockGasLimitType,
     transaction::{
@@ -22,8 +22,8 @@ const MAX_GAS_AMOUNT: u64 = 1_000_000;
 const TEST_GAS_PRICE: u64 = 100;
 
 // The block executor onchain config (gas limit parameters) for executor tests
-pub const TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG: BlockExecutorOnchainConfig =
-    BlockExecutorOnchainConfig {
+pub const TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG: BlockExecutorConfigFromOnchain =
+    BlockExecutorConfigFromOnchain {
         block_gas_limit_type: BlockGasLimitType::Limit(1000),
     };
 
@@ -253,7 +253,7 @@ pub fn get_test_txn_with_chain_id(
 
 pub fn block(
     mut user_txns: Vec<Transaction>,
-    block_executor_onchain_config: BlockExecutorOnchainConfig,
+    block_executor_onchain_config: BlockExecutorConfigFromOnchain,
 ) -> Vec<SignatureVerifiedTransaction> {
     if !block_executor_onchain_config.has_any_block_gas_limit() {
         user_txns.push(Transaction::StateCheckpoint(HashValue::random()));

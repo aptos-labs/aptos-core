@@ -33,7 +33,7 @@ use aptos_storage_interface::{
     state_delta::StateDelta, DbReaderWriter, ExecutedTrees,
 };
 use aptos_types::{
-    block_executor::config::BlockExecutorOnchainConfig,
+    block_executor::config::BlockExecutorConfigFromOnchain,
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     transaction::{
@@ -276,7 +276,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             ChunkOutput::by_transaction_execution::<V>(
                 sig_verified_txns.into(),
                 state_view,
-                BlockExecutorOnchainConfig::new_no_block_limit(),
+                BlockExecutorConfigFromOnchain::new_no_block_limit(),
             )?
         };
 
@@ -682,7 +682,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         let chunk_output = ChunkOutput::by_transaction_execution::<V>(
             txns.into(),
             state_view,
-            BlockExecutorOnchainConfig::new_no_block_limit(),
+            BlockExecutorConfigFromOnchain::new_no_block_limit(),
         )?;
         // not `zip_eq`, deliberately
         for (version, txn_out, txn_info, write_set, events) in multizip((

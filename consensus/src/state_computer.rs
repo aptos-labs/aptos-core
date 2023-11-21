@@ -23,7 +23,7 @@ use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResul
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    account_address::AccountAddress, block_executor::config::BlockExecutorOnchainConfig,
+    account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
     contract_event::ContractEvent, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
     on_chain_config::OnChainExecutionConfig, transaction::Transaction,
 };
@@ -63,7 +63,7 @@ pub struct ExecutionProxy {
     write_mutex: AsyncMutex<LogicalTime>,
     payload_manager: Mutex<Option<Arc<PayloadManager>>>,
     transaction_shuffler: Mutex<Option<Arc<dyn TransactionShuffler>>>,
-    block_executor_onchain_config: Mutex<BlockExecutorOnchainConfig>,
+    block_executor_onchain_config: Mutex<BlockExecutorConfigFromOnchain>,
     transaction_deduper: Mutex<Option<Arc<dyn TransactionDeduper>>>,
     transaction_filter: TransactionFilter,
     execution_pipeline: ExecutionPipeline,
@@ -326,7 +326,7 @@ impl StateComputer for ExecutionProxy {
         epoch_state: &EpochState,
         payload_manager: Arc<PayloadManager>,
         transaction_shuffler: Arc<dyn TransactionShuffler>,
-        block_executor_onchain_config: BlockExecutorOnchainConfig,
+        block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
     ) {
         *self.validators.lock() = epoch_state
@@ -384,7 +384,7 @@ async fn test_commit_sync_race() {
             &self,
             _block: ExecutableBlock,
             _parent_block_id: HashValue,
-            _onchain_config: BlockExecutorOnchainConfig,
+            _onchain_config: BlockExecutorConfigFromOnchain,
         ) -> ExecutorResult<StateComputeResult> {
             Ok(StateComputeResult::new_dummy())
         }
@@ -393,7 +393,7 @@ async fn test_commit_sync_race() {
             &self,
             _block: ExecutableBlock,
             _parent_block_id: HashValue,
-            _onchain_config: BlockExecutorOnchainConfig,
+            _onchain_config: BlockExecutorConfigFromOnchain,
         ) -> ExecutorResult<StateCheckpointOutput> {
             todo!()
         }
@@ -485,7 +485,7 @@ async fn test_commit_sync_race() {
         &EpochState::empty(),
         Arc::new(PayloadManager::DirectMempool),
         create_transaction_shuffler(TransactionShufflerType::NoShuffling),
-        BlockExecutorOnchainConfig::new_no_block_limit(),
+        BlockExecutorConfigFromOnchain::new_no_block_limit(),
         create_transaction_deduper(TransactionDeduperType::NoDedup),
     );
     executor

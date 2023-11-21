@@ -31,7 +31,7 @@ use aptos_state_view::StateView;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorOnchainConfig,
+        config::BlockExecutorConfigFromOnchain,
         partitioner::{ExecutableTransactions, PartitionedTransactions},
     },
     transaction::{
@@ -51,7 +51,7 @@ impl VMExecutor for PtxBlockExecutor {
     fn execute_block(
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
-        _onchain_config: BlockExecutorOnchainConfig,
+        _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = TIMER.timer_with(&["block_total"]);
 
@@ -107,7 +107,7 @@ impl VMExecutor for PtxBlockExecutor {
         _sharded_block_executor: &ShardedBlockExecutor<S, E>,
         _transactions: PartitionedTransactions,
         _state_view: Arc<S>,
-        _onchain_config: BlockExecutorOnchainConfig,
+        _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         unimplemented!()
     }
@@ -117,7 +117,7 @@ impl TransactionBlockExecutor for PtxBlockExecutor {
     fn execute_transaction_block(
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> anyhow::Result<ChunkOutput> {
         ChunkOutput::by_transaction_execution::<PtxBlockExecutor>(
             transactions,

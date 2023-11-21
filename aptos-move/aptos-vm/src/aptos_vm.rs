@@ -30,7 +30,7 @@ use aptos_types::{
     account_config,
     account_config::new_block_event_key,
     block_executor::{
-        config::{BlockExecutorConfig, BlockExecutorLocalConfig, BlockExecutorOnchainConfig},
+        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
         partitioner::PartitionedTransactions,
     },
     block_metadata::BlockMetadata,
@@ -1806,7 +1806,7 @@ impl VMExecutor for AptosVM {
     fn execute_block(
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         fail_point!("move_adapter::execute_block", |_| {
             Err(VMStatus::error(
@@ -1848,7 +1848,7 @@ impl VMExecutor for AptosVM {
         sharded_block_executor: &ShardedBlockExecutor<S, C>,
         transactions: PartitionedTransactions,
         state_view: Arc<S>,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         info!(

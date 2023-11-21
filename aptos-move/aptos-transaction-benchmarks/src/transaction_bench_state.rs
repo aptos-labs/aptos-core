@@ -14,7 +14,7 @@ use aptos_language_e2e_tests::{
 };
 use aptos_types::{
     block_executor::{
-        config::{BlockExecutorConfig, BlockExecutorOnchainConfig},
+        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain},
         partitioner::PartitionedTransactions,
     },
     block_metadata::BlockMetadata,
@@ -243,7 +243,7 @@ where
                 self.state_view.clone(),
                 transactions,
                 concurrency_level_per_shard,
-                BlockExecutorOnchainConfig::new_maybe_block_limit(maybe_block_gas_limit),
+                BlockExecutorConfigFromOnchain::new_maybe_block_limit(maybe_block_gas_limit),
             )
             .expect("VM should not fail to start");
         let exec_time = timer.elapsed().as_millis();

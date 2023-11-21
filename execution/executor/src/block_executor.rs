@@ -32,7 +32,7 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorOnchainConfig,
+        config::BlockExecutorConfigFromOnchain,
         partitioner::{ExecutableBlock, ExecutableTransactions},
     },
     ledger_info::LedgerInfoWithSignatures,
@@ -46,7 +46,7 @@ pub trait TransactionBlockExecutor: Send + Sync {
     fn execute_transaction_block(
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<ChunkOutput>;
 }
 
@@ -54,7 +54,7 @@ impl TransactionBlockExecutor for AptosVM {
     fn execute_transaction_block(
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<ChunkOutput> {
         ChunkOutput::by_transaction_execution::<AptosVM>(transactions, state_view, onchain_config)
     }
@@ -114,7 +114,7 @@ where
         &self,
         block: ExecutableBlock,
         parent_block_id: HashValue,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<StateCheckpointOutput> {
         self.maybe_initialize()?;
         self.inner
@@ -192,7 +192,7 @@ where
         &self,
         block: ExecutableBlock,
         parent_block_id: HashValue,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<StateCheckpointOutput> {
         let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         let ExecutableBlock {

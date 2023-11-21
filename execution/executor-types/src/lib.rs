@@ -11,7 +11,7 @@ use aptos_crypto::{
 };
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
 use aptos_types::{
-    block_executor::{config::BlockExecutorOnchainConfig, partitioner::ExecutableBlock},
+    block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
@@ -138,7 +138,7 @@ pub trait BlockExecutorTrait: Send + Sync {
         &self,
         block: ExecutableBlock,
         parent_block_id: HashValue,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<StateComputeResult> {
         let block_id = block.block_id;
         let state_checkpoint_output =
@@ -151,7 +151,7 @@ pub trait BlockExecutorTrait: Send + Sync {
         &self,
         block: ExecutableBlock,
         parent_block_id: HashValue,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<StateCheckpointOutput>;
 
     fn ledger_update(

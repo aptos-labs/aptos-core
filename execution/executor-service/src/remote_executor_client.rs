@@ -10,7 +10,9 @@ use aptos_secure_net::network_controller::{Message, NetworkController};
 use aptos_state_view::StateView;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
-    block_executor::{config::BlockExecutorOnchainConfig, partitioner::PartitionedTransactions},
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+    },
     transaction::TransactionOutput,
     vm_status::VMStatus,
 };
@@ -181,7 +183,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         state_view: Arc<S>,
         transactions: PartitionedTransactions,
         concurrency_level_per_shard: usize,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<ShardedExecutionOutput, VMStatus> {
         trace!("RemoteExecutorClient Sending block to shards");
         self.state_view_service.set_state_view(state_view);

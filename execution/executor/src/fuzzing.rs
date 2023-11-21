@@ -17,7 +17,7 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorOnchainConfig,
+        config::BlockExecutorConfigFromOnchain,
         partitioner::{ExecutableTransactions, PartitionedTransactions},
     },
     ledger_info::LedgerInfoWithSignatures,
@@ -73,7 +73,7 @@ impl TransactionBlockExecutor for FakeVM {
     fn execute_transaction_block(
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<ChunkOutput> {
         ChunkOutput::by_transaction_execution::<FakeVM>(transactions, state_view, onchain_config)
     }
@@ -84,7 +84,7 @@ impl VMExecutor for FakeVM {
         _sharded_block_executor: &ShardedBlockExecutor<S, E>,
         _transactions: PartitionedTransactions,
         _state_view: Arc<S>,
-        _onchain_config: BlockExecutorOnchainConfig,
+        _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         Ok(Vec::new())
     }
@@ -92,7 +92,7 @@ impl VMExecutor for FakeVM {
     fn execute_block(
         _transactions: &[SignatureVerifiedTransaction],
         _state_view: &impl StateView,
-        _onchain_config: BlockExecutorOnchainConfig,
+        _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         Ok(Vec::new())
     }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorOnchainConfig,
+        config::BlockExecutorConfigFromOnchain,
         partitioner::{ShardId, SubBlocksForShard},
     },
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -48,7 +48,7 @@ pub enum RemoteExecutionRequest {
 pub struct ExecuteBlockCommand {
     pub(crate) sub_blocks: SubBlocksForShard<AnalyzedTransaction>,
     pub(crate) concurrency_level: usize,
-    pub(crate) onchain_config: BlockExecutorOnchainConfig,
+    pub(crate) onchain_config: BlockExecutorConfigFromOnchain,
 }
 
 impl ExecuteBlockCommand {
@@ -57,7 +57,7 @@ impl ExecuteBlockCommand {
     ) -> (
         SubBlocksForShard<AnalyzedTransaction>,
         usize,
-        BlockExecutorOnchainConfig,
+        BlockExecutorConfigFromOnchain,
     ) {
         (self.sub_blocks, self.concurrency_level, self.onchain_config)
     }

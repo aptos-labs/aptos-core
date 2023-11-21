@@ -21,7 +21,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     block_executor::{
-        config::BlockExecutorOnchainConfig,
+        config::BlockExecutorConfigFromOnchain,
         partitioner::{ExecutableTransactions, PartitionedTransactions},
     },
     contract_event::ContractEvent,
@@ -52,7 +52,7 @@ impl ChunkOutput {
     pub fn by_transaction_execution<V: VMExecutor>(
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Self> {
         match transactions {
             ExecutableTransactions::Unsharded(txns) => {
@@ -67,7 +67,7 @@ impl ChunkOutput {
     fn by_transaction_execution_unsharded<V: VMExecutor>(
         transactions: Vec<SignatureVerifiedTransaction>,
         state_view: CachedStateView,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Self> {
         let transaction_outputs =
             Self::execute_block::<V>(&transactions, &state_view, onchain_config)?;
@@ -82,7 +82,7 @@ impl ChunkOutput {
     pub fn by_transaction_execution_sharded<V: VMExecutor>(
         transactions: PartitionedTransactions,
         state_view: CachedStateView,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Self> {
         let state_view_arc = Arc::new(state_view);
         let transaction_outputs = Self::execute_block_sharded::<V>(
@@ -173,7 +173,7 @@ impl ChunkOutput {
     fn execute_block_sharded<V: VMExecutor>(
         partitioned_txns: PartitionedTransactions,
         state_view: Arc<CachedStateView>,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>> {
         if !get_remote_addresses().is_empty() {
             Ok(V::execute_block_sharded(
@@ -198,7 +198,7 @@ impl ChunkOutput {
     fn execute_block<V: VMExecutor>(
         transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>> {
         Ok(V::execute_block(transactions, state_view, onchain_config)?)
     }
@@ -211,7 +211,7 @@ impl ChunkOutput {
     fn execute_block<V: VMExecutor>(
         transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>> {
         use aptos_state_view::{StateViewId, TStateView};
         use aptos_types::write_set::WriteSet;

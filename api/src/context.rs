@@ -29,7 +29,7 @@ use aptos_types::{
     access_path::{AccessPath, Path},
     account_address::AccountAddress,
     account_config::{AccountResource, NewBlockEvent},
-    block_executor::config::BlockExecutorOnchainConfig,
+    block_executor::config::BlockExecutorConfigFromOnchain,
     chain_id::ChainId,
     contract_event::EventWithVersion,
     event::EventKey,
@@ -1214,7 +1214,7 @@ impl Context {
     pub fn block_executor_onchain_config<E: InternalError>(
         &self,
         ledger_info: &LedgerInfo,
-    ) -> Result<BlockExecutorOnchainConfig, E> {
+    ) -> Result<BlockExecutorConfigFromOnchain, E> {
         // If it's the same epoch, use the cached results
         {
             let cache = self.gas_limit_cache.read().unwrap();
@@ -1303,7 +1303,7 @@ pub struct GasEstimationCache {
 
 pub struct GasLimitCache {
     last_updated_epoch: Option<u64>,
-    block_executor_onchain_config: BlockExecutorOnchainConfig,
+    block_executor_onchain_config: BlockExecutorConfigFromOnchain,
 }
 
 /// This function just calls tokio::task::spawn_blocking with the given closure and in

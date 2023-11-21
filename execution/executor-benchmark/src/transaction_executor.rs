@@ -8,15 +8,15 @@ use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::info;
 use aptos_types::block_executor::{
-    config::BlockExecutorOnchainConfig, partitioner::ExecutableBlock,
+    config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock,
 };
 use std::{
     sync::{mpsc, Arc},
     time::{Duration, Instant},
 };
 
-pub const BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG: BlockExecutorOnchainConfig =
-    BlockExecutorOnchainConfig {
+pub const BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG: BlockExecutorConfigFromOnchain =
+    BlockExecutorConfigFromOnchain {
     block_gas_limit_type:
         // present, but large to not limit blocks
         aptos_types::on_chain_config::BlockGasLimitType::Limit(1_000_000_000),

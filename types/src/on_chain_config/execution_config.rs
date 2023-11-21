@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{block_executor::config::BlockExecutorOnchainConfig, on_chain_config::OnChainConfig};
+use crate::{
+    block_executor::config::BlockExecutorConfigFromOnchain, on_chain_config::OnChainConfig,
+};
 use anyhow::{format_err, Result};
 use serde::{Deserialize, Serialize};
 
@@ -43,8 +45,8 @@ impl OnChainExecutionConfig {
         }
     }
 
-    pub fn block_executor_onchain_config(&self) -> BlockExecutorOnchainConfig {
-        BlockExecutorOnchainConfig {
+    pub fn block_executor_onchain_config(&self) -> BlockExecutorConfigFromOnchain {
+        BlockExecutorConfigFromOnchain {
             block_gas_limit_type: self.block_gas_limit_type(),
         }
     }

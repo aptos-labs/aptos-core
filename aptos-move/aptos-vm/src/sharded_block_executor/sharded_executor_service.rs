@@ -19,7 +19,7 @@ use aptos_logger::{info, trace};
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::{
-        config::{BlockExecutorConfig, BlockExecutorLocalConfig, BlockExecutorOnchainConfig},
+        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
         partitioner::{ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies},
     },
     transaction::{
@@ -72,7 +72,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         round: usize,
         state_view: &S,
         concurrency_level: usize,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         disable_speculative_logging();
         trace!(
@@ -104,7 +104,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         round: usize,
         state_view: &S,
         concurrency_level: usize,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let (callback, callback_receiver) = oneshot::channel();
 
@@ -179,7 +179,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         transactions: SubBlocksForShard<AnalyzedTransaction>,
         state_view: &S,
         concurrency_level: usize,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
         let mut result = vec![];
         for (round, sub_block) in transactions.into_sub_blocks().into_iter().enumerate() {

@@ -11,7 +11,7 @@ use aptos_rest_client::Client;
 use aptos_state_view::TStateView;
 use aptos_types::{
     account_address::AccountAddress,
-    block_executor::config::BlockExecutorOnchainConfig,
+    block_executor::config::BlockExecutorConfigFromOnchain,
     chain_id::ChainId,
     on_chain_config::{Features, OnChainConfig, TimedFeaturesBuilder},
     transaction::{
@@ -63,7 +63,7 @@ impl AptosDebugger {
         AptosVM::execute_block(
             &sig_verified_txns,
             &state_view,
-            BlockExecutorOnchainConfig::new_no_block_limit(),
+            BlockExecutorConfigFromOnchain::new_no_block_limit(),
         )
         .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
     }

@@ -3,17 +3,20 @@
 use crate::on_chain_config::BlockGasLimitType;
 use serde::{Deserialize, Serialize};
 
+/// Local, per-node configuration.
 #[derive(Clone, Debug)]
 pub struct BlockExecutorLocalConfig {
     pub concurrency_level: usize,
 }
 
+/// Configuration from on-chain configuration, that is
+/// required to be the same across all nodes.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct BlockExecutorOnchainConfig {
+pub struct BlockExecutorConfigFromOnchain {
     pub block_gas_limit_type: BlockGasLimitType,
 }
 
-impl BlockExecutorOnchainConfig {
+impl BlockExecutorConfigFromOnchain {
     pub fn new_no_block_limit() -> Self {
         Self {
             block_gas_limit_type: BlockGasLimitType::NoLimit,
@@ -32,17 +35,21 @@ impl BlockExecutorOnchainConfig {
     }
 }
 
+/// Configuration for the BlockExecutor.
 #[derive(Clone, Debug)]
 pub struct BlockExecutorConfig {
+    /// Local, per-node configuration.
     pub local: BlockExecutorLocalConfig,
-    pub onchain: BlockExecutorOnchainConfig,
+    /// Configuration from on-chain configuration, that is
+    /// required to be the same across all nodes.
+    pub onchain: BlockExecutorConfigFromOnchain,
 }
 
 impl BlockExecutorConfig {
     pub fn new_no_block_limit(concurrency_level: usize) -> Self {
         Self {
             local: BlockExecutorLocalConfig { concurrency_level },
-            onchain: BlockExecutorOnchainConfig::new_no_block_limit(),
+            onchain: BlockExecutorConfigFromOnchain::new_no_block_limit(),
         }
     }
 
@@ -52,7 +59,7 @@ impl BlockExecutorConfig {
     ) -> Self {
         Self {
             local: BlockExecutorLocalConfig { concurrency_level },
-            onchain: BlockExecutorOnchainConfig::new_maybe_block_limit(maybe_block_gas_limit),
+            onchain: BlockExecutorConfigFromOnchain::new_maybe_block_limit(maybe_block_gas_limit),
         }
     }
 }

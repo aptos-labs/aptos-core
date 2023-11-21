@@ -7,7 +7,7 @@ use anyhow::Result;
 use aptos_state_view::TStateView;
 use aptos_types::{
     account_address::AccountAddress,
-    block_executor::config::BlockExecutorOnchainConfig,
+    block_executor::config::BlockExecutorConfigFromOnchain,
     bytes::NumToBytes,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
@@ -47,7 +47,7 @@ fn test_mock_vm_different_senders() {
     let outputs = MockVM::execute_block(
         &into_signature_verified_block(txns.clone()),
         &MockStateView,
-        BlockExecutorOnchainConfig::new_no_block_limit(),
+        BlockExecutorConfigFromOnchain::new_no_block_limit(),
     )
     .expect("MockVM should not fail to start");
 
@@ -87,7 +87,7 @@ fn test_mock_vm_same_sender() {
     let outputs = MockVM::execute_block(
         &into_signature_verified_block(txns),
         &MockStateView,
-        BlockExecutorOnchainConfig::new_no_block_limit(),
+        BlockExecutorConfigFromOnchain::new_no_block_limit(),
     )
     .expect("MockVM should not fail to start");
 
@@ -125,7 +125,7 @@ fn test_mock_vm_payment() {
     let output = MockVM::execute_block(
         &into_signature_verified_block(txns),
         &MockStateView,
-        BlockExecutorOnchainConfig::new_no_block_limit(),
+        BlockExecutorConfigFromOnchain::new_no_block_limit(),
     )
     .expect("MockVM should not fail to start");
 

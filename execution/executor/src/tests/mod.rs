@@ -24,7 +24,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_address::AccountAddress,
     aggregate_signature::AggregateSignature,
-    block_executor::config::BlockExecutorOnchainConfig,
+    block_executor::config::BlockExecutorConfigFromOnchain,
     block_info::BlockInfo,
     bytes::NumToBytes,
     chain_id::ChainId,
@@ -355,7 +355,7 @@ fn test_executor_execute_same_block_multiple_times() {
 
 fn ledger_version_from_block_size(
     block_size: usize,
-    block_executor_onchain_config: BlockExecutorOnchainConfig,
+    block_executor_onchain_config: BlockExecutorConfigFromOnchain,
 ) -> usize {
     // With block gas limit, StateCheckpoint txn is inserted to block after execution.
     // So the ledger_info version needs to block_size + 1 with block gas limit.
@@ -653,7 +653,7 @@ fn test_reconfig_suffix_empty_blocks() {
         10000,
         1,
         gen_block_id(2),
-        BlockExecutorOnchainConfig::new_maybe_block_limit(Some(0)),
+        BlockExecutorConfigFromOnchain::new_maybe_block_limit(Some(0)),
     );
     let block_c = TestBlock::new(1, 1, gen_block_id(3), TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG);
     let block_d = TestBlock::new(1, 1, gen_block_id(4), TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG);
@@ -710,7 +710,7 @@ impl TestBlock {
         num_user_txns: u64,
         amount: u32,
         id: HashValue,
-        block_executor_onchain_config: BlockExecutorOnchainConfig,
+        block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Self {
         let txns = if num_user_txns == 0 {
             Vec::new()
@@ -734,7 +734,7 @@ impl TestBlock {
 // the root hash after all transactions are committed.
 fn run_transactions_naive(
     transactions: Vec<SignatureVerifiedTransaction>,
-    block_executor_onchain_config: BlockExecutorOnchainConfig,
+    block_executor_onchain_config: BlockExecutorConfigFromOnchain,
 ) -> HashValue {
     let executor = TestExecutor::new();
     let db = &executor.db;

@@ -15,7 +15,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::CORE_CODE_ADDRESS,
     block_executor::{
-        config::BlockExecutorOnchainConfig,
+        config::BlockExecutorConfigFromOnchain,
         partitioner::{ExecutableTransactions, PartitionedTransactions},
     },
     bytes::NumToBytes,
@@ -69,7 +69,7 @@ impl TransactionBlockExecutor for MockVM {
     fn execute_transaction_block(
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<ChunkOutput> {
         ChunkOutput::by_transaction_execution::<MockVM>(transactions, state_view, onchain_config)
     }
@@ -79,7 +79,7 @@ impl VMExecutor for MockVM {
     fn execute_block(
         transactions: &[SignatureVerifiedTransaction],
         state_view: &impl StateView,
-        _onchain_config: BlockExecutorOnchainConfig,
+        _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         // output_cache is used to store the output of transactions so they are visible to later
         // transactions.
@@ -194,7 +194,7 @@ impl VMExecutor for MockVM {
         _sharded_block_executor: &ShardedBlockExecutor<S, E>,
         _transactions: PartitionedTransactions,
         _state_view: Arc<S>,
-        _onchain_config: BlockExecutorOnchainConfig,
+        _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> std::result::Result<Vec<TransactionOutput>, VMStatus> {
         todo!()
     }

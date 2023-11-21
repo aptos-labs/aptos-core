@@ -8,7 +8,7 @@ use aptos_logger::trace;
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorOnchainConfig,
+        config::BlockExecutorConfigFromOnchain,
         partitioner::{TransactionWithDependencies, GLOBAL_ROUND_ID},
     },
     transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
@@ -45,7 +45,7 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
         &self,
         transactions: Vec<TransactionWithDependencies<AnalyzedTransaction>>,
         state_view: &S,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         trace!("executing the last round in global executor",);
         if transactions.is_empty() {

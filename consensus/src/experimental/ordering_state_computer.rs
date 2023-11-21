@@ -19,7 +19,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorResult, StateComputeResult};
 use aptos_logger::prelude::*;
 use aptos_types::{
-    block_executor::config::BlockExecutorOnchainConfig, epoch_state::EpochState,
+    block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
 };
 use async_trait::async_trait;
@@ -131,7 +131,7 @@ impl StateComputer for OrderingStateComputer {
         _: &EpochState,
         _payload_manager: Arc<PayloadManager>,
         _: Arc<dyn TransactionShuffler>,
-        _: BlockExecutorOnchainConfig,
+        _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
     ) {
     }
@@ -198,7 +198,7 @@ impl StateComputer for DagStateSyncComputer {
         _epoch_state: &EpochState,
         _payload_manager: Arc<PayloadManager>,
         _transaction_shuffler: Arc<dyn TransactionShuffler>,
-        _block_executor_onchain_config: BlockExecutorOnchainConfig,
+        _block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_deduper: Arc<dyn TransactionDeduper>,
     ) {
         unimplemented!("method not supported");

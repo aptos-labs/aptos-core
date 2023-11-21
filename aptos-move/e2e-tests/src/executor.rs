@@ -34,7 +34,7 @@ use aptos_types::{
         CORE_CODE_ADDRESS,
     },
     block_executor::config::{
-        BlockExecutorConfig, BlockExecutorLocalConfig, BlockExecutorOnchainConfig,
+        BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -469,7 +469,7 @@ impl FakeExecutor {
     pub fn execute_transaction_block_parallel(
         &self,
         txn_block: &[SignatureVerifiedTransaction],
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
             self.executor_thread_pool.clone(),
@@ -512,7 +512,7 @@ impl FakeExecutor {
             }
         });
 
-        let onchain_config = BlockExecutorOnchainConfig {
+        let onchain_config = BlockExecutorConfigFromOnchain {
             // TODO fetch values from state?
             block_gas_limit_type: BlockGasLimitType::Limit(30000),
         };

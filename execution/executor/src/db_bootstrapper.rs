@@ -18,7 +18,7 @@ use aptos_types::{
     access_path::AccessPath,
     account_config::CORE_CODE_ADDRESS,
     aggregate_signature::AggregateSignature,
-    block_executor::config::BlockExecutorOnchainConfig,
+    block_executor::config::BlockExecutorConfigFromOnchain,
     block_info::{BlockInfo, GENESIS_EPOCH, GENESIS_ROUND, GENESIS_TIMESTAMP_USECS},
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ConfigurationResource,
@@ -150,7 +150,7 @@ pub fn calculate_genesis<V: VMExecutor>(
     let (mut output, _, _) = ChunkOutput::by_transaction_execution::<V>(
         vec![genesis_txn.clone().into()].into(),
         base_state_view,
-        BlockExecutorOnchainConfig::new_no_block_limit(),
+        BlockExecutorConfigFromOnchain::new_no_block_limit(),
     )?
     .apply_to_ledger(&executed_trees, None, None)?;
     ensure!(

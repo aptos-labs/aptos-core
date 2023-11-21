@@ -13,7 +13,7 @@ use aptos_logger::info;
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorOnchainConfig,
+        config::BlockExecutorConfigFromOnchain,
         partitioner::{PartitionedTransactions, SubBlocksForShard},
     },
     transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
@@ -45,7 +45,7 @@ pub enum ExecutorShardCommand<S> {
         Arc<S>,
         SubBlocksForShard<AnalyzedTransaction>,
         usize,
-        BlockExecutorOnchainConfig,
+        BlockExecutorConfigFromOnchain,
     ),
     Stop,
 }
@@ -73,7 +73,7 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
         state_view: Arc<S>,
         transactions: PartitionedTransactions,
         concurrency_level_per_shard: usize,
-        onchain_config: BlockExecutorOnchainConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = SHARDED_BLOCK_EXECUTION_SECONDS.start_timer();
         let num_executor_shards = self.executor_client.num_shards();

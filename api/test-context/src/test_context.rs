@@ -35,7 +35,7 @@ use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::{create_multisig_account_address, AccountAddress},
     aggregate_signature::AggregateSignature,
-    block_executor::config::BlockExecutorOnchainConfig,
+    block_executor::config::BlockExecutorConfigFromOnchain,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -614,7 +614,7 @@ impl TestContext {
             .execute_block(
                 (metadata.id(), into_signature_verified_block(txns.clone())).into(),
                 parent_id,
-                BlockExecutorOnchainConfig::new_no_block_limit(),
+                BlockExecutorConfigFromOnchain::new_no_block_limit(),
             )
             .unwrap();
         let mut compute_status = result.compute_status().clone();

@@ -12,7 +12,7 @@ use aptos_executor_types::{
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::{debug, error};
 use aptos_types::{
-    block_executor::{config::BlockExecutorOnchainConfig, partitioner::ExecutableBlock},
+    block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     transaction::{signature_verified_transaction::SignatureVerifiedTransaction, Transaction},
 };
 use fail::fail_point;
@@ -57,7 +57,7 @@ impl ExecutionPipeline {
         block_id: HashValue,
         parent_block_id: HashValue,
         txns_to_execute: Vec<Transaction>,
-        block_executor_onchain_config: BlockExecutorOnchainConfig,
+        block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     ) -> StateComputeResultFut {
         let (result_tx, result_rx) = oneshot::channel();
         self.prepare_block_tx
@@ -208,7 +208,7 @@ impl ExecutionPipeline {
 struct PrepareBlockCommand {
     block_id: HashValue,
     txns_to_execute: Vec<Transaction>,
-    block_executor_onchain_config: BlockExecutorOnchainConfig,
+    block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     // The parent block id.
     parent_block_id: HashValue,
     result_tx: oneshot::Sender<ExecutorResult<StateComputeResult>>,
@@ -217,7 +217,7 @@ struct PrepareBlockCommand {
 struct ExecuteBlockCommand {
     block: ExecutableBlock,
     parent_block_id: HashValue,
-    block_executor_onchain_config: BlockExecutorOnchainConfig,
+    block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     result_tx: oneshot::Sender<ExecutorResult<StateComputeResult>>,
 }
 
