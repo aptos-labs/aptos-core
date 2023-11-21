@@ -40,7 +40,7 @@ impl RemoteCoordinatorClient {
         let execute_command_type = format!("execute_command_{}", shard_id);
         let execute_result_type = format!("execute_result_{}", shard_id);
         let command_rx = controller.create_inbound_channel(execute_command_type);
-        let result_tx = OutboundRpcHelper::new(controller.get_self_addr(), coordinator_address);
+        let result_tx = OutboundRpcHelper::new(controller.get_self_addr(), coordinator_address, controller.get_outbound_rpc_runtime());
             //controller.create_outbound_channel(coordinator_address, execute_result_type);
 
         let state_view_client =

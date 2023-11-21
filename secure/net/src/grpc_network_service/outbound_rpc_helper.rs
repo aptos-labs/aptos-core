@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::runtime;
 use tokio::runtime::Runtime;
@@ -11,13 +12,12 @@ use crate::network_controller::metrics::REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER;
 
 pub struct OutboundRpcHelper {
     self_addr: SocketAddr,
-    outbound_rpc_runtime: Runtime,
+    outbound_rpc_runtime: Arc<Runtime>,
     grpc_client: GRPCNetworkMessageServiceClientWrapper
 }
 
 impl OutboundRpcHelper {
-    pub fn new(self_addr: SocketAddr, remote_addr: SocketAddr) -> Self {
-        let outbound_rpc_runtime = runtime::Builder::new_multi_thread().enable_all().thread_name("outbound_rpc_helper").build().unwrap();
+    pub fn new(self_addr: SocketAddr, remote_addr: SocketAddr, outbound_rpc_runtime: Arc<Runtime>) -> Self {
         Self {
             self_addr,
             grpc_client: GRPCNetworkMessageServiceClientWrapper::new(&outbound_rpc_runtime, remote_addr),

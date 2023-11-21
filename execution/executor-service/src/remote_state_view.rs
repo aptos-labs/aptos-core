@@ -99,7 +99,7 @@ impl RemoteStateViewClient {
         let result_rx = controller.create_inbound_channel(kv_response_type.to_string());
         let mut command_tx = vec![];
         for _ in 0..num_kv_req_threads {
-            command_tx.push(Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), coordinator_address)));
+            command_tx.push(Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), coordinator_address, controller.get_outbound_rpc_runtime())));
         }
         let state_view = Arc::new(RwLock::new(RemoteStateView::new()));
         let state_value_receiver = RemoteStateValueReceiver::new(
