@@ -6,9 +6,9 @@
 
 use crate::{account::AccountData, executor::FakeExecutor};
 use aptos_proptest_helpers::Index;
-use move_core_types::{identifier::Identifier, language_storage::ModuleId};
+use move_core_types::{identifier::Identifier, language_storage::ModuleId, value::MoveValue};
 use move_ir_compiler::Compiler;
-use petgraph::{algo::toposort, Direction, Graph};
+use petgraph::{algo::toposort, graph::NodeIndex, Direction, Graph};
 use proptest::{
     collection::{vec, SizeRange},
     prelude::*,
@@ -25,7 +25,10 @@ pub struct Node {
 }
 
 #[derive(Debug)]
-pub struct DependencyGraph(Graph<Node, ()>);
+pub struct DependencyGraph {
+    graph: Graph<Node, ()>,
+    address_to_node: HashMap<ModuleId, NodeIndex>,
+}
 
 // This module generates a sets of modules that could be used to test the loader.
 //
@@ -116,6 +119,14 @@ impl DependencyGraph {
                 })
             })
             .collect::<Vec<_>>();
+
+        let address_to_node: HashMap<ModuleId, NodeIndex> = indices
+            .iter()
+            .map(|node_idx| {
+                (graph.node_weight(*node_idx).unwrap().name.clone(), *node_idx)
+            })
+            .collect();
+
         for (lhs_idx, rhs_idx) in edges {
             let lhs = lhs_idx.get(&indices);
             let rhs = rhs_idx.get(&indices);
@@ -130,37 +141,54 @@ impl DependencyGraph {
                 Ordering::Equal => (),
             }
         }
-        Self(graph)
+        Self {
+            graph,
+            address_to_node,
+        }
     }
 
     /// Set up [`DepGraph`] with the initial state generated in this universe.
     pub fn setup(&self, executor: &mut FakeExecutor) {
-        for node in self.0.raw_nodes().iter() {
+        for node in self.graph.raw_nodes().iter() {
             executor.add_account_data(&node.weight.account_data);
         }
     }
 
     pub fn execute(&self, executor: &mut FakeExecutor) {
         // Generate a list of modules
-        let accounts = toposort(&self.0, None).expect("Dep graph should be acyclic");
+        let accounts = toposort(&self.graph, None).expect("Dep graph should be acyclic");
         let mut expected_values = HashMap::new();
         let mut modules = vec![];
         for account_idx in accounts.iter().rev() {
-            let node = self.0.node_weight(*account_idx).expect("Node should exist");
+            let node = self
+                .graph
+                .node_weight(*account_idx)
+                .expect("Node should exist");
             let mut result = node.self_value;
             let mut deps = vec![];
 
             // Calculate the expected result of module entry function
-            for successor in self.0.neighbors_directed(*account_idx, Direction::Outgoing) {
+            for successor in self
+                .graph
+                .neighbors_directed(*account_idx, Direction::Outgoing)
+            {
                 result += expected_values
                     .get(&successor)
                     .expect("Topo sort should already compute the value for successor");
-                deps.push(self.0.node_weight(successor).unwrap().name.clone());
+                deps.push(self.graph.node_weight(successor).unwrap().name.clone());
             }
             expected_values.insert(*account_idx, result);
 
-            let module_str =
-                module_generator::generate_module(&node.name, &deps, node.self_value, result);
+            let module_str = module_generator::generate_module(
+                &node.name,
+                &deps,
+                node.self_value,
+                |module_id| {
+                    *expected_values
+                        .get(self.address_to_node.get(module_id).unwrap())
+                        .unwrap()
+                },
+            );
             let module = Compiler {
                 deps: modules.iter().collect(),
             }
@@ -177,10 +205,20 @@ impl DependencyGraph {
             modules.push(module);
         }
         for account_idx in accounts.iter() {
-            let node = self.0.node_weight(*account_idx).expect("Node should exist");
+            let node = self
+                .graph
+                .node_weight(*account_idx)
+                .expect("Node should exist");
 
             // TODO: Generate transactions instead of using exec api.
-            executor.exec_module(&node.name, "foo", vec![], vec![]);
+            executor.exec_module(
+                &node.name,
+                "foo",
+                vec![],
+                vec![MoveValue::U64(*expected_values.get(account_idx).unwrap())
+                    .simple_serialize()
+                    .unwrap()],
+            );
         }
     }
 }

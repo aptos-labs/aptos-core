@@ -12,7 +12,7 @@ pub fn generate_module(
     self_addr: &ModuleId,
     deps: &[ModuleId],
     self_val: u64,
-    expected_val: u64,
+    deps_expected_value: impl Fn(&ModuleId) -> u64,
 ) -> String {
     let writer = CodeWriter::new(Loc::default());
     emit!(
@@ -27,7 +27,7 @@ pub fn generate_module(
         emitln!(writer, "import {}.{};", dep.address(), dep.name());
     }
     emitln!(writer);
-    emitln!(writer, "public entry foo(): u64 {");
+    emitln!(writer, "public entry foo(expected_value: u64): u64 {");
     writer.indent();
     emitln!(writer, "let a: u64;");
     writer.unindent();
@@ -35,10 +35,10 @@ pub fn generate_module(
     writer.indent();
     emit!(writer, "a = {}", self_val);
     for dep in deps {
-        emit!(writer, "+ {}.foo()", dep.name());
+        emit!(writer, "+ {}.foo({})", dep.name(), deps_expected_value(dep));
     }
     emit!(writer, ";\n");
-    emitln!(writer, "assert(copy(a) == {}, 42);", expected_val);
+    emitln!(writer, "assert(copy(a) == move(expected_value), 42);");
     emitln!(writer, "return move(a);");
     writer.unindent();
     emitln!(writer, "}");
