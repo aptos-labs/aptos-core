@@ -274,7 +274,7 @@ where
             &mut main_signer_accounts,
             burner_accounts,
             &db_gen_init_transaction_executor,
-            &transaction_factory,
+            &transaction_factory.clone().with_max_gas_amount(10000),
             &transaction_factory,
             phase_clone,
         )
@@ -758,10 +758,7 @@ mod tests {
         AptosVM::set_concurrency_level_once(4);
         AptosVM::set_processed_transactions_detailed_counters();
         NativeExecutor::set_concurrency_level_once(4);
-        test_generic_benchmark::<AptosVM>(
-            Some(TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB),
-            true,
-        );
+        test_generic_benchmark::<AptosVM>(Some(TransactionTypeArg::Tournament10), true);
     }
 
     #[test]

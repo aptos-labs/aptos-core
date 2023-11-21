@@ -64,6 +64,11 @@ pub enum TransactionTypeArg {
     SmartTablePicture1MWith256Change,
     SmartTablePicture1BWith256Change,
     SmartTablePicture1MWith1KChangeExceedsLimit,
+    Tournament10,
+    Tournament10kBy100,
+    Tournament100kBy100,
+    Tournament100kBy300,
+    Tournament1mBy100,
 }
 
 impl TransactionTypeArg {
@@ -407,6 +412,51 @@ impl TransactionTypeArg {
                     num_modules: module_working_set_size,
                     use_account_pool: sender_use_account_pool,
                 }
+            },
+            TransactionTypeArg::Tournament10 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Tournament {
+                    num_players: 10,
+                    join_batch: 3,
+                },
+                num_modules: module_working_set_size,
+                progress_type: workflow_progress_type,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::Tournament10kBy100 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Tournament {
+                    num_players: 10000,
+                    join_batch: 100,
+                },
+                num_modules: module_working_set_size,
+                progress_type: workflow_progress_type,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::Tournament100kBy100 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Tournament {
+                    num_players: 100000,
+                    join_batch: 100,
+                },
+                num_modules: module_working_set_size,
+                progress_type: workflow_progress_type,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::Tournament100kBy300 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Tournament {
+                    num_players: 100000,
+                    join_batch: 300,
+                },
+                num_modules: module_working_set_size,
+                progress_type: workflow_progress_type,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::Tournament1mBy100 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Tournament {
+                    num_players: 1000000,
+                    join_batch: 100,
+                },
+                num_modules: module_working_set_size,
+                progress_type: workflow_progress_type,
+                use_account_pool: sender_use_account_pool,
             },
         }
     }
