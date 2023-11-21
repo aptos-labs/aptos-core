@@ -241,7 +241,7 @@ fn get_sys_txns_basic() {
         &mut max_block_bytes,
         &pending_sys_txns,
     );
-    // Proposing 2 txns, each of size 16 bytes.
+    // Proposing 2 txns, 32 bytes in total.
     assert_eq!(
         vec![SystemTransaction::dummy(0), SystemTransaction::dummy(2)],
         sys_txns
@@ -267,7 +267,7 @@ fn get_sys_txns_should_respect_feature_flag() {
         &mut max_block_bytes,
         &pending_sys_txns,
     );
-    // Proposing 2 txns, each of size 16 bytes.
+    // Proposing 0 txns.
     assert_eq!(0, sys_txns.len());
     assert_eq!(99, max_block_txns);
     assert_eq!(2048, max_block_bytes);
@@ -290,7 +290,7 @@ fn get_sys_txns_should_respect_txn_count_limit() {
         &mut max_block_bytes,
         &pending_sys_txns,
     );
-    // Proposing 1 txn, each of size 16 bytes.
+    // Proposing 1 txn, 16 bytes in total.
     assert_eq!(vec![SystemTransaction::dummy(0)], sys_txns);
     assert_eq!(0, max_block_txns);
     assert_eq!(2032, max_block_bytes);
@@ -313,7 +313,7 @@ fn get_sys_txns_should_respect_block_size_limit() {
         &mut max_block_bytes,
         &pending_sys_txns,
     );
-    // Proposing 2 txns, each of size 16 bytes.
+    // Proposing 1 txn, 16 bytes in total.
     assert_eq!(vec![SystemTransaction::dummy(0)], sys_txns);
     assert_eq!(98, max_block_txns);
     assert_eq!(4, max_block_bytes);
@@ -336,6 +336,7 @@ fn get_sys_txns_should_respect_pending_list() {
         &mut max_block_bytes,
         &pending_sys_txns,
     );
+    // Proposing 1 txn, 16 bytes in total.
     assert_eq!(vec![SystemTransaction::dummy(2)], sys_txns);
     assert_eq!(98, max_block_txns);
     assert_eq!(2032, max_block_bytes);
