@@ -78,10 +78,15 @@ impl FullnodeData for FullnodeDataService {
             match tx.send(Result::<_, Status>::Ok(init_status)).await {
                 Ok(_) => {
                     // TODO: Add request details later
-                    info!("[indexer-grpc] Init connection");
+                    info!(
+                        start_version = starting_version,
+                        chain_id = ledger_chain_id,
+                        service_type = SERVICE_TYPE,
+                        "[Indexer Fullnode] Init connection"
+                    );
                 },
                 Err(_) => {
-                    panic!("[indexer-grpc] Unable to initialize stream");
+                    panic!("[Indexer Fullnode] Unable to initialize stream");
                 },
             }
             let mut base: u64 = 0;
@@ -92,10 +97,23 @@ impl FullnodeData for FullnodeDataService {
                 let max_version = match IndexerStreamCoordinator::get_max_batch_version(results) {
                     Ok(max_version) => max_version,
                     Err(e) => {
-                        error!("[indexer-grpc] Error sending to stream: {}", e);
+                        error!("[Indexer Fullnode] Error sending to stream: {}", e);
                         break;
                     },
                 };
+                let highest_known_version = coordinator.highest_known_version;
+
+                info!(
+                    start_version = coordinator.current_version,
+                    end_version = max_version,
+                    num_of_transactions = ma.sum(),
+                    highest_known_version = highest_known_version,
+                    service_type = SERVICE_TYPE,
+                    duration_in_secs = start_time.elapsed().as_secs_f64(),
+                    step = IndexerGrpcStep::FullnodeProcessedBatch.get_step(),
+                    "{}",
+                    IndexerGrpcStep::FullnodeProcessedBatch.get_label(),
+                );
 
                 LATEST_PROCESSED_VERSION
                     .with_label_values(&[
@@ -139,11 +157,15 @@ impl FullnodeData for FullnodeDataService {
                             base = new_base;
 
                             info!(
-                                batch_start_version = coordinator.current_version,
-                                batch_end_version = max_version,
-                                versions_processed = ma.sum(),
+                                start_version = coordinator.current_version,
+                                end_version = max_version,
+                                num_of_transactions = ma.sum(),
+                                highest_known_version = highest_known_version,
                                 tps = (ma.avg() * 1000.0) as u64,
-                                "[indexer-grpc] Sent batch successfully"
+                                service_type = SERVICE_TYPE,
+                                step = IndexerGrpcStep::FullnodeSentBatch.get_step(),
+                                "{}",
+                                IndexerGrpcStep::FullnodeSentBatch.get_label(),
                             );
 
                             LATEST_PROCESSED_VERSION
@@ -170,7 +192,7 @@ impl FullnodeData for FullnodeDataService {
                         }
                     },
                     Err(_) => {
-                        aptos_logger::warn!("[indexer-grpc] Unable to send end batch status");
+                        aptos_logger::warn!("[Indexer Fullnode] Unable to send end batch status");
                         break;
                     },
                 }
