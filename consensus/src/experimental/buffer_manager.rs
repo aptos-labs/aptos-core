@@ -667,6 +667,16 @@ impl BufferManager {
                             >= Duration::from_millis(COMMIT_VOTE_REBROADCAST_INTERVAL_MS)
                     },
                 };
+                info!(
+                    "{} has {} out of {} voting power, {} out of {} votes",
+                    signed_item.commit_vote.commit_info(),
+                    self.verifier
+                        .sum_voting_power(signed_item.partial_commit_proof.signatures().keys(),)
+                        .unwrap_or_default(),
+                    self.verifier.total_voting_power(),
+                    signed_item.partial_commit_proof.signatures().len(),
+                    self.verifier.len(),
+                );
                 if re_broadcast {
                     if let Some((start_time, maybe_drop_guard)) = signed_item.rb_handle.as_mut() {
                         *start_time = Instant::now();
