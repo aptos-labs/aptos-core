@@ -11,7 +11,7 @@ Our UI logic relies on whether the connected account has created a todo list. If
 
 For that, we first need to check if the connected account has a `TodoList` resource. In our smart contract, whenever someone creates a todo list we create and assign a `TodoList` resource to their account.
 
-To fetch data from chain, we can use the [Aptos TypeScript SDK](../../sdks/ts-sdk/index.md). The SDK provides classes and functions for us to easily interact and query the Aptos chain.
+To fetch data from chain, we can use the [Aptos TypeScript SDK](../../sdks/ts-sdk/v1/index.md). The SDK provides classes and functions for us to easily interact and query the Aptos chain.
 
 To get started:
 
@@ -26,7 +26,7 @@ import { Provider, Network } from "aptos";
 The TypeScript SDK provides us with a `Provider` class where we can initialize and query the Aptos chain and Indexer. `Provider` expects `Network` type as an argument, which is the [network name](../../guides/system-integrators-guide.md#choose-a-network) we want to interact with.
 
 :::tip
-Read more about the [`Provider`](../../sdks/ts-sdk/typescript-sdk-overview.md#provider-class) class in the Aptos TypeScript SDK overview.
+Read more about the [`Provider`](../../sdks/ts-sdk/v1/typescript-sdk-overview.md#provider-class) class in the Aptos TypeScript SDK overview.
 :::
 
 1. In the `App.tsx` file, add:
@@ -79,8 +79,9 @@ function App (
   ...
 )
 ```
-also import `useEffect` using 
-```import { useState, useEffect } from "react"; ```
+
+also import `useEffect` using
+`import { useState, useEffect } from "react"; `
 
 5. Our `useEffect` hook is calling a `fetchList` function; let’s create it:
 
@@ -113,8 +114,8 @@ The `provider.getAccountResource()`expects an _account address_ that holds the r
 
 If the request succeeds and there is a resource for that account, we want to set our local state to `true`; otherwise, we would set it to `false`.
 
-6. Let’s update ```import { Layout, Row, Col } from "antd"; ``` to import Button:
-   ```import { Layout, Row, Col, Button  } from "antd"; ```
+6. Let’s update `import { Layout, Row, Col } from "antd"; ` to import Button:
+   `import { Layout, Row, Col, Button } from "antd"; `
 
 7. Let’s update our UI based on the `accountHasList` state:
 

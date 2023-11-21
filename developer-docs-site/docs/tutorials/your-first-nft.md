@@ -12,13 +12,12 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 This tutorial describes how to create and transfer non-fungible assets on the Aptos blockchain. The Aptos no-code implementation for non-fungible digital assets can be found in the [aptos_token.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token-objects/sources/aptos_token.move) Move module.
 
-
 ## Step 1: Pick an SDK
 
 Install your preferred SDK from the below list:
 
-* [TypeScript SDK](../sdks/ts-sdk/index.md)
-* [Python SDK](../sdks/python-sdk.md)
+- [TypeScript SDK](../sdks/ts-sdk/v1/index.md)
+- [Python SDK](../sdks/python-sdk.md)
 
 ---
 
@@ -27,6 +26,7 @@ Install your preferred SDK from the below list:
 Each SDK provides an `examples` directory. This tutorial covers the `simple_aptos_token` example.
 
 Clone the `aptos-core` repo:
+
 ```bash
 git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
 ```
@@ -34,38 +34,46 @@ git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
-  Navigate to the Typescript SDK examples directory:
-  ```bash
-  cd ~/aptos-core/ecosystem/typescript/sdk/examples/typescript
-  ```
+Navigate to the Typescript SDK examples directory:
 
-  Install the necessary dependencies:
-  ```bash
-  pnpm install
-  ```
+```bash
+cd ~/aptos-core/ecosystem/typescript/sdk/examples/typescript
+```
 
-  Run the Typescript [`simple_aptos_token`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/simple_aptos_token.ts) example:
-  ```bash
-  pnpm run simple_aptos_token
-  ```
+Install the necessary dependencies:
+
+```bash
+pnpm install
+```
+
+Run the Typescript [`simple_aptos_token`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/simple_aptos_token.ts) example:
+
+```bash
+pnpm run simple_aptos_token
+```
+
   </TabItem>
   <TabItem value="python" label="Python">
 
-  Navigate to the Python SDK directory:
-  ```bash
-  cd ~/aptos-core/ecosystem/python/sdk
-  ```
+Navigate to the Python SDK directory:
 
-  Install the necessary dependencies:
-  ```bash
-  curl -sSL https://install.python-poetry.org | python3
-  poetry install
-  ```
+```bash
+cd ~/aptos-core/ecosystem/python/sdk
+```
 
-  Run the Python [`simple_aptos_token`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simple_aptos_token.py) example:
-  ```bash
-  poetry run python -m examples.simple_aptos_token
-  ```
+Install the necessary dependencies:
+
+```bash
+curl -sSL https://install.python-poetry.org | python3
+poetry install
+```
+
+Run the Python [`simple_aptos_token`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simple_aptos_token.py) example:
+
+```bash
+poetry run python -m examples.simple_aptos_token
+```
+
   </TabItem>
 </Tabs>
 
@@ -136,6 +144,7 @@ Alice current token ownership: 1. Should be 1
 === Getting Bob's NFTs ===
 Bob current token ownership: 0. Should be 0
 ```
+
   </TabItem>
   <TabItem value="python" label="Python">
 
@@ -175,17 +184,18 @@ Token owner: Bob
 === Transferring the token back to Alice ===
 Token owner: Alice
 ```
+
   </TabItem>
 </Tabs>
 
 This example demonstrates:
 
-* Initializing the REST and faucet clients.
-* The creation of two accounts: Alice and Bob.
-* The funding and creation of Alice and Bob's accounts.
-* The creation of a collection and a token using Alice's account.
-* Alice sending a token to Bob.
-* Bob sending the token back to Alice.
+- Initializing the REST and faucet clients.
+- The creation of two accounts: Alice and Bob.
+- The funding and creation of Alice and Bob's accounts.
+- The creation of a collection and a token using Alice's account.
+- Alice sending a token to Bob.
+- Bob sending the token back to Alice.
 
 ---
 
@@ -197,13 +207,13 @@ This example demonstrates:
 :::tip See the full code
 See [`simple_aptos_token`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/simple_aptos_token.ts) for the complete code as you follow the below steps.
 :::
-  </TabItem>
-  <TabItem value="python" label="Python">
+</TabItem>
+<TabItem value="python" label="Python">
 
 :::tip See the full code
 See [`simple_aptos_token`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simple_aptos_token.py) for the complete code as you follow the below steps.
 :::
-  </TabItem>
+</TabItem>
 </Tabs>
 
 ---
@@ -223,14 +233,17 @@ In the first step, the example initializes both the API and faucet clients.
 ```
 
 Using the API client we can create a `TokenClient` that we use for common token operations such as creating collections and tokens, transferring them, claiming them, and so on.
+
 ```ts
 :!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_1b
 ```
 
 `common.ts` initializes the URL values as such:
+
 ```ts
 :!: static/sdks/typescript/examples/typescript/common.ts section_1
 ```
+
   </TabItem>
   <TabItem value="python" label="Python">
 
@@ -249,16 +262,17 @@ Using the API client we can create a `TokenClient` that we use for common token 
 ```python
 :!: static/sdks/python/examples/common.py section_1
 ```
+
   </TabItem>
 </Tabs>
-
 
 :::tip
 
 By default, the URLs for both the services point to Aptos devnet services. However, they can be configured with the following environment variables:
-  - `APTOS_NODE_URL`
-  - `APTOS_FAUCET_URL`
-:::
+
+- `APTOS_NODE_URL`
+- `APTOS_FAUCET_URL`
+  :::
 
 ---
 
@@ -266,19 +280,20 @@ By default, the URLs for both the services point to Aptos devnet services. Howev
 
 The next step is to create two accounts locally. [Accounts](../concepts/accounts.md) consist of a public address and the public/private key pair used to authenticate ownership of the account. This step demonstrates how to generate an Account and store its key pair and address in a variable.
 
-
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
 ```ts
 :!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_2
 ```
+
   </TabItem>
   <TabItem value="python" label="Python">
 
 ```python
 :!: static/sdks/python/examples/simple_aptos_token.py section_2
 ```
+
   </TabItem>
 </Tabs>
 
@@ -298,12 +313,14 @@ In order to actually instantiate the Account on-chain, it must be explicitly cre
 ```ts
 :!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_3
 ```
+
   </TabItem>
   <TabItem value="python" label="Python">
 
 ```python
 :!: static/sdks/python/examples/simple_aptos_token.py section_3
 ```
+
   </TabItem>
 </Tabs>
 
@@ -317,26 +334,32 @@ Now begins the process of creating the digital, non-fungible assets. First, as t
   <TabItem value="typescript" label="Typescript">
 
 Your application will call `createCollection`:
+
 ```ts
 :!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_4
 ```
 
 This is the function signature of `createCollection`. It returns a transaction hash:
+
 ```ts
 :!: static/sdks/typescript/src/plugins/aptos_token.ts createCollection
 ```
+
   </TabItem>
   <TabItem value="python" label="Python">
 
 Your application will call `create_collection`:
+
 ```python
 :!: static/sdks/python/examples/simple_aptos_token.py section_4
 ```
 
 This is the function signature of `create_collection`. It returns a transaction hash:
+
 ```python
 :!: static/sdks/python/aptos_sdk/aptos_token_client.py create_collection
 ```
+
   </TabItem>
 </Tabs>
 
@@ -350,26 +373,32 @@ To create a token, the creator must specify an associated collection. A token mu
   <TabItem value="typescript" label="Typescript">
 
 Your application will call `mint`:
+
 ```ts
 :!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_5
 ```
 
 This is the function signature of `mint`. It returns a transaction hash:
+
 ```ts
 :!: static/sdks/typescript/src/plugins/aptos_token.ts mint
 ```
+
   </TabItem>
   <TabItem value="python" label="Python">
 
 Your application will call `mint_token`:
+
 ```python
 :!: static/sdks/python/examples/simple_aptos_token.py section_5
 ```
 
 This is the function signature of `mint_token`. It returns a transaction hash:
+
 ```python
 :!: static/sdks/python/aptos_sdk/aptos_token_client.py mint_token
 ```
+
   </TabItem>
 </Tabs>
 
@@ -383,16 +412,19 @@ Both the collection and token assets are [Objects](../standards/aptos-object) on
   <TabItem value="typescript" label="Typescript">
 
 To read a collection's metadata:
+
 ```ts
 :!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_6
 ```
 
 To read a token's metadata:
+
 ```ts
 :!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_8
 ```
 
-Here's how `getTokenData` queries the token metadata using the [indexer client](../sdks/ts-sdk/typescript-sdk-indexer-client-class):
+Here's how `getTokenData` queries the token metadata using the [indexer client](../sdks/ts-sdk/v1/typescript-sdk-indexer-client-class):
+
 ```ts
 :!: static/sdks/typescript/src/providers/indexer.ts getTokenData
 ```
@@ -401,11 +433,13 @@ Here's how `getTokenData` queries the token metadata using the [indexer client](
   <TabItem value="python" label="Python">
 
 To read a collection's metadata:
+
 ```python
 :!: static/sdks/python/examples/simple_aptos_token.py section_6
 ```
 
 To read a token's metadata:
+
 ```python
 :!: static/sdks/python/examples/simple_aptos_token.py get_token_data
 ```
@@ -429,6 +463,7 @@ Each object created from the `aptos_token.move` contract is a distinct asset. Th
 ```ts title="Making the query to get the data"
 :!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts getTokenInfo
 ```
+
   </TabItem>
   <TabItem value="python" label="Python">
 
@@ -499,16 +534,14 @@ Each object created from the `aptos_token.move` contract is a distinct asset. Th
 :!: static/sdks/python/examples/simple_aptos_token.py section_11
 ```
 
-
   </TabItem>
 </Tabs>
 
 ---
 
-
 ## Supporting documentation
 
-* [Account basics](../concepts/accounts.md)
-* [TypeScript SDK](../sdks/ts-sdk/index.md)
-* [Python SDK](../sdks/python-sdk.md)
-* [REST API specification](https://aptos.dev/nodes/aptos-api-spec#/)
+- [Account basics](../concepts/accounts.md)
+- [TypeScript SDK](../sdks/ts-sdk/v1/index.md)
+- [Python SDK](../sdks/python-sdk.md)
+- [REST API specification](https://aptos.dev/nodes/aptos-api-spec#/)
