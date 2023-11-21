@@ -574,20 +574,20 @@ impl BufferManager {
             protocol,
             response_sender,
         } = commit_msg;
-        if let Err(e) = req.verify(&self.verifier) {
-            warn!("Invalid commit message: {}", e);
-            return None;
-        }
+        // if let Err(e) = req.verify(&self.verifier) {
+        //     warn!("Invalid commit message: {}", e);
+        //     return None;
+        // }
         match req {
             CommitMessage::Vote(vote) => {
                 // find the corresponding item
                 let (target_id, ack) = self.process_commit_vote(vote);
-                if ack {
-                    let response = ConsensusMsg::CommitMessage(Box::new(CommitMessage::Ack(())));
-                    if let Ok(bytes) = protocol.to_bytes(&response) {
-                        let _ = response_sender.send(Ok(bytes.into()));
-                    }
+                // if ack {
+                let response = ConsensusMsg::CommitMessage(Box::new(CommitMessage::Ack(())));
+                if let Ok(bytes) = protocol.to_bytes(&response) {
+                    let _ = response_sender.send(Ok(bytes.into()));
                 }
+                // }
                 if let Some(target_block_id) = target_id {
                     return Some(target_block_id);
                 }
@@ -730,7 +730,7 @@ impl BufferManager {
         let mut interval = tokio::time::interval(Duration::from_millis(LOOP_INTERVAL_MS));
         while !self.stop {
             // advancing the root will trigger sending requests to the pipeline
-            ::futures::select! {
+            ::futures::select_biased! {
                 blocks = self.block_rx.select_next_some() => {
                     monitor!("buffer_manager_process_ordered", {
                     self.process_ordered_blocks(blocks).await;
@@ -760,6 +760,12 @@ impl BufferManager {
                     self.advance_signing_root().await
                     })
                 },
+                _ = interval.tick().fuse() => {
+                    monitor!("buffer_manager_process_interval_tick", {
+                    self.update_buffer_manager_metrics();
+                    self.rebroadcast_commit_votes_if_needed().await
+                    });
+                },
                 commit_msg = self.commit_msg_rx.select_next_some() => {
                     monitor!("buffer_manager_process_commit_message",
                     if let Some(aggregated_block_id) = self.process_commit_message(commit_msg) {
@@ -770,12 +776,6 @@ impl BufferManager {
                         if self.signing_root.is_none() {
                             self.advance_signing_root().await;
                         }
-                    });
-                },
-                _ = interval.tick().fuse() => {
-                    monitor!("buffer_manager_process_interval_tick", {
-                    self.update_buffer_manager_metrics();
-                    self.rebroadcast_commit_votes_if_needed().await
                     });
                 },
                 // no else branch here because interval.tick will always be available
