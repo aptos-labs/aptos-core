@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::config::{
-    config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, utils::RootPath, Error,
-    NodeConfig,
+    config_sanitizer::ConfigSanitizer, node_config_loader::NodeType,
+    transaction_filter_type::Filter, utils::RootPath, Error, NodeConfig,
 };
 use aptos_types::{chain_id::ChainId, transaction::Transaction};
 use serde::{Deserialize, Serialize};
@@ -34,6 +34,8 @@ pub struct ExecutionConfig {
     pub paranoid_hot_potato_verification: bool,
     /// Enables enhanced metrics around processed transactions
     pub processed_transactions_detailed_counters: bool,
+    /// Enables filtering of transactions before they are sent to execution
+    pub transaction_filter: Filter,
 }
 
 impl std::fmt::Debug for ExecutionConfig {
@@ -63,6 +65,7 @@ impl Default for ExecutionConfig {
             paranoid_type_verification: true,
             paranoid_hot_potato_verification: true,
             processed_transactions_detailed_counters: false,
+            transaction_filter: Filter::empty(),
         }
     }
 }
