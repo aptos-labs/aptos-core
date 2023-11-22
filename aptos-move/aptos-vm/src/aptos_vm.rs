@@ -55,7 +55,7 @@ use aptos_vm_types::{
     resolver::{ExecutorView, ResourceGroupView},
     storage::{ChangeSetConfigs, StorageGasParameters},
 };
-use claims::assert_ok;
+use claims::assert_err;
 use fail::fail_point;
 use move_binary_format::{
     access::ModuleAccess,
@@ -1998,7 +1998,7 @@ impl VMSimulator for AptosVM {
         state_view: &impl StateView,
     ) -> (VMStatus, TransactionOutput) {
         assert!(self.is_simulation, "VM has to be created for simulation");
-        assert_ok!(
+        assert_err!(
             transaction.verify_signature(),
             "Simulated transaction should not have a valid signature"
         );
