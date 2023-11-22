@@ -55,6 +55,7 @@ use aptos_vm_types::{
     resolver::{ExecutorView, ResourceGroupView},
     storage::{ChangeSetConfigs, StorageGasParameters},
 };
+use claims::assert_ok;
 use fail::fail_point;
 use move_binary_format::{
     access::ModuleAccess,
@@ -1995,23 +1996,21 @@ impl VMSimulator for AptosVM {
         &self,
         transaction: &SignedTransaction,
         state_view: &impl StateView,
-    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
+    ) -> (VMStatus, TransactionOutput) {
         assert!(self.is_simulation, "VM has to be created for simulation");
-
-        // The caller must ensure that the signature is not invalid, as otherwise
-        // a malicious actor could execute the transaction without their knowledge.
-        if transaction.verify_signature().is_ok() {
-            return Err(VMStatus::error(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                Some("Simulated transaction should not have a valid signature".to_string()),
-            ));
-        }
+        assert_ok!(
+            transaction.verify_signature(),
+            "Simulated transaction should not have a valid signature"
+        );
 
         let resolver = state_view.as_move_resolver();
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let (vm_status, vm_output) =
             self.execute_user_transaction(&resolver, transaction, &log_context);
-        Ok((vm_status, vm_output.try_into_transaction_output(&resolver)?))
+        let txn_output = vm_output
+            .try_into_transaction_output(&resolver)
+            .expect("Materializing aggregator V1 deltas should never fail");
+        (vm_status, txn_output)
     }
 }
