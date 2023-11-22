@@ -1280,9 +1280,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 };
                 let mut result = et.translate_seq(&loc, seq, &result_type);
                 et.finalize_types();
-                if !as_spec_fun {
-                    result = et.post_process_spec_blocks(result.into_exp()).into();
-                }
+                result = et.post_process_placeholders(result.into_exp()).into();
                 (result, access_specifiers)
             };
 
