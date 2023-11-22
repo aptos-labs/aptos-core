@@ -73,9 +73,9 @@ fn run_test_impl(path: &Path, v2_flag: bool) -> datatest_stable::Result<String> 
                 .into())
             },
             (true, _) => match BuildPlan::create(resolved_package)
-                .and_then(|bp| bp.compile(&compiler_config.clone(), &mut Vec::new()))
+                .and_then(|bp| bp.compile_no_exit(&compiler_config.clone(), &mut Vec::new()))
             {
-                Ok(mut pkg) => {
+                Ok((mut pkg, _)) => {
                     pkg.compiled_package_info.source_digest =
                         Some(PackageDigest::from("ELIDED_FOR_TEST"));
                     pkg.compiled_package_info.build_flags.install_dir =
@@ -155,6 +155,7 @@ pub fn run_test(path: &Path) -> datatest_stable::Result<()> {
     let update_baseline = read_env_update_baseline();
     let res_v1 = check_or_update(path, output_v1.clone(), update_baseline, false);
     if read_env_var(ENABLE_V2) == "1" {
+        // Run test against v2 when ENABLE_V2 is set
         let output_v2 = run_test_impl(path, true)?;
         if output_v1 != output_v2 {
             // TODO: compare the result between V1 and V2.

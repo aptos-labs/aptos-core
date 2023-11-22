@@ -41,6 +41,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
         panic!("move unit tests failed")
     }
     if read_env_var(ENABLE_V2) == "1" {
+        // Run test against v2 when ENABLE_V2 is set
         compiler_config.compiler_version = Some(CompilerVersion::V2);
         build_config.compiler_config = compiler_config;
         ok = run_move_unit_tests(

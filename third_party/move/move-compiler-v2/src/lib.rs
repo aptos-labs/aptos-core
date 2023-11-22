@@ -173,9 +173,10 @@ pub fn annotate_units(units: Vec<CompiledUnit>) -> Vec<AnnotatedCompiledUnit> {
         .into_iter()
         .map(|u| match u {
             CompiledUnit::Module(named_module) => {
+                let loc = named_module.source_map.definition_location;
                 AnnotatedCompiledUnit::Module(AnnotatedCompiledModule {
-                    loc: named_module.source_map.definition_location,
-                    module_name_loc: named_module.source_map.definition_location,
+                    loc,
+                    module_name_loc: loc,
                     address_name: None,
                     named_module,
                     function_infos: UniqueMap::new(),

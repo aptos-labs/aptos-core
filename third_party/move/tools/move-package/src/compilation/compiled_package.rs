@@ -682,22 +682,29 @@ impl CompiledPackage {
         };
         let mut root_compiled_units = vec![];
         let mut deps_compiled_units = vec![];
-        let obtain_package_name = |default: Option<Symbol>, source_path_str: &str| -> Symbol {
-            if default.is_none() && source_package_map.contains_key(source_path_str) {
-                *source_package_map.get(source_path_str).unwrap()
-            } else {
-                default.unwrap()
-            }
-        };
+        let obtain_package_name =
+            |default_opt: Option<Symbol>, source_path_str: &str| -> Result<Symbol> {
+                if let Some(default) = default_opt {
+                    Ok(default)
+                } else if source_package_map.contains_key(source_path_str) {
+                    Ok(*source_package_map.get(source_path_str).unwrap())
+                } else {
+                    Err(anyhow::anyhow!("package name is none"))
+                }
+            };
         for annot_unit in all_compiled_units {
-            let source_path_str = file_map[&annot_unit.loc().file_hash()].0.as_str();
+            let source_path_str = file_map
+                .get(&annot_unit.loc().file_hash())
+                .ok_or(anyhow::anyhow!("invalid transaction script bytecode"))?
+                .0
+                .as_str();
             let source_path = PathBuf::from(source_path_str);
             let package_name = match &annot_unit {
                 compiled_unit::CompiledUnitEnum::Module(m) => {
-                    obtain_package_name(m.named_module.package_name, source_path_str)
+                    obtain_package_name(m.named_module.package_name, source_path_str)?
                 },
                 compiled_unit::CompiledUnitEnum::Script(s) => {
-                    obtain_package_name(s.named_script.package_name, source_path_str)
+                    obtain_package_name(s.named_script.package_name, source_path_str)?
                 },
             };
             let unit = CompiledUnitWithSource {

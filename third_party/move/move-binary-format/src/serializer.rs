@@ -502,7 +502,7 @@ fn serialize_function_handle(
             .as_ref()
             .unwrap()
             .iter()
-            .any(|sp| !sp.is_traditional_acquires())
+            .any(|sp| !sp.is_old_style_acquires())
     {
         Err(anyhow!(
             "Access specifiers not supported in bytecode version {}",
