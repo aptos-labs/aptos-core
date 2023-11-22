@@ -127,6 +127,8 @@ EntryFunctionPayload
 Enums
 EpochChangeProof
 Ethereum
+EventHandle
+EventHandles
 ExtendRef
 ExternalMarkdown
 FA

@@ -733,6 +733,9 @@ Remove a key/value pair from the map. The key must exist.
 
 
 <pre><code><b>pragma</b> intrinsic;
+<b>pragma</b> opaque;
+<b>ensures</b> [abstract] <a href="simple_map.md#0x1_simple_map_spec_len">spec_len</a>(result) == 0;
+<b>ensures</b> [abstract] <b>forall</b> k: Key: !<a href="simple_map.md#0x1_simple_map_spec_contains_key">spec_contains_key</a>(result, k);
 </code></pre>
 
 
@@ -749,6 +752,11 @@ Remove a key/value pair from the map. The key must exist.
 
 
 <pre><code><b>pragma</b> intrinsic;
+<b>pragma</b> opaque;
+<b>ensures</b> [abstract] <a href="simple_map.md#0x1_simple_map_spec_len">spec_len</a>(result) == len(keys);
+<b>ensures</b> [abstract] <b>forall</b> k: Key: <a href="simple_map.md#0x1_simple_map_spec_contains_key">spec_contains_key</a>(result, k) &lt;==&gt; <a href="../../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(keys, k);
+<b>ensures</b> [abstract] <b>forall</b> i in 0..len(keys):
+    <a href="simple_map.md#0x1_simple_map_spec_get">spec_get</a>(result, <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(keys, i)) == <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(values, i);
 </code></pre>
 
 

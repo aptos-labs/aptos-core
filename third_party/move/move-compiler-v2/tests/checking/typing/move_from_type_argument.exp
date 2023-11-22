@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: The type argument to `exists` and `global` must be a struct type but `?0` is not
+  ┌─ tests/checking/typing/move_from_type_argument.move:8:17
+  │
+8 │         let a = move_from(input);
+  │                 ^^^^^^^^^^^^^^^^
