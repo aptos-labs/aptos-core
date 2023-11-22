@@ -4,7 +4,7 @@
 
 use crate::{
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
-    block_executor::{AptosTransactionOutput, BlockAptosVM},
+    block_executor::{AptosTransactionOutput, BlockAptosVM, RAYON_EXEC_POOL},
     counters::*,
     data_cache::{AsMoveResolver, StorageAdapter},
     errors::expect_only_successful_execution,
@@ -76,7 +76,7 @@ use move_core_types::{
 use move_vm_runtime::session::SerializedReturnValues;
 use move_vm_types::gas::UnmeteredGasMeter;
 use num_cpus;
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::OnceCell;
 use std::{
     cmp::{max, min},
     collections::{BTreeMap, BTreeSet},
@@ -93,17 +93,6 @@ static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 static PARANOID_TYPE_CHECKS: OnceCell<bool> = OnceCell::new();
 static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
 static TIMED_FEATURE_OVERRIDE: OnceCell<TimedFeatureOverride> = OnceCell::new();
-
-// TODO: Don't expose this in AptosVM, and use only in BlockAptosVM!
-pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .thread_name(|index| format!("par_exec-{}", index))
-            .build()
-            .unwrap(),
-    )
-});
 
 /// Remove this once the bundle is removed from the code.
 static MODULE_BUNDLE_DISALLOWED: AtomicBool = AtomicBool::new(true);
@@ -1823,7 +1812,7 @@ impl VMExecutor for AptosVM {
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(
-            Arc::clone(&RAYON_EXEC_POOL),
+            triomphe::Arc::clone(&RAYON_EXEC_POOL),
             transactions,
             state_view,
             Self::get_concurrency_level(),

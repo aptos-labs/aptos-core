@@ -12,9 +12,10 @@ use std::{
     cmp::{max, min},
     sync::{
         atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
-        Arc, Condvar,
+        Condvar,
     },
 };
+use triomphe::Arc;
 
 const TXN_IDX_MASK: u64 = (1 << 32) - 1;
 

@@ -27,8 +27,8 @@ use std::{
         BTreeMap,
     },
     hash::Hash,
-    sync::Arc,
 };
+use triomphe::Arc;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 /// Describes an update to a resource group granularly, with WriteOps to affected

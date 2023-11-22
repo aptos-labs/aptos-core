@@ -19,7 +19,8 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::BTreeMap;
+use triomphe::Arc;
 
 pub(crate) struct WriteOpConverter<'r> {
     remote: &'r dyn AptosMoveResolver,

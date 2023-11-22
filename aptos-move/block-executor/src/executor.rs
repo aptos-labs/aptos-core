@@ -50,8 +50,9 @@ use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
     marker::{PhantomData, Sync},
-    sync::{atomic::AtomicU32, Arc},
+    sync::atomic::AtomicU32,
 };
+use triomphe::Arc;
 
 pub struct BlockExecutor<T, E, S, L, X> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon

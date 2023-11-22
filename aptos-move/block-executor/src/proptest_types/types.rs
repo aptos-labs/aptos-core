@@ -40,11 +40,9 @@ use std::{
     fmt::Debug,
     hash::{Hash, Hasher},
     marker::PhantomData,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicUsize, Ordering},
 };
+use triomphe::Arc;
 
 // Should not be possible to overflow or underflow, as each delta is at most 100 in the tests.
 // TODO: extend to delta failures.

@@ -60,11 +60,9 @@ use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
     fmt::Debug,
-    sync::{
-        atomic::{AtomicU32, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicU32, Ordering},
 };
+use triomphe::Arc;
 
 /// A struct which describes the result of the read from the proxy. The client
 /// can interpret these types to further resolve the reads.

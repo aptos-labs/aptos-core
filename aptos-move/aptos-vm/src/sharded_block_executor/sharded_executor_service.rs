@@ -29,14 +29,14 @@ use aptos_types::{
 use aptos_vm_logging::disable_speculative_logging;
 use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
-use std::sync::Arc;
+use triomphe::Arc;
 
 pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     shard_id: ShardId,
     num_shards: usize,
     executor_thread_pool: Arc<rayon::ThreadPool>,
-    coordinator_client: Arc<dyn CoordinatorClient<S>>,
-    cross_shard_client: Arc<dyn CrossShardClient>,
+    coordinator_client: std::sync::Arc<dyn CoordinatorClient<S>>,
+    cross_shard_client: std::sync::Arc<dyn CrossShardClient>,
 }
 
 impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
@@ -44,8 +44,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         shard_id: ShardId,
         num_shards: usize,
         num_threads: usize,
-        coordinator_client: Arc<dyn CoordinatorClient<S>>,
-        cross_shard_client: Arc<dyn CrossShardClient>,
+        coordinator_client: std::sync::Arc<dyn CoordinatorClient<S>>,
+        cross_shard_client: std::sync::Arc<dyn CrossShardClient>,
     ) -> Self {
         let executor_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
@@ -98,7 +98,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         shard_id: Option<ShardId>, // None means execution on global shard
         executor_thread_pool: Arc<rayon::ThreadPool>,
         transactions: Vec<TransactionWithDependencies<AnalyzedTransaction>>,
-        cross_shard_client: Arc<dyn CrossShardClient>,
+        cross_shard_client: std::sync::Arc<dyn CrossShardClient>,
         cross_shard_commit_sender: Option<CrossShardCommitSender>,
         round: usize,
         state_view: &S,

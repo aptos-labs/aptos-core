@@ -14,7 +14,8 @@ use aptos_types::{
 use aptos_vm_types::resource_group_adapter::group_size_as_sum;
 use move_core_types::value::MoveTypeLayout;
 use serde::Serialize;
-use std::{cell::RefCell, collections::HashMap, fmt::Debug, hash::Hash, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, fmt::Debug, hash::Hash};
+use triomphe::Arc;
 
 /// UnsyncMap is designed to mimic the functionality of MVHashMap for sequential execution.
 /// In this case only the latest recorded version is relevant, simplifying the implementation.

@@ -16,8 +16,8 @@ use std::{
     collections::btree_map::{self, BTreeMap},
     fmt::Debug,
     hash::Hash,
-    sync::Arc,
 };
+use triomphe::Arc;
 
 /// Every entry in shared multi-version data-structure has an "estimate" flag
 /// and some content.

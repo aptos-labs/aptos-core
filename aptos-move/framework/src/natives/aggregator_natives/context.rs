@@ -16,8 +16,8 @@ use move_core_types::value::MoveTypeLayout;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashSet},
-    sync::Arc,
 };
+use triomphe::Arc;
 
 /// Represents a single aggregator change.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

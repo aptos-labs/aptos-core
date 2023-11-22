@@ -34,7 +34,8 @@ use aptos_vm::{
     },
 };
 use proptest::{collection::vec, prelude::Strategy, strategy::ValueTree, test_runner::TestRunner};
-use std::{net::SocketAddr, sync::Arc, time::Instant};
+use std::{net::SocketAddr, time::Instant};
+use triomphe::Arc;
 
 pub struct TransactionBenchState<S> {
     num_transactions: usize,
@@ -44,7 +45,7 @@ pub struct TransactionBenchState<S> {
         Option<Arc<ShardedBlockExecutor<FakeDataStore, LocalExecutorClient<FakeDataStore>>>>,
     block_partitioner: Option<Box<dyn BlockPartitioner>>,
     validator_set: ValidatorSet,
-    state_view: Arc<FakeDataStore>,
+    state_view: std::sync::Arc<FakeDataStore>,
 }
 
 impl<S> TransactionBenchState<S>
@@ -92,7 +93,7 @@ where
         // characteristics.
         let universe = universe_gen.setup_gas_cost_stability(&mut executor);
 
-        let state_view = Arc::new(executor.get_state_view().clone());
+        let state_view = std::sync::Arc::new(executor.get_state_view().clone());
         let (parallel_block_executor, block_partitioner) = if num_executor_shards == 1 {
             (None, None)
         } else {

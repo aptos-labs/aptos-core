@@ -25,7 +25,8 @@ use move_bytecode_verifier::VerifierConfig;
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
-use std::{ops::Deref, sync::Arc};
+use std::ops::Deref;
+use triomphe::Arc;
 
 pub struct MoveVmExt {
     inner: MoveVM,

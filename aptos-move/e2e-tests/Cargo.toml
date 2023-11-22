@@ -53,3 +53,4 @@ proptest-derive = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
+triomphe = { workspace = true }

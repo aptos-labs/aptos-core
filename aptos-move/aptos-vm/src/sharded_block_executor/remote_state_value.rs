@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::state_store::state_value::StateValue;
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Condvar, Mutex};
+use triomphe::Arc;
 
 #[derive(Clone)]
 // This struct is used to store the status of a remote state value. It provides semantics for

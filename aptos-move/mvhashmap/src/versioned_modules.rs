@@ -12,8 +12,8 @@ use dashmap::DashMap;
 use std::{
     collections::{btree_map::BTreeMap, HashMap},
     hash::Hash,
-    sync::Arc,
 };
+use triomphe::Arc;
 
 /// Every entry in shared multi-version data-structure has an "estimate" flag
 /// and some content.

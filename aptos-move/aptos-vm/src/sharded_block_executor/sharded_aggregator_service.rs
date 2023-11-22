@@ -10,7 +10,8 @@ use aptos_types::{
 };
 use rayon::prelude::*;
 use serde::de::DeserializeOwned;
-use std::{ops, sync::Arc};
+use std::ops;
+use triomphe::Arc;
 
 pub fn get_state_value<S: StateView, T: DeserializeOwned>(
     state_key: &StateKey,

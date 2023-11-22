@@ -50,8 +50,8 @@ use move_core_types::{
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
-    sync::Arc,
 };
+use triomphe::Arc;
 
 pub(crate) fn get_resource_group_from_metadata(
     struct_tag: &StructTag,

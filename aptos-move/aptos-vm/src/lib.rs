@@ -133,7 +133,7 @@ use aptos_types::{
     },
     vm_status::VMStatus,
 };
-use std::{marker::Sync, sync::Arc};
+use std::marker::Sync;
 pub use verifier::view_function::determine_is_view;
 
 /// This trait describes the VM's validation interfaces.
@@ -164,7 +164,7 @@ pub trait VMExecutor: Send + Sync {
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(
         sharded_block_executor: &ShardedBlockExecutor<S, E>,
         transactions: PartitionedTransactions,
-        state_view: Arc<S>,
+        state_view: std::sync::Arc<S>,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
 }

@@ -25,7 +25,8 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::VMStatus,
 };
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::BTreeMap;
+use triomphe::Arc;
 
 pub(crate) struct MockChangeSetChecker;
 

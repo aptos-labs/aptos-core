@@ -24,16 +24,14 @@ use aptos_types::{
 };
 use derivative::Derivative;
 use move_core_types::value::MoveTypeLayout;
-use std::{
-    collections::{
-        hash_map::{
-            Entry,
-            Entry::{Occupied, Vacant},
-        },
-        HashMap, HashSet,
+use std::collections::{
+    hash_map::{
+        Entry,
+        Entry::{Occupied, Vacant},
     },
-    sync::Arc,
+    HashMap, HashSet,
 };
+use triomphe::Arc;
 
 /// The enum variants should not be re-ordered, as it defines a relation
 /// Existence < Metadata < Value.

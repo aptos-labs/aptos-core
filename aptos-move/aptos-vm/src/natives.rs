@@ -41,10 +41,9 @@ use move_core_types::language_storage::StructTag;
 use move_core_types::value::MoveTypeLayout;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 #[cfg(feature = "testing")]
-use std::{
-    collections::{BTreeMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{BTreeMap, HashSet};
+#[cfg(feature = "testing")]
+use triomphe::Arc;
 #[cfg(feature = "testing")]
 use {
     aptos_framework::natives::{

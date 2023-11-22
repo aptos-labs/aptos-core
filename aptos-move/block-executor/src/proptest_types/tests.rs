@@ -27,8 +27,9 @@ use proptest::{
     test_runner::TestRunner,
 };
 use rand::Rng;
-use std::{cmp::max, fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
+use std::{cmp::max, fmt::Debug, hash::Hash, marker::PhantomData};
 use test_case::test_case;
+use triomphe::Arc;
 
 fn run_transactions<K, V, E>(
     key_universe: &[K],

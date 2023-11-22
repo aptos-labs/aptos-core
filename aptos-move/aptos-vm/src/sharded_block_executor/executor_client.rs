@@ -6,7 +6,6 @@ use aptos_types::{
     block_executor::partitioner::PartitionedTransactions, transaction::TransactionOutput,
 };
 use move_core_types::vm_status::VMStatus;
-use std::sync::Arc;
 
 pub struct ShardedExecutionOutput {
     pub sharded_output: Vec<Vec<Vec<TransactionOutput>>>,
@@ -37,7 +36,7 @@ pub trait ExecutorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
     // and in the round order and also the global output.
     fn execute_block(
         &self,
-        state_view: Arc<S>,
+        state_view: std::sync::Arc<S>,
         transactions: PartitionedTransactions,
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,

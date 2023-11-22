@@ -17,17 +17,15 @@ use aptos_types::{
     transaction::analyzed_transaction::AnalyzedTransaction,
     write_set::TransactionWrite,
 };
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
+use triomphe::Arc;
 
 pub struct CrossShardCommitReceiver {}
 
 impl CrossShardCommitReceiver {
     pub fn start<S: StateView + Sync + Send>(
         cross_shard_state_view: Arc<CrossShardStateView<S>>,
-        cross_shard_client: Arc<dyn CrossShardClient>,
+        cross_shard_client: std::sync::Arc<dyn CrossShardClient>,
         round: RoundId,
     ) {
         loop {
@@ -49,7 +47,7 @@ impl CrossShardCommitReceiver {
 
 pub struct CrossShardCommitSender {
     shard_id: ShardId,
-    cross_shard_client: Arc<dyn CrossShardClient>,
+    cross_shard_client: std::sync::Arc<dyn CrossShardClient>,
     // The hashmap of source txn index to hashmap of conflicting storage location to the
     // list shard id and round id. Please note that the transaction indices stored here is
     // global indices, so we need to convert the local index received from the parallel execution to
@@ -63,7 +61,7 @@ pub struct CrossShardCommitSender {
 impl CrossShardCommitSender {
     pub fn new(
         shard_id: ShardId,
-        cross_shard_client: Arc<dyn CrossShardClient>,
+        cross_shard_client: std::sync::Arc<dyn CrossShardClient>,
         sub_block: &SubBlock<AnalyzedTransaction>,
     ) -> Self {
         let mut dependent_edges = HashMap::new();

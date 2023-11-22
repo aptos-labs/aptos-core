@@ -229,10 +229,8 @@ mod test {
         vm_status::{StatusCode, VMStatus},
     };
     use once_cell::sync::Lazy;
-    use std::{
-        collections::{BTreeMap, HashSet},
-        sync::Arc,
-    };
+    use std::collections::{BTreeMap, HashSet};
+    use triomphe::Arc;
 
     fn delta_add_with_history(v: u128, max_value: u128, max: u128, min: u128) -> DeltaOp {
         let mut delta = delta_add(v, max_value);

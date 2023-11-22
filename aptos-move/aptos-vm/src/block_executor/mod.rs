@@ -32,9 +32,20 @@ use aptos_types::{
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::output::VMOutput;
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::VMStatus};
-use once_cell::sync::OnceCell;
+use once_cell::sync::{Lazy, OnceCell};
 use rayon::ThreadPool;
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::BTreeMap;
+use triomphe::Arc;
+
+pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
+    Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .thread_name(|index| format!("par_exec-{}", index))
+            .build()
+            .unwrap(),
+    )
+});
 
 /// Output type wrapper used by block executor. VM output is stored first, then
 /// transformed into TransactionOutput type that is returned.

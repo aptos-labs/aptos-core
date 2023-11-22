@@ -35,8 +35,8 @@ use std::{
     cell::RefCell,
     collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque},
     mem::drop,
-    sync::Arc,
 };
+use triomphe::Arc;
 
 /// The native table context extension. This needs to be attached to the NativeContextExtensions
 /// value which is passed into session functions, so its accessible from natives of this

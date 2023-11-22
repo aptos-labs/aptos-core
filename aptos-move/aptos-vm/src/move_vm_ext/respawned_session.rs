@@ -39,10 +39,8 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use triomphe::Arc;
 
 /// We finish the session after the user transaction is done running to get the change set and
 /// charge gas and storage fee based on it before running storage refunds and the transaction

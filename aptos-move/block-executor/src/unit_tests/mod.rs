@@ -28,9 +28,8 @@ use aptos_types::{
 };
 use claims::assert_matches;
 use rand::{prelude::*, random};
-use std::{
-    cmp::min, collections::BTreeMap, fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc,
-};
+use std::{cmp::min, collections::BTreeMap, fmt::Debug, hash::Hash, marker::PhantomData};
+use triomphe::Arc;
 
 // TODO: add unit test for block gas limit!
 fn run_and_assert<K, E>(transactions: Vec<MockTransaction<K, E>>)

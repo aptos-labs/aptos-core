@@ -663,6 +663,7 @@ tonic = { version = "0.10.2", features = [
     "codegen",
 ] }
 tonic-reflection = "0.10.2"
+triomphe = "0.1.9"
 ureq = { version = "1.5.4", features = [
     "json",
     "native-tls",

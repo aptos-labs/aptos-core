@@ -10,7 +10,8 @@ use aptos_types::{
 };
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
 use move_core_types::value::MoveTypeLayout;
-use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
+use std::{collections::BTreeMap, fmt::Debug};
+use triomphe::Arc;
 
 /// The execution result of a transaction
 #[derive(Debug)]

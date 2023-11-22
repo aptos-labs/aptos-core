@@ -26,6 +26,7 @@ either = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 serde = { workspace = true }
+triomphe = { workspace = true }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }

@@ -20,8 +20,8 @@ use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
-    sync::Arc,
 };
+use triomphe::Arc;
 
 pub fn aggregator_v1_id_for_test(key: u128) -> AggregatorID {
     AggregatorID(aggregator_v1_state_key_for_test(key))

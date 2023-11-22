@@ -38,8 +38,8 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
-    sync::Arc,
 };
+use triomphe::Arc;
 
 pub(crate) enum ResourceGroupChangeSet {
     // Merged resource groups op.

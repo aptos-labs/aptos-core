@@ -73,9 +73,10 @@ use std::{
     fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::Mutex,
     time::Instant,
 };
+use triomphe::Arc;
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
 
@@ -839,8 +840,8 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) -> Vec<DynamicExpression> {
         // Define the shared buffers
-        let a1 = Arc::new(Mutex::new(Vec::<DynamicExpression>::new()));
-        let a2 = Arc::clone(&a1);
+        let a1 = std::sync::Arc::new(Mutex::new(Vec::<DynamicExpression>::new()));
+        let a2 = std::sync::Arc::clone(&a1);
 
         let (write_set, _events) = {
             // FIXME: should probably read the timestamp from storage.
@@ -883,7 +884,7 @@ impl FakeExecutor {
                         10000000000000,
                     ),
                     // coeff_buffer: BTreeMap::new(),
-                    shared_buffer: Arc::clone(&a1),
+                    shared_buffer: std::sync::Arc::clone(&a1),
                 }),
             );
             if let Err(err) = result {
@@ -904,7 +905,7 @@ impl FakeExecutor {
         };
         self.data_store.add_write_set(&write_set);
 
-        let a1_result = Arc::into_inner(a1);
+        let a1_result = std::sync::Arc::into_inner(a1);
         a1_result
             .expect("Failed to get a1 arc result")
             .lock()

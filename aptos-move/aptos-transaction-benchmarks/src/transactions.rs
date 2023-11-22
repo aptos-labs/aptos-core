@@ -15,7 +15,8 @@ use aptos_language_e2e_tests::{
 use criterion::{measurement::Measurement, BatchSize, Bencher};
 use once_cell::sync::Lazy;
 use proptest::strategy::Strategy;
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
+use triomphe::Arc;
 
 pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(

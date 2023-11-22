@@ -205,10 +205,7 @@ mod test_utils {
     };
     use move_core_types::account_address::AccountAddress;
     use rand::{rngs::OsRng, Rng};
-    use std::{
-        collections::HashMap,
-        sync::{Arc, Mutex},
-    };
+    use std::{collections::HashMap, sync::Mutex};
 
     pub fn generate_account_at(
         executor: &mut FakeExecutor,
@@ -293,7 +290,7 @@ mod test_utils {
         let partitioned_txns = partitioner.partition(transactions.clone(), num_shards);
         let sharded_txn_output = sharded_block_executor
             .execute_block(
-                Arc::new(executor.data_store().clone()),
+                std::sync::Arc::new(executor.data_store().clone()),
                 partitioned_txns.clone(),
                 2,
                 None,
@@ -347,7 +344,7 @@ mod test_utils {
                 .collect();
         let sharded_txn_output = sharded_block_executor
             .execute_block(
-                Arc::new(executor.data_store().clone()),
+                std::sync::Arc::new(executor.data_store().clone()),
                 partitioned_txns,
                 concurrency,
                 None,
@@ -400,7 +397,7 @@ mod test_utils {
 
         let sharded_txn_output = sharded_block_executor
             .execute_block(
-                Arc::new(executor.data_store().clone()),
+                std::sync::Arc::new(executor.data_store().clone()),
                 partitioned_txns,
                 concurrency,
                 None,

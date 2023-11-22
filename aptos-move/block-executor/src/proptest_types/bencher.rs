@@ -23,7 +23,8 @@ use proptest::{
     strategy::{Strategy, ValueTree},
     test_runner::TestRunner,
 };
-use std::{fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
+use std::{fmt::Debug, hash::Hash, marker::PhantomData};
+use triomphe::Arc;
 
 pub struct Bencher<K, V, E> {
     transaction_size: usize,

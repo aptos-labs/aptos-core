@@ -256,7 +256,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn resource_write_set(
         &self,
         txn_idx: TxnIndex,
-    ) -> Option<BTreeMap<T::Key, (T::Value, Option<Arc<MoveTypeLayout>>)>> {
+    ) -> Option<BTreeMap<T::Key, (T::Value, Option<triomphe::Arc<MoveTypeLayout>>)>> {
         self.outputs[txn_idx as usize]
             .load_full()
             .and_then(|txn_output| match &txn_output.output_status {
@@ -291,7 +291,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn reads_needing_delayed_field_exchange(
         &self,
         txn_idx: TxnIndex,
-    ) -> Option<BTreeMap<T::Key, (T::Value, Arc<MoveTypeLayout>)>> {
+    ) -> Option<BTreeMap<T::Key, (T::Value, triomphe::Arc<MoveTypeLayout>)>> {
         self.outputs[txn_idx as usize]
             .load()
             .as_ref()

@@ -16,7 +16,7 @@ use aptos_types::{
     transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
 };
 use move_core_types::vm_status::VMStatus;
-use std::{marker::PhantomData, sync::Arc};
+use std::marker::PhantomData;
 
 pub mod aggr_overridden_state_view;
 pub mod coordinator_client;
@@ -39,7 +39,7 @@ pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static, C: Executo
 
 pub enum ExecutorShardCommand<S> {
     ExecuteSubBlocks(
-        Arc<S>,
+        std::sync::Arc<S>,
         SubBlocksForShard<AnalyzedTransaction>,
         usize,
         Option<u64>,
@@ -67,7 +67,7 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
     /// dispatching each partition to a remote executor shard.
     pub fn execute_block(
         &self,
-        state_view: Arc<S>,
+        state_view: std::sync::Arc<S>,
         transactions: PartitionedTransactions,
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,

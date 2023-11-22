@@ -28,10 +28,8 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{StatusCode, VMStatus},
 };
-use std::{
-    collections::{BTreeMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{BTreeMap, HashSet};
+use triomphe::Arc;
 
 /// We differentiate between deprecated way to interact with aggregators (TAggregatorV1View),
 /// and new, more general, TDelayedFieldView.
