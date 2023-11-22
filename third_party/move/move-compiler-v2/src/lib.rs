@@ -70,7 +70,7 @@ pub fn run_move_compiler(
     check_errors(&env, error_writer, "stackless-bytecode analysis errors")?;
     let modules_and_scripts = run_file_format_gen(&env, &targets);
     check_errors(&env, error_writer, "assembling errors")?;
-    let annotated = annotate_units(&env, modules_and_scripts);
+    let annotated = annotate_units(modules_and_scripts);
     Ok((env, annotated))
 }
 
@@ -168,12 +168,12 @@ pub fn check_errors<W: WriteColor>(
 /// Annotate the given compiled units.
 /// TODO: this currently only fills in defaults. The annotations are only used in
 /// the prover, and compiler v2 is not yet connected to the prover.
-pub fn annotate_units(env: &GlobalEnv, units: Vec<CompiledUnit>) -> Vec<AnnotatedCompiledUnit> {
-    let loc = env.unknown_move_ir_loc();
+pub fn annotate_units(units: Vec<CompiledUnit>) -> Vec<AnnotatedCompiledUnit> {
     units
         .into_iter()
         .map(|u| match u {
             CompiledUnit::Module(named_module) => {
+                let loc = named_module.source_map.definition_location;
                 AnnotatedCompiledUnit::Module(AnnotatedCompiledModule {
                     loc,
                     module_name_loc: loc,
@@ -184,7 +184,7 @@ pub fn annotate_units(env: &GlobalEnv, units: Vec<CompiledUnit>) -> Vec<Annotate
             },
             CompiledUnit::Script(named_script) => {
                 AnnotatedCompiledUnit::Script(AnnotatedCompiledScript {
-                    loc,
+                    loc: named_script.source_map.definition_location,
                     named_script,
                     function_info: FunctionInfo {
                         spec_info: Default::default(),

@@ -3643,7 +3643,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         }
         let mut function_data: BTreeMap<FunId, FunctionData> = Default::default();
         for (name, entry) in &self.parent.fun_table {
-            if name.module_name != self.module_name {
+            if entry.module_id != self.module_id {
                 continue;
             }
             // New function
