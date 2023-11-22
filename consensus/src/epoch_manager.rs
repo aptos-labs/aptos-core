@@ -677,10 +677,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         epoch_state: &EpochState,
         network_sender: NetworkSender,
+        consensus_config: &OnChainConsensusConfig,
     ) -> (Arc<PayloadManager>, QuorumStoreClient, QuorumStoreBuilder) {
         // Start QuorumStore
         let (consensus_to_quorum_store_tx, consensus_to_quorum_store_rx) =
             mpsc::channel(self.config.intra_consensus_channel_buffer_size);
+
+        let quorum_store_config = if consensus_config.is_dag_enabled() {
+            self.dag_config.quorum_store.clone()
+        } else {
+            self.config.quorum_store.clone()
+        };
 
         let mut quorum_store_builder = if self.quorum_store_enabled {
             info!("Building QuorumStore");
@@ -688,7 +695,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.epoch(),
                 self.author,
                 epoch_state.verifier.len() as u64,
-                self.config.quorum_store.clone(),
+                quorum_store_config,
                 consensus_to_quorum_store_rx,
                 self.quorum_store_to_mempool_sender.clone(),
                 self.config.mempool_txn_pull_timeout_ms,
@@ -697,6 +704,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 epoch_state.verifier.clone(),
                 self.config.safety_rules.backend.clone(),
                 self.quorum_store_storage.clone(),
+                !consensus_config.is_dag_enabled(),
             ))
         } else {
             info!("Building DirectMempool");
@@ -983,7 +991,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.quorum_store_enabled = self.enable_quorum_store(consensus_config);
         let network_sender = self.create_network_sender(epoch_state);
         let (payload_manager, payload_client, quorum_store_builder) = self
-            .init_payload_provider(epoch_state, network_sender.clone())
+            .init_payload_provider(epoch_state, network_sender.clone(), consensus_config)
             .await;
 
         self.init_commit_state_computer(epoch_state, payload_manager.clone(), execution_config);
@@ -1076,6 +1084,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             payload_client,
             state_computer,
             block_tx,
+            onchain_consensus_config.quorum_store_enabled(),
         );
 
         let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);

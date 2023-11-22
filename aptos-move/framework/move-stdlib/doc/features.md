@@ -80,6 +80,8 @@ return true.
 -  [Function `concurrent_assets_enabled`](#0x1_features_concurrent_assets_enabled)
 -  [Function `get_operator_beneficiary_change_feature`](#0x1_features_get_operator_beneficiary_change_feature)
 -  [Function `operator_beneficiary_change_enabled`](#0x1_features_operator_beneficiary_change_enabled)
+-  [Function `get_commission_change_delegation_pool_feature`](#0x1_features_get_commission_change_delegation_pool_feature)
+-  [Function `commission_change_delegation_pool_enabled`](#0x1_features_commission_change_delegation_pool_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -247,6 +249,17 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES">COLLECT_AND_DISTRIBUTE_GAS_FEES</a>: u64 = 6;
+</code></pre>
+
+
+
+<a name="0x1_features_COMMISSION_CHANGE_DELEGATION_POOL"></a>
+
+Whether the operator commission rate change in delegation pool is enabled.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_COMMISSION_CHANGE_DELEGATION_POOL">COMMISSION_CHANGE_DELEGATION_POOL</a>: u64 = 42;
 </code></pre>
 
 
@@ -425,6 +438,15 @@ This is needed because of new attributes for structs and a change in storage rep
 
 
 
+<a name="0x1_features_RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM">RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM</a>: u64 = 41;
+</code></pre>
+
+
+
 <a name="0x1_features_SAFER_METADATA"></a>
 
 
@@ -528,6 +550,15 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_VM_BINARY_FORMAT_V6">VM_BINARY_FORMAT_V6</a>: u64 = 5;
+</code></pre>
+
+
+
+<a name="0x1_features_VM_BINARY_FORMAT_V7"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_VM_BINARY_FORMAT_V7">VM_BINARY_FORMAT_V7</a>: u64 = 40;
 </code></pre>
 
 
@@ -1655,6 +1686,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_operator_beneficiary_change_enabled">operator_beneficiary_change_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_OPERATOR_BENEFICIARY_CHANGE">OPERATOR_BENEFICIARY_CHANGE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_get_commission_change_delegation_pool_feature"></a>
+
+## Function `get_commission_change_delegation_pool_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_commission_change_delegation_pool_feature">get_commission_change_delegation_pool_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_commission_change_delegation_pool_feature">get_commission_change_delegation_pool_feature</a>(): u64 { <a href="features.md#0x1_features_COMMISSION_CHANGE_DELEGATION_POOL">COMMISSION_CHANGE_DELEGATION_POOL</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_commission_change_delegation_pool_enabled"></a>
+
+## Function `commission_change_delegation_pool_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_commission_change_delegation_pool_enabled">commission_change_delegation_pool_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_commission_change_delegation_pool_enabled">commission_change_delegation_pool_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_COMMISSION_CHANGE_DELEGATION_POOL">COMMISSION_CHANGE_DELEGATION_POOL</a>)
 }
 </code></pre>
 

@@ -299,8 +299,6 @@ pub struct Spec {
     pub update_map: BTreeMap<NodeId, Condition>,
 }
 
-pub enum ImplSpecId {}
-
 impl Spec {
     pub fn has_conditions(&self) -> bool {
         !self.conditions.is_empty()

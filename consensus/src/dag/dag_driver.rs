@@ -9,7 +9,7 @@ use crate::{
         dag_store::Dag,
         errors::DagDriverError,
         observability::{
-            counters,
+            counters::{self, NODE_PAYLOAD_SIZE, NUM_TXNS_PER_NODE},
             logging::{LogEvent, LogSchema},
             tracing::{observe_node, observe_round, NodeStage, RoundStage},
         },
@@ -22,12 +22,11 @@ use crate::{
         },
         DAGRpcResult, RpcHandler,
     },
-    payload_manager::PayloadManager,
     state_replication::PayloadClient,
 };
 use anyhow::bail;
 use aptos_config::config::DagPayloadConfig;
-use aptos_consensus_types::common::{Author, PayloadFilter};
+use aptos_consensus_types::common::{Author, Payload, PayloadFilter};
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
 use aptos_reliable_broadcast::ReliableBroadcast;
@@ -46,7 +45,6 @@ pub(crate) struct DagDriver {
     author: Author,
     epoch_state: Arc<EpochState>,
     dag: Arc<RwLock<Dag>>,
-    payload_manager: Arc<PayloadManager>,
     payload_client: Arc<dyn PayloadClient>,
     reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
     time_service: TimeService,
@@ -59,6 +57,7 @@ pub(crate) struct DagDriver {
     window_size_config: Round,
     payload_config: DagPayloadConfig,
     chain_backoff: Arc<dyn TChainHealthBackoff>,
+    quorum_store_enabled: bool,
 }
 
 impl DagDriver {
@@ -67,7 +66,6 @@ impl DagDriver {
         author: Author,
         epoch_state: Arc<EpochState>,
         dag: Arc<RwLock<Dag>>,
-        payload_manager: Arc<PayloadManager>,
         payload_client: Arc<dyn PayloadClient>,
         reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
         time_service: TimeService,
@@ -79,6 +77,7 @@ impl DagDriver {
         window_size_config: Round,
         payload_config: DagPayloadConfig,
         chain_backoff: Arc<dyn TChainHealthBackoff>,
+        quorum_store_enabled: bool,
     ) -> Self {
         let pending_node = storage
             .get_pending_node()
@@ -90,7 +89,6 @@ impl DagDriver {
             author,
             epoch_state,
             dag,
-            payload_manager,
             payload_client,
             reliable_broadcast,
             time_service,
@@ -103,6 +101,7 @@ impl DagDriver {
             window_size_config,
             payload_config,
             chain_backoff,
+            quorum_store_enabled,
         };
 
         // If we were broadcasting the node for the round already, resume it
@@ -135,8 +134,6 @@ impl DagDriver {
                 bail!(DagDriverError::MissingParents);
             }
 
-            self.payload_manager
-                .prefetch_payload_data(node.payload(), node.metadata().timestamp());
             dag_writer.add_node(node)?;
 
             let highest_strong_links_round =
@@ -212,8 +209,8 @@ impl DagDriver {
         {
             Ok(payload) => payload,
             Err(e) => {
-                // TODO: return empty payload instead
-                panic!("error pulling payload: {}", e);
+                error!("error pulling payload: {}", e);
+                Payload::empty(self.quorum_store_enabled)
             },
         };
         // TODO: need to wait to pass median of parents timestamp
@@ -291,6 +288,10 @@ impl DagDriver {
     fn calculate_payload_limits(&self, round: Round) -> (u64, u64) {
         let (voting_power_ratio, maybe_backoff_limits) =
             self.chain_backoff.get_round_payload_limits(round);
+        debug!(
+            "calculate_payload_limits voting_power_ratio {}",
+            voting_power_ratio
+        );
         let (max_txns_per_round, max_size_per_round_bytes) = {
             if let Some((backoff_max_txns, backoff_max_size_bytes)) = maybe_backoff_limits {
                 (
@@ -311,12 +312,16 @@ impl DagDriver {
         // TODO: warn/panic if division yields 0 txns
         let max_txns = max_txns_per_round
             .saturating_div(
-                (self.epoch_state.verifier.len() as f64 * voting_power_ratio).ceil() as u64,
+                (self.epoch_state.verifier.len() as f64 * voting_power_ratio)
+                    .ceil()
+                    .max(1.0) as u64,
             )
             .max(1);
         let max_txn_size_bytes = max_size_per_round_bytes
             .saturating_div(
-                (self.epoch_state.verifier.len() as f64 * voting_power_ratio).ceil() as u64,
+                (self.epoch_state.verifier.len() as f64 * voting_power_ratio)
+                    .ceil()
+                    .max(1.0) as u64,
             )
             .max(1024);
 
@@ -341,6 +346,8 @@ impl RpcHandler for DagDriver {
             }
         }
         observe_node(certified_node.timestamp(), NodeStage::CertifiedNodeReceived);
+        NUM_TXNS_PER_NODE.observe(certified_node.payload().len() as f64);
+        NODE_PAYLOAD_SIZE.observe(certified_node.payload().size() as f64);
 
         let node_metadata = certified_node.metadata().clone();
         self.add_node(certified_node)
