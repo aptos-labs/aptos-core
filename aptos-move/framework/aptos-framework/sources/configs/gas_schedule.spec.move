@@ -23,6 +23,8 @@ spec aptos_framework::gas_schedule {
         use aptos_framework::transaction_fee;
         use aptos_framework::staking_config;
 
+        // TODO: set because of timeout (property proved)
+        pragma verify_duration_estimate = 120;
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
