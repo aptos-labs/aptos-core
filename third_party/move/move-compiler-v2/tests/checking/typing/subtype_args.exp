@@ -28,6 +28,11 @@ module 0x8675309::M {
         M::imm_imm<u64>(Borrow(Mutable)(0), Borrow(Mutable)(0));
         Tuple()
     }
+    private inline fun t2(f: |(&u64, &mut u64)|()) {
+        (f)(Borrow(Mutable)(0), Borrow(Mutable)(0));
+        (f)(Borrow(Immutable)(0), Borrow(Mutable)(0));
+        Tuple()
+    }
     spec fun $imm<T>(_x: #0) {
         Tuple()
     }
@@ -42,4 +47,5 @@ module 0x8675309::M {
     }
     spec fun $t0();
     spec fun $t1();
+    spec fun $t2(f: |(&u64, &mut u64)|());
 } // end 0x8675309::M
