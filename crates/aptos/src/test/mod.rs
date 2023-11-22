@@ -767,7 +767,6 @@ impl CliTestFramework {
         self.move_dir = Some(move_dir.path().to_path_buf());
     }
 
-    #[cfg(feature = "cli-framework-test-move")]
     pub fn add_move_files(&self) {
         let move_dir = self.move_dir();
         let sources_dir = move_dir.join("sources");
