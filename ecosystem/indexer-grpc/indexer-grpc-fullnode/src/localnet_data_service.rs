@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{stream_coordinator::IndexerStreamCoordinator, ServiceContext};
+use aptos_db_indexer_async_v2::backup_restore_operator::BackupRestoreOperator;
 use aptos_logger::error;
 use aptos_protos::{
     indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
@@ -25,6 +26,7 @@ type TransactionResponseStream =
 pub struct LocalnetDataService {
     pub service_context: ServiceContext,
     pub db_writer: Arc<dyn DbWriter>,
+    pub backup_restore_operator: Arc<Box<dyn BackupRestoreOperator>>,
 }
 
 /// External service on the fullnode is for testing/local development only.
@@ -50,29 +52,35 @@ impl RawData for LocalnetDataService {
         let (tx, mut rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
         let (external_service_tx, external_service_rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
         let db_writer = self.db_writer.clone();
+        let backup_restore_operator = self.backup_restore_operator.clone();
         tokio::spawn(async move {
             // Initialize the coordinator that tracks starting version and processes transactions
-            let mut coordinator = IndexerStreamCoordinator::new(
-                context,
-                starting_version,
-                // Performance is not important for raw data, and to make sure data is in order,
-                // single thread is used.
-                1,
-                processor_batch_size,
-                output_batch_size,
-                tx.clone(),
-            );
+            let mut coordinator =
+                IndexerStreamCoordinator::new(
+                    context,
+                    starting_version,
+                    // Performance is not important for raw data, and to make sure data is in order,
+                    // single thread is used.
+                    1,
+                    processor_batch_size,
+                    output_batch_size,
+                    tx.clone(),
+                );
             let db_writer = db_writer.clone();
+            let backup_restore_operator = backup_restore_operator.clone();
             loop {
                 // Processes and sends batch of transactions to client
-                let results = coordinator.process_next_batch(db_writer.clone()).await;
-                let max_version = match IndexerStreamCoordinator::get_max_batch_version(results) {
-                    Ok(max_version) => max_version,
-                    Err(e) => {
-                        error!("[indexer-grpc] Error sending to stream: {}", e);
-                        break;
-                    },
-                };
+                let results = coordinator
+                    .process_next_batch(db_writer.clone(), backup_restore_operator.clone())
+                    .await;
+                let max_version =
+                    match IndexerStreamCoordinator::get_max_batch_version(results) {
+                        Ok(max_version) => max_version,
+                        Err(e) => {
+                            error!("[indexer-grpc] Error sending to stream: {}", e);
+                            break;
+                        },
+                    };
                 coordinator.current_version = max_version + 1;
             }
         });
@@ -115,8 +123,7 @@ impl RawData for LocalnetDataService {
         });
 
         let output_stream = ReceiverStream::new(external_service_rx);
-        Ok(Response::new(
-            Box::pin(output_stream) as Self::GetTransactionsStream
-        ))
+        Ok(Response::new(Box::pin(output_stream)
+            as Self::GetTransactionsStream))
     }
 }

@@ -6,7 +6,13 @@ use crate::{
     ServiceContext,
 };
 use aptos_api::context::Context;
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{IndexerBackupRestoreConfig, NodeConfig};
+use aptos_db_indexer_async_v2::{
+    backup_restore_operator::{
+        BackupRestoreOperator, GcsBackupRestoreOperator, LocalBackupRestoreOperator,
+    },
+    db::INDEX_ASYNC_V2_DB_NAME,
+};
 use aptos_logger::info;
 use aptos_mempool::MempoolClientSender;
 use aptos_protos::{
@@ -18,10 +24,11 @@ use aptos_protos::{
     util::timestamp::FILE_DESCRIPTOR_SET as UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
 };
 use aptos_storage_interface::DbReaderWriter;
-use aptos_types::chain_id::ChainId;
+use aptos_types::chain_id::{ChainId, NamedChain};
 use std::{net::ToSocketAddrs, sync::Arc};
 use tokio::runtime::Runtime;
 use tonic::{codec::CompressionEncoding, transport::Server};
+use std::env;
 
 // Default Values
 pub const DEFAULT_NUM_RETRIES: usize = 3;
@@ -48,14 +55,52 @@ pub fn bootstrap(
     let processor_task_count = node_config.indexer_grpc.processor_task_count;
     let processor_batch_size = node_config.indexer_grpc.processor_batch_size;
     let output_batch_size = node_config.indexer_grpc.output_batch_size;
+    let backup_restore_config = match node_config.indexer_grpc.backup_restore_config.clone() {
+        Some(config) => config.clone(),
+        None => IndexerBackupRestoreConfig::default(),
+    };
+    let named_chain =
+        match NamedChain::from_chain_id(&chain_id) {
+            Ok(named_chain) => format!("{}", named_chain).to_lowercase(),
+            Err(_err) => {
+                info!("Getting chain name from not named chains");
+                chain_id.id().to_string()
+            },
+        };
+        let backup_restore_operator: Arc<Box<dyn BackupRestoreOperator>> =
+        match &backup_restore_config.clone() {
+            IndexerBackupRestoreConfig::GcsFileStore(gcs_file_store) => {
+                Arc::new(Box::new(
+                GcsBackupRestoreOperator::new(
+                    gcs_file_store.gcs_bucket_name.clone() + "_" + &named_chain,
+                ),
+            ))},
+            IndexerBackupRestoreConfig::LocalFileStore(local_file_store) => Arc::new(Box::new(
+                LocalBackupRestoreOperator::new(local_file_store.local_file_store_path.clone()),
+            )),
+        };
+
+    runtime.block_on(async {
+        backup_restore_operator
+            .verify_storage_bucket_existence()
+            .await;
+        let db_path = node_config
+            .storage
+            .get_dir_paths()
+            .default_root_path()
+            .join(INDEX_ASYNC_V2_DB_NAME);
+        backup_restore_operator
+            .restore_snapshot(chain_id.id() as u64, db_path.clone())
+            .await
+            .expect("Failed to restore snapshot");
+        let _metadata = backup_restore_operator
+            .create_default_metadata_if_absent(chain_id.id().into())
+            .await;
+    });
 
     runtime.spawn(async move {
-        let context = Arc::new(Context::new(
-            chain_id,
-            db.reader.clone(),
-            mp_sender,
-            node_config,
-        ));
+        let context =
+            Arc::new(Context::new(chain_id, db.reader.clone(), mp_sender, node_config));
 
         let service_context = ServiceContext {
             context: context.clone(),
@@ -67,10 +112,12 @@ pub fn bootstrap(
         let server = FullnodeDataService {
             service_context: service_context.clone(),
             db_writer: db.writer.clone(),
+            backup_restore_operator: backup_restore_operator.clone(),
         };
         let localnet_data_server = LocalnetDataService {
             service_context,
             db_writer: db.writer.clone(),
+            backup_restore_operator: backup_restore_operator.clone(),
         };
 
         let reflection_service = tonic_reflection::server::Builder::configure()

@@ -443,6 +443,7 @@ ark-std = { version = "0.4.0", features = ["getrandom"] }
 assert_approx_eq = "1.1.0"
 assert_unordered = "0.3.5"
 async-channel = "1.7.1"
+async-compression = "0.4.5"
 async-mutex = "1.4.0"
 async-stream = "0.3"
 async-trait = "0.1.53"
@@ -502,6 +503,7 @@ event-listener = "2.5.3"
 fail = "0.5.0"
 field_count = "0.1.1"
 flate2 = "1.0.24"
+fs_extra = "1.3.0"
 futures = "0.3.24"
 futures-channel = "0.3.24"
 futures-core = "0.3.25"
@@ -654,6 +656,7 @@ tokio-metrics = "0.1.0"
 tokio-retry = "0.3.0"
 tokio-scoped = { version = "0.2.0" }
 tokio-stream = { version = "0.1.14", features = ["fs"] }
+tokio-tar = "0.3.1"
 tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
 toml = "0.7.4"

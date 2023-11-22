@@ -335,10 +335,21 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> transaction::WriteSe
             )),
         },
         WriteSetChange::DeleteTableItem(delete_table_item) => {
+            // let mut retry_count = 0;
+            // let max_retries = 5;
+            // let mut data = delete_table_item.data.as_ref();
+
+            // while data.is_none() && retry_count < max_retries {
+            //     std::thread::sleep(std::time::Duration::from_millis(500));
+
+            //     data = delete_table_item.data.as_ref();
+            //     retry_count += 1;
+            // }
             let data = delete_table_item.data.as_ref().unwrap_or_else(|| {
                 panic!(
-                    "Could not extract data from DeletedTableItem '{:?}'",
-                    delete_table_item
+                    "Could not extract data from DeletedTableItem '{:?}' with handle '{:?}'",
+                    delete_table_item,
+                    delete_table_item.handle.to_string()
                 )
             });
 
@@ -387,10 +398,22 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> transaction::WriteSe
             )),
         },
         WriteSetChange::WriteTableItem(write_table_item) => {
+            // let mut retry_count = 0;
+            // let max_retries = 5;
+            // let mut data = write_table_item.data.as_ref();
+
+            // while data.is_none() && retry_count < max_retries {
+            //     std::thread::sleep(std::time::Duration::from_millis(500));
+
+            //     data = write_table_item.data.as_ref();
+            //     retry_count += 1;
+            // }
+
             let data = write_table_item.data.as_ref().unwrap_or_else(|| {
                 panic!(
-                    "Could not extract data from DecodedTableData '{:?}'",
-                    write_table_item
+                    "Could not extract data from DecodedTableData '{:?}' with handle '{:?}'",
+                    write_table_item,
+                    write_table_item.handle.to_string(),
                 )
             });
             transaction::WriteSetChange {

@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{stream_coordinator::IndexerStreamCoordinator, ServiceContext};
+use aptos_db_indexer_async_v2::backup_restore_operator::BackupRestoreOperator;
 use aptos_logger::{error, info};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::internal::fullnode::v1::{
@@ -17,6 +18,7 @@ use tonic::{Request, Response, Status};
 pub struct FullnodeDataService {
     pub service_context: ServiceContext,
     pub db_writer: Arc<dyn DbWriter>,
+    pub backup_restore_operator: Arc<Box<dyn BackupRestoreOperator>>,
 }
 
 type FullnodeResponseStream =
@@ -61,17 +63,19 @@ impl FullnodeData for FullnodeDataService {
         let mut ma = MovingAverage::new(10_000);
 
         let db_writer = self.db_writer.clone();
+        let backup_restore_operator = self.backup_restore_operator.clone();
         // This is the main thread handling pushing to the stream
         tokio::spawn(async move {
             // Initialize the coordinator that tracks starting version and processes transactions
-            let mut coordinator = IndexerStreamCoordinator::new(
-                context,
-                starting_version,
-                processor_task_count,
-                processor_batch_size,
-                output_batch_size,
-                tx.clone(),
-            );
+            let mut coordinator =
+                IndexerStreamCoordinator::new(
+                    context,
+                    starting_version,
+                    processor_task_count,
+                    processor_batch_size,
+                    output_batch_size,
+                    tx.clone(),
+                );
             // Sends init message (one time per request) to the client in the with chain id and starting version. Basically a handshake
             let init_status = get_status(StatusType::Init, starting_version, None, ledger_chain_id);
             match tx.send(Result::<_, Status>::Ok(init_status)).await {
@@ -85,16 +89,21 @@ impl FullnodeData for FullnodeDataService {
             }
             let mut base: u64 = 0;
             let db_writer = db_writer.clone();
+            let backup_restore_operator = backup_restore_operator.clone();
             loop {
                 // Processes and sends batch of transactions to client
-                let results = coordinator.process_next_batch(db_writer.clone()).await;
-                let max_version = match IndexerStreamCoordinator::get_max_batch_version(results) {
-                    Ok(max_version) => max_version,
-                    Err(e) => {
-                        error!("[indexer-grpc] Error sending to stream: {}", e);
-                        break;
-                    },
-                };
+                let results = coordinator
+                    .process_next_batch(db_writer.clone(), backup_restore_operator.clone())
+                    .await;
+                let max_version =
+                    match IndexerStreamCoordinator::get_max_batch_version(results) {
+                        Ok(max_version) => max_version,
+                        Err(e) => {
+                            error!("[indexer-grpc] Error sending to stream: {}", e);
+                            break;
+                        },
+                    };
+
                 // send end batch message (each batch) upon success of the entire batch
                 // client can use the start and end version to ensure that there are no gaps
                 // end loop if this message fails to send because otherwise the client can't validate
@@ -130,9 +139,8 @@ impl FullnodeData for FullnodeDataService {
             }
         });
         let output_stream = ReceiverStream::new(rx);
-        Ok(Response::new(
-            Box::pin(output_stream) as Self::GetTransactionsFromNodeStream
-        ))
+        Ok(Response::new(Box::pin(output_stream)
+            as Self::GetTransactionsFromNodeStream))
     }
 }
 

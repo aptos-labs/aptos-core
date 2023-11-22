@@ -6,8 +6,10 @@ use crate::{
     counters::{FETCHED_LATENCY_IN_SECS, FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION},
     runtime::{DEFAULT_NUM_RETRIES, RETRY_TIME_MILLIS},
 };
+use anyhow::Error;
 use aptos_api::context::Context;
 use aptos_api_types::{AsConverter, Transaction as APITransaction, TransactionOnChainData};
+use aptos_db_indexer_async_v2::backup_restore_operator::BackupRestoreOperator;
 use aptos_indexer_grpc_utils::{chunk_transactions, constants::MESSAGE_SIZE_LIMIT};
 use aptos_logger::{error, info, sample, sample::SampleRate};
 use aptos_protos::{
@@ -17,7 +19,6 @@ use aptos_protos::{
     transaction::v1::Transaction as TransactionPB,
 };
 use aptos_storage_interface::DbWriter;
-#[cfg(feature = "indexer-async-v2")]
 use aptos_types::write_set::WriteSet;
 use aptos_vm::data_cache::AsMoveResolver;
 use std::{
@@ -78,22 +79,33 @@ impl IndexerStreamCoordinator {
     pub async fn process_next_batch(
         &mut self,
         db_writer: Arc<dyn DbWriter>,
+        backup_restore_operator: Arc<Box<dyn BackupRestoreOperator>>,
     ) -> Vec<Result<EndVersion, Status>> {
         let ledger_chain_id = self.context.chain_id().id();
         let mut tasks = vec![];
         let batches = self.get_batches().await;
         let output_batch_size = self.output_batch_size;
+        let db_writer = db_writer.clone();
+        let backup_restore_operator = backup_restore_operator.clone();
+        
+        // Process transactions in parallel
         for batch in batches {
-            let context = self.context.clone();
-            let ledger_version = self.highest_known_version;
-            let transaction_sender = self.transactions_sender.clone();
             let db_writer = db_writer.clone();
+            let backup_restore_operator = backup_restore_operator.clone();
+            let context = self.context.clone();
+            let ledger_version = self.highest_known_version.clone();
+            let raw_txns = Self::fetch_raw_txns_with_retries(context.clone(), ledger_version, batch).await;
+            Self::parse_table_info(
+                context.clone(),
+                raw_txns.clone(),
+                db_writer.clone(),
+                backup_restore_operator.clone(),
+            )
+            .await
+            .expect("Failed to parse table info");
+            let transaction_sender = self.transactions_sender.clone();
             let task = tokio::spawn(async move {
-                // Fetch and convert transactions from API
-                let raw_txns =
-                    Self::fetch_raw_txns_with_retries(context.clone(), ledger_version, batch).await;
-                let api_txns =
-                    Self::convert_to_api_txns(context, raw_txns, db_writer.clone()).await;
+                let api_txns = Self::convert_to_api_txns(context.clone(), raw_txns.clone()).await;
                 api_txns.last().map(record_fetched_transaction_latency);
                 let pb_txns = Self::convert_to_pb_txns(api_txns);
                 // Wrap in stream response object and send to channel
@@ -220,10 +232,78 @@ impl IndexerStreamCoordinator {
         }
     }
 
+    /// Parses the table information from the raw transactions before converting to the api transactions,
+    /// optionally backup the rocksdb to gcs depending on epoch advancement or not.
+    async fn parse_table_info(
+        context: Arc<Context>,
+        raw_txns: Vec<TransactionOnChainData>,
+        db_writer: Arc<dyn DbWriter>,
+        backup_restore_operator: Arc<Box<dyn BackupRestoreOperator>>,
+    ) -> Result<(), Error> {
+        if raw_txns.is_empty() {
+            return Ok(());
+        }
+
+        let start_millis = chrono::Utc::now().naive_utc();
+        let first_version = raw_txns.first().map(|txn| txn.version).unwrap();
+        let ledger_chain_id = context.chain_id().id();
+        let (_, _, block_event) = context
+            .db
+            .get_block_info_by_version(first_version)
+            .unwrap_or_else(|_| {
+                panic!(
+                    "Could not get block_info for start version {}",
+                    first_version,
+                )
+            });
+        let block_event_epoch = block_event.epoch();
+
+        let write_sets: Vec<WriteSet> =
+            raw_txns.iter().map(|txn| txn.changes.clone()).collect();
+        let write_sets_slice: Vec<&WriteSet> = write_sets.iter().collect();
+        db_writer
+            .clone()
+            .index(
+                context.db.clone(),
+                first_version,
+                &write_sets_slice,
+                block_event_epoch,
+            )
+            .expect("Failed to process write sets and index to the table info rocksdb");
+
+        let metadata_epoch = backup_restore_operator.clone().get_metadata_epoch();
+        if metadata_epoch < block_event_epoch {
+            let checkpoint_path = context
+            .node_config
+            .storage
+            .get_dir_paths()
+            .default_root_path().join(block_event_epoch.to_string());
+            backup_restore_operator
+                .try_upload_snapshot(
+                    ledger_chain_id as u64,
+                    block_event_epoch,
+                    db_writer.clone(),
+                    checkpoint_path.clone(),
+                )
+                .await
+                .expect("Failed to upload snapshot");
+        }
+        let fetch_millis = (chrono::Utc::now().naive_utc() - start_millis).num_milliseconds();
+
+        info!(
+            first_version = first_version,
+            block_event_epoch = block_event_epoch,
+            metadata_epoch = metadata_epoch,
+            ledger_chain_id = ledger_chain_id,
+            table_info_parsing_millis = fetch_millis,
+        );
+
+        Ok(())
+    }
+
     async fn convert_to_api_txns(
         context: Arc<Context>,
         raw_txns: Vec<TransactionOnChainData>,
-        _db_writer: Arc<dyn DbWriter>,
     ) -> Vec<APITransaction> {
         if raw_txns.is_empty() {
             return vec![];
@@ -234,16 +314,6 @@ impl IndexerStreamCoordinator {
         let state_view = context.latest_state_view().unwrap();
         let resolver = state_view.as_move_resolver();
         let converter = resolver.as_converter(context.db.clone());
-
-        #[cfg(feature = "indexer-async-v2")]
-        {
-            let write_sets: Vec<WriteSet> =
-                raw_txns.iter().map(|txn| txn.changes.clone()).collect();
-            let write_sets_slice: Vec<&WriteSet> = write_sets.iter().collect();
-            let _ = _db_writer
-                .clone()
-                .index(context.db.clone(), first_version, &write_sets_slice);
-        }
 
         // Enrich data with block metadata
         let (_, _, block_event) = context

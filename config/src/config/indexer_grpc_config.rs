@@ -6,7 +6,7 @@ use crate::config::{
 };
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::{net::{Ipv4Addr, SocketAddr, SocketAddrV4}, path::PathBuf};
 
 // Useful indexer defaults
 const DEFAULT_PROCESSOR_TASK_COUNT: u16 = 20;
@@ -36,6 +36,8 @@ pub struct IndexerGrpcConfig {
 
     /// Number of transactions returned in a single stream response
     pub output_batch_size: u16,
+
+    pub backup_restore_config: Option<IndexerBackupRestoreConfig>,
 }
 
 // Reminder, #[serde(default)] on IndexerGrpcConfig means that the default values for
@@ -53,6 +55,7 @@ impl Default for IndexerGrpcConfig {
             processor_task_count: DEFAULT_PROCESSOR_TASK_COUNT,
             processor_batch_size: DEFAULT_PROCESSOR_BATCH_SIZE,
             output_batch_size: DEFAULT_OUTPUT_BATCH_SIZE,
+            backup_restore_config: None,
         }
     }
 }
@@ -69,10 +72,10 @@ impl ConfigSanitizer for IndexerGrpcConfig {
             return Ok(());
         }
 
-        if !node_config.storage.enable_indexer && !cfg!(feature = "indexer-async-v2") {
+        if !node_config.storage.enable_indexer && !node_config.storage.enable_indexer_async_v2 {
             return Err(Error::ConfigSanitizerFailed(
                 sanitizer_name,
-                "storage.enable_indexer or feature flag indexer-async-v2 must be true if indexer_grpc.enabled is true".to_string(),
+                "storage.enable_indexer or storage.enable_indexer_async_v2 must be true if indexer_grpc.enabled is true".to_string(),
             ));
         }
         Ok(())
@@ -115,5 +118,31 @@ mod tests {
         // Sanitize the config and verify that it now succeeds
         IndexerGrpcConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
             .unwrap();
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(tag = "backup_restore_type")]
+pub enum IndexerBackupRestoreConfig {
+    GcsFileStore(GcsFileStore),
+    LocalFileStore(LocalFileStore),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct GcsFileStore {
+    pub gcs_bucket_name: String,
+    // pub gcs_service_account_key_path: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct LocalFileStore {
+    pub local_file_store_path: PathBuf,
+}
+
+impl Default for IndexerBackupRestoreConfig {
+    fn default() -> Self {
+        IndexerBackupRestoreConfig::LocalFileStore(LocalFileStore {
+            local_file_store_path: std::env::current_dir().unwrap(),
+        })
     }
 }
