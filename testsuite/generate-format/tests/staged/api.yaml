@@ -129,6 +129,9 @@ ContractEventV2:
 DepositEvent:
   STRUCT:
     - amount: U64
+DummySystemTransaction:
+  STRUCT:
+    - nonce: U64
 Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
@@ -320,6 +323,12 @@ StructTag:
     - type_args:
         SEQ:
           TYPENAME: TypeTag
+SystemTransaction:
+  ENUM:
+    0:
+      DummyTopic:
+        NEWTYPE:
+          TYPENAME: DummySystemTransaction
 TableHandle:
   NEWTYPESTRUCT:
     TYPENAME: AccountAddress
@@ -341,6 +350,10 @@ Transaction:
       StateCheckpoint:
         NEWTYPE:
           TYPENAME: HashValue
+    4:
+      SystemTransaction:
+        NEWTYPE:
+          TYPENAME: SystemTransaction
 TransactionArgument:
   ENUM:
     0:

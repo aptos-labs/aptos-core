@@ -22,5 +22,5 @@ error[E04010]: cannot infer type
   ┌─ tests/move_check/typing/exp_list_nested.move:6:19
   │
 6 │         (0, (S{}, R{}))
-  │                   ^^^ Could not infer this type. Try adding an annotation
+  │                   ^^^ Cannot infer the type parameter `T` for generic struct `0x8675309::M::R`. Try providing a type parameter.
 

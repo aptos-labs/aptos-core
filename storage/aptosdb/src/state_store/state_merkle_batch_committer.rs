@@ -94,9 +94,8 @@ impl StateMerkleBatchCommitter {
                         .epoch_snapshot_pruner
                         .maybe_set_pruner_target_db_version(current_version);
 
-                    if !self.state_db.skip_usage {
-                        self.check_usage_consistency(&state_delta).unwrap();
-                    }
+                    self.check_usage_consistency(&state_delta).unwrap();
+
                     state_delta.base.log_generation("buffered_state_commit");
                     state_delta
                         .current

@@ -20,6 +20,7 @@ use crate::{
     on_chain_config::ValidatorSet,
     proof::TransactionInfoListWithProof,
     state_store::{state_key::StateKey, state_value::StateValue},
+    system_txn::{DummySystemTransaction, SystemTransaction},
     transaction::{
         ChangeSet, ExecutionStatus, Module, ModuleBundle, RawTransaction, Script,
         SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
@@ -1210,6 +1211,17 @@ impl Arbitrary for ValidatorVerifier {
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         vec(any::<ValidatorConsensusInfo>(), 1..1000)
             .prop_map(ValidatorVerifier::new)
+            .boxed()
+    }
+}
+
+impl Arbitrary for SystemTransaction {
+    type Parameters = SizeRange;
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        Just(Value::Null)
+            .prop_map(|_| SystemTransaction::DummyTopic(DummySystemTransaction { nonce: 0 }))
             .boxed()
     }
 }

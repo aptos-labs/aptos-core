@@ -32,6 +32,7 @@ pub mod serde_helper;
 pub mod stake_pool;
 pub mod staking_contract;
 pub mod state_proof;
+pub mod system_txn;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test_helpers;
 pub mod timestamp;

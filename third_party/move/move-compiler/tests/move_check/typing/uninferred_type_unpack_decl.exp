@@ -2,5 +2,5 @@ error[E04010]: cannot infer type
   ┌─ tests/move_check/typing/uninferred_type_unpack_decl.move:5:13
   │
 5 │         let S{};
-  │             ^^^ Could not infer this type. Try adding an annotation
+  │             ^^^ Cannot infer the type parameter `T` for generic struct `0x8675309::M::S`. Try providing a type parameter.
 
