@@ -171,9 +171,10 @@ pub trait VMExecutor: Send + Sync {
 
 /// This trait describes the VM's simulation interfaces.
 pub trait VMSimulator {
-    /// Executes a SignedTransaction without performing signature verification.
-    fn simulate_signed_transaction(
-        &self,
+    /// Simulates a signed transaction (i.e., executes it without performing
+    /// signature verification) on a newly created VM instance.
+    /// *Precondition:* the transaction must **not** have a valid signature.
+    fn create_vm_and_simulate_signed_transaction(
         transaction: &SignedTransaction,
         state_view: &impl StateView,
     ) -> (VMStatus, TransactionOutput);

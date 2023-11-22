@@ -141,7 +141,7 @@ impl AptosVM {
         }
     }
 
-    pub fn for_simulation(mut self) -> Self {
+    fn for_simulation(mut self) -> Self {
         self.is_simulation = true;
         self
     }
@@ -1736,6 +1736,9 @@ impl AptosVM {
             .any(|(event, _)| event.event_key() == Some(&new_epoch_event_key))
     }
 
+    /// Executes a single transaction (including user transactions, block
+    /// metadata and state checkpoint, etc.).
+    /// *Precondition:* VM has to be instantiated in execution mode.
     pub fn execute_single_transaction(
         &self,
         txn: &SignatureVerifiedTransaction,
@@ -1994,22 +1997,21 @@ impl VMValidator for AptosVM {
 }
 
 impl VMSimulator for AptosVM {
-    fn simulate_signed_transaction(
-        &self,
+    fn create_vm_and_simulate_signed_transaction(
         transaction: &SignedTransaction,
         state_view: &impl StateView,
     ) -> (VMStatus, TransactionOutput) {
-        assert!(self.is_simulation, "VM has to be created for simulation");
         assert_err!(
             transaction.verify_signature(),
             "Simulated transaction should not have a valid signature"
         );
 
         let resolver = state_view.as_move_resolver();
+        let vm = Self::new(&resolver).for_simulation();
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let (vm_status, vm_output) =
-            self.execute_user_transaction(&resolver, transaction, &log_context);
+            vm.execute_user_transaction(&resolver, transaction, &log_context);
         let txn_output = vm_output
             .try_into_transaction_output(&resolver)
             .expect("Materializing aggregator V1 deltas should never fail");
