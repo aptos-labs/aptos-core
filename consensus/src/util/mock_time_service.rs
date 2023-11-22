@@ -123,6 +123,12 @@ impl SimulatedTimeService {
     }
 }
 
+impl Default for SimulatedTimeService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Clone for SimulatedTimeService {
     fn clone(&self) -> SimulatedTimeService {
         SimulatedTimeService {
