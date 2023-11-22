@@ -597,11 +597,13 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 <pre><code><b>let</b> account_addr_source = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(source);
+<b>let</b> coin_store_source = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(account_addr_source);
 <b>let</b> coin_store_to = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(<b>to</b>);
 <b>requires</b> account_addr_source != <b>to</b>;
 <b>include</b> <a href="aptos_account.md#0x1_aptos_account_CreateAccountTransferAbortsIf">CreateAccountTransferAbortsIf</a>;
 <b>include</b> <a href="aptos_account.md#0x1_aptos_account_GuidAbortsIf">GuidAbortsIf</a>&lt;AptosCoin&gt;;
 <b>include</b> <a href="aptos_account.md#0x1_aptos_account_WithdrawAbortsIf">WithdrawAbortsIf</a>&lt;AptosCoin&gt;{from: source};
+<b>include</b> <a href="aptos_account.md#0x1_aptos_account_TransferEnsures">TransferEnsures</a>&lt;AptosCoin&gt;;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(<b>to</b>) && <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(<b>to</b>).frozen;
 <b>ensures</b> <b>exists</b>&lt;aptos_framework::account::Account&gt;(<b>to</b>);
 <b>ensures</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(<b>to</b>);
@@ -669,11 +671,13 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 <pre><code><b>let</b> account_addr_source = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(from);
 <b>let</b> coin_store_to = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>);
+<b>let</b> coin_store_source = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr_source);
 <b>requires</b> account_addr_source != <b>to</b>;
 <b>include</b> <a href="aptos_account.md#0x1_aptos_account_CreateAccountTransferAbortsIf">CreateAccountTransferAbortsIf</a>;
 <b>include</b> <a href="aptos_account.md#0x1_aptos_account_WithdrawAbortsIf">WithdrawAbortsIf</a>&lt;CoinType&gt;;
 <b>include</b> <a href="aptos_account.md#0x1_aptos_account_GuidAbortsIf">GuidAbortsIf</a>&lt;CoinType&gt;;
 <b>include</b> <a href="aptos_account.md#0x1_aptos_account_RegistCoinAbortsIf">RegistCoinAbortsIf</a>&lt;CoinType&gt;;
+<b>include</b> <a href="aptos_account.md#0x1_aptos_account_TransferEnsures">TransferEnsures</a>&lt;CoinType&gt;;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>) && <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>).frozen;
 <b>ensures</b> <b>exists</b>&lt;aptos_framework::account::Account&gt;(<b>to</b>);
 <b>ensures</b> <b>exists</b>&lt;aptos_framework::coin::CoinStore&lt;CoinType&gt;&gt;(<b>to</b>);
@@ -742,6 +746,25 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
+
+<a name="0x1_aptos_account_TransferEnsures"></a>
+
+
+<pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_TransferEnsures">TransferEnsures</a>&lt;CoinType&gt; {
+    coin_store_to: <a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;;
+    coin_store_source: <a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;;
+    amount: u64;
+    <b>let</b> o_balance_source = coin_store_source.<a href="coin.md#0x1_coin">coin</a>.value;
+    <b>let</b> o_balance_to = coin_store_to.<a href="coin.md#0x1_coin">coin</a>.value;
+    <b>let</b> p_balance_source = coin_store_source.<a href="coin.md#0x1_coin">coin</a>.value;
+    <b>let</b> p_balance_to = coin_store_to.<a href="coin.md#0x1_coin">coin</a>.value;
+    <b>ensures</b> o_balance_source - amount == p_balance_source;
+    <b>ensures</b> o_balance_to + amount == p_balance_to;
+}
+</code></pre>
+
+
+
 <a name="@Specification_1_deposit_coins"></a>
 
 ### Function `deposit_coins`
@@ -759,6 +782,9 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 <b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>) && <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>).frozen;
 <b>ensures</b> <b>exists</b>&lt;aptos_framework::account::Account&gt;(<b>to</b>);
 <b>ensures</b> <b>exists</b>&lt;aptos_framework::coin::CoinStore&lt;CoinType&gt;&gt;(<b>to</b>);
+<b>let</b> o_coin_store_to = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>).<a href="coin.md#0x1_coin">coin</a>.value;
+<b>let</b> p_coin_store_to = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>).<a href="coin.md#0x1_coin">coin</a>.value;
+<b>ensures</b> p_coin_store_to == o_coin_store_to + coins.value;
 </code></pre>
 
 
@@ -811,6 +837,7 @@ Check if the AptosCoin under the address existed.
 
 <pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
 <b>include</b> !<b>exists</b>&lt;<a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(addr) ==&gt; <a href="account.md#0x1_account_NewEventHandleAbortsIf">account::NewEventHandleAbortsIf</a>;
+<b>ensures</b> <b>global</b>&lt;<a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(addr).allow_arbitrary_coin_transfers == allow;
 </code></pre>
 
 
