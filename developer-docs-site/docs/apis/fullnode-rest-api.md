@@ -50,7 +50,7 @@ View functions do not modify blockchain state when called from the API. A [View]
 * related [Move](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/aptos-move/framework/aptos-framework/sources/coin.move#L226) code
 * [specification](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/api/doc/spec.yaml#L8513).
 
-The view function operates like the [Aptos Simulation API](../guides/system-integrators-guide.md#testing-transactions-or-transaction-pre-execution), though with no side effects and a accessible output path. View functions can be called via the `/view` endpoint. Calls to view functions require the module and function names along with input type parameters and values.
+The view function operates like the [Aptos Simulation API](../guides/system-integrators-guide.md#testing-transactions-or-transaction-pre-execution), though with no side effects and an accessible output path. View functions can be called via the `/view` endpoint. Calls to view functions require the module and function names along with input type parameters and values.
 
 A function does not have to be immutable to be tagged as `#[view]`, but if the function is mutable it will not result in state mutation when called from the API.
 If you want to tag a mutable function as `#[view]`, consider making it private so that it cannot be maliciously called during runtime.

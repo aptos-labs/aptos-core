@@ -35,7 +35,7 @@ In this example, we are using the `getAccountNFTs()` method to retrieve the NFT 
 
 ## Use custom queries
 
-The TypeScript SDK provides frequently used queries by different users and/or apps and makes sure the queries are well structured to retrive the current response.
+The TypeScript SDK provides frequently used queries by different users and/or apps and makes sure the queries are well structured to retrieve the current response.
 
 With that being said, one can structure custom queries and use the SDK to query the Aptos Indexer API. For that, the SDK exports a `queryIndexer()` method that accepts a `GraphqlQuery` type argument. The `GraphqlQuery` type has a `query` field of type `string` and an optional `variable` field of an `object` type.
 
