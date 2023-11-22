@@ -154,6 +154,10 @@ impl Constraint {
                     Ok(true)
                 }
             },
+            (Constraint::SomeReference(ty1), Constraint::SomeReference(ty2)) => {
+                *ty1 = subs.unify(context, Variance::NoVariance, WideningOrder::Join, ty1, ty2)?;
+                Ok(true)
+            },
             (Constraint::SomeStruct(fields1), Constraint::SomeStruct(fields2)) => {
                 // Join the fields together, unifying their types if there are overlaps.
                 for (name, ty) in fields2 {
@@ -1151,13 +1155,13 @@ impl Substitution {
                 };
                 return Ok(Type::Reference(
                     *kind,
-                    Box::new(self.unify(context, sub_variance, order, bt1.as_ref(), t2)?),
+                    Box::new(self.unify(context, variance, order, bt1.as_ref(), t2)?),
                 ));
             }
             if let Type::Reference(kind, bt2) = t2 {
                 return Ok(Type::Reference(
                     *kind,
-                    Box::new(self.unify(context, sub_variance, order, t1, bt2.as_ref())?),
+                    Box::new(self.unify(context, variance, order, t1, bt2.as_ref())?),
                 ));
             }
         }
@@ -1235,10 +1239,12 @@ impl Substitution {
             },
             (Type::Struct(m1, s1, ts1), Type::Struct(m2, s2, ts2)) => {
                 if m1 == m2 && s1 == s2 {
+                    // For structs, also pass on `variance`, not `sub_variance`, to inherit
+                    // shallow processing to fields.
                     return Ok(Type::Struct(
                         *m1,
                         *s1,
-                        self.unify_vec(context, sub_variance, order, ts1, ts2, "structs")?,
+                        self.unify_vec(context, variance, order, ts1, ts2, "structs")?,
                     ));
                 }
             },
@@ -1622,61 +1628,7 @@ impl TypeUnificationError {
                     )
                 },
                 Constraint::SomeStruct(field_map) => {
-                    // Determine why this constraint did not match for better error message
-                    if let Type::Struct(mid, sid, inst) = ty {
-                        let actual_field_map = unification_context
-                            .get_struct_field_map(&mid.qualified_inst(*sid, inst.clone()));
-                        let missing_fields = field_map
-                            .keys()
-                            .filter(|n| !actual_field_map.contains_key(n))
-                            .collect::<Vec<_>>();
-                        if !missing_fields.is_empty() {
-                            // Primary error is missing fields
-                            let fields = Self::print_fields(
-                                display_context.env,
-                                missing_fields.into_iter().cloned(),
-                            );
-                            format!(
-                                "{} not declared in struct `{}`",
-                                fields,
-                                ty.display(display_context)
-                            )
-                        } else {
-                            // Primary error is a type mismatch
-                            let fields = field_map
-                                .iter()
-                                .filter_map(|(n, ty)| {
-                                    let Some(actual_ty) = actual_field_map.get(n) else { return None; };
-                                    if ty != actual_ty {
-                                        Some(format!("field `{}` has type `{}` instead of `{}`",
-                                                     n.display(display_context.env.symbol_pool()),
-                                                     ty.display(display_context),
-                                                     actual_ty.display(display_context)
-                                        ))
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .join(" and ");
-                            format!("{} in `{}`", fields, ty.display(display_context))
-                        }
-                    } else {
-                        format!(
-                            "expected a struct{} but found `{}`",
-                            if field_map.is_empty() {
-                                "".to_owned()
-                            } else {
-                                format!(
-                                    " with {}",
-                                    Self::print_fields(
-                                        display_context.env,
-                                        field_map.keys().cloned(),
-                                    )
-                                )
-                            },
-                            ty.display(display_context)
-                        )
-                    }
+                    Self::message_for_struct(unification_context, display_context, field_map, ty)
                 },
                 Constraint::WithDefault(_) => unreachable!("default constraint in error message"),
             },
@@ -1686,6 +1638,9 @@ impl TypeUnificationError {
                 match (c1, c2) {
                     (SomeStruct(..), SomeNumber(..)) | (SomeNumber(..), SomeStruct(..)) => {
                         "struct incompatible with integer".to_owned()
+                    },
+                    (SomeReference(..), SomeNumber(..)) | (SomeNumber(..), SomeReference(..)) => {
+                        "reference incompatible with integer".to_owned()
                     },
                     _ => {
                         format!(
@@ -1699,6 +1654,67 @@ impl TypeUnificationError {
             TypeUnificationError::RedirectedError(_, err) => {
                 err.message(unification_context, display_context)
             },
+        }
+    }
+
+    fn message_for_struct(
+        unification_context: &impl UnificationContext,
+        display_context: &TypeDisplayContext,
+        field_map: &BTreeMap<Symbol, Type>,
+        ty: &Type,
+    ) -> String {
+        // Determine why this constraint did not match for better error message
+        if let Type::Struct(mid, sid, inst) = ty {
+            let actual_field_map =
+                unification_context.get_struct_field_map(&mid.qualified_inst(*sid, inst.clone()));
+            let missing_fields = field_map
+                .keys()
+                .filter(|n| !actual_field_map.contains_key(n))
+                .collect::<Vec<_>>();
+            if !missing_fields.is_empty() {
+                // Primary error is missing fields
+                let fields =
+                    Self::print_fields(display_context.env, missing_fields.into_iter().cloned());
+                format!(
+                    "{} not declared in struct `{}`",
+                    fields,
+                    ty.display(display_context)
+                )
+            } else {
+                // Primary error is a type mismatch
+                let fields = field_map
+                    .iter()
+                    .filter_map(|(n, ty)| {
+                        let Some(actual_ty) = actual_field_map.get(n) else {
+                            return None;
+                        };
+                        if ty != actual_ty {
+                            Some(format!(
+                                "field `{}` has type `{}` instead of `{}`",
+                                n.display(display_context.env.symbol_pool()),
+                                ty.display(display_context),
+                                actual_ty.display(display_context)
+                            ))
+                        } else {
+                            None
+                        }
+                    })
+                    .join(" and ");
+                format!("{} in `{}`", fields, ty.display(display_context))
+            }
+        } else {
+            format!(
+                "expected a struct{} but found `{}`",
+                if field_map.is_empty() {
+                    "".to_owned()
+                } else {
+                    format!(
+                        " with {}",
+                        Self::print_fields(display_context.env, field_map.keys().cloned(),)
+                    )
+                },
+                ty.display(display_context)
+            )
         }
     }
 

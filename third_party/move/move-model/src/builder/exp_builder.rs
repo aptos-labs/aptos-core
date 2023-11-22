@@ -1341,6 +1341,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let id = self.new_node_id_with_type_loc(expected_type, &loc);
                 ExpData::Call(id, Operation::Deref, vec![target_exp.into_exp()])
             },
+            EA::Exp_::Borrow(_, exp) if self.mode == ExpTranslationMode::TryImplAsSpec => {
+                // Skipp borrow when interpreting as specification expression.
+                self.translate_exp(exp, expected_type)
+            },
             EA::Exp_::Borrow(mutable, exp) => {
                 self.require_impl_language(&loc);
                 let ref_kind = ReferenceKind::from_is_mut(*mutable);
@@ -1485,6 +1489,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             },
                         }
                     } else {
+                        // Reconstruct expression and return for traversal
                         Err(ExpData::Call(id, Operation::NoOp, args).into_exp())
                     }
                 } else {
@@ -1881,7 +1886,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             if let Some(entry) = self.lookup_local(sym, false) {
                 // Check whether the local has the expected function type.
                 let sym_ty = entry.type_.clone();
-                let (arg_types, args) = self.translate_exp_list(args, false);
+                let (arg_types, args) = self.translate_exp_list(args);
                 let fun_t = Type::Fun(
                     Box::new(Type::tuple(arg_types)),
                     Box::new(expected_type.clone()),
@@ -1949,7 +1954,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     }
 
                     // lambda variables appears in the back
-                    let (mut arg_types, mut args) = self.translate_exp_list(args, false);
+                    let (mut arg_types, mut args) = self.translate_exp_list(args);
                     full_arg_types.append(&mut arg_types);
                     full_arg_exprs.append(&mut args);
 
@@ -2465,11 +2470,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     ) -> ExpData {
         // Translate generic arguments, if any.
         let generics = generics.as_ref().map(|ts| self.translate_types(ts));
-        // Translate arguments. Skip any lambda expressions; they are resolved after the overload
-        // is identified to avoid restrictions with type inference.
-        // TODO: try to remove this special treatment as we have new constraint-based inference
-        //   powers.
-        let (arg_types, mut translated_args) = self.translate_exp_list(args, true);
+        // Translate arguments.
+        let (arg_types, translated_args) = self.translate_exp_list(args);
         let args_have_errors = arg_types.iter().any(|t| t == &Type::Error);
         // Lookup candidates.
         let cand_modules = if let Some(m) = module {
@@ -2639,14 +2641,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let result_type = result_type.instantiate(&instantiation);
                 // Commit the candidate substitution to this expression translator.
                 self.subs = subs;
-                // Now translate lambda-based arguments passing expected type to aid type inference.
-                for i in 0..translated_args.len() {
-                    let e = args[i];
-                    if matches!(e.value, EA::Exp_::Lambda(..)) {
-                        let expected_type = self.subs.specialize(&arg_types[i]);
-                        translated_args[i] = self.translate_exp(e, &expected_type).into_exp();
-                    }
-                }
+
                 // Check result type against expected type.
                 let ty = self.check_type(loc, &result_type, expected_type, "");
                 // calls to built-in functions might have additional requirements on the types
@@ -2756,28 +2751,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 
     /// Translate a list of expressions and deliver them together with their types.
-    fn translate_exp_list(
-        &mut self,
-        exps: &[&EA::Exp],
-        skip_lambda: bool,
-    ) -> (Vec<Type>, Vec<Exp>) {
+    fn translate_exp_list(&mut self, exps: &[&EA::Exp]) -> (Vec<Type>, Vec<Exp>) {
         let mut types = vec![];
         let exps = exps
             .iter()
             .map(|e| {
-                let (t, e) = if !skip_lambda || !matches!(e.value, EA::Exp_::Lambda(..)) {
-                    let (ty, exp) = self.translate_exp_free(e);
-                    (ty, exp.into_exp())
-                } else {
-                    // In skip-lambda mode, just create a fresh type variable. We translate
-                    // the expression in a second pass, once the expected type is known.
-                    (
-                        self.fresh_type_var(),
-                        ExpData::Invalid(NodeId::new(0)).into_exp(),
-                    )
-                };
+                let (t, e) = self.translate_exp_free(e);
                 types.push(t);
-                e
+                e.into_exp()
             })
             .collect_vec();
         (types, exps)

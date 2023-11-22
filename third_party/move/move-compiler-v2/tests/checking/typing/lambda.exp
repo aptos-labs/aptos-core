@@ -6,17 +6,17 @@ error: `M::reduce` is a function and not a macro
 34 │         foreach(&v, |e| sum = sum + reduce!(*e, 0, |t, r| t + r));
    │                                     ^^^^^^
 
-error: invalid call of `+`: expected `integer` but found `&integer` for argument 2
-   ┌─ tests/checking/typing/lambda.move:67:37
+error: invalid call of `M::foreach`: expected `&?19` but found `integer` for argument 2
+   ┌─ tests/checking/typing/lambda.move:67:21
    │
 67 │         foreach(&v, |e| sum = sum + e) // expected to cannot infer type
-   │                                     ^
+   │                     ^^^^^^^^^^^^^^^^^
 
-error: expected `()` but found `integer`
-   ┌─ tests/checking/typing/lambda.move:73:43
+error: invalid call of `M::foreach`: expected `()` but found `integer` for argument 2
+   ┌─ tests/checking/typing/lambda.move:73:21
    │
 73 │         foreach(&v, |e| { sum = sum + *e; *e }) // expected to have wrong result type of lambda
-   │                                           ^^
+   │                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: expected `(&T, u64)` but found `&T`
    ┌─ tests/checking/typing/lambda.move:40:13
