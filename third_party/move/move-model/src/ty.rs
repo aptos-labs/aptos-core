@@ -28,14 +28,14 @@ pub enum Type {
     Primitive(PrimitiveType),
     Tuple(Vec<Type>),
     Vector(Box<Type>),
-    Struct(ModuleId, StructId, Vec<Type>),
+    Struct(ModuleId, StructId, /*type-params*/ Vec<Type>),
     TypeParameter(u16),
+    Fun(/*args*/ Box<Type>, /*result*/ Box<Type>),
 
     // Types only appearing in programs.
     Reference(ReferenceKind, Box<Type>),
 
-    // Types only appearing in specifications
-    Fun(Box<Type>, Box<Type>),
+    // Types only appearing in specifications.
     TypeDomain(Box<Type>),
     ResourceDomain(ModuleId, StructId, Option<Vec<Type>>),
 
@@ -366,7 +366,8 @@ impl Type {
         use Type::*;
         match self {
             Primitive(p) => p.is_spec(),
-            Fun(..) | TypeDomain(..) | ResourceDomain(..) | Error => true,
+            Fun(args, result) => args.is_spec() || result.is_spec(),
+            TypeDomain(..) | ResourceDomain(..) | Error => true,
             Var(..) | TypeParameter(..) => false,
             Tuple(ts) => ts.iter().any(|t| t.is_spec()),
             Struct(_, _, ts) => ts.iter().any(|t| t.is_spec()),
