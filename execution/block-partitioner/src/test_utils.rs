@@ -27,8 +27,8 @@ use aptos_types::state_store::state_key::StateKey;
 use aptos_types::{
     chain_id::ChainId,
     transaction::{
-        analyzed_transaction::AnalyzedTransaction, EntryFunction, RawTransaction,
-        SignedTransaction, Transaction, TransactionPayload,
+        analyzed_transaction::AnalyzedTransaction, RawTransaction,
+        DeprecatedSignedUserTransaction, EntryFunction, Transaction, TransactionPayload,
     },
     utility_coin::APTOS_COIN_TYPE,
 };
@@ -101,7 +101,7 @@ pub fn create_signed_p2p_transaction(
             ChainId::new(10),
         );
         sender.sequence_number += 1;
-        let txn = Transaction::UserTransaction(SignedTransaction::new(
+        let txn = Transaction::DeprecatedUserTransaction(DeprecatedSignedUserTransaction::new(
             raw_transaction.clone(),
             sender.private_key.public_key().clone(),
             sender.private_key.sign(&raw_transaction).unwrap(),
@@ -127,8 +127,8 @@ impl P2PBlockGenerator {
     }
 
     pub fn rand_block<R>(&self, rng: &mut R, block_size: usize) -> Vec<AnalyzedTransaction>
-    where
-        R: Rng,
+        where
+            R: Rng,
     {
         (0..block_size)
             .map(|_| {
@@ -183,8 +183,8 @@ pub fn verify_partitioner_output(
                                   shard_id: usize,
                                   start_txn_idx: usize,
                                   sub_block_txns: &[TransactionWithDependencies<
-        AnalyzedTransaction,
-    >]| {
+                                      AnalyzedTransaction,
+                                  >]| {
         let mut cur_sub_block_inbound_costs: HashMap<(RoundId, ShardId, StateKey), u64> =
             HashMap::new();
         let mut cur_sub_block_outbound_costs: HashMap<(RoundId, ShardId, StateKey), u64> =

@@ -8,15 +8,18 @@ use crate::{
     execution_strategies::types::{Block, Executor, ExecutorResult, PartitionStrategy},
     executor::FakeExecutor,
 };
-use aptos_types::{transaction::SignedTransaction, vm_status::VMStatus};
+use aptos_types::{transaction::DeprecatedSignedUserTransaction, vm_status::VMStatus};
 
 #[derive(Debug)]
 pub struct BasicStrategy;
 
 impl PartitionStrategy for BasicStrategy {
-    type Txn = SignedTransaction;
+    type Txn = DeprecatedSignedUserTransaction;
 
-    fn partition(&mut self, block: Block<Self::Txn>) -> Vec<Block<SignedTransaction>> {
+    fn partition(
+        &mut self,
+        block: Block<Self::Txn>,
+    ) -> Vec<Block<DeprecatedSignedUserTransaction>> {
         vec![block]
     }
 }

@@ -126,7 +126,7 @@ impl TransactionsWithParsedOutput {
         }
         match txn {
             Transaction::BlockMetadata(_)
-            | Transaction::UserTransaction(_)
+            | Transaction::DeprecatedUserTransaction(_)
             | Transaction::SystemTransaction(_) => false,
             Transaction::GenesisTransaction(_) | Transaction::StateCheckpoint(_) => true,
         }

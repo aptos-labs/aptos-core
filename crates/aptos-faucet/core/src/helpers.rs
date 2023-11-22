@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_sdk::{crypto::HashValue, types::transaction::SignedTransaction};
+use aptos_sdk::{crypto::HashValue, types::transaction::DeprecatedSignedUserTransaction};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub fn transaction_hashes(transactions: &[&SignedTransaction]) -> Vec<String> {
+pub fn transaction_hashes(transactions: &[&DeprecatedSignedUserTransaction]) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for transaction in transactions.iter() {
         // This is clearly gross. If we commit to returning only txn hashes

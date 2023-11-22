@@ -7,7 +7,9 @@ use aptos_language_e2e_tests::{
 };
 use aptos_types::{
     account_config::{DepositEvent, WithdrawEvent},
-    transaction::{ExecutionStatus, SignedTransaction, TransactionOutput, TransactionStatus},
+    transaction::{
+        DeprecatedSignedUserTransaction, ExecutionStatus, TransactionOutput, TransactionStatus,
+    },
 };
 use std::{convert::TryFrom, time::Instant};
 
@@ -74,7 +76,7 @@ fn few_peer_to_peer_with_event() {
     let transfer_amount = 1_000;
 
     // execute transaction
-    let txns: Vec<SignedTransaction> = vec![
+    let txns: Vec<DeprecatedSignedUserTransaction> = vec![
         peer_to_peer_txn(sender.account(), receiver.account(), 10, transfer_amount, 0),
         peer_to_peer_txn(sender.account(), receiver.account(), 11, transfer_amount, 0),
         peer_to_peer_txn(sender.account(), receiver.account(), 12, transfer_amount, 0),
@@ -155,8 +157,8 @@ pub(crate) fn create_cyclic_transfers(
     executor: &FakeExecutor,
     accounts: &[Account],
     transfer_amount: u64,
-) -> (Vec<TxnInfo>, Vec<SignedTransaction>) {
-    let mut txns: Vec<SignedTransaction> = Vec::new();
+) -> (Vec<TxnInfo>, Vec<DeprecatedSignedUserTransaction>) {
+    let mut txns: Vec<DeprecatedSignedUserTransaction> = Vec::new();
     let mut txns_info: Vec<TxnInfo> = Vec::new();
     // loop through all transactions and let each transfer the same amount to the next one
     let count = accounts.len();
@@ -181,8 +183,8 @@ fn create_one_to_many_transfers(
     executor: &FakeExecutor,
     accounts: &[Account],
     transfer_amount: u64,
-) -> (Vec<TxnInfo>, Vec<SignedTransaction>) {
-    let mut txns: Vec<SignedTransaction> = Vec::new();
+) -> (Vec<TxnInfo>, Vec<DeprecatedSignedUserTransaction>) {
+    let mut txns: Vec<DeprecatedSignedUserTransaction> = Vec::new();
     let mut txns_info: Vec<TxnInfo> = Vec::new();
     // grab account 0 as a sender
     let sender = &accounts[0];
@@ -208,8 +210,8 @@ fn create_many_to_one_transfers(
     executor: &FakeExecutor,
     accounts: &[Account],
     transfer_amount: u64,
-) -> (Vec<TxnInfo>, Vec<SignedTransaction>) {
-    let mut txns: Vec<SignedTransaction> = Vec::new();
+) -> (Vec<TxnInfo>, Vec<DeprecatedSignedUserTransaction>) {
+    let mut txns: Vec<DeprecatedSignedUserTransaction> = Vec::new();
     let mut txns_info: Vec<TxnInfo> = Vec::new();
     // grab account 0 as a sender
     let receiver = &accounts[0];

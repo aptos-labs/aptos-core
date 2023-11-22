@@ -6,7 +6,9 @@ use crate::{
     move_types::account_address::AccountAddress,
     types::{
         chain_id::ChainId,
-        transaction::{authenticator::AuthenticationKey, RawTransaction, TransactionPayload},
+        transaction::{
+            authenticator::AuthenticationKey, RawTransaction, TransactionPayload,
+        },
     },
 };
 pub use aptos_cached_packages::aptos_stdlib;

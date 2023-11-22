@@ -15,7 +15,7 @@ use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     mempool_status::MempoolStatusCode,
-    transaction::{RawTransaction, Script, SignedTransaction},
+    transaction::{RawTransaction, DeprecatedSignedUserTransaction, Script},
 };
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, SeedableRng};
@@ -66,18 +66,18 @@ impl TestTransaction {
     pub(crate) fn make_signed_transaction_with_expiration_time(
         &self,
         exp_timestamp_secs: u64,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         self.make_signed_transaction_impl(100, exp_timestamp_secs)
     }
 
     pub(crate) fn make_signed_transaction_with_max_gas_amount(
         &self,
         max_gas_amount: u64,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         self.make_signed_transaction_impl(max_gas_amount, u64::MAX)
     }
 
-    pub(crate) fn make_signed_transaction(&self) -> SignedTransaction {
+    pub(crate) fn make_signed_transaction(&self) -> DeprecatedSignedUserTransaction {
         self.make_signed_transaction_impl(100, u64::MAX)
     }
 
@@ -85,7 +85,7 @@ impl TestTransaction {
         &self,
         max_gas_amount: u64,
         exp_timestamp_secs: u64,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         let raw_txn = RawTransaction::new_script(
             TestTransaction::get_address(self.address),
             self.sequence_number,
@@ -113,7 +113,7 @@ impl TestTransaction {
 pub(crate) fn add_txns_to_mempool(
     pool: &mut CoreMempool,
     txns: Vec<TestTransaction>,
-) -> Vec<SignedTransaction> {
+) -> Vec<DeprecatedSignedUserTransaction> {
     let mut transactions = vec![];
     for transaction in txns {
         let txn = transaction.make_signed_transaction();
@@ -133,7 +133,10 @@ pub(crate) fn add_txn(pool: &mut CoreMempool, transaction: TestTransaction) -> R
     add_signed_txn(pool, transaction.make_signed_transaction())
 }
 
-pub(crate) fn add_signed_txn(pool: &mut CoreMempool, transaction: SignedTransaction) -> Result<()> {
+pub(crate) fn add_signed_txn(
+    pool: &mut CoreMempool,
+    transaction: DeprecatedSignedUserTransaction,
+) -> Result<()> {
     match pool
         .add_txn(
             transaction.clone(),
@@ -151,7 +154,7 @@ pub(crate) fn add_signed_txn(pool: &mut CoreMempool, transaction: SignedTransact
 
 pub(crate) fn batch_add_signed_txn(
     pool: &mut CoreMempool,
-    transactions: Vec<SignedTransaction>,
+    transactions: Vec<DeprecatedSignedUserTransaction>,
 ) -> Result<()> {
     for txn in transactions.into_iter() {
         add_signed_txn(pool, txn)?
@@ -172,7 +175,7 @@ impl ConsensusMock {
         mempool: &mut CoreMempool,
         max_txns: u64,
         max_bytes: u64,
-    ) -> Vec<SignedTransaction> {
+    ) -> Vec<DeprecatedSignedUserTransaction> {
         let block = mempool.get_batch(max_txns, max_bytes, true, true, self.0.clone());
         block.iter().for_each(|t| {
             let txn_summary = TransactionSummary::new(t.sender(), t.sequence_number());
@@ -191,7 +194,7 @@ pub fn decompress_and_deserialize(message_bytes: &Vec<u8>) -> MempoolSyncMsg {
             CompressionClient::Mempool,
             MAX_APPLICATION_MESSAGE_SIZE,
         )
-        .unwrap(),
+            .unwrap(),
     )
-    .unwrap()
+        .unwrap()
 }

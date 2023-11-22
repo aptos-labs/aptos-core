@@ -17,8 +17,8 @@ use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     rest_client::Client,
     types::{
-        account_address::AccountAddress, chain_id::ChainId, transaction::SignedTransaction,
-        LocalAccount,
+        account_address::AccountAddress, chain_id::ChainId,
+        transaction::DeprecatedSignedUserTransaction, LocalAccount,
     },
 };
 use clap::Parser;
@@ -349,10 +349,10 @@ async fn get_sequence_numbers(
 pub async fn submit_transaction(
     client: &Client,
     faucet_account: &RwLock<LocalAccount>,
-    signed_transaction: SignedTransaction,
+    signed_transaction: DeprecatedSignedUserTransaction,
     receiver_address: &AccountAddress,
     wait_for_transactions: bool,
-) -> Result<SignedTransaction, AptosTapError> {
+) -> Result<DeprecatedSignedUserTransaction, AptosTapError> {
     let (result, event_on_success) = if wait_for_transactions {
         // If this fails, we assume it is the user's fault, e.g. because the
         // account already exists, but it is possible that the transaction

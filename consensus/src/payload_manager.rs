@@ -17,7 +17,7 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorError::DataNotFound, *};
 use aptos_logger::prelude::*;
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::DeprecatedSignedUserTransaction;
 use futures::{channel::mpsc::Sender, SinkExt};
 use std::sync::Arc;
 use tokio::sync::oneshot;
@@ -46,7 +46,7 @@ impl PayloadManager {
         batch_store: &BatchStore<NetworkSender>,
     ) -> Vec<(
         HashValue,
-        oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>,
+        oneshot::Receiver<ExecutorResult<Vec<DeprecatedSignedUserTransaction>>>,
     )> {
         let mut receivers = Vec::new();
         for pos in proofs {
@@ -131,7 +131,10 @@ impl PayloadManager {
 
     /// Extract transaction from a given block
     /// Assumes it is never called for the same block concurrently. Otherwise status can be None.
-    pub async fn get_transactions(&self, block: &Block) -> ExecutorResult<Vec<SignedTransaction>> {
+    pub async fn get_transactions(
+        &self,
+        block: &Block,
+    ) -> ExecutorResult<Vec<DeprecatedSignedUserTransaction>> {
         let payload = match block.payload() {
             Some(p) => p,
             None => return Ok(Vec::new()),
@@ -198,7 +201,8 @@ impl PayloadManager {
                                 },
                             }
                         }
-                        let ret: Vec<SignedTransaction> = vec_ret.into_iter().flatten().collect();
+                        let ret: Vec<DeprecatedSignedUserTransaction> =
+                            vec_ret.into_iter().flatten().collect();
                         // execution asks for the data twice, so data is cached here for the second time.
                         proof_with_data
                             .status

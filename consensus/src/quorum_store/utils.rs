@@ -8,7 +8,7 @@ use aptos_consensus_types::{
 };
 use aptos_logger::prelude::*;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
-use aptos_types::{transaction::SignedTransaction, PeerId};
+use aptos_types::{transaction::DeprecatedSignedUserTransaction, PeerId};
 use chrono::Utc;
 use futures::channel::{mpsc::Sender, oneshot};
 use move_core_types::account_address::AccountAddress;
@@ -105,7 +105,7 @@ impl MempoolProxy {
         max_items: u64,
         max_bytes: u64,
         exclude_transactions: BTreeMap<TransactionSummary, TransactionInProgress>,
-    ) -> Result<Vec<SignedTransaction>, anyhow::Error> {
+    ) -> Result<Vec<DeprecatedSignedUserTransaction>, anyhow::Error> {
         let (callback, callback_rcv) = oneshot::channel();
         let msg = QuorumStoreRequest::GetBatchRequest(
             max_items,

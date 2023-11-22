@@ -14,7 +14,8 @@ use aptos_sdk::{
         account_address::AccountAddress,
         chain_id::ChainId,
         transaction::{
-            authenticator::AuthenticationKey, Script, SignedTransaction, TransactionArgument,
+            authenticator::AuthenticationKey, DeprecatedSignedUserTransaction, Script,
+            TransactionArgument,
         },
         LocalAccount,
     },
@@ -213,7 +214,7 @@ impl MintFunder {
         receiver_address: AccountAddress,
         check_only: bool,
         wait_for_transactions: bool,
-    ) -> Result<Vec<SignedTransaction>, AptosTapError> {
+    ) -> Result<Vec<DeprecatedSignedUserTransaction>, AptosTapError> {
         let (_faucet_seq, receiver_seq) = update_sequence_numbers(
             client,
             &self.faucet_account,
@@ -271,7 +272,7 @@ impl FunderTrait for MintFunder {
         receiver_address: AccountAddress,
         check_only: bool,
         did_bypass_checkers: bool,
-    ) -> Result<Vec<SignedTransaction>, AptosTapError> {
+    ) -> Result<Vec<DeprecatedSignedUserTransaction>, AptosTapError> {
         let client = self.get_api_client();
         let amount = self.get_amount(amount, did_bypass_checkers);
         self.process(

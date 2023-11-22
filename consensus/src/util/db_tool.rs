@@ -11,7 +11,7 @@ use crate::{
 use anyhow::{bail, Result};
 use aptos_consensus_types::{block::Block, common::Payload};
 use aptos_crypto::HashValue;
-use aptos_types::transaction::{SignedTransaction, Transaction};
+use aptos_types::transaction::{DeprecatedSignedUserTransaction, Transaction};
 use clap::Parser;
 use std::{collections::HashMap, path::PathBuf};
 
@@ -49,7 +49,7 @@ impl Command {
                     extract_txns_from_block(&block, &all_batches)?
                         .into_iter()
                         .cloned()
-                        .map(Transaction::UserTransaction),
+                        .map(Transaction::DeprecatedUserTransaction),
                 );
             }
         }
@@ -61,7 +61,7 @@ impl Command {
 pub fn extract_txns_from_block<'a>(
     block: &'a Block,
     all_batches: &'a HashMap<HashValue, PersistedValue>,
-) -> anyhow::Result<Vec<&'a SignedTransaction>> {
+) -> anyhow::Result<Vec<&'a DeprecatedSignedUserTransaction>> {
     match block.payload().as_ref() {
         Some(payload) => {
             let mut block_txns = Vec::new();

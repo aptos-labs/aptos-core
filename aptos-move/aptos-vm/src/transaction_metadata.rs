@@ -7,7 +7,9 @@ use aptos_gas_algebra::{FeePerGasUnit, Gas, NumBytes};
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
-    transaction::{authenticator::AuthenticationKey, SignedTransaction, TransactionPayload},
+    transaction::{
+        authenticator::AuthenticationKey, DeprecatedSignedUserTransaction, TransactionPayload,
+    },
 };
 use std::convert::TryFrom;
 
@@ -29,7 +31,7 @@ pub struct TransactionMetadata {
 }
 
 impl TransactionMetadata {
-    pub fn new(txn: &SignedTransaction) -> Self {
+    pub fn new(txn: &DeprecatedSignedUserTransaction) -> Self {
         Self {
             sender: txn.sender(),
             authentication_key: txn.authenticator().sender().authentication_key().to_vec(),

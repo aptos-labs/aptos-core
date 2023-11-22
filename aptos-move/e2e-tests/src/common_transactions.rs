@@ -6,7 +6,7 @@
 
 use crate::account::Account;
 use aptos_cached_packages::aptos_stdlib;
-use aptos_types::transaction::{Script, SignedTransaction};
+use aptos_types::transaction::{DeprecatedSignedUserTransaction, Script};
 use move_ir_compiler::Compiler;
 use once_cell::sync::Lazy;
 
@@ -29,7 +29,7 @@ pub fn empty_txn(
     seq_num: u64,
     max_gas_amount: u64,
     gas_unit_price: u64,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     sender
         .transaction()
         .script(Script::new(EMPTY_SCRIPT.to_vec(), vec![], vec![]))
@@ -44,7 +44,7 @@ pub fn create_account_txn(
     sender: &Account,
     new_account: &Account,
     seq_num: u64,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     sender
         .transaction()
         .payload(aptos_stdlib::aptos_account_create_account(
@@ -64,7 +64,7 @@ pub fn peer_to_peer_txn(
     seq_num: u64,
     transfer_amount: u64,
     gas_unit_price: u64,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     // get a SignedTransaction
     sender
         .transaction()

@@ -9,7 +9,7 @@ use crate::{
 use aptos_logger::info;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{transaction::DeprecatedSignedUserTransaction, LocalAccount},
 };
 use async_trait::async_trait;
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
@@ -23,7 +23,7 @@ pub type TransactionGeneratorWorker = dyn Fn(
         &LocalAccount,
         &TransactionFactory,
         &mut StdRng,
-    ) -> SignedTransaction
+    ) -> DeprecatedSignedUserTransaction
     + Send
     + Sync;
 
@@ -39,7 +39,7 @@ pub trait UserModuleTransactionGenerator: Sync + Send {
         publisher: &mut LocalAccount,
         txn_factory: &TransactionFactory,
         rng: &mut StdRng,
-    ) -> Vec<SignedTransaction>;
+    ) -> Vec<DeprecatedSignedUserTransaction>;
 
     /// Create TransactionGeneratorWorker function, which will be called
     /// to generate transactions to submit.
@@ -84,7 +84,7 @@ impl TransactionGenerator for CustomModulesDelegationGenerator {
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
-    ) -> Vec<SignedTransaction> {
+    ) -> Vec<DeprecatedSignedUserTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);
 
         for _ in 0..num_to_create {

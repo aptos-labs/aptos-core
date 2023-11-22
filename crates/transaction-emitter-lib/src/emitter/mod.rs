@@ -20,7 +20,7 @@ use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Clien
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{transaction::DeprecatedSignedUserTransaction, LocalAccount},
 };
 use aptos_transaction_generator_lib::{create_txn_generator_creator, TransactionType};
 use futures::future::{try_join_all, FutureExt};
@@ -988,7 +988,7 @@ pub fn gen_transfer_txn_request(
     receiver: &AccountAddress,
     num_coins: u64,
     txn_factory: &TransactionFactory,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     sender.sign_with_transaction_builder(
         txn_factory.payload(aptos_stdlib::aptos_coin_transfer(*receiver, num_coins)),
     )

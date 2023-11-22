@@ -6,7 +6,7 @@ use anyhow::{format_err, Result};
 use aptos_consensus_types::common::RejectedTransactionSummary;
 use aptos_executor_types::StateComputeResult;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_types::transaction::{SignedTransaction, TransactionStatus};
+use aptos_types::transaction::{DeprecatedSignedUserTransaction, TransactionStatus};
 use futures::channel::{mpsc, oneshot};
 use itertools::Itertools;
 use std::time::Duration;
@@ -19,7 +19,7 @@ pub trait TxnNotifier: Send + Sync {
     /// state sync.)
     async fn notify_failed_txn(
         &self,
-        txns: Vec<SignedTransaction>,
+        txns: Vec<DeprecatedSignedUserTransaction>,
         compute_results: &StateComputeResult,
         block_gas_limit_enabled: bool,
     ) -> Result<(), MempoolError>;
@@ -49,7 +49,7 @@ impl MempoolNotifier {
 impl TxnNotifier for MempoolNotifier {
     async fn notify_failed_txn(
         &self,
-        user_txns: Vec<SignedTransaction>,
+        user_txns: Vec<DeprecatedSignedUserTransaction>,
         compute_results: &StateComputeResult,
         block_gas_limit_enabled: bool,
     ) -> Result<(), MempoolError> {

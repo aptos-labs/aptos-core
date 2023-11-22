@@ -4,7 +4,7 @@
 use crate::aptos_debugger::AptosDebugger;
 use anyhow::Result;
 use aptos_rest_client::Client;
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::DeprecatedSignedUserTransaction;
 use aptos_vm::AptosVM;
 use clap::Parser;
 use regex::Regex;
@@ -30,7 +30,8 @@ impl Command {
             .filter_map(|m| m.as_str().parse::<u8>().ok())
             .collect::<Vec<u8>>();
 
-        let txn: SignedTransaction = bcs::from_bytes::<SignedTransaction>(&bytes)?;
+        let txn: DeprecatedSignedUserTransaction =
+            bcs::from_bytes::<DeprecatedSignedUserTransaction>(&bytes)?;
         let chain_id = txn.chain_id();
         println!("===================");
         println!("Transaction Summary");

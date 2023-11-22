@@ -3,7 +3,7 @@
 
 use crate::{assert_success, harness::MoveHarness};
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
-use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
+use aptos_types::{account_address::AccountAddress, transaction::DeprecatedSignedUserTransaction};
 use std::path::PathBuf;
 
 pub fn initialize(path: PathBuf) -> (MoveHarness, Account) {
@@ -27,7 +27,7 @@ pub fn check(
     account: &Account,
     index: u64,
     expected: u128,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     harness.create_entry_function(
         account,
         str::parse("0x1::aggregator_test::check").unwrap(),
@@ -44,7 +44,7 @@ pub fn new(
     account: &Account,
     index: u64,
     limit: u128,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     harness.create_entry_function(
         account,
         str::parse("0x1::aggregator_test::new").unwrap(),
@@ -61,7 +61,7 @@ pub fn add(
     account: &Account,
     index: u64,
     value: u128,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     harness.create_entry_function(
         account,
         str::parse("0x1::aggregator_test::add").unwrap(),
@@ -78,7 +78,7 @@ pub fn sub(
     account: &Account,
     index: u64,
     value: u128,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     harness.create_entry_function(
         account,
         str::parse("0x1::aggregator_test::sub").unwrap(),
@@ -96,7 +96,7 @@ pub fn sub_add(
     index: u64,
     a: u128,
     b: u128,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     harness.create_entry_function(
         account,
         str::parse("0x1::aggregator_test::sub_add").unwrap(),
@@ -109,7 +109,11 @@ pub fn sub_add(
     )
 }
 
-pub fn destroy(harness: &mut MoveHarness, account: &Account, index: u64) -> SignedTransaction {
+pub fn destroy(
+    harness: &mut MoveHarness,
+    account: &Account,
+    index: u64,
+) -> DeprecatedSignedUserTransaction {
     harness.create_entry_function(
         account,
         str::parse("0x1::aggregator_test::destroy").unwrap(),
@@ -118,7 +122,11 @@ pub fn destroy(harness: &mut MoveHarness, account: &Account, index: u64) -> Sign
     )
 }
 
-pub fn materialize(harness: &mut MoveHarness, account: &Account, index: u64) -> SignedTransaction {
+pub fn materialize(
+    harness: &mut MoveHarness,
+    account: &Account,
+    index: u64,
+) -> DeprecatedSignedUserTransaction {
     harness.create_entry_function(
         account,
         str::parse("0x1::aggregator_test::materialize").unwrap(),
@@ -132,7 +140,7 @@ pub fn materialize_and_add(
     account: &Account,
     index: u64,
     value: u128,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     harness.create_entry_function(
         account,
         str::parse("0x1::aggregator_test::materialize_and_add").unwrap(),
@@ -149,7 +157,7 @@ pub fn materialize_and_sub(
     account: &Account,
     index: u64,
     value: u128,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     harness.create_entry_function(
         account,
         str::parse("0x1::aggregator_test::materialize_and_sub").unwrap(),
@@ -166,7 +174,7 @@ pub fn add_and_materialize(
     account: &Account,
     index: u64,
     value: u128,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     harness.create_entry_function(
         account,
         str::parse("0x1::aggregator_test::add_and_materialize").unwrap(),
@@ -183,7 +191,7 @@ pub fn sub_and_materialize(
     account: &Account,
     index: u64,
     value: u128,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     harness.create_entry_function(
         account,
         str::parse("0x1::aggregator_test::sub_and_materialize").unwrap(),

@@ -15,7 +15,7 @@ use aptos_gas_algebra::{FeePerGasUnit, Gas, GasExpression};
 use aptos_gas_schedule::{AptosGasParameters, InitialGasSchedule, LATEST_GAS_FEATURE_VERSION};
 use aptos_proptest_helpers::Index;
 use aptos_types::{
-    transaction::{Script, SignedTransaction, TransactionStatus},
+    transaction::{DeprecatedSignedUserTransaction, Script, TransactionStatus},
     vm_status::StatusCode,
 };
 use proptest::prelude::*;
@@ -36,7 +36,7 @@ impl AUTransactionGen for SequenceNumberMismatchGen {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
-    ) -> (SignedTransaction, (TransactionStatus, u64)) {
+    ) -> (DeprecatedSignedUserTransaction, (TransactionStatus, u64)) {
         let sender = universe.pick(self.sender).1;
 
         let seq = if sender.sequence_number == self.seq {
@@ -75,7 +75,7 @@ impl AUTransactionGen for InsufficientBalanceGen {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
-    ) -> (SignedTransaction, (TransactionStatus, u64)) {
+    ) -> (DeprecatedSignedUserTransaction, (TransactionStatus, u64)) {
         let sender = universe.pick(self.sender).1;
 
         let max_gas_unit = (sender.balance / self.gas_unit_price) + 1;
@@ -140,7 +140,7 @@ impl AUTransactionGen for InvalidAuthkeyGen {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
-    ) -> (SignedTransaction, (TransactionStatus, u64)) {
+    ) -> (DeprecatedSignedUserTransaction, (TransactionStatus, u64)) {
         let sender = universe.pick(self.sender).1;
 
         let txn = sender

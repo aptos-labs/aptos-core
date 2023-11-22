@@ -28,7 +28,7 @@ use aptos_types::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
         Transaction,
-        Transaction::UserTransaction,
+        Transaction::DeprecatedUserTransaction,
         TransactionListWithProof, TransactionWithProof, WriteSetPayload,
     },
     trusted_state::{TrustedState, TrustedStateChange},
@@ -130,16 +130,16 @@ pub fn test_execution_with_storage_impl_inner(
 
     let block1: Vec<_> = into_signature_verified_block(vec![
         block1_meta,
-        UserTransaction(tx1),
-        UserTransaction(tx2),
-        UserTransaction(tx3),
-        UserTransaction(txn1),
-        UserTransaction(txn2),
-        UserTransaction(txn3),
-        UserTransaction(txn4),
-        UserTransaction(txn5),
-        UserTransaction(txn6),
-        UserTransaction(reconfig1),
+        DeprecatedUserTransaction(tx1),
+        DeprecatedUserTransaction(tx2),
+        DeprecatedUserTransaction(tx3),
+        DeprecatedUserTransaction(txn1),
+        DeprecatedUserTransaction(txn2),
+        DeprecatedUserTransaction(txn3),
+        DeprecatedUserTransaction(txn4),
+        DeprecatedUserTransaction(txn5),
+        DeprecatedUserTransaction(txn6),
+        DeprecatedUserTransaction(reconfig1),
     ]);
 
     let block2_id = gen_block_id(2);
@@ -154,7 +154,7 @@ pub fn test_execution_with_storage_impl_inner(
     ));
     let reconfig2 = core_resources_account
         .sign_with_transaction_builder(txn_factory.payload(aptos_stdlib::version_set_version(200)));
-    let block2 = vec![block2_meta, UserTransaction(reconfig2)];
+    let block2 = vec![block2_meta, DeprecatedUserTransaction(reconfig2)];
 
     let block3_id = gen_block_id(3);
     let block3_meta = Transaction::BlockMetadata(BlockMetadata::new(
@@ -169,9 +169,10 @@ pub fn test_execution_with_storage_impl_inner(
     let mut block3 = vec![block3_meta];
     // Create 14 txns transferring 10k from account1 to account3 each.
     for _ in 2..=15 {
-        block3.push(UserTransaction(account1.sign_with_transaction_builder(
-            txn_factory.transfer(account3.address(), 10 * B),
-        )));
+        block3.push(DeprecatedUserTransaction(
+            account1
+                .sign_with_transaction_builder(txn_factory.transfer(account3.address(), 10 * B)),
+        ));
     }
     let block3 = block(block3, BLOCK_GAS_LIMIT); // append state checkpoint txn
 

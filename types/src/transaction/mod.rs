@@ -67,12 +67,13 @@ pub use script::{
 use serde::de::DeserializeOwned;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
 
-pub type Version = u64; // Height - also used for MVCC in StateDB
+pub type Version = u64;
+// Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
 
 /// RawTransaction is the portion of a transaction that a client signs.
 #[derive(
-    Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
+Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
 )]
 pub struct RawTransaction {
     /// Sender's address.
@@ -246,9 +247,9 @@ impl RawTransaction {
         public_key: Ed25519PublicKey,
     ) -> Result<SignatureCheckedTransaction> {
         let signature = private_key.sign(&self)?;
-        Ok(SignatureCheckedTransaction(SignedTransaction::new(
-            self, public_key, signature,
-        )))
+        Ok(SignatureCheckedTransaction(
+            DeprecatedSignedUserTransaction::new(self, public_key, signature),
+        ))
     }
 
     /// Signs the given multi-agent `RawTransaction`, which is a transaction with secondary
@@ -286,7 +287,7 @@ impl RawTransaction {
         }
 
         Ok(SignatureCheckedTransaction(
-            SignedTransaction::new_multi_agent(
+            DeprecatedSignedUserTransaction::new_multi_agent(
                 self,
                 sender_authenticator,
                 secondary_signers,
@@ -341,7 +342,7 @@ impl RawTransaction {
         );
 
         Ok(SignatureCheckedTransaction(
-            SignedTransaction::new_fee_payer(
+            DeprecatedSignedUserTransaction::new_fee_payer(
                 self,
                 sender_authenticator,
                 secondary_signers,
@@ -363,7 +364,7 @@ impl RawTransaction {
     ) -> Result<SignatureCheckedTransaction> {
         let signature = private_key.sign(&self)?;
         Ok(SignatureCheckedTransaction(
-            SignedTransaction::new_secp256k1_ecdsa(self, public_key, signature),
+            DeprecatedSignedUserTransaction::new_secp256k1_ecdsa(self, public_key, signature),
         ))
     }
 
@@ -375,7 +376,11 @@ impl RawTransaction {
     ) -> Result<SignatureCheckedTransaction> {
         let signature = private_key.sign(&self)?;
         Ok(SignatureCheckedTransaction(
-            SignedTransaction::new_multisig(self, public_key.into(), signature.into()),
+            DeprecatedSignedUserTransaction::new_multisig(
+                self,
+                public_key.into(),
+                signature.into(),
+            ),
         ))
     }
 
@@ -443,7 +448,7 @@ impl RawTransaction {
 }
 
 #[derive(
-    Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
+Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
 )]
 pub enum RawTransactionWithData {
     MultiAgent {
@@ -536,7 +541,7 @@ impl WriteSetPayload {
 /// transaction whose signature is statically guaranteed to be verified, see
 /// [`SignatureCheckedTransaction`].
 #[derive(Clone, Eq, Serialize, Deserialize)]
-pub struct SignedTransaction {
+pub struct DeprecatedSignedUserTransaction {
     /// The raw transaction
     raw_txn: RawTransaction,
 
@@ -551,20 +556,20 @@ pub struct SignedTransaction {
 
 /// PartialEq ignores the "bytes" field as this is a OnceCell that may or
 /// may not be initialized during runtime comparison.
-impl PartialEq for SignedTransaction {
+impl PartialEq for DeprecatedSignedUserTransaction {
     fn eq(&self, other: &Self) -> bool {
         self.raw_txn == other.raw_txn && self.authenticator == other.authenticator
     }
 }
 
 /// A transaction for which the signature has been verified. Created by
-/// [`SignedTransaction::check_signature`] and [`RawTransaction::sign`].
+/// [`DeprecatedSignedUserTransaction::check_signature`] and [`RawTransaction::sign`].
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SignatureCheckedTransaction(SignedTransaction);
+pub struct SignatureCheckedTransaction(DeprecatedSignedUserTransaction);
 
 impl SignatureCheckedTransaction {
     /// Returns the `SignedTransaction` within.
-    pub fn into_inner(self) -> SignedTransaction {
+    pub fn into_inner(self) -> DeprecatedSignedUserTransaction {
         self.0
     }
 
@@ -575,14 +580,14 @@ impl SignatureCheckedTransaction {
 }
 
 impl Deref for SignatureCheckedTransaction {
-    type Target = SignedTransaction;
+    type Target = DeprecatedSignedUserTransaction;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl Debug for SignedTransaction {
+impl Debug for DeprecatedSignedUserTransaction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -596,12 +601,12 @@ impl Debug for SignedTransaction {
     }
 }
 
-impl SignedTransaction {
+impl DeprecatedSignedUserTransaction {
     pub fn new_signed_transaction(
         raw_txn: RawTransaction,
         authenticator: TransactionAuthenticator,
-    ) -> SignedTransaction {
-        SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
+        DeprecatedSignedUserTransaction {
             raw_txn,
             authenticator,
             size: OnceCell::new(),
@@ -612,9 +617,9 @@ impl SignedTransaction {
         raw_txn: RawTransaction,
         public_key: Ed25519PublicKey,
         signature: Ed25519Signature,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         let authenticator = TransactionAuthenticator::ed25519(public_key, signature);
-        SignedTransaction {
+        DeprecatedSignedUserTransaction {
             raw_txn,
             authenticator,
             size: OnceCell::new(),
@@ -629,7 +634,7 @@ impl SignedTransaction {
         fee_payer_address: AccountAddress,
         fee_payer_signer: AccountAuthenticator,
     ) -> Self {
-        SignedTransaction {
+        DeprecatedSignedUserTransaction {
             raw_txn,
             authenticator: TransactionAuthenticator::fee_payer(
                 sender,
@@ -646,9 +651,9 @@ impl SignedTransaction {
         raw_txn: RawTransaction,
         public_key: MultiEd25519PublicKey,
         signature: MultiEd25519Signature,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         let authenticator = TransactionAuthenticator::multi_ed25519(public_key, signature);
-        SignedTransaction {
+        DeprecatedSignedUserTransaction {
             raw_txn,
             authenticator,
             size: OnceCell::new(),
@@ -661,7 +666,7 @@ impl SignedTransaction {
         secondary_signer_addresses: Vec<AccountAddress>,
         secondary_signers: Vec<AccountAuthenticator>,
     ) -> Self {
-        SignedTransaction {
+        DeprecatedSignedUserTransaction {
             raw_txn,
             authenticator: TransactionAuthenticator::multi_agent(
                 sender,
@@ -676,14 +681,14 @@ impl SignedTransaction {
         raw_txn: RawTransaction,
         public_key: secp256k1_ecdsa::PublicKey,
         signature: secp256k1_ecdsa::Signature,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         let authenticator = TransactionAuthenticator::single_sender(
             AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
                 AnyPublicKey::secp256k1_ecdsa(public_key),
                 AnySignature::secp256k1_ecdsa(signature),
             )),
         );
-        SignedTransaction {
+        DeprecatedSignedUserTransaction {
             raw_txn,
             authenticator,
             size: OnceCell::new(),
@@ -693,8 +698,8 @@ impl SignedTransaction {
     pub fn new_single_sender(
         raw_txn: RawTransaction,
         authenticator: AccountAuthenticator,
-    ) -> SignedTransaction {
-        SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
+        DeprecatedSignedUserTransaction {
             raw_txn,
             authenticator: TransactionAuthenticator::single_sender(authenticator),
             size: OnceCell::new(),
@@ -803,7 +808,7 @@ impl SignedTransaction {
 
     /// Returns the hash when the transaction is commited onchain.
     pub fn committed_hash(self) -> HashValue {
-        Transaction::UserTransaction(self).hash()
+        Transaction::DeprecatedUserTransaction(self).hash()
     }
 }
 
@@ -1007,7 +1012,7 @@ impl TransactionStatus {
             Ok(recorded) => match recorded {
                 KeptVMStatus::MiscellaneousError => {
                     TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(status_code)))
-                },
+                }
                 _ => TransactionStatus::Keep(recorded.into()),
             },
             Err(code) => {
@@ -1018,7 +1023,7 @@ impl TransactionStatus {
                 } else {
                     TransactionStatus::Discard(code)
                 }
-            },
+            }
         }
     }
 }
@@ -1622,13 +1627,13 @@ impl TransactionOutputListWithProof {
 
         // Verify the events, status, gas used and transaction hashes.
         self.transactions_and_outputs.par_iter().zip_eq(self.proof.transaction_infos.par_iter())
-        .map(|((txn, txn_output), txn_info)| {
-            // Check the events against the expected events root hash
-            verify_events_against_root_hash(&txn_output.events, txn_info)?;
+            .map(|((txn, txn_output), txn_info)| {
+                // Check the events against the expected events root hash
+                verify_events_against_root_hash(&txn_output.events, txn_info)?;
 
-            // Verify the write set matches for both the transaction info and output
-            let write_set_hash = CryptoHash::hash(&txn_output.write_set);
-            ensure!(
+                // Verify the write set matches for both the transaction info and output
+                let write_set_hash = CryptoHash::hash(&txn_output.write_set);
+                ensure!(
                 txn_info.state_change_hash == write_set_hash,
                 "The write set in transaction output does not match the transaction info \
                      in proof. Hash of write set in transaction output: {}. Write set hash in txn_info: {}.",
@@ -1636,8 +1641,8 @@ impl TransactionOutputListWithProof {
                 txn_info.state_change_hash,
             );
 
-            // Verify the gas matches for both the transaction info and output
-            ensure!(
+                // Verify the gas matches for both the transaction info and output
+                ensure!(
                 txn_output.gas_used() == txn_info.gas_used(),
                 "The gas used in transaction output does not match the transaction info \
                      in proof. Gas used in transaction output: {}. Gas used in txn_info: {}.",
@@ -1645,8 +1650,8 @@ impl TransactionOutputListWithProof {
                 txn_info.gas_used(),
             );
 
-            // Verify the execution status matches for both the transaction info and output.
-            ensure!(
+                // Verify the execution status matches for both the transaction info and output.
+                ensure!(
                 *txn_output.status() == TransactionStatus::Keep(txn_info.status().clone()),
                 "The execution status of transaction output does not match the transaction \
                      info in proof. Status in transaction output: {:?}. Status in txn_info: {:?}.",
@@ -1654,18 +1659,18 @@ impl TransactionOutputListWithProof {
                 txn_info.status(),
             );
 
-            // Verify the transaction hashes match those of the transaction infos
-            let txn_hash = txn.hash();
-            ensure!(
+                // Verify the transaction hashes match those of the transaction infos
+                let txn_hash = txn.hash();
+                ensure!(
                 txn_hash == txn_info.transaction_hash(),
                 "The transaction hash does not match the hash in transaction info. \
                      Transaction hash: {:x}. Transaction hash in txn_info: {:x}.",
                 txn_hash,
                 txn_info.transaction_hash(),
             );
-            Ok(())
-        })
-        .collect::<Result<Vec<_>>>()?;
+                Ok(())
+            })
+            .collect::<Result<Vec<_>>>()?;
 
         // Verify the transaction infos are proven by the ledger info.
         self.proof
@@ -1780,9 +1785,7 @@ impl AccountTransactionsWithProof {
 pub enum Transaction {
     /// Transaction submitted by the user. e.g: P2P payment transaction, publishing module
     /// transaction, etc.
-    /// TODO: We need to rename SignedTransaction to SignedUserTransaction, as well as all the other
-    ///       transaction types we had in our codebase.
-    UserTransaction(SignedTransaction),
+    DeprecatedUserTransaction(DeprecatedSignedUserTransaction),
 
     /// Transaction that applies a WriteSet to the current storage, it's applied manually via aptos-db-bootstrapper.
     GenesisTransaction(WriteSetPayload),
@@ -1799,9 +1802,9 @@ pub enum Transaction {
 }
 
 impl Transaction {
-    pub fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
+    pub fn try_as_signed_user_txn(&self) -> Option<&DeprecatedSignedUserTransaction> {
         match self {
-            Transaction::UserTransaction(txn) => Some(txn),
+            Transaction::DeprecatedUserTransaction(txn) => Some(txn),
             _ => None,
         }
     }
@@ -1815,9 +1818,9 @@ impl Transaction {
 
     pub fn format_for_client(&self, get_transaction_name: impl Fn(&[u8]) -> String) -> String {
         match self {
-            Transaction::UserTransaction(user_txn) => {
+            Transaction::DeprecatedUserTransaction(user_txn) => {
                 user_txn.format_for_client(get_transaction_name)
-            },
+            }
             // TODO: display proper information for client
             Transaction::GenesisTransaction(_write_set) => String::from("genesis"),
             // TODO: display proper information for client
@@ -1830,12 +1833,12 @@ impl Transaction {
     }
 }
 
-impl TryFrom<Transaction> for SignedTransaction {
+impl TryFrom<Transaction> for DeprecatedSignedUserTransaction {
     type Error = Error;
 
     fn try_from(txn: Transaction) -> Result<Self> {
         match txn {
-            Transaction::UserTransaction(txn) => Ok(txn),
+            Transaction::DeprecatedUserTransaction(txn) => Ok(txn),
             _ => Err(format_err!("Not a user transaction.")),
         }
     }
@@ -1850,28 +1853,28 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
     /// in the future if write-set format changes to be per-resource, could be more performant).
     /// Is generic primarily to provide easy plug-in replacement for mock tests and be extensible.
     type Tag: PartialOrd
-        + Ord
-        + Send
-        + Sync
-        + Clone
-        + Hash
-        + Eq
-        + Debug
-        + DeserializeOwned
-        + Serialize;
+    + Ord
+    + Send
+    + Sync
+    + Clone
+    + Hash
+    + Eq
+    + Debug
+    + DeserializeOwned
+    + Serialize;
     /// Delayed field identifier type.
     type Identifier: PartialOrd
-        + Ord
-        + Send
-        + Sync
-        + Clone
-        + Hash
-        + Eq
-        + Debug
-        + Copy
-        + From<u64>
-        + TryIntoMoveValue
-        + TryFromMoveValue<Hint = ()>;
+    + Ord
+    + Send
+    + Sync
+    + Clone
+    + Hash
+    + Eq
+    + Debug
+    + Copy
+    + From<u64>
+    + TryIntoMoveValue
+    + TryFromMoveValue<Hint=()>;
     type Value: Send + Sync + Debug + Clone + TransactionWrite;
     type Event: Send + Sync + Debug + Clone + TransactionEvent;
 }

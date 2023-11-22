@@ -20,7 +20,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, CORE_CODE_ADDRESS},
     on_chain_config::{ExecutionConfigV2, OnChainExecutionConfig, TransactionShufflerType},
-    transaction::{authenticator::AuthenticationKey, SignedTransaction, Transaction},
+    transaction::{authenticator::AuthenticationKey, DeprecatedSignedUserTransaction, Transaction},
 };
 use move_core_types::{
     ident_str,
@@ -362,7 +362,8 @@ async fn test_bcs() {
         let expected_hash =
             aptos_crypto::HashValue::from(expected_transaction.transaction_info().unwrap().hash);
 
-        let bcs_hash = if let Transaction::UserTransaction(ref txn) = bcs_txn.transaction {
+        let bcs_hash = if let Transaction::DeprecatedUserTransaction(ref txn) = bcs_txn.transaction
+        {
             txn.clone().committed_hash()
         } else {
             panic!("BCS transaction is not a user transaction! {:?}", bcs_txn);
@@ -422,7 +423,7 @@ async fn test_bcs() {
         .sender(local_account.address())
         .sequence_number(local_account.sequence_number())
         .build();
-    let signed_txn = SignedTransaction::new(
+    let signed_txn = DeprecatedSignedUserTransaction::new(
         transfer_txn,
         local_account.public_key().clone(),
         Ed25519Signature::dummy_signature(),

@@ -8,7 +8,7 @@ use aptos_language_e2e_tests::account_universe::{
     AccountPickStyle, AccountUniverseGen,
 };
 use aptos_proptest_helpers::ValueGenerator;
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::DeprecatedSignedUserTransaction;
 use once_cell::sync::Lazy;
 use proptest::{
     collection::vec,
@@ -53,12 +53,12 @@ impl FuzzTargetImpl for SignedTransactionTarget {
     }
 
     fn generate(&self, _idx: usize, gen: &mut ValueGenerator) -> Option<Vec<u8>> {
-        let value = gen.generate(any_with::<SignedTransaction>(()));
+        let value = gen.generate(any_with::<DeprecatedSignedUserTransaction>(()));
         Some(bcs::to_bytes(&value).expect("serialization should work"))
     }
 
     fn fuzz(&self, data: &[u8]) {
-        let _: Result<SignedTransaction, _> = bcs::from_bytes(data);
+        let _: Result<DeprecatedSignedUserTransaction, _> = bcs::from_bytes(data);
     }
 }
 
@@ -68,11 +68,11 @@ impl FuzzTargetImpl for SignedTransactionTarget {
 #[derive(Clone, Debug, Default)]
 pub struct MutatedSignedTransaction;
 
-static SIGNED_TXN: Lazy<SignedTransaction> = Lazy::new(|| {
+static SIGNED_TXN: Lazy<DeprecatedSignedUserTransaction> = Lazy::new(|| {
     let seed = [0u8; 32];
     let recorder_rng = test_runner::TestRng::from_seed(RngAlgorithm::ChaCha, &seed);
     let mut runner = TestRunner::new_with_rng(test_runner::Config::default(), recorder_rng);
-    SignedTransaction::arbitrary()
+    DeprecatedSignedUserTransaction::arbitrary()
         .new_tree(&mut runner)
         .expect("creating a new value should succeed")
         .current()
@@ -100,7 +100,7 @@ impl FuzzTargetImpl for MutatedSignedTransaction {
             return;
         }
 
-        if let Ok(signed_txn) = bcs::from_bytes::<SignedTransaction>(data) {
+        if let Ok(signed_txn) = bcs::from_bytes::<DeprecatedSignedUserTransaction>(data) {
             assert_ne!(*SIGNED_TXN, signed_txn);
         }
     }
@@ -115,7 +115,7 @@ impl FuzzTargetImpl for TwoSignedTransactions {
     }
 
     fn generate(&self, _idx: usize, gen: &mut ValueGenerator) -> Option<Vec<u8>> {
-        let txn = gen.generate(any_with::<SignedTransaction>(()));
+        let txn = gen.generate(any_with::<DeprecatedSignedUserTransaction>(()));
         let mut serialized_txn = bcs::to_bytes(&txn).expect("serialization should work");
         // return [serialized_txn | serialized_txn]
         serialized_txn.extend_from_slice(&serialized_txn.clone());
@@ -137,8 +137,8 @@ impl FuzzTargetImpl for TwoSignedTransactions {
         }
 
         // ensure the deserialization is different
-        if let Ok(txn1) = bcs::from_bytes::<SignedTransaction>(txn1) {
-            if let Ok(txn2) = bcs::from_bytes::<SignedTransaction>(txn2) {
+        if let Ok(txn1) = bcs::from_bytes::<DeprecatedSignedUserTransaction>(txn1) {
+            if let Ok(txn2) = bcs::from_bytes::<DeprecatedSignedUserTransaction>(txn2) {
                 assert_ne!(txn1, txn2);
             }
         }

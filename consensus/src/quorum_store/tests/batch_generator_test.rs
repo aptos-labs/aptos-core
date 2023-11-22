@@ -16,7 +16,7 @@ use aptos_consensus_types::{
     proof_of_store::BatchId,
 };
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::DeprecatedSignedUserTransaction;
 use futures::{
     channel::mpsc::{channel, Receiver},
     StreamExt,
@@ -27,7 +27,7 @@ use tokio::{sync::mpsc::channel as TokioChannel, time::timeout};
 
 #[allow(clippy::needless_collect)]
 async fn queue_mempool_batch_response(
-    txns: Vec<SignedTransaction>,
+    txns: Vec<DeprecatedSignedUserTransaction>,
     max_size: usize,
     quorum_store_to_mempool_receiver: &mut Receiver<QuorumStoreRequest>,
 ) -> BTreeMap<TransactionSummary, TransactionInProgress> {

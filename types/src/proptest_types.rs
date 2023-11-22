@@ -22,10 +22,10 @@ use crate::{
     state_store::{state_key::StateKey, state_value::StateValue},
     system_txn::{DummySystemTransaction, SystemTransaction},
     transaction::{
-        ChangeSet, ExecutionStatus, Module, ModuleBundle, RawTransaction, Script,
-        SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
-        TransactionInfo, TransactionListWithProof, TransactionPayload, TransactionStatus,
-        TransactionToCommit, Version, WriteSetPayload,
+        ChangeSet, RawTransaction, DeprecatedSignedUserTransaction, ExecutionStatus,
+        Module, ModuleBundle, Script, SignatureCheckedTransaction, Transaction,
+        TransactionArgument, TransactionInfo, TransactionListWithProof, TransactionPayload,
+        TransactionStatus, TransactionToCommit, Version, WriteSetPayload,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -58,11 +58,11 @@ use std::{
 };
 
 impl WriteOp {
-    pub fn value_strategy() -> impl Strategy<Value = Self> {
+    pub fn value_strategy() -> impl Strategy<Value=Self> {
         vec(any::<u8>(), 0..64).prop_map(|bytes| WriteOp::Modification(bytes.into()))
     }
 
-    pub fn deletion_strategy() -> impl Strategy<Value = Self> {
+    pub fn deletion_strategy() -> impl Strategy<Value=Self> {
         Just(WriteOp::Deletion)
     }
 }
@@ -119,8 +119,8 @@ impl Arbitrary for ChangeSet {
 
 impl EventKey {
     pub fn strategy_impl(
-        account_address_strategy: impl Strategy<Value = AccountAddress>,
-    ) -> impl Strategy<Value = Self> {
+        account_address_strategy: impl Strategy<Value=AccountAddress>,
+    ) -> impl Strategy<Value=Self> {
         // We only generate small counters so that it won't overflow.
         (account_address_strategy, 0..std::u64::MAX / 2)
             .prop_map(|(account_address, counter)| EventKey::new(counter, account_address))
@@ -266,22 +266,22 @@ impl Arbitrary for AccountInfoUniverse {
             ),
             num_accounts,
         )
-        .prop_map(|kps| {
-            let mut account_private_keys = vec![];
-            let mut consensus_private_keys = vec![];
-            for (kp1, kp2) in kps {
-                account_private_keys.push(kp1.private_key);
-                consensus_private_keys.push(kp2.private_key);
-            }
-            AccountInfoUniverse::new(
-                account_private_keys,
-                consensus_private_keys,
-                /* epoch = */ 0,
-                /* round = */ 0,
-                /* next_version = */ 0,
-            )
-        })
-        .boxed()
+            .prop_map(|kps| {
+                let mut account_private_keys = vec![];
+                let mut consensus_private_keys = vec![];
+                for (kp1, kp2) in kps {
+                    account_private_keys.push(kp1.private_key);
+                    consensus_private_keys.push(kp2.private_key);
+                }
+                AccountInfoUniverse::new(
+                    account_private_keys,
+                    consensus_private_keys,
+                    /* epoch = */ 0,
+                    /* round = */ 0,
+                    /* next_version = */ 0,
+                )
+            })
+            .boxed()
     }
 
     fn arbitrary() -> Self::Strategy {
@@ -321,9 +321,9 @@ impl RawTransactionGen {
 
 impl RawTransaction {
     fn strategy_impl(
-        address_strategy: impl Strategy<Value = AccountAddress>,
-        payload_strategy: impl Strategy<Value = TransactionPayload>,
-    ) -> impl Strategy<Value = Self> {
+        address_strategy: impl Strategy<Value=AccountAddress>,
+        payload_strategy: impl Strategy<Value=TransactionPayload>,
+    ) -> impl Strategy<Value=Self> {
         // XXX what other constraints do these need to obey?
         (
             address_strategy,
@@ -335,13 +335,13 @@ impl RawTransaction {
         )
             .prop_map(
                 |(
-                    sender,
-                    sequence_number,
-                    payload,
-                    max_gas_amount,
-                    gas_unit_price,
-                    expiration_time_secs,
-                )| {
+                     sender,
+                     sequence_number,
+                     payload,
+                     max_gas_amount,
+                     gas_unit_price,
+                     expiration_time_secs,
+                 )| {
                     new_raw_transaction(
                         sender,
                         sequence_number,
@@ -383,15 +383,17 @@ fn new_raw_transaction(
             expiration_time_secs,
             chain_id,
         ),
-        TransactionPayload::EntryFunction(script_fn) => RawTransaction::new_entry_function(
-            sender,
-            sequence_number,
-            script_fn,
-            max_gas_amount,
-            gas_unit_price,
-            expiration_time_secs,
-            chain_id,
-        ),
+        TransactionPayload::EntryFunction(script_fn) => {
+            RawTransaction::new_entry_function(
+                sender,
+                sequence_number,
+                script_fn,
+                max_gas_amount,
+                gas_unit_price,
+                expiration_time_secs,
+                chain_id,
+            )
+        }
         TransactionPayload::Multisig(multisig) => RawTransaction::new_multisig(
             sender,
             sequence_number,
@@ -417,21 +419,21 @@ impl SignatureCheckedTransaction {
     // This isn't an Arbitrary impl because this doesn't generate *any* possible SignedTransaction,
     // just one kind of them.
     pub fn script_strategy(
-        keypair_strategy: impl Strategy<Value = KeyPair<Ed25519PrivateKey, Ed25519PublicKey>>,
-    ) -> impl Strategy<Value = Self> {
+        keypair_strategy: impl Strategy<Value=KeyPair<Ed25519PrivateKey, Ed25519PublicKey>>,
+    ) -> impl Strategy<Value=Self> {
         Self::strategy_impl(keypair_strategy, TransactionPayload::script_strategy())
     }
 
     pub fn module_strategy(
-        keypair_strategy: impl Strategy<Value = KeyPair<Ed25519PrivateKey, Ed25519PublicKey>>,
-    ) -> impl Strategy<Value = Self> {
+        keypair_strategy: impl Strategy<Value=KeyPair<Ed25519PrivateKey, Ed25519PublicKey>>,
+    ) -> impl Strategy<Value=Self> {
         Self::strategy_impl(keypair_strategy, TransactionPayload::module_strategy())
     }
 
     fn strategy_impl(
-        keypair_strategy: impl Strategy<Value = KeyPair<Ed25519PrivateKey, Ed25519PublicKey>>,
-        payload_strategy: impl Strategy<Value = TransactionPayload>,
-    ) -> impl Strategy<Value = Self> {
+        keypair_strategy: impl Strategy<Value=KeyPair<Ed25519PrivateKey, Ed25519PublicKey>>,
+        payload_strategy: impl Strategy<Value=TransactionPayload>,
+    ) -> impl Strategy<Value=Self> {
         (keypair_strategy, payload_strategy)
             .prop_flat_map(|(keypair, payload)| {
                 let address = account_address::from_public_key(&keypair.public_key);
@@ -487,7 +489,7 @@ impl Arbitrary for SignatureCheckedTransaction {
 }
 
 /// This `Arbitrary` impl only generates valid signed transactions. TODO: maybe add invalid ones?
-impl Arbitrary for SignedTransaction {
+impl Arbitrary for DeprecatedSignedUserTransaction {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
 
@@ -499,11 +501,11 @@ impl Arbitrary for SignedTransaction {
 }
 
 impl TransactionPayload {
-    pub fn script_strategy() -> impl Strategy<Value = Self> {
+    pub fn script_strategy() -> impl Strategy<Value=Self> {
         any::<Script>().prop_map(TransactionPayload::Script)
     }
 
-    pub fn module_strategy() -> impl Strategy<Value = Self> {
+    pub fn module_strategy() -> impl Strategy<Value=Self> {
         any::<Module>()
             .prop_map(|module| TransactionPayload::ModuleBundle(ModuleBundle::from(module)))
     }
@@ -542,7 +544,7 @@ impl Arbitrary for TransactionPayload {
             4 => Self::script_strategy(),
             1 => Self::module_strategy(),
         ]
-        .boxed()
+            .boxed()
     }
 }
 
@@ -606,7 +608,7 @@ impl Arbitrary for LedgerInfoWithSignatures {
                     validator_infos.iter().map(|x| x.1.clone()).collect(),
                     validator_infos.len() as u128 / 2,
                 )
-                .unwrap();
+                    .unwrap();
                 let partial_sig = PartialSignatures::new(
                     validator_infos.iter().map(|x| (x.0, x.2.clone())).collect(),
                 );
@@ -707,8 +709,8 @@ impl AccountStateGen {
 
 impl EventHandle {
     pub fn strategy_impl(
-        event_key_strategy: impl Strategy<Value = EventKey>,
-    ) -> impl Strategy<Value = Self> {
+        event_key_strategy: impl Strategy<Value=EventKey>,
+    ) -> impl Strategy<Value=Self> {
         // We only generate small counters so that it won't overflow.
         (event_key_strategy, 0..std::u64::MAX / 2)
             .prop_map(|(event_key, counter)| EventHandle::new(event_key, counter))
@@ -726,8 +728,8 @@ impl Arbitrary for EventHandle {
 
 impl ContractEvent {
     pub fn strategy_impl(
-        event_key_strategy: impl Strategy<Value = EventKey>,
-    ) -> impl Strategy<Value = Self> {
+        event_key_strategy: impl Strategy<Value=EventKey>,
+    ) -> impl Strategy<Value=Self> {
         (
             event_key_strategy,
             any::<u64>(),
@@ -823,7 +825,7 @@ impl TransactionToCommitGen {
         });
 
         TransactionToCommit::new(
-            Transaction::UserTransaction(transaction),
+            Transaction::DeprecatedUserTransaction(transaction),
             TransactionInfo::new_placeholder(self.gas_used, None, self.status),
             sharded_state_updates,
             WriteSetMut::new(write_set).freeze().expect("Cannot fail"),
@@ -888,11 +890,11 @@ impl Arbitrary for TransactionToCommitGen {
     }
 }
 
-fn arb_transaction_list_with_proof() -> impl Strategy<Value = TransactionListWithProof> {
+fn arb_transaction_list_with_proof() -> impl Strategy<Value=TransactionListWithProof> {
     (
         vec(
             (
-                any::<SignedTransaction>(),
+                any::<DeprecatedSignedUserTransaction>(),
                 vec(any::<ContractEvent>(), 0..10),
             ),
             0..10,
@@ -903,7 +905,7 @@ fn arb_transaction_list_with_proof() -> impl Strategy<Value = TransactionListWit
             let transactions: Vec<_> = transaction_and_events
                 .clone()
                 .into_iter()
-                .map(|(transaction, _event)| Transaction::UserTransaction(transaction))
+                .map(|(transaction, _event)| Transaction::DeprecatedUserTransaction(transaction))
                 .collect();
             let events: Vec<_> = transaction_and_events
                 .into_iter()
@@ -951,14 +953,14 @@ impl Arbitrary for BlockMetadata {
         )
             .prop_map(
                 |(
-                    id,
-                    epoch,
-                    round,
-                    proposer,
-                    previous_block_votes,
-                    failed_proposer_indices,
-                    timestamp,
-                )| {
+                     id,
+                     epoch,
+                     round,
+                     proposer,
+                     previous_block_votes,
+                     failed_proposer_indices,
+                     timestamp,
+                 )| {
                     BlockMetadata::new(
                         id,
                         epoch,
@@ -1182,7 +1184,7 @@ impl LedgerInfoWithSignaturesGen {
 }
 
 // This function generates an arbitrary serde_json::Value.
-pub fn arb_json_value() -> impl Strategy<Value = Value> {
+pub fn arb_json_value() -> impl Strategy<Value=Value> {
     let leaf = prop_oneof![
         Just(Value::Null),
         any::<bool>().prop_map(Value::Bool),

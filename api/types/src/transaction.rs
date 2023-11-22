@@ -22,7 +22,7 @@ use aptos_types::{
             AccountAuthenticator, AnyPublicKey, AnySignature, MultiKey, MultiKeyAuthenticator,
             SingleKeyAuthenticator, TransactionAuthenticator, MAX_NUM_OF_SIGS,
         },
-        Script, SignedTransaction, TransactionOutput, TransactionWithProof,
+        DeprecatedSignedUserTransaction, Script, TransactionOutput, TransactionWithProof,
     },
 };
 use once_cell::sync::Lazy;
@@ -59,7 +59,7 @@ pub enum TransactionData {
     /// A committed transaction
     OnChain(TransactionOnChainData),
     /// A transaction currently sitting in mempool
-    Pending(Box<SignedTransaction>),
+    Pending(Box<DeprecatedSignedUserTransaction>),
 }
 
 impl From<TransactionOnChainData> for TransactionData {
@@ -68,8 +68,8 @@ impl From<TransactionOnChainData> for TransactionData {
     }
 }
 
-impl From<SignedTransaction> for TransactionData {
-    fn from(txn: SignedTransaction) -> Self {
+impl From<DeprecatedSignedUserTransaction> for TransactionData {
+    fn from(txn: DeprecatedSignedUserTransaction) -> Self {
         Self::Pending(Box::new(txn))
     }
 }
@@ -243,8 +243,8 @@ impl Transaction {
 }
 
 // TODO: Remove this when we cut over to the new API fully.
-impl From<(SignedTransaction, TransactionPayload)> for Transaction {
-    fn from((txn, payload): (SignedTransaction, TransactionPayload)) -> Self {
+impl From<(DeprecatedSignedUserTransaction, TransactionPayload)> for Transaction {
+    fn from((txn, payload): (DeprecatedSignedUserTransaction, TransactionPayload)) -> Self {
         Transaction::PendingTransaction(PendingTransaction {
             request: (&txn, payload).into(),
             hash: txn.committed_hash().into(),
@@ -254,7 +254,7 @@ impl From<(SignedTransaction, TransactionPayload)> for Transaction {
 
 impl
     From<(
-        &SignedTransaction,
+        &DeprecatedSignedUserTransaction,
         TransactionInfo,
         TransactionPayload,
         Vec<Event>,
@@ -263,7 +263,7 @@ impl
 {
     fn from(
         (txn, info, payload, events, timestamp): (
-            &SignedTransaction,
+            &DeprecatedSignedUserTransaction,
             TransactionInfo,
             TransactionPayload,
             Vec<Event>,
@@ -305,8 +305,8 @@ impl From<(&BlockMetadata, TransactionInfo, Vec<Event>)> for Transaction {
     }
 }
 
-impl From<(&SignedTransaction, TransactionPayload)> for UserTransactionRequest {
-    fn from((txn, payload): (&SignedTransaction, TransactionPayload)) -> Self {
+impl From<(&DeprecatedSignedUserTransaction, TransactionPayload)> for UserTransactionRequest {
+    fn from((txn, payload): (&DeprecatedSignedUserTransaction, TransactionPayload)) -> Self {
         Self {
             sender: txn.sender().into(),
             sequence_number: txn.sequence_number().into(),
@@ -354,8 +354,8 @@ pub struct PendingTransaction {
     pub request: UserTransactionRequest,
 }
 
-impl From<(SignedTransaction, TransactionPayload)> for PendingTransaction {
-    fn from((txn, payload): (SignedTransaction, TransactionPayload)) -> Self {
+impl From<(DeprecatedSignedUserTransaction, TransactionPayload)> for PendingTransaction {
+    fn from((txn, payload): (DeprecatedSignedUserTransaction, TransactionPayload)) -> Self {
         PendingTransaction {
             request: (&txn, payload).into(),
             hash: txn.committed_hash().into(),

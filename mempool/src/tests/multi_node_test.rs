@@ -23,7 +23,7 @@ use aptos_network::{
     peer_manager::{PeerManagerNotification, PeerManagerRequest},
     ProtocolId,
 };
-use aptos_types::{transaction::SignedTransaction, PeerId};
+use aptos_types::{transaction::DeprecatedSignedUserTransaction, PeerId};
 use maplit::btreemap;
 use rand::{rngs::StdRng, SeedableRng};
 use std::collections::HashMap;
@@ -305,7 +305,7 @@ impl TestHarness {
         check_txns_in_mempool: bool, // Check whether all txns in this broadcast are accepted into recipient's mempool
         execute_send: bool, // If true, actually delivers msg to remote peer; else, drop the message (useful for testing unreliable msg delivery)
         drop_ack: bool,     // If true, drop ack from remote peer to this peer
-    ) -> (Vec<SignedTransaction>, PeerId) {
+    ) -> (Vec<DeprecatedSignedUserTransaction>, PeerId) {
         // Await broadcast notification
         // Note: If there are other messages you're looking for, this could throw them away
         // Wait for the number of messages to be broadcasted on this node

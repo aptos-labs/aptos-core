@@ -138,7 +138,7 @@ where
         let mut transactions: Vec<Transaction> = transaction_gens
             .into_iter()
             .map(|txn_gen| {
-                Transaction::UserTransaction(txn_gen.apply(&mut self.account_universe).0)
+                Transaction::DeprecatedUserTransaction(txn_gen.apply(&mut self.account_universe).0)
             })
             .collect();
 

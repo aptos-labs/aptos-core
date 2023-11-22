@@ -17,7 +17,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
-    transaction::{SignedTransaction, Transaction, Version},
+    transaction::{DeprecatedSignedUserTransaction, Transaction, Version},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
@@ -376,7 +376,7 @@ impl Block {
     pub fn transactions_to_execute(
         &self,
         validators: &[AccountAddress],
-        txns: Vec<SignedTransaction>,
+        txns: Vec<DeprecatedSignedUserTransaction>,
         block_gas_limit: Option<u64>,
     ) -> Vec<Transaction> {
         if block_gas_limit.is_some() {
@@ -385,7 +385,7 @@ impl Block {
             once(Transaction::BlockMetadata(
                 self.new_block_metadata(validators),
             ))
-            .chain(txns.into_iter().map(Transaction::UserTransaction))
+            .chain(txns.into_iter().map(Transaction::DeprecatedUserTransaction))
             .collect()
         } else {
             // Before the per-block gas limit change, StateCheckpoint txn
@@ -393,7 +393,7 @@ impl Block {
             once(Transaction::BlockMetadata(
                 self.new_block_metadata(validators),
             ))
-            .chain(txns.into_iter().map(Transaction::UserTransaction))
+            .chain(txns.into_iter().map(Transaction::DeprecatedUserTransaction))
             .chain(once(Transaction::StateCheckpoint(self.id)))
             .collect()
         }

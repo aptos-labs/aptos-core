@@ -230,7 +230,11 @@ fn dump_blocks_bcs(
         if block_id.is_none() || id == block_id.unwrap() {
             match extract_txns_from_block(&block, &all_batches) {
                 Ok(txns) => {
-                    all_txns.extend(txns.into_iter().cloned().map(Transaction::UserTransaction));
+                    all_txns.extend(
+                        txns.into_iter()
+                            .cloned()
+                            .map(Transaction::DeprecatedUserTransaction),
+                    );
                 },
                 Err(e) => bail!("Failed to extract txns from block ({id:?}): {e:?}."),
             };

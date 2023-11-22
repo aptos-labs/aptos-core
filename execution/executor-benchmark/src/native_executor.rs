@@ -350,7 +350,7 @@ impl TransactionBlockExecutor for NativeExecutor {
                 .par_iter()
                 .map(|txn| match &txn.expect_valid() {
                     Transaction::StateCheckpoint(_) => Self::handle_state_checkpoint(),
-                    Transaction::UserTransaction(user_txn) => match user_txn.payload() {
+                    Transaction::DeprecatedUserTransaction(user_txn) => match user_txn.payload() {
                         aptos_types::transaction::TransactionPayload::EntryFunction(f) => {
                             match (
                                 *f.module().address(),

@@ -9,7 +9,7 @@ use aptos_consensus_types::{
 };
 use aptos_logger::prelude::*;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::DeprecatedSignedUserTransaction;
 use futures::{
     channel::{
         mpsc::{Receiver, Sender},
@@ -48,7 +48,7 @@ impl DirectMempoolQuorumStore {
         max_bytes: u64,
         return_non_full: bool,
         exclude_txns: Vec<TransactionSummary>,
-    ) -> Result<Vec<SignedTransaction>, anyhow::Error> {
+    ) -> Result<Vec<DeprecatedSignedUserTransaction>, anyhow::Error> {
         let (callback, callback_rcv) = oneshot::channel();
         let exclude_txns: BTreeMap<_, _> = exclude_txns
             .into_iter()

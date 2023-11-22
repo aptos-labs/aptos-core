@@ -6,8 +6,9 @@ use crate::{
     account_address::AccountAddress,
     chain_id::ChainId,
     transaction::{
-        AccountTransactionsWithProof, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionInfo, TransactionListWithProof, TransactionPayload, TransactionWithProof,
+        AccountTransactionsWithProof, RawTransaction, DeprecatedSignedUserTransaction,
+        Script, Transaction, TransactionInfo, TransactionListWithProof, TransactionPayload,
+        TransactionWithProof,
     },
 };
 use aptos_crypto::{
@@ -20,7 +21,7 @@ use std::convert::TryFrom;
 
 #[test]
 fn test_invalid_signature() {
-    let txn: SignedTransaction = SignedTransaction::new(
+    let txn: DeprecatedSignedUserTransaction = DeprecatedSignedUserTransaction::new(
         RawTransaction::new_script(
             AccountAddress::random(),
             0,
@@ -58,7 +59,7 @@ proptest! {
     }
 
     #[test]
-    fn signed_transaction_bcs_roundtrip(signed_txn in any::<SignedTransaction>()) {
+    fn signed_transaction_bcs_roundtrip(signed_txn in any::<DeprecatedSignedUserTransaction>()) {
         assert_canonical_encode_decode(signed_txn);
     }
 

@@ -4,7 +4,7 @@ use crate::{
     counters::{NUM_SENDERS_IN_BLOCK, TXN_SHUFFLE_SECONDS},
     transaction_shuffler::TransactionShuffler,
 };
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::DeprecatedSignedUserTransaction;
 use move_core_types::account_address::AccountAddress;
 use std::collections::{HashMap, VecDeque};
 
@@ -37,7 +37,10 @@ pub struct SenderAwareShuffler {
 }
 
 impl TransactionShuffler for SenderAwareShuffler {
-    fn shuffle(&self, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
+    fn shuffle(
+        &self,
+        txns: Vec<DeprecatedSignedUserTransaction>,
+    ) -> Vec<DeprecatedSignedUserTransaction> {
         let _timer = TXN_SHUFFLE_SECONDS.start_timer();
 
         // Early return for performance reason if there are no transactions to shuffle
@@ -55,27 +58,28 @@ impl TransactionShuffler for SenderAwareShuffler {
         let mut pending_txns = PendingTransactions::new();
         let num_transactions = txns.len();
         let mut orig_txns = VecDeque::from(txns);
-        let mut next_to_add = |sliding_window: &mut SlidingWindowState| -> SignedTransaction {
-            // First check if we have a sender dropped off of conflict window in previous step, if so,
-            // we try to find pending transaction from the corresponding sender and add it to the block.
-            if let Some(sender) = sliding_window.last_dropped_sender() {
-                if let Some(txn) = pending_txns.remove_pending_from_sender(sender) {
-                    return txn;
+        let mut next_to_add =
+            |sliding_window: &mut SlidingWindowState| -> DeprecatedSignedUserTransaction {
+                // First check if we have a sender dropped off of conflict window in previous step, if so,
+                // we try to find pending transaction from the corresponding sender and add it to the block.
+                if let Some(sender) = sliding_window.last_dropped_sender() {
+                    if let Some(txn) = pending_txns.remove_pending_from_sender(sender) {
+                        return txn;
+                    }
                 }
-            }
-            // If we can't find any transaction from a sender dropped off of conflict window, then
-            // iterate through the original transactions and try to find the next candidate
-            while let Some(txn) = orig_txns.pop_front() {
-                if !sliding_window.has_conflict(&txn.sender()) {
-                    return txn;
+                // If we can't find any transaction from a sender dropped off of conflict window, then
+                // iterate through the original transactions and try to find the next candidate
+                while let Some(txn) = orig_txns.pop_front() {
+                    if !sliding_window.has_conflict(&txn.sender()) {
+                        return txn;
+                    }
+                    pending_txns.add_transaction(txn);
                 }
-                pending_txns.add_transaction(txn);
-            }
 
-            // If we can't find any candidate in above steps, then lastly
-            // add pending transactions in the order if we can't find any other candidate
-            pending_txns.remove_first_pending().unwrap()
-        };
+                // If we can't find any candidate in above steps, then lastly
+                // add pending transactions in the order if we can't find any other candidate
+                pending_txns.remove_first_pending().unwrap()
+            };
         while sliding_window.num_txns() < num_transactions {
             let txn = next_to_add(&mut sliding_window);
             sliding_window.add_transaction(txn)
@@ -98,10 +102,10 @@ impl SenderAwareShuffler {
 /// to preserve the original order of the transactions. This is needed in case we can't find
 /// any non-conflicting transactions and we need to add the first pending transaction to the block.
 struct PendingTransactions {
-    txns_by_senders: HashMap<AccountAddress, VecDeque<SignedTransaction>>,
+    txns_by_senders: HashMap<AccountAddress, VecDeque<DeprecatedSignedUserTransaction>>,
     // Transactions are kept in the original order. This is not kept in sync with pending transactions,
     // so this can contain a bunch of transactions that are already added to the block.
-    ordered_txns: VecDeque<SignedTransaction>,
+    ordered_txns: VecDeque<DeprecatedSignedUserTransaction>,
 }
 
 impl PendingTransactions {
@@ -112,7 +116,7 @@ impl PendingTransactions {
         }
     }
 
-    pub fn add_transaction(&mut self, txn: SignedTransaction) {
+    pub fn add_transaction(&mut self, txn: DeprecatedSignedUserTransaction) {
         self.ordered_txns.push_back(txn.clone());
         self.txns_by_senders
             .entry(txn.sender())
@@ -126,13 +130,13 @@ impl PendingTransactions {
     pub fn remove_pending_from_sender(
         &mut self,
         sender: AccountAddress,
-    ) -> Option<SignedTransaction> {
+    ) -> Option<DeprecatedSignedUserTransaction> {
         self.txns_by_senders
             .get_mut(&sender)
             .and_then(|txns| txns.pop_front())
     }
 
-    pub fn remove_first_pending(&mut self) -> Option<SignedTransaction> {
+    pub fn remove_first_pending(&mut self) -> Option<DeprecatedSignedUserTransaction> {
         while let Some(txn) = self.ordered_txns.pop_front() {
             let sender = txn.sender();
             // We don't remove the txns from ordered_txns when remove_pending_from_sender is called.
@@ -158,7 +162,7 @@ struct SlidingWindowState {
     // sender.
     senders_in_window: HashMap<AccountAddress, usize>,
     // Partially ordered transactions, needs to be updated every time add_transactions is called.
-    txns: Vec<SignedTransaction>,
+    txns: Vec<DeprecatedSignedUserTransaction>,
 }
 
 impl SlidingWindowState {
@@ -172,7 +176,7 @@ impl SlidingWindowState {
 
     /// Slides the current window. Essentially, it increments the start_index and
     /// updates the senders_in_window map if start_index is greater than 0
-    pub fn add_transaction(&mut self, txn: SignedTransaction) {
+    pub fn add_transaction(&mut self, txn: DeprecatedSignedUserTransaction) {
         if self.start_index >= 0 {
             // if the start_index is negative, then no sender falls out of the window.
             let sender = self
@@ -215,7 +219,7 @@ impl SlidingWindowState {
         self.txns.len()
     }
 
-    pub fn finalize(self) -> Vec<SignedTransaction> {
+    pub fn finalize(self) -> Vec<DeprecatedSignedUserTransaction> {
         NUM_SENDERS_IN_BLOCK.set(self.senders_in_window.len() as f64);
         self.txns
     }
@@ -229,7 +233,9 @@ mod tests {
     use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
     use aptos_types::{
         chain_id::ChainId,
-        transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
+        transaction::{
+            RawTransaction, DeprecatedSignedUserTransaction, Script, TransactionPayload,
+        },
     };
     use move_core_types::account_address::AccountAddress;
     use rand::{rngs::OsRng, Rng};
@@ -238,7 +244,7 @@ mod tests {
         time::Instant,
     };
 
-    fn create_signed_transaction(num_transactions: usize) -> Vec<SignedTransaction> {
+    fn create_signed_transaction(num_transactions: usize) -> Vec<DeprecatedSignedUserTransaction> {
         let private_key = Ed25519PrivateKey::generate_for_testing();
         let public_key = private_key.public_key();
         let sender = AccountAddress::random();
@@ -257,7 +263,7 @@ mod tests {
                 0,
                 ChainId::new(10),
             );
-            let signed_transaction = SignedTransaction::new(
+            let signed_transaction = DeprecatedSignedUserTransaction::new(
                 raw_transaction.clone(),
                 public_key.clone(),
                 private_key.sign(&raw_transaction).unwrap(),

@@ -28,8 +28,8 @@ use aptos_types::{
         table::TableHandle,
     },
     transaction::{
-        EntryFunction, ExecutionStatus, ModuleBundle, Multisig, RawTransaction, Script,
-        SignedTransaction,
+        RawTransaction, DeprecatedSignedUserTransaction, EntryFunction, ExecutionStatus,
+        ModuleBundle, Multisig, Script,
     },
     vm_status::AbortLocation,
     write_set::WriteOp,
@@ -74,7 +74,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
 
     pub fn try_into_resources<'b>(
         &self,
-        data: impl Iterator<Item = (StructTag, &'b [u8])>,
+        data: impl Iterator<Item=(StructTag, &'b [u8])>,
     ) -> Result<Vec<MoveResource>> {
         data.map(|(typ, bytes)| self.try_into_resource(&typ, bytes))
             .collect()
@@ -109,14 +109,17 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         self.inner.move_struct_fields(typ, bytes)
     }
 
-    pub fn try_into_pending_transaction(&self, txn: SignedTransaction) -> Result<Transaction> {
+    pub fn try_into_pending_transaction(
+        &self,
+        txn: DeprecatedSignedUserTransaction,
+    ) -> Result<Transaction> {
         let payload = self.try_into_transaction_payload(txn.payload().clone())?;
         Ok((txn, payload).into())
     }
 
     pub fn try_into_pending_transaction_poem(
         &self,
-        txn: SignedTransaction,
+        txn: DeprecatedSignedUserTransaction,
     ) -> Result<PendingTransaction> {
         let payload = self.try_into_transaction_payload(txn.payload().clone())?;
         Ok((txn, payload).into())
@@ -136,21 +139,21 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         );
         let events = self.try_into_events(&data.events)?;
         Ok(match data.transaction {
-            UserTransaction(txn) => {
+            DeprecatedUserTransaction(txn) => {
                 let payload = self.try_into_transaction_payload(txn.payload().clone())?;
                 (&txn, info, payload, events, timestamp).into()
-            },
+            }
             GenesisTransaction(write_set) => {
                 let payload = self.try_into_write_set_payload(write_set)?;
                 (info, payload, events).into()
-            },
+            }
             BlockMetadata(txn) => (&txn, info, events).into(),
             StateCheckpoint(_) => {
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
                     info,
                     timestamp: timestamp.into(),
                 })
-            },
+            }
             SystemTransaction(_txn) => todo!(),
         })
     }
@@ -215,7 +218,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     },
                     type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
                 })
-            },
+            }
             Multisig(multisig) => {
                 let transaction_payload = if let Some(payload) = multisig.transaction_payload {
                     match payload {
@@ -250,7 +253,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                                         .collect(),
                                 },
                             ))
-                        },
+                        }
                     }
                 } else {
                     None
@@ -259,7 +262,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     multisig_address: multisig.multisig_address.into(),
                     transaction_payload,
                 })
-            },
+            }
 
             // Deprecated. Will be removed in the future.
             ModuleBundle(modules) => TransactionPayload::ModuleBundlePayload(ModuleBundlePayload {
@@ -300,7 +303,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                         events: self.try_into_events(&events)?,
                     }),
                 }
-            },
+            }
         };
         Ok(ret)
     }
@@ -315,12 +318,12 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         match state_key {
             StateKeyInner::AccessPath(access_path) => {
                 self.try_access_path_into_write_set_changes(hash, access_path, op)
-            },
+            }
             StateKeyInner::TableItem { handle, key } => {
                 vec![self.try_table_item_into_write_set_change(hash, handle, key, op)]
                     .into_iter()
                     .collect()
-            },
+            }
             StateKeyInner::Raw(_) => Err(format_err!(
                 "Can't convert account raw key {:?} to WriteSetChange",
                 state_key
@@ -398,7 +401,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     key,
                     data,
                 })
-            },
+            }
             Some(bytes) => {
                 let data =
                     self.try_write_table_item_into_decoded_table_data(handle, &key.0, bytes)?;
@@ -410,7 +413,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     value: bytes.to_vec().into(),
                     data,
                 })
-            },
+            }
         };
         Ok(ret)
     }
@@ -432,7 +435,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     handle
                 );
                 return Ok(None); // if table item not found return None anyway to avoid crash
-            },
+            }
         };
         let key = self.try_into_move_value(&table_info.key_type, key)?;
         let value = self.try_into_move_value(&table_info.value_type, value)?;
@@ -461,7 +464,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     handle
                 );
                 return Ok(None); // if table item not found return None anyway to avoid crash
-            },
+            }
         };
         let key = self.try_into_move_value(&table_info.key_type, key)?;
 
@@ -500,12 +503,12 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         &self,
         txn: UserTransactionRequest,
         chain_id: ChainId,
-    ) -> Result<SignedTransaction> {
+    ) -> Result<DeprecatedSignedUserTransaction> {
         let signature = txn
             .signature
             .clone()
             .ok_or_else(|| format_err!("missing signature"))?;
-        Ok(SignedTransaction::new_with_authenticator(
+        Ok(DeprecatedSignedUserTransaction::new_with_authenticator(
             self.try_into_raw_transaction(txn, chain_id)?,
             signature.try_into()?,
         ))
@@ -515,8 +518,8 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         &self,
         submit_transaction_request: SubmitTransactionRequest,
         chain_id: ChainId,
-    ) -> Result<SignedTransaction> {
-        Ok(SignedTransaction::new_with_authenticator(
+    ) -> Result<DeprecatedSignedUserTransaction> {
+        Ok(DeprecatedSignedUserTransaction::new_with_authenticator(
             self.try_into_raw_transaction_poem(
                 submit_transaction_request.user_transaction_request,
                 chain_id,
@@ -616,7 +619,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                         .collect::<Result<_>>()?,
                     args,
                 ))
-            },
+            }
             TransactionPayload::ScriptPayload(script) => {
                 let ScriptPayload {
                     code,
@@ -638,10 +641,10 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                                 .map(|arg| arg.try_into())
                                 .collect::<Result<_>>()?,
                         ))
-                    },
+                    }
                     None => return Err(anyhow::anyhow!("invalid transaction script bytecode")),
                 }
-            },
+            }
             TransactionPayload::MultisigPayload(multisig) => {
                 let transaction_payload = if let Some(payload) = multisig.transaction_payload {
                     match payload {
@@ -686,7 +689,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                                     ),
                                 ),
                             )
-                        },
+                        }
                     }
                 } else {
                     None
@@ -695,7 +698,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     multisig_address: multisig.multisig_address.into(),
                     transaction_payload,
                 })
-            },
+            }
 
             // Deprecated. Will be removed in the future.
             TransactionPayload::ModuleBundlePayload(payload) => {
@@ -706,7 +709,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                         .map(|m| m.bytecode.into())
                         .collect(),
                 ))
-            },
+            }
         };
         Ok(ret)
     }
@@ -773,7 +776,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     // For all other structs, use their set layout
                     self.inner.get_type_layout_with_types(type_tag)?
                 }
-            },
+            }
             _ => self.inner.get_type_layout_with_types(type_tag)?,
         };
 
@@ -797,17 +800,17 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
             MoveTypeLayout::Address => serde_json::from_value::<crate::Address>(val)?.into(),
             MoveTypeLayout::Vector(item_layout) => {
                 self.try_into_vm_value_vector(item_layout.as_ref(), val)?
-            },
+            }
             MoveTypeLayout::Struct(struct_layout) => {
                 self.try_into_vm_value_struct(struct_layout, val)?
-            },
+            }
             MoveTypeLayout::Signer => {
                 bail!("unexpected move type {:?} for value {:?}", layout, val)
-            },
+            }
             MoveTypeLayout::Tagged(tag, inner_layout) => match tag {
                 LayoutTag::IdentifierMapping(_) => {
                     self.try_into_vm_value_from_layout(inner_layout, val)?
-                },
+                }
             },
         })
     }
@@ -932,6 +935,7 @@ impl<'a, R: MoveResolver + ?Sized> ExplainVMStatus for MoveConverter<'a, R> {
             .map(|inner| inner as Rc<dyn Bytecode>)
     }
 }
+
 pub trait AsConverter<R> {
     fn as_converter(&self, db: Arc<dyn DbReader>) -> MoveConverter<R>;
 }
@@ -960,7 +964,7 @@ fn abort_location_to_str(loc: &AbortLocation) -> String {
     match loc {
         AbortLocation::Module(mid) => {
             format!("{}::{}", mid.address().to_hex_literal(), mid.name())
-        },
+        }
         _ => loc.to_string(),
     }
 }

@@ -7,7 +7,7 @@ use anyhow::Result;
 use aptos_state_view::StateView;
 use aptos_types::{
     account_address::AccountAddress,
-    transaction::{SignedTransaction, VMValidatorResult},
+    transaction::{DeprecatedSignedUserTransaction, VMValidatorResult},
     vm_status::StatusCode,
 };
 use aptos_vm::VMValidator;
@@ -33,7 +33,7 @@ pub struct MockVMValidator;
 impl VMValidator for MockVMValidator {
     fn validate_transaction(
         &self,
-        _transaction: SignedTransaction,
+        _transaction: DeprecatedSignedUserTransaction,
         _state_view: &impl StateView,
     ) -> VMValidatorResult {
         VMValidatorResult::new(None, 0)
@@ -43,7 +43,10 @@ impl VMValidator for MockVMValidator {
 impl TransactionValidation for MockVMValidator {
     type ValidationInstance = MockVMValidator;
 
-    fn validate_transaction(&self, txn: SignedTransaction) -> Result<VMValidatorResult> {
+    fn validate_transaction(
+        &self,
+        txn: DeprecatedSignedUserTransaction,
+    ) -> Result<VMValidatorResult> {
         let txn = match txn.check_signature() {
             Ok(txn) => txn,
             Err(_) => {

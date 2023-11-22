@@ -488,7 +488,7 @@ async fn assert_reordering(swarm: &mut dyn Swarm, expected_reordering: bool) {
     let mut block_txns = vec![];
     for txn in committed_order {
         match txn.transaction {
-            aptos_types::transaction::Transaction::UserTransaction(txn) => {
+            aptos_types::transaction::Transaction::DeprecatedUserTransaction(txn) => {
                 info!("from {}, seq_num {}", txn.sender(), txn.sequence_number());
                 block_txns.push(txn);
             },

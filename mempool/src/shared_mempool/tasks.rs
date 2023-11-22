@@ -27,7 +27,7 @@ use aptos_storage_interface::state_view::LatestDbStateCheckpointView;
 use aptos_types::{
     mempool_status::{MempoolStatus, MempoolStatusCode},
     on_chain_config::{OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig},
-    transaction::SignedTransaction,
+    transaction::DeprecatedSignedUserTransaction,
     vm_status::{DiscardedVMStatus, StatusCode},
 };
 use aptos_vm_validator::vm_validator::{get_account_sequence_number, TransactionValidation};
@@ -110,7 +110,7 @@ pub(crate) async fn execute_broadcast<NetworkClient, TransactionValidator>(
 /// Processes transactions directly submitted by client.
 pub(crate) async fn process_client_transaction_submission<NetworkClient, TransactionValidator>(
     smp: SharedMempool<NetworkClient, TransactionValidator>,
-    transaction: SignedTransaction,
+    transaction: DeprecatedSignedUserTransaction,
     callback: oneshot::Sender<Result<SubmissionStatus>>,
     timer: HistogramTimer,
 ) where
@@ -144,7 +144,7 @@ pub(crate) async fn process_client_transaction_submission<NetworkClient, Transac
 pub(crate) async fn process_client_get_transaction<NetworkClient, TransactionValidator>(
     smp: SharedMempool<NetworkClient, TransactionValidator>,
     hash: HashValue,
-    callback: oneshot::Sender<Option<SignedTransaction>>,
+    callback: oneshot::Sender<Option<DeprecatedSignedUserTransaction>>,
     timer: HistogramTimer,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
@@ -166,7 +166,7 @@ pub(crate) async fn process_client_get_transaction<NetworkClient, TransactionVal
 /// Processes transactions from other nodes.
 pub(crate) async fn process_transaction_broadcast<NetworkClient, TransactionValidator>(
     smp: SharedMempool<NetworkClient, TransactionValidator>,
-    transactions: Vec<SignedTransaction>,
+    transactions: Vec<DeprecatedSignedUserTransaction>,
     request_id: MultiBatchId,
     timeline_state: TimelineState,
     peer: PeerNetworkId,
@@ -253,7 +253,7 @@ pub(crate) fn update_ack_counter(
 /// and returns a vector containing [SubmissionStatusBundle].
 pub(crate) fn process_incoming_transactions<NetworkClient, TransactionValidator>(
     smp: &SharedMempool<NetworkClient, TransactionValidator>,
-    transactions: Vec<SignedTransaction>,
+    transactions: Vec<DeprecatedSignedUserTransaction>,
     timeline_state: TimelineState,
     client_submitted: bool,
 ) -> Vec<SubmissionStatusBundle>
@@ -333,10 +333,13 @@ where
 /// validation into the mempool.
 #[cfg(not(feature = "consensus-only-perf-test"))]
 fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
-    transactions: Vec<(SignedTransaction, u64)>,
+    transactions: Vec<(DeprecatedSignedUserTransaction, u64)>,
     smp: &SharedMempool<NetworkClient, TransactionValidator>,
     timeline_state: TimelineState,
-    statuses: &mut Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))>,
+    statuses: &mut Vec<(
+        DeprecatedSignedUserTransaction,
+        (MempoolStatus, Option<StatusCode>),
+    )>,
     client_submitted: bool,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
@@ -399,10 +402,13 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
 /// outstanding sequence numbers.
 #[cfg(feature = "consensus-only-perf-test")]
 fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
-    transactions: Vec<(SignedTransaction, u64)>,
+    transactions: Vec<(DeprecatedSignedUserTransaction, u64)>,
     smp: &SharedMempool<NetworkClient, TransactionValidator>,
     timeline_state: TimelineState,
-    statuses: &mut Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))>,
+    statuses: &mut Vec<(
+        DeprecatedSignedUserTransaction,
+        (MempoolStatus, Option<StatusCode>),
+    )>,
     client_submitted: bool,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,

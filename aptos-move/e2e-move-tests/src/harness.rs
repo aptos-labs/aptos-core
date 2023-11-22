@@ -26,8 +26,8 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
     },
     transaction::{
-        EntryFunction, Script, SignedTransaction, TransactionArgument, TransactionOutput,
-        TransactionPayload, TransactionStatus,
+        DeprecatedSignedUserTransaction, EntryFunction, Script, TransactionArgument,
+        TransactionOutput, TransactionPayload, TransactionStatus,
     },
 };
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
@@ -193,7 +193,7 @@ impl MoveHarness {
     }
 
     /// Runs a signed transaction. On success, applies the write set.
-    pub fn run_raw(&mut self, txn: SignedTransaction) -> TransactionOutput {
+    pub fn run_raw(&mut self, txn: DeprecatedSignedUserTransaction) -> TransactionOutput {
         let output = self.executor.execute_transaction(txn);
         if matches!(output.status(), TransactionStatus::Keep(_)) {
             self.executor.apply_write_set(output.write_set());
@@ -203,14 +203,14 @@ impl MoveHarness {
     }
 
     /// Runs a signed transaction. On success, applies the write set.
-    pub fn run(&mut self, txn: SignedTransaction) -> TransactionStatus {
+    pub fn run(&mut self, txn: DeprecatedSignedUserTransaction) -> TransactionStatus {
         self.run_raw(txn).status().to_owned()
     }
 
     /// Runs a signed transaction. On success, applies the write set and return events
     pub fn run_with_events(
         &mut self,
-        txn: SignedTransaction,
+        txn: DeprecatedSignedUserTransaction,
     ) -> (TransactionStatus, Vec<ContractEvent>) {
         let output = self.executor.execute_transaction(txn);
         if matches!(output.status(), TransactionStatus::Keep(_)) {
@@ -220,7 +220,10 @@ impl MoveHarness {
     }
 
     /// Runs a block of signed transactions. On success, applies the write set.
-    pub fn run_block(&mut self, txn_block: Vec<SignedTransaction>) -> Vec<TransactionStatus> {
+    pub fn run_block(
+        &mut self,
+        txn_block: Vec<DeprecatedSignedUserTransaction>,
+    ) -> Vec<TransactionStatus> {
         let mut result = vec![];
         for output in self.executor.execute_block(txn_block).unwrap() {
             if matches!(output.status(), TransactionStatus::Keep(_)) {
@@ -236,7 +239,7 @@ impl MoveHarness {
         &mut self,
         account: &Account,
         payload: TransactionPayload,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         let on_chain_seq_no = self.sequence_number(account.address());
         let seq_no_ref = self.txn_seq_no.get_mut(account.address()).unwrap();
         let seq_no = std::cmp::max(on_chain_seq_no, *seq_no_ref);
@@ -294,7 +297,7 @@ impl MoveHarness {
         fun: MemberId,
         ty_args: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         let MemberId {
             module_id,
             member_id: function_id,
@@ -316,7 +319,7 @@ impl MoveHarness {
         code: Vec<u8>,
         ty_args: Vec<TypeTag>,
         args: Vec<TransactionArgument>,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         self.create_transaction_payload(
             account,
             TransactionPayload::Script(Script::new(code, ty_args, args)),
@@ -358,7 +361,7 @@ impl MoveHarness {
         account: &Account,
         package: &BuiltPackage,
         mut patch_metadata: impl FnMut(&mut PackageMetadata),
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         let code = package.extract_code();
         let mut metadata = package
             .extract_metadata()
@@ -383,7 +386,7 @@ impl MoveHarness {
         path: &Path,
         options: Option<BuildOptions>,
         patch_metadata: impl FnMut(&mut PackageMetadata),
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         let package = BuiltPackage::build(path.to_owned(), options.unwrap_or_default())
             .expect("building package must succeed");
         self.create_publish_built_package(account, &package, patch_metadata)
@@ -394,7 +397,7 @@ impl MoveHarness {
         account: &Account,
         path: &Path,
         patch_metadata: impl FnMut(&mut PackageMetadata),
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         let package_arc = {
             let mut cache = CACHED_BUILT_PACKAGES.lock().unwrap();
 
@@ -500,7 +503,7 @@ impl MoveHarness {
         &mut self,
         proposer: AccountAddress,
         failed_proposer_indices: Vec<u32>,
-        txns: Vec<SignedTransaction>,
+        txns: Vec<DeprecatedSignedUserTransaction>,
     ) -> Vec<(TransactionStatus, u64)> {
         self.fast_forward(1);
         self.executor
@@ -718,11 +721,11 @@ impl MoveHarness {
     pub fn run_block_in_parts_and_check(
         &mut self,
         block_split: BlockSplit,
-        txn_block: Vec<(u64, SignedTransaction)>,
+        txn_block: Vec<(u64, DeprecatedSignedUserTransaction)>,
     ) -> Vec<TransactionStatus> {
         fn run_and_check_block(
             harness: &mut MoveHarness,
-            txn_block: Vec<(u64, SignedTransaction)>,
+            txn_block: Vec<(u64, DeprecatedSignedUserTransaction)>,
             offset: usize,
         ) -> Vec<TransactionStatus> {
             use crate::assert_abort_ref;

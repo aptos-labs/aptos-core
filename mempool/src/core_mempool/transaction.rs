@@ -4,7 +4,7 @@
 
 use crate::{core_mempool::TXN_INDEX_ESTIMATED_BYTES, counters};
 use aptos_crypto::HashValue;
-use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
+use aptos_types::{account_address::AccountAddress, transaction::DeprecatedSignedUserTransaction};
 use serde::{Deserialize, Serialize};
 use std::{
     mem::size_of,
@@ -16,7 +16,7 @@ pub const TXN_FIXED_ESTIMATED_BYTES: usize = size_of::<MempoolTransaction>();
 
 #[derive(Clone, Debug)]
 pub struct MempoolTransaction {
-    pub txn: SignedTransaction,
+    pub txn: DeprecatedSignedUserTransaction,
     // System expiration time of the transaction. It should be removed from mempool by that time.
     pub expiration_time: Duration,
     pub ranking_score: u64,
@@ -28,7 +28,7 @@ pub struct MempoolTransaction {
 
 impl MempoolTransaction {
     pub(crate) fn new(
-        txn: SignedTransaction,
+        txn: DeprecatedSignedUserTransaction,
         expiration_time: Duration,
         ranking_score: u64,
         timeline_state: TimelineState,
@@ -148,7 +148,9 @@ mod test {
     use aptos_types::{
         account_address::AccountAddress,
         chain_id::ChainId,
-        transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
+        transaction::{
+            RawTransaction, DeprecatedSignedUserTransaction, Script, TransactionPayload,
+        },
     };
     use std::time::{Duration, SystemTime};
 
@@ -162,7 +164,9 @@ mod test {
         assert!(mempool_txn1.get_estimated_bytes() < mempool_txn2.get_estimated_bytes());
     }
 
-    fn create_test_mempool_transaction(signed_txn: SignedTransaction) -> MempoolTransaction {
+    fn create_test_mempool_transaction(
+        signed_txn: DeprecatedSignedUserTransaction,
+    ) -> MempoolTransaction {
         MempoolTransaction::new(
             signed_txn,
             Duration::from_secs(1),
@@ -175,7 +179,10 @@ mod test {
     }
 
     /// Creates a signed transaction
-    fn create_test_transaction(sequence_number: u64, code_bytes: Vec<u8>) -> SignedTransaction {
+    fn create_test_transaction(
+        sequence_number: u64,
+        code_bytes: Vec<u8>,
+    ) -> DeprecatedSignedUserTransaction {
         let private_key = Ed25519PrivateKey::generate_for_testing();
         let public_key = private_key.public_key();
 
@@ -190,7 +197,7 @@ mod test {
             0,
             ChainId::new(10),
         );
-        SignedTransaction::new(
+        DeprecatedSignedUserTransaction::new(
             raw_transaction.clone(),
             public_key,
             private_key.sign(&raw_transaction).unwrap(),

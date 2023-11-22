@@ -7,7 +7,7 @@ use crate::{
     execution_strategies::types::{Block, Executor, ExecutorResult, PartitionStrategy},
     executor::FakeExecutor,
 };
-use aptos_types::{transaction::SignedTransaction, vm_status::VMStatus};
+use aptos_types::{transaction::DeprecatedSignedUserTransaction, vm_status::VMStatus};
 use rand::{
     rngs::{OsRng, StdRng},
     Rng, SeedableRng,
@@ -33,9 +33,12 @@ impl RandomizedStrategy {
 }
 
 impl PartitionStrategy for RandomizedStrategy {
-    type Txn = SignedTransaction;
+    type Txn = DeprecatedSignedUserTransaction;
 
-    fn partition(&mut self, mut block: Block<Self::Txn>) -> Vec<Block<SignedTransaction>> {
+    fn partition(
+        &mut self,
+        mut block: Block<Self::Txn>,
+    ) -> Vec<Block<DeprecatedSignedUserTransaction>> {
         let mut blocks = vec![];
         while !block.is_empty() {
             let block_size = self.gen.gen_range(0, block.len());
@@ -66,7 +69,7 @@ impl RandomExecutor {
 
 impl Executor for RandomExecutor {
     type BlockResult = VMStatus;
-    type Txn = SignedTransaction;
+    type Txn = DeprecatedSignedUserTransaction;
 
     fn execute_block(&mut self, block: Block<Self::Txn>) -> ExecutorResult<Self::BlockResult> {
         let blocks = self.strategy.partition(block);

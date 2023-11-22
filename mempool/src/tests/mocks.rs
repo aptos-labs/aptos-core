@@ -31,7 +31,7 @@ use aptos_storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
 use aptos_types::{
     mempool_status::MempoolStatusCode,
     on_chain_config::{InMemoryOnChainConfig, OnChainConfigPayload},
-    transaction::SignedTransaction,
+    transaction::DeprecatedSignedUserTransaction,
 };
 use aptos_vm_validator::{
     mocks::mock_vm_validator::MockVMValidator, vm_validator::TransactionValidation,
@@ -165,7 +165,7 @@ impl MockSharedMempool {
         (ac_client, mempool, quorum_store_sender, mempool_notifier)
     }
 
-    pub fn add_txns(&self, txns: Vec<SignedTransaction>) -> Result<()> {
+    pub fn add_txns(&self, txns: Vec<DeprecatedSignedUserTransaction>) -> Result<()> {
         {
             let mut pool = self.mempool.lock();
             for txn in txns {
@@ -187,13 +187,13 @@ impl MockSharedMempool {
         Ok(())
     }
 
-    pub fn get_txns(&self, size: u64) -> Vec<SignedTransaction> {
+    pub fn get_txns(&self, size: u64) -> Vec<DeprecatedSignedUserTransaction> {
         let pool = self.mempool.lock();
         // assume txn size is less than 100kb
         pool.get_batch(size, size * 102400, true, false, BTreeMap::new())
     }
 
-    pub fn remove_txn(&self, txn: &SignedTransaction) {
+    pub fn remove_txn(&self, txn: &DeprecatedSignedUserTransaction) {
         let mut pool = self.mempool.lock();
         pool.commit_transaction(&txn.sender(), txn.sequence_number())
     }

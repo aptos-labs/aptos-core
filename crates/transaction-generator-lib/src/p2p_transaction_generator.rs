@@ -5,7 +5,7 @@ use aptos_infallible::RwLock;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{chain_id::ChainId, transaction::SignedTransaction, LocalAccount},
+    types::{chain_id::ChainId, transaction::DeprecatedSignedUserTransaction, LocalAccount},
 };
 use rand::{
     distributions::{Distribution, Standard},
@@ -178,7 +178,7 @@ impl P2PTransactionGenerator {
         to: &AccountAddress,
         num_coins: u64,
         txn_factory: &TransactionFactory,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         from.sign_with_transaction_builder(
             txn_factory.payload(aptos_stdlib::aptos_coin_transfer(*to, num_coins)),
         )
@@ -189,8 +189,8 @@ impl P2PTransactionGenerator {
         rng: &mut StdRng,
         sender: &LocalAccount,
         receiver: &AccountAddress,
-        reqs: &[SignedTransaction],
-    ) -> SignedTransaction {
+        reqs: &[DeprecatedSignedUserTransaction],
+    ) -> DeprecatedSignedUserTransaction {
         let invalid_account = LocalAccount::generate(rng);
         let invalid_address = invalid_account.address();
         match Standard.sample(rng) {
@@ -253,7 +253,7 @@ impl TransactionGenerator for P2PTransactionGenerator {
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
-    ) -> Vec<SignedTransaction> {
+    ) -> Vec<DeprecatedSignedUserTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);
         let invalid_size = if self.invalid_transaction_ratio != 0 {
             // if enable mix invalid tx, at least 1 invalid tx per batch

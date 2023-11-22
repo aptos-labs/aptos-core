@@ -17,7 +17,7 @@ use aptos_consensus_types::{
 };
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_types::{transaction::SignedTransaction, PeerId};
+use aptos_types::{transaction::DeprecatedSignedUserTransaction, PeerId};
 use futures_channel::mpsc::Sender;
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
@@ -101,7 +101,7 @@ impl BatchGenerator {
 
     fn create_new_batch(
         &mut self,
-        txns: Vec<SignedTransaction>,
+        txns: Vec<DeprecatedSignedUserTransaction>,
         expiry_time: u64,
         bucket_start: u64,
     ) -> Batch {
@@ -142,7 +142,7 @@ impl BatchGenerator {
     fn push_bucket_to_batches(
         &mut self,
         batches: &mut Vec<Batch>,
-        txns: &mut Vec<SignedTransaction>,
+        txns: &mut Vec<DeprecatedSignedUserTransaction>,
         num_txns_in_bucket: usize,
         expiry_time: u64,
         bucket_start: u64,
@@ -163,7 +163,7 @@ impl BatchGenerator {
 
     fn bucket_into_batches(
         &mut self,
-        pulled_txns: &mut Vec<SignedTransaction>,
+        pulled_txns: &mut Vec<DeprecatedSignedUserTransaction>,
         expiry_time: u64,
     ) -> Vec<Batch> {
         // Sort by gas, in descending order. This is a stable sort on existing mempool ordering,

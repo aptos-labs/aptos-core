@@ -44,8 +44,8 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionPayload,
-        TransactionStatus, VMValidatorResult,
+        DeprecatedSignedUserTransaction, ExecutionStatus, Transaction, TransactionOutput,
+        TransactionPayload, TransactionStatus, VMValidatorResult,
     },
     vm_status::VMStatus,
     write_set::WriteSet,
@@ -430,19 +430,22 @@ impl FakeExecutor {
     /// However, this doesn't apply the results of successful transactions to the data store.
     pub fn execute_block(
         &self,
-        txn_block: Vec<SignedTransaction>,
+        txn_block: Vec<DeprecatedSignedUserTransaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         self.execute_transaction_block(
             txn_block
                 .into_iter()
-                .map(Transaction::UserTransaction)
+                .map(Transaction::DeprecatedUserTransaction)
                 .collect(),
         )
     }
 
     /// Executes the transaction as a singleton block and applies the resulting write set to the
     /// data store. Panics if execution fails
-    pub fn execute_and_apply(&mut self, transaction: SignedTransaction) -> TransactionOutput {
+    pub fn execute_and_apply(
+        &mut self,
+        transaction: DeprecatedSignedUserTransaction,
+    ) -> TransactionOutput {
         let mut outputs = self.execute_block(vec![transaction]).unwrap();
         assert!(outputs.len() == 1, "transaction outputs size mismatch");
         let output = outputs.pop().unwrap();
@@ -573,7 +576,7 @@ impl FakeExecutor {
         output
     }
 
-    pub fn execute_transaction(&self, txn: SignedTransaction) -> TransactionOutput {
+    pub fn execute_transaction(&self, txn: DeprecatedSignedUserTransaction) -> TransactionOutput {
         let txn_block = vec![txn];
         let mut outputs = self
             .execute_block(txn_block)
@@ -585,7 +588,7 @@ impl FakeExecutor {
 
     pub fn execute_transaction_with_gas_profiler(
         &self,
-        txn: SignedTransaction,
+        txn: DeprecatedSignedUserTransaction,
     ) -> anyhow::Result<(TransactionOutput, TransactionGasLog)> {
         let txn = txn
             .check_signature()
@@ -665,7 +668,7 @@ impl FakeExecutor {
     }
 
     /// Verifies the given transaction by running it through the VM verifier.
-    pub fn verify_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
+    pub fn verify_transaction(&self, txn: DeprecatedSignedUserTransaction) -> VMValidatorResult {
         let vm = AptosVM::new(&self.get_state_view().as_move_resolver());
         vm.validate_transaction(txn, &self.data_store)
     }
@@ -692,10 +695,12 @@ impl FakeExecutor {
         &mut self,
         proposer: AccountAddress,
         failed_proposer_indices: Vec<u32>,
-        txns: Vec<SignedTransaction>,
+        txns: Vec<DeprecatedSignedUserTransaction>,
     ) -> Vec<(TransactionStatus, u64)> {
-        let mut txn_block: Vec<Transaction> =
-            txns.into_iter().map(Transaction::UserTransaction).collect();
+        let mut txn_block: Vec<Transaction> = txns
+            .into_iter()
+            .map(Transaction::DeprecatedUserTransaction)
+            .collect();
         let validator_set = ValidatorSet::fetch_config(&self.data_store.as_move_resolver())
             .expect("Unable to retrieve the validator set from storage");
         let new_block_metadata = BlockMetadata::new(

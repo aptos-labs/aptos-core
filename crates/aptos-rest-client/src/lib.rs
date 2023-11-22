@@ -37,7 +37,7 @@ use aptos_types::{
     account_config::{AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},
     contract_event::EventWithVersion,
     state_store::state_key::StateKey,
-    transaction::SignedTransaction,
+    transaction::DeprecatedSignedUserTransaction,
 };
 use move_core_types::language_storage::StructTag;
 use reqwest::{
@@ -333,7 +333,7 @@ impl Client {
 
     pub async fn simulate(
         &self,
-        txn: &SignedTransaction,
+        txn: &DeprecatedSignedUserTransaction,
     ) -> AptosResult<Response<Vec<UserTransaction>>> {
         let txn_payload = bcs::to_bytes(txn)?;
         let url = self.build_path("transactions/simulate")?;
@@ -351,7 +351,7 @@ impl Client {
 
     pub async fn simulate_with_gas_estimation(
         &self,
-        txn: &SignedTransaction,
+        txn: &DeprecatedSignedUserTransaction,
         estimate_max_gas_amount: bool,
         estimate_max_gas_unit_price: bool,
     ) -> AptosResult<Response<Vec<UserTransaction>>> {
@@ -375,7 +375,7 @@ impl Client {
 
     pub async fn simulate_bcs(
         &self,
-        txn: &SignedTransaction,
+        txn: &DeprecatedSignedUserTransaction,
     ) -> AptosResult<Response<TransactionOnChainData>> {
         let txn_payload = bcs::to_bytes(txn)?;
         let url = self.build_path("transactions/simulate")?;
@@ -395,7 +395,7 @@ impl Client {
 
     pub async fn simulate_bcs_with_gas_estimation(
         &self,
-        txn: &SignedTransaction,
+        txn: &DeprecatedSignedUserTransaction,
         estimate_max_gas_amount: bool,
         estimate_max_gas_unit_price: bool,
     ) -> AptosResult<Response<TransactionOnChainData>> {
@@ -420,7 +420,7 @@ impl Client {
 
     pub async fn submit(
         &self,
-        txn: &SignedTransaction,
+        txn: &DeprecatedSignedUserTransaction,
     ) -> AptosResult<Response<PendingTransaction>> {
         let txn_payload = bcs::to_bytes(txn)?;
         let url = self.build_path("transactions")?;
@@ -436,7 +436,10 @@ impl Client {
         self.json(response).await
     }
 
-    pub async fn submit_bcs(&self, txn: &SignedTransaction) -> AptosResult<Response<()>> {
+    pub async fn submit_bcs(
+        &self,
+        txn: &DeprecatedSignedUserTransaction,
+    ) -> AptosResult<Response<()>> {
         let txn_payload = bcs::to_bytes(txn)?;
         let url = self.build_path("transactions")?;
 
@@ -455,7 +458,7 @@ impl Client {
 
     pub async fn submit_batch(
         &self,
-        txns: &[SignedTransaction],
+        txns: &[DeprecatedSignedUserTransaction],
     ) -> AptosResult<Response<TransactionsBatchSubmissionResult>> {
         let txn_payload = bcs::to_bytes(&txns.to_vec())?;
         let url = self.build_path("transactions/batch")?;
@@ -472,7 +475,7 @@ impl Client {
 
     pub async fn submit_batch_bcs(
         &self,
-        txns: &[SignedTransaction],
+        txns: &[DeprecatedSignedUserTransaction],
     ) -> AptosResult<Response<TransactionsBatchSubmissionResult>> {
         let txn_payload = bcs::to_bytes(&txns.to_vec())?;
         let url = self.build_path("transactions/batch")?;
@@ -492,7 +495,7 @@ impl Client {
 
     pub async fn submit_and_wait(
         &self,
-        txn: &SignedTransaction,
+        txn: &DeprecatedSignedUserTransaction,
     ) -> AptosResult<Response<Transaction>> {
         self.submit(txn).await?;
         self.wait_for_signed_transaction(txn).await
@@ -500,7 +503,7 @@ impl Client {
 
     pub async fn submit_and_wait_bcs(
         &self,
-        txn: &SignedTransaction,
+        txn: &DeprecatedSignedUserTransaction,
     ) -> AptosResult<Response<TransactionOnChainData>> {
         self.submit_bcs(txn).await?;
         self.wait_for_signed_transaction_bcs(txn).await
@@ -540,7 +543,7 @@ impl Client {
 
     pub async fn wait_for_signed_transaction(
         &self,
-        transaction: &SignedTransaction,
+        transaction: &DeprecatedSignedUserTransaction,
     ) -> AptosResult<Response<Transaction>> {
         let expiration_timestamp = transaction.expiration_timestamp_secs();
         self.wait_for_transaction_by_hash(
@@ -554,7 +557,7 @@ impl Client {
 
     pub async fn wait_for_signed_transaction_bcs(
         &self,
-        transaction: &SignedTransaction,
+        transaction: &DeprecatedSignedUserTransaction,
     ) -> AptosResult<Response<TransactionOnChainData>> {
         let expiration_timestamp = transaction.expiration_timestamp_secs();
         self.wait_for_transaction_by_hash_bcs(

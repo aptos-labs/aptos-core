@@ -13,7 +13,9 @@ pub use self::{
 use self::{fake::FakeFunderConfig, transfer::TransferFunderConfig};
 use crate::endpoints::AptosTapError;
 use anyhow::{Context, Result};
-use aptos_sdk::types::{account_address::AccountAddress, transaction::SignedTransaction};
+use aptos_sdk::types::{
+    account_address::AccountAddress, transaction::DeprecatedSignedUserTransaction,
+};
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 pub use fake::FakeFunder;
@@ -40,7 +42,7 @@ pub trait FunderTrait: Sync + Send + 'static {
         check_only: bool,
         // True if a Bypasser let this request bypass the Checkers.
         did_bypass_checkers: bool,
-    ) -> Result<Vec<SignedTransaction>, AptosTapError>;
+    ) -> Result<Vec<DeprecatedSignedUserTransaction>, AptosTapError>;
 
     /// Given a requested amount and any configuration internal to this funder,
     /// determine the amount that can be funded.

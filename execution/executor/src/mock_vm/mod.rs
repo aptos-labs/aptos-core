@@ -25,9 +25,10 @@ use aptos_types::{
     },
     state_store::state_key::StateKey,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, ChangeSet, ExecutionStatus,
-        RawTransaction, Script, SignedTransaction, Transaction, TransactionArgument,
-        TransactionOutput, TransactionPayload, TransactionStatus, WriteSetPayload,
+        signature_verified_transaction::SignatureVerifiedTransaction, ChangeSet,
+        RawTransaction, DeprecatedSignedUserTransaction, ExecutionStatus, Script,
+        Transaction, TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
+        WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -143,7 +144,7 @@ impl VMExecutor for MockVM {
                         0,
                         KEEP_STATUS.clone(),
                     ));
-                },
+                }
                 MockVMTransaction::Payment {
                     sender,
                     recipient,
@@ -184,7 +185,7 @@ impl VMExecutor for MockVM {
                         0,
                         TransactionStatus::Keep(ExecutionStatus::Success),
                     ));
-                },
+                }
             }
         }
 
@@ -359,10 +360,11 @@ pub fn encode_transfer_transaction(
 }
 
 fn encode_transaction(sender: AccountAddress, program: Script) -> Transaction {
-    let raw_transaction = RawTransaction::new_script(sender, 0, program, 0, 0, 0, ChainId::test());
+    let raw_transaction =
+        RawTransaction::new_script(sender, 0, program, 0, 0, 0, ChainId::test());
 
     let privkey = Ed25519PrivateKey::generate_for_testing();
-    Transaction::UserTransaction(
+    Transaction::DeprecatedUserTransaction(
         raw_transaction
             .sign(&privkey, privkey.public_key())
             .expect("Failed to sign raw transaction.")
@@ -377,7 +379,7 @@ pub fn encode_reconfiguration_transaction() -> Transaction {
     )))
 }
 
-fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {
+fn decode_transaction(txn: &DeprecatedSignedUserTransaction) -> MockVMTransaction {
     let sender = txn.sender();
     match txn.payload() {
         TransactionPayload::Script(script) => {
@@ -396,7 +398,7 @@ fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {
                             recipient: *recipient,
                             amount: *amount,
                         }
-                    },
+                    }
                     _ => unimplemented!(
                         "The first argument for payment transaction must be recipient address \
                          and the second argument must be amount."
@@ -404,17 +406,17 @@ fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {
                 },
                 _ => unimplemented!("Transaction must have one or two arguments."),
             }
-        },
+        }
         TransactionPayload::EntryFunction(_) => {
             // TODO: we need to migrate Script to EntryFunction later
             unimplemented!("MockVM does not support entry function transaction payload.")
-        },
+        }
         TransactionPayload::Multisig(_) => {
             unimplemented!("MockVM does not support multisig transaction payload.")
-        },
+        }
         // Deprecated. Will be removed in the future.
         TransactionPayload::ModuleBundle(_) => {
             unimplemented!("MockVM does not support Module transaction payload.")
-        },
+        }
     }
 }

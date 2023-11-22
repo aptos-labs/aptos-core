@@ -73,7 +73,7 @@ pub fn get_test_signed_transaction(
     public_key: Ed25519PublicKey,
     payload: Option<TransactionPayload>,
 ) -> Transaction {
-    Transaction::UserTransaction(get_test_signed_txn(
+    Transaction::DeprecatedUserTransaction(get_test_signed_txn(
         sender,
         sequence_number,
         &private_key,

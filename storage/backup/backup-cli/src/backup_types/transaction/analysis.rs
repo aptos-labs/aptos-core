@@ -112,7 +112,7 @@ impl TransactionAnalysis {
         use Transaction::*;
 
         match txn {
-            UserTransaction(signed_txn) => signed_txn.raw_txn_bytes_len(),
+            DeprecatedUserTransaction(signed_txn) => signed_txn.raw_txn_bytes_len(),
             GenesisTransaction(_)
             | BlockMetadata(_)
             | StateCheckpoint(_)

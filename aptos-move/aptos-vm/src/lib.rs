@@ -128,8 +128,8 @@ use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::PartitionedTransactions,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
-        TransactionOutput, VMValidatorResult,
+        signature_verified_transaction::SignatureVerifiedTransaction,
+        DeprecatedSignedUserTransaction, TransactionOutput, VMValidatorResult,
     },
     vm_status::VMStatus,
 };
@@ -141,7 +141,7 @@ pub trait VMValidator {
     /// Executes the prologue of the Aptos Account and verifies that the transaction is valid.
     fn validate_transaction(
         &self,
-        transaction: SignedTransaction,
+        transaction: DeprecatedSignedUserTransaction,
         state_view: &impl StateView,
     ) -> VMValidatorResult;
 }

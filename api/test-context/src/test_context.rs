@@ -26,8 +26,8 @@ use aptos_sdk::{
     bcs,
     transaction_builder::TransactionFactory,
     types::{
-        account_config::aptos_test_root_address, transaction::SignedTransaction, AccountKey,
-        LocalAccount,
+        account_config::aptos_test_root_address, transaction::DeprecatedSignedUserTransaction,
+        AccountKey, LocalAccount,
     },
 };
 use aptos_storage_interface::{state_view::DbStateView, DbReaderWriter};
@@ -348,12 +348,18 @@ impl TestContext {
         account
     }
 
-    pub async fn create_user_account(&self, account: &LocalAccount) -> SignedTransaction {
+    pub async fn create_user_account(
+        &self,
+        account: &LocalAccount,
+    ) -> DeprecatedSignedUserTransaction {
         let mut tc = self.root_account().await;
         self.create_user_account_by(&mut tc, account)
     }
 
-    pub async fn mint_user_account(&self, account: &LocalAccount) -> SignedTransaction {
+    pub async fn mint_user_account(
+        &self,
+        account: &LocalAccount,
+    ) -> DeprecatedSignedUserTransaction {
         let tc = self.root_account().await;
         let factory = self.transaction_factory();
         tc.sign_with_transaction_builder(
@@ -493,7 +499,7 @@ impl TestContext {
         sender: &mut LocalAccount,
         receiver: &LocalAccount,
         amount: u64,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         self.account_transfer_to(sender, receiver.address(), amount)
     }
 
@@ -502,7 +508,7 @@ impl TestContext {
         sender: &mut LocalAccount,
         receiver: AccountAddress,
         amount: u64,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         let factory = self.transaction_factory();
         sender.sign_with_transaction_builder(
             factory
@@ -515,7 +521,7 @@ impl TestContext {
         &self,
         creator: &mut LocalAccount,
         account: &LocalAccount,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         let factory = self.transaction_factory();
         creator.sign_with_transaction_builder(
             factory
@@ -524,7 +530,9 @@ impl TestContext {
         )
     }
 
-    pub async fn create_invalid_signature_transaction(&mut self) -> SignedTransaction {
+    pub async fn create_invalid_signature_transaction(
+        &mut self,
+    ) -> DeprecatedSignedUserTransaction {
         let factory = self.transaction_factory();
         let root_account = self.root_account().await;
         let txn = factory
@@ -574,7 +582,7 @@ impl TestContext {
         &mut self,
         publisher: &mut LocalAccount,
         payload: TransactionPayload,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         let txn =
             publisher.sign_with_transaction_builder(self.transaction_factory().payload(payload));
         let bcs_txn = bcs::to_bytes(&txn).unwrap();
@@ -593,7 +601,7 @@ impl TestContext {
         }
     }
 
-    pub async fn commit_block(&mut self, signed_txns: &[SignedTransaction]) {
+    pub async fn commit_block(&mut self, signed_txns: &[DeprecatedSignedUserTransaction]) {
         let metadata = self.new_block_metadata();
         let timestamp = metadata.timestamp_usecs();
         let txns: Vec<Transaction> = std::iter::once(Transaction::BlockMetadata(metadata.clone()))
@@ -601,7 +609,7 @@ impl TestContext {
                 signed_txns
                     .iter()
                     .cloned()
-                    .map(Transaction::UserTransaction),
+                    .map(Transaction::DeprecatedUserTransaction),
             )
             .chain(once(Transaction::StateCheckpoint(metadata.id())))
             .collect();

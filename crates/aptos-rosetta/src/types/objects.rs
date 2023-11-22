@@ -875,7 +875,7 @@ impl Transaction {
     ) -> ApiResult<Transaction> {
         use aptos_types::transaction::Transaction::*;
         let (txn_type, maybe_user_txn, txn_info, events) = match &txn.transaction {
-            UserTransaction(user_txn) => {
+            DeprecatedUserTransaction(user_txn) => {
                 (TransactionType::User, Some(user_txn), txn.info, txn.events)
             },
             GenesisTransaction(_) => (TransactionType::Genesis, None, txn.info, txn.events),

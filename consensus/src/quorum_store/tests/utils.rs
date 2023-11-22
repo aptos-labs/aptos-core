@@ -8,11 +8,13 @@ use aptos_crypto::{
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
-    transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
+    transaction::{
+        RawTransaction, DeprecatedSignedUserTransaction, Script, TransactionPayload,
+    },
 };
 
 // Creates a single test transaction for a random account
-pub(crate) fn create_signed_transaction(gas_unit_price: u64) -> SignedTransaction {
+pub(crate) fn create_signed_transaction(gas_unit_price: u64) -> DeprecatedSignedUserTransaction {
     let private_key = Ed25519PrivateKey::generate_for_testing();
     let public_key = private_key.public_key();
 
@@ -26,21 +28,21 @@ pub(crate) fn create_signed_transaction(gas_unit_price: u64) -> SignedTransactio
         0,
         ChainId::new(10),
     );
-    SignedTransaction::new(
+    DeprecatedSignedUserTransaction::new(
         raw_transaction,
         public_key,
         Ed25519Signature::dummy_signature(),
     )
 }
 
-pub(crate) fn create_vec_signed_transactions(size: u64) -> Vec<SignedTransaction> {
+pub(crate) fn create_vec_signed_transactions(size: u64) -> Vec<DeprecatedSignedUserTransaction> {
     (0..size).map(|_| create_signed_transaction(1)).collect()
 }
 
 pub(crate) fn create_vec_signed_transactions_with_gas(
     size: u64,
     gas_unit_price: u64,
-) -> Vec<SignedTransaction> {
+) -> Vec<DeprecatedSignedUserTransaction> {
     (0..size)
         .map(|_| create_signed_transaction(gas_unit_price))
         .collect()

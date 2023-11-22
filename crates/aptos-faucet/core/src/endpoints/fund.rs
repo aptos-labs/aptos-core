@@ -17,7 +17,7 @@ use aptos_sdk::{
     crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt},
     types::{
         account_address::AccountAddress,
-        transaction::{authenticator::AuthenticationKey, SignedTransaction},
+        transaction::{authenticator::AuthenticationKey, DeprecatedSignedUserTransaction},
     },
 };
 use poem::{http::HeaderMap, web::RealIp};
@@ -286,7 +286,7 @@ impl FundApiComponents {
         // Same thing, this uses FromRequest.
         header_map: &HeaderMap,
         dry_run: bool,
-    ) -> poem::Result<Vec<SignedTransaction>, AptosTapError> {
+    ) -> poem::Result<Vec<DeprecatedSignedUserTransaction>, AptosTapError> {
         let (checker_data, bypass, _semaphore_permit) = self
             .preprocess_request(&fund_request, source_ip, header_map, dry_run)
             .await?;
@@ -300,7 +300,11 @@ impl FundApiComponents {
         // This might be empty if there is an error and we never got to the
         // point where we could submit a transaction.
         let txn_hashes = match &fund_result {
-            Ok(txns) => transaction_hashes(&txns.iter().collect::<Vec<&SignedTransaction>>()),
+            Ok(txns) => transaction_hashes(
+                &txns
+                    .iter()
+                    .collect::<Vec<&DeprecatedSignedUserTransaction>>(),
+            ),
             Err(e) => e.txn_hashes.to_vec(),
         };
 
@@ -407,7 +411,7 @@ pub async fn mint(
 }
 
 /// This returns long hashes with no 0x in front.
-fn get_hashes(txns: &[SignedTransaction]) -> Vec<String> {
+fn get_hashes(txns: &[DeprecatedSignedUserTransaction]) -> Vec<String> {
     txns.iter()
         .map(|t| t.clone().committed_hash().to_hex())
         .collect()

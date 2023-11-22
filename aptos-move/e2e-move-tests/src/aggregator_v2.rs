@@ -7,7 +7,8 @@ use aptos_language_e2e_tests::{
     executor::{ExecutorMode, FakeExecutor},
 };
 use aptos_types::{
-    account_address::AccountAddress, on_chain_config::FeatureFlag, transaction::SignedTransaction,
+    account_address::AccountAddress, on_chain_config::FeatureFlag,
+    transaction::DeprecatedSignedUserTransaction,
 };
 use move_core_types::{
     ident_str,
@@ -138,7 +139,7 @@ impl AggV2TestHarness {
     pub fn run_block_in_parts_and_check(
         &mut self,
         block_split: BlockSplit,
-        txn_block: Vec<(u64, SignedTransaction)>,
+        txn_block: Vec<(u64, DeprecatedSignedUserTransaction)>,
     ) {
         self.harness
             .run_block_in_parts_and_check(block_split, txn_block);
@@ -150,7 +151,7 @@ impl AggV2TestHarness {
         use_type: UseType,
         element_type: ElementType,
         aggregator: bool,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         self.harness.create_entry_function(
             account.unwrap_or(&self.account),
             str::parse(
@@ -171,7 +172,7 @@ impl AggV2TestHarness {
         name: &str,
         agg_loc: &AggregatorLocation,
         arguments: &[u128],
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         self.txn_index += 1;
 
         let mut args = vec![
@@ -190,7 +191,11 @@ impl AggV2TestHarness {
         )
     }
 
-    pub fn check(&mut self, agg_loc: &AggregatorLocation, expected: u128) -> SignedTransaction {
+    pub fn check(
+        &mut self,
+        agg_loc: &AggregatorLocation,
+        expected: u128,
+    ) -> DeprecatedSignedUserTransaction {
         self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::check", agg_loc, &[expected])
     }
 
@@ -198,7 +203,7 @@ impl AggV2TestHarness {
         &mut self,
         snap_loc: &AggregatorLocation,
         expected: u128,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         self.create_entry_agg_func_with_args(
             "0x1::aggregator_v2_test::check_snapshot",
             snap_loc,
@@ -207,23 +212,43 @@ impl AggV2TestHarness {
     }
 
     #[allow(clippy::new_ret_no_self)]
-    pub fn new(&mut self, agg_loc: &AggregatorLocation, max_value: u128) -> SignedTransaction {
+    pub fn new(
+        &mut self,
+        agg_loc: &AggregatorLocation,
+        max_value: u128,
+    ) -> DeprecatedSignedUserTransaction {
         self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::new", agg_loc, &[max_value])
     }
 
-    pub fn add(&mut self, agg_loc: &AggregatorLocation, value: u128) -> SignedTransaction {
+    pub fn add(
+        &mut self,
+        agg_loc: &AggregatorLocation,
+        value: u128,
+    ) -> DeprecatedSignedUserTransaction {
         self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::add", agg_loc, &[value])
     }
 
-    pub fn try_add(&mut self, agg_loc: &AggregatorLocation, value: u128) -> SignedTransaction {
+    pub fn try_add(
+        &mut self,
+        agg_loc: &AggregatorLocation,
+        value: u128,
+    ) -> DeprecatedSignedUserTransaction {
         self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::try_add", agg_loc, &[value])
     }
 
-    pub fn sub(&mut self, agg_loc: &AggregatorLocation, value: u128) -> SignedTransaction {
+    pub fn sub(
+        &mut self,
+        agg_loc: &AggregatorLocation,
+        value: u128,
+    ) -> DeprecatedSignedUserTransaction {
         self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::sub", agg_loc, &[value])
     }
 
-    pub fn try_sub(&mut self, agg_loc: &AggregatorLocation, value: u128) -> SignedTransaction {
+    pub fn try_sub(
+        &mut self,
+        agg_loc: &AggregatorLocation,
+        value: u128,
+    ) -> DeprecatedSignedUserTransaction {
         self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::try_sub", agg_loc, &[value])
     }
 
@@ -232,21 +257,31 @@ impl AggV2TestHarness {
         agg_loc: &AggregatorLocation,
         max_value: u128,
         a: u128,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::new_add", agg_loc, &[
             max_value, a,
         ])
     }
 
-    pub fn sub_add(&mut self, agg_loc: &AggregatorLocation, a: u128, b: u128) -> SignedTransaction {
+    pub fn sub_add(
+        &mut self,
+        agg_loc: &AggregatorLocation,
+        a: u128,
+        b: u128,
+    ) -> DeprecatedSignedUserTransaction {
         self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::sub_add", agg_loc, &[a, b])
     }
 
-    pub fn add_sub(&mut self, agg_loc: &AggregatorLocation, a: u128, b: u128) -> SignedTransaction {
+    pub fn add_sub(
+        &mut self,
+        agg_loc: &AggregatorLocation,
+        a: u128,
+        b: u128,
+    ) -> DeprecatedSignedUserTransaction {
         self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::add_sub", agg_loc, &[a, b])
     }
 
-    pub fn materialize(&mut self, agg_loc: &AggregatorLocation) -> SignedTransaction {
+    pub fn materialize(&mut self, agg_loc: &AggregatorLocation) -> DeprecatedSignedUserTransaction {
         self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::materialize", agg_loc, &[])
     }
 
@@ -254,7 +289,7 @@ impl AggV2TestHarness {
         &mut self,
         agg_loc: &AggregatorLocation,
         value: u128,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         self.create_entry_agg_func_with_args(
             "0x1::aggregator_v2_test::materialize_and_add",
             agg_loc,
@@ -266,7 +301,7 @@ impl AggV2TestHarness {
         &mut self,
         agg_loc: &AggregatorLocation,
         value: u128,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         self.create_entry_agg_func_with_args(
             "0x1::aggregator_v2_test::materialize_and_sub",
             agg_loc,
@@ -278,7 +313,7 @@ impl AggV2TestHarness {
         &mut self,
         agg_loc: &AggregatorLocation,
         value: u128,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         self.create_entry_agg_func_with_args(
             "0x1::aggregator_v2_test::add_and_materialize",
             agg_loc,
@@ -290,7 +325,7 @@ impl AggV2TestHarness {
         &mut self,
         agg_loc: &AggregatorLocation,
         value: u128,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         self.create_entry_agg_func_with_args(
             "0x1::aggregator_v2_test::sub_and_materialize",
             agg_loc,
@@ -304,7 +339,7 @@ impl AggV2TestHarness {
         agg_loc_b: &AggregatorLocation,
         value_a: u128,
         value_b: u128,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         self.txn_index += 1;
         self.harness.create_entry_function(
             &self.txn_accounts[self.txn_index % self.txn_accounts.len()],
@@ -330,7 +365,7 @@ impl AggV2TestHarness {
         &mut self,
         agg_loc: &AggregatorLocation,
         snap_loc: &AggregatorLocation,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         assert_eq!(agg_loc.element_type, snap_loc.element_type);
         self.txn_index += 1;
         self.harness.create_entry_function(
@@ -354,7 +389,7 @@ impl AggV2TestHarness {
         output_loc: &AggregatorLocation,
         prefix: &str,
         suffix: &str,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         assert_eq!(output_loc.element_type, ElementType::String);
         self.txn_index += 1;
         self.harness.create_entry_function(
@@ -374,7 +409,10 @@ impl AggV2TestHarness {
         )
     }
 
-    pub fn read_snapshot(&mut self, agg_loc: &AggregatorLocation) -> SignedTransaction {
+    pub fn read_snapshot(
+        &mut self,
+        agg_loc: &AggregatorLocation,
+    ) -> DeprecatedSignedUserTransaction {
         self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::read_snapshot", agg_loc, &[])
     }
 
@@ -382,7 +420,7 @@ impl AggV2TestHarness {
         &mut self,
         agg_loc: &AggregatorLocation,
         value: u128,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         self.create_entry_agg_func_with_args(
             "0x1::aggregator_v2_test::add_and_read_snapshot",
             agg_loc,
@@ -392,7 +430,7 @@ impl AggV2TestHarness {
 
     // idempotent verify functions:
 
-    pub fn verify_copy_snapshot(&mut self) -> SignedTransaction {
+    pub fn verify_copy_snapshot(&mut self) -> DeprecatedSignedUserTransaction {
         self.txn_index += 1;
         self.harness.create_entry_function(
             &self.txn_accounts[self.txn_index % self.txn_accounts.len()],
@@ -402,7 +440,7 @@ impl AggV2TestHarness {
         )
     }
 
-    pub fn verify_copy_string_snapshot(&mut self) -> SignedTransaction {
+    pub fn verify_copy_string_snapshot(&mut self) -> DeprecatedSignedUserTransaction {
         self.txn_index += 1;
         self.harness.create_entry_function(
             &self.txn_accounts[self.txn_index % self.txn_accounts.len()],
@@ -412,7 +450,7 @@ impl AggV2TestHarness {
         )
     }
 
-    pub fn verify_string_concat(&mut self) -> SignedTransaction {
+    pub fn verify_string_concat(&mut self) -> DeprecatedSignedUserTransaction {
         self.txn_index += 1;
         self.harness.create_entry_function(
             &self.txn_accounts[self.txn_index % self.txn_accounts.len()],
@@ -422,7 +460,7 @@ impl AggV2TestHarness {
         )
     }
 
-    pub fn verify_string_snapshot_concat(&mut self) -> SignedTransaction {
+    pub fn verify_string_snapshot_concat(&mut self) -> DeprecatedSignedUserTransaction {
         self.txn_index += 1;
         self.harness.create_entry_function(
             &self.txn_accounts[self.txn_index % self.txn_accounts.len()],

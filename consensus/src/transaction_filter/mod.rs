@@ -3,7 +3,7 @@
 
 use aptos_config::config::transaction_filter_type::Filter;
 use aptos_crypto::HashValue;
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::DeprecatedSignedUserTransaction;
 
 pub struct TransactionFilter {
     filter: Filter,
@@ -18,8 +18,8 @@ impl TransactionFilter {
         &self,
         block_id: HashValue,
         timestamp: u64,
-        txns: Vec<SignedTransaction>,
-    ) -> Vec<SignedTransaction> {
+        txns: Vec<DeprecatedSignedUserTransaction>,
+    ) -> Vec<DeprecatedSignedUserTransaction> {
         // Special case for no filter to avoid unnecessary iteration through all transactions in the default case
         if self.filter.is_empty() {
             return txns;
@@ -38,11 +38,14 @@ mod test {
     use aptos_types::{
         chain_id::ChainId,
         move_utils::MemberId,
-        transaction::{EntryFunction, RawTransaction, SignedTransaction, TransactionPayload},
+        transaction::{
+            RawTransaction, DeprecatedSignedUserTransaction, EntryFunction,
+            TransactionPayload,
+        },
     };
     use move_core_types::account_address::AccountAddress;
 
-    fn create_signed_transaction(function: MemberId) -> SignedTransaction {
+    fn create_signed_transaction(function: MemberId) -> DeprecatedSignedUserTransaction {
         let private_key = Ed25519PrivateKey::generate_for_testing();
         let public_key = private_key.public_key();
         let sender = AccountAddress::random();
@@ -58,17 +61,24 @@ mod test {
             vec![],
             vec![],
         ));
-        let raw_transaction =
-            RawTransaction::new(sender, sequence_number, payload, 0, 0, 0, ChainId::new(10));
+        let raw_transaction = RawTransaction::new(
+            sender,
+            sequence_number,
+            payload,
+            0,
+            0,
+            0,
+            ChainId::new(10),
+        );
 
-        SignedTransaction::new(
+        DeprecatedSignedUserTransaction::new(
             raw_transaction.clone(),
             public_key.clone(),
             private_key.sign(&raw_transaction).unwrap(),
         )
     }
 
-    fn get_transactions() -> Vec<SignedTransaction> {
+    fn get_transactions() -> Vec<DeprecatedSignedUserTransaction> {
         vec![
             create_signed_transaction(str::parse("0x1::test::add").unwrap()),
             create_signed_transaction(str::parse("0x1::test::check").unwrap()),
@@ -80,21 +90,21 @@ mod test {
         ]
     }
 
-    fn get_module_address(txn: &SignedTransaction) -> AccountAddress {
+    fn get_module_address(txn: &DeprecatedSignedUserTransaction) -> AccountAddress {
         match txn.payload() {
             TransactionPayload::EntryFunction(entry_func) => *entry_func.module().address(),
             _ => panic!("Unexpected transaction payload"),
         }
     }
 
-    fn get_module_name(txn: &SignedTransaction) -> String {
+    fn get_module_name(txn: &DeprecatedSignedUserTransaction) -> String {
         match txn.payload() {
             TransactionPayload::EntryFunction(entry_func) => entry_func.module().name().to_string(),
             _ => panic!("Unexpected transaction payload"),
         }
     }
 
-    fn get_function_name(txn: &SignedTransaction) -> String {
+    fn get_function_name(txn: &DeprecatedSignedUserTransaction) -> String {
         match txn.payload() {
             TransactionPayload::EntryFunction(entry_func) => entry_func.function().to_string(),
             _ => panic!("Unexpected transaction payload"),

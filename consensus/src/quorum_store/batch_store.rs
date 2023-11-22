@@ -17,7 +17,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorError, ExecutorResult};
 use aptos_logger::prelude::*;
 use aptos_types::{
-    transaction::SignedTransaction, validator_signer::ValidatorSigner,
+    transaction::DeprecatedSignedUserTransaction, validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier, PeerId,
 };
 use dashmap::{
@@ -398,7 +398,7 @@ pub trait BatchReader: Send + Sync {
     fn get_batch(
         &self,
         proof: ProofOfStore,
-    ) -> oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>;
+    ) -> oneshot::Receiver<ExecutorResult<Vec<DeprecatedSignedUserTransaction>>>;
 }
 
 impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for BatchStore<T> {
@@ -409,7 +409,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for Batch
     fn get_batch(
         &self,
         proof: ProofOfStore,
-    ) -> oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>> {
+    ) -> oneshot::Receiver<ExecutorResult<Vec<DeprecatedSignedUserTransaction>>> {
         let (tx, rx) = oneshot::channel();
 
         if let Ok(mut value) = self.get_batch_from_local(proof.digest()) {

@@ -10,8 +10,8 @@ use crate::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        Module, RawTransaction, RawTransactionWithData, Script, SignedTransaction, Transaction,
-        TransactionPayload,
+        RawTransaction, DeprecatedSignedUserTransaction, Module, RawTransactionWithData,
+        Script, Transaction, TransactionPayload,
     },
 };
 use aptos_crypto::{ed25519::*, traits::*, HashValue};
@@ -41,7 +41,7 @@ pub fn get_test_signed_module_publishing_transaction(
     private_key: &Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
     module: Module,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     let expiration_time = expiration_time(10);
     let raw_txn = RawTransaction::new_module(
         sender,
@@ -55,7 +55,7 @@ pub fn get_test_signed_module_publishing_transaction(
 
     let signature = private_key.sign(&raw_txn).unwrap();
 
-    SignedTransaction::new(raw_txn, public_key, signature)
+    DeprecatedSignedUserTransaction::new(raw_txn, public_key, signature)
 }
 
 // Test helper for transaction creation
@@ -68,7 +68,7 @@ pub fn get_test_signed_transaction(
     expiration_timestamp_secs: u64,
     gas_unit_price: u64,
     max_gas_amount: Option<u64>,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     let raw_txn = RawTransaction::new(
         sender,
         sequence_number,
@@ -83,7 +83,7 @@ pub fn get_test_signed_transaction(
 
     let signature = private_key.sign(&raw_txn).unwrap();
 
-    SignedTransaction::new(raw_txn, public_key, signature)
+    DeprecatedSignedUserTransaction::new(raw_txn, public_key, signature)
 }
 
 // Test helper for creating transactions for which the signature hasn't been checked.
@@ -96,7 +96,7 @@ pub fn get_test_unchecked_transaction(
     expiration_time: u64,
     gas_unit_price: u64,
     max_gas_amount: Option<u64>,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     get_test_unchecked_transaction_(
         sender,
         sequence_number,
@@ -121,7 +121,7 @@ fn get_test_unchecked_transaction_(
     gas_unit_price: u64,
     max_gas_amount: Option<u64>,
     chain_id: ChainId,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     let raw_txn = RawTransaction::new(
         sender,
         sequence_number,
@@ -134,7 +134,7 @@ fn get_test_unchecked_transaction_(
 
     let signature = private_key.sign(&raw_txn).unwrap();
 
-    SignedTransaction::new(raw_txn, public_key, signature)
+    DeprecatedSignedUserTransaction::new(raw_txn, public_key, signature)
 }
 
 // Test helper for transaction creation. Short version for get_test_signed_transaction
@@ -145,7 +145,7 @@ pub fn get_test_signed_txn(
     private_key: &Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
     payload: Option<TransactionPayload>,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     let expiration_time = expiration_time(10);
     get_test_signed_transaction(
         sender,
@@ -165,7 +165,7 @@ pub fn get_test_unchecked_txn(
     private_key: &Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
     payload: TransactionPayload,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     let expiration_time = expiration_time(10);
     get_test_unchecked_transaction(
         sender,
@@ -188,7 +188,7 @@ pub fn get_test_unchecked_multi_agent_txn(
     secondary_private_keys: Vec<&Ed25519PrivateKey>,
     secondary_public_keys: Vec<Ed25519PublicKey>,
     script: Option<Script>,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     let expiration_time = expiration_time(10);
     let raw_txn = RawTransaction::new(
         sender,
@@ -216,7 +216,7 @@ pub fn get_test_unchecked_multi_agent_txn(
         ));
     }
 
-    SignedTransaction::new_multi_agent(
+    DeprecatedSignedUserTransaction::new_multi_agent(
         raw_txn,
         sender_authenticator,
         secondary_signers,
@@ -230,7 +230,7 @@ pub fn get_test_txn_with_chain_id(
     private_key: &Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
     chain_id: ChainId,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     let expiration_time = expiration_time(10);
     let raw_txn = RawTransaction::new_script(
         sender,
@@ -244,7 +244,7 @@ pub fn get_test_txn_with_chain_id(
 
     let signature = private_key.sign(&raw_txn).unwrap();
 
-    SignedTransaction::new(raw_txn, public_key, signature)
+    DeprecatedSignedUserTransaction::new(raw_txn, public_key, signature)
 }
 
 pub fn block(

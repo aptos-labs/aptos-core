@@ -37,7 +37,7 @@ impl SignatureVerifiedTransaction {
     pub fn sender(&self) -> Option<AccountAddress> {
         match self {
             SignatureVerifiedTransaction::Valid(txn) => match txn {
-                Transaction::UserTransaction(txn) => Some(txn.sender()),
+                Transaction::DeprecatedUserTransaction(txn) => Some(txn.sender()),
                 _ => None,
             },
             SignatureVerifiedTransaction::Invalid(_) => None,
@@ -70,9 +70,13 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
 impl From<Transaction> for SignatureVerifiedTransaction {
     fn from(txn: Transaction) -> Self {
         match txn {
-            Transaction::UserTransaction(txn) => match txn.verify_signature() {
-                Ok(_) => SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)),
-                Err(_) => SignatureVerifiedTransaction::Invalid(Transaction::UserTransaction(txn)),
+            Transaction::DeprecatedUserTransaction(txn) => match txn.verify_signature() {
+                Ok(_) => {
+                    SignatureVerifiedTransaction::Valid(Transaction::DeprecatedUserTransaction(txn))
+                },
+                Err(_) => SignatureVerifiedTransaction::Invalid(
+                    Transaction::DeprecatedUserTransaction(txn),
+                ),
             },
             _ => SignatureVerifiedTransaction::Valid(txn),
         }

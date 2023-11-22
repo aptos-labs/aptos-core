@@ -14,7 +14,7 @@ use aptos_consensus_types::proof_of_store::{BatchId, BatchInfo};
 use aptos_crypto::HashValue;
 use aptos_temppath::TempPath;
 use aptos_types::{
-    account_address::AccountAddress, transaction::SignedTransaction,
+    account_address::AccountAddress, transaction::DeprecatedSignedUserTransaction,
     validator_verifier::random_validator_verifier,
 };
 use claims::{assert_err, assert_ok, assert_ok_eq};
@@ -60,7 +60,7 @@ fn request_for_test(
     digest: &HashValue,
     round: u64,
     num_bytes: u64,
-    maybe_payload: Option<Vec<SignedTransaction>>,
+    maybe_payload: Option<Vec<DeprecatedSignedUserTransaction>>,
 ) -> PersistedValue {
     PersistedValue::new(
         BatchInfo::new(

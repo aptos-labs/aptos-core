@@ -7,7 +7,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
 use aptos_types::{
-    account_address::AccountAddress, transaction::SignedTransaction,
+    account_address::AccountAddress, transaction::DeprecatedSignedUserTransaction,
     validator_verifier::ValidatorVerifier, vm_status::DiscardedVMStatus,
 };
 use rayon::prelude::*;
@@ -82,11 +82,11 @@ pub struct RejectedTransactionSummary {
 
 #[derive(Debug)]
 pub enum DataStatus {
-    Cached(Vec<SignedTransaction>),
+    Cached(Vec<DeprecatedSignedUserTransaction>),
     Requested(
         Vec<(
             HashValue,
-            oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>,
+            oneshot::Receiver<ExecutorResult<Vec<DeprecatedSignedUserTransaction>>>,
         )>,
     ),
 }
@@ -142,7 +142,7 @@ impl ProofWithData {
 /// The payload in block.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum Payload {
-    DirectMempool(Vec<SignedTransaction>),
+    DirectMempool(Vec<DeprecatedSignedUserTransaction>),
     InQuorumStore(ProofWithData),
 }
 

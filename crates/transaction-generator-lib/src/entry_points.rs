@@ -12,7 +12,7 @@ use crate::{
 };
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{transaction::DeprecatedSignedUserTransaction, LocalAccount},
 };
 use async_trait::async_trait;
 use rand::rngs::StdRng;
@@ -30,7 +30,7 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
         publisher: &mut LocalAccount,
         txn_factory: &TransactionFactory,
         rng: &mut StdRng,
-    ) -> Vec<SignedTransaction> {
+    ) -> Vec<DeprecatedSignedUserTransaction> {
         if let Some(initial_entry_point) = self.entry_point.initialize_entry_point() {
             let payload = initial_entry_point.create_payload(
                 package.get_module_id(initial_entry_point.module_name()),

@@ -21,7 +21,7 @@ use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress,
     mempool_status::{MempoolStatus, MempoolStatusCode},
-    transaction::SignedTransaction,
+    transaction::DeprecatedSignedUserTransaction,
     vm_status::DiscardedVMStatus,
 };
 use std::{
@@ -167,7 +167,7 @@ impl Mempool {
         }
     }
 
-    pub(crate) fn get_by_hash(&self, hash: HashValue) -> Option<SignedTransaction> {
+    pub(crate) fn get_by_hash(&self, hash: HashValue) -> Option<DeprecatedSignedUserTransaction> {
         self.transactions.get_by_hash(hash)
     }
 
@@ -175,7 +175,7 @@ impl Mempool {
     /// Performs basic validation: checks account's sequence number.
     pub(crate) fn add_txn(
         &mut self,
-        txn: SignedTransaction,
+        txn: DeprecatedSignedUserTransaction,
         ranking_score: u64,
         db_sequence_number: u64,
         timeline_state: TimelineState,
@@ -245,7 +245,7 @@ impl Mempool {
         return_non_full: bool,
         include_gas_upgraded: bool,
         exclude_transactions: BTreeMap<TransactionSummary, TransactionInProgress>,
-    ) -> Vec<SignedTransaction> {
+    ) -> Vec<DeprecatedSignedUserTransaction> {
         let start_time = Instant::now();
         let exclude_size = exclude_transactions.len();
         let mut seen = HashMap::new();
@@ -417,7 +417,10 @@ impl Mempool {
         &self,
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
-    ) -> (Vec<SignedTransaction>, MultiBucketTimelineIndexIds) {
+    ) -> (
+        Vec<DeprecatedSignedUserTransaction>,
+        MultiBucketTimelineIndexIds,
+    ) {
         self.transactions.read_timeline(timeline_id, count)
     }
 
@@ -425,7 +428,7 @@ impl Mempool {
     pub(crate) fn timeline_range(
         &self,
         start_end_pairs: &Vec<(u64, u64)>,
-    ) -> Vec<SignedTransaction> {
+    ) -> Vec<DeprecatedSignedUserTransaction> {
         self.transactions.timeline_range(start_end_pairs)
     }
 

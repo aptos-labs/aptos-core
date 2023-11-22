@@ -9,7 +9,7 @@ use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{transaction::DeprecatedSignedUserTransaction, LocalAccount},
 };
 use args::TransactionTypeArg;
 use async_trait::async_trait;
@@ -87,7 +87,7 @@ pub trait TransactionGenerator: Sync + Send {
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
-    ) -> Vec<SignedTransaction>;
+    ) -> Vec<DeprecatedSignedUserTransaction>;
 }
 
 #[async_trait]
@@ -109,7 +109,7 @@ pub trait ReliableTransactionSubmitter: Sync + Send {
 
     async fn query_sequence_number(&self, account_address: AccountAddress) -> Result<u64>;
 
-    async fn execute_transactions(&self, txns: &[SignedTransaction]) -> Result<()> {
+    async fn execute_transactions(&self, txns: &[DeprecatedSignedUserTransaction]) -> Result<()> {
         self.execute_transactions_with_counter(txns, &CounterState {
             submit_failures: vec![AtomicUsize::new(0)],
             wait_failures: vec![AtomicUsize::new(0)],
@@ -121,7 +121,7 @@ pub trait ReliableTransactionSubmitter: Sync + Send {
 
     async fn execute_transactions_with_counter(
         &self,
-        txns: &[SignedTransaction],
+        txns: &[DeprecatedSignedUserTransaction],
         state: &CounterState,
     ) -> Result<()>;
 
@@ -329,7 +329,7 @@ pub fn create_account_transaction(
     to: AccountAddress,
     txn_factory: &TransactionFactory,
     creation_balance: u64,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     from.sign_with_transaction_builder(txn_factory.payload(
         if creation_balance > 0 {
             aptos_stdlib::aptos_account_transfer(to, creation_balance)

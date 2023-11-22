@@ -32,9 +32,10 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     test_helpers::transaction_test_helpers::{block, BLOCK_GAS_LIMIT},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, ExecutionStatus,
-        RawTransaction, Script, SignedTransaction, Transaction, TransactionListWithProof,
-        TransactionOutput, TransactionPayload, TransactionStatus, Version,
+        signature_verified_transaction::SignatureVerifiedTransaction, RawTransaction,
+        DeprecatedSignedUserTransaction, ExecutionStatus, Script, Transaction,
+        TransactionListWithProof, TransactionOutput, TransactionPayload, TransactionStatus,
+        Version,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -435,13 +436,13 @@ fn create_test_transaction(sequence_number: u64) -> Transaction {
         0,
         ChainId::new(10),
     );
-    let signed_transaction = SignedTransaction::new(
+    let signed_transaction = DeprecatedSignedUserTransaction::new(
         raw_transaction.clone(),
         public_key,
         private_key.sign(&raw_transaction).unwrap(),
     );
 
-    Transaction::UserTransaction(signed_transaction)
+    Transaction::DeprecatedUserTransaction(signed_transaction)
 }
 
 fn apply_transaction_by_writeset(
@@ -533,15 +534,15 @@ fn test_deleted_key_from_state_store() {
         dummy_state_key1.clone(),
         WriteOp::Modification(dummy_value1.clone()),
     )])
-    .freeze()
-    .unwrap();
+        .freeze()
+        .unwrap();
 
     let write_set2 = WriteSetMut::new(vec![(
         dummy_state_key2.clone(),
         WriteOp::Modification(dummy_value2.clone()),
     )])
-    .freeze()
-    .unwrap();
+        .freeze()
+        .unwrap();
 
     apply_transaction_by_writeset(db, vec![
         (transaction1, write_set1),
@@ -708,7 +709,7 @@ fn run_transactions_naive(
                 .unwrap(),
             maybe_block_gas_limit,
         )
-        .unwrap();
+            .unwrap();
         let (executed, _, _) = out.apply_to_ledger(&ledger_view, None, None).unwrap();
         let next_ledger_view = executed.result_view();
         let ExecutedChunk {

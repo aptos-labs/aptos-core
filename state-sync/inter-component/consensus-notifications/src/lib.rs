@@ -281,7 +281,10 @@ mod tests {
         contract_event::ContractEvent,
         event::EventKey,
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-        transaction::{RawTransaction, Script, SignedTransaction, Transaction, TransactionPayload},
+        transaction::{
+            RawTransaction, DeprecatedSignedUserTransaction, Script, Transaction,
+            TransactionPayload,
+        },
     };
     use claims::{assert_err, assert_matches, assert_ok};
     use futures::{executor::block_on, FutureExt, StreamExt};
@@ -349,7 +352,7 @@ mod tests {
                         reconfiguration_events,
                         commit_notification.reconfiguration_events
                     );
-                },
+                }
                 result => panic!(
                     "Expected consensus commit notification but got: {:?}",
                     result
@@ -371,7 +374,7 @@ mod tests {
             Some(consensus_notification) => match consensus_notification {
                 ConsensusNotification::SyncToTarget(sync_notification) => {
                     assert_eq!(create_ledger_info(), sync_notification.target);
-                },
+                }
                 result => panic!("Expected consensus sync notification but got: {:?}", result),
             },
             result => panic!("Expected consensus notification but got: {:?}", result),
@@ -394,14 +397,14 @@ mod tests {
                         consensus_listener
                             .respond_to_commit_notification(commit_notification, Ok(())),
                     );
-                },
+                }
                 Some(ConsensusNotification::SyncToTarget(sync_notification)) => {
                     let _result = block_on(consensus_listener.respond_to_sync_notification(
                         sync_notification,
                         Err(Error::UnexpectedErrorEncountered("Oops?".into())),
                     ));
-                },
-                _ => { /* Do nothing */ },
+                }
+                _ => { /* Do nothing */ }
             }
         });
 
@@ -429,13 +432,13 @@ mod tests {
             0,
             ChainId::new(10),
         );
-        let signed_transaction = SignedTransaction::new(
+        let signed_transaction = DeprecatedSignedUserTransaction::new(
             raw_transaction.clone(),
             public_key,
             private_key.sign(&raw_transaction).unwrap(),
         );
 
-        Transaction::UserTransaction(signed_transaction)
+        Transaction::DeprecatedUserTransaction(signed_transaction)
     }
 
     fn create_contract_event() -> ContractEvent {

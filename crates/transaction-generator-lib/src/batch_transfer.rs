@@ -5,7 +5,7 @@ use aptos_infallible::RwLock;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{transaction::DeprecatedSignedUserTransaction, LocalAccount},
 };
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 use std::sync::Arc;
@@ -41,7 +41,7 @@ impl TransactionGenerator for BatchTransferTransactionGenerator {
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
-    ) -> Vec<SignedTransaction> {
+    ) -> Vec<DeprecatedSignedUserTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);
         for _ in 0..num_to_create {
             let receivers = self

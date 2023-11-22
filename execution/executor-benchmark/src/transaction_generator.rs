@@ -324,7 +324,7 @@ impl TransactionGenerator {
                             )
                         })
                         .borrow_mut();
-                    Transaction::UserTransaction(
+                    Transaction::DeprecatedUserTransaction(
                         transaction_generator
                             .generate_transactions(sender, 1)
                             .pop()
@@ -372,7 +372,7 @@ impl TransactionGenerator {
                                 seed_account_balance,
                             ),
                     );
-                    Transaction::UserTransaction(txn)
+                    Transaction::DeprecatedUserTransaction(txn)
                 })
                 .chain(once(Transaction::StateCheckpoint(HashValue::random())))
                 .collect();
@@ -428,7 +428,7 @@ impl TransactionGenerator {
                                 init_account_balance,
                             ),
                     );
-                    Transaction::UserTransaction(txn)
+                    Transaction::DeprecatedUserTransaction(txn)
                 },
                 |(sender_idx, _)| *sender_idx,
             );
@@ -623,7 +623,7 @@ impl TransactionGenerator {
                     self.transaction_factory
                         .transfer(account_cache.accounts[receiver_idx].address(), 1),
                 );
-                Transaction::UserTransaction(txn)
+                Transaction::DeprecatedUserTransaction(txn)
             },
             |(sender_idx, _)| *sender_idx,
         );

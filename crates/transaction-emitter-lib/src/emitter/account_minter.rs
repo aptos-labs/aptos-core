@@ -11,7 +11,7 @@ use aptos_logger::{error, info};
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{
-        transaction::{authenticator::AuthenticationKey, SignedTransaction},
+        transaction::{authenticator::AuthenticationKey, DeprecatedSignedUserTransaction},
         AccountKey, LocalAccount,
     },
 };
@@ -512,7 +512,7 @@ pub fn create_and_fund_account_request(
     amount: u64,
     pubkey: &Ed25519PublicKey,
     txn_factory: &TransactionFactory,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     let auth_key = AuthenticationKey::ed25519(pubkey);
     creation_account.sign_with_transaction_builder(txn_factory.payload(
         aptos_stdlib::aptos_account_transfer(auth_key.account_address(), amount),

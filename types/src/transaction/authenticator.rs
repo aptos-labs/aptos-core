@@ -130,10 +130,10 @@ impl TransactionAuthenticator {
     pub fn verify(&self, raw_txn: &RawTransaction) -> Result<()> {
         let num_sigs: usize = self.sender().number_of_signatures()
             + self
-                .secondary_signers()
-                .iter()
-                .map(|auth| auth.number_of_signatures())
-                .sum::<usize>();
+            .secondary_signers()
+            .iter()
+            .map(|auth| auth.number_of_signatures())
+            .sum::<usize>();
         if num_sigs > MAX_NUM_OF_SIGS {
             return Err(Error::new(AuthenticationError::MaxSignaturesExceeded));
         }
@@ -187,7 +187,7 @@ impl TransactionAuthenticator {
                 }
 
                 Ok(())
-            },
+            }
             Self::MultiEd25519 {
                 public_key,
                 signature,
@@ -206,7 +206,7 @@ impl TransactionAuthenticator {
                     signer.verify(&message)?;
                 }
                 Ok(())
-            },
+            }
             Self::SingleSender { sender } => sender.verify(raw_txn),
         }
     }
@@ -234,7 +234,7 @@ impl TransactionAuthenticator {
         match self {
             Self::Ed25519 { .. } | Self::MultiEd25519 { .. } | Self::SingleSender { .. } => {
                 vec![]
-            },
+            }
             Self::FeePayer {
                 sender: _,
                 secondary_signer_addresses,
@@ -252,7 +252,7 @@ impl TransactionAuthenticator {
         match self {
             Self::Ed25519 { .. } | Self::MultiEd25519 { .. } | Self::SingleSender { .. } => {
                 vec![]
-            },
+            }
             Self::FeePayer {
                 sender: _,
                 secondary_signer_addresses: _,
@@ -309,7 +309,7 @@ impl fmt::Display for TransactionAuthenticator {
                     "TransactionAuthenticator[scheme: Ed25519, sender: {}]",
                     self.sender()
                 )
-            },
+            }
             Self::FeePayer {
                 sender,
                 secondary_signer_addresses,
@@ -336,14 +336,14 @@ impl fmt::Display for TransactionAuthenticator {
                         \tfee payer signer: {}]",
                     sender, sec_addrs, sec_signers, fee_payer_address, fee_payer_signer,
                 )
-            },
+            }
             Self::MultiEd25519 { .. } => {
                 write!(
                     f,
                     "TransactionAuthenticator[scheme: MultiEd25519, sender: {}]",
                     self.sender()
                 )
-            },
+            }
             Self::MultiAgent {
                 sender,
                 secondary_signer_addresses,
@@ -366,14 +366,14 @@ impl fmt::Display for TransactionAuthenticator {
                         \tsecondary signers: {}]",
                     sender, sec_addrs, sec_signers,
                 )
-            },
+            }
             Self::SingleSender { sender } => {
                 write!(
                     f,
                     "TransactionAuthenticator[scheme: SingleSender, sender: {}]",
                     sender
                 )
-            },
+            }
         }
     }
 }
@@ -536,17 +536,17 @@ impl AccountAuthenticator {
 /// A struct that represents an account authentication key. An account's address is the last 32
 /// bytes of authentication key used to create it
 #[derive(
-    Clone,
-    Copy,
-    CryptoHasher,
-    Debug,
-    DeserializeKey,
-    Eq,
-    Hash,
-    Ord,
-    PartialEq,
-    PartialOrd,
-    SerializeKey,
+Clone,
+Copy,
+CryptoHasher,
+Debug,
+DeserializeKey,
+Eq,
+Hash,
+Ord,
+PartialEq,
+PartialOrd,
+SerializeKey,
 )]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct AuthenticationKey([u8; AuthenticationKey::LENGTH]);
@@ -738,7 +738,7 @@ impl MultiKeyAuthenticator {
     pub fn signatures(&self) -> Vec<(u8, AnySignature)> {
         let mut values = vec![];
         for (idx, signature) in
-            std::iter::zip(self.signatures_bitmap.iter_ones(), self.signatures.iter())
+        std::iter::zip(self.signatures_bitmap.iter_ones(), self.signatures.iter())
         {
             values.push((idx as u8, signature.clone()));
         }
@@ -777,7 +777,7 @@ impl MultiKeyAuthenticator {
             self.public_keys.len(),
         );
         for (idx, signature) in
-            std::iter::zip(self.signatures_bitmap.iter_ones(), self.signatures.iter())
+        std::iter::zip(self.signatures_bitmap.iter_ones(), self.signatures.iter())
         {
             signature.verify(&self.public_keys.public_keys[idx], message)?;
         }
@@ -903,10 +903,10 @@ impl AnySignature {
         match (self, public_key) {
             (Self::Ed25519 { signature }, AnyPublicKey::Ed25519 { public_key }) => {
                 signature.verify(message, public_key)
-            },
+            }
             (Self::Secp256k1Ecdsa { signature }, AnyPublicKey::Secp256k1Ecdsa { public_key }) => {
                 signature.verify(message, public_key)
-            },
+            }
             _ => bail!("Invalid key, signature pairing"),
         }
     }
@@ -939,7 +939,7 @@ impl AnyPublicKey {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::transaction::SignedTransaction;
+    use crate::transaction::DeprecatedSignedUserTransaction;
     use aptos_crypto::{
         ed25519::Ed25519PrivateKey, secp256k1_ecdsa, PrivateKey, SigningKey, Uniform,
     };
@@ -972,7 +972,7 @@ mod tests {
             0,
             None,
         )
-        .into_raw_transaction();
+            .into_raw_transaction();
 
         let signature = sender.sign(&raw_txn).unwrap();
         let sk_auth = SingleKeyAuthenticator::new(
@@ -980,7 +980,7 @@ mod tests {
             AnySignature::ed25519(signature),
         );
         let account_auth = AccountAuthenticator::single_key(sk_auth);
-        let signed_txn = SignedTransaction::new_single_sender(raw_txn, account_auth);
+        let signed_txn = DeprecatedSignedUserTransaction::new_single_sender(raw_txn, account_auth);
         signed_txn.verify_signature().unwrap();
     }
 
@@ -1006,7 +1006,7 @@ mod tests {
             0,
             None,
         )
-        .into_raw_transaction();
+            .into_raw_transaction();
 
         let signature = sender.sign(&raw_txn).unwrap();
         let sk_auth = SingleKeyAuthenticator::new(
@@ -1014,7 +1014,7 @@ mod tests {
             AnySignature::secp256k1_ecdsa(signature),
         );
         let account_auth = AccountAuthenticator::single_key(sk_auth);
-        let signed_txn = SignedTransaction::new_single_sender(raw_txn, account_auth);
+        let signed_txn = DeprecatedSignedUserTransaction::new_single_sender(raw_txn, account_auth);
         signed_txn.verify_signature().unwrap();
     }
 
@@ -1047,7 +1047,7 @@ mod tests {
             0,
             None,
         )
-        .into_raw_transaction();
+            .into_raw_transaction();
 
         let signature0 = AnySignature::ed25519(sender0.sign(&raw_txn).unwrap());
         let signature1 = AnySignature::secp256k1_ecdsa(sender1.sign(&raw_txn).unwrap());
@@ -1055,47 +1055,52 @@ mod tests {
         let mk_auth_0 =
             MultiKeyAuthenticator::new(multi_key.clone(), vec![(0, signature0.clone())]).unwrap();
         let account_auth = AccountAuthenticator::multi_key(mk_auth_0);
-        let signed_txn = SignedTransaction::new_single_sender(raw_txn.clone(), account_auth);
+        let signed_txn =
+            DeprecatedSignedUserTransaction::new_single_sender(raw_txn.clone(), account_auth);
         signed_txn.verify_signature().unwrap_err();
 
         let mk_auth_1 =
             MultiKeyAuthenticator::new(multi_key.clone(), vec![(1, signature1.clone())]).unwrap();
         let account_auth = AccountAuthenticator::multi_key(mk_auth_1);
-        let signed_txn = SignedTransaction::new_single_sender(raw_txn.clone(), account_auth);
+        let signed_txn =
+            DeprecatedSignedUserTransaction::new_single_sender(raw_txn.clone(), account_auth);
         signed_txn.verify_signature().unwrap_err();
 
         let mk_auth_01 = MultiKeyAuthenticator::new(multi_key.clone(), vec![
             (0, signature0.clone()),
             (1, signature1.clone()),
         ])
-        .unwrap();
+            .unwrap();
         let account_auth = AccountAuthenticator::multi_key(mk_auth_01);
-        let signed_txn = SignedTransaction::new_single_sender(raw_txn.clone(), account_auth);
+        let signed_txn =
+            DeprecatedSignedUserTransaction::new_single_sender(raw_txn.clone(), account_auth);
         signed_txn.verify_signature().unwrap();
 
         let mk_auth_02 = MultiKeyAuthenticator::new(multi_key.clone(), vec![
             (0, signature0.clone()),
             (2, signature1.clone()),
         ])
-        .unwrap();
+            .unwrap();
         let account_auth = AccountAuthenticator::multi_key(mk_auth_02);
-        let signed_txn = SignedTransaction::new_single_sender(raw_txn.clone(), account_auth);
+        let signed_txn =
+            DeprecatedSignedUserTransaction::new_single_sender(raw_txn.clone(), account_auth);
         signed_txn.verify_signature().unwrap();
 
         let mk_auth_12 = MultiKeyAuthenticator::new(multi_key.clone(), vec![
             (1, signature1.clone()),
             (2, signature1.clone()),
         ])
-        .unwrap();
+            .unwrap();
         let account_auth = AccountAuthenticator::multi_key(mk_auth_12);
-        let signed_txn = SignedTransaction::new_single_sender(raw_txn.clone(), account_auth);
+        let signed_txn =
+            DeprecatedSignedUserTransaction::new_single_sender(raw_txn.clone(), account_auth);
         signed_txn.verify_signature().unwrap();
 
         MultiKeyAuthenticator::new(multi_key.clone(), vec![
             (0, signature0.clone()),
             (0, signature0.clone()),
         ])
-        .unwrap_err();
+            .unwrap_err();
     }
 
     #[test]
@@ -1132,7 +1137,7 @@ mod tests {
             0,
             None,
         )
-        .into_raw_transaction();
+            .into_raw_transaction();
 
         let original_fee_payer = raw_txn
             .clone()

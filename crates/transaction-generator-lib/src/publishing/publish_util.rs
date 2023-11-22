@@ -7,7 +7,9 @@ use aptos_sdk::{
     bcs,
     move_types::{identifier::Identifier, language_storage::ModuleId},
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{account_address::AccountAddress, transaction::SignedTransaction, LocalAccount},
+    types::{
+        account_address::AccountAddress, transaction::DeprecatedSignedUserTransaction, LocalAccount,
+    },
 };
 use move_binary_format::{access::ModuleAccess, CompiledModule};
 use rand::{rngs::StdRng, Rng};
@@ -163,7 +165,7 @@ impl Package {
         &self,
         publisher: &LocalAccount,
         txn_factory: &TransactionFactory,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         match self {
             Self::Simple(modules, metadata) => {
                 publish_transaction(txn_factory, publisher, modules, metadata)
@@ -177,7 +179,7 @@ impl Package {
         rng: &mut StdRng,
         account: &LocalAccount,
         txn_factory: &TransactionFactory,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         // let payload = module_simple::rand_gen_function(rng, module_id);
         let payload = module_simple::rand_simple_function(rng, self.get_module_id("simple"));
         account.sign_with_transaction_builder(txn_factory.payload(payload))
@@ -262,7 +264,7 @@ fn publish_transaction(
     publisher: &LocalAccount,
     modules: &[(String, CompiledModule)],
     metadata: &PackageMetadata,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     let metadata = bcs::to_bytes(metadata).expect("PackageMetadata must serialize");
     let mut code: Vec<Vec<u8>> = vec![];
     for (_, module) in modules {

@@ -16,7 +16,7 @@ use aptos_types::{
     account_address::AccountAddress,
     transaction::{
         authenticator::{AuthenticationKey, TransactionAuthenticator},
-        EntryFunction, Script, SignedTransaction,
+        DeprecatedSignedUserTransaction, EntryFunction, Script,
     },
     utility_coin::APTOS_COIN_TYPE,
 };
@@ -379,7 +379,7 @@ async fn test_fee_payer_signed_transaction() {
                 fee_payer_address,
                 fee_payer_signer,
             );
-            SignedTransaction::new_signed_transaction(another_raw_txn, auth)
+            DeprecatedSignedUserTransaction::new_signed_transaction(another_raw_txn, auth)
         },
         _ => panic!(
             "expecting TransactionAuthenticator::FeePayer, but got: {:?}",
@@ -423,7 +423,7 @@ async fn test_multi_ed25519_signed_transaction() {
         .build();
 
     let signature = private_key.sign(&raw_txn).unwrap();
-    let txn = SignedTransaction::new_multisig(raw_txn, public_key, signature.clone());
+    let txn = DeprecatedSignedUserTransaction::new_multisig(raw_txn, public_key, signature.clone());
 
     let body = bcs::to_bytes(&txn).unwrap();
     let resp = context
@@ -585,7 +585,7 @@ async fn test_signing_message_with_entry_function_payload() {
 
 async fn test_signing_message_with_payload(
     mut context: TestContext,
-    txn: SignedTransaction,
+    txn: DeprecatedSignedUserTransaction,
     payload: serde_json::Value,
 ) {
     let sender = context.root_account().await;
@@ -1043,7 +1043,7 @@ async fn test_get_txn_execute_failed_by_invalid_entry_function(
 
 async fn test_transaction_vm_status(
     mut context: TestContext,
-    txn: SignedTransaction,
+    txn: DeprecatedSignedUserTransaction,
     success: bool,
 ) {
     let body = bcs::to_bytes(&txn).unwrap();
@@ -1197,7 +1197,7 @@ async fn test_gas_estimation_empty() {
 }
 
 async fn fill_block(
-    block: &mut Vec<SignedTransaction>,
+    block: &mut Vec<DeprecatedSignedUserTransaction>,
     ctx: &mut TestContext,
     creator: &mut LocalAccount,
 ) {

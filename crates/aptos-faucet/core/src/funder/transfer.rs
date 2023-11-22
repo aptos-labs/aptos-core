@@ -21,7 +21,9 @@ use aptos_sdk::{
     types::{
         account_address::AccountAddress,
         chain_id::ChainId,
-        transaction::{authenticator::AuthenticationKey, SignedTransaction, TransactionPayload},
+        transaction::{
+            authenticator::AuthenticationKey, DeprecatedSignedUserTransaction, TransactionPayload,
+        },
         LocalAccount,
     },
 };
@@ -173,7 +175,7 @@ impl TransferFunder {
         payload: TransactionPayload,
         // Only used for logging.
         receiver_address: &AccountAddress,
-    ) -> Result<SignedTransaction, AptosTapError> {
+    ) -> Result<DeprecatedSignedUserTransaction, AptosTapError> {
         // Build a transaction factory using the gas unit price from the
         // GasUnitPriceManager. This mostly ensures that we will build a
         // transaction with a gas unit price that will be accepted.
@@ -235,7 +237,7 @@ impl FunderTrait for TransferFunder {
         receiver_address: AccountAddress,
         check_only: bool,
         did_bypass_checkers: bool,
-    ) -> Result<Vec<SignedTransaction>, AptosTapError> {
+    ) -> Result<Vec<DeprecatedSignedUserTransaction>, AptosTapError> {
         // Confirm the funder has sufficient balance, return a 500 if not. This
         // will only happen briefly, soon after we get into this state the LB
         // will deregister this instance based on the health check responses

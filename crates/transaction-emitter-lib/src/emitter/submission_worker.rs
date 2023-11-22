@@ -12,7 +12,7 @@ use aptos_logger::{info, sample, sample::SampleRate, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
-    types::{transaction::SignedTransaction, vm_status::StatusCode, LocalAccount},
+    types::{transaction::DeprecatedSignedUserTransaction, vm_status::StatusCode, LocalAccount},
 };
 use aptos_transaction_generator_lib::TransactionGenerator;
 use core::{
@@ -289,7 +289,7 @@ impl SubmissionWorker {
         }
     }
 
-    fn gen_requests(&mut self) -> Vec<SignedTransaction> {
+    fn gen_requests(&mut self) -> Vec<DeprecatedSignedUserTransaction> {
         let batch_size = max(
             1,
             min(
@@ -314,7 +314,7 @@ impl SubmissionWorker {
 
 pub async fn submit_transactions(
     client: &RestClient,
-    txns: &[SignedTransaction],
+    txns: &[DeprecatedSignedUserTransaction],
     loop_start_time: Instant,
     txn_offset_time: Arc<AtomicU64>,
     stats: &StatsAccumulator,

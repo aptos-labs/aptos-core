@@ -252,7 +252,7 @@ trait AnalyzedTransactionProvider {
 impl AnalyzedTransactionProvider for Transaction {
     fn get_read_write_hints(&self) -> (Vec<StorageLocation>, Vec<StorageLocation>) {
         match self {
-            Transaction::UserTransaction(signed_txn) => match signed_txn.payload() {
+            Transaction::DeprecatedUserTransaction(signed_txn) => match signed_txn.payload() {
                 TransactionPayload::EntryFunction(func) => {
                     match (
                         *func.module().address(),
@@ -267,7 +267,7 @@ impl AnalyzedTransactionProvider for Transaction {
                                 receiver_address,
                                 true,
                             )
-                        },
+                        }
                         (AccountAddress::ONE, "aptos_account", "transfer") => {
                             let sender_address = signed_txn.sender();
                             let receiver_address = bcs::from_bytes(&func.args()[0]).unwrap();
@@ -276,7 +276,7 @@ impl AnalyzedTransactionProvider for Transaction {
                                 receiver_address,
                                 false,
                             )
-                        },
+                        }
                         (AccountAddress::ONE, "aptos_account", "create_account") => {
                             let sender_address = signed_txn.sender();
                             let receiver_address = bcs::from_bytes(&func.args()[0]).unwrap();
@@ -284,7 +284,7 @@ impl AnalyzedTransactionProvider for Transaction {
                                 sender_address,
                                 receiver_address,
                             )
-                        },
+                        }
                         _ => todo!("Only coin transfer and create account transactions are supported for now")
                     }
                 },

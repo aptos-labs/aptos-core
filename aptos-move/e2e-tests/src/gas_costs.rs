@@ -9,7 +9,7 @@ use crate::{
     common_transactions::{create_account_txn, peer_to_peer_txn},
     executor::FakeExecutor,
 };
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::DeprecatedSignedUserTransaction;
 use once_cell::sync::Lazy;
 
 /// The gas each transaction is configured to reserve. If the gas available in the account,
@@ -237,7 +237,7 @@ pub static PEER_TO_PEER_NEW_RECEIVER_TOO_LOW_NEXT: Lazy<u64> = Lazy::new(|| {
     output[1].gas_used()
 });
 
-fn compute_gas_used(txn: SignedTransaction, executor: &mut FakeExecutor) -> u64 {
+fn compute_gas_used(txn: DeprecatedSignedUserTransaction, executor: &mut FakeExecutor) -> u64 {
     let output = &executor.execute_transaction(txn);
     output.gas_used()
 }

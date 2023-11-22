@@ -39,9 +39,9 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        RawTransaction, Script, SignedTransaction, Transaction, TransactionListWithProof,
-        TransactionOutput, TransactionOutputListWithProof, TransactionPayload, TransactionStatus,
-        Version,
+        RawTransaction, DeprecatedSignedUserTransaction, Script, Transaction,
+        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
+        TransactionPayload, TransactionStatus, Version,
     },
     write_set::WriteSet,
 };
@@ -86,11 +86,15 @@ pub struct MockAptosDataClient {
     pub aptos_data_client_config: AptosDataClientConfig,
     pub advertised_epoch_ending_ledger_infos: BTreeMap<Epoch, LedgerInfoWithSignatures>,
     pub advertised_synced_ledger_infos: Vec<LedgerInfoWithSignatures>,
-    pub data_beyond_highest_advertised: bool, // If true, data exists beyond the highest advertised
-    pub data_request_counter: Arc<Mutex<HashMap<DataRequest, u64>>>, // Tracks the number of times the same data request was made
+    pub data_beyond_highest_advertised: bool,
+    // If true, data exists beyond the highest advertised
+    pub data_request_counter: Arc<Mutex<HashMap<DataRequest, u64>>>,
+    // Tracks the number of times the same data request was made
     pub highest_epoch_ending_ledger_infos: BTreeMap<Epoch, LedgerInfoWithSignatures>,
-    pub limit_chunk_sizes: bool, // If true, responses will be truncated to emulate chunk and network limits
-    pub skip_emulate_network_latencies: bool, // If true, skips network latency emulation
+    pub limit_chunk_sizes: bool,
+    // If true, responses will be truncated to emulate chunk and network limits
+    pub skip_emulate_network_latencies: bool,
+    // If true, skips network latency emulation
     pub skip_timeout_verification: bool, // If true, skips timeout verification for incoming requests
 }
 
@@ -263,18 +267,18 @@ impl AptosDataClientInterface for MockAptosDataClient {
                 MIN_ADVERTISED_EPOCH_END,
                 MAX_ADVERTISED_EPOCH_END,
             )
-            .unwrap()],
+                .unwrap()],
             synced_ledger_infos: self.advertised_synced_ledger_infos.clone(),
             transactions: vec![CompleteDataRange::new(
                 MIN_ADVERTISED_TRANSACTION,
                 MAX_ADVERTISED_TRANSACTION,
             )
-            .unwrap()],
+                .unwrap()],
             transaction_outputs: vec![CompleteDataRange::new(
                 MIN_ADVERTISED_TRANSACTION_OUTPUT,
                 MAX_ADVERTISED_TRANSACTION_OUTPUT,
             )
-            .unwrap()],
+                .unwrap()],
         };
         GlobalDataSummary {
             advertised_data,
@@ -925,7 +929,7 @@ fn create_epoch_ending_ledger_infos(
             )
             .is_some()
         {
-            panic!("Duplicate epoch ending ledger info found! This should not occur!",);
+            panic!("Duplicate epoch ending ledger info found! This should not occur!", );
         }
         current_epoch += 1;
     }
@@ -990,9 +994,10 @@ fn create_transaction() -> Transaction {
         ChainId::new(10),
     );
     let signature = private_key.sign(&raw_transaction).unwrap();
-    let signed_transaction = SignedTransaction::new(raw_transaction, public_key, signature);
+    let signed_transaction =
+        DeprecatedSignedUserTransaction::new(raw_transaction, public_key, signature);
 
-    Transaction::UserTransaction(signed_transaction)
+    Transaction::DeprecatedUserTransaction(signed_transaction)
 }
 
 /// Creates an empty transaction output
@@ -1052,7 +1057,7 @@ pub async fn get_data_notification(
         Duration::from_secs(MAX_NOTIFICATION_TIMEOUT_SECS),
         stream_listener.select_next_some(),
     )
-    .await
+        .await
     {
         Ok(data_notification)
     } else {

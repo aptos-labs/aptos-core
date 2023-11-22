@@ -39,8 +39,8 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ValidatorSet,
     transaction::{
-        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
+        RawTransaction, DeprecatedSignedUserTransaction, ExecutionStatus, Script,
+        Transaction, TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
         TransactionPayload, TransactionStatus,
     },
     validator_verifier::ValidatorVerifier,
@@ -210,13 +210,13 @@ fn create_test_transaction(sequence_number: u64, code_bytes: Vec<u8>) -> Transac
         0,
         ChainId::new(10),
     );
-    let signed_transaction = SignedTransaction::new(
+    let signed_transaction = DeprecatedSignedUserTransaction::new(
         raw_transaction.clone(),
         public_key,
         private_key.sign(&raw_transaction).unwrap(),
     );
 
-    Transaction::UserTransaction(signed_transaction)
+    Transaction::DeprecatedUserTransaction(signed_transaction)
 }
 
 /// Creates a test transaction list with proof with the given sizes
@@ -418,7 +418,7 @@ pub async fn force_cache_update_notification(
             StorageServerSummary::default(),
             true,
         )
-        .await;
+            .await;
     }
 }
 
@@ -435,7 +435,7 @@ pub async fn force_optimistic_fetch_handler_to_run(
         false,
         true,
     )
-    .await;
+        .await;
 }
 
 /// This function forces the subscription handler to work
@@ -451,7 +451,7 @@ pub async fn force_subscription_handler_to_run(
         false,
         true,
     )
-    .await;
+        .await;
 }
 
 /// Sends a number of states request and processes the response
@@ -538,7 +538,7 @@ pub async fn send_output_subscription_request_batch(
             stream_request_index,
             Some(peer_network_id),
         )
-        .await;
+            .await;
 
         // Save the response receiver
         response_receivers.insert(stream_request_index, response_receiver);
@@ -577,7 +577,7 @@ pub async fn subscribe_to_transactions_or_outputs(
         stream_index,
         None,
     )
-    .await
+        .await
 }
 
 /// Creates and sends a request to subscribe to new transactions or outputs for the specified peer
@@ -630,7 +630,7 @@ pub async fn subscribe_to_transaction_outputs(
         stream_index,
         None,
     )
-    .await
+        .await
 }
 
 /// Creates and sends a request to subscribe to new transaction outputs for the specified peer
@@ -681,7 +681,7 @@ pub async fn subscribe_to_transactions(
         stream_index,
         None,
     )
-    .await
+        .await
 }
 
 /// Creates and sends a request to subscribe to new transactions for the specified peer
@@ -808,7 +808,7 @@ pub async fn verify_new_transaction_outputs_with_proof(
         DataResponse::NewTransactionOutputsWithProof((outputs_with_proof, ledger_info)) => {
             assert_eq!(outputs_with_proof, output_list_with_proof);
             assert_eq!(ledger_info, expected_ledger_info);
-        },
+        }
         response => panic!(
             "Expected new transaction outputs with proof but got: {:?}",
             response
@@ -834,7 +834,7 @@ pub async fn verify_new_transactions_with_proof(
         DataResponse::NewTransactionsWithProof((transactions_with_proof, ledger_info)) => {
             assert_eq!(transactions_with_proof, expected_transactions_with_proof);
             assert_eq!(ledger_info, expected_ledger_info);
-        },
+        }
         response => panic!(
             "Expected new transaction with proof but got: {:?}",
             response
@@ -854,9 +854,9 @@ pub async fn verify_new_transactions_or_outputs_with_proof(
     let response = mock_client.wait_for_response(receiver).await.unwrap();
     match response.get_data_response().unwrap() {
         DataResponse::NewTransactionsOrOutputsWithProof((
-            transactions_or_outputs_with_proof,
-            ledger_info,
-        )) => {
+                                                            transactions_or_outputs_with_proof,
+                                                            ledger_info,
+                                                        )) => {
             let (transactions_with_proof, outputs_with_proof) = transactions_or_outputs_with_proof;
             if let Some(transactions_with_proof) = transactions_with_proof {
                 assert_eq!(
@@ -870,7 +870,7 @@ pub async fn verify_new_transactions_or_outputs_with_proof(
                 );
             }
             assert_eq!(ledger_info, expected_ledger_info);
-        },
+        }
         response => panic!(
             "Expected new transaction outputs with proof but got: {:?}",
             response
@@ -903,7 +903,7 @@ pub async fn verify_output_subscription_response(
         expected_output_lists_with_proofs[stream_request_index as usize].clone(),
         expected_target_ledger_info,
     )
-    .await;
+        .await;
 }
 
 /// Verifies the state of an active subscription stream entry.
@@ -968,7 +968,7 @@ pub async fn wait_for_active_optimistic_fetches(
             expected_num_active_fetches
         ),
     )
-    .await;
+        .await;
 }
 
 /// Waits for the specified number of active stream requests for
@@ -1005,7 +1005,7 @@ pub async fn wait_for_active_stream_requests(
             expected_num_active_stream_requests
         ),
     )
-    .await;
+        .await;
 }
 
 /// Waits for the specified number of subscriptions to be active
@@ -1034,7 +1034,7 @@ pub async fn wait_for_active_subscriptions(
             expected_num_active_subscriptions
         ),
     )
-    .await;
+        .await;
 }
 
 /// Waits for the cached storage summary to update
@@ -1054,9 +1054,9 @@ async fn wait_for_cached_summary_update(
             .await
             .unwrap()
             == StorageServiceResponse::new(
-                DataResponse::StorageServerSummary(old_storage_server_summary.clone()),
-                true,
-            )
+            DataResponse::StorageServerSummary(old_storage_server_summary.clone()),
+            true,
+        )
             .unwrap()
         {
             // Advance the storage refresh time
@@ -1074,11 +1074,11 @@ async fn wait_for_cached_summary_update(
         storage_summary_updated,
         "Timed-out while waiting for the cached storage summary to update!",
     )
-    .await;
+        .await;
 }
 
 /// Spawns the given task with a timeout
-pub async fn spawn_with_timeout(task: impl Future<Output = ()>, timeout_error_message: &str) {
+pub async fn spawn_with_timeout(task: impl Future<Output=()>, timeout_error_message: &str) {
     let timeout_duration = Duration::from_secs(MAX_WAIT_TIME_SECS);
     timeout(timeout_duration, task)
         .await

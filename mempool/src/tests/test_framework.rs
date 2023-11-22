@@ -46,7 +46,7 @@ use aptos_types::{
     account_address::AccountAddress,
     mempool_status::MempoolStatusCode,
     on_chain_config::{InMemoryOnChainConfig, OnChainConfigPayload},
-    transaction::SignedTransaction,
+    transaction::DeprecatedSignedUserTransaction,
 };
 use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
 use futures::{channel::oneshot, SinkExt};
@@ -215,7 +215,7 @@ impl MempoolNode {
     }
 
     fn assert_condition_on_mempool_txns<
-        Condition: FnOnce(&[SignedTransaction], &[TestTransaction]) -> bool,
+        Condition: FnOnce(&[DeprecatedSignedUserTransaction], &[TestTransaction]) -> bool,
     >(
         &self,
         txns: &[TestTransaction],
@@ -641,9 +641,9 @@ pub const fn test_transaction(seq_num: u64) -> TestTransaction {
     TestTransaction::new(1, seq_num, 1)
 }
 
-/// Tells us if a [`SignedTransaction`] block contains only the [`TestTransaction`]s
+/// Tells us if a [`DeprecatedSignedUserTransaction`] block contains only the [`TestTransaction`]s
 pub fn block_only_contains_transactions(
-    block: &[SignedTransaction],
+    block: &[DeprecatedSignedUserTransaction],
     txns: &[TestTransaction],
 ) -> bool {
     txns.iter()
@@ -651,18 +651,18 @@ pub fn block_only_contains_transactions(
         && block.len() == txns.len()
 }
 
-/// Tells us if a [`SignedTransaction`] block contains all the [`TestTransaction`]s
+/// Tells us if a [`DeprecatedSignedUserTransaction`] block contains all the [`TestTransaction`]s
 pub fn block_contains_all_transactions(
-    block: &[SignedTransaction],
+    block: &[DeprecatedSignedUserTransaction],
     txns: &[TestTransaction],
 ) -> bool {
     txns.iter()
         .all(|txn| block_contains_transaction(block, txn))
 }
 
-/// Tells us if a [`SignedTransaction`] block contains any of the [`TestTransaction`]s
+/// Tells us if a [`DeprecatedSignedUserTransaction`] block contains any of the [`TestTransaction`]s
 pub fn block_contains_any_transaction(
-    block: &[SignedTransaction],
+    block: &[DeprecatedSignedUserTransaction],
     txns: &[TestTransaction],
 ) -> bool {
     txns.iter()
@@ -670,8 +670,11 @@ pub fn block_contains_any_transaction(
         && block.len() == txns.len()
 }
 
-/// Tells us if a [`SignedTransaction`] block contains the [`TestTransaction`]
-fn block_contains_transaction(block: &[SignedTransaction], txn: &TestTransaction) -> bool {
+/// Tells us if a [`DeprecatedSignedUserTransaction`] block contains the [`TestTransaction`]
+fn block_contains_transaction(
+    block: &[DeprecatedSignedUserTransaction],
+    txn: &TestTransaction,
+) -> bool {
     block.iter().any(|signed_txn| {
         signed_txn.sequence_number() == txn.sequence_number
             && signed_txn.sender() == TestTransaction::get_address(txn.address)
@@ -680,7 +683,7 @@ fn block_contains_transaction(block: &[SignedTransaction], txn: &TestTransaction
 }
 
 /// Signs [`TestTransaction`]s with a max gas amount
-pub fn sign_transactions(txns: &[TestTransaction]) -> Vec<SignedTransaction> {
+pub fn sign_transactions(txns: &[TestTransaction]) -> Vec<DeprecatedSignedUserTransaction> {
     txns.iter()
         .map(|txn| txn.make_signed_transaction_with_max_gas_amount(5))
         .collect()

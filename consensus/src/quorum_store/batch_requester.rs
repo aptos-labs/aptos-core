@@ -9,7 +9,7 @@ use crate::{
 use aptos_crypto::HashValue;
 use aptos_executor_types::*;
 use aptos_logger::prelude::*;
-use aptos_types::{transaction::SignedTransaction, PeerId};
+use aptos_types::{transaction::DeprecatedSignedUserTransaction, PeerId};
 use futures::{stream::FuturesUnordered, StreamExt};
 use rand::Rng;
 use std::time::Duration;
@@ -18,7 +18,7 @@ use tokio::{sync::oneshot, time};
 struct BatchRequesterState {
     signers: Vec<PeerId>,
     next_index: usize,
-    ret_tx: oneshot::Sender<ExecutorResult<Vec<SignedTransaction>>>,
+    ret_tx: oneshot::Sender<ExecutorResult<Vec<DeprecatedSignedUserTransaction>>>,
     num_retries: usize,
     retry_limit: usize,
 }
@@ -26,7 +26,7 @@ struct BatchRequesterState {
 impl BatchRequesterState {
     fn new(
         signers: Vec<PeerId>,
-        ret_tx: oneshot::Sender<ExecutorResult<Vec<SignedTransaction>>>,
+        ret_tx: oneshot::Sender<ExecutorResult<Vec<DeprecatedSignedUserTransaction>>>,
         retry_limit: usize,
     ) -> Self {
         Self {
@@ -65,7 +65,11 @@ impl BatchRequesterState {
     }
 
     // TODO: if None, then return an error to the caller
-    fn serve_request(self, digest: HashValue, maybe_payload: Option<Vec<SignedTransaction>>) {
+    fn serve_request(
+        self,
+        digest: HashValue,
+        maybe_payload: Option<Vec<DeprecatedSignedUserTransaction>>,
+    ) {
         if let Some(payload) = maybe_payload {
             trace!(
                 "QS: batch to oneshot, digest {}, tx {:?}",
@@ -130,7 +134,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
         &self,
         digest: HashValue,
         signers: Vec<PeerId>,
-        ret_tx: oneshot::Sender<ExecutorResult<Vec<SignedTransaction>>>,
+        ret_tx: oneshot::Sender<ExecutorResult<Vec<DeprecatedSignedUserTransaction>>>,
     ) {
         let mut request_state = BatchRequesterState::new(signers, ret_tx, self.retry_limit);
         let network_sender = self.network_sender.clone();

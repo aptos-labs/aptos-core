@@ -53,7 +53,7 @@ pub fn generate_p2p_txn(
     receiver: &AccountData,
     transfer_amount: u64,
 ) -> AnalyzedTransaction {
-    let txn = Transaction::UserTransaction(peer_to_peer_txn(
+    let txn = Transaction::DeprecatedUserTransaction(peer_to_peer_txn(
         sender.account(),
         receiver.account(),
         sender.sequence_number(),

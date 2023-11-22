@@ -3,19 +3,27 @@
 
 use crate::txn_hash_and_authenticator_deduper::TxnHashAndAuthenticatorDeduper;
 use aptos_logger::info;
-use aptos_types::{on_chain_config::TransactionDeduperType, transaction::SignedTransaction};
+use aptos_types::{
+    on_chain_config::TransactionDeduperType, transaction::DeprecatedSignedUserTransaction,
+};
 use std::sync::Arc;
 
 /// Interface to dedup transactions. The dedup filters duplicate transactions within a block.
 pub trait TransactionDeduper: Send + Sync {
-    fn dedup(&self, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction>;
+    fn dedup(
+        &self,
+        txns: Vec<DeprecatedSignedUserTransaction>,
+    ) -> Vec<DeprecatedSignedUserTransaction>;
 }
 
 /// No Op Deduper to maintain backward compatibility
 struct NoOpDeduper {}
 
 impl TransactionDeduper for NoOpDeduper {
-    fn dedup(&self, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
+    fn dedup(
+        &self,
+        txns: Vec<DeprecatedSignedUserTransaction>,
+    ) -> Vec<DeprecatedSignedUserTransaction> {
         txns
     }
 }

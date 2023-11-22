@@ -40,8 +40,9 @@ use aptos_sdk::{
 use aptos_types::{
     chain_id::ChainId,
     transaction::{
-        authenticator::AuthenticationKey, EntryFunction, MultisigTransactionPayload, Script,
-        SignedTransaction, TransactionArgument, TransactionPayload, TransactionStatus,
+        authenticator::AuthenticationKey, DeprecatedSignedUserTransaction, EntryFunction,
+        MultisigTransactionPayload, Script, TransactionArgument, TransactionPayload,
+        TransactionStatus,
     },
 };
 use async_trait::async_trait;
@@ -1628,7 +1629,7 @@ impl TransactionOptions {
                 .expiration_timestamp_secs(expiration_time_secs)
                 .build();
 
-            let signed_transaction = SignedTransaction::new(
+            let signed_transaction = DeprecatedSignedUserTransaction::new(
                 unsigned_transaction,
                 sender_public_key.clone(),
                 Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),

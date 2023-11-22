@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{error::FaucetClientError, Client, Result};
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::DeprecatedSignedUserTransaction;
 use move_core_types::account_address::AccountAddress;
 use reqwest::{Client as ReqwestClient, Response, Url};
 use std::time::Duration;
@@ -70,7 +70,7 @@ impl FaucetClient {
         }
 
         let bytes = hex::decode(body).map_err(FaucetClientError::decode)?;
-        let txns: Vec<SignedTransaction> =
+        let txns: Vec<DeprecatedSignedUserTransaction> =
             bcs::from_bytes(&bytes).map_err(FaucetClientError::decode)?;
 
         self.rest_client
@@ -98,7 +98,7 @@ impl FaucetClient {
         }
 
         let bytes = hex::decode(body).map_err(FaucetClientError::decode)?;
-        let txns: Vec<SignedTransaction> =
+        let txns: Vec<DeprecatedSignedUserTransaction> =
             bcs::from_bytes(&bytes).map_err(FaucetClientError::decode)?;
 
         self.rest_client

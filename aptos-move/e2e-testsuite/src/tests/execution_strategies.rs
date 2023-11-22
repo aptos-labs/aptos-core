@@ -17,11 +17,11 @@ use aptos_language_e2e_tests::{
     },
 };
 use aptos_types::{
-    transaction::{ExecutionStatus, SignedTransaction, TransactionStatus},
+    transaction::{DeprecatedSignedUserTransaction, ExecutionStatus, TransactionStatus},
     vm_status::VMStatus,
 };
 
-fn txn(seq_num: u64) -> SignedTransaction {
+fn txn(seq_num: u64) -> DeprecatedSignedUserTransaction {
     let account = Account::new();
     let aptos_root = Account::new_aptos_root();
     create_account_txn(&aptos_root, &account, seq_num)
@@ -124,7 +124,7 @@ fn test_execution_strategies() {
         println!("===========================================================================");
         let block = (0..10).map(txn).collect();
 
-        let mut exec = MultiExecutor::<SignedTransaction, VMStatus>::new();
+        let mut exec = MultiExecutor::<DeprecatedSignedUserTransaction, VMStatus>::new();
         exec.add_executor(RandomExecutor::from_os_rng());
         exec.add_executor(RandomExecutor::from_os_rng());
         exec.add_executor(RandomExecutor::from_os_rng());

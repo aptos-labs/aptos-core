@@ -14,7 +14,7 @@ use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     contract_event::ContractEvent,
-    transaction::{SignedTransaction, Transaction, TransactionStatus},
+    transaction::{DeprecatedSignedUserTransaction, Transaction, TransactionStatus},
 };
 use std::fmt::{Debug, Display, Formatter};
 
@@ -114,7 +114,7 @@ impl ExecutedBlock {
     pub fn transactions_to_commit(
         &self,
         validators: &[AccountAddress],
-        txns: Vec<SignedTransaction>,
+        txns: Vec<DeprecatedSignedUserTransaction>,
         block_gas_limit: Option<u64>,
     ) -> Vec<Transaction> {
         // reconfiguration suffix don't execute

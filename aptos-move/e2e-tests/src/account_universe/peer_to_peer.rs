@@ -7,7 +7,7 @@ use crate::{
     common_transactions::peer_to_peer_txn,
 };
 use aptos_types::{
-    transaction::{ExecutionStatus, SignedTransaction, TransactionStatus},
+    transaction::{DeprecatedSignedUserTransaction, ExecutionStatus, TransactionStatus},
     vm_status::StatusCode,
 };
 use move_core_types::{
@@ -34,7 +34,7 @@ impl AUTransactionGen for P2PTransferGen {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
-    ) -> (SignedTransaction, (TransactionStatus, u64)) {
+    ) -> (DeprecatedSignedUserTransaction, (TransactionStatus, u64)) {
         let AccountPair {
             account_1: sender,
             account_2: receiver,

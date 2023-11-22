@@ -39,7 +39,7 @@ use aptos_types::{
         state_key_prefix::StateKeyPrefix,
         state_value::StateValue,
     },
-    transaction::{SignedTransaction, TransactionWithProof, Version},
+    transaction::{DeprecatedSignedUserTransaction, TransactionWithProof, Version},
 };
 use aptos_utils::aptos_try;
 use aptos_vm::data_cache::AsMoveResolver;
@@ -173,7 +173,10 @@ impl Context {
         self.node_config.api.max_submit_transaction_batch_size
     }
 
-    pub async fn submit_transaction(&self, txn: SignedTransaction) -> Result<SubmissionStatus> {
+    pub async fn submit_transaction(
+        &self,
+        txn: DeprecatedSignedUserTransaction,
+    ) -> Result<SubmissionStatus> {
         let (req_sender, callback) = oneshot::channel();
         self.mp_sender
             .clone()
@@ -776,7 +779,7 @@ impl Context {
     pub async fn get_pending_transaction_by_hash(
         &self,
         hash: HashValue,
-    ) -> Result<Option<SignedTransaction>> {
+    ) -> Result<Option<DeprecatedSignedUserTransaction>> {
         let (req_sender, callback) = oneshot::channel();
 
         self.mp_sender

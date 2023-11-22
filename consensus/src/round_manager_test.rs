@@ -64,7 +64,7 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
     on_chain_config::OnChainConsensusConfig,
-    transaction::SignedTransaction,
+    transaction::DeprecatedSignedUserTransaction,
     validator_signer::ValidatorSigner,
     validator_verifier::{generate_validator_verifier, random_validator_verifier},
     waypoint::Waypoint,
@@ -103,7 +103,7 @@ pub struct NodeSetup {
     all_network_events: Box<dyn Stream<Item = Event<ConsensusMsg>> + Send + Unpin>,
     ordered_blocks_events: mpsc::UnboundedReceiver<OrderedBlocks>,
     mock_state_computer: Arc<MockStateComputer>,
-    _state_sync_receiver: mpsc::UnboundedReceiver<Vec<SignedTransaction>>,
+    _state_sync_receiver: mpsc::UnboundedReceiver<Vec<DeprecatedSignedUserTransaction>>,
     id: usize,
 }
 

@@ -6,7 +6,7 @@ use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::TransactionFactory,
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{transaction::DeprecatedSignedUserTransaction, LocalAccount},
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{sync::Arc, time::Duration};
@@ -76,7 +76,7 @@ impl TransactionGenerator for AccountGenerator {
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
-    ) -> Vec<SignedTransaction> {
+    ) -> Vec<DeprecatedSignedUserTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);
         let mut new_accounts = Vec::with_capacity(num_to_create);
         let mut new_account_addresses = Vec::with_capacity(num_to_create);

@@ -41,7 +41,7 @@ fn test_non_conflicting_txns() {
 
 fn get_account_seq_number(txn: &Transaction) -> (AccountAddress, u64) {
     match txn {
-        Transaction::UserTransaction(txn) => (txn.sender(), txn.sequence_number()),
+        Transaction::DeprecatedUserTransaction(txn) => (txn.sender(), txn.sequence_number()),
         _ => unreachable!("Only user transaction can be executed in executor"),
     }
 }

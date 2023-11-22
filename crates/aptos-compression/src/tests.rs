@@ -10,8 +10,8 @@ use aptos_types::{
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{
-        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
+        RawTransaction, DeprecatedSignedUserTransaction, ExecutionStatus, Script,
+        Transaction, TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
         TransactionPayload, TransactionStatus,
     },
     write_set::WriteSet,
@@ -57,7 +57,7 @@ fn test_compression_limits() {
         CompressionClient::StateSync,
         MAX_COMPRESSION_SIZE,
     )
-    .unwrap();
+        .unwrap();
     let maybe_decompressed_bytes = crate::decompress(
         &compressed_bytes,
         CompressionClient::StateSync,
@@ -75,13 +75,13 @@ fn test_compress_and_decompress<T: Debug + DeserializeOwned + PartialEq + Serial
         CompressionClient::StateSync,
         MAX_COMPRESSION_SIZE,
     )
-    .unwrap();
+        .unwrap();
     let decompressed_bytes = crate::decompress(
         &compressed_bytes,
         CompressionClient::StateSync,
         MAX_COMPRESSION_SIZE,
     )
-    .unwrap();
+        .unwrap();
     let decoded_object = bcs::from_bytes::<T>(&decompressed_bytes).unwrap();
 
     assert_eq!(object, decoded_object);
@@ -163,13 +163,13 @@ fn create_test_transaction(sequence_number: u64) -> Transaction {
         0,
         ChainId::new(10),
     );
-    let signed_transaction = SignedTransaction::new(
+    let signed_transaction = DeprecatedSignedUserTransaction::new(
         raw_transaction.clone(),
         public_key,
         private_key.sign(&raw_transaction).unwrap(),
     );
 
-    Transaction::UserTransaction(signed_transaction)
+    Transaction::DeprecatedUserTransaction(signed_transaction)
 }
 
 /// Creates a test transaction output list with proof

@@ -23,7 +23,7 @@ use aptos_logger::{prelude::*, Level};
 use aptos_types::{
     account_address::AccountAddress,
     mempool_status::{MempoolStatus, MempoolStatusCode},
-    transaction::SignedTransaction,
+    transaction::DeprecatedSignedUserTransaction,
 };
 use std::{
     cmp::max,
@@ -130,7 +130,7 @@ impl TransactionStore {
         &self,
         address: &AccountAddress,
         sequence_number: u64,
-    ) -> Option<SignedTransaction> {
+    ) -> Option<DeprecatedSignedUserTransaction> {
         if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
             return Some(txn.txn.clone());
         }
@@ -142,14 +142,14 @@ impl TransactionStore {
         &self,
         address: &AccountAddress,
         sequence_number: u64,
-    ) -> Option<(SignedTransaction, u64)> {
+    ) -> Option<(DeprecatedSignedUserTransaction, u64)> {
         if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
             return Some((txn.txn.clone(), txn.ranking_score));
         }
         None
     }
 
-    pub(crate) fn get_by_hash(&self, hash: HashValue) -> Option<SignedTransaction> {
+    pub(crate) fn get_by_hash(&self, hash: HashValue) -> Option<DeprecatedSignedUserTransaction> {
         match self.hash_index.get(&hash) {
             Some((address, seq)) => self.get(address, *seq),
             None => None,
@@ -580,7 +580,10 @@ impl TransactionStore {
         &self,
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
-    ) -> (Vec<SignedTransaction>, MultiBucketTimelineIndexIds) {
+    ) -> (
+        Vec<DeprecatedSignedUserTransaction>,
+        MultiBucketTimelineIndexIds,
+    ) {
         let mut batch = vec![];
         let mut batch_total_bytes: u64 = 0;
         let mut last_timeline_id = timeline_id.id_per_bucket.clone();
@@ -627,7 +630,7 @@ impl TransactionStore {
     pub(crate) fn timeline_range(
         &self,
         start_end_pairs: &Vec<(u64, u64)>,
-    ) -> Vec<SignedTransaction> {
+    ) -> Vec<DeprecatedSignedUserTransaction> {
         self.timeline_index
             .timeline_range(start_end_pairs)
             .iter()

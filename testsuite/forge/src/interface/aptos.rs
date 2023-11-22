@@ -14,7 +14,7 @@ use aptos_sdk::{
         account_address::AccountAddress,
         account_config::CORE_CODE_ADDRESS,
         chain_id::ChainId,
-        transaction::{authenticator::AuthenticationKey, SignedTransaction},
+        transaction::{authenticator::AuthenticationKey, DeprecatedSignedUserTransaction},
         LocalAccount,
     },
 };
@@ -300,7 +300,10 @@ pub async fn reconfig(
     submit_and_wait_reconfig(client, txn).await
 }
 
-pub async fn submit_and_wait_reconfig(client: &RestClient, txn: SignedTransaction) -> State {
+pub async fn submit_and_wait_reconfig(
+    client: &RestClient,
+    txn: DeprecatedSignedUserTransaction,
+) -> State {
     let state = client.get_ledger_information().await.unwrap().into_inner();
     let result = client.submit_and_wait(&txn).await;
     if let Err(e) = result {

@@ -25,7 +25,10 @@ use aptos_proptest_helpers::ValueGenerator;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
-    transaction::{EntryFunction, RawTransaction, Script, SignedTransaction, TransactionArgument},
+    transaction::{
+        RawTransaction, DeprecatedSignedUserTransaction, EntryFunction, Script,
+        TransactionArgument,
+    },
 };
 use move_core_types::{
     identifier::Identifier,
@@ -45,38 +48,38 @@ struct NumberToStringFormatter;
 impl Formatter for NumberToStringFormatter {
     // Formats u64 as a string
     fn write_u64<W>(&mut self, writer: &mut W, value: u64) -> io::Result<()>
-    where
-        W: ?Sized + Write,
+        where
+            W: ?Sized + Write,
     {
         write!(writer, "\"{}\"", value)
     }
 
     // Formats u128 as a string
     fn write_number_str<W>(&mut self, writer: &mut W, value: &str) -> io::Result<()>
-    where
-        W: ?Sized + io::Write,
+        where
+            W: ?Sized + io::Write,
     {
         write!(writer, "\"{}\"", value)
     }
 }
 
 #[cfg(test)]
-fn chain_id_strategy() -> impl Strategy<Value = u8> {
+fn chain_id_strategy() -> impl Strategy<Value=u8> {
     any::<u8>().prop_filter("no 0 chain id", |x| x > &0)
 }
 
 #[cfg(test)]
-fn coin_name_strategy() -> impl Strategy<Value = String> {
+fn coin_name_strategy() -> impl Strategy<Value=String> {
     string::string_regex("[a-zA-Z]+[0-9]?_Coin").unwrap()
 }
 
 #[cfg(test)]
-fn identifier_strategy() -> impl Strategy<Value = String> {
+fn identifier_strategy() -> impl Strategy<Value=String> {
     string::string_regex("[a-zA-Z]+[0-9]?").unwrap()
 }
 
 #[cfg(test)]
-fn type_tag_strategy() -> impl Strategy<Value = TypeTag> {
+fn type_tag_strategy() -> impl Strategy<Value=TypeTag> {
     let leaf = prop_oneof![
         1 => Just(TypeTag::Bool),
         1 => Just(TypeTag::U8),
@@ -117,7 +120,7 @@ impl Arg {
 }
 
 #[cfg(test)]
-fn arg_strategy() -> impl Strategy<Value = Arg> {
+fn arg_strategy() -> impl Strategy<Value=Arg> {
     prop_oneof![
         1 => any::<u8>().prop_map(Arg::new),
         1 => any::<u64>().prop_map(Arg::new),
@@ -128,7 +131,7 @@ fn arg_strategy() -> impl Strategy<Value = Arg> {
 }
 
 #[cfg(test)]
-fn entry_function_strategy() -> impl Strategy<Value = EntryFunction> {
+fn entry_function_strategy() -> impl Strategy<Value=EntryFunction> {
     (
         any::<AccountAddress>(),
         coin_name_strategy(),
@@ -147,7 +150,7 @@ fn entry_function_strategy() -> impl Strategy<Value = EntryFunction> {
 }
 
 #[cfg(test)]
-fn bytes_strategy() -> impl Strategy<Value = Vec<u8>> {
+fn bytes_strategy() -> impl Strategy<Value=Vec<u8>> {
     string::string_regex("[a-f0-9]+")
         .unwrap()
         .prop_filter("only even letters count", |s| s.len() % 2 == 0)
@@ -155,7 +158,7 @@ fn bytes_strategy() -> impl Strategy<Value = Vec<u8>> {
 }
 
 #[cfg(test)]
-fn transaction_argument_strategy() -> impl Strategy<Value = TransactionArgument> {
+fn transaction_argument_strategy() -> impl Strategy<Value=TransactionArgument> {
     prop_oneof![
         1 => any::<u8>().prop_map(TransactionArgument::U8),
         1 => any::<u64>().prop_map(TransactionArgument::U64),
@@ -167,7 +170,7 @@ fn transaction_argument_strategy() -> impl Strategy<Value = TransactionArgument>
 }
 
 #[cfg(test)]
-fn script_strategy() -> impl Strategy<Value = Script> {
+fn script_strategy() -> impl Strategy<Value=Script> {
     (
         bytes_strategy(),
         collection::vec(type_tag_strategy(), 0..=10),
@@ -212,7 +215,7 @@ fn sign_transaction(raw_txn: RawTransaction) -> serde_json::Value {
     let public_key = Ed25519PublicKey::from(&private_key);
 
     let signature = private_key.sign(&raw_txn).unwrap();
-    let txn = SignedTransaction::new(raw_txn.clone(), public_key, signature);
+    let txn = DeprecatedSignedUserTransaction::new(raw_txn.clone(), public_key, signature);
 
     let mut raw_txn_json_out = Vec::new();
     let formatter = NumberToStringFormatter;

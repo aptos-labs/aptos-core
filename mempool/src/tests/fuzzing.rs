@@ -14,7 +14,7 @@ use aptos_network::{
     protocols::wire::handshake::v1::ProtocolId::MempoolDirectSend,
 };
 use aptos_storage_interface::mock::MockDbReaderWriter;
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::DeprecatedSignedUserTransaction;
 use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
 use proptest::{
     arbitrary::any,
@@ -24,9 +24,9 @@ use proptest::{
 use std::{collections::HashMap, sync::Arc};
 
 pub fn mempool_incoming_transactions_strategy(
-) -> impl Strategy<Value = (Vec<SignedTransaction>, TimelineState)> {
+) -> impl Strategy<Value = (Vec<DeprecatedSignedUserTransaction>, TimelineState)> {
     (
-        proptest::collection::vec(any::<SignedTransaction>(), 0..100),
+        proptest::collection::vec(any::<DeprecatedSignedUserTransaction>(), 0..100),
         prop_oneof![
             Just(TimelineState::NotReady),
             Just(TimelineState::NonQualified)
@@ -35,7 +35,7 @@ pub fn mempool_incoming_transactions_strategy(
 }
 
 pub fn test_mempool_process_incoming_transactions_impl(
-    txns: Vec<SignedTransaction>,
+    txns: Vec<DeprecatedSignedUserTransaction>,
     timeline_state: TimelineState,
 ) {
     let config = NodeConfig::default();

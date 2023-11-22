@@ -43,7 +43,7 @@ fn execute_genesis_and_drop_other_transaction() {
     let txn2 = peer_to_peer_txn(sender.account(), receiver.account(), 11, 1000, 0);
 
     let mut output = executor
-        .execute_transaction_block(vec![txn, Transaction::UserTransaction(txn2)])
+        .execute_transaction_block(vec![txn, Transaction::DeprecatedUserTransaction(txn2)])
         .unwrap();
 
     // Transaction that comes after genesis should be dropped.

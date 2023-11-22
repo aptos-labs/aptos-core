@@ -6,7 +6,7 @@ use crate::{
 use aptos_infallible::RwLock;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{transaction::DeprecatedSignedUserTransaction, LocalAccount},
 };
 use rand::{rngs::StdRng, SeedableRng};
 use std::sync::Arc;
@@ -36,7 +36,7 @@ impl TransactionGenerator for PublishPackageGenerator {
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
-    ) -> Vec<SignedTransaction> {
+    ) -> Vec<DeprecatedSignedUserTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);
 
         // First publish the module and then use it

@@ -36,11 +36,12 @@ use aptos_types::{
     system_txn::SystemTransaction,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction,
-        EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
-        MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
+        DeprecatedSignedUserTransaction, EntryFunction, ExecutionError, ExecutionStatus,
+        ModuleBundle, Multisig, MultisigTransactionPayload, SignatureCheckedTransaction,
+        Transaction,
         Transaction::{
-            BlockMetadata as BlockMetadataTransaction, GenesisTransaction, StateCheckpoint,
-            UserTransaction,
+            BlockMetadata as BlockMetadataTransaction, DeprecatedUserTransaction,
+            GenesisTransaction, StateCheckpoint,
         },
         TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
         WriteSetPayload,
@@ -107,6 +108,7 @@ pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
 
 /// Remove this once the bundle is removed from the code.
 static MODULE_BUNDLE_DISALLOWED: AtomicBool = AtomicBool::new(true);
+
 pub fn allow_module_bundle_for_test() {
     MODULE_BUNDLE_DISALLOWED.store(false, Ordering::Relaxed);
 }
@@ -932,7 +934,7 @@ impl AptosVM {
                 },
                 Err(_err) => {
                     return Err(PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
-                        .finish(Location::Undefined))
+                        .finish(Location::Undefined));
                 },
             }
         }
@@ -1152,7 +1154,7 @@ impl AptosVM {
         &self,
         session: &mut SessionExt,
         resolver: &impl AptosMoveResolver,
-        transaction: &SignedTransaction,
+        transaction: &DeprecatedSignedUserTransaction,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         // Check transaction format.
@@ -1190,7 +1192,7 @@ impl AptosVM {
     fn execute_user_transaction_impl(
         &self,
         resolver: &impl AptosMoveResolver,
-        txn: &SignedTransaction,
+        txn: &DeprecatedSignedUserTransaction,
         log_context: &AdapterLogSchema,
         gas_meter: &mut impl AptosGasMeter,
     ) -> (VMStatus, VMOutput) {
@@ -1322,7 +1324,7 @@ impl AptosVM {
     fn execute_user_transaction(
         &self,
         resolver: &impl AptosMoveResolver,
-        txn: &SignedTransaction,
+        txn: &DeprecatedSignedUserTransaction,
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
         let balance = TransactionMetadata::new(txn).max_gas_amount();
@@ -1543,7 +1545,7 @@ impl AptosVM {
 
     /// Executes a SignedTransaction without performing signature verification.
     pub fn simulate_signed_transaction(
-        txn: &SignedTransaction,
+        txn: &DeprecatedSignedUserTransaction,
         state_view: &impl StateView,
     ) -> (VMStatus, TransactionOutput) {
         let resolver = state_view.as_move_resolver();
@@ -1700,7 +1702,7 @@ impl AptosVM {
                 )?;
                 (vm_status, output, Some("waypoint_write_set".to_string()))
             },
-            UserTransaction(txn) => {
+            DeprecatedUserTransaction(txn) => {
                 fail_point!("aptos_vm::execution::user_transaction");
                 let sender = txn.sender().to_hex();
                 let _timer = TXN_TOTAL_SECONDS.start_timer();
@@ -1711,7 +1713,7 @@ impl AptosVM {
                         // Type resolution failure can be triggered by user input when providing a bad type argument, skip this case.
                         StatusCode::TYPE_RESOLUTION_FAILURE
                         if vm_status.sub_status()
-                            == Some(move_core_types::vm_status::sub_status::type_resolution_failure::EUSER_TYPE_LOADING_FAILURE) => {},
+                            == Some(move_core_types::vm_status::sub_status::type_resolution_failure::EUSER_TYPE_LOADING_FAILURE) => {}
                         // The known Move function failure and type resolution failure could be a result of speculative execution. Use speculative logger.
                         StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION
                         | StatusCode::TYPE_RESOLUTION_FAILURE => {
@@ -1719,11 +1721,11 @@ impl AptosVM {
                                 log_context,
                                 format!(
                                     "[aptos_vm] Transaction breaking invariant violation. txn: {:?}, status: {:?}",
-                                    bcs::to_bytes::<SignedTransaction>(txn),
+                                    bcs::to_bytes::<DeprecatedSignedUserTransaction>(txn),
                                     vm_status
                                 ),
                             );
-                        },
+                        }
                         // Paranoid mode failure. We need to be alerted about this ASAP.
                         StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
                         if vm_status.sub_status()
@@ -1732,10 +1734,10 @@ impl AptosVM {
                                 error!(
                                 *log_context,
                                 "[aptos_vm] Transaction breaking paranoid mode. txn: {:?}, status: {:?}",
-                                bcs::to_bytes::<SignedTransaction>(txn),
+                                bcs::to_bytes::<DeprecatedSignedUserTransaction>(txn),
                                 vm_status,
                             );
-                            },
+                            }
                         // Paranoid mode failure but with reference counting
                         StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
                         if vm_status.sub_status()
@@ -1744,10 +1746,10 @@ impl AptosVM {
                                 error!(
                                 *log_context,
                                 "[aptos_vm] Transaction breaking paranoid mode. txn: {:?}, status: {:?}",
-                                bcs::to_bytes::<SignedTransaction>(txn),
+                                bcs::to_bytes::<DeprecatedSignedUserTransaction>(txn),
                                 vm_status,
                             );
-                            },
+                            }
                         // Ignore DelayedFields speculative errors as it can be intentionally triggered by parallel execution.
                         StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR => (),
                         // Ignore Storage Error as currently it sometimes wraps speculative errors
@@ -1760,10 +1762,10 @@ impl AptosVM {
                             error!(
                                 *log_context,
                                 "[aptos_vm] Transaction breaking invariant violation. txn: {:?}, status: {:?}",
-                                bcs::to_bytes::<SignedTransaction>(txn),
+                                bcs::to_bytes::<DeprecatedSignedUserTransaction>(txn),
                                 vm_status,
                             );
-                        },
+                        }
                     }
                 }
 
@@ -1880,7 +1882,7 @@ impl VMValidator for AptosVM {
     ///    We don't check this item for now and would execute the check at execution time.
     fn validate_transaction(
         &self,
-        transaction: SignedTransaction,
+        transaction: DeprecatedSignedUserTransaction,
         state_view: &impl StateView,
     ) -> VMValidatorResult {
         let _timer = TXN_VALIDATION_SECONDS.start_timer();
@@ -1891,7 +1893,7 @@ impl VMValidator for AptosVM {
             .get_features()
             .is_enabled(FeatureFlag::SINGLE_SENDER_AUTHENTICATOR)
         {
-            if let aptos_types::transaction::authenticator::TransactionAuthenticator::SingleSender{ .. } = transaction.authenticator_ref() {
+            if let aptos_types::transaction::authenticator::TransactionAuthenticator::SingleSender { .. } = transaction.authenticator_ref() {
                 return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
             }
         }
@@ -1933,7 +1935,7 @@ impl AptosSimulationVM {
     fn simulate_signed_transaction(
         &self,
         resolver: &impl AptosMoveResolver,
-        txn: &SignedTransaction,
+        txn: &DeprecatedSignedUserTransaction,
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
         // simulation transactions should not carry valid signatures, otherwise malicious fullnodes

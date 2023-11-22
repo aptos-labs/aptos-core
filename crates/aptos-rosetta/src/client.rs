@@ -177,7 +177,7 @@ impl RosettaClient {
             gas_unit_price,
             false,
         )
-        .await
+            .await
     }
 
     pub async fn transfer(
@@ -226,7 +226,7 @@ impl RosettaClient {
             gas_unit_price,
             false,
         )
-        .await
+            .await
     }
 
     pub async fn set_operator(
@@ -267,7 +267,7 @@ impl RosettaClient {
             gas_unit_price,
             old_operator.is_none(),
         )
-        .await
+            .await
     }
 
     pub async fn set_voter(
@@ -307,7 +307,7 @@ impl RosettaClient {
             gas_unit_price,
             operator.is_none(),
         )
-        .await
+            .await
     }
 
     pub async fn reset_lockup(
@@ -345,7 +345,7 @@ impl RosettaClient {
             gas_unit_price,
             operator.is_none(),
         )
-        .await
+            .await
     }
 
     pub async fn update_commission(
@@ -384,7 +384,7 @@ impl RosettaClient {
             gas_unit_price,
             operator.is_none(),
         )
-        .await
+            .await
     }
 
     pub async fn unlock_stake(
@@ -423,7 +423,7 @@ impl RosettaClient {
             gas_unit_price,
             operator.is_none(),
         )
-        .await
+            .await
     }
 
     pub async fn distribute_staking_rewards(
@@ -462,7 +462,7 @@ impl RosettaClient {
             gas_unit_price,
             false,
         )
-        .await
+            .await
     }
 
     pub async fn create_stake_pool(
@@ -507,7 +507,7 @@ impl RosettaClient {
             gas_unit_price,
             true,
         )
-        .await
+            .await
     }
 
     pub async fn add_delegated_stake(
@@ -547,7 +547,7 @@ impl RosettaClient {
             gas_unit_price,
             true,
         )
-        .await
+            .await
     }
 
     pub async fn unlock_delegated_stake(
@@ -586,7 +586,7 @@ impl RosettaClient {
             gas_unit_price,
             true,
         )
-        .await
+            .await
     }
 
     pub async fn withdraw_undelegated_stake(
@@ -625,7 +625,7 @@ impl RosettaClient {
             gas_unit_price,
             false,
         )
-        .await
+            .await
     }
 
     /// Retrieves the account address from the derivation path if there isn't an overriding account specified
@@ -768,8 +768,8 @@ impl RosettaClient {
             network_identifier,
             options: preprocess_response.options,
         })
-        .await
-        .map(|response| (response, public_keys))
+            .await
+            .map(|response| (response, public_keys))
     }
 
     /// Build an unsigned transaction

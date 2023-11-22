@@ -14,8 +14,9 @@ use aptos_types::{
     chain_id::ChainId,
     on_chain_config::{Features, OnChainConfig, TimedFeaturesBuilder},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
-        Transaction, TransactionInfo, TransactionOutput, TransactionPayload, Version,
+        signature_verified_transaction::SignatureVerifiedTransaction,
+        DeprecatedSignedUserTransaction, Transaction, TransactionInfo, TransactionOutput,
+        TransactionPayload, Version,
     },
     vm_status::VMStatus,
 };
@@ -66,7 +67,7 @@ impl AptosDebugger {
     pub fn execute_transaction_at_version_with_gas_profiler(
         &self,
         version: Version,
-        txn: SignedTransaction,
+        txn: DeprecatedSignedUserTransaction,
     ) -> Result<(VMStatus, VMOutput, TransactionGasLog)> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);

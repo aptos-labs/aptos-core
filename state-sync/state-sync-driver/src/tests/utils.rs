@@ -31,9 +31,9 @@ use aptos_types::{
     },
     state_store::state_value::StateValueChunkWithProof,
     transaction::{
-        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction, TransactionInfo,
-        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        TransactionPayload, TransactionStatus, Version,
+        RawTransaction, DeprecatedSignedUserTransaction, ExecutionStatus, Script,
+        Transaction, TransactionInfo, TransactionListWithProof, TransactionOutput,
+        TransactionOutputListWithProof, TransactionPayload, TransactionStatus, Version,
     },
     waypoint::Waypoint,
     write_set::WriteSet,
@@ -209,13 +209,13 @@ pub fn create_transaction() -> Transaction {
         0,
         ChainId::new(10),
     );
-    let signed_transaction = SignedTransaction::new(
+    let signed_transaction = DeprecatedSignedUserTransaction::new(
         raw_transaction,
         public_key,
         Ed25519Signature::dummy_signature(),
     );
 
-    Transaction::UserTransaction(signed_transaction)
+    Transaction::DeprecatedUserTransaction(signed_transaction)
 }
 
 /// Creates a test transaction info

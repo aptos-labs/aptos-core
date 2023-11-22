@@ -6,7 +6,8 @@ use anyhow::{Context, Result};
 use aptos_logger::{debug, sample, sample::SampleRate, warn};
 use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Client as RestClient};
 use aptos_sdk::{
-    move_types::account_address::AccountAddress, types::transaction::SignedTransaction,
+    move_types::account_address::AccountAddress,
+    types::transaction::DeprecatedSignedUserTransaction,
 };
 use aptos_transaction_generator_lib::{CounterState, ReliableTransactionSubmitter};
 use async_trait::async_trait;
@@ -39,7 +40,7 @@ impl RestApiReliableTransactionSubmitter {
 
     async fn submit_check_and_retry(
         &self,
-        txn: &SignedTransaction,
+        txn: &DeprecatedSignedUserTransaction,
         counters: &CounterState,
         run_seed: u64,
     ) -> Result<()> {
@@ -147,7 +148,7 @@ impl RestApiReliableTransactionSubmitter {
 async fn warn_detailed_error(
     call_name: &str,
     rest_client: &RestClient,
-    txn: &SignedTransaction,
+    txn: &DeprecatedSignedUserTransaction,
     err: Result<&aptos_types::transaction::TransactionInfo, &RestError>,
 ) {
     let sender = txn.sender();
@@ -196,7 +197,7 @@ async fn warn_detailed_error(
 
 async fn submit_and_check(
     rest_client: &RestClient,
-    txn: &SignedTransaction,
+    txn: &DeprecatedSignedUserTransaction,
     wait_duration: Duration,
     failed_submit: &mut bool,
     failed_wait: &mut bool,
@@ -290,7 +291,7 @@ impl ReliableTransactionSubmitter for RestApiReliableTransactionSubmitter {
 
     async fn execute_transactions_with_counter(
         &self,
-        txns: &[SignedTransaction],
+        txns: &[DeprecatedSignedUserTransaction],
         counters: &CounterState,
     ) -> Result<()> {
         let run_seed: u64 = thread_rng().gen();

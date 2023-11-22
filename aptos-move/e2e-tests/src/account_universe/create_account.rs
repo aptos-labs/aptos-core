@@ -14,7 +14,7 @@ use crate::{
 };
 use aptos_proptest_helpers::Index;
 use aptos_types::{
-    transaction::{ExecutionStatus, SignedTransaction, TransactionStatus},
+    transaction::{DeprecatedSignedUserTransaction, ExecutionStatus, TransactionStatus},
     vm_status::{AbortLocation, StatusCode},
 };
 use proptest::prelude::*;
@@ -37,7 +37,7 @@ impl AUTransactionGen for CreateAccountGen {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
-    ) -> (SignedTransaction, (TransactionStatus, u64)) {
+    ) -> (DeprecatedSignedUserTransaction, (TransactionStatus, u64)) {
         let sender = universe.pick(self.sender).1;
 
         let txn = create_account_txn(sender.account(), &self.new_account, sender.sequence_number);
@@ -82,7 +82,7 @@ impl AUTransactionGen for CreateExistingAccountGen {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
-    ) -> (SignedTransaction, (TransactionStatus, u64)) {
+    ) -> (DeprecatedSignedUserTransaction, (TransactionStatus, u64)) {
         let AccountPair {
             account_1: sender,
             account_2: receiver,

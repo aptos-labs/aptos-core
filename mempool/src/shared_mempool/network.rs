@@ -26,7 +26,7 @@ use aptos_network::{
     application::{error::Error, interface::NetworkClientInterface, metadata::PeerMetadata},
     transport::ConnectionMetadata,
 };
-use aptos_types::{transaction::SignedTransaction, PeerId};
+use aptos_types::{transaction::DeprecatedSignedUserTransaction, PeerId};
 use aptos_vm_validator::vm_validator::TransactionValidation;
 use fail::fail_point;
 use itertools::Itertools;
@@ -48,7 +48,7 @@ pub enum MempoolSyncMsg {
     BroadcastTransactionsRequest {
         /// Unique id of sync request. Can be used by sender for rebroadcast analysis
         request_id: MultiBatchId,
-        transactions: Vec<SignedTransaction>,
+        transactions: Vec<DeprecatedSignedUserTransaction>,
     },
     /// Broadcast ack issued by the receiver.
     BroadcastTransactionsResponse {
@@ -306,7 +306,14 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         peer: PeerNetworkId,
         scheduled_backoff: bool,
         smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
-    ) -> Result<(MultiBatchId, Vec<SignedTransaction>, Option<&str>), BroadcastError> {
+    ) -> Result<
+        (
+            MultiBatchId,
+            Vec<DeprecatedSignedUserTransaction>,
+            Option<&str>,
+        ),
+        BroadcastError,
+    > {
         let mut sync_states = self.sync_states.write();
         // If we don't have any info about the node, we shouldn't broadcast to it
         let state = sync_states
@@ -409,7 +416,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         &self,
         peer: PeerNetworkId,
         batch_id: MultiBatchId,
-        transactions: Vec<SignedTransaction>,
+        transactions: Vec<DeprecatedSignedUserTransaction>,
     ) -> Result<(), BroadcastError> {
         let request = MempoolSyncMsg::BroadcastTransactionsRequest {
             request_id: batch_id,

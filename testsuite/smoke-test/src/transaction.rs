@@ -12,7 +12,7 @@ use aptos_rest_client::{
 };
 use aptos_sdk::{
     crypto::{PrivateKey, SigningKey},
-    types::transaction::{authenticator::AuthenticationKey, SignedTransaction},
+    types::transaction::{authenticator::AuthenticationKey, DeprecatedSignedUserTransaction},
 };
 
 // TODO: debug me and re-enable the test!
@@ -73,7 +73,7 @@ async fn test_external_transaction_signer() {
     let signature = private_key.sign(&unsigned_txn).unwrap();
 
     // submit the transaction
-    let txn = SignedTransaction::new(unsigned_txn.clone(), public_key, signature);
+    let txn = DeprecatedSignedUserTransaction::new(unsigned_txn.clone(), public_key, signature);
     info.client().submit_and_wait(&txn).await.unwrap();
 
     // query the transaction and check it contains the same values as requested

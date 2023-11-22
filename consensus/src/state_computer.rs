@@ -361,7 +361,7 @@ async fn test_commit_sync_race() {
         block_info::BlockInfo,
         ledger_info::LedgerInfo,
         on_chain_config::{TransactionDeduperType, TransactionShufflerType},
-        transaction::SignedTransaction,
+        transaction::DeprecatedSignedUserTransaction,
     };
 
     struct RecordedCommit {
@@ -424,7 +424,7 @@ async fn test_commit_sync_race() {
     impl TxnNotifier for RecordedCommit {
         async fn notify_failed_txn(
             &self,
-            _txns: Vec<SignedTransaction>,
+            _txns: Vec<DeprecatedSignedUserTransaction>,
             _compute_results: &StateComputeResult,
             _block_gas_limit_enabled: bool,
         ) -> Result<(), MempoolError> {

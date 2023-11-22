@@ -3,7 +3,9 @@
 
 use super::FunderTrait;
 use crate::endpoints::AptosTapError;
-use aptos_sdk::types::{account_address::AccountAddress, transaction::SignedTransaction};
+use aptos_sdk::types::{
+    account_address::AccountAddress, transaction::DeprecatedSignedUserTransaction,
+};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
@@ -20,7 +22,7 @@ impl FunderTrait for FakeFunder {
         _receiver_address: AccountAddress,
         _check_only: bool,
         _did_bypass_checkers: bool,
-    ) -> Result<Vec<SignedTransaction>, AptosTapError> {
+    ) -> Result<Vec<DeprecatedSignedUserTransaction>, AptosTapError> {
         Ok(vec![])
     }
 

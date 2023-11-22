@@ -24,7 +24,7 @@ use crate::{
     gas_costs, transaction_status_eq,
 };
 use aptos_types::{
-    transaction::{ExecutionStatus, SignedTransaction, TransactionStatus},
+    transaction::{DeprecatedSignedUserTransaction, ExecutionStatus, TransactionStatus},
     vm_status::{known_locations, StatusCode},
 };
 pub use bad_transaction::*;
@@ -93,7 +93,7 @@ pub trait AUTransactionGen: fmt::Debug {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
-    ) -> (SignedTransaction, (TransactionStatus, u64));
+    ) -> (DeprecatedSignedUserTransaction, (TransactionStatus, u64));
 
     /// Creates an arced version of this transaction, suitable for dynamic dispatch.
     fn arced(self) -> Arc<dyn AUTransactionGen>
@@ -108,7 +108,7 @@ impl AUTransactionGen for Arc<dyn AUTransactionGen> {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
-    ) -> (SignedTransaction, (TransactionStatus, u64)) {
+    ) -> (DeprecatedSignedUserTransaction, (TransactionStatus, u64)) {
         (**self).apply(universe)
     }
 }

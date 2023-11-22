@@ -22,7 +22,8 @@ use aptos_network::{
 };
 use aptos_storage_interface::DbReader;
 use aptos_types::{
-    mempool_status::MempoolStatus, transaction::SignedTransaction, vm_status::DiscardedVMStatus,
+    mempool_status::MempoolStatus, transaction::DeprecatedSignedUserTransaction,
+    vm_status::DiscardedVMStatus,
 };
 use aptos_vm_validator::vm_validator::TransactionValidation;
 use futures::{
@@ -221,17 +222,23 @@ impl fmt::Display for QuorumStoreRequest {
 #[derive(Debug)]
 pub enum QuorumStoreResponse {
     /// Block to submit to consensus
-    GetBatchResponse(Vec<SignedTransaction>),
+    GetBatchResponse(Vec<DeprecatedSignedUserTransaction>),
     CommitResponse(),
 }
 
 pub type SubmissionStatus = (MempoolStatus, Option<DiscardedVMStatus>);
 
-pub type SubmissionStatusBundle = (SignedTransaction, SubmissionStatus);
+pub type SubmissionStatusBundle = (DeprecatedSignedUserTransaction, SubmissionStatus);
 
 pub enum MempoolClientRequest {
-    SubmitTransaction(SignedTransaction, oneshot::Sender<Result<SubmissionStatus>>),
-    GetTransactionByHash(HashValue, oneshot::Sender<Option<SignedTransaction>>),
+    SubmitTransaction(
+        DeprecatedSignedUserTransaction,
+        oneshot::Sender<Result<SubmissionStatus>>,
+    ),
+    GetTransactionByHash(
+        HashValue,
+        oneshot::Sender<Option<DeprecatedSignedUserTransaction>>,
+    ),
 }
 
 pub type MempoolClientSender = mpsc::Sender<MempoolClientRequest>;

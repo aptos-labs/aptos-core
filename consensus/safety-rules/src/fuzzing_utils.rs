@@ -28,7 +28,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proof::AccumulatorExtensionProof,
     proptest_types::{AccountInfoUniverse, BlockInfoGen},
-    transaction::SignedTransaction,
+    transaction::DeprecatedSignedUserTransaction,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
 use proptest::prelude::*;
@@ -97,7 +97,7 @@ prop_compose! {
     pub fn arb_block_type_proposal(
     )(
         author in any::<AccountAddress>(),
-        txns in prop::collection::vec(any::<SignedTransaction>(), 0..MAX_PROPOSAL_TRANSACTIONS),
+        txns in prop::collection::vec(any::<DeprecatedSignedUserTransaction>(), 0..MAX_PROPOSAL_TRANSACTIONS),
     ) -> BlockType {
         BlockType::Proposal{
             payload: Payload::DirectMempool(txns),

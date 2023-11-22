@@ -12,7 +12,7 @@ use crate::{
 use aptos_rest_client::aptos_api_types::U64;
 use aptos_types::{
     chain_id::ChainId,
-    transaction::{RawTransaction, SignedTransaction},
+    transaction::{RawTransaction, DeprecatedSignedUserTransaction},
 };
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -58,6 +58,7 @@ pub struct AccountBalanceMetadata {
     pub operators: Option<Vec<AccountAddress>>,
     pub lockup_expiration_time_utc: U64,
 }
+
 /// Reqyest a block (version) on the account
 ///
 /// With neither value for PartialBlockIdentifier, get the latest version
@@ -119,7 +120,7 @@ pub struct BlockResponse {
 }
 
 /// Request to combine signatures and an unsigned transaction for submission as a
-/// [`aptos_types::transaction::SignedTransaction`]
+/// [`aptos_types::transaction::DeprecatedSignedUserTransaction`]
 ///
 /// This should be able to run without a running full node connection
 ///
@@ -139,7 +140,7 @@ pub struct ConstructionCombineRequest {
 /// [API Spec](https://www.rosetta-api.org/docs/models/ConstructionCombineResponse.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConstructionCombineResponse {
-    /// A hex encoded, BCS encoded, [`aptos_types::transaction::SignedTransaction`]
+    /// A hex encoded, BCS encoded, [`aptos_types::transaction::DeprecatedSignedUserTransaction`]
     pub signed_transaction: String,
 }
 
@@ -176,7 +177,7 @@ pub struct ConstructionDeriveResponse {
 pub struct ConstructionHashRequest {
     /// Network identifier describing the blockchain and the chain id
     pub network_identifier: NetworkIdentifier,
-    /// A hex encoded, BCS encoded, [`aptos_types::transaction::SignedTransaction`]
+    /// A hex encoded, BCS encoded, [`aptos_types::transaction::DeprecatedSignedUserTransaction`]
     pub signed_transaction: String,
 }
 
@@ -268,10 +269,10 @@ pub struct ConstructionMetadata {
 pub struct ConstructionParseRequest {
     /// Network identifier describing the blockchain and the chain id
     pub network_identifier: NetworkIdentifier,
-    /// Whether the transaction is a [`aptos_types::transaction::SignedTransaction`]
+    /// Whether the transaction is a [`aptos_types::transaction::DeprecatedSignedUserTransaction`]
     /// or a [`aptos_types::transaction::RawTransaction`]
     pub signed: bool,
-    /// A hex encoded, BCS encoded [`aptos_types::transaction::SignedTransaction`]
+    /// A hex encoded, BCS encoded [`aptos_types::transaction::DeprecatedSignedUserTransaction`]
     /// or a [`aptos_types::transaction::RawTransaction`]
     pub transaction: String,
 }
@@ -283,7 +284,7 @@ pub struct ConstructionParseRequest {
 pub struct ConstructionParseResponse {
     /// The set of [`Operation`] that happened during the transaction
     pub operations: Vec<Operation>,
-    /// The signers of the transaction, if it was a [`aptos_types::transaction::SignedTransaction`]
+    /// The signers of the transaction, if it was a [`aptos_types::transaction::DeprecatedSignedUserTransaction`]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub account_identifier_signers: Option<Vec<AccountIdentifier>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -295,7 +296,7 @@ pub struct ConstructionParseMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unsigned_transaction: Option<RawTransaction>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub signed_transaction: Option<SignedTransaction>,
+    pub signed_transaction: Option<DeprecatedSignedUserTransaction>,
 }
 
 /// Request to build payloads from the operations to sign
@@ -312,7 +313,7 @@ pub struct ConstructionPayloadsRequest {
     /// Required information for building a [`aptos_types::transaction::RawTransaction`]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ConstructionMetadata>,
-    /// Public keys of those who will sign the eventual [`aptos_types::transaction::SignedTransaction`]
+    /// Public keys of those who will sign the eventual [`aptos_types::transaction::DeprecatedSignedUserTransaction`]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_keys: Option<Vec<PublicKey>>,
 }
@@ -417,8 +418,8 @@ impl FromStr for GasPricePriority {
 
 impl Serialize for GasPricePriority {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
+        where
+            S: Serializer,
     {
         self.as_str().serialize(serializer)
     }
@@ -426,8 +427,8 @@ impl Serialize for GasPricePriority {
 
 impl<'de> Deserialize<'de> for GasPricePriority {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
+        where
+            D: Deserializer<'de>,
     {
         let str = <String>::deserialize(deserializer)?;
         Self::from_str(&str).map_err(|err| D::Error::custom(err.to_string()))
@@ -454,7 +455,7 @@ pub struct ConstructionPreprocessResponse {
 pub struct ConstructionSubmitRequest {
     /// Network identifier describing the blockchain and the chain id
     pub network_identifier: NetworkIdentifier,
-    /// A hex encoded, BCS encoded [`aptos_types::transaction::SignedTransaction`]
+    /// A hex encoded, BCS encoded [`aptos_types::transaction::DeprecatedSignedUserTransaction`]
     pub signed_transaction: String,
 }
 
@@ -463,7 +464,7 @@ pub struct ConstructionSubmitRequest {
 /// [API Spec](https://www.rosetta-api.org/docs/models/ConstructionSubmitResponse.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConstructionSubmitResponse {
-    /// Hash of the submitted [`aptos_types::transaction::SignedTransaction`]
+    /// Hash of the submitted [`aptos_types::transaction::DeprecatedSignedUserTransaction`]
     pub transaction_identifier: TransactionIdentifier,
 }
 

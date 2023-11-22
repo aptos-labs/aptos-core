@@ -6,7 +6,7 @@ use crate::{
     transaction_deduper::TransactionDeduper,
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::DeprecatedSignedUserTransaction;
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
@@ -36,7 +36,10 @@ use std::collections::{HashMap, HashSet};
 pub(crate) struct TxnHashAndAuthenticatorDeduper {}
 
 impl TransactionDeduper for TxnHashAndAuthenticatorDeduper {
-    fn dedup(&self, transactions: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
+    fn dedup(
+        &self,
+        transactions: Vec<DeprecatedSignedUserTransaction>,
+    ) -> Vec<DeprecatedSignedUserTransaction> {
         let _timer = TXN_DEDUP_SECONDS.start_timer();
         let mut seen = HashMap::new();
         let mut is_possible_duplicate = false;
@@ -45,12 +48,12 @@ impl TransactionDeduper for TxnHashAndAuthenticatorDeduper {
             match seen.get(&(txn.sender(), txn.sequence_number())) {
                 None => {
                     seen.insert((txn.sender(), txn.sequence_number()), i);
-                },
+                }
                 Some(first_index) => {
                     is_possible_duplicate = true;
                     possible_duplicates[*first_index] = true;
                     possible_duplicates[i] = true;
-                },
+                }
             }
         }
         if !is_possible_duplicate {
@@ -85,7 +88,7 @@ impl TransactionDeduper for TxnHashAndAuthenticatorDeduper {
                         num_duplicates += 1;
                         None
                     }
-                },
+                }
             })
             .collect();
 
@@ -111,7 +114,9 @@ mod tests {
     use aptos_keygen::KeyGen;
     use aptos_types::{
         chain_id::ChainId,
-        transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
+        transaction::{
+            RawTransaction, DeprecatedSignedUserTransaction, Script, TransactionPayload,
+        },
     };
     use move_core_types::account_address::AccountAddress;
     use std::time::Instant;
@@ -157,7 +162,11 @@ mod tests {
         )
     }
 
-    fn empty_txn(sender: AccountAddress, seq_num: u64, gas_unit_price: u64) -> RawTransaction {
+    fn empty_txn(
+        sender: AccountAddress,
+        seq_num: u64,
+        gas_unit_price: u64,
+    ) -> RawTransaction {
         let payload = TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
         raw_txn(payload, sender, seq_num, gas_unit_price)
     }
@@ -172,7 +181,7 @@ mod tests {
         raw_txn(payload, sender, seq_num, gas_unit_price)
     }
 
-    fn block(refs: Vec<&SignedTransaction>) -> Vec<SignedTransaction> {
+    fn block(refs: Vec<&DeprecatedSignedUserTransaction>) -> Vec<DeprecatedSignedUserTransaction> {
         refs.into_iter().cloned().collect()
     }
 
@@ -258,7 +267,7 @@ mod tests {
 
     fn measure_dedup_time(
         deduper: TxnHashAndAuthenticatorDeduper,
-        txns: Vec<SignedTransaction>,
+        txns: Vec<DeprecatedSignedUserTransaction>,
     ) -> f64 {
         let start = Instant::now();
         let mut iterations = 0;

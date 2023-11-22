@@ -15,8 +15,9 @@ use aptos_types::{
     event::{EventHandle, EventKey},
     state_store::state_key::StateKey,
     transaction::{
-        authenticator::AuthenticationKey, EntryFunction, Module, ModuleBundle, RawTransaction,
-        Script, SignedTransaction, TransactionPayload,
+        authenticator::AuthenticationKey, RawTransaction,
+        DeprecatedSignedUserTransaction, EntryFunction, Module, ModuleBundle, Script,
+        TransactionPayload,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -249,7 +250,7 @@ impl TransactionBuilder {
         )
     }
 
-    pub fn sign(self) -> SignedTransaction {
+    pub fn sign(self) -> DeprecatedSignedUserTransaction {
         RawTransaction::new(
             *self.sender.address(),
             self.sequence_number.expect("sequence number not set"),
@@ -259,12 +260,12 @@ impl TransactionBuilder {
             self.ttl.unwrap_or(DEFAULT_EXPIRATION_TIME),
             self.chain_id.unwrap_or_else(ChainId::test),
         )
-        .sign(&self.sender.privkey, self.sender.pubkey)
-        .unwrap()
-        .into_inner()
+            .sign(&self.sender.privkey, self.sender.pubkey)
+            .unwrap()
+            .into_inner()
     }
 
-    pub fn sign_multi_agent(self) -> SignedTransaction {
+    pub fn sign_multi_agent(self) -> DeprecatedSignedUserTransaction {
         let secondary_signer_addresses: Vec<AccountAddress> = self
             .secondary_signers
             .iter()
@@ -284,16 +285,16 @@ impl TransactionBuilder {
             self.ttl.unwrap_or(DEFAULT_EXPIRATION_TIME),
             ChainId::test(),
         )
-        .sign_multi_agent(
-            &self.sender.privkey,
-            secondary_signer_addresses,
-            secondary_private_keys,
-        )
-        .unwrap()
-        .into_inner()
+            .sign_multi_agent(
+                &self.sender.privkey,
+                secondary_signer_addresses,
+                secondary_private_keys,
+            )
+            .unwrap()
+            .into_inner()
     }
 
-    pub fn sign_fee_payer(self) -> SignedTransaction {
+    pub fn sign_fee_payer(self) -> DeprecatedSignedUserTransaction {
         let secondary_signer_addresses: Vec<AccountAddress> = self
             .secondary_signers
             .iter()
@@ -314,15 +315,15 @@ impl TransactionBuilder {
             self.ttl.unwrap_or(DEFAULT_EXPIRATION_TIME),
             ChainId::test(),
         )
-        .sign_fee_payer(
-            &self.sender.privkey,
-            secondary_signer_addresses,
-            secondary_private_keys,
-            *fee_payer.address(),
-            &fee_payer.privkey,
-        )
-        .unwrap()
-        .into_inner()
+            .sign_fee_payer(
+                &self.sender.privkey,
+                secondary_signer_addresses,
+                secondary_private_keys,
+                *fee_payer.address(),
+                &fee_payer.privkey,
+            )
+            .unwrap()
+            .into_inner()
     }
 }
 

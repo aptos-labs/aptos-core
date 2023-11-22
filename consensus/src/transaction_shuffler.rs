@@ -8,20 +8,26 @@ use aptos_types::{
         TransactionShufflerType,
         TransactionShufflerType::{DeprecatedSenderAwareV1, NoShuffling, SenderAwareV2},
     },
-    transaction::SignedTransaction,
+    transaction::DeprecatedSignedUserTransaction,
 };
 use std::sync::Arc;
 
 /// Interface to shuffle transactions
 pub trait TransactionShuffler: Send + Sync {
-    fn shuffle(&self, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction>;
+    fn shuffle(
+        &self,
+        txns: Vec<DeprecatedSignedUserTransaction>,
+    ) -> Vec<DeprecatedSignedUserTransaction>;
 }
 
 /// No Op Shuffler to maintain backward compatibility
 pub struct NoOpShuffler {}
 
 impl TransactionShuffler for NoOpShuffler {
-    fn shuffle(&self, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
+    fn shuffle(
+        &self,
+        txns: Vec<DeprecatedSignedUserTransaction>,
+    ) -> Vec<DeprecatedSignedUserTransaction> {
         txns
     }
 }

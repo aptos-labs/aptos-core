@@ -81,7 +81,7 @@ fn test_mempool_notify_committed_txns() {
         assert!(batch_add_signed_txn(&mut pool, txns).is_ok());
     }
 
-    let committed_txns = vec![Transaction::UserTransaction(committed_txn)];
+    let committed_txns = vec![Transaction::DeprecatedUserTransaction(committed_txn)];
     block_on(async {
         assert!(smp
             .mempool_notifier

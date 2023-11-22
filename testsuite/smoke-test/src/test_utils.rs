@@ -7,7 +7,7 @@ use aptos_forge::{reconfig, LocalSwarm, NodeExt, Swarm, SwarmExt};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{transaction::DeprecatedSignedUserTransaction, LocalAccount},
 };
 use rand::random;
 use std::time::Duration;
@@ -88,7 +88,7 @@ pub async fn transfer_coins_non_blocking(
     sender: &mut LocalAccount,
     receiver: &LocalAccount,
     amount: u64,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     let txn = sender.sign_with_transaction_builder(transaction_factory.payload(
         aptos_stdlib::aptos_coin_transfer(receiver.address(), amount),
     ));
@@ -103,7 +103,7 @@ pub async fn transfer_coins(
     sender: &mut LocalAccount,
     receiver: &LocalAccount,
     amount: u64,
-) -> SignedTransaction {
+) -> DeprecatedSignedUserTransaction {
     let txn =
         transfer_coins_non_blocking(client, transaction_factory, sender, receiver, amount).await;
 

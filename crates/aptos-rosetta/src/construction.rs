@@ -47,7 +47,8 @@ use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     transaction::{
-        authenticator::AuthenticationKey, RawTransaction, SignedTransaction, TransactionPayload,
+        authenticator::AuthenticationKey, RawTransaction,
+        DeprecatedSignedUserTransaction, TransactionPayload,
     },
 };
 use serde::de::DeserializeOwned;
@@ -59,7 +60,7 @@ use warp::Filter;
 
 pub fn combine_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract=(impl warp::Reply, ), Error=warp::Rejection> + Clone {
     warp::path!("construction" / "combine")
         .and(warp::post())
         .and(warp::body::json())
@@ -69,7 +70,7 @@ pub fn combine_route(
 
 pub fn derive_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract=(impl warp::Reply, ), Error=warp::Rejection> + Clone {
     warp::path!("construction" / "derive")
         .and(warp::post())
         .and(warp::body::json())
@@ -79,7 +80,7 @@ pub fn derive_route(
 
 pub fn hash_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract=(impl warp::Reply, ), Error=warp::Rejection> + Clone {
     warp::path!("construction" / "hash")
         .and(warp::post())
         .and(warp::body::json())
@@ -89,7 +90,7 @@ pub fn hash_route(
 
 pub fn metadata_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract=(impl warp::Reply, ), Error=warp::Rejection> + Clone {
     warp::path!("construction" / "metadata")
         .and(warp::post())
         .and(warp::body::json())
@@ -99,7 +100,7 @@ pub fn metadata_route(
 
 pub fn parse_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract=(impl warp::Reply, ), Error=warp::Rejection> + Clone {
     warp::path!("construction" / "parse")
         .and(warp::post())
         .and(warp::body::json())
@@ -109,7 +110,7 @@ pub fn parse_route(
 
 pub fn payloads_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract=(impl warp::Reply, ), Error=warp::Rejection> + Clone {
     warp::path!("construction" / "payloads")
         .and(warp::post())
         .and(warp::body::json())
@@ -119,7 +120,7 @@ pub fn payloads_route(
 
 pub fn preprocess_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract=(impl warp::Reply, ), Error=warp::Rejection> + Clone {
     warp::path!("construction" / "preprocess")
         .and(warp::post())
         .and(warp::body::json())
@@ -129,7 +130,7 @@ pub fn preprocess_route(
 
 pub fn submit_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract=(impl warp::Reply, ), Error=warp::Rejection> + Clone {
     warp::path!("construction" / "submit")
         .and(warp::post())
         .and(warp::body::json())
@@ -172,7 +173,7 @@ async fn construction_combine(
         decode_key(&signature.public_key.hex_bytes, "Ed25519PublicKey")?;
     let signature: Ed25519Signature = decode_key(&signature.hex_bytes, "Ed25519Signature")?;
 
-    let signed_txn = SignedTransaction::new(unsigned_txn, public_key, signature);
+    let signed_txn = DeprecatedSignedUserTransaction::new(unsigned_txn, public_key, signature);
 
     Ok(ConstructionCombineResponse {
         signed_transaction: encode_bcs(&signed_txn)?,
@@ -214,7 +215,7 @@ async fn construction_hash(
     debug!("/construction/hash {:?}", request);
     check_network(request.network_identifier, &server_context)?;
 
-    let signed_transaction: SignedTransaction =
+    let signed_transaction: DeprecatedSignedUserTransaction =
         decode_bcs(&request.signed_transaction, "SignedTransaction")?;
 
     Ok(TransactionIdentifierResponse {
@@ -255,7 +256,7 @@ async fn fill_in_operator(
                     );
                 }
             }
-        },
+        }
         InternalOperation::SetVoter(op) => {
             // If there was no operator set, and there is only one, we should use that
             if op.operator.is_none() {
@@ -283,8 +284,8 @@ async fn fill_in_operator(
                     );
                 }
             }
-        },
-        _ => {},
+        }
+        _ => {}
     }
 
     Ok(internal_operation)
@@ -358,7 +359,7 @@ async fn simulate_transaction(
         };
 
     // Sign the transaction with a dummy signature of all zeros as required by the API
-    let signed_transaction = SignedTransaction::new(
+    let signed_transaction = DeprecatedSignedUserTransaction::new(
         unsigned_transaction,
         public_key,
         Ed25519Signature::try_from([0u8; 64].as_ref()).expect("Zero signature should always work"),
@@ -455,7 +456,7 @@ async fn construction_metadata(
         rest_client.as_ref(),
         request.options.internal_operation.clone(),
     )
-    .await?;
+        .await?;
 
     // If both are present, we skip simulation
     let (suggested_fee, gas_unit_price, max_gas_amount) = simulate_transaction(
@@ -465,7 +466,7 @@ async fn construction_metadata(
         &internal_operation,
         sequence_number,
     )
-    .await?;
+        .await?;
 
     Ok(ConstructionMetadataResponse {
         metadata: ConstructionMetadata {
@@ -492,7 +493,8 @@ async fn construction_parse(
     check_network(request.network_identifier, &server_context)?;
     let metadata;
     let (account_identifier_signers, unsigned_txn) = if request.signed {
-        let signed_txn: SignedTransaction = decode_bcs(&request.transaction, "SignedTransaction")?;
+        let signed_txn: DeprecatedSignedUserTransaction =
+            decode_bcs(&request.transaction, "SignedTransaction")?;
         metadata = Some(ConstructionParseMetadata {
             unsigned_transaction: None,
             signed_transaction: Some(signed_txn.clone()),
@@ -509,7 +511,8 @@ async fn construction_parse(
             signed_txn.into_raw_transaction(),
         )
     } else {
-        let unsigned_txn: RawTransaction = decode_bcs(&request.transaction, "UnsignedTransaction")?;
+        let unsigned_txn: RawTransaction =
+            decode_bcs(&request.transaction, "UnsignedTransaction")?;
         metadata = Some(ConstructionParseMetadata {
             unsigned_transaction: Some(unsigned_txn.clone()),
             signed_transaction: None,
@@ -530,13 +533,13 @@ async fn construction_parse(
             ) {
                 (AccountAddress::ONE, COIN_MODULE, TRANSFER_FUNCTION) => {
                     parse_transfer_operation(sender, &type_args, &args)?
-                },
+                }
                 (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, TRANSFER_FUNCTION) => {
                     parse_account_transfer_operation(sender, &type_args, &args)?
-                },
+                }
                 (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, CREATE_ACCOUNT_FUNCTION) => {
                     parse_create_account_operation(sender, &type_args, &args)?
-                },
+                }
                 (
                     AccountAddress::ONE,
                     STAKING_CONTRACT_MODULE,
@@ -544,7 +547,7 @@ async fn construction_parse(
                 ) => parse_set_operator_operation(sender, &type_args, &args)?,
                 (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UPDATE_VOTER_FUNCTION) => {
                     parse_set_voter_operation(sender, &type_args, &args)?
-                },
+                }
                 (
                     AccountAddress::ONE,
                     STAKING_CONTRACT_MODULE,
@@ -552,13 +555,13 @@ async fn construction_parse(
                 ) => parse_create_stake_pool_operation(sender, &type_args, &args)?,
                 (AccountAddress::ONE, STAKING_CONTRACT_MODULE, RESET_LOCKUP_FUNCTION) => {
                     parse_reset_lockup_operation(sender, &type_args, &args)?
-                },
+                }
                 (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UPDATE_COMMISSION_FUNCTION) => {
                     parse_update_commission_operation(sender, &type_args, &args)?
-                },
+                }
                 (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UNLOCK_STAKE_FUNCTION) => {
                     parse_unlock_stake_operation(sender, &type_args, &args)?
-                },
+                }
                 (
                     AccountAddress::ONE,
                     STAKING_CONTRACT_MODULE,
@@ -576,7 +579,7 @@ async fn construction_parse(
                 ) => parse_delegation_pool_withdraw_operation(sender, &type_args, &args)?,
                 (AccountAddress::ONE, DELEGATION_POOL_MODULE, DELEGATION_POOL_UNLOCK_FUNCTION) => {
                     parse_delegation_pool_unlock_operation(sender, &type_args, &args)?
-                },
+                }
                 _ => {
                     return Err(ApiError::TransactionParseError(Some(format!(
                         "Unsupported entry function type {:x}::{}::{}",
@@ -584,15 +587,15 @@ async fn construction_parse(
                         module.name(),
                         function_name
                     ))));
-                },
+                }
             }
-        },
+        }
         payload => {
             return Err(ApiError::TransactionParseError(Some(format!(
                 "Unsupported transaction payload type {:?}",
                 payload
-            ))))
-        },
+            ))));
+        }
     };
 
     Ok(ConstructionParseResponse {
@@ -651,12 +654,12 @@ fn parse_transfer_operation(
             } = &**struct_tag;
 
             parse_currency(*address, module.as_str(), name.as_str())?
-        },
+        }
         _ => {
             return Err(ApiError::TransactionParseError(Some(
                 "No coin type in transfer".to_string(),
-            )))
-        },
+            )));
+        }
     };
 
     // Retrieve the args for the operations
@@ -1026,7 +1029,7 @@ async fn construction_payloads(
                     operation, metadata.internal_operation
                 ))));
             }
-        },
+        }
         InternalOperation::Transfer(_) => {
             if operation != metadata.internal_operation {
                 return Err(ApiError::InvalidInput(Some(format!(
@@ -1034,7 +1037,7 @@ async fn construction_payloads(
                     operation, metadata.internal_operation
                 ))));
             }
-        },
+        }
         InternalOperation::SetOperator(inner) => {
             if let InternalOperation::SetOperator(ref metadata_op) = metadata.internal_operation {
                 if inner.owner == metadata_op.owner
@@ -1055,7 +1058,7 @@ async fn construction_payloads(
                     inner, metadata.internal_operation
                 ))));
             }
-        },
+        }
         InternalOperation::SetVoter(inner) => {
             if let InternalOperation::SetVoter(ref metadata_op) = metadata.internal_operation {
                 if inner.owner == metadata_op.owner && inner.new_voter == metadata_op.new_voter {
@@ -1074,7 +1077,7 @@ async fn construction_payloads(
                     inner, metadata.internal_operation
                 ))));
             }
-        },
+        }
         InternalOperation::InitializeStakePool(_) => {
             if operation != metadata.internal_operation {
                 return Err(ApiError::InvalidInput(Some(format!(
@@ -1082,7 +1085,7 @@ async fn construction_payloads(
                     operation, metadata.internal_operation
                 ))));
             }
-        },
+        }
         InternalOperation::ResetLockup(inner) => {
             if let InternalOperation::ResetLockup(ref metadata_op) = metadata.internal_operation {
                 if inner.owner != metadata_op.owner || inner.operator != metadata_op.operator {
@@ -1097,7 +1100,7 @@ async fn construction_payloads(
                     inner, metadata.internal_operation
                 ))));
             }
-        },
+        }
         InternalOperation::UnlockStake(inner) => {
             if let InternalOperation::UnlockStake(ref metadata_op) = metadata.internal_operation {
                 if inner.owner != metadata_op.owner || inner.operator != metadata_op.operator {
@@ -1112,7 +1115,7 @@ async fn construction_payloads(
                     inner, metadata.internal_operation
                 ))));
             }
-        },
+        }
         InternalOperation::UpdateCommission(inner) => {
             if let InternalOperation::UpdateCommission(ref metadata_op) =
                 metadata.internal_operation
@@ -1129,7 +1132,7 @@ async fn construction_payloads(
                     inner, metadata.internal_operation
                 ))));
             }
-        },
+        }
         InternalOperation::DistributeStakingRewards(inner) => {
             if let InternalOperation::DistributeStakingRewards(ref metadata_op) =
                 metadata.internal_operation
@@ -1146,7 +1149,7 @@ async fn construction_payloads(
                     inner, metadata.internal_operation
                 ))));
             }
-        },
+        }
         InternalOperation::AddDelegatedStake(inner) => {
             if let InternalOperation::AddDelegatedStake(ref metadata_op) =
                 metadata.internal_operation
@@ -1165,7 +1168,7 @@ async fn construction_payloads(
                     inner, metadata.internal_operation
                 ))));
             }
-        },
+        }
         InternalOperation::UnlockDelegatedStake(inner) => {
             if let InternalOperation::UnlockDelegatedStake(ref metadata_op) =
                 metadata.internal_operation
@@ -1184,7 +1187,7 @@ async fn construction_payloads(
                     inner, metadata.internal_operation
                 ))));
             }
-        },
+        }
         InternalOperation::WithdrawUndelegated(inner) => {
             if let InternalOperation::WithdrawUndelegated(ref metadata_op) =
                 metadata.internal_operation
@@ -1203,7 +1206,7 @@ async fn construction_payloads(
                     inner, metadata.internal_operation
                 ))));
             }
-        },
+        }
     }
 
     // Encode operation
@@ -1277,11 +1280,11 @@ async fn construction_preprocess(
     {
         if expiry_time_secs.0
             <= SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map_err(|err| {
-                    ApiError::InternalError(Some(format!("Failed to get current time {}", err)))
-                })?
-                .as_secs()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|err| {
+                ApiError::InternalError(Some(format!("Failed to get current time {}", err)))
+            })?
+            .as_secs()
         {
             return Err(ApiError::InvalidInput(Some(
                 "Expiry time secs is in the past, please provide a Unix timestamp in the future"
@@ -1303,9 +1306,9 @@ async fn construction_preprocess(
         .and_then(|inner| inner.max_gas_amount)
         .is_none()
         && public_keys
-            .as_ref()
-            .map(|inner| inner.is_empty())
-            .unwrap_or(false)
+        .as_ref()
+        .map(|inner| inner.is_empty())
+        .unwrap_or(false)
     {
         return Err(ApiError::InvalidInput(Some(
             "Must provide either max gas amount or public keys to estimate max gas amount"
@@ -1360,7 +1363,8 @@ async fn construction_submit(
 
     let rest_client = server_context.rest_client()?;
 
-    let txn: SignedTransaction = decode_bcs(&request.signed_transaction, "SignedTransaction")?;
+    let txn: DeprecatedSignedUserTransaction =
+        decode_bcs(&request.signed_transaction, "SignedTransaction")?;
     let hash = txn.clone().committed_hash();
     rest_client.submit_bcs(&txn).await?;
     Ok(ConstructionSubmitResponse {

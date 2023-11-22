@@ -8,7 +8,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_crypto_derive::CryptoHasher;
-use aptos_types::{transaction::SignedTransaction, PeerId};
+use aptos_types::{transaction::DeprecatedSignedUserTransaction, PeerId};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -19,7 +19,7 @@ use std::{
 #[derive(Clone, Eq, Deserialize, Serialize, PartialEq, Debug)]
 pub struct PersistedValue {
     info: BatchInfo,
-    maybe_payload: Option<Vec<SignedTransaction>>,
+    maybe_payload: Option<Vec<DeprecatedSignedUserTransaction>>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -29,7 +29,10 @@ pub(crate) enum StorageMode {
 }
 
 impl PersistedValue {
-    pub(crate) fn new(info: BatchInfo, maybe_payload: Option<Vec<SignedTransaction>>) -> Self {
+    pub(crate) fn new(
+        info: BatchInfo,
+        maybe_payload: Option<Vec<DeprecatedSignedUserTransaction>>,
+    ) -> Self {
         Self {
             info,
             maybe_payload,
@@ -43,7 +46,7 @@ impl PersistedValue {
         }
     }
 
-    pub(crate) fn take_payload(&mut self) -> Option<Vec<SignedTransaction>> {
+    pub(crate) fn take_payload(&mut self) -> Option<Vec<DeprecatedSignedUserTransaction>> {
         self.maybe_payload.take()
     }
 
@@ -55,7 +58,7 @@ impl PersistedValue {
         &self.info
     }
 
-    pub fn payload(&self) -> &Option<Vec<SignedTransaction>> {
+    pub fn payload(&self) -> &Option<Vec<DeprecatedSignedUserTransaction>> {
         &self.maybe_payload
     }
 }
@@ -88,7 +91,7 @@ impl TryFrom<PersistedValue> for Batch {
 #[derive(Clone, Debug, Deserialize, Serialize, CryptoHasher)]
 pub struct BatchPayload {
     author: PeerId,
-    txns: Vec<SignedTransaction>,
+    txns: Vec<DeprecatedSignedUserTransaction>,
     #[serde(skip)]
     num_bytes: OnceCell<usize>,
 }
@@ -106,7 +109,7 @@ impl CryptoHash for BatchPayload {
 }
 
 impl BatchPayload {
-    pub fn new(author: PeerId, txns: Vec<SignedTransaction>) -> Self {
+    pub fn new(author: PeerId, txns: Vec<DeprecatedSignedUserTransaction>) -> Self {
         Self {
             author,
             txns,
@@ -114,7 +117,7 @@ impl BatchPayload {
         }
     }
 
-    pub fn into_transactions(self) -> Vec<SignedTransaction> {
+    pub fn into_transactions(self) -> Vec<DeprecatedSignedUserTransaction> {
         self.txns
     }
 
@@ -138,7 +141,7 @@ pub struct Batch {
 impl Batch {
     pub fn new(
         batch_id: BatchId,
-        payload: Vec<SignedTransaction>,
+        payload: Vec<DeprecatedSignedUserTransaction>,
         epoch: u64,
         expiration: u64,
         batch_author: PeerId,
@@ -197,7 +200,7 @@ impl Batch {
         Ok(())
     }
 
-    pub fn into_transactions(self) -> Vec<SignedTransaction> {
+    pub fn into_transactions(self) -> Vec<DeprecatedSignedUserTransaction> {
         self.payload.txns
     }
 

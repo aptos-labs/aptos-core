@@ -11,7 +11,7 @@ use aptos_transaction_generator_lib::{CounterState, ReliableTransactionSubmitter
 use aptos_types::{
     account_address::AccountAddress,
     account_view::AccountView,
-    transaction::{SignedTransaction, Transaction},
+    transaction::{DeprecatedSignedUserTransaction, Transaction},
 };
 use async_trait::async_trait;
 use std::{
@@ -50,12 +50,12 @@ impl ReliableTransactionSubmitter for DbReliableTransactionSubmitter {
 
     async fn execute_transactions_with_counter(
         &self,
-        txns: &[SignedTransaction],
+        txns: &[DeprecatedSignedUserTransaction],
         _state: &CounterState,
     ) -> Result<()> {
         self.block_sender.send(
             txns.iter()
-                .map(|t| Transaction::UserTransaction(t.clone()))
+                .map(|t| Transaction::DeprecatedUserTransaction(t.clone()))
                 .chain(once(Transaction::StateCheckpoint(HashValue::random())))
                 .collect(),
         )?;

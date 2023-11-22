@@ -20,7 +20,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     on_chain_config::Features,
     state_store::state_key::StateKey,
-    transaction::{SignatureCheckedTransaction, SignedTransaction},
+    transaction::{DeprecatedSignedUserTransaction, SignatureCheckedTransaction},
 };
 use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
 use bytes::Bytes;
@@ -81,7 +81,7 @@ pub enum SessionId {
 }
 
 impl SessionId {
-    pub fn txn(txn: &SignedTransaction) -> Self {
+    pub fn txn(txn: &DeprecatedSignedUserTransaction) -> Self {
         Self::txn_meta(&TransactionMetadata::new(&txn.clone()))
     }
 
@@ -103,7 +103,7 @@ impl SessionId {
         }
     }
 
-    pub fn prologue(txn: &SignedTransaction) -> Self {
+    pub fn prologue(txn: &DeprecatedSignedUserTransaction) -> Self {
         Self::prologue_meta(&TransactionMetadata::new(&txn.clone()))
     }
 

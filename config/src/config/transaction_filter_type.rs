@@ -4,7 +4,7 @@
 use aptos_crypto::HashValue;
 use aptos_types::{
     account_address::AccountAddress,
-    transaction::{SignedTransaction, TransactionPayload},
+    transaction::{DeprecatedSignedUserTransaction, TransactionPayload},
 };
 use serde::{Deserialize, Serialize};
 
@@ -21,7 +21,12 @@ enum Matcher {
 }
 
 impl Matcher {
-    fn matches(&self, block_id: HashValue, timestamp: u64, txn: &SignedTransaction) -> bool {
+    fn matches(
+        &self,
+        block_id: HashValue,
+        timestamp: u64,
+        txn: &DeprecatedSignedUserTransaction,
+    ) -> bool {
         match self {
             Matcher::All => true,
             Matcher::BlockId(id) => block_id == *id,
@@ -60,7 +65,12 @@ enum EvalResult {
 }
 
 impl Rule {
-    fn eval(&self, block_id: HashValue, timestamp: u64, txn: &SignedTransaction) -> EvalResult {
+    fn eval(
+        &self,
+        block_id: HashValue,
+        timestamp: u64,
+        txn: &DeprecatedSignedUserTransaction,
+    ) -> EvalResult {
         match self {
             Rule::Allow(matcher) => {
                 if matcher.matches(block_id, timestamp, txn) {
@@ -188,7 +198,12 @@ impl Filter {
         self
     }
 
-    pub fn allows(&self, block_id: HashValue, timestamp: u64, txn: &SignedTransaction) -> bool {
+    pub fn allows(
+        &self,
+        block_id: HashValue,
+        timestamp: u64,
+        txn: &DeprecatedSignedUserTransaction,
+    ) -> bool {
         for rule in &self.rules {
             // Rules are evaluated in the order and the first rule that matches is used. If no rule
             // matches, the transaction is allowed.

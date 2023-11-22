@@ -11,7 +11,10 @@ use crate::{
     transaction_builder::TransactionBuilder,
     types::{
         account_address::AccountAddress,
-        transaction::{authenticator::AuthenticationKey, RawTransaction, SignedTransaction},
+        transaction::{
+            authenticator::AuthenticationKey, RawTransaction,
+            DeprecatedSignedUserTransaction,
+        },
     },
 };
 use anyhow::Result;
@@ -80,8 +83,8 @@ impl LocalAccount {
     /// create an account on the Aptos blockchain, it just generates a new
     /// account locally.
     pub fn generate<R>(rng: &mut R) -> Self
-    where
-        R: ::rand_core::RngCore + ::rand_core::CryptoRng,
+        where
+            R: ::rand_core::RngCore + ::rand_core::CryptoRng,
     {
         let key = AccountKey::generate(rng);
         let address = key.authentication_key().account_address();
@@ -89,13 +92,19 @@ impl LocalAccount {
         Self::new(address, key, 0)
     }
 
-    pub fn sign_transaction(&self, txn: RawTransaction) -> SignedTransaction {
+    pub fn sign_transaction(
+        &self,
+        txn: RawTransaction,
+    ) -> DeprecatedSignedUserTransaction {
         txn.sign(self.private_key(), self.public_key().clone())
             .expect("Signing a txn can't fail")
             .into_inner()
     }
 
-    pub fn sign_with_transaction_builder(&self, builder: TransactionBuilder) -> SignedTransaction {
+    pub fn sign_with_transaction_builder(
+        &self,
+        builder: TransactionBuilder,
+    ) -> DeprecatedSignedUserTransaction {
         let raw_txn = builder
             .sender(self.address())
             .sequence_number(self.increment_sequence_number())
@@ -107,7 +116,7 @@ impl LocalAccount {
         &self,
         secondary_signers: Vec<&Self>,
         builder: TransactionBuilder,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         let secondary_signer_addresses = secondary_signers
             .iter()
             .map(|signer| signer.address())
@@ -135,7 +144,7 @@ impl LocalAccount {
         secondary_signers: Vec<&Self>,
         fee_payer_signer: &Self,
         builder: TransactionBuilder,
-    ) -> SignedTransaction {
+    ) -> DeprecatedSignedUserTransaction {
         let secondary_signer_addresses = secondary_signers
             .iter()
             .map(|signer| signer.address())
@@ -213,12 +222,15 @@ pub enum HardwareWalletType {
 }
 
 pub trait TransactionSigner {
-    fn sign_transaction(&self, txn: RawTransaction) -> Result<SignedTransaction>;
+    fn sign_transaction(
+        &self,
+        txn: RawTransaction,
+    ) -> Result<DeprecatedSignedUserTransaction>;
 
     fn sign_with_transaction_builder(
         &mut self,
         builder: TransactionBuilder,
-    ) -> Result<SignedTransaction>;
+    ) -> Result<DeprecatedSignedUserTransaction>;
 }
 
 /// Similar to LocalAccount, but for hardware wallets.
@@ -235,13 +247,16 @@ pub struct HardwareWalletAccount {
 }
 
 impl TransactionSigner for HardwareWalletAccount {
-    fn sign_transaction(&self, txn: RawTransaction) -> Result<SignedTransaction> {
+    fn sign_transaction(
+        &self,
+        txn: RawTransaction,
+    ) -> Result<DeprecatedSignedUserTransaction> {
         let signature = self.sign_arbitrary_message(
             signing_message(&txn)
                 .expect("Unable to convert txn to signing message.")
                 .as_ref(),
         )?;
-        Ok(SignedTransaction::new(
+        Ok(DeprecatedSignedUserTransaction::new(
             txn,
             self.public_key().clone(),
             signature,
@@ -251,7 +266,7 @@ impl TransactionSigner for HardwareWalletAccount {
     fn sign_with_transaction_builder(
         &mut self,
         builder: TransactionBuilder,
-    ) -> Result<SignedTransaction> {
+    ) -> Result<DeprecatedSignedUserTransaction> {
         let two_minutes = Duration::from_secs(2 * 60);
         let current_time = SystemTime::now().duration_since(UNIX_EPOCH)? + two_minutes;
         let seconds = current_time.as_secs();
@@ -343,8 +358,8 @@ pub struct AccountKey {
 
 impl AccountKey {
     pub fn generate<R>(rng: &mut R) -> Self
-    where
-        R: ::rand_core::RngCore + ::rand_core::CryptoRng,
+        where
+            R: ::rand_core::RngCore + ::rand_core::CryptoRng,
     {
         let private_key = Ed25519PrivateKey::generate(rng);
         Self::from_private_key(private_key)

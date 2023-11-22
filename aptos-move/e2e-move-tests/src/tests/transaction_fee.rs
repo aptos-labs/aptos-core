@@ -9,7 +9,7 @@ use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_types::{
     account_address::AccountAddress,
     on_chain_config::FeatureFlag,
-    transaction::{SignedTransaction, TransactionArgument, TransactionStatus},
+    transaction::{DeprecatedSignedUserTransaction, TransactionArgument, TransactionStatus},
 };
 use once_cell::sync::Lazy;
 use rand::{
@@ -92,7 +92,7 @@ impl TestUniverse {
     }
 
     /// Creates a block of p2p transactions in the universe.
-    pub fn create_block(&mut self, num_txns: usize) -> Vec<SignedTransaction> {
+    pub fn create_block(&mut self, num_txns: usize) -> Vec<DeprecatedSignedUserTransaction> {
         let mut rng = StdRng::from_seed(OsRng.gen());
         let num_users = self.users.len();
         (0..num_txns)
@@ -113,7 +113,7 @@ impl TestUniverse {
     /// Injects a governance proposal script into transaction block.
     pub fn inject_proposal_into_block(
         &mut self,
-        block: &mut Vec<SignedTransaction>,
+        block: &mut Vec<DeprecatedSignedUserTransaction>,
         proposal_idx: usize,
         package_name: &str,
         args: Vec<TransactionArgument>,

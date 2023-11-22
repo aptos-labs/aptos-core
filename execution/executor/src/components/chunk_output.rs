@@ -323,7 +323,7 @@ pub fn update_counters_for_processed_chunk<T, O>(
         };
 
         let kind = match txn.get_transaction() {
-            Some(Transaction::UserTransaction(_)) => "user_transaction",
+            Some(Transaction::DeprecatedUserTransaction(_)) => "user_transaction",
             Some(Transaction::GenesisTransaction(_)) => "genesis",
             Some(Transaction::BlockMetadata(_)) => "block_metadata",
             Some(Transaction::StateCheckpoint(_)) => "state_checkpoint",
@@ -347,7 +347,7 @@ pub fn update_counters_for_processed_chunk<T, O>(
                 .inc();
         }
 
-        if let Some(Transaction::UserTransaction(user_txn)) = txn.get_transaction() {
+        if let Some(Transaction::DeprecatedUserTransaction(user_txn)) = txn.get_transaction() {
             match user_txn.payload() {
                 aptos_types::transaction::TransactionPayload::Script(_script) => {
                     metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE

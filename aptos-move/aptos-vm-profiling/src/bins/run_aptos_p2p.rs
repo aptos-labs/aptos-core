@@ -32,7 +32,7 @@ fn main() -> Result<()> {
 
     let txns: Vec<SignatureVerifiedTransaction> = (0..NUM_TXNS)
         .map(|seq_num| {
-            Transaction::UserTransaction(
+            Transaction::DeprecatedUserTransaction(
                 alice
                     .account()
                     .transaction()

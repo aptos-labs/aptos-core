@@ -13,7 +13,8 @@ use aptos_config::config::NodeConfig;
 use aptos_consensus_types::common::{TransactionInProgress, TransactionSummary};
 use aptos_crypto::HashValue;
 use aptos_types::{
-    mempool_status::MempoolStatusCode, transaction::SignedTransaction, vm_status::DiscardedVMStatus,
+    mempool_status::MempoolStatusCode, transaction::DeprecatedSignedUserTransaction,
+    vm_status::DiscardedVMStatus,
 };
 use itertools::Itertools;
 use maplit::btreemap;
@@ -350,9 +351,9 @@ fn test_reset_sequence_number_on_failure() {
     assert!(add_txn(&mut pool, TestTransaction::new(1, 0, 1)).is_ok());
 }
 
-fn view(txns: Vec<SignedTransaction>) -> Vec<u64> {
+fn view(txns: Vec<DeprecatedSignedUserTransaction>) -> Vec<u64> {
     txns.iter()
-        .map(SignedTransaction::sequence_number)
+        .map(DeprecatedSignedUserTransaction::sequence_number)
         .sorted()
         .collect()
 }
@@ -618,7 +619,7 @@ fn test_parking_lot_eviction() {
     let mut txns: Vec<_> = pool
         .get_batch(5, 5120, true, false, btreemap![])
         .iter()
-        .map(SignedTransaction::sequence_number)
+        .map(DeprecatedSignedUserTransaction::sequence_number)
         .collect();
     txns.sort_unstable();
     assert_eq!(txns, vec![0, 0, 1, 1, 2]);
@@ -647,7 +648,7 @@ fn test_parking_lot_evict_only_for_ready_txn_insertion() {
     let mut txns: Vec<_> = pool
         .get_batch(5, 5120, true, false, btreemap![])
         .iter()
-        .map(SignedTransaction::sequence_number)
+        .map(DeprecatedSignedUserTransaction::sequence_number)
         .collect();
     txns.sort_unstable();
     assert_eq!(txns, vec![0, 1, 2, 3, 4]);

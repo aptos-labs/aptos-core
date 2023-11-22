@@ -86,7 +86,7 @@ impl MempoolNotificationSender for MempoolNotifier {
         let user_transactions: Vec<CommittedTransaction> = transactions
             .iter()
             .filter_map(|transaction| match transaction {
-                Transaction::UserTransaction(signed_txn) => Some(CommittedTransaction {
+                Transaction::DeprecatedUserTransaction(signed_txn) => Some(CommittedTransaction {
                     sender: signed_txn.sender(),
                     sequence_number: signed_txn.sequence_number(),
                 }),
@@ -121,7 +121,7 @@ impl MempoolNotificationSender for MempoolNotifier {
             Duration::from_millis(notification_timeout_ms),
             callback_receiver,
         )
-        .await
+            .await
         {
             match response {
                 Ok(MempoolNotificationResponse::Success) => Ok(()),
@@ -176,7 +176,8 @@ impl FusedStream for MempoolNotificationListener {
 #[derive(Debug)]
 pub struct MempoolCommitNotification {
     pub transactions: Vec<CommittedTransaction>,
-    pub block_timestamp_usecs: u64, // The timestamp of the committed block.
+    pub block_timestamp_usecs: u64,
+    // The timestamp of the committed block.
     pub(crate) callback: oneshot::Sender<MempoolNotificationResponse>,
 }
 
@@ -199,7 +200,7 @@ pub struct CommittedTransaction {
 
 impl fmt::Display for CommittedTransaction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.sender, self.sequence_number,)
+        write!(f, "{}:{}", self.sender, self.sequence_number, )
     }
 }
 
@@ -220,8 +221,8 @@ mod tests {
         block_metadata::BlockMetadata,
         chain_id::ChainId,
         transaction::{
-            ChangeSet, RawTransaction, Script, SignedTransaction, Transaction, TransactionPayload,
-            WriteSetPayload,
+            ChangeSet, RawTransaction, DeprecatedSignedUserTransaction, Script,
+            Transaction, TransactionPayload, WriteSetPayload,
         },
         write_set::WriteSetMut,
     };
@@ -303,7 +304,7 @@ mod tests {
         // Verify the notification arrives at the receiver
         match mempool_listener.select_next_some().now_or_never() {
             Some(mempool_commit_notification) => match user_transaction {
-                Transaction::UserTransaction(signed_transaction) => {
+                Transaction::DeprecatedUserTransaction(signed_transaction) => {
                     assert_eq!(mempool_commit_notification.transactions, vec![
                         CommittedTransaction {
                             sender: signed_transaction.sender(),
@@ -314,7 +315,7 @@ mod tests {
                         mempool_commit_notification.block_timestamp_usecs,
                         block_timestamp_usecs
                     );
-                },
+                }
                 result => panic!("Expected user transaction but got: {:?}", result),
             },
             result => panic!("Expected mempool commit notification but got: {:?}", result),
@@ -360,13 +361,13 @@ mod tests {
             0,
             ChainId::new(10),
         );
-        let signed_transaction = SignedTransaction::new(
+        let signed_transaction = DeprecatedSignedUserTransaction::new(
             raw_transaction.clone(),
             public_key,
             private_key.sign(&raw_transaction).unwrap(),
         );
 
-        Transaction::UserTransaction(signed_transaction)
+        Transaction::DeprecatedUserTransaction(signed_transaction)
     }
 
     fn create_block_metadata_transaction() -> Transaction {
