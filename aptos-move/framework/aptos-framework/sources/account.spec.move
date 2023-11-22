@@ -11,8 +11,6 @@ spec aptos_framework::account {
         aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
         aborts_if exists<OriginatingAddress>(aptos_addr);
         ensures exists<OriginatingAddress>(aptos_addr);
-        // TODO: boogie error
-        // ensures global<OriginatingAddress>(aptos_addr).address_map = table::new();
     }
 
     /// Ensure that the account exists at the end of the call.
@@ -125,7 +123,6 @@ spec aptos_framework::account {
             challenge
         );
         aborts_if scheme != ED25519_SCHEME && scheme != MULTI_ED25519_SCHEME;
-        ensures scheme == ED25519_SCHEME || scheme == MULTI_ED25519_SCHEME;
     }
 
     /// The Account existed under the signer
@@ -194,7 +191,10 @@ spec aptos_framework::account {
         aborts_if !from_bcs::deserializable<address>(new_auth_key_vector);
 
         aborts_if curr_auth_key != new_auth_key && table::spec_contains(address_map, new_auth_key);
-        ensures from_scheme == ED25519_SCHEME || from_scheme == MULTI_ED25519_SCHEME;
+
+        include UpdateAuthKeyAndOriginatingAddressTableAbortsIf {
+            originating_addr: addr,
+        };
 
         let post auth_key = global<Account>(addr).authentication_key;
         ensures auth_key == new_auth_key_vector;
@@ -241,7 +241,10 @@ spec aptos_framework::account {
         let new_auth_key = from_bcs::deserialize<address>(new_auth_key_vector);
 
         aborts_if curr_auth_key != new_auth_key && table::spec_contains(address_map, new_auth_key);
-        ensures new_scheme == ED25519_SCHEME || new_scheme == MULTI_ED25519_SCHEME;
+        include UpdateAuthKeyAndOriginatingAddressTableAbortsIf {
+            originating_addr: rotation_cap_offerer_address,
+            account_resource: offerer_account_resource,
+        };
 
         let post auth_key = global<Account>(rotation_cap_offerer_address).authentication_key;
         ensures auth_key == new_auth_key_vector;
@@ -297,8 +300,6 @@ spec aptos_framework::account {
         let post offer_for = global<Account>(source_address).rotation_capability_offer.for;
         ensures option::spec_borrow(offer_for) == recipient_address;
     }
-
-
 
     /// The Account existed under the signer.
     /// The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME.
@@ -456,6 +457,7 @@ spec aptos_framework::account {
         ensures signer::address_of(result_1) == resource_addr;
         let post offer_for = global<Account>(resource_addr).signer_capability_offer.for;
         ensures option::spec_borrow(offer_for) == resource_addr;
+        ensures result_2 == SignerCapability { account: resource_addr };
     }
 
     /// Check if the bytes of the new address is 32.
