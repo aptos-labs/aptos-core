@@ -120,12 +120,14 @@ impl RemoteCoordinatorClient {
                                                 is_block_init_done: Arc<AtomicBool>,
                                                 cmd_rx_thread_pool: Arc<rayon::ThreadPool>,) {
         if num_txns_processed == num_txns_in_the_block {
+            //info!("Breaking out initially .............................");
             return;
         }
         //let num_txns_processed_rc = Arc::new(AtomicUsize::new(num_txns_processed));
         let mut break_out = false;
         loop {
             if break_out {
+                //info!("Breaking out of the loop.............................");
                 break;
             }
             match command_rx.recv() {
@@ -151,6 +153,7 @@ impl RemoteCoordinatorClient {
 
                     let transactions = txns.cmds;
                     num_txns_processed += transactions.len();
+                    info!("txns considered is ********* {}; num txns in block {}", num_txns_processed, num_txns_in_the_block);
                     if num_txns_processed == num_txns_in_the_block {
                         is_block_init_done_clone.store(false, std::sync::atomic::Ordering::Relaxed);
                         break_out = true;

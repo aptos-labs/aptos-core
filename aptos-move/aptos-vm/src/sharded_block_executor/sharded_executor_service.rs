@@ -229,6 +229,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
 
         let mut cumulative_txns = 0;
         loop {
+           // info!("Looping back to recv cmd after execution of a block********************");
             let mut command = self.coordinator_client.lock().unwrap().receive_execute_command_stream();
             let (state_view, num_txns_in_the_block, shard_txns_start_index, onchain_config, blocking_transactions_provider) = match command {
                 StreamedExecutorShardCommand::InitBatch(
@@ -301,8 +302,10 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 let mut curr_batch = vec![];
                 loop {
                     let txn_idx_output: TransactionIdxAndOutput = stream_results_rx.recv().unwrap();
-                    if txn_idx_output.txn_idx == u32::MAX && !curr_batch.is_empty() {
-                        coordinator_client_clone.lock().unwrap().stream_execution_result(curr_batch);
+                    if txn_idx_output.txn_idx == u32::MAX {
+                        if !curr_batch.is_empty() {
+                            coordinator_client_clone.lock().unwrap().stream_execution_result(curr_batch);
+                        }
                         break;
                     }
                     curr_batch.push(txn_idx_output);
