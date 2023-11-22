@@ -10,16 +10,14 @@ use aptos_protos::internal::fullnode::v1::{
     fullnode_data_server::FullnodeData, stream_status::StatusType, transactions_from_node_response,
     GetTransactionsFromNodeRequest, StreamStatus, TransactionsFromNodeResponse,
 };
-use aptos_storage_interface::DbWriter;
 use futures::Stream;
-use std::{pin::Pin, sync::Arc};
+use std::pin::Pin;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 
 pub struct FullnodeDataService {
     pub service_context: ServiceContext,
-    pub db_writer: Arc<dyn DbWriter>,
 }
 
 type FullnodeResponseStream =
@@ -64,18 +62,18 @@ impl FullnodeData for FullnodeDataService {
         // Creates a moving average to track tps
         let mut ma = MovingAverage::new(10_000);
 
-        let db_writer = self.db_writer.clone();
         // This is the main thread handling pushing to the stream
         tokio::spawn(async move {
             // Initialize the coordinator that tracks starting version and processes transactions
-            let mut coordinator = IndexerStreamCoordinator::new(
-                context,
-                starting_version,
-                processor_task_count,
-                processor_batch_size,
-                output_batch_size,
-                tx.clone(),
-            );
+            let mut coordinator =
+                IndexerStreamCoordinator::new(
+                    context,
+                    starting_version,
+                    processor_task_count,
+                    processor_batch_size,
+                    output_batch_size,
+                    tx.clone(),
+                );
             // Sends init message (one time per request) to the client in the with chain id and starting version. Basically a handshake
             let init_status = get_status(StatusType::Init, starting_version, None, ledger_chain_id);
             match tx.send(Result::<_, Status>::Ok(init_status)).await {
@@ -88,18 +86,18 @@ impl FullnodeData for FullnodeDataService {
                 },
             }
             let mut base: u64 = 0;
-            let db_writer = db_writer.clone();
             loop {
                 let mut start_time = std::time::Instant::now();
                 // Processes and sends batch of transactions to client
-                let results = coordinator.process_next_batch(db_writer.clone()).await;
-                let max_version = match IndexerStreamCoordinator::get_max_batch_version(results) {
-                    Ok(max_version) => max_version,
-                    Err(e) => {
-                        error!("[indexer-grpc] Error sending to stream: {}", e);
-                        break;
-                    },
-                };
+                let results = coordinator.process_next_batch().await;
+                let max_version =
+                    match IndexerStreamCoordinator::get_max_batch_version(results) {
+                        Ok(max_version) => max_version,
+                        Err(e) => {
+                            error!("[indexer-grpc] Error sending to stream: {}", e);
+                            break;
+                        },
+                    };
 
                 LATEST_PROCESSED_VERSION
                     .with_label_values(&[
@@ -182,9 +180,8 @@ impl FullnodeData for FullnodeDataService {
             }
         });
         let output_stream = ReceiverStream::new(rx);
-        Ok(Response::new(
-            Box::pin(output_stream) as Self::GetTransactionsFromNodeStream
-        ))
+        Ok(Response::new(Box::pin(output_stream)
+            as Self::GetTransactionsFromNodeStream))
     }
 }
 

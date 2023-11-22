@@ -1,6 +1,5 @@
 [package]
-name = "aptos-indexer-grpc-fullnode"
-description = "Aptos Indexer GRPC runtime on fullnode."
+name = "aptos-indexer-grpc-table-info"
 version = "1.0.0"
 
 # Workspace inherited keys

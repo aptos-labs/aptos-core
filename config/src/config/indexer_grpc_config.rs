@@ -13,6 +13,8 @@ const DEFAULT_PROCESSOR_TASK_COUNT: u16 = 20;
 const DEFAULT_PROCESSOR_BATCH_SIZE: u16 = 1000;
 const DEFAULT_OUTPUT_BATCH_SIZE: u16 = 100;
 pub const DEFAULT_GRPC_STREAM_PORT: u16 = 50051;
+pub const DEFAULT_PARSER_TASK_COUNT: u16 = 20;
+pub const DEFAULT_PARSER_BATCH_SIZE: u16 = 1000;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -36,6 +38,12 @@ pub struct IndexerGrpcConfig {
 
     /// Number of transactions returned in a single stream response
     pub output_batch_size: u16,
+
+    pub backup_restore_bucket_name: String,
+
+    pub parser_task_count: u16,
+
+    pub parser_batch_size: u16,
 }
 
 // Reminder, #[serde(default)] on IndexerGrpcConfig means that the default values for
@@ -53,6 +61,9 @@ impl Default for IndexerGrpcConfig {
             processor_task_count: DEFAULT_PROCESSOR_TASK_COUNT,
             processor_batch_size: DEFAULT_PROCESSOR_BATCH_SIZE,
             output_batch_size: DEFAULT_OUTPUT_BATCH_SIZE,
+            backup_restore_bucket_name: "".to_owned(),
+            parser_task_count: DEFAULT_PARSER_TASK_COUNT,
+            parser_batch_size: DEFAULT_PARSER_BATCH_SIZE,
         }
     }
 }
@@ -69,10 +80,10 @@ impl ConfigSanitizer for IndexerGrpcConfig {
             return Ok(());
         }
 
-        if !node_config.storage.enable_indexer && !cfg!(feature = "indexer-async-v2") {
+        if !node_config.storage.enable_indexer && !node_config.storage.enable_indexer_async_v2 {
             return Err(Error::ConfigSanitizerFailed(
                 sanitizer_name,
-                "storage.enable_indexer or feature flag indexer-async-v2 must be true if indexer_grpc.enabled is true".to_string(),
+                "storage.enable_indexer or storage.enable_indexer_async_v2 must be true if indexer_grpc.enabled is true".to_string(),
             ));
         }
         Ok(())
@@ -117,3 +128,4 @@ mod tests {
             .unwrap();
     }
 }
+

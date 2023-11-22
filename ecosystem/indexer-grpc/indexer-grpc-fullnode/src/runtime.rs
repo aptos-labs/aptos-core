@@ -19,7 +19,7 @@ use aptos_protos::{
 };
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::chain_id::ChainId;
-use std::{net::ToSocketAddrs, sync::Arc};
+use std::{env, net::ToSocketAddrs, sync::Arc};
 use tokio::runtime::Runtime;
 use tonic::{codec::CompressionEncoding, transport::Server};
 
@@ -50,12 +50,8 @@ pub fn bootstrap(
     let output_batch_size = node_config.indexer_grpc.output_batch_size;
 
     runtime.spawn(async move {
-        let context = Arc::new(Context::new(
-            chain_id,
-            db.reader.clone(),
-            mp_sender,
-            node_config,
-        ));
+        let context =
+            Arc::new(Context::new(chain_id, db.reader.clone(), mp_sender, node_config));
 
         let service_context = ServiceContext {
             context: context.clone(),
@@ -66,12 +62,8 @@ pub fn bootstrap(
         // If we are here, we know indexer grpc is enabled.
         let server = FullnodeDataService {
             service_context: service_context.clone(),
-            db_writer: db.writer.clone(),
         };
-        let localnet_data_server = LocalnetDataService {
-            service_context,
-            db_writer: db.writer.clone(),
-        };
+        let localnet_data_server = LocalnetDataService { service_context };
 
         let reflection_service = tonic_reflection::server::Builder::configure()
             // Note: It is critical that the file descriptor set is registered for every

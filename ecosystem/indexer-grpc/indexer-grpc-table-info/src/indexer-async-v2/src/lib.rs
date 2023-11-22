@@ -1,14 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-mod db;
+pub mod backup_restore_operator;
+pub mod db;
 mod schema;
-
 use crate::{
     db::INDEX_ASYNC_V2_DB_NAME,
     schema::{column_families, table_info::TableInfoSchema},
 };
-use anyhow::{bail, ensure, Result};
+use anyhow::{bail, Result};
 use aptos_config::config::RocksdbConfig;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
@@ -33,22 +33,27 @@ use move_core_types::{
 use move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
 use std::{
     collections::{BTreeMap, HashMap},
-    convert::TryInto,
-    sync::Arc,
+    fs,
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
 };
-
-pub const QUERY_RETRIES: u32 = 5;
-pub const QUERY_RETRY_DELAY_MS: u64 = 500;
+use tracing::info;
 
 #[derive(Debug)]
 pub struct IndexerAsyncV2 {
     db: DB,
+    latest_epoch: AtomicU64,
+    pending_on: HashMap<TableHandle, Vec<Bytes>>,
 }
 
 impl IndexerAsyncV2 {
     pub fn open(
         db_root_path: impl AsRef<std::path::Path>,
         rocksdb_config: RocksdbConfig,
+        latest_epoch: u64,
     ) -> Result<Self> {
         let db_path = db_root_path.as_ref().join(INDEX_ASYNC_V2_DB_NAME);
 
@@ -58,8 +63,11 @@ impl IndexerAsyncV2 {
             column_families(),
             &gen_rocksdb_options(&rocksdb_config, false),
         )?;
-
-        Ok(Self { db })
+        Ok(Self {
+            db,
+            latest_epoch: AtomicU64::new(latest_epoch),
+            pending_on: HashMap::new(),
+        })
     }
 
     pub fn index(
@@ -67,6 +75,7 @@ impl IndexerAsyncV2 {
         db_reader: Arc<dyn DbReader>,
         first_version: Version,
         write_sets: &[&WriteSet],
+        latest_epoch: u64,
     ) -> Result<()> {
         let last_version = first_version + write_sets.len() as Version;
         let state_view = DbStateView {
@@ -75,7 +84,12 @@ impl IndexerAsyncV2 {
         };
         let resolver = state_view.as_move_resolver();
         let annotator = MoveValueAnnotator::new(&resolver);
-        self.index_with_annotator(&annotator, first_version, write_sets)
+        let _ = self.index_with_annotator(&annotator, first_version, write_sets);
+        if latest_epoch > self.latest_epoch() {
+            self.latest_epoch.store(latest_epoch, Ordering::Relaxed);
+        }
+
+        Ok(())
     }
 
     pub fn index_with_annotator<R: MoveResolver>(
@@ -86,7 +100,7 @@ impl IndexerAsyncV2 {
     ) -> Result<()> {
         let end_version = first_version + write_sets.len() as Version;
 
-        let mut table_info_parser = TableInfoParser::new(self, annotator);
+        let mut table_info_parser = TableInfoParser::new(self, annotator, self.pending_on.clone());
         for write_set in write_sets {
             for (state_key, write_op) in write_set.iter() {
                 table_info_parser.parse_write_op(state_key, write_op)?;
@@ -118,14 +132,30 @@ impl IndexerAsyncV2 {
 
     pub fn get_table_info_with_retry(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
         let mut retried = 0;
-        while retried < QUERY_RETRIES {
-            retried += 1;
+        loop {
             if let Ok(Some(table_info)) = self.get_table_info(handle) {
                 return Ok(Some(table_info));
             }
-            std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
+            retried += 1;
+            info!(
+                "Retried {} times when getting table info with the handle: {:?}",
+                retried, handle
+            );
         }
-        Ok(None)
+    }
+
+    pub fn create_checkpoint(&self, path: PathBuf) -> Result<()> {
+        if path.exists() {
+            fs::remove_dir_all(&path)?;
+        }
+        if !path.exists() {
+            fs::create_dir_all(&path)?;
+        }
+        self.db.create_checkpoint(path.as_path())
+    }
+
+    fn latest_epoch(&self) -> u64 {
+        self.latest_epoch.load(Ordering::Relaxed)
     }
 }
 
@@ -136,13 +166,21 @@ struct TableInfoParser<'a, R> {
     pending_on: HashMap<TableHandle, Vec<Bytes>>,
 }
 
+/// This module contains the implementation of the `TableInfoParser` struct, which is responsible for parsing
+/// write operations and extracting table information from them. It provides methods for parsing different types
+/// of write operations, such as structs, resource groups, and table items. The parsed table information is stored
+/// in a HashMap and can be saved to a schema batch for further processing.
 impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
-    pub fn new(indexer_async_v2: &'a IndexerAsyncV2, annotator: &'a MoveValueAnnotator<R>) -> Self {
+    pub fn new(
+        indexer_async_v2: &'a IndexerAsyncV2,
+        annotator: &'a MoveValueAnnotator<R>,
+        pending_on: HashMap<TableHandle, Vec<Bytes>>,
+    ) -> Self {
         Self {
             indexer_async_v2,
             annotator,
             result: HashMap::new(),
-            pending_on: HashMap::new(),
+            pending_on,
         }
     }
 
@@ -266,18 +304,11 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
     }
 
     fn finish(self, batch: &mut SchemaBatch) -> Result<bool> {
-        let mut retries = 0;
-        while !self.pending_on.is_empty() {
-            if retries >= QUERY_RETRIES {
-                ensure!(
-                    self.pending_on.is_empty(),
-                    "There is still pending table items to parse due to unknown table info for table handles: {:?}",
-                    self.pending_on.keys(),
-                );
-            }
-
-            std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
-            retries += 1;
+        if !self.pending_on.is_empty() {
+            aptos_logger::warn!(
+                "There is still pending table items to parse due to unknown table info for table handles: {:?}",
+                self.pending_on.keys(),
+            );
         }
 
         if self.result.is_empty() {
@@ -286,6 +317,7 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
             self.result
                 .into_iter()
                 .try_for_each(|(table_handle, table_info)| {
+                    info!("Written to rocksdb handle: {:?}", table_handle);
                     batch.put::<TableInfoSchema>(&table_handle, &table_info)
                 })?;
             Ok(true)

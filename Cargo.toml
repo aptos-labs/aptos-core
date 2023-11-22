@@ -113,6 +113,7 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-integration-tests",
     "ecosystem/indexer-grpc/indexer-grpc-post-processor",
     "ecosystem/indexer-grpc/indexer-grpc-server-framework",
+    "ecosystem/indexer-grpc/indexer-grpc-table-info",
     "ecosystem/indexer-grpc/indexer-grpc-utils",
     "ecosystem/nft-metadata-crawler-parser",
     "ecosystem/node-checker",
@@ -298,7 +299,7 @@ aptos-data-client = { path = "state-sync/aptos-data-client" }
 aptos-data-streaming-service = { path = "state-sync/data-streaming-service" }
 aptos-db = { path = "storage/aptosdb" }
 aptos-db-indexer = { path = "storage/indexer" }
-aptos-db-indexer-async-v2 = { path = "storage/indexer-async-v2" }
+aptos-db-indexer-async-v2 =  { path = "ecosystem/indexer-grpc/indexer-grpc-table-info/src/indexer-async-v2" }
 aptos-db-tool = { path = "storage/db-tool" }
 aptos-debugger = { path = "crates/aptos-debugger" }
 aptos-drop-helper = { path = "crates/aptos-drop-helper" }
@@ -339,6 +340,7 @@ aptos-indexer-grpc-data-access = { path = "ecosystem/indexer-grpc/indexer-grpc-d
 aptos-indexer-grpc-file-store = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store" }
 aptos-indexer-grpc-post-processor = { path = "ecosystem/indexer-grpc/indexer-grpc-post-processor" }
 aptos-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-fullnode" }
+aptos-indexer-grpc-table-info = { path = "ecosystem/indexer-grpc/indexer-grpc-table-info" }
 aptos-indexer-grpc-utils = { path = "ecosystem/indexer-grpc/indexer-grpc-utils" }
 aptos-indexer-grpc-server-framework = { path = "ecosystem/indexer-grpc/indexer-grpc-server-framework" }
 aptos-infallible = { path = "crates/aptos-infallible" }
@@ -444,6 +446,7 @@ ark-std = { version = "0.4.0", features = ["getrandom"] }
 assert_approx_eq = "1.1.0"
 assert_unordered = "0.3.5"
 async-channel = "1.7.1"
+async-compression = "0.4.5"
 async-mutex = "1.4.0"
 async-recursion = "1.0.5"
 async-stream = "0.3"
@@ -504,6 +507,7 @@ event-listener = "2.5.3"
 fail = "0.5.0"
 field_count = "0.1.1"
 flate2 = "1.0.24"
+fs_extra = "1.3.0"
 futures = "0.3.24"
 futures-channel = "0.3.24"
 futures-core = "0.3.25"
@@ -656,6 +660,7 @@ tokio-metrics = "0.1.0"
 tokio-retry = "0.3.0"
 tokio-scoped = { version = "0.2.0" }
 tokio-stream = { version = "0.1.14", features = ["fs"] }
+tokio-tar = "0.3.1"
 tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
 toml = "0.7.4"

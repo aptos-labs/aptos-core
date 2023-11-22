@@ -21,7 +21,7 @@ pub struct GcsFileStoreOperator {
 
 impl GcsFileStoreOperator {
     pub fn new(bucket_name: String, service_account_path: String) -> Self {
-        env::set_var(SERVICE_ACCOUNT_ENV_VAR, service_account_path);
+        env::set_var(SERVICE_ACCOUNT_ENV_VAR, service_account_path.clone());
         Self {
             bucket_name,
             latest_metadata_update_timestamp: None,

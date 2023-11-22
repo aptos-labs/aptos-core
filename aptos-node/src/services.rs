@@ -13,6 +13,7 @@ use aptos_consensus_notifications::ConsensusNotifier;
 use aptos_data_client::client::AptosDataClient;
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_indexer_grpc_fullnode::runtime::bootstrap as bootstrap_indexer_grpc;
+use aptos_indexer_grpc_table_info::runtime::bootstrap as bootstrap_indexer_table_info;
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
 use aptos_mempool::{network::MempoolSyncMsg, MempoolClientRequest, QuorumStoreRequest};
 use aptos_mempool_notifications::MempoolNotificationListener;
@@ -44,10 +45,18 @@ pub fn bootstrap_api_and_indexer(
     Option<Runtime>,
     Option<Runtime>,
     Option<Runtime>,
+    Option<Runtime>,
 )> {
     // Create the mempool client and sender
     let (mempool_client_sender, mempool_client_receiver) =
         mpsc::channel(AC_SMP_CHANNEL_BUFFER_SIZE);
+        
+    let indexer_table_info = bootstrap_indexer_table_info(
+        node_config,
+        chain_id,
+        db_rw.clone(),
+        mempool_client_sender.clone(),
+    );
 
     // Create the API runtime
     let api_runtime = if node_config.api.enabled {
@@ -80,6 +89,7 @@ pub fn bootstrap_api_and_indexer(
     Ok((
         mempool_client_receiver,
         api_runtime,
+        indexer_table_info,
         indexer_runtime,
         indexer_grpc,
     ))

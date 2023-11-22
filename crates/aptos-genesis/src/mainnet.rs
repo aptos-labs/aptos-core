@@ -141,6 +141,7 @@ impl MainnetGenesisInfo {
             false,
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            false
         )?;
         let db_rw = DbReaderWriter::new(aptosdb);
         aptos_executor::db_bootstrapper::generate_waypoint::<AptosVM>(&db_rw, genesis)
