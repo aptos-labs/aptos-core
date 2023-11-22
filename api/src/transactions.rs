@@ -1180,7 +1180,7 @@ impl TransactionsApi {
         ledger_info: LedgerInfo,
         txn: SignedTransaction,
     ) -> SimulateTransactionResult<Vec<UserTransaction>> {
-        // The caller must ensure that the signature is not invalid, as otherwise
+        // The caller must ensure that the signature is not valid, as otherwise
         // a malicious actor could execute the transaction without their knowledge
         if txn.verify_signature().is_ok() {
             return Err(SubmitTransactionError::bad_request_with_code(
