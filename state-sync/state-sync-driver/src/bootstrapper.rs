@@ -33,8 +33,9 @@ use aptos_types::{
 use futures::channel::oneshot;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
-/// The expected version of the genesis transaction
-pub const GENESIS_TRANSACTION_VERSION: u64 = 0;
+// Useful bootstrapper constants
+const BOOTSTRAPPER_LOG_INTERVAL_SECS: u64 = 3;
+pub const GENESIS_TRANSACTION_VERSION: u64 = 0; // The expected version of the genesis transaction
 
 /// A simple container for verified epoch states and epoch ending ledger infos
 /// that have been fetched from the network.
@@ -487,9 +488,13 @@ impl<
             return self.bootstrapping_complete().await;
         }
 
-        info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
-            "Highest synced version is {}, highest_known_ledger_info is {:?}, bootstrapping_mode is {:?}.",
-            highest_synced_version, highest_known_ledger_info, self.get_bootstrapping_mode())));
+        sample!(
+            SampleRate::Duration(Duration::from_secs(BOOTSTRAPPER_LOG_INTERVAL_SECS)),
+            info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
+                "Highest synced version is {}, highest_known_ledger_info is {:?}, bootstrapping_mode is {:?}.",
+                highest_synced_version, highest_known_ledger_info, self.get_bootstrapping_mode()))
+            );
+        );
 
         // Bootstrap according to the mode
         if self.get_bootstrapping_mode().is_fast_sync() {
@@ -832,14 +837,7 @@ impl<
         };
 
         // Compare the highest local epoch end to the highest advertised epoch end
-        if highest_local_epoch_end > highest_advertised_epoch_end {
-            let error_message =
-                format!(
-                    "The highest local epoch end is higher than the advertised epoch end! Local: {:?}, advertised: {:?}",
-                    highest_local_epoch_end, highest_advertised_epoch_end
-                );
-            return Err(Error::AdvertisedDataError(error_message));
-        } else if highest_local_epoch_end < highest_advertised_epoch_end {
+        if highest_local_epoch_end < highest_advertised_epoch_end {
             info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
                 "Found higher epoch ending ledger infos in the network! Local: {:?}, advertised: {:?}",
                    highest_local_epoch_end, highest_advertised_epoch_end
@@ -885,17 +883,17 @@ impl<
             .advertised_data
             .highest_synced_ledger_info()
             .ok_or_else(|| {
-                Error::AdvertisedDataError(
-                    "No highest advertised ledger info found in the network!".into(),
+                Error::UnsatisfiableWaypoint(
+                    "Unable to check waypoint satisfiability! No highest advertised ledger info found in the network!".into(),
                 )
             })?;
         let highest_advertised_version = highest_advertised_ledger_info.ledger_info().version();
 
         // Compare the highest advertised version with our waypoint
         if highest_advertised_version < waypoint_version {
-            Err(Error::AdvertisedDataError(
+            Err(Error::UnsatisfiableWaypoint(
                 format!(
-                    "No advertised version higher than our waypoint! Highest version: {:?}, waypoint version: {:?}",
+                    "The waypoint is not satisfiable! No advertised version higher than our waypoint! Highest version: {:?}, waypoint version: {:?}.",
                     highest_advertised_version, waypoint_version
                 )
             ))

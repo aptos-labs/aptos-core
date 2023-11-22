@@ -663,3 +663,4 @@ yaml
 yamls
 zkSNARK
 zksnark
+observability
