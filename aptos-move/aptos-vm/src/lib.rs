@@ -122,7 +122,7 @@ pub mod transaction_metadata;
 mod transaction_validation;
 mod verifier;
 
-pub use crate::aptos_vm::AptosVM;
+pub use crate::aptos_vm::{AptosSimulationVM, AptosVM};
 use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor};
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -167,15 +167,4 @@ pub trait VMExecutor: Send + Sync {
         state_view: Arc<S>,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
-}
-
-/// This trait describes the VM's simulation interfaces.
-pub trait VMSimulator {
-    /// Simulates a signed transaction (i.e., executes it without performing
-    /// signature verification) on a newly created VM instance.
-    /// *Precondition:* the transaction must **not** have a valid signature.
-    fn create_vm_and_simulate_signed_transaction(
-        transaction: &SignedTransaction,
-        state_view: &impl StateView,
-    ) -> (VMStatus, TransactionOutput);
 }

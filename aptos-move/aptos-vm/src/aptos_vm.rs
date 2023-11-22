@@ -14,7 +14,7 @@ use crate::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
-    verifier, VMExecutor, VMSimulator, VMValidator,
+    verifier, VMExecutor, VMValidator,
 };
 use anyhow::{anyhow, Result};
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
@@ -139,11 +139,6 @@ impl AptosVM {
             is_simulation: false,
             vm_impl: AptosVMImpl::new(resolver),
         }
-    }
-
-    fn for_simulation(mut self) -> Self {
-        self.is_simulation = true;
-        self
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -1996,8 +1991,20 @@ impl VMValidator for AptosVM {
     }
 }
 
-impl VMSimulator for AptosVM {
-    fn create_vm_and_simulate_signed_transaction(
+// Ensure encapsulation of AptosVM APIs by using a wrapper.
+pub struct AptosSimulationVM(AptosVM);
+
+impl AptosSimulationVM {
+    pub fn new(resolver: &impl AptosMoveResolver) -> Self {
+        let mut vm = AptosVM::new(resolver);
+        vm.is_simulation = true;
+        Self(vm)
+    }
+
+    /// Simulates a signed transaction (i.e., executes it without performing
+    /// signature verification) on a newly created VM instance.
+    /// *Precondition:* the transaction must **not** have a valid signature.
+    pub fn create_vm_and_simulate_signed_transaction(
         transaction: &SignedTransaction,
         state_view: &impl StateView,
     ) -> (VMStatus, TransactionOutput) {
@@ -2007,11 +2014,11 @@ impl VMSimulator for AptosVM {
         );
 
         let resolver = state_view.as_move_resolver();
-        let vm = Self::new(&resolver).for_simulation();
+        let vm = Self::new(&resolver);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let (vm_status, vm_output) =
-            vm.execute_user_transaction(&resolver, transaction, &log_context);
+            vm.0.execute_user_transaction(&resolver, transaction, &log_context);
         let txn_output = vm_output
             .try_into_transaction_output(&resolver)
             .expect("Materializing aggregator V1 deltas should never fail");
