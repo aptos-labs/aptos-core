@@ -21,6 +21,7 @@ To add your own resource, click **Edit this page** at the bottom, add your resou
 | [Aptos Validator/Staking Postman Collection](https://github.com/pakaplace/aptos-validator-staking-postman) | A Postman collection for querying staking pool, staking contract, and account resources/events. | [pakaplace](https://github.com/pakaplace/) | 2023-03-10 |
 | [One-stop solution for Aptos node monitoring](https://github.com/LavenderFive/aptos-monitoring) | A monitoring solution for Aptos nodes utilizing Docker containers with Prometheus, Grafana, cAdvisor, NodeExporter, and alerting with AlertManager. | [Lavender.Five Nodes](https://github.com/LavenderFive) | 2023-03-10 |
 | [Monitor Your Aptos validator and validator fullnodes with Prometheus and Grafana](https://github.com/RhinoStake/aptos_monitoring) | A full-featured Grafana/Prometheus dashboard to monitor key infrastructure, node, and chain-related metrics and data relationships. | [RHINO](https://rhinostake.com) | 2023-03-10 |
+| [Supra's Oracle and VRF](https://supraoracles.com/docs/overview/) | Supra is a novel, high-throughput Oracle & IntraLayer: A vertically integrated toolkit of cross-chain solutions (data oracles, asset bridges, automation network, and more) that interlink all blockchains, public (L1s and L2s) or private (enterprises). | [ksdumont] | 11/22/23 |
 
 ## Tutorials
 
