@@ -24,6 +24,9 @@ function cargo_fuzz() {
 
 function usage() {
     case "$1" in
+        "add")
+            echo "Usage: $0 add <fuzz_target>"
+            ;;
         "build")
             echo "Usage: $0 build <fuzz_target|all> [target_dir]"
             ;;
@@ -41,6 +44,7 @@ function usage() {
             ;;
         *)
             echo "Usage: $0 <build|build-oss-fuzz|list|run|test>"
+            echo "    add               adds a new fuzz target"
             echo "    build             builds fuzz targets"
             echo "    build-oss-fuzz    builds fuzz targets for oss-fuzz"
             echo "    list              lists existing fuzz targets"
@@ -108,11 +112,65 @@ function test() {
     done
 }
 
+function add() {
+    if [ -z "$1" ]; then
+        usage add
+    fi
+
+    fuzz_target=$1
+    fuzz_target_path="$fuzz_target.rs"
+
+    mkdir -p fuzz/fuzz_targets/$(dirname $fuzz_target_path) && touch fuzz/fuzz_targets/$fuzz_target_path
+
+    if [ $? -eq 0 ]; then
+        {
+            echo ""
+            echo "[[bin]]"
+            echo "name = \"$fuzz_target\""
+            echo "path = \"$fuzz_target_path\""
+            echo "test = false"
+            echo "doc = false"
+        } >> $fuzz_path/Cargo.toml
+        info "Fuzzing target '$fuzz_target' added successfully at $fuzz_target_path."
+    else
+        error "Failed to create directory or file for fuzzing target."
+    fi
+
+    mkdir -p fuzz/fuzz_targets/$(dirname $fuzz_target_path) && touch fuzz/fuzz_targets/$fuzz_target_path
+
+    if [ $? -eq 0 ]; then
+        {
+            echo ""
+            echo "[[bin]]"
+            echo "name = \"$fuzz_target\""
+            echo "path = \"$fuzz_target_path\""
+            echo "test = false"
+            echo "doc = false"
+        } >> $fuzz_path/Cargo.toml
+        info "Fuzzing target '$fuzz_target' added successfully at $fuzz_target_path."
+    else
+        error "Failed to create directory or file for fuzzing target."
+    fi
+}
+
 function list() {
     cargo fuzz list
 }
 
+function check_cargo_fuzz() {
+    if ! command -v cargo-fuzz &> /dev/null; then
+        info "cargo-fuzz is not installed. Installing..."
+        cargo install cargo-fuzz
+    fi
+}
+
+check_cargo_fuzz
+
 case "$1" in
+  "add")
+    shift
+    add "$@"
+    ;;
   "build")
     shift
     build "$@"
