@@ -306,6 +306,20 @@ module std::features {
         is_enabled(OPERATOR_BENEFICIARY_CHANGE)
     }
 
+    const VM_BINARY_FORMAT_V7: u64 = 40;
+
+    const RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM: u64 = 41;
+
+    /// Whether the operator commission rate change in delegation pool is enabled.
+    /// Lifetime: transient
+    const COMMISSION_CHANGE_DELEGATION_POOL: u64 = 42;
+
+    public fun get_commission_change_delegation_pool_feature(): u64 { COMMISSION_CHANGE_DELEGATION_POOL }
+
+    public fun commission_change_delegation_pool_enabled(): bool acquires Features {
+        is_enabled(COMMISSION_CHANGE_DELEGATION_POOL)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

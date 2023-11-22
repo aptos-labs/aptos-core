@@ -224,7 +224,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
                     Severity::Warning
                 },
             ) {
-                diagnostics::report_diagnostics(&files, diags);
+                diagnostics::report_diagnostics_exit_on_error(&files, diags);
             }
 
             let compilation_result = compiler.at_cfgir(cfgir).build();
