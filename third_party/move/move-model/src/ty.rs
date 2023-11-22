@@ -1228,14 +1228,21 @@ impl Substitution {
                 return Ok(Type::Tuple(self.unify_vec(
                     // Note for tuples, we pass on `variance` not `sub_variance`. A shallow
                     // variance type will be effective for the elements of tuples,
-                    // which are treated similar as expression lists in function calls.
+                    // which are treated similar as expression lists in function calls, and allow
+                    // e.g. reference type conversions.
                     context, variance, order, ts1, ts2, "tuples",
                 )?));
             },
             (Type::Fun(a1, r1), Type::Fun(a2, r2)) => {
+                // Same as for tuples, we pass on `variance` not `sub_variance`, allowing
+                // conversion for arguments. We also have contra-variance of arguments:
+                //   |T1|R1 <= |T2|R2  <==>  T1 >= T2 && R1 <= R2
+                // Intuitively, function f1 can safely _substitute_ function f2 if any argument
+                // of type T2 can be passed as a T1 -- which is the case since T1 >= T2 (every
+                // T2 is also a T1).
                 return Ok(Type::Fun(
-                    Box::new(self.unify(context, sub_variance, order, a1, a2)?),
-                    Box::new(self.unify(context, sub_variance, order, r1, r2)?),
+                    Box::new(self.unify(context, variance, order.swap(), a1, a2)?),
+                    Box::new(self.unify(context, variance, order, r1, r2)?),
                 ));
             },
             (Type::Struct(m1, s1, ts1), Type::Struct(m2, s2, ts2)) => {
