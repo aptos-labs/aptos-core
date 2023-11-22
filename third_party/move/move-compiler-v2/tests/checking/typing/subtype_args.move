@@ -21,6 +21,8 @@ module 0x8675309::M {
     }
 
     inline fun t2(f: |&u64, &mut u64|) {
-        f(&mut 0, &mut 0)
+        f(&mut 0, &mut 0);
+        f(&0, &mut 0);
     }
+
 }
