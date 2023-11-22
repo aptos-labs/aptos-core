@@ -370,7 +370,7 @@ impl Type {
                 },
                 _ => Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message("VecMutBorrow expects a vector reference".to_string())
+                        .with_message("VecImmBorrow expects a vector reference".to_string())
                         .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
                 ),
             },
