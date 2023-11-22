@@ -87,6 +87,7 @@ pub enum FeatureFlag {
     SponsoredAutomaticAccountCreation,
     FeePayerAccountOptional,
     LimitMaxIdentifierLength,
+    OperatorBeneficiaryChange,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -226,6 +227,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::FeePayerAccountOptional => AptosFeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
             FeatureFlag::LimitMaxIdentifierLength => AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
+            FeatureFlag::OperatorBeneficiaryChange => AptosFeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
         }
     }
 }
@@ -288,6 +290,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL => FeatureFlag::FeePayerAccountOptional,
             AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH => FeatureFlag::LimitMaxIdentifierLength,
+            AptosFeatureFlag::OPERATOR_BENEFICIARY_CHANGE => FeatureFlag::OperatorBeneficiaryChange,
         }
     }
 }

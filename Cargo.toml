@@ -48,6 +48,7 @@ members = [
     "consensus/consensus-types",
     "consensus/safety-rules",
     "crates/aptos",
+    "crates/aptos-admin-service",
     "crates/aptos-api-tester",
     "crates/aptos-bitvec",
     "crates/aptos-build-info",
@@ -267,6 +268,7 @@ rust-version = "1.71.1"
 # Please do not add any test features here: they should be declared by the individual crate.
 aptos = { path = "crates/aptos" }
 aptos-accumulator = { path = "storage/accumulator" }
+aptos-admin-service = { path = "crates/aptos-admin-service" }
 aptos-aggregator = { path = "aptos-move/aptos-aggregator" }
 aptos-api = { path = "api" }
 aptos-api-test-context = { path = "api/test-context" }
@@ -432,6 +434,8 @@ ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
 assert_approx_eq = "1.1.0"
 assert_unordered = "0.3.5"
+async-channel = "1.7.1"
+async-mutex = "1.4.0"
 async-stream = "0.3"
 async-trait = "0.1.53"
 axum = "0.5.16"
@@ -507,6 +511,7 @@ heck = "0.3.2"
 hex = "0.4.3"
 hkdf = "0.10.0"
 hostname = "0.3.1"
+http = "0.2.9"
 httpmock = "0.6.8"
 hyper = { version = "0.14.18", features = ["full"] }
 hyper-tls = "0.5.0"
@@ -523,6 +528,7 @@ jemallocator = { version = "0.3.2", features = [
 ] }
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
+lazy_static = "1.4.0"
 libc = "0.2.147"
 libfuzzer-sys = "0.4.6"
 libsecp256k1 = "0.7.0"
@@ -551,6 +557,7 @@ pin-project = "1.0.10"
 poem = { version = "=1.3.55", features = ["anyhow", "rustls"] }
 poem-openapi = { version = "=2.0.11", features = ["swagger-ui", "url"] }
 poem-openapi-derive = "=2.0.11"
+pprof = { version = "0.11", features = ["flamegraph", "protobuf-codec"] }
 pretty_assertions = "1.2.1"
 procfs = "0.14.1"
 proc-macro2 = "1.0.38"
@@ -582,10 +589,12 @@ reqwest-retry = "0.2.1"
 ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
 rocksdb = { version = "0.21.0", features = ["lz4"] }
+rstack-self = { version = "0.3.0", features = ["dw"], default_features = false }
 rstest = "0.15.0"
 rusty-fork = "0.3.0"
 sha-1 = "0.10.0"
 sha2 = "0.9.3"
+sha256 = "1.4.0"
 sha2_0_10_6 = { package = "sha2", version = "0.10.6" }
 sha3 = "0.9.1"
 siphasher = "0.3.10"
@@ -621,6 +630,7 @@ tokio = { version = "1.21.0", features = ["full"] }
 tokio-io-timeout = "1.2.0"
 tokio-metrics = "0.1.0"
 tokio-retry = "0.3.0"
+tokio-scoped = { version = "0.2.0" }
 tokio-stream = { version = "0.1.14", features = ["fs"] }
 tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }

@@ -3,11 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // All modules should be declared below
+mod admin_service_config;
 mod api_config;
 mod base_config;
 mod config_optimizer;
 mod config_sanitizer;
 mod consensus_config;
+mod dag_consensus_config;
 mod error;
 mod execution_config;
 mod gas_estimation_config;
@@ -17,6 +19,7 @@ mod indexer_grpc_config;
 mod inspection_service_config;
 mod logger_config;
 mod mempool_config;
+mod netbench;
 mod network_config;
 mod node_config;
 mod node_config_loader;
@@ -31,6 +34,7 @@ pub mod transaction_filter_type;
 mod utils;
 
 // All public usage statements should be declared below
+pub use admin_service_config::*;
 pub use api_config::*;
 pub use base_config::*;
 pub use consensus_config::*;

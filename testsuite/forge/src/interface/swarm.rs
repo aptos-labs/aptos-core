@@ -407,15 +407,14 @@ async fn wait_for_all_nodes_to_catchup_to_target_version_or_epoch(
                 ))
             }))
             .await;
-        let node_versions_and_epochs = version_and_epoch_results
-            .map(|results| results.into_iter().collect::<Vec<_>>())
-            .ok();
+        let node_versions_and_epochs =
+            version_and_epoch_results.map(|results| results.into_iter().collect::<Vec<_>>());
 
         // Check if all nodes are caught up to the target version
         let all_caught_up_to_version = target_version
             .map(|target_version| {
                 node_versions_and_epochs
-                    .clone()
+                    .as_ref()
                     .map(|responses| {
                         responses
                             .iter()
@@ -429,7 +428,7 @@ async fn wait_for_all_nodes_to_catchup_to_target_version_or_epoch(
         let all_caught_up_to_epoch = target_epoch
             .map(|target_epoch| {
                 node_versions_and_epochs
-                    .clone()
+                    .as_ref()
                     .map(|responses| responses.iter().all(|(_, _, epoch)| *epoch >= target_epoch))
                     .unwrap_or(false) // No epoch found
             })
@@ -453,7 +452,7 @@ async fn wait_for_all_nodes_to_catchup_to_target_version_or_epoch(
                 target_version,
                 target_epoch,
                 start_time.elapsed().as_secs(),
-                node_versions_and_epochs.unwrap_or_default()
+                node_versions_and_epochs
             ));
         }
 

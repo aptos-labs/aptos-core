@@ -51,6 +51,7 @@ byteorder = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true }
 claims = { workspace = true }
+clap = { workspace = true }
 dashmap = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }

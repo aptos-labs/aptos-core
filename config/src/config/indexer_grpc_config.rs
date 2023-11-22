@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::config::{
-    config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
+    config_optimizer::ConfigOptimizer, node_config_loader::NodeType, Error, NodeConfig,
 };
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
+use serde_yaml::Value;
 
 // Useful indexer defaults
 const DEFAULT_ADDRESS: &str = "0.0.0.0:50051";
@@ -35,17 +36,18 @@ pub struct IndexerGrpcConfig {
     pub output_batch_size: Option<u16>,
 }
 
-impl ConfigSanitizer for IndexerGrpcConfig {
-    fn sanitize(
+impl ConfigOptimizer for IndexerGrpcConfig {
+    fn optimize(
         node_config: &mut NodeConfig,
+        _local_config_yaml: &Value,
         _node_type: NodeType,
-        _chain_id: ChainId,
-    ) -> Result<(), Error> {
+        _chain_id: Option<ChainId>,
+    ) -> Result<bool, Error> {
         let indexer_grpc_config = &mut node_config.indexer_grpc;
 
         // If the indexer is not enabled, we don't need to do anything
         if !indexer_grpc_config.enabled {
-            return Ok(());
+            return Ok(false);
         }
 
         // Set appropriate defaults
@@ -63,6 +65,6 @@ impl ConfigSanitizer for IndexerGrpcConfig {
             .output_batch_size
             .or(Some(DEFAULT_OUTPUT_BATCH_SIZE));
 
-        Ok(())
+        Ok(true)
     }
 }
