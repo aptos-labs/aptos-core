@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::{Arc, Mutex};
 use crate::sharded_block_executor::{ExecutorShardCommand, StreamedExecutorShardCommand};
 use aptos_state_view::StateView;
 use aptos_types::transaction::TransactionOutput;

@@ -18,6 +18,7 @@ use aptos_types::{
 use move_core_types::vm_status::VMStatus;
 use std::{marker::PhantomData, sync::Arc};
 use std::time::SystemTime;
+use crate::sharded_block_executor::streamed_transactions_provider::BlockingTransactionsProvider;
 
 pub mod aggr_overridden_state_view;
 pub mod coordinator_client;
@@ -56,10 +57,7 @@ pub enum StreamedExecutorShardCommand<S> {
         usize,
         usize,
         usize,
-    ),
-    ExecuteBatch(
-        Vec<AnalyzedTransaction>,
-        usize,
+        Arc<BlockingTransactionsProvider>
     ),
     Stop,
 }
