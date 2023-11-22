@@ -2077,19 +2077,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         },
                         _ => unreachable!(),
                     };
-                    /* TODO: remove debug print once stabilized
-                    println!(
-                        "let {:?} = ({:?}, {})",
-                        lvlist,
-                        ty,
-                        //ty.display(&self.parent.parent.env.get_type_display_ctx()),
-                            format!("{:?}", e)
-                            //e.display(self.parent.parent.env).to_string()
-                        } else {
-                            "none".to_string()
-                        }
-                    );
-                     */
 
                     // Translate the lhs lvalue list into a pattern
                     let pat =
@@ -2428,6 +2415,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 &self.unification_context,
                 loc,
                 expected_type,
+                self.type_variance(),
                 WideningOrder::RightToLeft,
                 constraint,
             ) {
@@ -2440,10 +2428,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     .parent
                     .parent
                     .lookup_struct_fields(mid.qualified_inst(sid, inst));
-                let field_type = field_map
-                    .get(&field_name)
-                    .cloned()
-                    .unwrap_or_else(|| Type::Error); // this error is reported via type unification
+                let field_type = field_map.get(&field_name).cloned().unwrap_or(Type::Error); // this error is reported via type unification
 
                 // Translate the new value with the field type as the expected type.
                 let value_exp = self.translate_exp(args[2], &field_type);
@@ -2844,8 +2829,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
     }
 
-    /// Adds the constraints to the provided types, reporting errors if the types cannot satisfy
-    /// the constraints.
+    /// Adds the constraints to the provided types, generating an error result if the types
+    /// cannot satisfy the constraints.
     fn add_constraints(
         &mut self,
         subs: &mut Substitution,
@@ -2859,6 +2844,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 &self.unification_context,
                 loc,
                 &subs.specialize(ty),
+                self.type_variance(),
                 WideningOrder::LeftToRight,
                 ctr.to_owned(),
             )?;
@@ -2866,11 +2852,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         Ok(())
     }
 
+    /// Adds a single constraint and reports error if the constraint is not satisfied.
     fn add_constraint_and_report(&mut self, loc: &Loc, ty: &Type, c: Constraint) {
         if let Err(e) = self.subs.eval_constraint(
             &self.unification_context,
             loc,
             &self.subs.specialize(ty),
+            self.type_variance(),
             WideningOrder::LeftToRight,
             c,
         ) {

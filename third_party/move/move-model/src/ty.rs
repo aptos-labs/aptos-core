@@ -132,7 +132,7 @@ impl Constraint {
     }
 
     /// Joins the two constraints. If they are incompatible, produces a type unification error.
-    /// Otherwise returns true if the constraint has been absorbed by the other and can be waived.
+    /// Otherwise returns true if `self` absorbs the `other` constraint (and waives the `other`).
     pub fn join(
         &mut self,
         context: &impl UnificationContext,
@@ -669,14 +669,14 @@ impl Type {
                     .expect("Invariant violation: vector type argument contains incomplete, tuple, or spec type"))
             )),
             Reference(r, t) =>
-            match r {
-                ReferenceKind::Mutable => {
-                    Some(MType::MutableReference(Box::new(t.into_normalized_type(env).expect("Invariant violation: reference type contains incomplete, tuple, or spec type"))))
+                match r {
+                    ReferenceKind::Mutable => {
+                        Some(MType::MutableReference(Box::new(t.into_normalized_type(env).expect("Invariant violation: reference type contains incomplete, tuple, or spec type"))))
+                    }
+                    ReferenceKind::Immutable => {
+                        Some(MType::Reference(Box::new(t.into_normalized_type(env).expect("Invariant violation: reference type contains incomplete, tuple, or spec type"))))
+                    }
                 },
-                ReferenceKind::Immutable => {
-                    Some(MType::Reference(Box::new(t.into_normalized_type(env).expect("Invariant violation: reference type contains incomplete, tuple, or spec type"))))
-                },
-            },
             TypeParameter(idx) => Some(MType::TypeParameter(idx)),
             Tuple(..) | Error | Fun(..) | TypeDomain(..) | ResourceDomain(..) | Var(..) =>
                 None
@@ -882,6 +882,7 @@ pub trait UnificationContext {
 
 /// A struct representing an empty unification context.
 pub struct NoUnificationContext;
+
 impl UnificationContext for NoUnificationContext {
     fn get_struct_field_map(&self, _id: &QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type> {
         BTreeMap::new()
@@ -891,6 +892,7 @@ impl UnificationContext for NoUnificationContext {
 /// A struct representing a cached unification context.
 #[derive(Debug)]
 pub struct CachedUnificationContext(pub BTreeMap<QualifiedId<StructId>, BTreeMap<Symbol, Type>>);
+
 impl UnificationContext for CachedUnificationContext {
     fn get_struct_field_map(&self, id: &QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type> {
         self.0
@@ -974,6 +976,7 @@ impl Substitution {
         &mut self,
         context: &impl UnificationContext,
         var: u32,
+        variance: Variance,
         order: WideningOrder,
         ty: Type,
     ) -> Result<(), TypeUnificationError> {
@@ -984,7 +987,7 @@ impl Substitution {
                 // The effective order is the one combining the constraint order with the
                 // context order. The result needs to be swapped because the constraint
                 // of the variable is evaluated against the given type.
-                self.eval_constraint(context, &loc, &ty, o.combine(order).swap(), c)?
+                self.eval_constraint(context, &loc, &ty, variance, o.combine(order).swap(), c)?
             }
         }
         self.subs.insert(var, ty);
@@ -1000,6 +1003,7 @@ impl Substitution {
         context: &impl UnificationContext,
         loc: &Loc,
         ty: &Type,
+        variance: Variance,
         order: WideningOrder,
         c: Constraint,
     ) -> Result<(), TypeUnificationError> {
@@ -1011,7 +1015,7 @@ impl Substitution {
             self.add_constraint(context, *other_var, loc.clone(), order, c)
         } else if c.propagate_over_reference() && ty.is_reference() {
             // Propagate constraint to referred type
-            self.eval_constraint(context, loc, ty.skip_reference(), order, c)
+            self.eval_constraint(context, loc, ty.skip_reference(), variance, order, c)
         } else {
             let constraint_unsatisfied_error = || {
                 Err(TypeUnificationError::ConstraintUnsatisfied(
@@ -1021,51 +1025,40 @@ impl Substitution {
                     c.clone(),
                 ))
             };
-            match &c {
-                Constraint::SomeNumber(options) => match ty {
-                    Type::Primitive(prim) if options.contains(prim) => Ok(()),
-                    _ => constraint_unsatisfied_error(),
+            match (&c, ty) {
+                (Constraint::SomeNumber(options), Type::Primitive(prim))
+                    if options.contains(prim) =>
+                {
+                    Ok(())
                 },
-                Constraint::SomeReference(inner_type) => match ty {
-                    Type::Reference(_, target_type) => self
-                        .unify(
-                            context,
-                            Variance::NoVariance,
-                            order,
-                            target_type,
-                            inner_type,
-                        )
-                        .map(|_| ())
-                        .map_err(|e| e.redirect(loc.clone())),
-                    _ => constraint_unsatisfied_error(),
-                },
-                Constraint::SomeStruct(constr_field_map) => {
-                    if let Type::Struct(mid, sid, inst) = ty {
-                        let field_map =
-                            context.get_struct_field_map(&mid.qualified_inst(*sid, inst.clone()));
-                        // The actual struct must have all the fields in the constraint, with same
-                        // type.
-                        for (field_name, field_ty) in constr_field_map {
-                            if let Some(declared_field_type) = field_map.get(field_name) {
-                                self.unify(
-                                    context,
-                                    Variance::NoVariance,
-                                    WideningOrder::RightToLeft,
-                                    field_ty,
-                                    declared_field_type,
-                                )
-                                .map(|_| ())
-                                .map_err(|e| e.redirect(loc.clone()))?
-                            } else {
-                                return constraint_unsatisfied_error();
-                            }
+                (Constraint::SomeReference(inner_type), Type::Reference(_, target_type)) => self
+                    .unify(context, variance, order, target_type, inner_type)
+                    .map(|_| ())
+                    .map_err(|e| e.redirect(loc.clone())),
+                (Constraint::SomeStruct(constr_field_map), Type::Struct(mid, sid, inst)) => {
+                    let field_map =
+                        context.get_struct_field_map(&mid.qualified_inst(*sid, inst.clone()));
+                    // The actual struct must have all the fields in the constraint, with same
+                    // type.
+                    for (field_name, field_ty) in constr_field_map {
+                        if let Some(declared_field_type) = field_map.get(field_name) {
+                            self.unify(
+                                context,
+                                variance,
+                                WideningOrder::RightToLeft,
+                                field_ty,
+                                declared_field_type,
+                            )
+                            .map(|_| ())
+                            .map_err(|e| e.redirect(loc.clone()))?
+                        } else {
+                            return constraint_unsatisfied_error();
                         }
-                        Ok(())
-                    } else {
-                        constraint_unsatisfied_error()
                     }
+                    Ok(())
                 },
-                Constraint::WithDefault(_) => Ok(()),
+                (Constraint::WithDefault(_), _) => Ok(()),
+                _ => constraint_unsatisfied_error(),
             }
         }
     }
@@ -1334,7 +1327,7 @@ impl Substitution {
             }
             // Cycle check.
             if !self.occurs_check(&t2, *v1) {
-                self.bind(context, *v1, order, t2.clone())?;
+                self.bind(context, *v1, variance, order, t2.clone())?;
                 Ok(Some(t2))
             } else {
                 Err(TypeUnificationError::CyclicSubstitution(
@@ -1565,6 +1558,7 @@ impl TypeUnificationAdapter {
 }
 
 impl TypeUnificationError {
+    /// Redirect the error to be reported at given location instead of default location.
     pub fn redirect(self, loc: Loc) -> Self {
         Self::RedirectedError(loc, Box::new(self))
     }
@@ -1638,27 +1632,33 @@ impl TypeUnificationError {
                             .collect::<Vec<_>>();
                         if !missing_fields.is_empty() {
                             // Primary error is missing fields
+                            let fields = Self::print_fields(
+                                display_context.env,
+                                missing_fields.into_iter().cloned(),
+                            );
                             format!(
                                 "{} not declared in struct `{}`",
-                                Self::print_fields(
-                                    display_context.env,
-                                    missing_fields.into_iter().cloned()
-                                ),
+                                fields,
                                 ty.display(display_context)
                             )
                         } else {
                             // Primary error is a type mismatch
-                            format!("{} in `{}`",
-                            field_map.iter().filter_map(|(n, ty)| {
-                                let Some(actual_ty) = actual_field_map.get(n) else { return None };
-                                if ty != actual_ty {
-                                    Some(format!("field `{}` has type `{}` instead of `{}`",
-                                                 n.display(display_context.env.symbol_pool()),
-                                                 ty.display(display_context), actual_ty.display(display_context)))
-                                } else {
-                                    None
-                                }
-                            }).join(" and "), ty.display(display_context))
+                            let fields = field_map
+                                .iter()
+                                .filter_map(|(n, ty)| {
+                                    let Some(actual_ty) = actual_field_map.get(n) else { return None; };
+                                    if ty != actual_ty {
+                                        Some(format!("field `{}` has type `{}` instead of `{}`",
+                                                     n.display(display_context.env.symbol_pool()),
+                                                     ty.display(display_context),
+                                                     actual_ty.display(display_context)
+                                        ))
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .join(" and ");
+                            format!("{} in `{}`", fields, ty.display(display_context))
                         }
                     } else {
                         format!(
@@ -1670,7 +1670,7 @@ impl TypeUnificationError {
                                     " with {}",
                                     Self::print_fields(
                                         display_context.env,
-                                        field_map.keys().cloned()
+                                        field_map.keys().cloned(),
                                     )
                                 )
                             },
