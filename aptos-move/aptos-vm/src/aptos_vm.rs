@@ -1742,6 +1742,8 @@ impl AptosVM {
         resolver: &impl AptosMoveResolver,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus> {
+        assert!(!self.is_simulation, "VM has to be created for execution");
+
         if let SignatureVerifiedTransaction::Invalid(_) = txn {
             let (vm_status, output) =
                 discard_error_vm_status(VMStatus::error(StatusCode::INVALID_SIGNATURE, None));
