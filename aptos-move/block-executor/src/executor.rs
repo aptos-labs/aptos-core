@@ -32,6 +32,7 @@ use aptos_mvhashmap::{
 use aptos_state_view::TStateView;
 use aptos_types::{
     aggregator::PanicError,
+    block_executor::config::BlockExecutorConfig,
     contract_event::TransactionEvent,
     executable::Executable,
     fee_statement::FeeStatement,
@@ -74,20 +75,19 @@ where
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
     pub fn new(
-        concurrency_level: usize,
+        config: BlockExecutorConfig,
         executor_thread_pool: Arc<ThreadPool>,
-        maybe_block_gas_limit: Option<u64>,
         transaction_commit_hook: Option<L>,
     ) -> Self {
         assert!(
-            concurrency_level > 0 && concurrency_level <= num_cpus::get(),
+            config.local.concurrency_level > 0 && config.local.concurrency_level <= num_cpus::get(),
             "Parallel execution concurrency level {} should be between 1 and number of CPUs",
-            concurrency_level
+            config.local.concurrency_level
         );
         Self {
-            concurrency_level,
+            concurrency_level: config.local.concurrency_level,
             executor_thread_pool,
-            maybe_block_gas_limit,
+            maybe_block_gas_limit: config.onchain.block_gas_limit_type.block_gas_limit(),
             transaction_commit_hook,
             phantom: PhantomData,
         }
