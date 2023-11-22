@@ -56,8 +56,9 @@ use aptos_testcases::{
     validator_reboot_stress_test::ValidatorRebootStressTest,
     CompositeNetworkTest,
 };
-use clap::{Parser, Subcommand, __derive_refs::once_cell::sync::Lazy};
+use clap::{Parser, Subcommand};
 use futures::stream::{FuturesUnordered, StreamExt};
+use once_cell::sync::Lazy;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use std::{
     env,

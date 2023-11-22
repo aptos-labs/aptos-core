@@ -1630,6 +1630,7 @@ dependencies = [
  "clap 4.3.21",
  "futures",
  "jemallocator",
+ "once_cell",
  "rand 0.7.3",
  "random_word",
  "reqwest",
