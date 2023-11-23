@@ -17,3 +17,5 @@ anyhow = "1.0"
 clap = { version = "4.3", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 toml = "0.5"
+
+move-package = { path = "../move-package" }

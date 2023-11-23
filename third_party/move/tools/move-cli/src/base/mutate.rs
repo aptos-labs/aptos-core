@@ -25,7 +25,9 @@ pub struct Mutate {
 }
 
 impl Mutate {
-    pub fn execute(self, _path: Option<PathBuf>, _config: BuildConfig) -> anyhow::Result<()> {
+    pub fn execute(self, path: Option<PathBuf>, config: BuildConfig) -> anyhow::Result<()> {
+        let path = path.unwrap_or_else(|| PathBuf::from("."));
+
         let Self { options } = self;
 
         let opts = match options {
@@ -33,7 +35,7 @@ impl Mutate {
             _ => vec![],
         };
 
-        let options = move_mutator::Options::create_from_args(&opts)?;
-        move_mutator::run_move_mutator(options)
+        let options = move_mutator::cli::Options::create_from_args(&opts)?;
+        move_mutator::run_move_mutator(options, config, path)
     }
 }
