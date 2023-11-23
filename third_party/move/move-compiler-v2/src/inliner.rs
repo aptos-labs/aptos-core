@@ -204,13 +204,12 @@ fn functions_needing_inlining_in_order(
         .collect();
 
     // Set of inline functions calling at least one inline function.
-    let inline_functions_calling_others: Vec<QualifiedFunId> =
-        inline_function_call_graph
-            .iter()
-            .filter(|(_, callees)| !callees.is_empty())
-            .map(|(caller_fnid, _)| caller_fnid)
-            .cloned()
-            .collect();
+    let inline_functions_calling_others: Vec<QualifiedFunId> = inline_function_call_graph
+        .iter()
+        .filter(|(_, callees)| !callees.is_empty())
+        .map(|(caller_fnid, _)| caller_fnid)
+        .cloned()
+        .collect();
 
     // Check for cycles
     let cycles = check_for_cycles(&inline_function_call_graph);
@@ -256,18 +255,17 @@ fn functions_needing_inlining_in_order(
 
     // Identify subset of non-inline functions which call inline functions.  Order doesn't matter
     // here.
-    let non_inline_functions_needing_inlining: Vec<QualifiedFunId> =
-        call_graph
-            .iter()
-            .filter(|(caller_fnid, callees)| {
-                !env.get_function(**caller_fnid).is_inline()
-                    && callees
-                        .iter()
-                        .any(|callee_fnid| env.get_function(*callee_fnid).is_inline())
-            })
-            .map(|(caller_fnid, _)| caller_fnid)
-            .cloned()
-            .collect();
+    let non_inline_functions_needing_inlining: Vec<QualifiedFunId> = call_graph
+        .iter()
+        .filter(|(caller_fnid, callees)| {
+            !env.get_function(**caller_fnid).is_inline()
+                && callees
+                    .iter()
+                    .any(|callee_fnid| env.get_function(*callee_fnid).is_inline())
+        })
+        .map(|(caller_fnid, _)| caller_fnid)
+        .cloned()
+        .collect();
 
     let result: Vec<QualifiedFunId> =
         chain(po_inline_functions, non_inline_functions_needing_inlining).collect();
@@ -437,16 +435,15 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
                 let type_args = self.env.get_node_instantiation(call_id);
                 let parameters = func_env.get_parameters();
                 let func_loc = func_env.get_loc();
-                let body_expr = if let Some(Some(expr)) =
-                    self.inliner.funexprs_after_inlining.get(&qfid)
-                {
-                    // `qfid` was previously inlined into, use the post-inlining copy of body.
-                    Some(expr.clone())
-                } else {
-                    // `qfid` was not previously inlined into, look for the original body expr.
-                    let func_env_def = func_env.get_def();
-                    (*func_env_def).as_ref().cloned()
-                };
+                let body_expr =
+                    if let Some(Some(expr)) = self.inliner.funexprs_after_inlining.get(&qfid) {
+                        // `qfid` was previously inlined into, use the post-inlining copy of body.
+                        Some(expr.clone())
+                    } else {
+                        // `qfid` was not previously inlined into, look for the original body expr.
+                        let func_env_def = func_env.get_def();
+                        (*func_env_def).as_ref().cloned()
+                    };
                 // inline here
                 if let Some(expr) = body_expr {
                     if self.inliner.debug {
@@ -582,11 +579,10 @@ impl ShadowStack {
         &mut self,
         entering_vars: impl Iterator<Item = &'a Symbol>,
     ) {
-        let entering_free_vars: Vec<Symbol> =
-            entering_vars
-                .filter_map(|sym| self.shadow_symbols_inverse.get(sym))
-                .cloned()
-                .collect();
+        let entering_free_vars: Vec<Symbol> = entering_vars
+            .filter_map(|sym| self.shadow_symbols_inverse.get(sym))
+            .cloned()
+            .collect();
         self.enter_scope(entering_free_vars);
     }
 
@@ -1019,33 +1015,32 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         // Disallow Return and free LoopCont("continue" and "break") expressions in an inlined function.
         // Record if this is a Loop, as well as tracking loop nesting depth in self.in_loop.
-        let this_is_loop =
-            match exp.as_ref() {
-                ExpData::Return(node_id, _) => {
-                    let node_loc = self.env.get_node_loc(*node_id);
-                    self.env.error(
-                        &node_loc,
-                        concat!("Return not currently supported in inline functions"),
-                    );
-                    false
-                },
-                ExpData::Loop(..) => {
-                    self.in_loop += 1;
-                    true
-                },
-                ExpData::LoopCont(node_id, is_continue) if self.in_loop == 0 => {
-                    let node_loc = self.env.get_node_loc(*node_id);
-                    self.env.error(
-                        &node_loc,
-                        &format!(
-                            "{} outside of a loop not currently supported in inline functions",
-                            if *is_continue { "Continue" } else { "Break" },
-                        ),
-                    );
-                    false
-                },
-                _ => false,
-            };
+        let this_is_loop = match exp.as_ref() {
+            ExpData::Return(node_id, _) => {
+                let node_loc = self.env.get_node_loc(*node_id);
+                self.env.error(
+                    &node_loc,
+                    concat!("Return not currently supported in inline functions"),
+                );
+                false
+            },
+            ExpData::Loop(..) => {
+                self.in_loop += 1;
+                true
+            },
+            ExpData::LoopCont(node_id, is_continue) if self.in_loop == 0 => {
+                let node_loc = self.env.get_node_loc(*node_id);
+                self.env.error(
+                    &node_loc,
+                    &format!(
+                        "{} outside of a loop not currently supported in inline functions",
+                        if *is_continue { "Continue" } else { "Break" },
+                    ),
+                );
+                false
+            },
+            _ => false,
+        };
 
         // Proceed with default behavior in any case.
         let result = self.rewrite_exp_descent(exp);

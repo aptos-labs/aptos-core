@@ -633,17 +633,16 @@ impl ExpData {
     /// Returns the bound local variables with node id in this expression
     pub fn bound_local_vars_with_node_id(&self) -> BTreeMap<Symbol, NodeId> {
         let mut vars = BTreeMap::new();
-        let mut visitor =
-            |up: bool, e: &ExpData| {
-                use ExpData::*;
-                if up {
-                    if let LocalVar(id, sym) = e {
-                        if !vars.iter().any(|(s, _)| s == sym) {
-                            vars.insert(*sym, *id);
-                        }
+        let mut visitor = |up: bool, e: &ExpData| {
+            use ExpData::*;
+            if up {
+                if let LocalVar(id, sym) = e {
+                    if !vars.iter().any(|(s, _)| s == sym) {
+                        vars.insert(*sym, *id);
                     }
                 }
-            };
+            }
+        };
         self.visit_pre_post(&mut visitor);
         vars
     }
@@ -654,50 +653,49 @@ impl ExpData {
         F: FnMut(&NodeId, &Symbol),
     {
         let mut shadowed: BTreeMap<Symbol, usize> = BTreeMap::new();
-        let mut visitor =
-            |up: bool, e: &ExpData| {
-                use ExpData::*;
-                let decls = match e {
-                    Lambda(_, pat, _) | Block(_, pat, _, _) => {
-                        pat.vars().iter().map(|(_, d)| *d).collect_vec()
-                    },
-                    Quant(_, _, ranges, ..) => ranges
-                        .iter()
-                        .flat_map(|(pat, _)| pat.vars().into_iter().map(|(_, name)| name))
-                        .collect_vec(),
-                    _ => vec![],
-                };
-                if !up {
-                    // Visit the Assigned pat on the way down, before visiting the RHS expression
-                    if let Assign(_, pat, _) = e {
-                        for (id, sym) in pat.vars().iter() {
-                            if shadowed.get(sym).cloned().unwrap_or(0) == 0 {
-                                node_symbol_visitor(id, sym);
-                            }
-                        }
-                    } else {
-                        for sym in &decls {
-                            shadowed
-                                .entry(*sym)
-                                .and_modify(|curr| *curr += 1)
-                                .or_insert(1);
-                        }
-                    }
-                }
-                if up {
-                    if let LocalVar(id, sym) = e {
+        let mut visitor = |up: bool, e: &ExpData| {
+            use ExpData::*;
+            let decls = match e {
+                Lambda(_, pat, _) | Block(_, pat, _, _) => {
+                    pat.vars().iter().map(|(_, d)| *d).collect_vec()
+                },
+                Quant(_, _, ranges, ..) => ranges
+                    .iter()
+                    .flat_map(|(pat, _)| pat.vars().into_iter().map(|(_, name)| name))
+                    .collect_vec(),
+                _ => vec![],
+            };
+            if !up {
+                // Visit the Assigned pat on the way down, before visiting the RHS expression
+                if let Assign(_, pat, _) = e {
+                    for (id, sym) in pat.vars().iter() {
                         if shadowed.get(sym).cloned().unwrap_or(0) == 0 {
                             node_symbol_visitor(id, sym);
                         }
-                    } else {
-                        for sym in &decls {
-                            if let Some(x) = shadowed.get_mut(sym) {
-                                *x -= 1;
-                            }
+                    }
+                } else {
+                    for sym in &decls {
+                        shadowed
+                            .entry(*sym)
+                            .and_modify(|curr| *curr += 1)
+                            .or_insert(1);
+                    }
+                }
+            }
+            if up {
+                if let LocalVar(id, sym) = e {
+                    if shadowed.get(sym).cloned().unwrap_or(0) == 0 {
+                        node_symbol_visitor(id, sym);
+                    }
+                } else {
+                    for sym in &decls {
+                        if let Some(x) = shadowed.get_mut(sym) {
+                            *x -= 1;
                         }
                     }
                 }
-            };
+            }
+        };
         self.visit_pre_post(&mut visitor);
     }
 
@@ -747,14 +745,13 @@ impl ExpData {
     /// Returns the temporaries used in this expression. Result is ordered by occurrence.
     pub fn used_temporaries(&self, env: &GlobalEnv) -> Vec<(TempIndex, Type)> {
         let mut temps = vec![];
-        let mut visitor =
-            |e: &ExpData| {
-                if let ExpData::Temporary(id, idx) = e {
-                    if !temps.iter().any(|(i, _)| i == idx) {
-                        temps.push((*idx, env.get_node_type(*id)));
-                    }
+        let mut visitor = |e: &ExpData| {
+            if let ExpData::Temporary(id, idx) = e {
+                if !temps.iter().any(|(i, _)| i == idx) {
+                    temps.push((*idx, env.get_node_type(*id)));
                 }
-            };
+            }
+        };
         self.visit(&mut visitor);
         temps
     }
@@ -791,12 +788,11 @@ impl ExpData {
         // are inside a loop.
         let mut in_loop = false;
         let mut has_exit = false;
-        let mut visitor =
-            |post: bool, e: &ExpData| match e {
-                ExpData::Loop(_, _) => in_loop = !post,
-                ExpData::LoopCont(_, _) if !in_loop => has_exit = true,
-                _ => {},
-            };
+        let mut visitor = |post: bool, e: &ExpData| match e {
+            ExpData::Loop(_, _) => in_loop = !post,
+            ExpData::LoopCont(_, _) if !in_loop => has_exit = true,
+            _ => {},
+        };
         self.visit_pre_post(&mut visitor);
         has_exit
     }
@@ -1404,30 +1400,29 @@ impl ExpData {
     /// variables.
     pub fn is_pure(&self, env: &GlobalEnv) -> bool {
         let mut is_pure = true;
-        let mut visitor =
-            |e: &ExpData| {
-                use ExpData::*;
-                use Operation::*;
-                match e {
-                    Temporary(id, _) => {
-                        if env.get_node_type(*id).is_mutable_reference() {
+        let mut visitor = |e: &ExpData| {
+            use ExpData::*;
+            use Operation::*;
+            match e {
+                Temporary(id, _) => {
+                    if env.get_node_type(*id).is_mutable_reference() {
+                        is_pure = false;
+                    }
+                },
+                Call(_, oper, _) => match oper {
+                    Exists(..) | Global(..) => is_pure = false,
+                    SpecFunction(mid, fid, _) => {
+                        let module = env.get_module(*mid);
+                        let fun = module.get_spec_fun(*fid);
+                        if !fun.used_memory.is_empty() {
                             is_pure = false;
                         }
                     },
-                    Call(_, oper, _) => match oper {
-                        Exists(..) | Global(..) => is_pure = false,
-                        SpecFunction(mid, fid, _) => {
-                            let module = env.get_module(*mid);
-                            let fun = module.get_spec_fun(*fid);
-                            if !fun.used_memory.is_empty() {
-                                is_pure = false;
-                            }
-                        },
-                        _ => {},
-                    },
                     _ => {},
-                }
-            };
+                },
+                _ => {},
+            }
+        };
         self.visit(&mut visitor);
         is_pure
     }

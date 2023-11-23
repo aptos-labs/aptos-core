@@ -217,39 +217,36 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     }
 
     // Step 2: run the compiler up to expansion
-    let parsed_prog =
-        {
-            let P::Program {
-                named_address_maps,
-                mut source_definitions,
-                lib_definitions,
-            } = parsed_prog;
-            source_definitions.extend(lib_definitions);
-            P::Program {
-                named_address_maps,
-                source_definitions,
-                lib_definitions: vec![],
-            }
-        };
-    let (compiler, expansion_ast) =
-        match compiler.at_parser(parsed_prog).run::<PASS_EXPANSION>() {
-            Err(diags) => {
+    let parsed_prog = {
+        let P::Program {
+            named_address_maps,
+            mut source_definitions,
+            lib_definitions,
+        } = parsed_prog;
+        source_definitions.extend(lib_definitions);
+        P::Program {
+            named_address_maps,
+            source_definitions,
+            lib_definitions: vec![],
+        }
+    };
+    let (compiler, expansion_ast) = match compiler.at_parser(parsed_prog).run::<PASS_EXPANSION>() {
+        Err(diags) => {
+            add_move_lang_diagnostics(&mut env, diags);
+            return Ok(env);
+        },
+        Ok(mut compiler) => {
+            // There may have been errors but nevertheless a stepped compiler is returned.
+            let compiler_env: &mut CompilationEnv = compiler.compilation_env();
+            if let Err(diags) = compiler_env.check_diags_at_or_above_severity(Severity::Warning) {
                 add_move_lang_diagnostics(&mut env, diags);
-                return Ok(env);
-            },
-            Ok(mut compiler) => {
-                // There may have been errors but nevertheless a stepped compiler is returned.
-                let compiler_env: &mut CompilationEnv = compiler.compilation_env();
-                if let Err(diags) = compiler_env.check_diags_at_or_above_severity(Severity::Warning)
-                {
-                    add_move_lang_diagnostics(&mut env, diags);
-                    if env.has_errors() {
-                        return Ok(env);
-                    }
+                if env.has_errors() {
+                    return Ok(env);
                 }
-                compiler.into_ast()
-            },
-        };
+            }
+            compiler.into_ast()
+        },
+    };
 
     // Extract the module/script closure
     let mut visited_modules = BTreeSet::new();
@@ -512,15 +509,14 @@ fn script_into_module(compiled_script: CompiledScript) -> CompiledModule {
 
     // Find the index to the empty signature [].
     // Create one if it doesn't exist.
-    let return_sig_idx =
-        match script.signatures.iter().position(|sig| sig.0.is_empty()) {
-            Some(idx) => SignatureIndex::new(idx as u16),
-            None => {
-                let idx = SignatureIndex::new(script.signatures.len() as u16);
-                script.signatures.push(Signature(vec![]));
-                idx
-            },
-        };
+    let return_sig_idx = match script.signatures.iter().position(|sig| sig.0.is_empty()) {
+        Some(idx) => SignatureIndex::new(idx as u16),
+        None => {
+            let idx = SignatureIndex::new(script.signatures.len() as u16);
+            script.signatures.push(Signature(vec![]));
+            idx
+        },
+    };
 
     // Create a function handle for the main function.
     let main_handle_idx = FunctionHandleIndex::new(script.function_handles.len() as u16);
@@ -915,9 +911,10 @@ fn downgrade_type_inlining_to_expansion(ty: &N::Type) -> E::Type {
                 .collect();
             match &name.value {
                 N::TypeName_::Builtin(builtin) => {
-                    let access = E::ModuleAccess_::Name(
-                        sp(builtin.loc, MoveSymbol::from(builtin.to_string()))
-                    );
+                    let access = E::ModuleAccess_::Name(sp(
+                        builtin.loc,
+                        MoveSymbol::from(builtin.to_string()),
+                    ));
                     E::Type_::Apply(sp(ty.loc, access), rewritten_args)
                 },
                 N::TypeName_::ModuleType(module_ident, struct_name) => {
@@ -1004,9 +1001,10 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
             )
         },
         UnannotatedExp_::Builtin(builtin, arguments) => {
-            let access = E::ModuleAccess_::Name(
-                sp(builtin.loc, MoveSymbol::from(builtin.value.to_string()))
-            );
+            let access = E::ModuleAccess_::Name(sp(
+                builtin.loc,
+                MoveSymbol::from(builtin.value.to_string()),
+            ));
             let rewritten_arguments = match downgrade_exp_inlining_to_expansion(arguments).value {
                 Exp_::Unit { .. } => vec![],
                 Exp_::ExpList(exps) => exps,
