@@ -952,6 +952,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let features: anyhow::Result<Features> = payload.get();
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
+
+        if let Err(error) = &features {
+            error!("Failed to read on-chain features {}", error);
+        }
+
         if let Err(error) = &onchain_consensus_config {
             error!("Failed to read on-chain consensus config {}", error);
         }
