@@ -1,10 +1,10 @@
 ---
 remote_endpoint: ~
-name: "v1.8"
+name: "v1.8.1"
 proposals:
   - name: step_1_upgrade_framework
     metadata:
-      title: "Multi-step proposal to upgrade mainnet framework to v1.8"
+      title: "Multi-step proposal to upgrade mainnet framework to v1.8.1"
       description: "This includes changes in https://github.com/aptos-labs/aptos-core/commits/aptos-release-v1.8"
     execution_mode: MultiStep
     update_sequence:
@@ -12,43 +12,13 @@ proposals:
       - Framework:
           bytecode_version: 6
           git_hash: ~
-  - name: step_2_add_secp256k1_support_and_introduce_single_sender_authenticator
+  - name: step_2_change_operator_beneficiary
     metadata:
-      title: "AIP-49: secp256k1 ECDSA for Transaction Authentication, and AIP-55: Generalize Transaction Authentication and Support Arbitrary K-of-N MultiKey Accounts"
-      description: "AIP-49: secp256k1 ECDSA for Transaction Authentication (Discussion URL: https://github.com/aptos-foundation/AIPs/issues/247), and AIP-55: Generalize Transaction Authentication and Support Arbitrary K-of-N MultiKey Accounts (Discussion URL: https://github.com/aptos-foundation/AIPs/issues/267)."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/247"
+      title: "AIP-51: Changing beneficiaries for operators"
+      description: "AIP-51: This allows operator to change their beneficiaries."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/251"
     execution_mode: MultiStep
     update_sequence:
       - FeatureFlag:
           enabled:
-            - single_sender_authenticator
-  - name: step_3_enable_automatic_sponsored_account_creation
-    metadata:
-      title: "AIP-52: Automated Account Creation for Sponsored Transactions"
-      description: "AIP-52: Automated Account Creation for Sponsored Transactions."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/258"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - sponsored_automatic_account_creation
-  - name: step_4_allow_optional_fee_payer
-    metadata:
-      title: "AIP-53: Make Fee Payer Address Optional in Transactions Authenticator"
-      description: "AIP-53: Make Fee Payer Address Optional in Transactions Authenticator."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/257"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - fee_payer_account_optional
-  - name: step_5_reduce_ident_size_max
-    metadata:
-      title: "Reduce the maximum identifier size"
-      description: "This reduces the maximum identifier size for (de)serializer of Move binary format"
-      discussion_url: "https://github.com/aptos-labs/aptos-core/pull/10502"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - limit_max_identifier_length
+            - operator_beneficiary_change
