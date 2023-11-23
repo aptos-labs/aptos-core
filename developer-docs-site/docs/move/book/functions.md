@@ -536,14 +536,15 @@ If we call this inline function as `percent(2, 200)`, the compiler will replace 
 
 ### Function parameters and lambda expressions
 
-Inline functions support _function parameters_, which accept lambda expressions (i.e., higher-order functions) as arguments.
+Inline functions support _function parameters_, which accept lambda expressions (i.e., anonymous functions) as arguments.
 This feature allows writing several common programming patterns elegantly.
 Similar to inline functions, lambda expressions are also expanded at call site.
 
 A lambda expression includes a list of parameter names (enclosed within `||`) followed by the body.
 Some simple examples are: `|x| x + 1`, `|x, y| x + y`, `|| 1`, `|| { 1 }`.
 A lambda's body can refer to variables available in the scope where the lambda is defined: this is also known as capturing.
-Such variables can be read or written (if mutable) by the lambda expression; since a lambda expression currently can only occur as a direct argument to a call to an inline function, there are no complicated scoping issues as in some other languages.
+Such variables can be read or written (if mutable) by the lambda expression.
+
 The type of a function parameter is written as `|<list of parameter types>| <return type>`.
 For example, when the function parameter type is `|u64, u64| bool`, any lambda expression that takes two `u64` parameters and returns a `bool` value can be provided as the argument.
 
@@ -578,4 +579,10 @@ There are plans to loosen some of these restrictions in the future, but for now,
 - Inline functions and lambda expressions cannot have `return` expressions.
 - Inline functions or lambda expressions cannot return lambda expressions.
 - Cyclic recursion involving only inline functions is not allowed.
-- Parameters in lambda expressions should not be type annotated (e.g., `|x: u64| x + 1` is not allowed): their types are inferred.
+- Parameters in lambda expressions must not be type annotated (e.g., `|x: u64| x + 1` is not allowed): their types are inferred.
+
+### Additional considerations
+
+- Avoid using private constants in public inline functions.
+  When code outside of the inline-function-defining module calls such an inline function, an in-place expansion of the inline function leads to invalid access of the private constant.
+
