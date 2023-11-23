@@ -153,7 +153,7 @@ Aborts if StateStorageUsage already exists.
 <b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(addr);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@aptos_framework);
 <b>aborts_if</b> !(len(config) &gt; 0);
-<b>ensures</b>  <b>exists</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@aptos_framework);
+<b>ensures</b> <b>global</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(addr) == <a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a> { config };
 </code></pre>
 
 
