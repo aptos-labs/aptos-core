@@ -1,4 +1,7 @@
 pub mod cli;
+mod compiler;
+
+use crate::compiler::generate_ast;
 
 use move_package::BuildConfig;
 use std::path::PathBuf;
@@ -15,6 +18,10 @@ pub fn run_move_mutator(
         options, config, package_path
     );
 
+    let (files, ast) = generate_ast(options.move_sources, config, package_path)?;
+
+    println!("Files: {:?}", files);
+    println!("AST: {:?}", ast);
 
     Ok(())
 }
