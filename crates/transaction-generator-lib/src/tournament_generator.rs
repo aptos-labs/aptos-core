@@ -61,8 +61,8 @@ impl TransactionGenerator for TournamentTransactionGenerator {
 pub struct TournamentTransactionGeneratorCreator {
     txn_factory: TransactionFactory,
     num_tournaments: usize,
-    admin_accounts: Arc<RwLock<Vec<LocalAccount>>>,
-    player_accounts: Arc<RwLock<Vec<LocalAccount>>>,
+    admin_accounts: Arc<RwLock<Vec<&LocalAccount>>>,
+    player_accounts: Arc<RwLock<Vec<&LocalAccount>>>,
 }
 
 
@@ -74,8 +74,23 @@ impl TournamentTransactionGeneratorCreator {
         txn_executor: &dyn ReliableTransactionSubmitter,
     ) -> Self {
         // Split accounts into admins and players.
-        let admin_accounts = all_accounts.write().iter().take(num_tournaments).collect();
-        let player_accounts = Arc::new(RwLock::new(all_accounts.iter().collect()));
+        let mut all_accounts = all_accounts.write();
+        let mut player_accounts = Vec::new();
+        let mut admin_accounts = Vec::new();
+        
+        for account in all_accounts.iter().take(num_tournaments) {
+            admin_accounts.push(account.clone());
+        }
+
+        for account in all_accounts.iter().skip(num_tournaments) {
+            player_accounts.push(account.clone());
+        }
+        
+        let player_accounts = Arc::new(RwLock::new(player_accounts));
+        let admin_accounts = Arc::new(RwLock::new(admin_accounts));
+
+        // let admin_accounts = all_accounts.write().iter().take(num_tournaments).collect();
+        // let player_accounts = Arc::new(RwLock::new(all_accounts.iter().collect()));
         
         // Setup tournament for each of the admin accounts.
         let setup_tournament_txns = admin_accounts.write().iter().map(|admin_account| admin_account.sign_with_transaction_builder(txn_factory.payload(

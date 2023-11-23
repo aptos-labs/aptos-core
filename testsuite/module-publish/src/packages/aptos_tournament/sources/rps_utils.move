@@ -4,6 +4,7 @@ module tournament::rps_unit_tests {
     use std::signer;
     use std::string;
     use std::vector;
+    use std::table::{Self, Table};
     use std::option::{Self, Option};
     use std::string_utils::{to_string};
     use aptos_framework::object::{Self, Object};
@@ -23,13 +24,13 @@ module tournament::rps_unit_tests {
     }
 
     struct PlayerConfig has key {
-        player_token: Object<Token>,
-        signer_cap: account::SignerCapability,
+        // Configuration of the player for each tournament.
+        player_configs: Table<address, Object<Token>>
     }
 
-    fun get_signer(account_address: address): signer acquires PlayerConfig {
-        account::create_signer_with_capability(&borrow_global<PlayerConfig>(account_address).signer_cap)
-    }
+    // fun get_signer(account_address: address): signer acquires PlayerConfig {
+    //     account::create_signer_with_capability(&borrow_global<PlayerConfig>(account_address).signer_cap)
+    // }
 
     public entry fun setup_tournament(
         admin: &signer
@@ -57,21 +58,23 @@ module tournament::rps_unit_tests {
         user: &signer,
         admin_address: address
     ) acquires TournamentConfig {
-        let (resource_signer, signer_cap) = account::create_resource_account(user, vector::empty());
-        let player_name = to_string<address>(&signer::address_of(user));
+        let user_address = signer::address_of(user);
+        // TODO: Does this create a new resource account for each tournament? Should we just use one resource account for all tournaments?
+        let player_name = to_string<address>(&user_address);
         let tournament_address = borrow_global<TournamentConfig>(admin_address).tournament_address;
         let player_token = tournament_manager::join_tournament_with_return(
-            &resource_signer,
+            user,
             tournament_address,
             player_name
         );
-        // TODO[fix]: If the same player account is used to 
-        // play multiple tournaments at the same time, this could mess up.
-        // May be store [admin_address] -> [player_token, signer_cap] map instead. 
-        move_to(user, PlayerConfig {
-            player_token,
-            signer_cap
-        });
+        if (exists<PlayerConfig>(user_address)) {
+            move_to(user, PlayerConfig {
+                player_configs: table::new()
+            })
+        };
+        // TODO: Can a resource be inserted and modified in the same transaction?
+        let player_config = borrow_global_mut<PlayerConfig>(user_address);
+        table::upsert(&mut player_config.player_configs, tournament_address, player_token);
     }
 
     public entry fun start_new_round(admin: &signer, player_addresses: vector<address>) acquires PlayerConfig, TournamentConfig {
@@ -79,7 +82,10 @@ module tournament::rps_unit_tests {
         let tournament_address = borrow_global<TournamentConfig>(admin_address).tournament_address;
         aptos_tournament::start_new_round<RockPaperScissorsGame>(admin, tournament_address);
 
-        let player_tokens: vector<Object<Token>> = vector::map_ref(&player_addresses, |player_address| borrow_global<PlayerConfig>(*player_address).player_token);
+        let player_tokens: vector<Object<Token>> = vector::map_ref(&player_addresses, |player_address| {
+            let player_config = borrow_global_mut<PlayerConfig>(*player_address);
+            table::remove(&mut player_config.player_configs, admin_address)
+        });
         // TODO: Should this be done every round, or only once in the beginning?
         let game_addresses = aptos_tournament::add_players_to_game_returning(
             admin,
@@ -99,52 +105,64 @@ module tournament::rps_unit_tests {
         rock_paper_scissor::commit_action(player, game_address, hash::sha3_256(combo));
     }
 
-    fun full_play(
-        admin: &signer,
+    fun game_play(
+        player: signer,
+        admin_address: address,
+        action: vector<u8>,
         game_index: u64,
-        // TODO: We need to get player1 and player 2 details from game_index instead of supplying them as input here.
-        player1: address,
-        player2: address,
-        action1: vector<u8>,
-        action2: vector<u8>,
-        // 0: no one goes. 1: first goes. 2: second goes. 3: all go
-        move_players: u8,
-    ): (vector<address>, vector<address>, address) acquires PlayerConfig, TournamentConfig {
-        let admin_address = signer::address_of(admin);
+    ) {
         let game_address = *vector::borrow(&borrow_global<TournamentConfig>(admin_address).game_addresses, game_index);
-        // let RockPaperScissor {player1, player2} =  borrow_global<RockPaperScissor>(game_address);
+        let RockPaperScissor {player1, player2} =  borrow_global<RockPaperScissor>(game_address);
+        let hash_addition = b"random uuid";
+        player_commit(&player, game_address, action, hash_addition);
 
-        let player1_signer = get_signer(player1);
-        let player2_signer = get_signer(player2);
-
-        let hash_addition1 = b"random uuid 1";
-        let hash_addition2 = b"random uuid 2";
-
-        player_commit(&player1_signer, game_address, action1, hash_addition1);
-        player_commit(&player2_signer, game_address, action2, hash_addition2);
-        if (move_players == 1 || move_players == 3) {
-            let (is_game_over, _winners, _losers) = rock_paper_scissor::verify_action_returning(
-                &player1_signer,
-                game_address,
-                action1,
-                hash_addition1
-            );
-            assert!(!is_game_over, 0);
-        };
-
-        let winners = vector[];
-        let losers = vector[];
-        if (move_players == 2 || move_players == 3) {
-            let (_is_game_over, winnersi, losersi) = rock_paper_scissor::verify_action_returning(
-                &player2_signer,
-                game_address,
-                action2,
-                hash_addition2
-            );
-            winners = winnersi;
-            losers = losersi;
-        };
-
-        (winners, losers, game_address)
     }
+
+    // fun full_play(
+    //     admin: address,
+    //     game_index: u64,
+    //     // TODO: We need to get player1 and player 2 details from game_index instead of supplying them as input here.
+    //     player1: address,
+    //     player2: address,
+    //     action1: vector<u8>,
+    //     action2: vector<u8>,
+    //     // 0: no one goes. 1: first goes. 2: second goes. 3: all go
+    //     move_players: u8,
+    // ): (vector<address>, vector<address>, address) acquires PlayerConfig, TournamentConfig {
+    //     let game_address = *vector::borrow(&borrow_global<TournamentConfig>(admin).game_addresses, game_index);
+    //     // let RockPaperScissor {player1, player2} =  borrow_global<RockPaperScissor>(game_address);
+
+    //     let player1_signer = get_signer(player1);
+    //     let player2_signer = get_signer(player2);
+
+    //     let hash_addition1 = b"random uuid 1";
+    //     let hash_addition2 = b"random uuid 2";
+
+    //     player_commit(&player1_signer, game_address, action1, hash_addition1);
+    //     player_commit(&player2_signer, game_address, action2, hash_addition2);
+    //     if (move_players == 1 || move_players == 3) {
+    //         let (is_game_over, _winners, _losers) = rock_paper_scissor::verify_action_returning(
+    //             &player1_signer,
+    //             game_address,
+    //             action1,
+    //             hash_addition1
+    //         );
+    //         assert!(!is_game_over, 0);
+    //     };
+
+    //     let winners = vector[];
+    //     let losers = vector[];
+    //     if (move_players == 2 || move_players == 3) {
+    //         let (_is_game_over, winnersi, losersi) = rock_paper_scissor::verify_action_returning(
+    //             &player2_signer,
+    //             game_address,
+    //             action2,
+    //             hash_addition2
+    //         );
+    //         winners = winnersi;
+    //         losers = losersi;
+    //     };
+
+    //     (winners, losers, game_address)
+    // }
 }
