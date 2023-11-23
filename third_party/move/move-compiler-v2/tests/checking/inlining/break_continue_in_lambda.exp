@@ -6,7 +6,7 @@ error: Break outside of a loop not supported in function-typed arguments (lambda
 40 │                 brk2(| | break);
    │                          ^^^^^
 
-error: Break outside of a loop not currently supported in inline functions (lambda expressions)
+error: Break outside of a loop not currently supported in inline functions
   ┌─ tests/checking/inlining/break_continue_in_lambda.move:3:9
   │
 3 │         break;
