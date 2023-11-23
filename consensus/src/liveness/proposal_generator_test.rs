@@ -11,7 +11,6 @@ use crate::{
         rotating_proposer_election::RotatingProposer,
         unequivocal_proposer_election::UnequivocalProposerElection,
     },
-    sys_txn_provider::SysTxnProvider,
     test_utils::{build_empty_tree, MockPayloadManager, TreeInserter},
     util::mock_time_service::SimulatedTimeService,
 };
@@ -19,10 +18,9 @@ use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::Author,
 };
-use aptos_crypto::hash::CryptoHash;
-use aptos_types::{system_txn::SystemTransaction, validator_signer::ValidatorSigner};
+use aptos_types::{system_txn::pool::SystemTransactionPool, validator_signer::ValidatorSigner};
 use futures::{future::BoxFuture, FutureExt};
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 fn empty_callback() -> BoxFuture<'static, ()> {
     async move {}.boxed()
@@ -44,7 +42,7 @@ async fn test_proposal_generation_empty_tree() {
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
-        vec![],
+        Arc::new(SystemTransactionPool::new()),
         false,
     );
     let mut proposer_election =
@@ -86,7 +84,7 @@ async fn test_proposal_generation_parent() {
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
-        vec![],
+        Arc::new(SystemTransactionPool::new()),
         false,
     );
     let mut proposer_election = UnequivocalProposerElection::new(Arc::new(RotatingProposer::new(
@@ -160,7 +158,7 @@ async fn test_old_proposal_generation() {
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
-        vec![],
+        Arc::new(SystemTransactionPool::new()),
         false,
     );
     let mut proposer_election = UnequivocalProposerElection::new(Arc::new(RotatingProposer::new(
@@ -199,7 +197,7 @@ async fn test_correct_failed_authors() {
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
-        vec![],
+        Arc::new(SystemTransactionPool::new()),
         false,
     );
     let mut proposer_election = UnequivocalProposerElection::new(Arc::new(RotatingProposer::new(
@@ -222,141 +220,4 @@ async fn test_correct_failed_authors() {
     assert_eq!(result.failed_authors().unwrap()[2], (3, author));
     assert_eq!(result.failed_authors().unwrap()[3], (4, peer1));
     assert_eq!(result.failed_authors().unwrap()[4], (5, peer2));
-}
-
-#[test]
-fn get_sys_txns_basic() {
-    let sys_txn_providers = vec![
-        new_dummy_txn_provider(Some(0)),
-        new_dummy_txn_provider(None),
-        new_dummy_txn_provider(Some(2)),
-    ];
-    let mut max_block_txns = 99;
-    let mut max_block_bytes = 2048;
-    let pending_sys_txns = HashSet::new();
-    let sys_txns = ProposalGenerator::propose_sys_txns(
-        true,
-        sys_txn_providers.as_slice(),
-        &mut max_block_txns,
-        &mut max_block_bytes,
-        &pending_sys_txns,
-    );
-    // Proposing 2 txns, 32 bytes in total.
-    assert_eq!(
-        vec![SystemTransaction::dummy(0), SystemTransaction::dummy(2)],
-        sys_txns
-    );
-    assert_eq!(97, max_block_txns);
-    assert_eq!(2016, max_block_bytes);
-}
-
-#[test]
-fn get_sys_txns_should_respect_feature_flag() {
-    let sys_txn_providers = vec![
-        new_dummy_txn_provider(Some(0)),
-        new_dummy_txn_provider(None),
-        new_dummy_txn_provider(Some(2)),
-    ];
-    let mut max_block_txns = 99;
-    let mut max_block_bytes = 2048;
-    let pending_sys_txns = HashSet::new();
-    let sys_txns = ProposalGenerator::propose_sys_txns(
-        false,
-        sys_txn_providers.as_slice(),
-        &mut max_block_txns,
-        &mut max_block_bytes,
-        &pending_sys_txns,
-    );
-    // Proposing 0 txns.
-    assert_eq!(0, sys_txns.len());
-    assert_eq!(99, max_block_txns);
-    assert_eq!(2048, max_block_bytes);
-}
-
-#[test]
-fn get_sys_txns_should_respect_txn_count_limit() {
-    let sys_txn_providers = vec![
-        new_dummy_txn_provider(Some(0)),
-        new_dummy_txn_provider(None),
-        new_dummy_txn_provider(Some(2)),
-    ];
-    let mut max_block_txns = 1;
-    let mut max_block_bytes = 2048;
-    let pending_sys_txns = HashSet::new();
-    let sys_txns = ProposalGenerator::propose_sys_txns(
-        true,
-        sys_txn_providers.as_slice(),
-        &mut max_block_txns,
-        &mut max_block_bytes,
-        &pending_sys_txns,
-    );
-    // Proposing 1 txn, 16 bytes in total.
-    assert_eq!(vec![SystemTransaction::dummy(0)], sys_txns);
-    assert_eq!(0, max_block_txns);
-    assert_eq!(2032, max_block_bytes);
-}
-
-#[test]
-fn get_sys_txns_should_respect_block_size_limit() {
-    let sys_txn_providers = vec![
-        new_dummy_txn_provider(Some(0)),
-        new_dummy_txn_provider(None),
-        new_dummy_txn_provider(Some(2)),
-    ];
-    let mut max_block_txns = 99;
-    let mut max_block_bytes = 20;
-    let pending_sys_txns = HashSet::new();
-    let sys_txns = ProposalGenerator::propose_sys_txns(
-        true,
-        sys_txn_providers.as_slice(),
-        &mut max_block_txns,
-        &mut max_block_bytes,
-        &pending_sys_txns,
-    );
-    // Proposing 1 txn, 16 bytes in total.
-    assert_eq!(vec![SystemTransaction::dummy(0)], sys_txns);
-    assert_eq!(98, max_block_txns);
-    assert_eq!(4, max_block_bytes);
-}
-
-#[test]
-fn get_sys_txns_should_respect_pending_list() {
-    let sys_txn_providers = vec![
-        new_dummy_txn_provider(Some(0)),
-        new_dummy_txn_provider(None),
-        new_dummy_txn_provider(Some(2)),
-    ];
-    let mut max_block_txns = 99;
-    let mut max_block_bytes = 2048;
-    let pending_sys_txns = HashSet::from([SystemTransaction::dummy(0).hash()]);
-    let sys_txns = ProposalGenerator::propose_sys_txns(
-        true,
-        sys_txn_providers.as_slice(),
-        &mut max_block_txns,
-        &mut max_block_bytes,
-        &pending_sys_txns,
-    );
-    // Proposing 1 txn, 16 bytes in total.
-    assert_eq!(vec![SystemTransaction::dummy(2)], sys_txns);
-    assert_eq!(98, max_block_txns);
-    assert_eq!(2032, max_block_bytes);
-}
-
-#[cfg(test)]
-struct DummySysTxnProvider {
-    txn: Option<Arc<SystemTransaction>>,
-}
-
-#[cfg(test)]
-impl SysTxnProvider for DummySysTxnProvider {
-    fn get(&self) -> Option<Arc<SystemTransaction>> {
-        self.txn.clone()
-    }
-}
-
-#[cfg(test)]
-fn new_dummy_txn_provider(nonce: Option<u64>) -> Arc<dyn SysTxnProvider> {
-    Arc::new(DummySysTxnProvider {
-        txn: nonce.map(|x| Arc::new(SystemTransaction::dummy(x))),
-    })
 }

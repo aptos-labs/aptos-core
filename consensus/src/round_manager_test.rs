@@ -64,6 +64,7 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
     on_chain_config::OnChainConsensusConfig,
+    system_txn::pool::SystemTransactionPool,
     transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
     validator_verifier::{generate_validator_verifier, random_validator_verifier},
@@ -261,7 +262,7 @@ impl NodeSetup {
             PipelineBackpressureConfig::new_no_backoff(),
             ChainHealthBackoffConfig::new_no_backoff(),
             false,
-            vec![],
+            Arc::new(SystemTransactionPool::new()),
             false,
         );
 

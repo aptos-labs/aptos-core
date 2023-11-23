@@ -13,7 +13,6 @@ use crate::{
         PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
     },
     state_replication::PayloadClient,
-    sys_txn_provider::SysTxnProvider,
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
@@ -26,12 +25,15 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::{error, sample, sample::SampleRate, warn};
-use aptos_types::system_txn::SystemTransaction;
+use aptos_types::system_txn::{
+    pool::{SystemTransactionFilter, SystemTransactionPoolClient},
+    SystemTransaction,
+};
 use futures::future::BoxFuture;
 use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 #[cfg(test)]
@@ -176,7 +178,7 @@ pub struct ProposalGenerator {
     last_round_generated: Round,
     quorum_store_enabled: bool,
 
-    sys_txn_providers: Vec<Arc<dyn SysTxnProvider>>,
+    sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
     should_propose_sys_txns: bool,
 }
 
@@ -193,7 +195,7 @@ impl ProposalGenerator {
         pipeline_backpressure_config: PipelineBackpressureConfig,
         chain_health_backoff_config: ChainHealthBackoffConfig,
         quorum_store_enabled: bool,
-        sys_txn_providers: Vec<Arc<dyn SysTxnProvider>>,
+        sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
         should_propose_sys_txns: bool,
     ) -> Self {
         Self {
@@ -209,7 +211,7 @@ impl ProposalGenerator {
             chain_health_backoff_config,
             last_round_generated: 0,
             quorum_store_enabled,
-            sys_txn_providers,
+            sys_txn_pool_client,
             should_propose_sys_txns,
         }
     }
@@ -300,29 +302,32 @@ impl ProposalGenerator {
 
             let voting_power_ratio = proposer_election.get_voting_power_participation_ratio(round);
 
-            let (mut max_block_txns, mut max_block_bytes, proposal_delay) = self
+            let (mut max_block_txns, mut max_block_bytes, mut proposal_delay) = self
                 .calculate_max_block_sizes(voting_power_ratio, timestamp)
                 .await;
 
-            let pending_sys_txns: HashSet<HashValue> = if self.should_propose_sys_txns {
-                pending_blocks
+            let sys_txn_pull_timer = Instant::now();
+            let sys_txns = if self.should_propose_sys_txns {
+                let pending_sys_txn_hashes: HashSet<HashValue> = pending_blocks
                     .iter()
                     .filter_map(|block| block.sys_txns())
                     .flatten()
                     .map(SystemTransaction::hash)
-                    .collect()
+                    .collect();
+
+                self.sys_txn_pool_client.pull(
+                    max_block_txns as usize,
+                    max_block_bytes as usize,
+                    SystemTransactionFilter::PendingTxnHashSet(pending_sys_txn_hashes),
+                )
             } else {
-                HashSet::default()
+                vec![]
             };
 
-            // Priority: self.sys_txn_provider[0] > ... > self.sys_txn_provider[-1] > payload.
-            let sys_txns = Self::propose_sys_txns(
-                self.should_propose_sys_txns,
-                self.sys_txn_providers.as_slice(),
-                &mut max_block_txns,
-                &mut max_block_bytes,
-                &pending_sys_txns,
-            );
+            let sys_txn_total_bytes = sys_txns.iter().map(|txn| txn.size_in_bytes() as u64).sum();
+            max_block_txns = max_block_txns.saturating_sub(sys_txns.len() as u64);
+            max_block_bytes = max_block_bytes.saturating_sub(sys_txn_total_bytes);
+            proposal_delay = proposal_delay.saturating_sub(sys_txn_pull_timer.elapsed());
 
             PROPOSER_DELAY_PROPOSAL.set(proposal_delay.as_secs_f64());
             if !proposal_delay.is_zero() {
@@ -480,33 +485,5 @@ impl ProposalGenerator {
         }
 
         failed_authors
-    }
-
-    fn propose_sys_txns(
-        should_propose_sys_txns: bool,
-        sys_txn_providers: &[Arc<dyn SysTxnProvider>],
-        max_block_txns: &mut u64,
-        max_block_bytes: &mut u64,
-        pending_sys_txns: &HashSet<HashValue>,
-    ) -> Vec<SystemTransaction> {
-        if !should_propose_sys_txns {
-            return vec![];
-        }
-
-        let mut sys_txns = vec![];
-        for provider in sys_txn_providers.iter() {
-            if let Some(txn) = provider.get() {
-                let txn_size = txn.size_in_bytes() as u64;
-                if !pending_sys_txns.contains(&txn.hash())
-                    && *max_block_txns >= 1
-                    && *max_block_bytes >= txn_size
-                {
-                    sys_txns.push(txn.as_ref().clone());
-                    *max_block_txns -= 1;
-                    *max_block_bytes -= txn_size;
-                }
-            }
-        }
-        sys_txns
     }
 }

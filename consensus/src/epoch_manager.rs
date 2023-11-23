@@ -49,7 +49,6 @@ use crate::{
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
     state_replication::{PayloadClient, StateComputer},
-    sys_txn_provider::SysTxnProvider,
     transaction_deduper::create_transaction_deduper,
     transaction_shuffler::create_transaction_shuffler,
     util::time_service::TimeService,
@@ -82,6 +81,7 @@ use aptos_types::{
         FeatureFlag, Features, LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider,
         OnChainConsensusConfig, OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
     },
+    system_txn::pool::SystemTransactionPoolClient,
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
@@ -133,7 +133,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     commit_state_computer: Arc<dyn StateComputer>,
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
-    sys_txn_providers: Vec<Arc<dyn SysTxnProvider>>,
+    sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
     reconfig_events: ReconfigNotificationListener<P>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingCommitRequest>>,
@@ -176,7 +176,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         reconfig_events: ReconfigNotificationListener<P>,
         bounded_executor: BoundedExecutor,
         aptos_time_service: aptos_time_service::TimeService,
-        sys_txn_providers: Vec<Arc<dyn SysTxnProvider>>,
+        sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -198,7 +198,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             commit_state_computer,
             storage,
             safety_rules_manager,
-            sys_txn_providers,
+            sys_txn_pool_client,
             reconfig_events,
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
@@ -876,7 +876,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
-            self.sys_txn_providers.clone(),
+            self.sys_txn_pool_client.clone(),
             features.is_enabled(FeatureFlag::PROPOSE_SYSTEM_TRANSACTIONS),
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(

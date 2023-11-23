@@ -43,6 +43,7 @@ use aptos_types::{
         ProposerElectionType::{self, RoundProposer},
         ValidatorSet,
     },
+    system_txn::pool::{SystemTransactionPool, SystemTransactionPoolClient},
     transaction::SignedTransaction,
     validator_info::ValidatorInfo,
     waypoint::Waypoint,
@@ -73,6 +74,7 @@ impl SMRNode {
         consensus_config: OnChainConsensusConfig,
         storage: Arc<MockStorage>,
         twin_id: TwinId,
+        sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
     ) -> Self {
         // Create a runtime for the twin
         let thread_name = format!("twin-{}", twin_id.id);
@@ -158,7 +160,7 @@ impl SMRNode {
             reconfig_listener,
             bounded_executor,
             aptos_time_service::TimeService::real(),
-            vec![],
+            sys_txn_pool_client,
         );
         let (network_task, network_receiver) =
             NetworkTask::new(network_service_events, self_receiver);
@@ -284,12 +286,14 @@ impl SMRNode {
                 ..ConsensusConfigV1::default()
             });
 
+            let sys_txn_pool = Arc::new(SystemTransactionPool::new());
             smr_nodes.push(Self::start(
                 playground,
                 config,
                 consensus_config,
                 storage,
                 twin_id,
+                sys_txn_pool,
             ));
         }
         smr_nodes

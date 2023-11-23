@@ -54,7 +54,6 @@ pub mod network_interface;
 mod payload_manager;
 mod qc_aggregator;
 mod sender_aware_shuffler;
-mod sys_txn_provider;
 mod transaction_deduper;
 mod transaction_filter;
 mod transaction_shuffler;
