@@ -1,5 +1,5 @@
 
-<a name="0x1_math_fixed"></a>
+<a id="0x1_math_fixed"></a>
 
 # Module `0x1::math_fixed`
 
@@ -24,12 +24,12 @@ Standard math utilities missing in the Move Language.
 
 
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_math_fixed_EOVERFLOW_EXP"></a>
+<a id="0x1_math_fixed_EOVERFLOW_EXP"></a>
 
 Abort code on overflow
 
@@ -39,7 +39,7 @@ Abort code on overflow
 
 
 
-<a name="0x1_math_fixed_LN2"></a>
+<a id="0x1_math_fixed_LN2"></a>
 
 Natural log 2 in 32 bit fixed point
 
@@ -49,7 +49,7 @@ Natural log 2 in 32 bit fixed point
 
 
 
-<a name="0x1_math_fixed_LN2_X_32"></a>
+<a id="0x1_math_fixed_LN2_X_32"></a>
 
 
 
@@ -58,7 +58,7 @@ Natural log 2 in 32 bit fixed point
 
 
 
-<a name="0x1_math_fixed_sqrt"></a>
+<a id="0x1_math_fixed_sqrt"></a>
 
 ## Function `sqrt`
 
@@ -84,7 +84,7 @@ Square root of fixed point number
 
 </details>
 
-<a name="0x1_math_fixed_exp"></a>
+<a id="0x1_math_fixed_exp"></a>
 
 ## Function `exp`
 
@@ -110,7 +110,7 @@ Exponent function with a precission of 9 digits.
 
 </details>
 
-<a name="0x1_math_fixed_log2_plus_32"></a>
+<a id="0x1_math_fixed_log2_plus_32"></a>
 
 ## Function `log2_plus_32`
 
@@ -137,7 +137,7 @@ is positive for all values of x.
 
 </details>
 
-<a name="0x1_math_fixed_ln_plus_32ln2"></a>
+<a id="0x1_math_fixed_ln_plus_32ln2"></a>
 
 ## Function `ln_plus_32ln2`
 
@@ -163,7 +163,7 @@ is positive for all values of x.
 
 </details>
 
-<a name="0x1_math_fixed_pow"></a>
+<a id="0x1_math_fixed_pow"></a>
 
 ## Function `pow`
 
@@ -189,7 +189,7 @@ Integer power of a fixed point number
 
 </details>
 
-<a name="0x1_math_fixed_mul_div"></a>
+<a id="0x1_math_fixed_mul_div"></a>
 
 ## Function `mul_div`
 
@@ -217,7 +217,7 @@ Specialized function for x * y / z that omits intermediate shifting
 
 </details>
 
-<a name="0x1_math_fixed_exp_raw"></a>
+<a id="0x1_math_fixed_exp_raw"></a>
 
 ## Function `exp_raw`
 
@@ -262,7 +262,7 @@ Specialized function for x * y / z that omits intermediate shifting
 
 </details>
 
-<a name="0x1_math_fixed_pow_raw"></a>
+<a id="0x1_math_fixed_pow_raw"></a>
 
 ## Function `pow_raw`
 

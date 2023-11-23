@@ -1,5 +1,5 @@
 
-<a name="0x1_version"></a>
+<a id="0x1_version"></a>
 
 # Module `0x1::version`
 
@@ -26,7 +26,7 @@ Maintains the version number for the blockchain.
 
 
 
-<a name="0x1_version_Version"></a>
+<a id="0x1_version_Version"></a>
 
 ## Resource `Version`
 
@@ -53,7 +53,7 @@ Maintains the version number for the blockchain.
 
 </details>
 
-<a name="0x1_version_SetVersionCapability"></a>
+<a id="0x1_version_SetVersionCapability"></a>
 
 ## Resource `SetVersionCapability`
 
@@ -80,12 +80,12 @@ Maintains the version number for the blockchain.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_version_EINVALID_MAJOR_VERSION_NUMBER"></a>
+<a id="0x1_version_EINVALID_MAJOR_VERSION_NUMBER"></a>
 
 Specified major version number must be greater than current version number.
 
@@ -95,7 +95,7 @@ Specified major version number must be greater than current version number.
 
 
 
-<a name="0x1_version_ENOT_AUTHORIZED"></a>
+<a id="0x1_version_ENOT_AUTHORIZED"></a>
 
 Account is not authorized to make this change.
 
@@ -105,7 +105,7 @@ Account is not authorized to make this change.
 
 
 
-<a name="0x1_version_initialize"></a>
+<a id="0x1_version_initialize"></a>
 
 ## Function `initialize`
 
@@ -136,7 +136,7 @@ Publishes the Version config.
 
 </details>
 
-<a name="0x1_version_set_version"></a>
+<a id="0x1_version_set_version"></a>
 
 ## Function `set_version`
 
@@ -171,7 +171,7 @@ This can be called by on chain governance.
 
 </details>
 
-<a name="0x1_version_initialize_for_test"></a>
+<a id="0x1_version_initialize_for_test"></a>
 
 ## Function `initialize_for_test`
 
@@ -198,7 +198,7 @@ to update the version.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -210,7 +210,7 @@ to update the version.
 
 
 
-<a name="@Specification_1_initialize"></a>
+<a id="@Specification_1_initialize"></a>
 
 ### Function `initialize`
 
@@ -233,7 +233,7 @@ Abort if resource already exists in <code>@aptos_framwork</code> when initializi
 
 
 
-<a name="@Specification_1_set_version"></a>
+<a id="@Specification_1_set_version"></a>
 
 ### Function `set_version`
 
@@ -260,7 +260,7 @@ Abort if resource already exists in <code>@aptos_framwork</code> when initializi
 
 
 
-<a name="@Specification_1_initialize_for_test"></a>
+<a id="@Specification_1_initialize_for_test"></a>
 
 ### Function `initialize_for_test`
 

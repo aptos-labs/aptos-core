@@ -1,5 +1,5 @@
 
-<a name="0x1_main"></a>
+<a id="0x1_main"></a>
 
 # Module `0x1::main`
 
@@ -13,12 +13,12 @@
 
 
 
-<a name="0x1_main_main"></a>
+<a id="0x1_main_main"></a>
 
 ## Function `main`
 
 
-<a name="@Explanation_of_the_algorithm_0"></a>
+<a id="@Explanation_of_the_algorithm_0"></a>
 
 ### Explanation of the algorithm
 

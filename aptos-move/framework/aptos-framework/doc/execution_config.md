@@ -1,5 +1,5 @@
 
-<a name="0x1_execution_config"></a>
+<a id="0x1_execution_config"></a>
 
 # Module `0x1::execution_config`
 
@@ -21,7 +21,7 @@ Reconfiguration, and may be updated by root.
 
 
 
-<a name="0x1_execution_config_ExecutionConfig"></a>
+<a id="0x1_execution_config_ExecutionConfig"></a>
 
 ## Resource `ExecutionConfig`
 
@@ -48,12 +48,12 @@ Reconfiguration, and may be updated by root.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_execution_config_EINVALID_CONFIG"></a>
+<a id="0x1_execution_config_EINVALID_CONFIG"></a>
 
 The provided on chain config bytes are empty or invalid
 
@@ -63,7 +63,7 @@ The provided on chain config bytes are empty or invalid
 
 
 
-<a name="0x1_execution_config_set"></a>
+<a id="0x1_execution_config_set"></a>
 
 ## Function `set`
 
@@ -98,7 +98,7 @@ This can be called by on-chain governance to update on-chain execution configs.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -110,7 +110,7 @@ This can be called by on-chain governance to update on-chain execution configs.
 
 
 
-<a name="@Specification_1_set"></a>
+<a id="@Specification_1_set"></a>
 
 ### Function `set`
 

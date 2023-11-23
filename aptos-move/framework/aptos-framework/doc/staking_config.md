@@ -1,5 +1,5 @@
 
-<a name="0x1_staking_config"></a>
+<a id="0x1_staking_config"></a>
 
 # Module `0x1::staking_config`
 
@@ -54,7 +54,7 @@ Provides the configuration for staking and rewards
 
 
 
-<a name="0x1_staking_config_StakingConfig"></a>
+<a id="0x1_staking_config_StakingConfig"></a>
 
 ## Resource `StakingConfig`
 
@@ -118,7 +118,7 @@ Validator set configurations that will be stored with the @aptos_framework accou
 
 </details>
 
-<a name="0x1_staking_config_StakingRewardsConfig"></a>
+<a id="0x1_staking_config_StakingRewardsConfig"></a>
 
 ## Resource `StakingRewardsConfig`
 
@@ -170,12 +170,12 @@ Staking reward configurations that will be stored with the @aptos_framework acco
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_staking_config_MAX_U64"></a>
+<a id="0x1_staking_config_MAX_U64"></a>
 
 
 
@@ -184,7 +184,7 @@ Staking reward configurations that will be stored with the @aptos_framework acco
 
 
 
-<a name="0x1_staking_config_BPS_DENOMINATOR"></a>
+<a id="0x1_staking_config_BPS_DENOMINATOR"></a>
 
 Denominator of number in basis points. 1 bps(basis points) = 0.01%.
 
@@ -194,7 +194,7 @@ Denominator of number in basis points. 1 bps(basis points) = 0.01%.
 
 
 
-<a name="0x1_staking_config_EDEPRECATED_FUNCTION"></a>
+<a id="0x1_staking_config_EDEPRECATED_FUNCTION"></a>
 
 The function has been deprecated.
 
@@ -204,7 +204,7 @@ The function has been deprecated.
 
 
 
-<a name="0x1_staking_config_EDISABLED_FUNCTION"></a>
+<a id="0x1_staking_config_EDISABLED_FUNCTION"></a>
 
 The function is disabled or hasn't been enabled.
 
@@ -214,7 +214,7 @@ The function is disabled or hasn't been enabled.
 
 
 
-<a name="0x1_staking_config_EINVALID_LAST_REWARDS_RATE_PERIOD_START"></a>
+<a id="0x1_staking_config_EINVALID_LAST_REWARDS_RATE_PERIOD_START"></a>
 
 Specified start time of last rewards rate period is invalid, which must be not late than the current timestamp.
 
@@ -224,7 +224,7 @@ Specified start time of last rewards rate period is invalid, which must be not l
 
 
 
-<a name="0x1_staking_config_EINVALID_MIN_REWARDS_RATE"></a>
+<a id="0x1_staking_config_EINVALID_MIN_REWARDS_RATE"></a>
 
 Specified min rewards rate is invalid, which must be within [0, rewards_rate].
 
@@ -234,7 +234,7 @@ Specified min rewards rate is invalid, which must be within [0, rewards_rate].
 
 
 
-<a name="0x1_staking_config_EINVALID_REWARDS_RATE"></a>
+<a id="0x1_staking_config_EINVALID_REWARDS_RATE"></a>
 
 Specified rewards rate is invalid, which must be within [0, MAX_REWARDS_RATE].
 
@@ -244,7 +244,7 @@ Specified rewards rate is invalid, which must be within [0, MAX_REWARDS_RATE].
 
 
 
-<a name="0x1_staking_config_EINVALID_REWARDS_RATE_DECREASE_RATE"></a>
+<a id="0x1_staking_config_EINVALID_REWARDS_RATE_DECREASE_RATE"></a>
 
 Specified rewards rate decrease rate is invalid, which must be not greater than BPS_DENOMINATOR.
 
@@ -254,7 +254,7 @@ Specified rewards rate decrease rate is invalid, which must be not greater than 
 
 
 
-<a name="0x1_staking_config_EINVALID_REWARDS_RATE_PERIOD"></a>
+<a id="0x1_staking_config_EINVALID_REWARDS_RATE_PERIOD"></a>
 
 Specified rewards rate period is invalid. It must be larger than 0 and cannot be changed if configured.
 
@@ -264,7 +264,7 @@ Specified rewards rate period is invalid. It must be larger than 0 and cannot be
 
 
 
-<a name="0x1_staking_config_EINVALID_STAKE_RANGE"></a>
+<a id="0x1_staking_config_EINVALID_STAKE_RANGE"></a>
 
 Specified stake range is invalid. Max must be greater than min.
 
@@ -274,7 +274,7 @@ Specified stake range is invalid. Max must be greater than min.
 
 
 
-<a name="0x1_staking_config_EINVALID_VOTING_POWER_INCREASE_LIMIT"></a>
+<a id="0x1_staking_config_EINVALID_VOTING_POWER_INCREASE_LIMIT"></a>
 
 The voting power increase limit percentage must be within (0, 50].
 
@@ -284,7 +284,7 @@ The voting power increase limit percentage must be within (0, 50].
 
 
 
-<a name="0x1_staking_config_EZERO_LOCKUP_DURATION"></a>
+<a id="0x1_staking_config_EZERO_LOCKUP_DURATION"></a>
 
 Stake lockup duration cannot be zero.
 
@@ -294,7 +294,7 @@ Stake lockup duration cannot be zero.
 
 
 
-<a name="0x1_staking_config_EZERO_REWARDS_RATE_DENOMINATOR"></a>
+<a id="0x1_staking_config_EZERO_REWARDS_RATE_DENOMINATOR"></a>
 
 Reward rate denominator cannot be zero.
 
@@ -304,7 +304,7 @@ Reward rate denominator cannot be zero.
 
 
 
-<a name="0x1_staking_config_MAX_REWARDS_RATE"></a>
+<a id="0x1_staking_config_MAX_REWARDS_RATE"></a>
 
 Limit the maximum value of <code>rewards_rate</code> in order to avoid any arithmetic overflow.
 
@@ -314,7 +314,7 @@ Limit the maximum value of <code>rewards_rate</code> in order to avoid any arith
 
 
 
-<a name="0x1_staking_config_ONE_YEAR_IN_SECS"></a>
+<a id="0x1_staking_config_ONE_YEAR_IN_SECS"></a>
 
 1 year => 365 * 24 * 60 * 60
 
@@ -324,7 +324,7 @@ Limit the maximum value of <code>rewards_rate</code> in order to avoid any arith
 
 
 
-<a name="0x1_staking_config_initialize"></a>
+<a id="0x1_staking_config_initialize"></a>
 
 ## Function `initialize`
 
@@ -389,7 +389,7 @@ Only called during genesis.
 
 </details>
 
-<a name="0x1_staking_config_initialize_rewards"></a>
+<a id="0x1_staking_config_initialize_rewards"></a>
 
 ## Function `initialize_rewards`
 
@@ -441,7 +441,7 @@ Can only be called as part of the Aptos governance proposal process established 
 
 </details>
 
-<a name="0x1_staking_config_get"></a>
+<a id="0x1_staking_config_get"></a>
 
 ## Function `get`
 
@@ -465,7 +465,7 @@ Can only be called as part of the Aptos governance proposal process established 
 
 </details>
 
-<a name="0x1_staking_config_get_allow_validator_set_change"></a>
+<a id="0x1_staking_config_get_allow_validator_set_change"></a>
 
 ## Function `get_allow_validator_set_change`
 
@@ -490,7 +490,7 @@ Return whether validator set changes are allowed
 
 </details>
 
-<a name="0x1_staking_config_get_required_stake"></a>
+<a id="0x1_staking_config_get_required_stake"></a>
 
 ## Function `get_required_stake`
 
@@ -515,7 +515,7 @@ Return the required min/max stake.
 
 </details>
 
-<a name="0x1_staking_config_get_recurring_lockup_duration"></a>
+<a id="0x1_staking_config_get_recurring_lockup_duration"></a>
 
 ## Function `get_recurring_lockup_duration`
 
@@ -541,7 +541,7 @@ withdraw all funds).
 
 </details>
 
-<a name="0x1_staking_config_get_reward_rate"></a>
+<a id="0x1_staking_config_get_reward_rate"></a>
 
 ## Function `get_reward_rate`
 
@@ -582,7 +582,7 @@ Return the reward rate of this epoch.
 
 </details>
 
-<a name="0x1_staking_config_get_voting_power_increase_limit"></a>
+<a id="0x1_staking_config_get_voting_power_increase_limit"></a>
 
 ## Function `get_voting_power_increase_limit`
 
@@ -607,7 +607,7 @@ Return the joining limit %.
 
 </details>
 
-<a name="0x1_staking_config_calculate_and_save_latest_epoch_rewards_rate"></a>
+<a id="0x1_staking_config_calculate_and_save_latest_epoch_rewards_rate"></a>
 
 ## Function `calculate_and_save_latest_epoch_rewards_rate`
 
@@ -634,7 +634,7 @@ Calculate and save the latest rewards rate.
 
 </details>
 
-<a name="0x1_staking_config_calculate_and_save_latest_rewards_config"></a>
+<a id="0x1_staking_config_calculate_and_save_latest_rewards_config"></a>
 
 ## Function `calculate_and_save_latest_rewards_config`
 
@@ -687,7 +687,7 @@ Calculate and return the up-to-date StakingRewardsConfig.
 
 </details>
 
-<a name="0x1_staking_config_update_required_stake"></a>
+<a id="0x1_staking_config_update_required_stake"></a>
 
 ## Function `update_required_stake`
 
@@ -722,7 +722,7 @@ Can only be called as part of the Aptos governance proposal process established 
 
 </details>
 
-<a name="0x1_staking_config_update_recurring_lockup_duration_secs"></a>
+<a id="0x1_staking_config_update_recurring_lockup_duration_secs"></a>
 
 ## Function `update_recurring_lockup_duration_secs`
 
@@ -755,7 +755,7 @@ Can only be called as part of the Aptos governance proposal process established 
 
 </details>
 
-<a name="0x1_staking_config_update_rewards_rate"></a>
+<a id="0x1_staking_config_update_rewards_rate"></a>
 
 ## Function `update_rewards_rate`
 
@@ -802,7 +802,7 @@ Can only be called as part of the Aptos governance proposal process established 
 
 </details>
 
-<a name="0x1_staking_config_update_rewards_config"></a>
+<a id="0x1_staking_config_update_rewards_config"></a>
 
 ## Function `update_rewards_config`
 
@@ -851,7 +851,7 @@ Can only be called as part of the Aptos governance proposal process established 
 
 </details>
 
-<a name="0x1_staking_config_update_voting_power_increase_limit"></a>
+<a id="0x1_staking_config_update_voting_power_increase_limit"></a>
 
 ## Function `update_voting_power_increase_limit`
 
@@ -887,7 +887,7 @@ Can only be called as part of the Aptos governance proposal process established 
 
 </details>
 
-<a name="0x1_staking_config_validate_required_stake"></a>
+<a id="0x1_staking_config_validate_required_stake"></a>
 
 ## Function `validate_required_stake`
 
@@ -911,7 +911,7 @@ Can only be called as part of the Aptos governance proposal process established 
 
 </details>
 
-<a name="0x1_staking_config_validate_rewards_config"></a>
+<a id="0x1_staking_config_validate_rewards_config"></a>
 
 ## Function `validate_rewards_config`
 
@@ -959,7 +959,7 @@ Can only be called as part of the Aptos governance proposal process established 
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -972,7 +972,7 @@ Can only be called as part of the Aptos governance proposal process established 
 
 
 
-<a name="@Specification_1_StakingConfig"></a>
+<a id="@Specification_1_StakingConfig"></a>
 
 ### Resource `StakingConfig`
 
@@ -1036,7 +1036,7 @@ Can only be called as part of the Aptos governance proposal process established 
 
 
 
-<a name="@Specification_1_StakingRewardsConfig"></a>
+<a id="@Specification_1_StakingRewardsConfig"></a>
 
 ### Resource `StakingRewardsConfig`
 
@@ -1091,7 +1091,7 @@ Can only be called as part of the Aptos governance proposal process established 
 
 
 
-<a name="@Specification_1_initialize"></a>
+<a id="@Specification_1_initialize"></a>
 
 ### Function `initialize`
 
@@ -1123,7 +1123,7 @@ StakingConfig does not exist under the aptos_framework before creating it.
 
 
 
-<a name="@Specification_1_initialize_rewards"></a>
+<a id="@Specification_1_initialize_rewards"></a>
 
 ### Function `initialize_rewards`
 
@@ -1149,7 +1149,7 @@ StakingRewardsConfig does not exist under the aptos_framework before creating it
 
 
 
-<a name="@Specification_1_get"></a>
+<a id="@Specification_1_get"></a>
 
 ### Function `get`
 
@@ -1165,7 +1165,7 @@ StakingRewardsConfig does not exist under the aptos_framework before creating it
 
 
 
-<a name="@Specification_1_get_reward_rate"></a>
+<a id="@Specification_1_get_reward_rate"></a>
 
 ### Function `get_reward_rate`
 
@@ -1184,7 +1184,7 @@ StakingRewardsConfig does not exist under the aptos_framework before creating it
 
 
 
-<a name="@Specification_1_calculate_and_save_latest_epoch_rewards_rate"></a>
+<a id="@Specification_1_calculate_and_save_latest_epoch_rewards_rate"></a>
 
 ### Function `calculate_and_save_latest_epoch_rewards_rate`
 
@@ -1203,7 +1203,7 @@ StakingRewardsConfig does not exist under the aptos_framework before creating it
 
 
 
-<a name="@Specification_1_calculate_and_save_latest_rewards_config"></a>
+<a id="@Specification_1_calculate_and_save_latest_rewards_config"></a>
 
 ### Function `calculate_and_save_latest_rewards_config`
 
@@ -1221,7 +1221,7 @@ StakingRewardsConfig does not exist under the aptos_framework before creating it
 
 
 
-<a name="@Specification_1_update_required_stake"></a>
+<a id="@Specification_1_update_required_stake"></a>
 
 ### Function `update_required_stake`
 
@@ -1245,7 +1245,7 @@ The StakingConfig is under @aptos_framework.
 
 
 
-<a name="@Specification_1_update_recurring_lockup_duration_secs"></a>
+<a id="@Specification_1_update_recurring_lockup_duration_secs"></a>
 
 ### Function `update_recurring_lockup_duration_secs`
 
@@ -1268,7 +1268,7 @@ The StakingConfig is under @aptos_framework.
 
 
 
-<a name="@Specification_1_update_rewards_rate"></a>
+<a id="@Specification_1_update_rewards_rate"></a>
 
 ### Function `update_rewards_rate`
 
@@ -1298,7 +1298,7 @@ rewards_rate/rewards_rate_denominator <= 1.
 
 
 
-<a name="@Specification_1_update_rewards_config"></a>
+<a id="@Specification_1_update_rewards_config"></a>
 
 ### Function `update_rewards_config`
 
@@ -1326,7 +1326,7 @@ StakingRewardsConfig is under the @aptos_framework.
 
 
 
-<a name="@Specification_1_update_voting_power_increase_limit"></a>
+<a id="@Specification_1_update_voting_power_increase_limit"></a>
 
 ### Function `update_voting_power_increase_limit`
 
@@ -1349,7 +1349,7 @@ The StakingConfig is under @aptos_framework.
 
 
 
-<a name="@Specification_1_validate_required_stake"></a>
+<a id="@Specification_1_validate_required_stake"></a>
 
 ### Function `validate_required_stake`
 
@@ -1366,7 +1366,7 @@ The maximum_stake must be greater than maximum_stake in the range of Specified s
 
 
 
-<a name="@Specification_1_validate_rewards_config"></a>
+<a id="@Specification_1_validate_rewards_config"></a>
 
 ### Function `validate_rewards_config`
 
