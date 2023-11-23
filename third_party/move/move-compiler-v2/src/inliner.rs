@@ -680,6 +680,9 @@ struct InlinedRewriter<'env, 'rewriter> {
     /// Shadow stack tracks whether free variables are hidden by local variable declarations.
     shadow_stack: ShadowStack,
 
+    /// Track loop nesting, 0 outside a loop
+    in_loop: usize,
+
     debug: bool,
 }
 
@@ -699,6 +702,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             lambda_param_map,
             inlined_formal_params,
             shadow_stack,
+            in_loop: 0,
             debug,
         }
     }
@@ -840,21 +844,41 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         self.shadow_stack.enter_scope(entering_vars);
     }
 
-    /// Check for and warn about Return inside a lambda
+    /// Check for and warn about Return inside a lambda.
+    /// Also check for Break or Continue inside a lambda and not inside a loop.
     fn check_for_return_in_lambda(env: &GlobalEnv, lambda_body: &Exp) {
-        lambda_body.visit_pre_post(&mut |up, e| {
-            if !up {
-                if let ExpData::Return(node_id, _) = e {
-                    let node_loc = env.get_node_loc(*node_id);
-                    env.error(
-                        &node_loc,
+        let mut in_loop = 0;
+        lambda_body.visit_pre_post(&mut |up, e| match e {
+            ExpData::Loop(..) if !up => {
+                in_loop += 1;
+            },
+            ExpData::Loop(..) if up => {
+                in_loop -= 1;
+            },
+            ExpData::Return(node_id, _) if !up => {
+                let node_loc = env.get_node_loc(*node_id);
+                env.error(
+                    &node_loc,
+                    concat!(
+                        "Return not currently supported in function-typed arguments",
+                        " (lambda expressions)"
+                    ),
+                )
+            },
+            ExpData::LoopCont(node_id, is_continue) if !up && in_loop == 0 => {
+                let node_loc = env.get_node_loc(*node_id);
+                env.error(
+                    &node_loc,
+                    &format!(
                         concat!(
-                            "Return not currently supported in function-typed arguments",
+                            "{} outside of a loop not supported in function-typed arguments",
                             " (lambda expressions)"
                         ),
-                    );
-                }
-            }
+                        if *is_continue { "Continue" } else { "Break" }
+                    ),
+                )
+            },
+            _ => {},
         });
     }
 
@@ -1078,17 +1102,49 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
 }
 
 impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> {
-    /// Override default implementation to flag an error on an inlined Return expressions.
+    /// Override default implementation to flag an error on an disallowed Return and LoopCont expressions.
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
-        // Disallow Return expression in an inlined function.
-        if let ExpData::Return(id, _val) = exp.as_ref() {
-            self.env.error(
-                &self.env.get_node_loc(*id),
-                "Return not currently supported in inline functions",
-            );
-        }
+        // Disallow Return and free LoopCont("continue" and "break") expressions in an inlined function.
+        // Record if this is a Loop, as well as tracking loop nesting depth in self.in_loop.
+        let this_is_loop = match exp.as_ref() {
+            ExpData::Return(node_id, _) => {
+                let node_loc = self.env.get_node_loc(*node_id);
+                self.env.error(
+                    &node_loc,
+                    concat!("Return not currently supported in inline functions"),
+                );
+                false
+            },
+            ExpData::Loop(..) => {
+                self.in_loop += 1;
+                true
+            },
+            ExpData::LoopCont(node_id, is_continue) if self.in_loop == 0 => {
+                let node_loc = self.env.get_node_loc(*node_id);
+                self.env.error(
+                    &node_loc,
+                    &format!(
+                        concat!(
+                            "{} outside of a loop not currently supported in inline functions",
+                            " (lambda expressions)"
+                        ),
+                        if *is_continue { "Continue" } else { "Break" },
+                    ),
+                );
+                false
+            },
+            _ => false,
+        };
+
         // Proceed with default behavior in any case.
-        self.rewrite_exp_descent(exp)
+        let result = self.rewrite_exp_descent(exp);
+
+        // Exit loop if we matched it.
+        if this_is_loop {
+            self.in_loop -= 1;
+        };
+
+        result
     }
 
     /// Record that the provided symbols have local definitions, so renaming should be done.
