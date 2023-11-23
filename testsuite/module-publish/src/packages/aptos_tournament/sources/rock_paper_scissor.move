@@ -5,6 +5,8 @@ module tournament::rock_paper_scissor {
     use std::signer;
     use std::string::{String, utf8};
     use std::vector;
+    use std::simple_map::{Self, SimpleMap};
+    use std::table::{Self, Table};
     use aptos_framework::object::Self;
 
     use aptos_token_objects::token::Token;
@@ -60,10 +62,16 @@ module tournament::rock_paper_scissor {
         opponent_action: Option<vector<u8>>,
     }
 
-    public fun get_game_players(
-        game: &RockPaperScissor
-    ): address {
-        game.player1.address
+    public fun get_player_to_game_mapping(
+        game_addresses: &vector<address>
+    ): Table<address, address> {
+        let player_to_game_mapping = table::new();
+        vector::for_each_ref(game_addresses, |game_address| {
+            let game = borrow_global<RockPaperScissor>(*game_address);
+            table::upsert(&mut player_to_game_mapping, game.player1.address, game_address);
+            table::upsert(&mut player_to_game_mapping, game.player2.address, game_address);
+        });
+        player_to_game_mapping
     }
 
     public(friend) fun add_players_returning(

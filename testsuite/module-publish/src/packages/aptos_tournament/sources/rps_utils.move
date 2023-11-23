@@ -7,6 +7,7 @@ module tournament::rps_unit_tests {
     use std::table::{Self, Table};
     use std::option::{Self, Option};
     use std::string_utils::{to_string};
+    use std::simple_map::{Self, SimpleMap};
     use aptos_framework::object::{Self, Object};
     use aptos_token_objects::token::Token;
 
@@ -21,6 +22,10 @@ module tournament::rps_unit_tests {
         tournament_address: address,
         game_addresses: vector<address>,
         round_address: Option<address>,
+    }
+
+    struct PlayerToGameMapping has key {
+        mapping: Table<address, address>
     }
 
     struct PlayerConfig has key {
@@ -77,7 +82,7 @@ module tournament::rps_unit_tests {
         table::upsert(&mut player_config.player_configs, tournament_address, player_token);
     }
 
-    public entry fun start_new_round(admin: &signer, player_addresses: vector<address>) acquires PlayerConfig, TournamentConfig {
+    public entry fun start_new_round(admin: &signer, player_addresses: vector<address>) acquires PlayerConfig, TournamentConfig, PlayerToGameMapping {
         let admin_address = signer::address_of(admin);
         let tournament_address = borrow_global<TournamentConfig>(admin_address).tournament_address;
         aptos_tournament::start_new_round<RockPaperScissorsGame>(admin, tournament_address);
@@ -92,14 +97,20 @@ module tournament::rps_unit_tests {
             tournament_address,
             player_tokens
         );
-        let i = 0;
-        let len = vector::length(&game_addresses);
-        while (i < len) {
-            let player1_address = rock_paper_scissor::get_game_players(borrow_global<RockPaperScissor>(*vector::borrow(&game_addresses, i)));
-            i = i + 1;
-        };
+        let player_to_game_mapping = rock_paper_scissor::get_player_to_game_mapping(&game_addresses);
+        move_to<PlayerToGameMapping>(admin, PlayerToGameMapping {
+            mapping: player_to_game_mapping
+        });
+        // let (player_addrs, game_addrs) = simple_map::to_vec_pair(player_to_game_mapping);
+        // let i = 0;
+        // let len = vector::length(&player_addrs);
+        // while (i < len) {
+        //     move_tovector::borrow(&player_addrs, i), 
+        //     let player1_address = rock_paper_scissor::get_game_players(borrow_global<RockPaperScissor>(*vector::borrow(&game_addresses, i)));
+        //     i = i + 1;
+        // };
         // vector::for_each_ref(&game_addresses, |game_address| {
-        //     let (player1_address, player2_address) = rock_paper_scissor::get_game_players(&borrow_global<RockPaperScissor>(game_address));
+        //     let player1_address = rock_paper_scissor::get_game_players(&borrow_global<RockPaperScissor>(game_address));
         // });
         let round_address = tournament_manager::get_round_address(tournament_address);
         let tournament_config = borrow_global_mut<TournamentConfig>(admin_address);
