@@ -65,8 +65,11 @@ use std::{
 // -------------------------------------------------------------------------------------------------
 // Program Analysis Domain
 
-/// Lifetime graph nodes represent information about memory locations, as well as nodes derived
-/// from those locations.
+/// The borrow graph consists of a set of `LifetimeNode` values which are labeled by
+/// `LifetimeLabel`. Each node carries information about an associated
+/// `MemoryLocation`, as well as the children of the node, given by list of `BorrowEdge`s.
+/// The node also has backlinks to its parents, given by a set of `LifetimeLabel`, for
+/// more flexible navigation through the (acyclic) graph.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct LifetimeNode {
     /// Memory location associated with this node.
@@ -169,6 +172,11 @@ impl BorrowEdgeKind {
 }
 
 /// The program analysis domain used with the data flow analysis framework.
+///
+/// This structure and its components need to implement `AbstractDomain` so they
+/// can be used by the data flow analysis framework. This trait defines a `join`
+/// which is used to merge information from multiple incoming paths during data
+/// flow analysis.
 #[derive(Clone, Default, Debug)]
 struct LifetimeState {
     /// Contains the borrow graph at the current program point.
@@ -675,7 +683,7 @@ impl<'env> LifeTimeAnalysis<'env> {
                 let mut_prefix = if e.is_mut { "mutable " } else { "" };
                 return Some((
                     loc.clone(),
-                    format!("{}{}{}", prefix, mut_prefix, match e.kind {
+                    format!("{}{}{}", prefix, mut_prefix, match &e.kind {
                         BorrowLocal => "local borrow",
                         BorrowGlobal => "global borrow",
                         BorrowField(..) => "field borrow",
@@ -1261,7 +1269,7 @@ impl LifetimeInfoAtCodeOffset {
         self.before
             .local_to_label_map
             .keys()
-            .filter(|t| self.after.local_to_label_map.contains_key(t))
+            .filter(|t| !self.after.local_to_label_map.contains_key(t))
             .cloned()
     }
 }
