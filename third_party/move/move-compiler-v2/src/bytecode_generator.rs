@@ -882,10 +882,10 @@ impl<'env> Generator<'env> {
 impl<'env> Generator<'env> {
     fn gen_borrow(&mut self, target: TempIndex, id: NodeId, kind: ReferenceKind, arg: &Exp) {
         match arg.as_ref() {
-            ExpData::Call(arg_id, Operation::Select(mid, sid, fid), args) => {
+            ExpData::Call(_arg_id, Operation::Select(mid, sid, fid), args) => {
                 return self.gen_borrow_field(
                     target,
-                    *arg_id,
+                    id,
                     kind,
                     mid.qualified(*sid),
                     *fid,

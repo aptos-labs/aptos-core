@@ -66,10 +66,10 @@ error: cannot return a reference derived from local `s1` since it is not a param
 21 │ │         id_mut(&mut v3),
 22 │ │         id(&v4),
 23 │ │         &mut s1.f,
-   │ │              ----
-   │ │              │
-   │ │              used by mutable field borrow
-   │ │              previous mutable local borrow
+   │ │         ---------
+   │ │         │    │
+   │ │         │    previous mutable local borrow
+   │ │         used by mutable field borrow
 24 │ │         &s2.f,
 25 │ │         id_mut(&mut s3.f),
 26 │ │         id(&s4.f))
@@ -84,10 +84,10 @@ error: cannot return a reference derived from local `s2` since it is not a param
 22 │ │         id(&v4),
 23 │ │         &mut s1.f,
 24 │ │         &s2.f,
-   │ │          ----
-   │ │          │
-   │ │          used by field borrow
-   │ │          previous local borrow
+   │ │         -----
+   │ │         ││
+   │ │         │previous local borrow
+   │ │         used by field borrow
 25 │ │         id_mut(&mut s3.f),
 26 │ │         id(&s4.f))
    │ ╰──────────────────^ returned here
@@ -101,10 +101,10 @@ error: cannot return a reference derived from local `s3` since it is not a param
 22 │ │         id(&v4),
    · │
 25 │ │         id_mut(&mut s3.f),
-   │ │                     ----
-   │ │                     │
-   │ │                     used by mutable field borrow
-   │ │                     previous mutable local borrow
+   │ │                ---------
+   │ │                │    │
+   │ │                │    previous mutable local borrow
+   │ │                used by mutable field borrow
 26 │ │         id(&s4.f))
    │ ╰──────────────────^ returned here
 
@@ -118,8 +118,8 @@ error: cannot return a reference derived from local `s4` since it is not a param
    · │
 25 │ │         id_mut(&mut s3.f),
 26 │ │         id(&s4.f))
-   │ │             ----
-   │ │             │
-   │ │             used by field borrow
-   │ │             previous local borrow
+   │ │            -----
+   │ │            ││
+   │ │            │previous local borrow
+   │ │            used by field borrow
    │ ╰──────────────────^ returned here
