@@ -12,10 +12,10 @@ error: cannot extract resource `M::R` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_from_invalid.move:42:23
    │
 41 │         let f_ref = &borrow_global<R>(addr).f;
-   │                      ------------------------
-   │                      │
-   │                      used by field borrow
-   │                      previous global borrow
+   │                     -------------------------
+   │                     ││
+   │                     │previous global borrow
+   │                     used by field borrow
 42 │         let R { f } = move_from<R>(addr);
    │                       ^^^^^^^^^^^^^^^^^^ extracted here
 
@@ -31,10 +31,10 @@ error: cannot extract resource `M::R` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_from_invalid.move:18:23
    │
 17 │         let f_ref = &mut borrow_global_mut<R>(addr).f;
-   │                          ----------------------------
-   │                          │
-   │                          used by mutable field borrow
-   │                          previous mutable global borrow
+   │                     ---------------------------------
+   │                     │    │
+   │                     │    previous mutable global borrow
+   │                     used by mutable field borrow
 18 │         let R { f } = move_from<R>(addr);
    │                       ^^^^^^^^^^^^^^^^^^ extracted here
 
@@ -50,10 +50,10 @@ error: cannot extract resource `M::R` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_from_invalid.move:30:23
    │
 29 │         let f_ref = id_mut(&mut borrow_global_mut<R>(addr).f);
-   │                                 ----------------------------
-   │                                 │
-   │                                 used by mutable field borrow
-   │                                 previous mutable global borrow
+   │                            ---------------------------------
+   │                            │    │
+   │                            │    previous mutable global borrow
+   │                            used by mutable field borrow
 30 │         let R { f } = move_from<R>(addr);
    │                       ^^^^^^^^^^^^^^^^^^ extracted here
 
@@ -72,10 +72,10 @@ error: cannot extract resource `M::R` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_from_invalid.move:54:23
    │
 53 │         let f_ref = id(&borrow_global<R>(addr).f);
-   │                         ------------------------
-   │                         │
-   │                         used by field borrow
-   │                         previous global borrow
+   │                        -------------------------
+   │                        ││
+   │                        │previous global borrow
+   │                        used by field borrow
 54 │         let R { f } = move_from<R>(addr);
    │                       ^^^^^^^^^^^^^^^^^^ extracted here
 

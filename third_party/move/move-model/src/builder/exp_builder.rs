@@ -1012,7 +1012,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             EA::AddressSpecifier_::Name(name) => {
                 // Construct an expansion name exp for regular type check
                 let maccess = sp(name.loc, EA::ModuleAccess_::Name(*name));
-                self.translate_name(&maccess, None, &Type::new_prim(PrimitiveType::Address));
+                self.translate_name(
+                    &self.to_loc(&maccess.loc),
+                    &maccess,
+                    None,
+                    &Type::new_prim(PrimitiveType::Address),
+                );
                 (
                     loc,
                     AddressSpecifier::Parameter(self.symbol_pool().make(name.value.as_str())),
@@ -1095,13 +1100,21 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     self.new_error_exp()
                 }
             },
-            EA::Exp_::Name(maccess, type_params) => {
-                self.translate_name(maccess, type_params.as_deref(), expected_type)
-            },
+            EA::Exp_::Name(maccess, type_params) => self.translate_name(
+                &self.to_loc(&maccess.loc),
+                maccess,
+                type_params.as_deref(),
+                expected_type,
+            ),
             EA::Exp_::Move(var) | EA::Exp_::Copy(var) => {
                 let fake_access = sp(var.loc(), EA::ModuleAccess_::Name(var.0));
                 let name_exp = self
-                    .translate_name(&fake_access, None, expected_type)
+                    .translate_name(
+                        &self.to_loc(&fake_access.loc),
+                        &fake_access,
+                        None,
+                        expected_type,
+                    )
                     .into_exp();
                 let id = self.new_node_id_with_type_loc(expected_type, &loc);
                 ExpData::Call(
@@ -1347,10 +1360,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let target_exp = self.translate_exp(exp, &var);
                 let id = self.new_node_id_with_type_loc(expected_type, &loc);
                 ExpData::Call(id, Operation::Deref, vec![target_exp.into_exp()])
-            },
-            EA::Exp_::Borrow(_, exp) if self.mode == ExpTranslationMode::TryImplAsSpec => {
-                // Skipp borrow when interpreting as specification expression.
-                self.translate_exp(exp, expected_type)
             },
             EA::Exp_::Borrow(mutable, exp) => {
                 self.require_impl_language(&loc);
@@ -2183,11 +2192,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     /// Translates a name. Reports an error if the name is not found.
     fn translate_name(
         &mut self,
+        loc: &Loc,
         maccess: &EA::ModuleAccess,
         type_args: Option<&[EA::Type]>,
         expected_type: &Type,
     ) -> ExpData {
-        let loc = &self.to_loc(&maccess.loc);
         let global_var_sym = match &maccess.value {
             EA::ModuleAccess_::ModuleAccess(..) => self.parent.module_access_to_qualified(maccess),
             EA::ModuleAccess_::Name(name) => {

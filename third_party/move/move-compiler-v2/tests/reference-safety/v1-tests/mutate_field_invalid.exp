@@ -4,7 +4,7 @@ error: cannot write to reference in local `s` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/mutate_field_invalid.move:11:9
    │
 10 │         let f = &s.f;
-   │                  --- previous field borrow
+   │                 ---- previous field borrow
 11 │         *s = S { f: 0, g: 0 };
    │         ^^^^^^^^^^^^^^^^^^^^^ written here
 
@@ -12,7 +12,7 @@ error: cannot write to reference in local `s` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/mutate_field_invalid.move:15:9
    │
 14 │         let f = &mut s.f;
-   │                      --- previous mutable field borrow
+   │                 -------- previous mutable field borrow
 15 │         *s = S { f: 0, g: 0 };
    │         ^^^^^^^^^^^^^^^^^^^^^ written here
 
@@ -21,8 +21,8 @@ error: cannot write to reference in local `s` which is still borrowed
    │
 18 │         let f = id(&s.f);
    │                 --------
-   │                 │   │
-   │                 │   previous field borrow
+   │                 │  │
+   │                 │  previous field borrow
    │                 used by call result
 19 │         *s = S { f: 0, g: 0 };
    │         ^^^^^^^^^^^^^^^^^^^^^ written here
@@ -32,8 +32,8 @@ error: cannot write to reference in local `s` which is still borrowed
    │
 22 │         let f = id_mut(&mut s.f);
    │                 ----------------
-   │                 │           │
-   │                 │           previous mutable field borrow
+   │                 │      │
+   │                 │      previous mutable field borrow
    │                 used by mutable call result
 23 │         *s = S { f: 0, g: 0 };
    │         ^^^^^^^^^^^^^^^^^^^^^ written here
