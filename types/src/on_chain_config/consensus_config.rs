@@ -14,14 +14,21 @@ pub enum OnChainConsensusConfig {
     V1(ConsensusConfigV1),
     V2(ConsensusConfigV1),
     DagV1(DagConsensusConfigV1),
+    V3(ConsensusConfigV1Ext),
 }
 
 /// The public interface that exposes all values with safe fallback.
 impl OnChainConsensusConfig {
+    pub fn default_for_genesis() -> Self {
+        OnChainConsensusConfig::V3(ConsensusConfigV1Ext::default_for_genesis())
+    }
+
     /// The number of recent rounds that don't count into reputations.
     pub fn leader_reputation_exclude_round(&self) -> u64 {
         match &self {
-            OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
+            OnChainConsensusConfig::V1(config)
+            | OnChainConsensusConfig::V2(config)
+            | OnChainConsensusConfig::V3(ConsensusConfigV1Ext { main: config, .. }) => {
                 config.exclude_round
             },
             _ => unimplemented!("method not supported"),
@@ -37,7 +44,9 @@ impl OnChainConsensusConfig {
     // to this max size.
     pub fn max_failed_authors_to_store(&self) -> usize {
         match &self {
-            OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
+            OnChainConsensusConfig::V1(config)
+            | OnChainConsensusConfig::V2(config)
+            | OnChainConsensusConfig::V3(ConsensusConfigV1Ext { main: config, .. }) => {
                 config.max_failed_authors_to_store
             },
             _ => unimplemented!("method not supported"),
@@ -47,7 +56,9 @@ impl OnChainConsensusConfig {
     // Type and configuration used for proposer election.
     pub fn proposer_election_type(&self) -> &ProposerElectionType {
         match &self {
-            OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
+            OnChainConsensusConfig::V1(config)
+            | OnChainConsensusConfig::V2(config)
+            | OnChainConsensusConfig::V3(ConsensusConfigV1Ext { main: config, .. }) => {
                 &config.proposer_election_type
             },
             _ => unimplemented!("method not supported"),
@@ -57,7 +68,7 @@ impl OnChainConsensusConfig {
     pub fn quorum_store_enabled(&self) -> bool {
         match &self {
             OnChainConsensusConfig::V1(_config) => false,
-            OnChainConsensusConfig::V2(_config) => true,
+            OnChainConsensusConfig::V2(_) | OnChainConsensusConfig::V3(_) => true,
             OnChainConsensusConfig::DagV1(_) => false,
         }
     }
@@ -72,12 +83,21 @@ impl OnChainConsensusConfig {
             _ => unreachable!("not a dag config"),
         }
     }
+
+    pub fn should_propose_system_txns(&self) -> bool {
+        match self {
+            OnChainConsensusConfig::V3(obj) => {
+                obj.is_enabled(ConsensusExtraFeature::ProposalWithSystemTransactions)
+            },
+            _ => false,
+        }
+    }
 }
 
 /// This is used when on-chain config is not initialized.
 impl Default for OnChainConsensusConfig {
     fn default() -> Self {
-        OnChainConsensusConfig::V2(ConsensusConfigV1::default())
+        OnChainConsensusConfig::V3(ConsensusConfigV1Ext::default_if_missing())
     }
 }
 
@@ -132,6 +152,39 @@ impl Default for ConsensusConfigV1 {
                     use_history_from_previous_epoch_max_count: 5,
                 }),
             ),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct ConsensusConfigV1Ext {
+    pub main: ConsensusConfigV1,
+    pub extra_feature_flags: Vec<bool>,
+}
+
+pub enum ConsensusExtraFeature {
+    ProposalWithSystemTransactions = 0,
+}
+
+impl ConsensusConfigV1Ext {
+    pub fn is_enabled(&self, feature: ConsensusExtraFeature) -> bool {
+        self.extra_feature_flags
+            .get(feature as usize)
+            .copied()
+            .unwrap_or(false)
+    }
+
+    pub fn default_for_genesis() -> Self {
+        ConsensusConfigV1Ext {
+            main: ConsensusConfigV1::default(),
+            extra_feature_flags: vec![true],
+        }
+    }
+
+    pub fn default_if_missing() -> Self {
+        ConsensusConfigV1Ext {
+            main: ConsensusConfigV1::default(),
+            extra_feature_flags: vec![false],
         }
     }
 }

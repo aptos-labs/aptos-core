@@ -184,7 +184,6 @@ pub struct RoundManager {
     onchain_config: OnChainConsensusConfig,
     buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
     local_config: ConsensusConfig,
-    should_propose_sys_txns: bool,
 }
 
 impl RoundManager {
@@ -200,7 +199,6 @@ impl RoundManager {
         onchain_config: OnChainConsensusConfig,
         buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
         local_config: ConsensusConfig,
-        sys_txn_enabled: bool,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -222,7 +220,6 @@ impl RoundManager {
             onchain_config,
             buffered_proposal_tx,
             local_config,
-            should_propose_sys_txns: sys_txn_enabled,
         }
     }
 
@@ -637,7 +634,7 @@ impl RoundManager {
             .author()
             .expect("Proposal should be verified having an author");
 
-        if !self.should_propose_sys_txns
+        if !self.onchain_config.should_propose_system_txns()
             && matches!(
                 proposal.block_data().block_type(),
                 BlockType::ProposalExt(_)

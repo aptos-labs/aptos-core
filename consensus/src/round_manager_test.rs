@@ -285,7 +285,6 @@ impl NodeSetup {
             OnChainConsensusConfig::default(),
             round_manager_tx,
             ConsensusConfig::default(),
-            false,
         );
         block_on(round_manager.init(last_vote_sent));
         Self {

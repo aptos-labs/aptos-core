@@ -78,8 +78,8 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     on_chain_config::{
-        FeatureFlag, Features, LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider,
-        OnChainConsensusConfig, OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
+        LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
+        OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
     },
     system_txn::pool::SystemTransactionPoolClient,
     validator_signer::ValidatorSigner,
@@ -795,7 +795,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         recovery_data: RecoveryData,
         epoch_state: EpochState,
-        features: Features,
         onchain_consensus_config: OnChainConsensusConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
@@ -877,7 +876,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             chain_health_backoff_config,
             self.quorum_store_enabled,
             self.sys_txn_pool_client.clone(),
-            features.is_enabled(FeatureFlag::PROPOSE_SYSTEM_TRANSACTIONS),
+            onchain_consensus_config.should_propose_system_txns(),
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::LIFO,
@@ -905,7 +904,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config,
             buffered_proposal_tx,
             self.config.clone(),
-            features.is_enabled(FeatureFlag::PROPOSE_SYSTEM_TRANSACTIONS),
         );
 
         round_manager.init(last_vote).await;
@@ -949,13 +947,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             verifier: (&validator_set).into(),
         };
 
-        let features: anyhow::Result<Features> = payload.get();
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
-
-        if let Err(error) = &features {
-            error!("Failed to read on-chain features {}", error);
-        }
 
         if let Err(error) = &onchain_consensus_config {
             error!("Failed to read on-chain consensus config {}", error);
@@ -986,7 +979,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         } else {
             self.start_new_epoch_with_joltean(
                 epoch_state,
-                features.unwrap_or_default(),
                 consensus_config,
                 network_sender,
                 payload_client,
@@ -1017,7 +1009,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     async fn start_new_epoch_with_joltean(
         &mut self,
         epoch_state: EpochState,
-        features: Features,
         consensus_config: OnChainConsensusConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
@@ -1029,7 +1020,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.start_round_manager(
                     initial_data,
                     epoch_state,
-                    features,
                     consensus_config,
                     network_sender,
                     payload_client,
