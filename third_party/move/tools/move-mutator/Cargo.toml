@@ -18,4 +18,7 @@ clap = { version = "4.3", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 toml = "0.5"
 
+move-command-line-common = { path = "../../move-command-line-common" }
+move-compiler = { path = "../../move-compiler" }
+move-ir-types = { path = "../../move-ir/types" }
 move-package = { path = "../move-package" }
