@@ -616,9 +616,32 @@ impl CliCommand<&'static str> for MutatePackage {
             mutator_options,
         } = self;
 
-        let result = move_mutator::run_move_mutator(move_mutator::Options {
-            move_sources: mutator_options.move_sources,
-        })
+        let known_attributes = extended_checks::get_all_attribute_names();
+        let config = BuildConfig {
+            dev_mode: self.move_options.dev,
+            additional_named_addresses: self.move_options.named_addresses(),
+            test_mode: true,
+            full_model_generation: self.move_options.check_test_code,
+            install_dir: self.move_options.output_dir.clone(),
+            skip_fetch_latest_git_deps: self.move_options.skip_fetch_latest_git_deps,
+            compiler_config: CompilerConfig {
+                known_attributes: known_attributes.clone(),
+                skip_attribute_checks: self.move_options.skip_attribute_checks,
+                compiler_version: self.move_options.compiler_version,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let path = self.move_options.get_package_path()?;
+
+        let result = move_mutator::run_move_mutator(
+            move_mutator::cli::Options {
+                move_sources: mutator_options.move_sources,
+            },
+            config,
+            path,
+        )
         .map_err(|err| CliError::UnexpectedError(err.to_string()));
 
         match result {
