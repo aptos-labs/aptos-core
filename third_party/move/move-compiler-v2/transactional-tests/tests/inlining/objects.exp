@@ -3,31 +3,31 @@ comparison between v1 and v2 failed:
 = 
 + task 0 'publish'. lines 1-74:
 + Error: compilation errors:
-+  error: The type argument to `exists` and `global` must be a struct type but `T` is not
++  error: expected a struct but found `T`
 +    ┌─ TEMPFILE:41:9
 +    │
 + 41 │         move_to<T>(signer, val)
 +    │         ^^^^^^^^^^^^^^^^^^^^^^^
 + 
-+ error: The type argument to `exists` and `global` must be a struct type but `T` is not
++ error: expected a struct but found `T`
 +    ┌─ TEMPFILE:54:9
 +    │
 + 54 │         borrow_global<T>(reader_addr_of(ref))
 +    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 + 
-+ error: The type argument to `exists` and `global` must be a struct type but `T` is not
++ error: expected a struct but found `T`
 +    ┌─ TEMPFILE:45:17
 +    │
 + 45 │         assert!(exists<T>(addr), 22);
 +    │                 ^^^^^^^^^^^^^^^
 + 
-+ error: The type argument to `exists` and `global` must be a struct type but `T` is not
++ error: expected a struct but found `T`
 +    ┌─ TEMPFILE:57:9
 +    │
 + 57 │         borrow_global_mut<T>(writer_addr_of(ref))
 +    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 + 
-+ error: The type argument to `exists` and `global` must be a struct type but `T` is not
++ error: expected a struct but found `T`
 +    ┌─ TEMPFILE:50:17
 +    │
 + 50 │         assert!(exists<T>(addr), 23);

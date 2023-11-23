@@ -938,13 +938,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 if is_wildcard(resource) {
                     ResourceSpecifier::DeclaredInModule(module_id)
                 } else {
-                    let mident = sp(
-                        specifier.loc,
-                        EA::ModuleIdent_ {
-                            address: *address,
-                            module: *module,
-                        },
-                    );
+                    let mident = sp(specifier.loc, EA::ModuleIdent_ {
+                        address: *address,
+                        module: *module,
+                    });
                     let maccess = sp(
                         specifier.loc,
                         EA::ModuleAccess_::ModuleAccess(mident, *resource),
@@ -1402,13 +1399,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let id = self.new_node_id_with_type_loc(&rt, &loc);
                 if self.mode == ExpTranslationMode::Impl {
                     // Remember information about this spec block for deferred checking.
-                    self.placeholder_map.insert(
-                        id,
-                        ExpPlaceholder::SpecBlockInfo {
+                    self.placeholder_map
+                        .insert(id, ExpPlaceholder::SpecBlockInfo {
                             spec_id: *spec_id,
                             locals: self.get_locals(),
-                        },
-                    );
+                        });
                 }
                 ExpData::Call(id, Operation::NoOp, vec![])
             },
@@ -2247,11 +2242,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             );
             let global_id = self.new_node_id_with_type_loc(&ghost_mem_ty, loc);
             self.set_node_instantiation(global_id, vec![ghost_mem_ty]);
-            let global_access = ExpData::Call(
-                global_id,
-                Operation::Global(None),
-                vec![zero_addr.into_exp()],
-            );
+            let global_access = ExpData::Call(global_id, Operation::Global(None), vec![
+                zero_addr.into_exp()
+            ]);
             let select_id = self.new_node_id_with_type_loc(&ty, loc);
             self.set_node_instantiation(select_id, instantiation);
             return ExpData::Call(
@@ -2383,13 +2376,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     Operation::Select(mid, sid, FieldId::new(field_name))
                 } else {
                     // Create a placeholder for later resolution.
-                    self.placeholder_map.insert(
-                        id,
-                        ExpPlaceholder::FieldSelectInfo {
+                    self.placeholder_map
+                        .insert(id, ExpPlaceholder::FieldSelectInfo {
                             struct_ty: ty,
                             field_name,
-                        },
-                    );
+                        });
                     Operation::NoOp
                 };
                 ExpData::Call(id, oper, vec![exp.into_exp()])

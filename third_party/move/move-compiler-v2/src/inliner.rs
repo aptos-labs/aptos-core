@@ -116,11 +116,8 @@ pub fn run_inlining(env: &mut GlobalEnv) {
             for (fun_id, funexpr_after_inlining) in inliner.funexprs_after_inlining {
                 if let Some(changed_funexpr) = funexpr_after_inlining {
                     let oldexp = env.get_function(fun_id);
-                    // Only record changed function bodies for functions which are targets.
-                    if oldexp.module_env.is_target() {
-                        let mut old_def = oldexp.get_mut_def();
-                        *old_def = Some(changed_funexpr);
-                    }
+                    let mut old_def = oldexp.get_mut_def();
+                    *old_def = Some(changed_funexpr);
                 }
             }
         }
