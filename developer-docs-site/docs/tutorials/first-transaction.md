@@ -61,7 +61,7 @@ git clone https://github.com/aptos-labs/aptos-core.git
 
   Run the [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/transfer_coin.py) example:
   ```bash
-  poetry run python -m examples.transfer-coin
+  poetry run python -m examples.transfer_coin
   ```
   </TabItem>
   <TabItem value="rust" label="Rust">
@@ -131,7 +131,7 @@ See the TypeScript [`transfer-coin`](https://github.com/aptos-labs/aptos-core/bl
   <TabItem value="python" label="Python">
 
 :::tip See the full code
-See the Python [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/transfer_coin.py) for the complete code as you follow the below steps.
+See the Python [`transfer_coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/transfer_coin.py) for the complete code as you follow the below steps.
 :::
   </TabItem>
   <TabItem value="rust" label="Rust">

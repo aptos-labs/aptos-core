@@ -735,14 +735,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) {
         let transaction_shuffler =
             create_transaction_shuffler(onchain_execution_config.transaction_shuffler_type());
-        let block_gas_limit = onchain_execution_config.block_gas_limit();
+        let block_executor_onchain_config =
+            onchain_execution_config.block_executor_onchain_config();
         let transaction_deduper =
             create_transaction_deduper(onchain_execution_config.transaction_deduper_type());
         self.commit_state_computer.new_epoch(
             epoch_state,
             payload_manager,
             transaction_shuffler,
-            block_gas_limit,
+            block_executor_onchain_config,
             transaction_deduper,
         );
     }

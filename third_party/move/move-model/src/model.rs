@@ -30,7 +30,8 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{
-        PrimitiveType, ReferenceKind, Type, TypeDisplayContext, TypeUnificationAdapter, Variance,
+        NoUnificationContext, PrimitiveType, ReferenceKind, Type, TypeDisplayContext,
+        TypeUnificationAdapter, Variance,
     },
     well_known,
 };
@@ -1045,7 +1046,7 @@ impl GlobalEnv {
             }
             assert_eq!(key.inst.len(), memory.inst.len());
             let adapter = TypeUnificationAdapter::new_vec(&memory.inst, &key.inst, true, true);
-            let rel = adapter.unify(Variance::SpecVariance, true);
+            let rel = adapter.unify(&NoUnificationContext, Variance::SpecVariance, true);
             if rel.is_some() {
                 inv_ids.extend(val.clone());
             }

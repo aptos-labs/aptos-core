@@ -623,7 +623,7 @@ mod tests {
     }
 
     #[test]
-    fn test_benchmark() {
+    fn test_benchmark_default() {
         test_generic_benchmark::<AptosVM>(None, true);
     }
 

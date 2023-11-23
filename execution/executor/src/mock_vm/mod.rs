@@ -14,7 +14,10 @@ use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_config::CORE_CODE_ADDRESS,
-    block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions},
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain,
+        partitioner::{ExecutableTransactions, PartitionedTransactions},
+    },
     bytes::NumToBytes,
     chain_id::ChainId,
     contract_event::ContractEvent,
@@ -66,13 +69,9 @@ impl TransactionBlockExecutor for MockVM {
     fn execute_transaction_block(
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<MockVM>(
-            transactions,
-            state_view,
-            maybe_block_gas_limit,
-        )
+        ChunkOutput::by_transaction_execution::<MockVM>(transactions, state_view, onchain_config)
     }
 }
 
@@ -80,7 +79,7 @@ impl VMExecutor for MockVM {
     fn execute_block(
         transactions: &[SignatureVerifiedTransaction],
         state_view: &impl StateView,
-        _maybe_block_gas_limit: Option<u64>,
+        _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         // output_cache is used to store the output of transactions so they are visible to later
         // transactions.
@@ -195,7 +194,7 @@ impl VMExecutor for MockVM {
         _sharded_block_executor: &ShardedBlockExecutor<S, E>,
         _transactions: PartitionedTransactions,
         _state_view: Arc<S>,
-        _maybe_block_gas_limit: Option<u64>,
+        _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> std::result::Result<Vec<TransactionOutput>, VMStatus> {
         todo!()
     }

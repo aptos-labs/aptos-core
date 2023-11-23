@@ -42,7 +42,7 @@ error: invalid call of `move_to`: expected `M::R` but found `integer` for argume
 14 │         let () = move_to<R>(a, 0);
    │                                ^
 
-error: The type argument to `exists` and `global` must be a struct type but `integer` is not
+error: struct incompatible with integer
    ┌─ tests/checking/typing/global_builtins_invalid.move:15:18
    │
 15 │         let () = move_to(a, 0);
