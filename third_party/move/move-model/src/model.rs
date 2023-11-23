@@ -1307,10 +1307,11 @@ impl GlobalEnv {
             };
 
             // While releasing any mutation, compute the called functions if needed.
-            let fun_data = &self.module_data[module_id.0 as usize]
-                .function_data
-                .get(&fun_id)
-                .unwrap();
+            let fun_data =
+                &self.module_data[module_id.0 as usize]
+                    .function_data
+                    .get(&fun_id)
+                    .unwrap();
             let called_funs = if fun_data.called_funs.is_none() {
                 Some(self.get_called_funs_from_bytecode(&module, def_idx))
             } else {
@@ -1588,11 +1589,7 @@ impl GlobalEnv {
                         .enumerate()
                         .map(|(idx, _)| Type::new_param(idx))
                         .collect_vec();
-                    res.push(Type::Struct(
-                        module_env.get_id(),
-                        struct_env.get_id(),
-                        formals,
-                    ));
+                    res.push(Type::Struct(module_env.get_id(), struct_env.get_id(), formals));
                 }
             }
         }
@@ -2300,11 +2297,12 @@ impl<'env> ModuleEnv<'env> {
                     }
                 }
             };
-            let add_usage_of_spec = |usage: &mut BTreeSet<ModuleId>, spec: &Spec| {
-                for cond in &spec.conditions {
-                    add_usage_of_exp(usage, &cond.exp);
-                }
-            };
+            let add_usage_of_spec =
+                |usage: &mut BTreeSet<ModuleId>, spec: &Spec| {
+                    for cond in &spec.conditions {
+                        add_usage_of_exp(usage, &cond.exp);
+                    }
+                };
             add_usage_of_spec(&mut usage, self.get_spec());
             for struct_env in self.get_structs() {
                 add_usage_of_spec(&mut usage, struct_env.get_spec())
@@ -2466,9 +2464,7 @@ impl<'env> ModuleEnv<'env> {
     /// FunctionHandleIndex. The returned function might be from this or another module.
     pub fn get_used_function(&self, idx: FunctionHandleIndex) -> Option<FunctionEnv<'_>> {
         let module = self.data.compiled_module.as_ref()?;
-        Some(Self::get_used_function_from_compiled_module(
-            self.env, idx, module,
-        ))
+        Some(Self::get_used_function_from_compiled_module(self.env, idx, module))
     }
 
     fn get_used_function_from_compiled_module<'a>(
@@ -4009,11 +4005,7 @@ impl<'env> FunctionEnv<'env> {
             Rc::from(format!("Script::{}", self.get_simple_name_string()))
         } else {
             let module_name = self.module_env.get_name().display(self.module_env.env);
-            Rc::from(format!(
-                "{}::{}",
-                module_name,
-                self.get_simple_name_string()
-            ))
+            Rc::from(format!("{}::{}", module_name, self.get_simple_name_string()))
         }
     }
 
@@ -4023,10 +4015,7 @@ impl<'env> FunctionEnv<'env> {
             "attempt to access bytecode info for inline function"
         );
         let module = self.module_env.data.compiled_module.as_ref()?;
-        Some(FunctionDefinitionView::new(
-            module,
-            module.function_def_at(self.data.def_idx?),
-        ))
+        Some(FunctionDefinitionView::new(module, module.function_def_at(self.data.def_idx?)))
     }
 
     /// Produce a TypeDisplayContext to print types within the scope of this env

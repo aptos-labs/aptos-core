@@ -359,10 +359,9 @@ impl<'a> Instrumenter<'a> {
             // The inlined variant may have an inlined spec that used "old" values - these need to
             // be saved in both cases
             assert!(
-                verification_analysis::get_info(&FunctionTarget::new(
-                    self.builder.fun_env,
-                    &self.builder.data
-                ))
+                verification_analysis::get_info(
+                    &FunctionTarget::new(self.builder.fun_env, &self.builder.data)
+                )
                 .inlined
             );
             for translated_spec in inlined_props.values().map(|(s, _)| s) {
@@ -597,9 +596,9 @@ impl<'a> Instrumenter<'a> {
                     self.emit_traces(&callee_spec, &cond);
                     self.builder.emit_with(move |id| Prop(id, Assume, cond));
                 }
-                self.builder.emit_with(move |id| {
-                    Call(id, vec![], Operation::TraceAbort, vec![abort_local], None)
-                });
+                self.builder.emit_with(
+                    move |id| Call(id, vec![], Operation::TraceAbort, vec![abort_local], None)
+                );
                 self.builder.emit_with(|id| Jump(id, abort_label));
                 self.builder.emit_with(|id| Label(id, no_abort_label));
                 self.can_abort = true;
@@ -626,18 +625,18 @@ impl<'a> Instrumenter<'a> {
             // they are `&mut`, they are never modified, and this is not expressed in the
             // specifications. We treat this by skipping the Havoc for them. TODO: find a better
             // solution
-            let mut_srcs = srcs
-                .iter()
-                .cloned()
-                .filter(|src| {
-                    let ty = &self.builder.data.local_types[*src];
-                    ty.is_mutable_reference()
-                        && !self
-                            .builder
-                            .global_env()
-                            .is_wellknown_event_handle_type(ty.skip_reference())
-                })
-                .collect_vec();
+            let mut_srcs =
+                srcs.iter()
+                    .cloned()
+                    .filter(|src| {
+                        let ty = &self.builder.data.local_types[*src];
+                        ty.is_mutable_reference()
+                            && !self
+                                .builder
+                                .global_env()
+                                .is_wellknown_event_handle_type(ty.skip_reference())
+                    })
+                    .collect_vec();
             for src in &mut_srcs {
                 self.builder.emit_with(|id| {
                     Call(
@@ -734,11 +733,12 @@ impl<'a> Instrumenter<'a> {
             // interpret this like any other memory access.
             self.builder.set_loc(loc.clone());
             self.emit_traces(spec, lhs);
-            let new_rhs = if let Some(ref prop_rhs) = prop_rhs_opt {
-                prop_rhs
-            } else {
-                rhs
-            };
+            let new_rhs =
+                if let Some(ref prop_rhs) = prop_rhs_opt {
+                    prop_rhs
+                } else {
+                    rhs
+                };
             self.emit_traces(spec, new_rhs);
 
             // Extract the ghost mem from lhs
@@ -751,19 +751,19 @@ impl<'a> Instrumenter<'a> {
             // directly, ignoring the `_field_id`. This is currently possible because
             // each ghost memory struct contains exactly one field. Should this change,
             // this code here needs to be generalized.
-            let (rhs_temp, _) = self.builder.emit_let(self.builder.mk_call_with_inst(
-                &ghost_mem_ty,
-                ghost_mem.inst.clone(),
-                ast::Operation::Pack(ghost_mem.module_id, ghost_mem.id),
-                vec![new_rhs.clone()],
-            ));
+            let (rhs_temp, _) =
+                self.builder.emit_let(self.builder.mk_call_with_inst(
+                    &ghost_mem_ty,
+                    ghost_mem.inst.clone(),
+                    ast::Operation::Pack(ghost_mem.module_id, ghost_mem.id),
+                    vec![new_rhs.clone()],
+                ));
 
             // Update memory. We create a mut ref for the location then write the value back to it.
             let (addr_temp, _) = self.builder.emit_let(addr);
-            let mem_ref = self.builder.new_temp(Type::Reference(
-                ReferenceKind::Mutable,
-                Box::new(ghost_mem_ty),
-            ));
+            let mem_ref = self
+                .builder
+                .new_temp(Type::Reference(ReferenceKind::Mutable, Box::new(ghost_mem_ty)));
             // mem_ref = borrow_global_mut<ghost_mem>(addr)
             self.builder.emit_with(|id| {
                 Bytecode::Call(
@@ -965,13 +965,14 @@ impl<'a> Instrumenter<'a> {
 
         // Emit specification variable updates. They are generated for both verified and inlined
         // function variants, as the evolution of state updates is always the same.
-        let lets_emitted = if !spec.updates.is_empty() {
-            self.emit_lets(spec, true);
-            self.emit_updates(spec, None);
-            true
-        } else {
-            false
-        };
+        let lets_emitted =
+            if !spec.updates.is_empty() {
+                self.emit_lets(spec, true);
+                self.emit_updates(spec, None);
+                true
+            } else {
+                false
+            };
 
         if self.is_verified() {
             // Emit `let` bindings if not already emitted.

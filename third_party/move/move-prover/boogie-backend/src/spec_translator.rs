@@ -179,19 +179,21 @@ impl<'env> SpecTranslator<'env> {
         let empty = &BTreeSet::new();
         let mut translated = BTreeSet::new();
         for (id, var) in module_env.get_spec_vars() {
-            for type_inst in mono_info
-                .spec_vars
-                .get(&module_env.get_id().qualified(*id))
-                .unwrap_or(empty)
-                .iter()
-                .cloned()
+            for type_inst in
+                mono_info
+                    .spec_vars
+                    .get(&module_env.get_id().qualified(*id))
+                    .unwrap_or(empty)
+                    .iter()
+                    .cloned()
             {
-                let name = boogie_spec_var_name(
-                    module_env,
-                    module_env.get_spec_var(*id).name,
-                    &type_inst,
-                    &None,
-                );
+                let name =
+                    boogie_spec_var_name(
+                        module_env,
+                        module_env.get_spec_var(*id).name,
+                        &type_inst,
+                        &None,
+                    );
                 if !translated.insert(name) {
                     continue;
                 }
@@ -231,12 +233,13 @@ impl<'env> SpecTranslator<'env> {
         let empty = &BTreeSet::new();
         let mut translated = BTreeSet::new();
         for (id, fun) in module_env.get_spec_funs() {
-            for type_inst in mono_info
-                .spec_funs
-                .get(&module_env.get_id().qualified(*id))
-                .unwrap_or(empty)
-                .iter()
-                .cloned()
+            for type_inst in
+                mono_info
+                    .spec_funs
+                    .get(&module_env.get_id().qualified(*id))
+                    .unwrap_or(empty)
+                    .iter()
+                    .cloned()
             {
                 let name = boogie_spec_fun_name(module_env, *id, &type_inst, false);
                 if !translated.insert(name) {
@@ -1062,13 +1065,14 @@ impl<'env> SpecTranslator<'env> {
             let name = boogie_spec_fun_name(module_env, fun_id, inst, bv_flag);
             emit!(self.writer, "{}(", name);
             let mut first = true;
-            let mut maybe_comma = || {
-                if first {
-                    first = false;
-                } else {
-                    emit!(self.writer, ", ");
-                }
-            };
+            let mut maybe_comma =
+                || {
+                    if first {
+                        first = false;
+                    } else {
+                        emit!(self.writer, ", ");
+                    }
+                };
             let label_at = |i| memory_labels.as_ref().map(|labels| labels[i]);
             let mut i = 0;
             for memory in &fun_decl.used_memory {
@@ -1541,16 +1545,17 @@ impl<'env> SpecTranslator<'env> {
         // Construct the arguments. Notice that those might be different for each call of
         // the choice function, resulting from the choice being injected into multiple contexts
         // with different substitutions.
-        let args = free_vars
-            .iter()
-            .map(|(s, _)| s.display(self.env.symbol_pool()).to_string())
-            .chain(used_temps.iter().map(|(t, _)| format!("$t{}", t)))
-            .chain(
-                used_memory
-                    .iter()
-                    .map(|(m, l)| boogie_resource_memory_name(self.env, m, l)),
-            )
-            .join(", ");
+        let args =
+            free_vars
+                .iter()
+                .map(|(s, _)| s.display(self.env.symbol_pool()).to_string())
+                .chain(used_temps.iter().map(|(t, _)| format!("$t{}", t)))
+                .chain(
+                    used_memory
+                        .iter()
+                        .map(|(m, l)| boogie_resource_memory_name(self.env, m, l)),
+                )
+                .join(", ");
         emit!(self.writer, "{}({})", fun_name, args);
     }
 

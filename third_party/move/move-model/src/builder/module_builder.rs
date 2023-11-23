@@ -489,13 +489,14 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         et.enter_scope();
         let params = et.analyze_and_add_params(&def.signature.parameters, true);
         let result_type = et.translate_type(&def.signature.return_type);
-        let kind = if def.entry.is_some() {
-            FunctionKind::Entry
-        } else if def.inline {
-            FunctionKind::Inline
-        } else {
-            FunctionKind::Regular
-        };
+        let kind =
+            if def.entry.is_some() {
+                FunctionKind::Entry
+            } else if def.inline {
+                FunctionKind::Inline
+            } else {
+                FunctionKind::Regular
+            };
         let visibility = match def.visibility {
             EA::Visibility::Public(_) => Visibility::Public,
             EA::Visibility::Friend(_) => Visibility::Friend,
@@ -1007,31 +1008,32 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             for spec_info in fun_spec_info.values() {
                 // locate the spec block
                 let origin = &spec_info.origin;
-                let spec_block_opt = match origin.module {
-                    None => {
-                        // inline spec in a script function
-                        fun_def.specs.get(&origin.id)
-                    },
-                    Some(module_ident) => {
-                        // inline spec in a normal function
-                        let module_addr = self
-                            .parent
-                            .resolve_address(&fun_name_loc, &module_ident.address);
-                        let module_name = ModuleName::from_address_bytes_and_name(
-                            module_addr,
-                            self.symbol_pool()
-                                .make(module_ident.module.0.value.as_str()),
-                        );
-                        let origin_symbol = QualifiedSymbol {
-                            module_name,
-                            symbol: self.symbol_pool().make(origin.function.as_str()),
-                        };
-                        self.parent
-                            .fun_table
-                            .get(&origin_symbol)
-                            .and_then(|entry| entry.inline_specs.get(&origin.id))
-                    },
-                };
+                let spec_block_opt =
+                    match origin.module {
+                        None => {
+                            // inline spec in a script function
+                            fun_def.specs.get(&origin.id)
+                        },
+                        Some(module_ident) => {
+                            // inline spec in a normal function
+                            let module_addr = self
+                                .parent
+                                .resolve_address(&fun_name_loc, &module_ident.address);
+                            let module_name = ModuleName::from_address_bytes_and_name(
+                                module_addr,
+                                self.symbol_pool()
+                                    .make(module_ident.module.0.value.as_str()),
+                            );
+                            let origin_symbol = QualifiedSymbol {
+                                module_name,
+                                symbol: self.symbol_pool().make(origin.function.as_str()),
+                            };
+                            self.parent
+                                .fun_table
+                                .get(&origin_symbol)
+                                .and_then(|entry| entry.inline_specs.get(&origin.id))
+                        },
+                    };
                 let spec_block = match spec_block_opt {
                     None => {
                         self.parent.error(&fun_name_loc, "unresolved spec anchor");
@@ -1061,13 +1063,14 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     additional_exps,
                 } => {
                     if let Some(kind) = self.convert_condition_kind(kind, &context) {
-                        let properties = self.translate_properties(properties, &|_, _, prop| {
-                            if !is_property_valid_for_condition(&kind, prop) {
-                                Some(loc.clone())
-                            } else {
-                                None
-                            }
-                        });
+                        let properties =
+                            self.translate_properties(properties, &|_, _, prop| {
+                                if !is_property_valid_for_condition(&kind, prop) {
+                                    Some(loc.clone())
+                                } else {
+                                    None
+                                }
+                            });
                         self.def_ana_condition(
                             loc,
                             &context,
@@ -1389,11 +1392,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             .get_mut(&self.qualified_by_module_from_name(&name.0))
         {
             if entry.len() != 1 {
-                let error_msg = if entry.is_empty() {
-                    "missing"
-                } else {
-                    "duplicate"
-                };
+                let error_msg =
+                    if entry.is_empty() {
+                        "missing"
+                    } else {
+                        "duplicate"
+                    };
                 self.parent.error(
                     &self.parent.to_loc(&name.loc()),
                     &format!("{} declaration of `{}`", error_msg, name.value()),
@@ -1521,11 +1525,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     ) {
         // Check the expression and extract results.
         let sym = self.symbol_pool().make(&name.value);
-        let kind = if post_state {
-            ConditionKind::LetPost(sym)
-        } else {
-            ConditionKind::LetPre(sym)
-        };
+        let kind =
+            if post_state {
+                ConditionKind::LetPost(sym)
+            } else {
+                ConditionKind::LetPre(sym)
+            };
         let mut et = self.exp_translator_for_context(loc, context, &kind);
         let (_, def) = et.translate_exp_free(def);
         et.finalize_types();
@@ -1566,13 +1571,14 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         context: &SpecBlockContext,
         properties: &[EA::PragmaProperty],
     ) {
-        let mut properties = self.translate_properties(properties, &|symbols, bag, prop| {
-            if !is_pragma_valid_for_block(symbols, bag, context, prop) {
-                Some(loc.clone())
-            } else {
-                None
-            }
-        });
+        let mut properties =
+            self.translate_properties(properties, &|symbols, bag, prop| {
+                if !is_pragma_valid_for_block(symbols, bag, context, prop) {
+                    Some(loc.clone())
+                } else {
+                    None
+                }
+            });
 
         // extra processing on concrete pragma declarations
         process_intrinsic_declaration(self, loc, context, &mut properties);
@@ -2055,14 +2061,15 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     exp,
                     additional_exps,
                 } = cond;
-                let mut replacer = |id: NodeId, target: RewriteTarget| {
-                    if let RewriteTarget::LocalVar(name) = target {
-                        if let Some(unique_name) = let_substitution.get(&name) {
-                            return Some(ExpData::LocalVar(id, *unique_name).into_exp());
+                let mut replacer =
+                    |id: NodeId, target: RewriteTarget| {
+                        if let RewriteTarget::LocalVar(name) = target {
+                            if let Some(unique_name) = let_substitution.get(&name) {
+                                return Some(ExpData::LocalVar(id, *unique_name).into_exp());
+                            }
                         }
-                    }
-                    None
-                };
+                        None
+                    };
                 let mut rewriter = ExpRewriter::new(self.parent.env, &mut replacer);
                 let exp = rewriter.rewrite_exp(exp);
                 let additional_exps = additional_exps
@@ -3194,9 +3201,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             }
             let is_public = matches!(entry.visibility, Visibility::Public);
             let type_arg_count = entry.type_params.len();
-            let is_excluded = exclusion_patterns.iter().any(|p| {
-                self.apply_pattern_matches(fun_name.symbol, is_public, type_arg_count, true, p)
-            });
+            let is_excluded =
+                exclusion_patterns.iter().any(|p| {
+                    self.apply_pattern_matches(fun_name.symbol, is_public, type_arg_count, true, p)
+                });
             if is_excluded {
                 // Explicitly excluded from matching.
                 continue;
@@ -3467,41 +3475,46 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 .iter()
                 .map(|m| self.parent.to_loc(&m.loc))
                 .collect_vec();
-            let target = match self.get_spec_block_context(&block.value.target) {
-                Some(SpecBlockContext::Module) => SpecBlockTarget::Module,
-                Some(SpecBlockContext::Function(qsym)) => {
-                    SpecBlockTarget::Function(self.module_id, FunId::new(qsym.symbol))
-                },
-                Some(SpecBlockContext::FunctionCode(qsym, info)) => SpecBlockTarget::FunctionCode(
-                    self.module_id,
-                    FunId::new(qsym.symbol),
-                    info.offset as usize,
-                ),
-                Some(SpecBlockContext::FunctionCodeV2(qsym, ..)) => SpecBlockTarget::FunctionCode(
-                    self.module_id,
-                    FunId::new(qsym.symbol),
-                    0, // TODO: investigate what to do with this in v2 compile chain
-                ),
-                Some(SpecBlockContext::Struct(qsym)) => {
-                    SpecBlockTarget::Struct(self.module_id, StructId::new(qsym.symbol))
-                },
-                Some(SpecBlockContext::Schema(qsym)) => {
-                    let entry = self
-                        .parent
-                        .spec_schema_table
-                        .get(&qsym)
-                        .expect("schema defined");
-                    SpecBlockTarget::Schema(
-                        self.module_id,
-                        SchemaId::new(qsym.symbol),
-                        entry.type_params.clone(),
-                    )
-                },
-                None => {
-                    // This has been reported as an error. Choose a dummy target.
-                    SpecBlockTarget::Module
-                },
-            };
+            let target =
+                match self.get_spec_block_context(&block.value.target) {
+                    Some(SpecBlockContext::Module) => SpecBlockTarget::Module,
+                    Some(SpecBlockContext::Function(qsym)) => {
+                        SpecBlockTarget::Function(self.module_id, FunId::new(qsym.symbol))
+                    },
+                    Some(SpecBlockContext::FunctionCode(qsym, info)) => {
+                        SpecBlockTarget::FunctionCode(
+                            self.module_id,
+                            FunId::new(qsym.symbol),
+                            info.offset as usize,
+                        )
+                    },
+                    Some(SpecBlockContext::FunctionCodeV2(qsym, ..)) => {
+                        SpecBlockTarget::FunctionCode(
+                            self.module_id,
+                            FunId::new(qsym.symbol),
+                            0, // TODO: investigate what to do with this in v2 compile chain
+                        )
+                    },
+                    Some(SpecBlockContext::Struct(qsym)) => {
+                        SpecBlockTarget::Struct(self.module_id, StructId::new(qsym.symbol))
+                    },
+                    Some(SpecBlockContext::Schema(qsym)) => {
+                        let entry = self
+                            .parent
+                            .spec_schema_table
+                            .get(&qsym)
+                            .expect("schema defined");
+                        SpecBlockTarget::Schema(
+                            self.module_id,
+                            SchemaId::new(qsym.symbol),
+                            entry.type_params.clone(),
+                        )
+                    },
+                    None => {
+                        // This has been reported as an error. Choose a dummy target.
+                        SpecBlockTarget::Module
+                    },
+                };
             self.spec_block_infos.push(SpecBlockInfo {
                 loc: block_loc,
                 member_locs,

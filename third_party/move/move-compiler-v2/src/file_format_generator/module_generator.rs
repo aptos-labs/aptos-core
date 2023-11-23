@@ -101,9 +101,9 @@ impl ModuleGenerator {
             let module_name_opt = if module_env.is_script_module() {
                 None
             } else {
-                let name = IR_AST::ModuleName(IR_SYMBOL::Symbol::from(
-                    ctx.symbol_to_str(module_env.get_name().name()),
-                ));
+                let name = IR_AST::ModuleName(
+                    IR_SYMBOL::Symbol::from(ctx.symbol_to_str(module_env.get_name().name()))
+                );
                 Some(IR_AST::ModuleIdent::new(
                     name,
                     module_env.get_name().addr().expect_numerical(),
@@ -280,16 +280,17 @@ impl ModuleGenerator {
         if let Some(idx) = self.name_to_idx.get(&name) {
             return *idx;
         }
-        let ident =
-            if let Ok(ident) = Identifier::new(name.display(ctx.env.symbol_pool()).to_string()) {
-                ident
-            } else {
-                ctx.internal_error(
-                    loc,
-                    format!("invalid identifier {}", name.display(ctx.env.symbol_pool())),
-                );
-                Identifier::new("error").unwrap()
-            };
+        let ident = if let Ok(ident) =
+            Identifier::new(name.display(ctx.env.symbol_pool()).to_string())
+        {
+            ident
+        } else {
+            ctx.internal_error(
+                loc,
+                format!("invalid identifier {}", name.display(ctx.env.symbol_pool())),
+            );
+            Identifier::new("error").unwrap()
+        };
         let idx = FF::IdentifierIndex(ctx.checked_bound(
             loc,
             self.module.identifiers.len(),
@@ -311,12 +312,13 @@ impl ModuleGenerator {
         if let Some(idx) = self.address_to_idx.get(&addr) {
             return *idx;
         }
-        let idx = FF::AddressIdentifierIndex(ctx.checked_bound(
-            loc,
-            self.module.address_identifiers.len(),
-            MAX_ADDRESS_COUNT,
-            "address",
-        ));
+        let idx =
+            FF::AddressIdentifierIndex(ctx.checked_bound(
+                loc,
+                self.module.address_identifiers.len(),
+                MAX_ADDRESS_COUNT,
+                "address",
+            ));
         self.module.address_identifiers.push(addr);
         self.address_to_idx.insert(addr, idx);
         idx
@@ -390,14 +392,15 @@ impl ModuleGenerator {
                 .map(|s| self.access_specifier(ctx, fun_env, s))
                 .collect()
         });
-        let handle = FF::FunctionHandle {
-            module,
-            name,
-            type_parameters,
-            parameters,
-            return_,
-            access_specifiers,
-        };
+        let handle =
+            FF::FunctionHandle {
+                module,
+                name,
+                type_parameters,
+                parameters,
+                return_,
+                access_specifiers,
+            };
         let idx = if fun_env.module_env.is_script_module() {
             self.main_handle = Some(handle);
             FF::FunctionHandleIndex(TableIndex::MAX)
@@ -436,11 +439,9 @@ impl ModuleGenerator {
             ResourceSpecifier::Resource(struct_id) => {
                 let struct_env = ctx.env.get_struct(struct_id.to_qualified_id());
                 if struct_id.inst.is_empty() {
-                    FF::ResourceSpecifier::Resource(self.struct_index(
-                        ctx,
-                        &access_specifier.loc,
-                        &struct_env,
-                    ))
+                    FF::ResourceSpecifier::Resource(
+                        self.struct_index(ctx, &access_specifier.loc, &struct_env)
+                    )
                 } else {
                     FF::ResourceSpecifier::ResourceInstantiation(
                         self.struct_index(ctx, &access_specifier.loc, &struct_env),
@@ -449,35 +450,36 @@ impl ModuleGenerator {
                 }
             },
         };
-        let address =
-            match &access_specifier.address.1 {
-                AddressSpecifier::Any => FF::AddressSpecifier::Any,
-                AddressSpecifier::Address(addr) => FF::AddressSpecifier::Literal(
-                    self.address_index(ctx, &access_specifier.address.0, addr.expect_numerical()),
-                ),
-                AddressSpecifier::Parameter(name) => {
-                    let param_index = fun_env
-                        .get_parameters()
-                        .iter()
-                        .position(|Parameter(n, _)| n == name)
-                        .expect("parameter defined") as u8;
-                    FF::AddressSpecifier::Parameter(param_index, None)
-                },
-                AddressSpecifier::Call(fun, name) => {
-                    let param_index = fun_env
-                        .get_parameters()
-                        .iter()
-                        .position(|Parameter(n, _)| n == name)
-                        .expect("parameter defined") as u8;
-                    let fun_index = self.function_instantiation_index(
-                        ctx,
-                        &access_specifier.address.0,
-                        &ctx.env.get_function(fun.to_qualified_id()),
-                        fun.inst.clone(),
-                    );
-                    FF::AddressSpecifier::Parameter(param_index, Some(fun_index))
-                },
-            };
+        let address = match &access_specifier.address.1 {
+            AddressSpecifier::Any => FF::AddressSpecifier::Any,
+            AddressSpecifier::Address(addr) => FF::AddressSpecifier::Literal(self.address_index(
+                ctx,
+                &access_specifier.address.0,
+                addr.expect_numerical(),
+            )),
+            AddressSpecifier::Parameter(name) => {
+                let param_index = fun_env
+                    .get_parameters()
+                    .iter()
+                    .position(|Parameter(n, _)| n == name)
+                    .expect("parameter defined") as u8;
+                FF::AddressSpecifier::Parameter(param_index, None)
+            },
+            AddressSpecifier::Call(fun, name) => {
+                let param_index = fun_env
+                    .get_parameters()
+                    .iter()
+                    .position(|Parameter(n, _)| n == name)
+                    .expect("parameter defined") as u8;
+                let fun_index = self.function_instantiation_index(
+                    ctx,
+                    &access_specifier.address.0,
+                    &ctx.env.get_function(fun.to_qualified_id()),
+                    fun.inst.clone(),
+                );
+                FF::AddressSpecifier::Parameter(param_index, Some(fun_index))
+            },
+        };
         FF::AccessSpecifier {
             kind: access_specifier.kind,
             negated: access_specifier.negated,
@@ -547,12 +549,13 @@ impl ModuleGenerator {
                 )
                 .collect(),
         };
-        let idx = FF::StructHandleIndex(ctx.checked_bound(
-            loc,
-            self.module.struct_handles.len(),
-            MAX_STRUCT_COUNT,
-            "used structs",
-        ));
+        let idx =
+            FF::StructHandleIndex(ctx.checked_bound(
+                loc,
+                self.module.struct_handles.len(),
+                MAX_STRUCT_COUNT,
+                "used structs",
+            ));
         self.module.struct_handles.push(handle);
         self.struct_to_idx
             .insert(struct_env.get_qualified_id(), idx);

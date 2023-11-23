@@ -421,12 +421,11 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             for exp in cond.all_exps() {
                 // Auto trace the inner address expression.
                 let exp = match exp.as_ref() {
-                    ExpData::Call(id, oper, args) if args.len() == 1 => ExpData::Call(
-                        *id,
-                        oper.clone(),
-                        vec![self.auto_trace(&cond.loc, &args[0])],
-                    )
-                    .into_exp(),
+                    ExpData::Call(id, oper, args) if args.len() == 1 => {
+                        ExpData::Call(*id, oper.clone(), vec![self
+                            .auto_trace(&cond.loc, &args[0])])
+                        .into_exp()
+                    },
                     _ => cond.exp.to_owned(),
                 };
                 let exp = self.translate_exp(&exp, false);
@@ -453,11 +452,17 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             let event_exp = self.translate_exp(&self.auto_trace(&cond.loc, &cond.exp), false);
             let handle_exp =
                 self.translate_exp(&self.auto_trace_no_loc(&cond.additional_exps[0]), false);
-            let cond_exp = if cond.additional_exps.len() > 1 {
-                Some(self.translate_exp(&self.auto_trace_no_loc(&cond.additional_exps[1]), false))
-            } else {
-                None
-            };
+            let cond_exp =
+                if cond.additional_exps.len() > 1 {
+                    Some(
+                        self.translate_exp(
+                            &self.auto_trace_no_loc(&cond.additional_exps[1]),
+                            false,
+                        ),
+                    )
+                } else {
+                    None
+                };
             self.result
                 .emits
                 .push((cond.loc.clone(), event_exp, handle_exp, cond_exp));
@@ -696,22 +701,26 @@ impl<'a, 'b, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, 'b
         use ExpData::*;
         use Operation::*;
         match oper {
-            Global(None) if self.in_old => Some(
-                Call(
-                    id,
-                    Global(Some(self.save_memory(self.builder.get_memory_of_node(id)))),
-                    args.to_owned(),
+            Global(None) if self.in_old => {
+                Some(
+                    Call(
+                        id,
+                        Global(Some(self.save_memory(self.builder.get_memory_of_node(id)))),
+                        args.to_owned(),
+                    )
+                    .into_exp(),
                 )
-                .into_exp(),
-            ),
-            Exists(None) if self.in_old => Some(
-                Call(
-                    id,
-                    Exists(Some(self.save_memory(self.builder.get_memory_of_node(id)))),
-                    args.to_owned(),
+            },
+            Exists(None) if self.in_old => {
+                Some(
+                    Call(
+                        id,
+                        Exists(Some(self.save_memory(self.builder.get_memory_of_node(id)))),
+                        args.to_owned(),
+                    )
+                    .into_exp(),
                 )
-                .into_exp(),
-            ),
+            },
             SpecFunction(mid, fid, None) if self.in_old => {
                 let used_memory = {
                     let module_env = self.builder.global_env().get_module(*mid);

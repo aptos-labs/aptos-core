@@ -536,12 +536,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         operation: Option<Operation>,
         temp_index: Option<usize>,
     ) {
-        let entry = LocalVarEntry {
-            loc: loc.clone(),
-            type_,
-            operation,
-            temp_index,
-        };
+        let entry =
+            LocalVarEntry {
+                loc: loc.clone(),
+                type_,
+                operation,
+                temp_index,
+            };
         if let Some(old) = self
             .local_table
             .front_mut()
@@ -757,14 +758,15 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         match &ty.value {
             Apply(access, args) => {
                 if let EA::ModuleAccess_::Name(n) = &access.value {
-                    let check_zero_args = |et: &mut Self, ty: Type| {
-                        if args.is_empty() {
-                            ty
-                        } else {
-                            et.error(&et.to_loc(&n.loc), "expected no type arguments");
-                            Type::Error
-                        }
-                    };
+                    let check_zero_args =
+                        |et: &mut Self, ty: Type| {
+                            if args.is_empty() {
+                                ty
+                            } else {
+                                et.error(&et.to_loc(&n.loc), "expected no type arguments");
+                                Type::Error
+                            }
+                        };
                     // Attempt to resolve as builtin type.
                     match n.value.as_str() {
                         "bool" => {
@@ -938,13 +940,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 if is_wildcard(resource) {
                     ResourceSpecifier::DeclaredInModule(module_id)
                 } else {
-                    let mident = sp(
-                        specifier.loc,
-                        EA::ModuleIdent_ {
-                            address: *address,
-                            module: *module,
-                        },
-                    );
+                    let mident = sp(specifier.loc, EA::ModuleIdent_ {
+                        address: *address,
+                        module: *module,
+                    });
                     let maccess = sp(
                         specifier.loc,
                         EA::ModuleAccess_::ModuleAccess(mident, *resource),
@@ -1122,12 +1121,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 } else {
                     self.fresh_type_var()
                 };
-                let result_ty = self.check_type(
-                    &loc,
-                    &Type::Vector(Box::new(elem_ty.clone())),
-                    expected_type,
-                    "",
-                );
+                let result_ty =
+                    self.check_type(
+                        &loc,
+                        &Type::Vector(Box::new(elem_ty.clone())),
+                        expected_type,
+                        "",
+                    );
                 let mut elems = vec![];
                 if !exps.value.is_empty() {
                     if self.subs.is_free_var(&elem_ty) {
@@ -1402,13 +1402,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let id = self.new_node_id_with_type_loc(&rt, &loc);
                 if self.mode == ExpTranslationMode::Impl {
                     // Remember information about this spec block for deferred checking.
-                    self.placeholder_map.insert(
-                        id,
-                        ExpPlaceholder::SpecBlockInfo {
+                    self.placeholder_map
+                        .insert(id, ExpPlaceholder::SpecBlockInfo {
                             spec_id: *spec_id,
                             locals: self.get_locals(),
-                        },
-                    );
+                        });
                 }
                 ExpData::Call(id, Operation::NoOp, vec![])
             },
@@ -1708,44 +1706,55 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 // the model AST. For now, this just always resolves to a numeric address.
                 let account_addr = self.parent.parent.resolve_address(&loc, addr).into_inner();
                 let value = Value::Address(Address::Numerical(account_addr));
-                let ty = self.check_type(
-                    &loc,
-                    &Type::new_prim(PrimitiveType::Address),
-                    expected_type,
-                    "",
-                );
+                let ty =
+                    self.check_type(
+                        &loc,
+                        &Type::new_prim(PrimitiveType::Address),
+                        expected_type,
+                        "",
+                    );
                 Some((value, ty))
             },
-            EA::Value_::U8(x) => Some(self.translate_number(
-                &loc,
-                BigInt::from_u8(*x).unwrap(),
-                Some(PrimitiveType::U8),
-                expected_type,
-            )),
-            EA::Value_::U16(x) => Some(self.translate_number(
-                &loc,
-                BigInt::from_u16(*x).unwrap(),
-                Some(PrimitiveType::U16),
-                expected_type,
-            )),
-            EA::Value_::U32(x) => Some(self.translate_number(
-                &loc,
-                BigInt::from_u32(*x).unwrap(),
-                Some(PrimitiveType::U32),
-                expected_type,
-            )),
-            EA::Value_::U64(x) => Some(self.translate_number(
-                &loc,
-                BigInt::from_u64(*x).unwrap(),
-                Some(PrimitiveType::U64),
-                expected_type,
-            )),
-            EA::Value_::U128(x) => Some(self.translate_number(
-                &loc,
-                BigInt::from_u128(*x).unwrap(),
-                Some(PrimitiveType::U128),
-                expected_type,
-            )),
+            EA::Value_::U8(x) => {
+                Some(self.translate_number(
+                    &loc,
+                    BigInt::from_u8(*x).unwrap(),
+                    Some(PrimitiveType::U8),
+                    expected_type,
+                ))
+            },
+            EA::Value_::U16(x) => {
+                Some(self.translate_number(
+                    &loc,
+                    BigInt::from_u16(*x).unwrap(),
+                    Some(PrimitiveType::U16),
+                    expected_type,
+                ))
+            },
+            EA::Value_::U32(x) => {
+                Some(self.translate_number(
+                    &loc,
+                    BigInt::from_u32(*x).unwrap(),
+                    Some(PrimitiveType::U32),
+                    expected_type,
+                ))
+            },
+            EA::Value_::U64(x) => {
+                Some(self.translate_number(
+                    &loc,
+                    BigInt::from_u64(*x).unwrap(),
+                    Some(PrimitiveType::U64),
+                    expected_type,
+                ))
+            },
+            EA::Value_::U128(x) => {
+                Some(self.translate_number(
+                    &loc,
+                    BigInt::from_u128(*x).unwrap(),
+                    Some(PrimitiveType::U128),
+                    expected_type,
+                ))
+            },
             EA::Value_::U256(x) => Some(self.translate_number(
                 &loc,
                 BigInt::from(x),
@@ -2020,11 +2029,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         },
                     }
                     let call_exp_id = self.new_node_id_with_type_loc(expected_type, loc);
-                    return Some(ExpData::Call(
-                        call_exp_id,
-                        spec_fun_entry.oper.clone(),
-                        full_arg_exprs,
-                    ));
+                    return Some(
+                        ExpData::Call(call_exp_id, spec_fun_entry.oper.clone(), full_arg_exprs)
+                    );
                 }
             }
         }
@@ -2191,12 +2198,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             EA::ModuleAccess_::Name(name) => {
                 // First try to resolve simple name as local.
                 let sym = self.symbol_pool().make(name.value.as_str());
-                if let Some(exp) = self.resolve_local(
-                    loc,
-                    sym,
-                    self.old_status == OldExpStatus::InsideOld,
-                    expected_type,
-                ) {
+                if let Some(exp) =
+                    self.resolve_local(
+                        loc,
+                        sym,
+                        self.old_status == OldExpStatus::InsideOld,
+                        expected_type,
+                    )
+                {
                     return exp;
                 }
 
@@ -2247,11 +2256,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             );
             let global_id = self.new_node_id_with_type_loc(&ghost_mem_ty, loc);
             self.set_node_instantiation(global_id, vec![ghost_mem_ty]);
-            let global_access = ExpData::Call(
-                global_id,
-                Operation::Global(None),
-                vec![zero_addr.into_exp()],
-            );
+            let global_access = ExpData::Call(global_id, Operation::Global(None), vec![
+                zero_addr.into_exp()
+            ]);
             let select_id = self.new_node_id_with_type_loc(&ty, loc);
             self.set_node_instantiation(select_id, instantiation);
             return ExpData::Call(
@@ -2383,13 +2390,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     Operation::Select(mid, sid, FieldId::new(field_name))
                 } else {
                     // Create a placeholder for later resolution.
-                    self.placeholder_map.insert(
-                        id,
-                        ExpPlaceholder::FieldSelectInfo {
+                    self.placeholder_map
+                        .insert(id, ExpPlaceholder::FieldSelectInfo {
                             struct_ty: ty,
                             field_name,
-                        },
-                    );
+                        });
                     Operation::NoOp
                 };
                 ExpData::Call(id, oper, vec![exp.into_exp()])
@@ -2425,14 +2430,16 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let field_name = self.symbol_pool().make(name.value.as_str());
             let constraint =
                 Constraint::SomeStruct([(field_name, expected_type.clone())].into_iter().collect());
-            if let Err(e) = self.subs.eval_constraint(
-                &self.unification_context,
-                loc,
-                expected_type,
-                self.type_variance(),
-                WideningOrder::RightToLeft,
-                constraint,
-            ) {
+            if let Err(e) =
+                self.subs.eval_constraint(
+                    &self.unification_context,
+                    loc,
+                    expected_type,
+                    self.type_variance(),
+                    WideningOrder::RightToLeft,
+                    constraint,
+                )
+            {
                 self.report_unification_error(loc, e, "update field")
             }
             let struct_exp = self.translate_exp(args[0], expected_type);
@@ -3148,11 +3155,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let field_name = self.symbol_pool().make(name);
             if let Some((_, def_idx, field_ty)) = field_decls.get(&field_name) {
                 let field_ty = field_ty.instantiate(&instantiation);
-                let expected_field_ty = if let Some(kind) = ref_expected {
-                    Type::Reference(kind, Box::new(field_ty.clone()))
-                } else {
-                    field_ty.clone()
-                };
+                let expected_field_ty =
+                    if let Some(kind) = ref_expected {
+                        Type::Reference(kind, Box::new(field_ty.clone()))
+                    } else {
+                        field_ty.clone()
+                    };
                 let translated =
                     self.translate_lvalue(value, &expected_field_ty, expected_order, match_locals);
                 args.insert(def_idx, translated);
@@ -3271,15 +3279,16 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             self.define_locals_of_pat(&rpat);
             rranges.push((rpat, rdomain_exp.into_exp()));
         }
-        let rtriggers = triggers
-            .iter()
-            .map(|trigger| {
-                trigger
-                    .iter()
-                    .map(|e| self.translate_exp_free(e).1.into_exp())
-                    .collect()
-            })
-            .collect();
+        let rtriggers =
+            triggers
+                .iter()
+                .map(|trigger| {
+                    trigger
+                        .iter()
+                        .map(|e| self.translate_exp_free(e).1.into_exp())
+                        .collect()
+                })
+                .collect();
         let rbody = self.translate_exp(body, &BOOL_TYPE);
         let rcondition = condition
             .as_ref()

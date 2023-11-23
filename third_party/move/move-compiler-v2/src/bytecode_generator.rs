@@ -438,31 +438,35 @@ impl<'env> Generator<'env> {
         let ty = self.get_node_type(id);
         match val {
             Value::Address(x) => Constant::Address(x.clone()),
-            Value::Number(x) => match ty {
-                // In the AST, all numbers are uniquely represent by `BigInt`. The bytecode
-                // distinguishes representations, we need to do a type based conversion.
-                Type::Primitive(PrimitiveType::U8) => Constant::U8(x.to_u8().unwrap_or_default()),
-                Type::Primitive(PrimitiveType::U16) => {
-                    Constant::U16(x.to_u16().unwrap_or_default())
-                },
-                Type::Primitive(PrimitiveType::U32) => {
-                    Constant::U32(x.to_u32().unwrap_or_default())
-                },
-                Type::Primitive(PrimitiveType::U64) => {
-                    Constant::U64(x.to_u64().unwrap_or_default())
-                },
-                Type::Primitive(PrimitiveType::U128) => {
-                    Constant::U128(x.to_u128().unwrap_or_default())
-                },
-                Type::Primitive(PrimitiveType::U256) => {
-                    // No direct way to go from BigInt to ethnum::U256...
-                    let x = U256::from_str_radix(&x.to_str_radix(16), 16).unwrap();
-                    Constant::U256(x)
-                },
-                ty => {
-                    self.internal_error(id, format!("inconsistent numeric constant: {:?}", ty));
-                    Constant::Bool(false)
-                },
+            Value::Number(x) => {
+                match ty {
+                    // In the AST, all numbers are uniquely represent by `BigInt`. The bytecode
+                    // distinguishes representations, we need to do a type based conversion.
+                    Type::Primitive(PrimitiveType::U8) => {
+                        Constant::U8(x.to_u8().unwrap_or_default())
+                    },
+                    Type::Primitive(PrimitiveType::U16) => {
+                        Constant::U16(x.to_u16().unwrap_or_default())
+                    },
+                    Type::Primitive(PrimitiveType::U32) => {
+                        Constant::U32(x.to_u32().unwrap_or_default())
+                    },
+                    Type::Primitive(PrimitiveType::U64) => {
+                        Constant::U64(x.to_u64().unwrap_or_default())
+                    },
+                    Type::Primitive(PrimitiveType::U128) => {
+                        Constant::U128(x.to_u128().unwrap_or_default())
+                    },
+                    Type::Primitive(PrimitiveType::U256) => {
+                        // No direct way to go from BigInt to ethnum::U256...
+                        let x = U256::from_str_radix(&x.to_str_radix(16), 16).unwrap();
+                        Constant::U256(x)
+                    },
+                    ty => {
+                        self.internal_error(id, format!("inconsistent numeric constant: {:?}", ty));
+                        Constant::Bool(false)
+                    },
+                }
             },
             Value::Bool(x) => Constant::Bool(*x),
             Value::ByteArray(x) => Constant::ByteArray(x.clone()),
@@ -829,21 +833,20 @@ impl<'env> Generator<'env> {
     }
 
     fn gen_auto_ref_arg(&mut self, exp: &Exp, default_ref_kind: ReferenceKind) -> TempIndex {
-        let temp = self.with_reference_mode(|s, entering| {
-            if entering {
-                s.reference_mode_kind = default_ref_kind
-            }
-            s.gen_arg(exp)
-        });
+        let temp =
+            self.with_reference_mode(|s, entering| {
+                if entering {
+                    s.reference_mode_kind = default_ref_kind
+                }
+                s.gen_arg(exp)
+            });
         let ty = self.temp_type(temp);
         if ty.is_reference() {
             temp
         } else {
             // Need to introduce a reference for the temp.
-            let temp_ref = self.new_temp(Type::Reference(
-                self.reference_mode_kind,
-                Box::new(ty.to_owned()),
-            ));
+            let temp_ref =
+                self.new_temp(Type::Reference(self.reference_mode_kind, Box::new(ty.to_owned())));
             self.emit_call(
                 exp.node_id(),
                 vec![temp_ref],
@@ -1009,12 +1012,13 @@ impl<'env> Generator<'env> {
         // to get the actual value from the field selection.
         let target_type = self.temp_type(target).to_owned();
         let need_read_ref = !(target_type.is_reference() || self.reference_mode());
-        let borrow_dest = if need_read_ref {
-            let ref_ty = Type::Reference(ReferenceKind::Immutable, Box::new(target_type));
-            self.new_temp(ref_ty)
-        } else {
-            target
-        };
+        let borrow_dest =
+            if need_read_ref {
+                let ref_ty = Type::Reference(ReferenceKind::Immutable, Box::new(target_type));
+                self.new_temp(ref_ty)
+            } else {
+                target
+            };
         self.emit_call(
             id,
             vec![borrow_dest],
