@@ -60,6 +60,12 @@ module tournament::rock_paper_scissor {
         opponent_action: Option<vector<u8>>,
     }
 
+    public fun get_game_players(
+        game: &RockPaperScissor
+    ): address {
+        game.player1.address
+    }
+
     public(friend) fun add_players_returning(
         tournament_address: address,
         players: vector<Object<Token>>

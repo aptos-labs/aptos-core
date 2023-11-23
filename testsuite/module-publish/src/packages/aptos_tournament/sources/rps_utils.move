@@ -92,9 +92,17 @@ module tournament::rps_unit_tests {
             tournament_address,
             player_tokens
         );
+        let i = 0;
+        let len = vector::length(&game_addresses);
+        while (i < len) {
+            let player1_address = rock_paper_scissor::get_game_players(borrow_global<RockPaperScissor>(*vector::borrow(&game_addresses, i)));
+            i = i + 1;
+        };
+        // vector::for_each_ref(&game_addresses, |game_address| {
+        //     let (player1_address, player2_address) = rock_paper_scissor::get_game_players(&borrow_global<RockPaperScissor>(game_address));
+        // });
         let round_address = tournament_manager::get_round_address(tournament_address);
         let tournament_config = borrow_global_mut<TournamentConfig>(admin_address);
-        // TODO: Is this correct syntax?
         tournament_config.round_address = option::some(round_address);
         tournament_config.game_addresses = game_addresses;
     }
@@ -106,15 +114,15 @@ module tournament::rps_unit_tests {
     }
 
     fun game_play(
-        player: signer,
+        player: &signer,
         admin_address: address,
         action: vector<u8>,
         game_index: u64,
     ) {
         let game_address = *vector::borrow(&borrow_global<TournamentConfig>(admin_address).game_addresses, game_index);
-        let RockPaperScissor {player1, player2} =  borrow_global<RockPaperScissor>(game_address);
+        // let RockPaperScissor {player1, player2} =  borrow_global<RockPaperScissor>(game_address);
         let hash_addition = b"random uuid";
-        player_commit(&player, game_address, action, hash_addition);
+        player_commit(player, game_address, action, hash_addition);
 
     }
 
