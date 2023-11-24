@@ -27,8 +27,6 @@ spec aptos_framework::aptos_account {
 
     spec transfer(source: &signer, to: address, amount: u64) {
         let account_addr_source = signer::address_of(source);
-        let coin_store_source = global<coin::CoinStore<AptosCoin>>(account_addr_source);
-        let coin_store_to = global<coin::CoinStore<AptosCoin>>(to);
 
         // The 'from' addr is implictly not equal to 'to' addr
         requires account_addr_source != to;
@@ -165,19 +163,18 @@ spec aptos_framework::aptos_account {
         include GuidAbortsIf<CoinType>;
         include RegistCoinAbortsIf<CoinType>;
 
-        aborts_if exists<coin::CoinStore<CoinType>>(to) && global<coin::CoinStore<CoinType>>(to).frozen;
+        let if_exist_coin = exists<coin::CoinStore<CoinType>>(to);
+        aborts_if if_exist_coin && global<coin::CoinStore<CoinType>>(to).frozen;
         ensures exists<aptos_framework::account::Account>(to);
         ensures exists<aptos_framework::coin::CoinStore<CoinType>>(to);
 
-        let o_coin_store_to = global<coin::CoinStore<CoinType>>(to).coin.value;
-        let p_coin_store_to = global<coin::CoinStore<CoinType>>(to).coin.value;
-        ensures p_coin_store_to == o_coin_store_to + coins.value;
+        let coin_store_to = global<coin::CoinStore<CoinType>>(to).coin.value;
+        let post post_coin_store_to = global<coin::CoinStore<CoinType>>(to).coin.value;
+        ensures if_exist_coin ==> post_coin_store_to == coin_store_to + coins.value;
     }
 
     spec transfer_coins<CoinType>(from: &signer, to: address, amount: u64) {
         let account_addr_source = signer::address_of(from);
-        let coin_store_to = global<coin::CoinStore<CoinType>>(to);
-        let coin_store_source = global<coin::CoinStore<CoinType>>(account_addr_source);
 
         //The 'from' addr is implictly not equal to 'to' addr
         requires account_addr_source != to;
@@ -228,15 +225,17 @@ spec aptos_framework::aptos_account {
     }
 
     spec schema TransferEnsures<CoinType> {
-        coin_store_to: coin::CoinStore<CoinType>;
-        coin_store_source: coin::CoinStore<CoinType>;
+        to: address;
+        account_addr_source: address;
         amount: u64;
 
-        let o_balance_source = coin_store_source.coin.value;
-        let o_balance_to = coin_store_to.coin.value;
-        let p_balance_source = coin_store_source.coin.value;
-        let p_balance_to = coin_store_to.coin.value;
-        ensures o_balance_source - amount == p_balance_source;
-        ensures o_balance_to + amount == p_balance_to;
+        let if_exist_account = exists<account::Account>(to);
+        let if_exist_coin = exists<coin::CoinStore<CoinType>>(to);
+        let coin_store_to = global<coin::CoinStore<CoinType>>(to);
+        let coin_store_source = global<coin::CoinStore<CoinType>>(account_addr_source);
+        let post p_coin_store_to = global<coin::CoinStore<CoinType>>(to);
+        let post p_coin_store_source = global<coin::CoinStore<CoinType>>(account_addr_source);
+        ensures coin_store_source.coin.value - amount == p_coin_store_source.coin.value;
+        ensures if_exist_account && if_exist_coin ==> coin_store_to.coin.value + amount == p_coin_store_to.coin.value;
     }
 }

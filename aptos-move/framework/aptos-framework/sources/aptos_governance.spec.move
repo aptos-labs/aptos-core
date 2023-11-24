@@ -16,8 +16,8 @@ spec aptos_framework::aptos_governance {
         aborts_if exists<GovernanceResponsbility>(@aptos_framework) &&
             simple_map::spec_contains_key(signer_caps, signer_address);
         ensures exists<GovernanceResponsbility>(@aptos_framework);
-        let post p_signer_caps = global<GovernanceResponsbility>(@aptos_framework).signer_caps;
-        ensures simple_map::spec_contains_key(p_signer_caps, signer_address);
+        let post post_signer_caps = global<GovernanceResponsbility>(@aptos_framework).signer_caps;
+        ensures simple_map::spec_contains_key(post_signer_caps, signer_address);
     }
 
     /// Signer address must be @aptos_framework.
