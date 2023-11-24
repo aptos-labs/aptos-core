@@ -16,14 +16,16 @@ pub fn generate_ast(
     config: BuildConfig,
     package_path: PathBuf,
 ) -> Result<(FilesSourceText, move_compiler::parser::ast::Program), anyhow::Error> {
-    let mut named_addr_map = BTreeMap::new();
-
-    for (name, addr) in config.additional_named_addresses {
-        named_addr_map.insert(
-            name,
-            NumericalAddress::new(addr.into_bytes(), NumberFormat::Decimal),
-        );
-    }
+    let named_addr_map = config
+        .additional_named_addresses
+        .into_iter()
+        .map(|(name, addr)| {
+            (
+                name,
+                NumericalAddress::new(addr.into_bytes(), NumberFormat::Decimal),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
 
     let out_dir = "mutator_build";
     let interface_files_dir = format!("{}/generated_interface_files", out_dir);
