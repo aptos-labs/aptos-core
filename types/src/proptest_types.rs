@@ -1215,6 +1215,7 @@ impl Arbitrary for ValidatorVerifier {
     }
 }
 
+#[cfg(any(test, feature = "fuzzing"))]
 impl Arbitrary for SystemTransaction {
     type Parameters = SizeRange;
     type Strategy = BoxedStrategy<Self>;

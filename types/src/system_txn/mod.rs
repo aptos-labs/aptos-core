@@ -7,24 +7,33 @@ use std::fmt::Debug;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub enum SystemTransaction {
+    #[cfg(any(test, feature = "fuzzing"))]
     DummyTopic(DummySystemTransaction),
     // to be populated...
 }
 
+#[cfg(any(test, feature = "fuzzing"))]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct DummySystemTransaction {
     pub nonce: u64,
 }
 
 impl SystemTransaction {
+    #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy(nonce: u64) -> Self {
         Self::DummyTopic(DummySystemTransaction { nonce })
     }
 
+    #[cfg(any(test, feature = "fuzzing"))]
     pub fn size_in_bytes(&self) -> usize {
         match self {
             SystemTransaction::DummyTopic(_) => 16, // Better over-claim?
         }
+    }
+
+    #[cfg(not(any(test, feature = "fuzzing")))]
+    pub fn size_in_bytes(&self) -> usize {
+        0
     }
 }
 
