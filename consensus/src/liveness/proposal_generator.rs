@@ -237,6 +237,7 @@ impl ProposalGenerator {
         proposer_election: &mut UnequivocalProposerElection,
         wait_callback: BoxFuture<'static, ()>,
     ) -> anyhow::Result<BlockData> {
+        println!("!");
         if self.last_round_generated < round {
             self.last_round_generated = round;
         } else {
