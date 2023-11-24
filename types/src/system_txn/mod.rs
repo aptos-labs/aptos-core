@@ -15,6 +15,7 @@ pub enum SystemTransaction {
 #[cfg(any(test, feature = "fuzzing"))]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct DummySystemTransaction {
+    #[serde(with = "serde_bytes")]
     pub payload: Vec<u8>,
 }
 

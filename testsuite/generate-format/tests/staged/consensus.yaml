@@ -340,7 +340,7 @@ DAGNetworkMessage:
     - data: BYTES
 DummySystemTransaction:
   STRUCT:
-    - nonce: U64
+    - payload: BYTES
 Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
