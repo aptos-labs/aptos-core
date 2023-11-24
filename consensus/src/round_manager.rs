@@ -644,17 +644,13 @@ impl RoundManager {
             bail!("ProposalExt unexpected while the feature is disabled.");
         }
 
-        let (num_sys_txns, sys_txns_total_bytes) = {
-            let mut num: usize = 0;
-            let mut size: usize = 0;
-            if let Some(txns) = proposal.sys_txns() {
-                for txn in txns {
-                    num += 1;
-                    size += txn.size_in_bytes();
-                }
-            }
-            (num, size)
-        };
+        let (num_sys_txns, sys_txns_total_bytes): (usize, usize) =
+            proposal.sys_txns().map_or((0, 0), |txns| {
+                txns.iter().fold((0, 0), |(count_acc, size_acc), txn| {
+                    (count_acc + 1, size_acc + txn.size_in_bytes())
+                })
+            });
+
         let payload_len = proposal.payload().map_or(0, |payload| payload.len());
         let payload_size = proposal.payload().map_or(0, |payload| payload.size());
         ensure!(
