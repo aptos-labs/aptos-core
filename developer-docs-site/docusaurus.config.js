@@ -336,10 +336,6 @@ const config = {
             to: "/indexer/indexer-landing",
           },
           {
-            from: "/tutorials/your-first-transaction-sdk",
-            to: "/integration/creating-a-signed-transaction",
-          },
-          {
             from: "/tutorials/run-a-fullnode-on-gcp",
             to: "/nodes/full-node/run-a-fullnode-on-gcp",
           },

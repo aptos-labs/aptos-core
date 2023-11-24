@@ -17,7 +17,7 @@ use aptos_executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    test_helpers::transaction_test_helpers::{block, BLOCK_GAS_LIMIT},
+    test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
     transaction::TransactionListWithProof,
 };
 use rand::Rng;
@@ -235,9 +235,9 @@ fn test_executor_execute_and_commit_chunk_local_result_mismatch() {
             .collect::<Vec<_>>();
         let output = executor
             .execute_block(
-                (block_id, block(txns, BLOCK_GAS_LIMIT)).into(),
+                (block_id, block(txns, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG)).into(),
                 parent_block_id,
-                BLOCK_GAS_LIMIT,
+                TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
             )
             .unwrap();
         let ledger_info = tests::gen_ledger_info(5 + 1, output.root_hash(), block_id, 1);

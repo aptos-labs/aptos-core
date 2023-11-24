@@ -22,7 +22,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     event::EventKey,
-    test_helpers::transaction_test_helpers::{block, BLOCK_GAS_LIMIT},
+    test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
     transaction::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
@@ -173,13 +173,13 @@ pub fn test_execution_with_storage_impl_inner(
             txn_factory.transfer(account3.address(), 10 * B),
         )));
     }
-    let block3 = block(block3, BLOCK_GAS_LIMIT); // append state checkpoint txn
+    let block3 = block(block3, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG); // append state checkpoint txn
 
     let output1 = executor
         .execute_block(
             (block1_id, block1.clone()).into(),
             parent_block_id,
-            BLOCK_GAS_LIMIT,
+            TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         )
         .unwrap();
     let li1 = gen_ledger_info_with_sigs(1, &output1, block1_id, &[signer.clone()]);
@@ -386,7 +386,7 @@ pub fn test_execution_with_storage_impl_inner(
         .execute_block(
             (block2_id, block2).into(),
             epoch2_genesis_id,
-            BLOCK_GAS_LIMIT,
+            TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         )
         .unwrap();
     let li2 = gen_ledger_info_with_sigs(2, &output2, block2_id, &[signer.clone()]);
@@ -405,7 +405,7 @@ pub fn test_execution_with_storage_impl_inner(
         .execute_block(
             (block3_id, block3.clone()).into(),
             epoch3_genesis_id,
-            BLOCK_GAS_LIMIT,
+            TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         )
         .unwrap();
     let li3 = gen_ledger_info_with_sigs(3, &output3, block3_id, &[signer]);
@@ -450,7 +450,11 @@ pub fn test_execution_with_storage_impl_inner(
     .unwrap();
 
     // With block gas limit, StateCheckpoint txn is inserted to block after execution.
-    let diff = BLOCK_GAS_LIMIT.map(|_| 0).unwrap_or(1);
+    let diff = if TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG.has_any_block_gas_limit() {
+        0
+    } else {
+        1
+    };
 
     let transaction_list_with_proof = db
         .reader

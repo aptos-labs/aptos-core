@@ -1,13 +1,24 @@
-
-Diagnostics:
-error: field `f` of struct `X::S` is private to its module
-   ┌─ tests/checking/typing/mutate_field_internal.move:13:16
-   │
-13 │         X::s().f = 0;
-   │                ^
-
-error: field `f` of struct `X::S` is private to its module
-   ┌─ tests/checking/typing/mutate_field_internal.move:15:11
-   │
-15 │         s.f = 0;
-   │           ^
+// ---- Model Dump
+module 0x2::X {
+    struct S {
+        f: u64,
+    }
+    public fun s(): X::S {
+        pack X::S(0)
+    }
+    spec fun $s(): X::S {
+        pack X::S(0)
+    }
+} // end 0x2::X
+module 0x2::M {
+    use 0x2::X; // resolved as: 0x2::X
+    private fun t0() {
+        select X::S.f(X::s()) = 0;
+        {
+          let s: &mut X::S = Borrow(Mutable)(X::s());
+          select X::S.f(s) = 0;
+          Abort(0)
+        }
+    }
+    spec fun $t0();
+} // end 0x2::M
