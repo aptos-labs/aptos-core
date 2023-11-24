@@ -28,7 +28,7 @@ or
 ./target/debug/aptos move mutate --move-sources third_party/move/tools/move-mutator/tests/move-assets/simple/sources/Sum.move
 ```
 
-The output will be generated under `mutants_output` directory.
+The output will be generated under the `mutants_output` directory.
 
 To generate mutants for all files within a test project run:
 ```bash
