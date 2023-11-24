@@ -162,6 +162,8 @@ pub struct ConsensusConfigV1Ext {
     pub extra_feature_flags: Vec<bool>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[allow(non_camel_case_types)]
 pub enum ConsensusExtraFeature {
     ProposalWithSystemTransactions = 0,
 }
@@ -186,6 +188,28 @@ impl ConsensusConfigV1Ext {
             main: ConsensusConfigV1::default(),
             extra_feature_flags: vec![false],
         }
+    }
+
+    pub fn update_extra_features(
+        &mut self,
+        features_to_enable: Vec<ConsensusExtraFeature>,
+        features_to_disable: Vec<ConsensusExtraFeature>,
+    ) {
+        for feature in features_to_enable {
+            *self.get_feature_status_mut(feature) = true;
+        }
+
+        for feature in features_to_disable {
+            *self.get_feature_status_mut(feature) = false;
+        }
+    }
+
+    fn get_feature_status_mut(&mut self, feature: ConsensusExtraFeature) -> &mut bool {
+        let idx = feature as usize;
+        if idx >= self.extra_feature_flags.len() {
+            self.extra_feature_flags.resize(idx + 1, false);
+        }
+        self.extra_feature_flags.get_mut(idx).unwrap()
     }
 }
 

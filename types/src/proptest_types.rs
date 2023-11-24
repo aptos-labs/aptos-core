@@ -1222,7 +1222,11 @@ impl Arbitrary for SystemTransaction {
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         Just(Value::Null)
-            .prop_map(|_| SystemTransaction::DummyTopic(DummySystemTransaction { nonce: 0 }))
+            .prop_map(|_| {
+                SystemTransaction::DummyTopic(DummySystemTransaction {
+                    payload: vec![0xFF; 16],
+                })
+            })
             .boxed()
     }
 }

@@ -254,6 +254,28 @@ impl Block {
         Self::new_proposal_from_block_data(block_data, validator_signer)
     }
 
+    pub fn new_proposal_ext(
+        sys_txns: Vec<SystemTransaction>,
+        payload: Payload,
+        round: Round,
+        timestamp_usecs: u64,
+        quorum_cert: QuorumCert,
+        validator_signer: &ValidatorSigner,
+        failed_authors: Vec<(Round, Author)>,
+    ) -> anyhow::Result<Self> {
+        let block_data = BlockData::new_proposal_ext(
+            sys_txns,
+            payload,
+            validator_signer.author(),
+            failed_authors,
+            round,
+            timestamp_usecs,
+            quorum_cert,
+        );
+
+        Self::new_proposal_from_block_data(block_data, validator_signer)
+    }
+
     pub fn new_proposal_from_block_data(
         block_data: BlockData,
         validator_signer: &ValidatorSigner,

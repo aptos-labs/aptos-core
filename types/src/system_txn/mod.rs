@@ -15,19 +15,19 @@ pub enum SystemTransaction {
 #[cfg(any(test, feature = "fuzzing"))]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct DummySystemTransaction {
-    pub nonce: u64,
+    pub payload: Vec<u8>,
 }
 
 impl SystemTransaction {
     #[cfg(any(test, feature = "fuzzing"))]
-    pub fn dummy(nonce: u64) -> Self {
-        Self::DummyTopic(DummySystemTransaction { nonce })
+    pub fn dummy(payload: Vec<u8>) -> Self {
+        Self::DummyTopic(DummySystemTransaction { payload })
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn size_in_bytes(&self) -> usize {
         match self {
-            SystemTransaction::DummyTopic(_) => 16, // Better over-claim?
+            SystemTransaction::DummyTopic(txn) => txn.payload.len(),
         }
     }
 
