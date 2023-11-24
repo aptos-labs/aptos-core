@@ -1,5 +1,5 @@
 
-<a name="0x1_multisig_account"></a>
+<a id="0x1_multisig_account"></a>
 
 # Module `0x1::multisig_account`
 
@@ -127,7 +127,7 @@ and implement the governance voting logic on top.
 
 
 
-<a name="0x1_multisig_account_MultisigAccount"></a>
+<a id="0x1_multisig_account_MultisigAccount"></a>
 
 ## Resource `MultisigAccount`
 
@@ -246,7 +246,7 @@ This will be stored in the multisig account (created as a resource account separ
 
 </details>
 
-<a name="0x1_multisig_account_MultisigTransaction"></a>
+<a id="0x1_multisig_account_MultisigTransaction"></a>
 
 ## Struct `MultisigTransaction`
 
@@ -299,7 +299,7 @@ This must contain either the full transaction payload or its hash (stored as byt
 
 </details>
 
-<a name="0x1_multisig_account_ExecutionError"></a>
+<a id="0x1_multisig_account_ExecutionError"></a>
 
 ## Struct `ExecutionError`
 
@@ -339,7 +339,7 @@ Contains information about execution failure.
 
 </details>
 
-<a name="0x1_multisig_account_MultisigAccountCreationMessage"></a>
+<a id="0x1_multisig_account_MultisigAccountCreationMessage"></a>
 
 ## Struct `MultisigAccountCreationMessage`
 
@@ -391,7 +391,7 @@ Used only for verifying multisig account creation on top of existing accounts.
 
 </details>
 
-<a name="0x1_multisig_account_MultisigAccountCreationWithAuthKeyRevocationMessage"></a>
+<a id="0x1_multisig_account_MultisigAccountCreationWithAuthKeyRevocationMessage"></a>
 
 ## Struct `MultisigAccountCreationWithAuthKeyRevocationMessage`
 
@@ -443,7 +443,7 @@ Used only for verifying multisig account creation on top of existing accounts an
 
 </details>
 
-<a name="0x1_multisig_account_AddOwnersEvent"></a>
+<a id="0x1_multisig_account_AddOwnersEvent"></a>
 
 ## Struct `AddOwnersEvent`
 
@@ -471,7 +471,7 @@ Event emitted when new owners are added to the multisig account.
 
 </details>
 
-<a name="0x1_multisig_account_RemoveOwnersEvent"></a>
+<a id="0x1_multisig_account_RemoveOwnersEvent"></a>
 
 ## Struct `RemoveOwnersEvent`
 
@@ -499,7 +499,7 @@ Event emitted when new owners are removed from the multisig account.
 
 </details>
 
-<a name="0x1_multisig_account_UpdateSignaturesRequiredEvent"></a>
+<a id="0x1_multisig_account_UpdateSignaturesRequiredEvent"></a>
 
 ## Struct `UpdateSignaturesRequiredEvent`
 
@@ -533,7 +533,7 @@ Event emitted when the number of signatures required is updated.
 
 </details>
 
-<a name="0x1_multisig_account_CreateTransactionEvent"></a>
+<a id="0x1_multisig_account_CreateTransactionEvent"></a>
 
 ## Struct `CreateTransactionEvent`
 
@@ -573,7 +573,7 @@ Event emitted when a transaction is created.
 
 </details>
 
-<a name="0x1_multisig_account_VoteEvent"></a>
+<a id="0x1_multisig_account_VoteEvent"></a>
 
 ## Struct `VoteEvent`
 
@@ -613,7 +613,7 @@ Event emitted when an owner approves or rejects a transaction.
 
 </details>
 
-<a name="0x1_multisig_account_ExecuteRejectedTransactionEvent"></a>
+<a id="0x1_multisig_account_ExecuteRejectedTransactionEvent"></a>
 
 ## Struct `ExecuteRejectedTransactionEvent`
 
@@ -654,7 +654,7 @@ number of signatures required.
 
 </details>
 
-<a name="0x1_multisig_account_TransactionExecutionSucceededEvent"></a>
+<a id="0x1_multisig_account_TransactionExecutionSucceededEvent"></a>
 
 ## Struct `TransactionExecutionSucceededEvent`
 
@@ -700,7 +700,7 @@ Event emitted when a transaction is executed.
 
 </details>
 
-<a name="0x1_multisig_account_TransactionExecutionFailedEvent"></a>
+<a id="0x1_multisig_account_TransactionExecutionFailedEvent"></a>
 
 ## Struct `TransactionExecutionFailedEvent`
 
@@ -752,7 +752,7 @@ Event emitted when a transaction's execution failed.
 
 </details>
 
-<a name="0x1_multisig_account_MetadataUpdatedEvent"></a>
+<a id="0x1_multisig_account_MetadataUpdatedEvent"></a>
 
 ## Struct `MetadataUpdatedEvent`
 
@@ -786,12 +786,12 @@ Event emitted when a transaction's metadata is updated.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_multisig_account_ZERO_AUTH_KEY"></a>
+<a id="0x1_multisig_account_ZERO_AUTH_KEY"></a>
 
 
 
@@ -800,7 +800,7 @@ Event emitted when a transaction's metadata is updated.
 
 
 
-<a name="0x1_multisig_account_DOMAIN_SEPARATOR"></a>
+<a id="0x1_multisig_account_DOMAIN_SEPARATOR"></a>
 
 The salt used to create a resource account during multisig account creation.
 This is used to avoid conflicts with other modules that also create resource accounts with the same owner
@@ -812,7 +812,7 @@ account.
 
 
 
-<a name="0x1_multisig_account_EACCOUNT_NOT_MULTISIG"></a>
+<a id="0x1_multisig_account_EACCOUNT_NOT_MULTISIG"></a>
 
 Specified account is not a multisig account.
 
@@ -822,7 +822,7 @@ Specified account is not a multisig account.
 
 
 
-<a name="0x1_multisig_account_EDUPLICATE_METADATA_KEY"></a>
+<a id="0x1_multisig_account_EDUPLICATE_METADATA_KEY"></a>
 
 The specified metadata contains duplicate attributes (keys).
 
@@ -832,7 +832,7 @@ The specified metadata contains duplicate attributes (keys).
 
 
 
-<a name="0x1_multisig_account_EDUPLICATE_OWNER"></a>
+<a id="0x1_multisig_account_EDUPLICATE_OWNER"></a>
 
 Owner list cannot contain the same address more than once.
 
@@ -842,7 +842,7 @@ Owner list cannot contain the same address more than once.
 
 
 
-<a name="0x1_multisig_account_EINVALID_PAYLOAD_HASH"></a>
+<a id="0x1_multisig_account_EINVALID_PAYLOAD_HASH"></a>
 
 Payload hash must be exactly 32 bytes (sha3-256).
 
@@ -852,7 +852,7 @@ Payload hash must be exactly 32 bytes (sha3-256).
 
 
 
-<a name="0x1_multisig_account_EINVALID_SEQUENCE_NUMBER"></a>
+<a id="0x1_multisig_account_EINVALID_SEQUENCE_NUMBER"></a>
 
 The sequence number provided is invalid. It must be between [1, next pending transaction - 1].
 
@@ -862,7 +862,7 @@ The sequence number provided is invalid. It must be between [1, next pending tra
 
 
 
-<a name="0x1_multisig_account_EINVALID_SIGNATURES_REQUIRED"></a>
+<a id="0x1_multisig_account_EINVALID_SIGNATURES_REQUIRED"></a>
 
 Number of signatures required must be more than zero and at most the total number of owners.
 
@@ -872,7 +872,7 @@ Number of signatures required must be more than zero and at most the total numbe
 
 
 
-<a name="0x1_multisig_account_EMULTISIG_ACCOUNTS_NOT_ENABLED_YET"></a>
+<a id="0x1_multisig_account_EMULTISIG_ACCOUNTS_NOT_ENABLED_YET"></a>
 
 Multisig accounts has not been enabled on this current network yet.
 
@@ -882,7 +882,7 @@ Multisig accounts has not been enabled on this current network yet.
 
 
 
-<a name="0x1_multisig_account_ENOT_ENOUGH_APPROVALS"></a>
+<a id="0x1_multisig_account_ENOT_ENOUGH_APPROVALS"></a>
 
 Transaction has not received enough approvals to be executed.
 
@@ -892,7 +892,7 @@ Transaction has not received enough approvals to be executed.
 
 
 
-<a name="0x1_multisig_account_ENOT_ENOUGH_OWNERS"></a>
+<a id="0x1_multisig_account_ENOT_ENOUGH_OWNERS"></a>
 
 Multisig account must have at least one owner.
 
@@ -902,7 +902,7 @@ Multisig account must have at least one owner.
 
 
 
-<a name="0x1_multisig_account_ENOT_ENOUGH_REJECTIONS"></a>
+<a id="0x1_multisig_account_ENOT_ENOUGH_REJECTIONS"></a>
 
 Transaction has not received enough rejections to be officially rejected.
 
@@ -912,7 +912,7 @@ Transaction has not received enough rejections to be officially rejected.
 
 
 
-<a name="0x1_multisig_account_ENOT_OWNER"></a>
+<a id="0x1_multisig_account_ENOT_OWNER"></a>
 
 Account executing this operation is not an owner of the multisig account.
 
@@ -922,7 +922,7 @@ Account executing this operation is not an owner of the multisig account.
 
 
 
-<a name="0x1_multisig_account_ENUMBER_OF_METADATA_KEYS_AND_VALUES_DONT_MATCH"></a>
+<a id="0x1_multisig_account_ENUMBER_OF_METADATA_KEYS_AND_VALUES_DONT_MATCH"></a>
 
 The number of metadata keys and values don't match.
 
@@ -932,7 +932,7 @@ The number of metadata keys and values don't match.
 
 
 
-<a name="0x1_multisig_account_EOWNERS_TO_REMOVE_NEW_OWNERS_OVERLAP"></a>
+<a id="0x1_multisig_account_EOWNERS_TO_REMOVE_NEW_OWNERS_OVERLAP"></a>
 
 Provided owners to remove and new owners overlap.
 
@@ -942,7 +942,7 @@ Provided owners to remove and new owners overlap.
 
 
 
-<a name="0x1_multisig_account_EOWNER_CANNOT_BE_MULTISIG_ACCOUNT_ITSELF"></a>
+<a id="0x1_multisig_account_EOWNER_CANNOT_BE_MULTISIG_ACCOUNT_ITSELF"></a>
 
 The multisig account itself cannot be an owner.
 
@@ -952,7 +952,7 @@ The multisig account itself cannot be an owner.
 
 
 
-<a name="0x1_multisig_account_EPAYLOAD_CANNOT_BE_EMPTY"></a>
+<a id="0x1_multisig_account_EPAYLOAD_CANNOT_BE_EMPTY"></a>
 
 Transaction payload cannot be empty.
 
@@ -962,7 +962,7 @@ Transaction payload cannot be empty.
 
 
 
-<a name="0x1_multisig_account_EPAYLOAD_DOES_NOT_MATCH_HASH"></a>
+<a id="0x1_multisig_account_EPAYLOAD_DOES_NOT_MATCH_HASH"></a>
 
 Provided target function does not match the hash stored in the on-chain transaction.
 
@@ -972,7 +972,7 @@ Provided target function does not match the hash stored in the on-chain transact
 
 
 
-<a name="0x1_multisig_account_ETRANSACTION_NOT_FOUND"></a>
+<a id="0x1_multisig_account_ETRANSACTION_NOT_FOUND"></a>
 
 Transaction with specified id cannot be found.
 
@@ -982,7 +982,7 @@ Transaction with specified id cannot be found.
 
 
 
-<a name="0x1_multisig_account_metadata"></a>
+<a id="0x1_multisig_account_metadata"></a>
 
 ## Function `metadata`
 
@@ -1008,7 +1008,7 @@ Return the multisig account's metadata.
 
 </details>
 
-<a name="0x1_multisig_account_num_signatures_required"></a>
+<a id="0x1_multisig_account_num_signatures_required"></a>
 
 ## Function `num_signatures_required`
 
@@ -1035,7 +1035,7 @@ multisig account.
 
 </details>
 
-<a name="0x1_multisig_account_owners"></a>
+<a id="0x1_multisig_account_owners"></a>
 
 ## Function `owners`
 
@@ -1061,7 +1061,7 @@ Return a vector of all of the provided multisig account's owners.
 
 </details>
 
-<a name="0x1_multisig_account_get_transaction"></a>
+<a id="0x1_multisig_account_get_transaction"></a>
 
 ## Function `get_transaction`
 
@@ -1095,7 +1095,7 @@ Return the transaction with the given transaction id.
 
 </details>
 
-<a name="0x1_multisig_account_get_pending_transactions"></a>
+<a id="0x1_multisig_account_get_pending_transactions"></a>
 
 ## Function `get_pending_transactions`
 
@@ -1129,7 +1129,7 @@ Return all pending transactions.
 
 </details>
 
-<a name="0x1_multisig_account_get_next_transaction_payload"></a>
+<a id="0x1_multisig_account_get_next_transaction_payload"></a>
 
 ## Function `get_next_transaction_payload`
 
@@ -1164,7 +1164,7 @@ Return the payload for the next transaction in the queue.
 
 </details>
 
-<a name="0x1_multisig_account_can_be_executed"></a>
+<a id="0x1_multisig_account_can_be_executed"></a>
 
 ## Function `can_be_executed`
 
@@ -1199,7 +1199,7 @@ Return true if the transaction with given transaction id can be executed now.
 
 </details>
 
-<a name="0x1_multisig_account_can_be_rejected"></a>
+<a id="0x1_multisig_account_can_be_rejected"></a>
 
 ## Function `can_be_rejected`
 
@@ -1234,7 +1234,7 @@ Return true if the transaction with given transaction id can be officially rejec
 
 </details>
 
-<a name="0x1_multisig_account_get_next_multisig_account_address"></a>
+<a id="0x1_multisig_account_get_next_multisig_account_address"></a>
 
 ## Function `get_next_multisig_account_address`
 
@@ -1261,7 +1261,7 @@ Return the predicted address for the next multisig account if created from the g
 
 </details>
 
-<a name="0x1_multisig_account_last_resolved_sequence_number"></a>
+<a id="0x1_multisig_account_last_resolved_sequence_number"></a>
 
 ## Function `last_resolved_sequence_number`
 
@@ -1288,7 +1288,7 @@ Return the id of the last transaction that was executed (successful or failed) o
 
 </details>
 
-<a name="0x1_multisig_account_next_sequence_number"></a>
+<a id="0x1_multisig_account_next_sequence_number"></a>
 
 ## Function `next_sequence_number`
 
@@ -1315,7 +1315,7 @@ Return the id of the next transaction created.
 
 </details>
 
-<a name="0x1_multisig_account_vote"></a>
+<a id="0x1_multisig_account_vote"></a>
 
 ## Function `vote`
 
@@ -1351,7 +1351,7 @@ Return a bool tuple indicating whether an owner has voted and if so, whether the
 
 </details>
 
-<a name="0x1_multisig_account_create_with_existing_account"></a>
+<a id="0x1_multisig_account_create_with_existing_account"></a>
 
 ## Function `create_with_existing_account`
 
@@ -1421,7 +1421,7 @@ create_with_existing_account_and_revoke_auth_key instead.
 
 </details>
 
-<a name="0x1_multisig_account_create_with_existing_account_and_revoke_auth_key"></a>
+<a id="0x1_multisig_account_create_with_existing_account_and_revoke_auth_key"></a>
 
 ## Function `create_with_existing_account_and_revoke_auth_key`
 
@@ -1499,7 +1499,7 @@ account.
 
 </details>
 
-<a name="0x1_multisig_account_create"></a>
+<a id="0x1_multisig_account_create"></a>
 
 ## Function `create`
 
@@ -1529,7 +1529,7 @@ Creates a new multisig account and add the signer as a single owner.
 
 </details>
 
-<a name="0x1_multisig_account_create_with_owners"></a>
+<a id="0x1_multisig_account_create_with_owners"></a>
 
 ## Function `create_with_owners`
 
@@ -1574,7 +1574,7 @@ at most the total number of owners.
 
 </details>
 
-<a name="0x1_multisig_account_create_with_owners_then_remove_bootstrapper"></a>
+<a id="0x1_multisig_account_create_with_owners_then_remove_bootstrapper"></a>
 
 ## Function `create_with_owners_then_remove_bootstrapper`
 
@@ -1621,7 +1621,7 @@ be an owner after the vanity multisig address has been secured.
 
 </details>
 
-<a name="0x1_multisig_account_create_with_owners_internal"></a>
+<a id="0x1_multisig_account_create_with_owners_internal"></a>
 
 ## Function `create_with_owners_internal`
 
@@ -1680,7 +1680,7 @@ be an owner after the vanity multisig address has been secured.
 
 </details>
 
-<a name="0x1_multisig_account_add_owner"></a>
+<a id="0x1_multisig_account_add_owner"></a>
 
 ## Function `add_owner`
 
@@ -1705,7 +1705,7 @@ Similar to add_owners, but only allow adding one owner.
 
 </details>
 
-<a name="0x1_multisig_account_add_owners"></a>
+<a id="0x1_multisig_account_add_owners"></a>
 
 ## Function `add_owners`
 
@@ -1741,7 +1741,7 @@ maliciously alter the owners list.
 
 </details>
 
-<a name="0x1_multisig_account_add_owners_and_update_signatures_required"></a>
+<a id="0x1_multisig_account_add_owners_and_update_signatures_required"></a>
 
 ## Function `add_owners_and_update_signatures_required`
 
@@ -1775,7 +1775,7 @@ Add owners then update number of signatures required, in a single operation.
 
 </details>
 
-<a name="0x1_multisig_account_remove_owner"></a>
+<a id="0x1_multisig_account_remove_owner"></a>
 
 ## Function `remove_owner`
 
@@ -1801,7 +1801,7 @@ Similar to remove_owners, but only allow removing one owner.
 
 </details>
 
-<a name="0x1_multisig_account_remove_owners"></a>
+<a id="0x1_multisig_account_remove_owners"></a>
 
 ## Function `remove_owners`
 
@@ -1838,7 +1838,7 @@ maliciously alter the owners list.
 
 </details>
 
-<a name="0x1_multisig_account_swap_owner"></a>
+<a id="0x1_multisig_account_swap_owner"></a>
 
 ## Function `swap_owner`
 
@@ -1872,7 +1872,7 @@ Swap an owner in for an old one, without changing required signatures.
 
 </details>
 
-<a name="0x1_multisig_account_swap_owners"></a>
+<a id="0x1_multisig_account_swap_owners"></a>
 
 ## Function `swap_owners`
 
@@ -1906,7 +1906,7 @@ Swap owners in and out, without changing required signatures.
 
 </details>
 
-<a name="0x1_multisig_account_swap_owners_and_update_signatures_required"></a>
+<a id="0x1_multisig_account_swap_owners_and_update_signatures_required"></a>
 
 ## Function `swap_owners_and_update_signatures_required`
 
@@ -1941,7 +1941,7 @@ Swap owners in and out, updating number of required signatures.
 
 </details>
 
-<a name="0x1_multisig_account_update_signatures_required"></a>
+<a id="0x1_multisig_account_update_signatures_required"></a>
 
 ## Function `update_signatures_required`
 
@@ -1977,7 +1977,7 @@ maliciously alter the number of signatures required.
 
 </details>
 
-<a name="0x1_multisig_account_update_metadata"></a>
+<a id="0x1_multisig_account_update_metadata"></a>
 
 ## Function `update_metadata`
 
@@ -2009,7 +2009,7 @@ maliciously alter the number of signatures required.
 
 </details>
 
-<a name="0x1_multisig_account_update_metadata_internal"></a>
+<a id="0x1_multisig_account_update_metadata_internal"></a>
 
 ## Function `update_metadata_internal`
 
@@ -2071,7 +2071,7 @@ maliciously alter the number of signatures required.
 
 </details>
 
-<a name="0x1_multisig_account_create_transaction"></a>
+<a id="0x1_multisig_account_create_transaction"></a>
 
 ## Function `create_transaction`
 
@@ -2114,7 +2114,7 @@ Create a multisig transaction, which will have one approval initially (from the 
 
 </details>
 
-<a name="0x1_multisig_account_create_transaction_with_hash"></a>
+<a id="0x1_multisig_account_create_transaction_with_hash"></a>
 
 ## Function `create_transaction_with_hash`
 
@@ -2160,7 +2160,7 @@ to provide the full payload, which will be validated against the hash stored on-
 
 </details>
 
-<a name="0x1_multisig_account_approve_transaction"></a>
+<a id="0x1_multisig_account_approve_transaction"></a>
 
 ## Function `approve_transaction`
 
@@ -2186,7 +2186,7 @@ Approve a multisig transaction.
 
 </details>
 
-<a name="0x1_multisig_account_reject_transaction"></a>
+<a id="0x1_multisig_account_reject_transaction"></a>
 
 ## Function `reject_transaction`
 
@@ -2212,7 +2212,7 @@ Reject a multisig transaction.
 
 </details>
 
-<a name="0x1_multisig_account_vote_transanction"></a>
+<a id="0x1_multisig_account_vote_transanction"></a>
 
 ## Function `vote_transanction`
 
@@ -2263,7 +2263,7 @@ Generic function that can be used to either approve or reject a multisig transac
 
 </details>
 
-<a name="0x1_multisig_account_execute_rejected_transaction"></a>
+<a id="0x1_multisig_account_execute_rejected_transaction"></a>
 
 ## Function `execute_rejected_transaction`
 
@@ -2312,7 +2312,7 @@ Remove the next transaction if it has sufficient owner rejections.
 
 </details>
 
-<a name="0x1_multisig_account_validate_multisig_transaction"></a>
+<a id="0x1_multisig_account_validate_multisig_transaction"></a>
 
 ## Function `validate_multisig_transaction`
 
@@ -2364,7 +2364,7 @@ Transaction payload is optional if it's already stored on chain for the transact
 
 </details>
 
-<a name="0x1_multisig_account_successful_transaction_execution_cleanup"></a>
+<a id="0x1_multisig_account_successful_transaction_execution_cleanup"></a>
 
 ## Function `successful_transaction_execution_cleanup`
 
@@ -2404,7 +2404,7 @@ This function is private so no other code can call this beside the VM itself as 
 
 </details>
 
-<a name="0x1_multisig_account_failed_transaction_execution_cleanup"></a>
+<a id="0x1_multisig_account_failed_transaction_execution_cleanup"></a>
 
 ## Function `failed_transaction_execution_cleanup`
 
@@ -2446,7 +2446,7 @@ This function is private so no other code can call this beside the VM itself as 
 
 </details>
 
-<a name="0x1_multisig_account_remove_executed_transaction"></a>
+<a id="0x1_multisig_account_remove_executed_transaction"></a>
 
 ## Function `remove_executed_transaction`
 
@@ -2473,7 +2473,7 @@ This function is private so no other code can call this beside the VM itself as 
 
 </details>
 
-<a name="0x1_multisig_account_add_transaction"></a>
+<a id="0x1_multisig_account_add_transaction"></a>
 
 ## Function `add_transaction`
 
@@ -2506,7 +2506,7 @@ This function is private so no other code can call this beside the VM itself as 
 
 </details>
 
-<a name="0x1_multisig_account_create_multisig_account"></a>
+<a id="0x1_multisig_account_create_multisig_account"></a>
 
 ## Function `create_multisig_account`
 
@@ -2539,7 +2539,7 @@ This function is private so no other code can call this beside the VM itself as 
 
 </details>
 
-<a name="0x1_multisig_account_create_multisig_account_seed"></a>
+<a id="0x1_multisig_account_create_multisig_account_seed"></a>
 
 ## Function `create_multisig_account_seed`
 
@@ -2568,7 +2568,7 @@ This function is private so no other code can call this beside the VM itself as 
 
 </details>
 
-<a name="0x1_multisig_account_validate_owners"></a>
+<a id="0x1_multisig_account_validate_owners"></a>
 
 ## Function `validate_owners`
 
@@ -2599,7 +2599,7 @@ This function is private so no other code can call this beside the VM itself as 
 
 </details>
 
-<a name="0x1_multisig_account_assert_is_owner"></a>
+<a id="0x1_multisig_account_assert_is_owner"></a>
 
 ## Function `assert_is_owner`
 
@@ -2626,7 +2626,7 @@ This function is private so no other code can call this beside the VM itself as 
 
 </details>
 
-<a name="0x1_multisig_account_num_approvals_and_rejections"></a>
+<a id="0x1_multisig_account_num_approvals_and_rejections"></a>
 
 ## Function `num_approvals_and_rejections`
 
@@ -2664,7 +2664,7 @@ This function is private so no other code can call this beside the VM itself as 
 
 </details>
 
-<a name="0x1_multisig_account_assert_multisig_account_exists"></a>
+<a id="0x1_multisig_account_assert_multisig_account_exists"></a>
 
 ## Function `assert_multisig_account_exists`
 
@@ -2688,7 +2688,7 @@ This function is private so no other code can call this beside the VM itself as 
 
 </details>
 
-<a name="0x1_multisig_account_update_owner_schema"></a>
+<a id="0x1_multisig_account_update_owner_schema"></a>
 
 ## Function `update_owner_schema`
 

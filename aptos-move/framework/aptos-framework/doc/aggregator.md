@@ -1,5 +1,5 @@
 
-<a name="0x1_aggregator"></a>
+<a id="0x1_aggregator"></a>
 
 # Module `0x1::aggregator`
 
@@ -37,7 +37,7 @@ at the moment.**
 
 
 
-<a name="0x1_aggregator_Aggregator"></a>
+<a id="0x1_aggregator_Aggregator"></a>
 
 ## Struct `Aggregator`
 
@@ -78,12 +78,12 @@ across multiple transactions. See the module description for more details.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_aggregator_EAGGREGATOR_OVERFLOW"></a>
+<a id="0x1_aggregator_EAGGREGATOR_OVERFLOW"></a>
 
 The value of aggregator overflows. Raised by native code.
 
@@ -93,7 +93,7 @@ The value of aggregator overflows. Raised by native code.
 
 
 
-<a name="0x1_aggregator_EAGGREGATOR_UNDERFLOW"></a>
+<a id="0x1_aggregator_EAGGREGATOR_UNDERFLOW"></a>
 
 The value of aggregator underflows (goes below zero). Raised by native code.
 
@@ -103,7 +103,7 @@ The value of aggregator underflows (goes below zero). Raised by native code.
 
 
 
-<a name="0x1_aggregator_ENOT_SUPPORTED"></a>
+<a id="0x1_aggregator_ENOT_SUPPORTED"></a>
 
 Aggregator feature is not supported. Raised by native code.
 
@@ -113,7 +113,7 @@ Aggregator feature is not supported. Raised by native code.
 
 
 
-<a name="0x1_aggregator_limit"></a>
+<a id="0x1_aggregator_limit"></a>
 
 ## Function `limit`
 
@@ -138,7 +138,7 @@ Returns <code>limit</code> exceeding which aggregator overflows.
 
 </details>
 
-<a name="0x1_aggregator_add"></a>
+<a id="0x1_aggregator_add"></a>
 
 ## Function `add`
 
@@ -161,7 +161,7 @@ Adds <code>value</code> to aggregator. Aborts on overflowing the limit.
 
 </details>
 
-<a name="0x1_aggregator_sub"></a>
+<a id="0x1_aggregator_sub"></a>
 
 ## Function `sub`
 
@@ -184,7 +184,7 @@ Subtracts <code>value</code> from aggregator. Aborts on going below zero.
 
 </details>
 
-<a name="0x1_aggregator_read"></a>
+<a id="0x1_aggregator_read"></a>
 
 ## Function `read`
 
@@ -207,7 +207,7 @@ Returns a value stored in this aggregator.
 
 </details>
 
-<a name="0x1_aggregator_destroy"></a>
+<a id="0x1_aggregator_destroy"></a>
 
 ## Function `destroy`
 
@@ -230,12 +230,12 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
 
-<a name="@Specification_1_Aggregator"></a>
+<a id="@Specification_1_Aggregator"></a>
 
 ### Struct `Aggregator`
 
@@ -273,7 +273,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 
-<a name="@Specification_1_limit"></a>
+<a id="@Specification_1_limit"></a>
 
 ### Function `limit`
 
@@ -292,7 +292,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 
-<a name="0x1_aggregator_spec_read"></a>
+<a id="0x1_aggregator_spec_read"></a>
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_read">spec_read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
@@ -301,7 +301,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 
-<a name="0x1_aggregator_spec_get_limit"></a>
+<a id="0x1_aggregator_spec_get_limit"></a>
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
@@ -310,7 +310,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 
-<a name="0x1_aggregator_spec_get_handle"></a>
+<a id="0x1_aggregator_spec_get_handle"></a>
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_get_handle">spec_get_handle</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
@@ -319,7 +319,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 
-<a name="0x1_aggregator_spec_get_key"></a>
+<a id="0x1_aggregator_spec_get_key"></a>
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_get_key">spec_get_key</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
@@ -328,7 +328,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 
-<a name="0x1_aggregator_spec_aggregator_set_val"></a>
+<a id="0x1_aggregator_spec_aggregator_set_val"></a>
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_set_val">spec_aggregator_set_val</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>, v: u128): <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>;
@@ -337,7 +337,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 
-<a name="0x1_aggregator_spec_aggregator_get_val"></a>
+<a id="0x1_aggregator_spec_aggregator_get_val"></a>
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
@@ -345,7 +345,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 
-<a name="@Specification_1_add"></a>
+<a id="@Specification_1_add"></a>
 
 ### Function `add`
 
@@ -366,7 +366,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 
-<a name="@Specification_1_sub"></a>
+<a id="@Specification_1_sub"></a>
 
 ### Function `sub`
 
@@ -386,7 +386,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 
-<a name="@Specification_1_read"></a>
+<a id="@Specification_1_read"></a>
 
 ### Function `read`
 
@@ -405,7 +405,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 
-<a name="@Specification_1_destroy"></a>
+<a id="@Specification_1_destroy"></a>
 
 ### Function `destroy`
 

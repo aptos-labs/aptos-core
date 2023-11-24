@@ -412,9 +412,9 @@ impl Block {
         &self,
         validators: &[AccountAddress],
         txns: Vec<SignedTransaction>,
-        block_gas_limit: Option<u64>,
+        is_block_gas_limit: bool,
     ) -> Vec<Transaction> {
-        if block_gas_limit.is_some() {
+        if is_block_gas_limit {
             // After the per-block gas limit change, StateCheckpoint txn
             // is inserted after block execution
             once(Transaction::BlockMetadata(

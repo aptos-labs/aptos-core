@@ -1,5 +1,5 @@
 
-<a name="0x1_state_storage"></a>
+<a id="0x1_state_storage"></a>
 
 # Module `0x1::state_storage`
 
@@ -28,7 +28,7 @@
 
 
 
-<a name="0x1_state_storage_Usage"></a>
+<a id="0x1_state_storage_Usage"></a>
 
 ## Struct `Usage`
 
@@ -61,7 +61,7 @@
 
 </details>
 
-<a name="0x1_state_storage_StateStorageUsage"></a>
+<a id="0x1_state_storage_StateStorageUsage"></a>
 
 ## Resource `StateStorageUsage`
 
@@ -96,7 +96,7 @@ usage after the last txn of the previous epoch is committed.
 
 </details>
 
-<a name="0x1_state_storage_GasParameter"></a>
+<a id="0x1_state_storage_GasParameter"></a>
 
 ## Resource `GasParameter`
 
@@ -123,12 +123,12 @@ usage after the last txn of the previous epoch is committed.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_state_storage_ESTATE_STORAGE_USAGE"></a>
+<a id="0x1_state_storage_ESTATE_STORAGE_USAGE"></a>
 
 
 
@@ -137,7 +137,7 @@ usage after the last txn of the previous epoch is committed.
 
 
 
-<a name="0x1_state_storage_initialize"></a>
+<a id="0x1_state_storage_initialize"></a>
 
 ## Function `initialize`
 
@@ -172,7 +172,7 @@ usage after the last txn of the previous epoch is committed.
 
 </details>
 
-<a name="0x1_state_storage_on_new_block"></a>
+<a id="0x1_state_storage_on_new_block"></a>
 
 ## Function `on_new_block`
 
@@ -204,7 +204,7 @@ usage after the last txn of the previous epoch is committed.
 
 </details>
 
-<a name="0x1_state_storage_current_items_and_bytes"></a>
+<a id="0x1_state_storage_current_items_and_bytes"></a>
 
 ## Function `current_items_and_bytes`
 
@@ -233,7 +233,7 @@ usage after the last txn of the previous epoch is committed.
 
 </details>
 
-<a name="0x1_state_storage_get_state_storage_usage_only_at_epoch_beginning"></a>
+<a id="0x1_state_storage_get_state_storage_usage_only_at_epoch_beginning"></a>
 
 ## Function `get_state_storage_usage_only_at_epoch_beginning`
 
@@ -259,7 +259,7 @@ guarantees a fresh state view then.
 
 </details>
 
-<a name="0x1_state_storage_on_reconfig"></a>
+<a id="0x1_state_storage_on_reconfig"></a>
 
 ## Function `on_reconfig`
 
@@ -283,7 +283,7 @@ guarantees a fresh state view then.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -297,7 +297,7 @@ guarantees a fresh state view then.
 
 
 
-<a name="@Specification_1_initialize"></a>
+<a id="@Specification_1_initialize"></a>
 
 ### Function `initialize`
 
@@ -320,7 +320,7 @@ aborts if StateStorageUsage already exists.
 
 
 
-<a name="@Specification_1_on_new_block"></a>
+<a id="@Specification_1_on_new_block"></a>
 
 ### Function `on_new_block`
 
@@ -338,7 +338,7 @@ aborts if StateStorageUsage already exists.
 
 
 
-<a name="@Specification_1_current_items_and_bytes"></a>
+<a id="@Specification_1_current_items_and_bytes"></a>
 
 ### Function `current_items_and_bytes`
 
@@ -354,7 +354,7 @@ aborts if StateStorageUsage already exists.
 
 
 
-<a name="@Specification_1_get_state_storage_usage_only_at_epoch_beginning"></a>
+<a id="@Specification_1_get_state_storage_usage_only_at_epoch_beginning"></a>
 
 ### Function `get_state_storage_usage_only_at_epoch_beginning`
 
@@ -370,7 +370,7 @@ aborts if StateStorageUsage already exists.
 
 
 
-<a name="@Specification_1_on_reconfig"></a>
+<a id="@Specification_1_on_reconfig"></a>
 
 ### Function `on_reconfig`
 

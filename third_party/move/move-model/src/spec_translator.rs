@@ -631,7 +631,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, 'b
                 // allowed, i.e. if there are free LocalVar terms, excluding locals from lets.
                 let loc = env.get_node_loc(*id);
                 let has_free_vars = args[0]
-                    .free_vars(env)
+                    .free_vars_with_types(env)
                     .iter()
                     .any(|(s, _)| !self.let_locals.contains_key(s));
                 if has_free_vars {
