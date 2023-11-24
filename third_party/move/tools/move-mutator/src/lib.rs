@@ -1,6 +1,11 @@
 pub mod cli;
 mod compiler;
 
+mod mutate;
+
+mod operator;
+
+mod mutant;
 use crate::compiler::generate_ast;
 
 use move_package::BuildConfig;
@@ -18,10 +23,14 @@ pub fn run_move_mutator(
         options, config, package_path
     );
 
-    let (files, ast) = generate_ast(options.move_sources, config, package_path)?;
+    let (_files, ast) = generate_ast(options.move_sources, config, package_path)?;
 
-    println!("Files: {:?}", files);
-    println!("AST: {:?}", ast);
+    let mutants = mutate::mutate(ast)?;
+
+    println!("Mutants:");
+    for mutant in mutants {
+        println!("{}", mutant);
+    }
 
     Ok(())
 }
