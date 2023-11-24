@@ -14,6 +14,7 @@ use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     contract_event::ContractEvent,
+    system_txn::SystemTransaction,
     transaction::{SignedTransaction, Transaction, TransactionStatus},
 };
 use std::fmt::{Debug, Display, Formatter};
@@ -84,6 +85,10 @@ impl ExecutedBlock {
 
     pub fn round(&self) -> Round {
         self.block().round()
+    }
+
+    pub fn sys_txns(&self) -> Option<&Vec<SystemTransaction>> {
+        self.block().sys_txns()
     }
 
     pub fn timestamp_usecs(&self) -> u64 {

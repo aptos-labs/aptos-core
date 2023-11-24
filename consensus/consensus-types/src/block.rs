@@ -17,6 +17,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
+    system_txn::SystemTransaction,
     transaction::{SignedTransaction, Transaction, Version},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
@@ -253,6 +254,28 @@ impl Block {
         Self::new_proposal_from_block_data(block_data, validator_signer)
     }
 
+    pub fn new_proposal_ext(
+        sys_txns: Vec<SystemTransaction>,
+        payload: Payload,
+        round: Round,
+        timestamp_usecs: u64,
+        quorum_cert: QuorumCert,
+        validator_signer: &ValidatorSigner,
+        failed_authors: Vec<(Round, Author)>,
+    ) -> anyhow::Result<Self> {
+        let block_data = BlockData::new_proposal_ext(
+            sys_txns,
+            payload,
+            validator_signer.author(),
+            failed_authors,
+            round,
+            timestamp_usecs,
+            quorum_cert,
+        );
+
+        Self::new_proposal_from_block_data(block_data, validator_signer)
+    }
+
     pub fn new_proposal_from_block_data(
         block_data: BlockData,
         validator_signer: &ValidatorSigner,
@@ -274,6 +297,10 @@ impl Block {
         }
     }
 
+    pub fn sys_txns(&self) -> Option<&Vec<SystemTransaction>> {
+        self.block_data.sys_txns()
+    }
+
     /// Verifies that the proposal and the QC are correctly signed.
     /// If this is the genesis block, we skip these checks.
     pub fn validate_signature(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
@@ -286,6 +313,14 @@ impl Block {
                     .as_ref()
                     .ok_or_else(|| format_err!("Missing signature in Proposal"))?;
                 validator.verify(*author, &self.block_data, signature)?;
+                self.quorum_cert().verify(validator)
+            },
+            BlockType::ProposalExt(proposal_ext) => {
+                let signature = self
+                    .signature
+                    .as_ref()
+                    .ok_or_else(|| format_err!("Missing signature in Proposal"))?;
+                validator.verify(*proposal_ext.author(), &self.block_data, signature)?;
                 self.quorum_cert().verify(validator)
             },
             BlockType::DAGBlock { .. } => bail!("We should not accept DAG block from others"),

@@ -1179,15 +1179,13 @@ impl AptosVM {
     fn process_system_transaction(
         &self,
         _resolver: &impl AptosMoveResolver,
-        txn: SystemTransaction,
+        _txn: SystemTransaction,
         _log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
-        match txn {
-            SystemTransaction::DummyTopic(_) => (
-                VMStatus::Executed,
-                VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)),
-            ),
-        }
+        (
+            VMStatus::Executed,
+            VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)),
+        )
     }
 
     fn execute_user_transaction_impl(
