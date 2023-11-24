@@ -10,7 +10,7 @@ Then build also the `move-cli` tool:
 cargo build -p move-cli
 ```
 
-Check if tool is working properly by running its tests:
+Check if the tool is working properly by running its tests:
 ```bash
 cargo test -p move-mutator
 ```
@@ -28,7 +28,7 @@ or
 ./target/debug/aptos move mutate --move-sources third_party/move/tools/move-mutator/tests/move-assets/simple/sources/Sum.move
 ```
 
-Output will be generated under `mutants_output` directory.
+The output will be generated under `mutants_output` directory.
 
 To generate mutants for all files within a test project run:
 ```bash

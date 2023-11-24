@@ -13,6 +13,8 @@ use std::path::Path;
 use move_package::BuildConfig;
 use std::path::PathBuf;
 
+const OUTPUT_DIR: &str = "mutants_output";
+
 /// Runs the Move mutator tool.
 /// Entry point for the Move mutator tool both for the CLI and the Rust API.
 pub fn run_move_mutator(
@@ -29,12 +31,10 @@ pub fn run_move_mutator(
 
     let mutants = mutate::mutate(ast)?;
 
-    let _ = std::fs::remove_dir_all("mutants_output");
-    std::fs::create_dir("mutants_output")?;
+    let _ = std::fs::remove_dir_all(OUTPUT_DIR);
+    std::fs::create_dir(OUTPUT_DIR)?;
 
-    for (hash, file) in files {
-        let (filename, source) = file;
-
+    for (hash, (filename, source)) in files {
         let path = Path::new(filename.as_str());
         let file_name = path.file_stem().unwrap().to_str().unwrap();
 
