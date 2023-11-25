@@ -7,7 +7,6 @@
 //     inline functions will be either gone or inlined by then.
 // - check that non-inline function parameters do not have function type
 // - check that all private functions in target modules have uses (if -Wunused flag is set)
-// - check that there is exactly one function in scripts
 
 use crate::Options;
 use codespan_reporting::diagnostic::Severity;
