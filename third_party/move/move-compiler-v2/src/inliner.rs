@@ -811,7 +811,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                 // lambdas inlined, etc.
                 let id = env.new_node(
                     function_loc.clone().inlined_from(call_site_loc),
-                    ty.instantiate(self.type_args)
+                    ty.instantiate(self.type_args),
                 );
                 if let Some(new_sym) = self.shadow_stack.get_shadow_symbol(*sym, true) {
                     Pattern::Var(id, new_sym)
