@@ -9,32 +9,38 @@
 // - check that all private functions in target modules have uses (if -Wunused flag is set)
 // - check that there is exactly one function in scripts
 
-use codespan_reporting::diagnostic::Severity;
 use crate::Options;
+use codespan_reporting::diagnostic::Severity;
 use move_binary_format::file_format::Visibility;
-use move_model::{model::{FunId, GlobalEnv, Loc, QualifiedId}, ty::Type};
-use std::{collections::{BTreeMap, BTreeSet}, iter::Iterator, ops::Deref, vec::Vec};
+use move_model::{
+    model::{FunId, GlobalEnv, Loc, QualifiedId},
+    ty::Type
+};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    iter::Iterator,
+    ops::Deref,
+    vec::Vec
+};
 
 type QualifiedFunId = QualifiedId<FunId>;
 
 // Run checks for all functions in all target modules.
 pub fn check_functions(env: &mut GlobalEnv) {
-    let options = env.get_extension::<Options>().expect("Options is available");
+    let options = env
+        .get_extension::<Options>()
+        .expect("Options is available");
     //let debug = options.debug;
     let warn_about_unused = options.warn_unused;
 
-    let mut callees_seen : BTreeMap<QualifiedFunId, BTreeSet<QualifiedFunId>> = BTreeMap::new();
-    let mut private_funcs : BTreeSet<QualifiedFunId> = BTreeSet::new();
-    let mut saw_script_loc: Option<Loc> = None;
+    let mut callees_seen: BTreeMap<QualifiedFunId, BTreeSet<QualifiedFunId>> = BTreeMap::new();
+    let mut private_funcs: BTreeSet<QualifiedFunId> = BTreeSet::new();
     for caller_module in env.get_modules() {
         if caller_module.is_target() {
             let caller_module_id = caller_module.get_id();
             let caller_module_name = caller_module.get_name();
             let caller_module_has_friends = !caller_module.get_friend_modules().is_empty();
             let caller_module_is_script = caller_module.get_name().is_script();
-            if caller_module_is_script {
-                saw_script_loc = Some(caller_module.get_loc());
-            }
             for caller_func in caller_module.get_functions() {
                 let caller_name_str = caller_func.get_full_name_with_address();
                 let caller_qfid = caller_func.get_qualified_id();
@@ -59,8 +65,7 @@ pub fn check_functions(env: &mut GlobalEnv) {
                 }
 
                 match caller_func.visibility() {
-                    Visibility::Public => {
-                    },
+                    Visibility::Public => {},
                     Visibility::Friend => {
                         if !caller_module_has_friends {
                             // Function is essentially private
@@ -81,17 +86,44 @@ pub fn check_functions(env: &mut GlobalEnv) {
                         let callee_env = env.get_function(callee);
                         // check visibility if not in the same module
                         let callee_is_inline = callee_env.is_inline();
-                        let callee_is_accessible =
-                            if callee_env.module_env.get_id() == caller_module_id {
-                                true
-                            } else {
-                                match callee_env.visibility() {
-                                    Visibility::Public => {
+                        let callee_is_accessible = if callee_env.module_env.get_id()
+                            == caller_module_id
+                        {
+                            true
+                        } else {
+                            match callee_env.visibility() {
+                                Visibility::Public => true,
+                                _ if caller_module_is_script => {
+                                    // Only public functions are visible from scripts.
+                                    if callee_is_inline {
+                                        let call_details: Vec<_> = sites
+                                            .iter()
+                                            .map(|node_id| {
+                                                (
+                                                    env.get_node_loc(*node_id),
+                                                    "called here".to_owned(),
+                                                )
+                                            })
+                                            .collect();
+                                        let msg = format!(
+                                            "inline function `{}` cannot be called from a script, \
+                                             because it is not public",
+                                            callee_env.get_full_name_with_address(),
+                                        );
+                                        env.diag_with_labels(
+                                            Severity::Error,
+                                            &callee_env.get_loc(),
+                                            &msg,
+                                            call_details,
+                                        );
+                                    }
+                                    false
+                                }
+                                Visibility::Friend => {
+                                    if callee_env.module_env.has_friend(&caller_module_id) {
                                         true
-                                    },
-                                    _ if caller_module_is_script => {
-                                        // Only public functions are visible from scripts.
-                                        if callee_is_inline {
+                                    } else {
+                                        if caller_is_inline || callee_is_inline {
                                             let call_details: Vec<_> = sites
                                                 .iter()
                                                 .map(|node_id| {
@@ -102,64 +134,12 @@ pub fn check_functions(env: &mut GlobalEnv) {
                                                 })
                                                 .collect();
                                             let msg = format!(
-                                                "inline function `{}` cannot be called from a script, because it is not public",
-                                                callee_env.get_full_name_with_address(),
-                                            );
-                                            env.diag_with_labels(
-                                                Severity::Error,
-                                                &callee_env.get_loc(),
-                                                &msg,
-                                                call_details,
-                                            );
-                                        }
-                                        false
-                                    }
-                                    Visibility::Friend => {
-                                        if callee_env.module_env.has_friend(&caller_module_id) {
-                                            true
-                                        } else {
-                                            if caller_is_inline || callee_is_inline {
-                                                let call_details: Vec<_> = sites
-                                                    .iter()
-                                                    .map(|node_id| {
-                                                        (
-                                                            env.get_node_loc(*node_id),
-                                                            "called here".to_owned(),
-                                                        )
-                                                    })
-                                                    .collect();
-                                                let msg = format!(
-                                                    "`public(friend)` {}function `{}` cannot be called from {}function `{}` because module `{}` is not a `friend` of `{}`",
-                                                    if callee_is_inline { "inline " } else { "" },
-                                                    callee_env.get_full_name_with_address(),
-                                                    caller_name_str,
-                                                    if caller_is_inline { "inline " } else { "" },
-                                                    caller_module_name.display_full(env),
-                                                    callee_env.module_env.get_full_name_str());
-                                                env.diag_with_labels(
-                                                    Severity::Error,
-                                                    &callee_env.get_loc(),
-                                                    &msg,
-                                                    call_details,
-                                                );
-                                            }
-                                            false
-                                        }
-                                    },
-                                    Visibility::Private => {
-                                        if caller_is_inline || callee_is_inline {
-                                            let call_details: Vec<_> = sites
-                                                .iter()
-                                                .map(|node_id| {
-                                                    (env.get_node_loc(*node_id), "called here".to_owned())
-                                                })
-                                                .collect();
-                                            let msg = format!(
-                                                "{}function `{}` cannot be called from {}function `{}` because it is private to module `{}`",
+                                                "`public(friend)` {}function `{}` cannot be called from {}function `{}` because module `{}` is not a `friend` of `{}`",
                                                 if callee_is_inline { "inline " } else { "" },
                                                 callee_env.get_full_name_with_address(),
-                                                if caller_is_inline { "inline " } else { "" },
                                                 caller_name_str,
+                                                if caller_is_inline { "inline " } else { "" },
+                                                caller_module_name.display_full(env),
                                                 callee_env.module_env.get_full_name_str());
                                             env.diag_with_labels(
                                                 Severity::Error,
@@ -169,12 +149,44 @@ pub fn check_functions(env: &mut GlobalEnv) {
                                             );
                                         }
                                         false
-                                    },
-                                }
-                            };
+                                    }
+                                },
+                                Visibility::Private => {
+                                    if caller_is_inline || callee_is_inline {
+                                        let call_details: Vec<_> = sites
+                                            .iter()
+                                            .map(|node_id| {
+                                                (
+                                                    env.get_node_loc(*node_id),
+                                                    "called here".to_owned()
+                                                )
+                                            })
+                                            .collect();
+                                        let msg = format!(
+                                            "{}function `{}` cannot be called from {}function `{}` \
+                                             because it is private to module `{}`",
+                                            if callee_is_inline { "inline " } else { "" },
+                                            callee_env.get_full_name_with_address(),
+                                            if caller_is_inline { "inline " } else { "" },
+                                            caller_name_str,
+                                            callee_env.module_env.get_full_name_str());
+                                        env.diag_with_labels(
+                                            Severity::Error,
+                                            &callee_env.get_loc(),
+                                            &msg,
+                                            call_details,
+                                        );
+                                    }
+                                    false
+                                },
+                            }
+                        };
                         if callee_is_accessible {
-                            callees_seen.entry(callee)
-                                .and_modify(|curr | { curr.insert(caller_qfid); })
+                            callees_seen
+                                .entry(callee)
+                                .and_modify(|curr | {
+                                    curr.insert(caller_qfid);
+                                })
                                 .or_insert(BTreeSet::from([caller_qfid]));
                         }
                     }
@@ -183,28 +195,20 @@ pub fn check_functions(env: &mut GlobalEnv) {
         }
     }
     // Check for Unused functions: private (or friendless public(friend)) funs with no callers.
-    // While we're at it, check for scripts with duplicated entry functions, since we need
-    // to check for them here to exclude them from the check.
-    let mut saw_entry_function_loc: Option<Loc> = None;
     for callee in private_funcs {
-        if callees_seen.get(&callee).map(|s| s.is_empty()).unwrap_or(true) {
-            // We saw no uses of private fun Calleee.
+        if callees_seen
+            .get(&callee)
+            .map(|s| s.is_empty())
+            .unwrap_or(true)
+        {
+            // We saw no uses of private/friendless function `callee`.
             let callee_env = env.get_function(callee);
             let callee_loc = callee_env.get_loc();
             let callee_is_script = callee_env.module_env.get_name().is_script();
-            if callee_is_script {
-                // Callee is in a script, so it must be entry function.
-                if let Some(loc) = &saw_entry_function_loc {
-                    env.diag_with_labels(
-                        Severity::Error,
-                        &callee_loc,
-                        "Duplicate script entry function declaration",
-                        vec![(loc.clone(), "Other declaration".to_owned())]);
-                } else {
-                    // Record entry function location in case we see a duplicate.
-                    saw_entry_function_loc = Some(callee_loc);
-                }
-            } else {
+
+            // Entry functions in a script don't need any uses.
+            // Check others which are private.
+            if !callee_is_script {
                 let is_private = matches!(callee_env.visibility(), Visibility::Private);
                 if warn_about_unused {
                     let msg = format!(
@@ -220,10 +224,5 @@ pub fn check_functions(env: &mut GlobalEnv) {
                 }
             }
         }
-    }
-    if let (Some(script_loc), None) = (saw_script_loc, saw_entry_function_loc) {
-        env.error(&script_loc,
-                  "Script has no entry function",
-        );
     }
 }
