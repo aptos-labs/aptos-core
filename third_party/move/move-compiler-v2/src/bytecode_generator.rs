@@ -875,20 +875,11 @@ impl<'env> Generator<'env> {
             ExpData::Temporary(_arg_id, temp) => return self.gen_borrow_temp(target, id, *temp),
             _ => {},
         }
-        if kind == ReferenceKind::Mutable {
-            // Operand is neither field selection nor local. We can take an immutable reference
-            // of such anonymous (stack) locations, but cannot mutate them.
-            self.error(
-                arg.node_id(),
-                "operand to `&mut` must be a field selection (`&mut s.f`) or a local (`&mut name`)",
-            );
-        } else {
-            // Borrow the temporary, allowing to do e.g. `&(1+2)`. Note to match
-            // this capability in the stack machine, we need to keep those temps in locals
-            // and can't manage them on the stack during stackification.
-            let temp = self.gen_arg(arg);
-            self.gen_borrow_temp(target, id, temp)
-        }
+        // Borrow the temporary, allowing to do e.g. `&(1+2)`. Note to match
+        // this capability in the stack machine, we need to keep those temps in locals
+        // and can't manage them on the stack during stackification.
+        let temp = self.gen_arg(arg);
+        self.gen_borrow_temp(target, id, temp)
     }
 
     fn gen_borrow_local(&mut self, target: TempIndex, id: NodeId, name: Symbol) {
