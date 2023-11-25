@@ -13,13 +13,13 @@ use codespan_reporting::diagnostic::Severity;
 use move_binary_format::file_format::Visibility;
 use move_model::{
     model::{FunId, GlobalEnv, QualifiedId},
-    ty::Type
+    ty::Type,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
     iter::Iterator,
     ops::Deref,
-    vec::Vec
+    vec::Vec,
 };
 
 type QualifiedFunId = QualifiedId<FunId>;
@@ -117,7 +117,7 @@ pub fn check_functions(env: &mut GlobalEnv) {
                                         );
                                     }
                                     false
-                                }
+                                },
                                 Visibility::Friend => {
                                     if callee_env.module_env.has_friend(&caller_module_id) {
                                         true
@@ -157,7 +157,7 @@ pub fn check_functions(env: &mut GlobalEnv) {
                                             .map(|node_id| {
                                                 (
                                                     env.get_node_loc(*node_id),
-                                                    "called here".to_owned()
+                                                    "called here".to_owned(),
                                                 )
                                             })
                                             .collect();
@@ -183,7 +183,7 @@ pub fn check_functions(env: &mut GlobalEnv) {
                         if callee_is_accessible {
                             callees_seen
                                 .entry(callee)
-                                .and_modify(|curr | {
+                                .and_modify(|curr| {
                                     curr.insert(caller_qfid);
                                 })
                                 .or_insert(BTreeSet::from([caller_qfid]));
