@@ -48,6 +48,8 @@ use move_vm_runtime::logging::expect_no_verification_errors;
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::sync::Arc;
 
+const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
+
 /// A wrapper to make VMRuntime standalone
 pub struct AptosVMImpl {
     move_vm: MoveVmExt,
@@ -230,7 +232,6 @@ impl AptosVMImpl {
                             .any(|(_, hash)| hash == txn_data.script_hash)
                     })
                     .unwrap_or(false);
-                const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
                 valid
                     // If it is valid ensure that it is only the approved payload that exceeds the
                     // maximum. The (unknown) user input should be restricted to the original

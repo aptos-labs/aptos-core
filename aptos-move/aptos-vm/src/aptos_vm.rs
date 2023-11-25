@@ -14,7 +14,7 @@ use crate::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
-    verifier, VMExecutor, VMSimulator, VMValidator,
+    verifier, VMExecutor, VMValidator,
 };
 use anyhow::{anyhow, Result};
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
