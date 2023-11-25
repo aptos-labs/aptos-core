@@ -12,7 +12,7 @@ use crate::Options;
 use codespan_reporting::diagnostic::Severity;
 use move_binary_format::file_format::Visibility;
 use move_model::{
-    model::{FunId, GlobalEnv, Loc, QualifiedId},
+    model::{FunId, GlobalEnv, QualifiedId},
     ty::Type
 };
 use std::{
