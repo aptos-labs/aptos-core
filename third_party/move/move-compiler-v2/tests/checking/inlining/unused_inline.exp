@@ -1,0 +1,24 @@
+// ---- Model Dump
+module 0xc0ffee::m {
+    public fun bar(): u64 {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, 10) {
+              i: u64 = Add<u64>(i, 1);
+              if Eq<u64>(i, 5) {
+                break;
+                Tuple()
+              } else {
+                Tuple()
+              }
+            } else {
+              break
+            }
+          };
+          i
+        }
+    }
+    spec fun $bar(): u64;
+    spec fun $foo(): u64;
+} // end 0xc0ffee::m

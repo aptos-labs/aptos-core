@@ -11,6 +11,7 @@ use aptos_rest_client::Client;
 use aptos_state_view::TStateView;
 use aptos_types::{
     account_address::AccountAddress,
+    block_executor::config::BlockExecutorConfigFromOnchain,
     chain_id::ChainId,
     on_chain_config::{Features, OnChainConfig, TimedFeaturesBuilder},
     transaction::{
@@ -59,8 +60,12 @@ impl AptosDebugger {
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             txns.into_iter().map(|x| x.into()).collect::<Vec<_>>();
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        AptosVM::execute_block(&sig_verified_txns, &state_view, None)
-            .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
+        AptosVM::execute_block(
+            &sig_verified_txns,
+            &state_view,
+            BlockExecutorConfigFromOnchain::new_no_block_limit(),
+        )
+        .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
     }
 
     pub fn execute_transaction_at_version_with_gas_profiler(

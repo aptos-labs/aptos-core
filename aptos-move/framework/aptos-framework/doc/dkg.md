@@ -1,5 +1,5 @@
 
-<a name="0x1_dkg"></a>
+<a id="0x1_dkg"></a>
 
 # Module `0x1::dkg`
 
@@ -28,7 +28,7 @@
 
 
 
-<a name="0x1_dkg_StartDKGEvent"></a>
+<a id="0x1_dkg_StartDKGEvent"></a>
 
 ## Struct `StartDKGEvent`
 
@@ -61,7 +61,7 @@
 
 </details>
 
-<a name="0x1_dkg_DKGSessionState"></a>
+<a id="0x1_dkg_DKGSessionState"></a>
 
 ## Struct `DKGSessionState`
 
@@ -120,7 +120,7 @@ The validator set of epoch <code>x</code> works together and outputs a transcrip
 
 </details>
 
-<a name="0x1_dkg_DKGState"></a>
+<a id="0x1_dkg_DKGState"></a>
 
 ## Resource `DKGState`
 
@@ -160,12 +160,12 @@ The complete and ongoing DKG sessions.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_dkg_EINVALID_GUID_FOR_EVENT"></a>
+<a id="0x1_dkg_EINVALID_GUID_FOR_EVENT"></a>
 
 
 
@@ -174,7 +174,7 @@ The complete and ongoing DKG sessions.
 
 
 
-<a name="0x1_dkg_EDKG_IN_PROGRESS"></a>
+<a id="0x1_dkg_EDKG_IN_PROGRESS"></a>
 
 
 
@@ -183,7 +183,7 @@ The complete and ongoing DKG sessions.
 
 
 
-<a name="0x1_dkg_EDKG_NOT_IN_PROGRESS"></a>
+<a id="0x1_dkg_EDKG_NOT_IN_PROGRESS"></a>
 
 
 
@@ -192,7 +192,7 @@ The complete and ongoing DKG sessions.
 
 
 
-<a name="0x1_dkg_initialize"></a>
+<a id="0x1_dkg_initialize"></a>
 
 ## Function `initialize`
 
@@ -225,7 +225,7 @@ The complete and ongoing DKG sessions.
 
 </details>
 
-<a name="0x1_dkg_start"></a>
+<a id="0x1_dkg_start"></a>
 
 ## Function `start`
 
@@ -270,7 +270,7 @@ The complete and ongoing DKG sessions.
 
 </details>
 
-<a name="0x1_dkg_update"></a>
+<a id="0x1_dkg_update"></a>
 
 ## Function `update`
 
@@ -312,7 +312,7 @@ Abort if no DKG is in progress.
 
 </details>
 
-<a name="0x1_dkg_in_progress"></a>
+<a id="0x1_dkg_in_progress"></a>
 
 ## Function `in_progress`
 
@@ -336,7 +336,7 @@ Abort if no DKG is in progress.
 
 </details>
 
-<a name="0x1_dkg_current_deadline"></a>
+<a id="0x1_dkg_current_deadline"></a>
 
 ## Function `current_deadline`
 

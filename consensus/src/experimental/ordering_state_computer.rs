@@ -20,7 +20,8 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorResult, StateComputeResult};
 use aptos_logger::prelude::*;
 use aptos_types::{
-    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
+    block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
 };
 use async_trait::async_trait;
 use fail::fail_point;
@@ -149,7 +150,7 @@ impl StateComputer for OrderingStateComputer {
         _payload_manager: Arc<PayloadManager>,
         _dkg_manager_wrapper: Arc<DKGManagerWrapper>,
         _: Arc<dyn TransactionShuffler>,
-        _: Option<u64>,
+        _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
         _: bool,
     ) {
@@ -221,7 +222,7 @@ impl StateComputer for DagStateSyncComputer {
         _payload_manager: Arc<PayloadManager>,
         _dkg_manager: Arc<DKGManagerWrapper>,
         _transaction_shuffler: Arc<dyn TransactionShuffler>,
-        _block_gas_limit: Option<u64>,
+        _block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_deduper: Arc<dyn TransactionDeduper>,
         _randomness_enabled: bool,
     ) {

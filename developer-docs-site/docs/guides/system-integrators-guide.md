@@ -35,7 +35,7 @@ There are four well-supported networks for integrating with the Aptos blockchain
 1. [Testnet](https://fullnode.testnet.aptoslabs.com/v1/spec#/) -- a shared resource for the community, data will be preserved, network configuration will mimic Mainnet.
 1. [Mainnet](https://fullnode.mainnet.aptoslabs.com/v1/spec#/) -- a production network with real assets.
 
-See [Aptos Blockchain Deployments](../nodes/deployments.md) for full details on each environment.
+See [Aptos Blockchain Networks](../nodes/networks.md) for full details on each environment.
 
 ### Run a local testnet
 
@@ -43,7 +43,7 @@ There are two options for running a local testnet:
 * [Install the Aptos CLI](../tools/aptos-cli/install-cli/index.md) and 2) run a [local development network](./local-development-network.md). This path is useful for developing on the Aptos blockchain, debugging Move contracts, and testing node operations. Using the CLI you will have a fully featured local development environment including a single node network, the node API, indexer API, and a faucet.
 * Directly [run a local testnet](../nodes/local-testnet/run-a-local-testnet.md) using either the [Aptos-core source code](../nodes/local-testnet/run-a-local-testnet.md#using-the-aptos-core-source-code) or a [Docker image](../nodes/local-testnet/run-a-local-testnet.md#using-docker). These paths are useful for testing changes to the Aptos-core codebase or framework, or for building services on top of the Aptos blockchain, respectively.
 
-Either of these methods will expose a [REST API service](../integration/aptos-apis.md) at `http://127.0.0.1:8080` and a Faucet API service at `http://127.0.0.1:8000` for option 1 run a local testnet or `http://127.0.0.1:8081` for option 2 install the Aptos CLI. The applications will output the location of the services.
+Either of these methods will expose a [REST API service](../apis/fullnode-rest-api.md) at `http://127.0.0.1:8080` and a Faucet API service at `http://127.0.0.1:8000` for option 1 run a local testnet or `http://127.0.0.1:8081` for option 2 install the Aptos CLI. The applications will output the location of the services.
 
 ### Production network access
 
@@ -152,7 +152,7 @@ To facilitate evaluation of transactions as well as gas estimation, Aptos suppor
 
 The simulation API is a synchronous API that executes a transaction and returns the output inclusive of gas usage. The simulation API can be accessed by submitting a transaction to [`/transactions/simulate`](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/simulate_transaction).
 
-Both the [Typescript SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_client.ts#L413) and [Python SDK](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simulate-transfer-coin.py) support the simulation API. Note the output and gas used may change based upon the state of the account. For gas estimations, we recommend that the maximum gas amount be larger than the amount quoted by this API.
+Both the [Typescript SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_client.ts#L413) and [Python SDK](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simulate_transfer_coin.py) support the simulation API. Note the output and gas used may change based upon the state of the account. For gas estimations, we recommend that the maximum gas amount be larger than the amount quoted by this API.
 
 ## Viewing current and historical state
 

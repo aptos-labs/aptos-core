@@ -48,6 +48,7 @@ async fn test_proof_coordinator_basic() {
             peer: signers[0].author(),
         }),
         tx,
+        true,
     );
     let (proof_coordinator_tx, proof_coordinator_rx) = channel(100);
     let (tx, mut rx) = channel(100);

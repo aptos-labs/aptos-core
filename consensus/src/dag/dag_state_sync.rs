@@ -8,7 +8,10 @@ use super::{
     types::{CertifiedNodeMessage, RemoteFetchRequest},
     ProofNotifier,
 };
-use crate::{dag::DAGMessage, network::IncomingDAGRequest, state_replication::StateComputer};
+use crate::{
+    dag::DAGMessage, network::IncomingDAGRequest, payload_manager::TPayloadManager,
+    state_replication::StateComputer,
+};
 use anyhow::ensure;
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::{Author, Round};
@@ -148,7 +151,7 @@ impl StateSyncTrigger {
             || self
                 .ledger_info_provider
                 .get_highest_committed_anchor_round()
-                + self.dag_window_size_config
+                + 2 * self.dag_window_size_config
                 < li.commit_info().round()
     }
 }
@@ -158,6 +161,7 @@ pub(super) struct DagStateSynchronizer {
     time_service: TimeService,
     state_computer: Arc<dyn StateComputer>,
     storage: Arc<dyn DAGStorage>,
+    payload_manager: Arc<dyn TPayloadManager>,
     dag_window_size_config: Round,
 }
 
@@ -167,6 +171,7 @@ impl DagStateSynchronizer {
         time_service: TimeService,
         state_computer: Arc<dyn StateComputer>,
         storage: Arc<dyn DAGStorage>,
+        payload_manager: Arc<dyn TPayloadManager>,
         dag_window_size_config: Round,
     ) -> Self {
         Self {
@@ -174,6 +179,7 @@ impl DagStateSynchronizer {
             time_service,
             state_computer,
             storage,
+            payload_manager,
             dag_window_size_config,
         }
     }
@@ -210,6 +216,7 @@ impl DagStateSynchronizer {
         let sync_dag_store = Arc::new(RwLock::new(Dag::new_empty(
             self.epoch_state.clone(),
             self.storage.clone(),
+            self.payload_manager.clone(),
             start_round,
             self.dag_window_size_config,
         )));
@@ -258,6 +265,7 @@ pub(crate) struct SyncModeMessageHandler {
     epoch_state: Arc<EpochState>,
     start_round: Round,
     target_round: Round,
+    window: u64,
 }
 
 impl SyncModeMessageHandler {
@@ -265,11 +273,13 @@ impl SyncModeMessageHandler {
         epoch_state: Arc<EpochState>,
         start_round: Round,
         target_round: Round,
+        window: u64,
     ) -> Self {
         Self {
             epoch_state,
             start_round,
             target_round,
+            window,
         }
     }
 
@@ -314,7 +324,7 @@ impl SyncModeMessageHandler {
                 DAGMessage::CertifiedNodeMsg(ref cert_node_msg) => {
                     if cert_node_msg.round() < self.start_round {
                         debug!("ignoring stale certified node msg");
-                    } else if cert_node_msg.round() > self.target_round * 2 {
+                    } else if cert_node_msg.round() > self.target_round + (2 * self.window) {
                         debug!("cancelling current sync");
                         return Ok(Some(cert_node_msg.clone()));
                     } else {

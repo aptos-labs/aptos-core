@@ -1,5 +1,5 @@
 
-<a name="0x1_transaction_fee"></a>
+<a id="0x1_transaction_fee"></a>
 
 # Module `0x1::transaction_fee`
 
@@ -51,7 +51,7 @@ This module provides an interface to burn or collect and redistribute transactio
 
 
 
-<a name="0x1_transaction_fee_AptosCoinCapabilities"></a>
+<a id="0x1_transaction_fee_AptosCoinCapabilities"></a>
 
 ## Resource `AptosCoinCapabilities`
 
@@ -79,7 +79,7 @@ Stores burn capability to burn the gas fees.
 
 </details>
 
-<a name="0x1_transaction_fee_AptosCoinMintCapability"></a>
+<a id="0x1_transaction_fee_AptosCoinMintCapability"></a>
 
 ## Resource `AptosCoinMintCapability`
 
@@ -107,7 +107,7 @@ Stores mint capability to mint the refunds.
 
 </details>
 
-<a name="0x1_transaction_fee_CollectedFeesPerBlock"></a>
+<a id="0x1_transaction_fee_CollectedFeesPerBlock"></a>
 
 ## Resource `CollectedFeesPerBlock`
 
@@ -148,7 +148,7 @@ collected when executing the block.
 
 </details>
 
-<a name="0x1_transaction_fee_FeeStatement"></a>
+<a id="0x1_transaction_fee_FeeStatement"></a>
 
 ## Struct `FeeStatement`
 
@@ -219,12 +219,12 @@ This is meant to emitted as a module event.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_transaction_fee_EALREADY_COLLECTING_FEES"></a>
+<a id="0x1_transaction_fee_EALREADY_COLLECTING_FEES"></a>
 
 Gas fees are already being collected and the struct holding
 information about collected amounts is already published.
@@ -235,7 +235,7 @@ information about collected amounts is already published.
 
 
 
-<a name="0x1_transaction_fee_EINVALID_BURN_PERCENTAGE"></a>
+<a id="0x1_transaction_fee_EINVALID_BURN_PERCENTAGE"></a>
 
 The burn percentage is out of range [0, 100].
 
@@ -245,7 +245,7 @@ The burn percentage is out of range [0, 100].
 
 
 
-<a name="0x1_transaction_fee_initialize_fee_collection_and_distribution"></a>
+<a id="0x1_transaction_fee_initialize_fee_collection_and_distribution"></a>
 
 ## Function `initialize_fee_collection_and_distribution`
 
@@ -287,7 +287,7 @@ distribution. Should be called by on-chain governance.
 
 </details>
 
-<a name="0x1_transaction_fee_is_fees_collection_enabled"></a>
+<a id="0x1_transaction_fee_is_fees_collection_enabled"></a>
 
 ## Function `is_fees_collection_enabled`
 
@@ -311,7 +311,7 @@ distribution. Should be called by on-chain governance.
 
 </details>
 
-<a name="0x1_transaction_fee_upgrade_burn_percentage"></a>
+<a id="0x1_transaction_fee_upgrade_burn_percentage"></a>
 
 ## Function `upgrade_burn_percentage`
 
@@ -351,7 +351,7 @@ Sets the burn percentage for collected fees to a new value. Should be called by 
 
 </details>
 
-<a name="0x1_transaction_fee_register_proposer_for_fee_collection"></a>
+<a id="0x1_transaction_fee_register_proposer_for_fee_collection"></a>
 
 ## Function `register_proposer_for_fee_collection`
 
@@ -380,7 +380,7 @@ can only be called at the beginning of the block.
 
 </details>
 
-<a name="0x1_transaction_fee_burn_coin_fraction"></a>
+<a id="0x1_transaction_fee_burn_coin_fraction"></a>
 
 ## Function `burn_coin_fraction`
 
@@ -419,7 +419,7 @@ Burns a specified fraction of the coin.
 
 </details>
 
-<a name="0x1_transaction_fee_process_collected_fees"></a>
+<a id="0x1_transaction_fee_process_collected_fees"></a>
 
 ## Function `process_collected_fees`
 
@@ -487,7 +487,7 @@ at the beginning of the block or during reconfiguration.
 
 </details>
 
-<a name="0x1_transaction_fee_burn_fee"></a>
+<a id="0x1_transaction_fee_burn_fee"></a>
 
 ## Function `burn_fee`
 
@@ -516,7 +516,7 @@ Burn transaction fees in epilogue.
 
 </details>
 
-<a name="0x1_transaction_fee_mint_and_refund"></a>
+<a id="0x1_transaction_fee_mint_and_refund"></a>
 
 ## Function `mint_and_refund`
 
@@ -543,7 +543,7 @@ Mint refund in epilogue.
 
 </details>
 
-<a name="0x1_transaction_fee_collect_fee"></a>
+<a id="0x1_transaction_fee_collect_fee"></a>
 
 ## Function `collect_fee`
 
@@ -574,7 +574,7 @@ Collect transaction fees in epilogue.
 
 </details>
 
-<a name="0x1_transaction_fee_store_aptos_coin_burn_cap"></a>
+<a id="0x1_transaction_fee_store_aptos_coin_burn_cap"></a>
 
 ## Function `store_aptos_coin_burn_cap`
 
@@ -600,7 +600,7 @@ Only called during genesis.
 
 </details>
 
-<a name="0x1_transaction_fee_store_aptos_coin_mint_cap"></a>
+<a id="0x1_transaction_fee_store_aptos_coin_mint_cap"></a>
 
 ## Function `store_aptos_coin_mint_cap`
 
@@ -626,7 +626,7 @@ Only called during genesis.
 
 </details>
 
-<a name="0x1_transaction_fee_initialize_storage_refund"></a>
+<a id="0x1_transaction_fee_initialize_storage_refund"></a>
 
 ## Function `initialize_storage_refund`
 
@@ -651,7 +651,7 @@ Only called during genesis.
 
 </details>
 
-<a name="0x1_transaction_fee_emit_fee_statement"></a>
+<a id="0x1_transaction_fee_emit_fee_statement"></a>
 
 ## Function `emit_fee_statement`
 
@@ -675,7 +675,7 @@ Only called during genesis.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -688,7 +688,7 @@ Only called during genesis.
 
 
 
-<a name="@Specification_1_CollectedFeesPerBlock"></a>
+<a id="@Specification_1_CollectedFeesPerBlock"></a>
 
 ### Resource `CollectedFeesPerBlock`
 
@@ -726,7 +726,7 @@ Only called during genesis.
 
 
 
-<a name="@Specification_1_initialize_fee_collection_and_distribution"></a>
+<a id="@Specification_1_initialize_fee_collection_and_distribution"></a>
 
 ### Function `initialize_fee_collection_and_distribution`
 
@@ -751,7 +751,7 @@ Only called during genesis.
 
 
 
-<a name="@Specification_1_upgrade_burn_percentage"></a>
+<a id="@Specification_1_upgrade_burn_percentage"></a>
 
 ### Function `upgrade_burn_percentage`
 
@@ -772,7 +772,7 @@ Only called during genesis.
 
 
 
-<a name="@Specification_1_register_proposer_for_fee_collection"></a>
+<a id="@Specification_1_register_proposer_for_fee_collection"></a>
 
 ### Function `register_proposer_for_fee_collection`
 
@@ -790,7 +790,7 @@ Only called during genesis.
 
 
 
-<a name="@Specification_1_burn_coin_fraction"></a>
+<a id="@Specification_1_burn_coin_fraction"></a>
 
 ### Function `burn_coin_fraction`
 
@@ -812,7 +812,7 @@ Only called during genesis.
 
 
 
-<a name="0x1_transaction_fee_collectedFeesAggregator"></a>
+<a id="0x1_transaction_fee_collectedFeesAggregator"></a>
 
 
 <pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_collectedFeesAggregator">collectedFeesAggregator</a>(): AggregatableCoin&lt;AptosCoin&gt; {
@@ -823,7 +823,7 @@ Only called during genesis.
 
 
 
-<a name="0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply"></a>
+<a id="0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply"></a>
 
 
 <pre><code><b>schema</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">RequiresCollectedFeesPerValueLeqBlockAptosSupply</a> {
@@ -840,7 +840,7 @@ Only called during genesis.
 
 
 
-<a name="0x1_transaction_fee_ProcessCollectedFeesRequiresAndEnsures"></a>
+<a id="0x1_transaction_fee_ProcessCollectedFeesRequiresAndEnsures"></a>
 
 
 <pre><code><b>schema</b> <a href="transaction_fee.md#0x1_transaction_fee_ProcessCollectedFeesRequiresAndEnsures">ProcessCollectedFeesRequiresAndEnsures</a> {
@@ -877,7 +877,7 @@ Only called during genesis.
 
 
 
-<a name="@Specification_1_process_collected_fees"></a>
+<a id="@Specification_1_process_collected_fees"></a>
 
 ### Function `process_collected_fees`
 
@@ -893,7 +893,7 @@ Only called during genesis.
 
 
 
-<a name="@Specification_1_burn_fee"></a>
+<a id="@Specification_1_burn_fee"></a>
 
 ### Function `burn_fee`
 
@@ -933,7 +933,7 @@ Only called during genesis.
 
 
 
-<a name="@Specification_1_mint_and_refund"></a>
+<a id="@Specification_1_mint_and_refund"></a>
 
 ### Function `mint_and_refund`
 
@@ -960,7 +960,7 @@ Only called during genesis.
 
 
 
-<a name="@Specification_1_collect_fee"></a>
+<a id="@Specification_1_collect_fee"></a>
 
 ### Function `collect_fee`
 
@@ -991,7 +991,7 @@ Only called during genesis.
 
 
 
-<a name="@Specification_1_store_aptos_coin_burn_cap"></a>
+<a id="@Specification_1_store_aptos_coin_burn_cap"></a>
 
 ### Function `store_aptos_coin_burn_cap`
 
@@ -1012,7 +1012,7 @@ Aborts if <code><a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabil
 
 
 
-<a name="@Specification_1_store_aptos_coin_mint_cap"></a>
+<a id="@Specification_1_store_aptos_coin_mint_cap"></a>
 
 ### Function `store_aptos_coin_mint_cap`
 
@@ -1033,7 +1033,7 @@ Aborts if <code><a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCap
 
 
 
-<a name="@Specification_1_initialize_storage_refund"></a>
+<a id="@Specification_1_initialize_storage_refund"></a>
 
 ### Function `initialize_storage_refund`
 
@@ -1056,7 +1056,7 @@ Aborts if <code><a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCap
 
 
 
-<a name="@Specification_1_emit_fee_statement"></a>
+<a id="@Specification_1_emit_fee_statement"></a>
 
 ### Function `emit_fee_statement`
 

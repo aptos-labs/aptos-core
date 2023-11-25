@@ -20,7 +20,7 @@ Implementing wallet integration can be difficult for dapps in:
 
 1. Support and test all edge cases
 2. Implement and maintain different wallet APIs
-3. Provide users with needed functionality the wallet itself doesnt support
+3. Provide users with needed functionality the wallet itself doesn't support
 4. Keep track on all the different wallets in our ecosystem
 
 In addition, creating and implementing a wallet is also not an easy task,

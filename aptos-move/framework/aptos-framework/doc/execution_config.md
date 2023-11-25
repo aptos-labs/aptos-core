@@ -1,5 +1,5 @@
 
-<a name="0x1_execution_config"></a>
+<a id="0x1_execution_config"></a>
 
 # Module `0x1::execution_config`
 
@@ -25,7 +25,7 @@ Reconfiguration, and may be updated by root.
 
 
 
-<a name="0x1_execution_config_ExecutionConfig"></a>
+<a id="0x1_execution_config_ExecutionConfig"></a>
 
 ## Resource `ExecutionConfig`
 
@@ -52,12 +52,12 @@ Reconfiguration, and may be updated by root.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_execution_config_EAPI_DISABLED"></a>
+<a id="0x1_execution_config_EAPI_DISABLED"></a>
 
 
 
@@ -66,7 +66,7 @@ Reconfiguration, and may be updated by root.
 
 
 
-<a name="0x1_execution_config_EINVALID_CONFIG"></a>
+<a id="0x1_execution_config_EINVALID_CONFIG"></a>
 
 The provided on chain config bytes are empty or invalid
 
@@ -76,7 +76,7 @@ The provided on chain config bytes are empty or invalid
 
 
 
-<a name="0x1_execution_config_set"></a>
+<a id="0x1_execution_config_set"></a>
 
 ## Function `set`
 
@@ -112,7 +112,7 @@ This can be called by on-chain governance to update on-chain execution configs.
 
 </details>
 
-<a name="0x1_execution_config_set_for_next_epoch"></a>
+<a id="0x1_execution_config_set_for_next_epoch"></a>
 
 ## Function `set_for_next_epoch`
 
@@ -140,7 +140,7 @@ This can be called by on-chain governance to update on-chain execution configs.
 
 </details>
 
-<a name="0x1_execution_config_on_new_epoch"></a>
+<a id="0x1_execution_config_on_new_epoch"></a>
 
 ## Function `on_new_epoch`
 
@@ -169,7 +169,7 @@ Only used in reconfiguration with DKG.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -181,7 +181,7 @@ Only used in reconfiguration with DKG.
 
 
 
-<a name="@Specification_1_set"></a>
+<a id="@Specification_1_set"></a>
 
 ### Function `set`
 
@@ -205,6 +205,7 @@ When setting now time must be later than last_reconfiguration_time.
 <b>include</b> <a href="aptos_coin.md#0x1_aptos_coin_ExistsAptosCoin">aptos_coin::ExistsAptosCoin</a>;
 <b>requires</b> <a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(addr);
 <b>requires</b> <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() &gt;= <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>();
+<b>ensures</b> <b>exists</b>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;(@aptos_framework);
 </code></pre>
 
 

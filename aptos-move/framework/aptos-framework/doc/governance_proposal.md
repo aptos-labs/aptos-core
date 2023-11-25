@@ -1,5 +1,5 @@
 
-<a name="0x1_governance_proposal"></a>
+<a id="0x1_governance_proposal"></a>
 
 # Module `0x1::governance_proposal`
 
@@ -20,7 +20,7 @@ This is separate from the AptosGovernance module to avoid circular dependency be
 
 
 
-<a name="0x1_governance_proposal_GovernanceProposal"></a>
+<a id="0x1_governance_proposal_GovernanceProposal"></a>
 
 ## Struct `GovernanceProposal`
 
@@ -47,7 +47,7 @@ This is separate from the AptosGovernance module to avoid circular dependency be
 
 </details>
 
-<a name="0x1_governance_proposal_create_proposal"></a>
+<a id="0x1_governance_proposal_create_proposal"></a>
 
 ## Function `create_proposal`
 
@@ -72,7 +72,7 @@ Create and return a GovernanceProposal resource. Can only be called by AptosGove
 
 </details>
 
-<a name="0x1_governance_proposal_create_empty_proposal"></a>
+<a id="0x1_governance_proposal_create_empty_proposal"></a>
 
 ## Function `create_empty_proposal`
 
@@ -97,12 +97,12 @@ Useful for AptosGovernance to create an empty proposal as proof.
 
 </details>
 
-<a name="@Specification_0"></a>
+<a id="@Specification_0"></a>
 
 ## Specification
 
 
-<a name="@Specification_0_create_proposal"></a>
+<a id="@Specification_0_create_proposal"></a>
 
 ### Function `create_proposal`
 
@@ -119,7 +119,7 @@ Useful for AptosGovernance to create an empty proposal as proof.
 
 
 
-<a name="@Specification_0_create_empty_proposal"></a>
+<a id="@Specification_0_create_empty_proposal"></a>
 
 ### Function `create_empty_proposal`
 

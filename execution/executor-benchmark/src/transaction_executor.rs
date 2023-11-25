@@ -7,10 +7,19 @@ use aptos_crypto::hash::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::info;
-use aptos_types::block_executor::partitioner::ExecutableBlock;
+use aptos_types::block_executor::{
+    config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock,
+};
 use std::{
     sync::{mpsc, Arc},
     time::{Duration, Instant},
+};
+
+pub const BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG: BlockExecutorConfigFromOnchain =
+    BlockExecutorConfigFromOnchain {
+    block_gas_limit_type:
+        // present, but large to not limit blocks
+        aptos_types::on_chain_config::BlockGasLimitType::Limit(1_000_000_000),
 };
 
 pub struct TransactionExecutor<V> {
@@ -57,10 +66,19 @@ where
         let num_txns = executable_block.transactions.num_transactions();
         let output = self
             .executor
-            .execute_and_state_checkpoint(executable_block, self.parent_block_id, None)
+            .execute_and_state_checkpoint(
+                executable_block,
+                self.parent_block_id,
+                BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
+            )
             .unwrap();
 
-        assert_eq!(output.txn_statuses().len(), num_txns);
+        let diff = if BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG.has_any_block_gas_limit() {
+            1
+        } else {
+            0
+        };
+        assert_eq!(output.txn_statuses().len(), num_txns + diff);
 
         let msg = LedgerUpdateMessage {
             current_block_start_time,

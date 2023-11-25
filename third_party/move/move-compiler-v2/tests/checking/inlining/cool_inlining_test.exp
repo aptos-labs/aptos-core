@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: no function named `beans` found
+   ┌─ tests/checking/inlining/cool_inlining_test.move:15:17
+   │
+15 │         foo(| | beans())
+   │                 ^^^^^^^

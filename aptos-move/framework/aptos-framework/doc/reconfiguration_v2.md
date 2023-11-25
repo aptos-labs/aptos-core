@@ -1,5 +1,5 @@
 
-<a name="0x1_reconfiguration_v2"></a>
+<a id="0x1_reconfiguration_v2"></a>
 
 # Module `0x1::reconfiguration_v2`
 
@@ -22,7 +22,7 @@
 
 
 
-<a name="0x1_reconfiguration_v2_start"></a>
+<a id="0x1_reconfiguration_v2_start"></a>
 
 ## Function `start`
 
@@ -48,7 +48,7 @@
 
 </details>
 
-<a name="0x1_reconfiguration_v2_finish"></a>
+<a id="0x1_reconfiguration_v2_finish"></a>
 
 ## Function `finish`
 

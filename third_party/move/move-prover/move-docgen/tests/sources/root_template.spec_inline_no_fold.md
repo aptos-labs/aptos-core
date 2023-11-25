@@ -1,6 +1,6 @@
 
 
-<a name="@A_Root_Documentation_Template_0"></a>
+<a id="@A_Root_Documentation_Template_0"></a>
 
 # A Root Documentation Template
 
@@ -26,13 +26,13 @@ The script <code><a href="root_template_script3.md#0x1_yet_another">yet_another<
 
 
 
-<a name="@Some_Scripts_1"></a>
+<a id="@Some_Scripts_1"></a>
 
 ## Some Scripts
 
 
 
-<a name="0x1_some"></a>
+<a id="0x1_some"></a>
 
 ### Module `0x1::some`
 
@@ -42,7 +42,7 @@ The script <code><a href="root_template_script3.md#0x1_yet_another">yet_another<
 
 
 
-<a name="0x1_some_some"></a>
+<a id="0x1_some_some"></a>
 
 #### Function `some`
 
@@ -75,13 +75,13 @@ This script does really nothing but just aborts.
 
 
 
-<a name="@Other_Scripts_2"></a>
+<a id="@Other_Scripts_2"></a>
 
 ## Other Scripts
 
 
 
-<a name="0x1_other"></a>
+<a id="0x1_other"></a>
 
 ### Module `0x1::other`
 
@@ -91,7 +91,7 @@ This script does really nothing but just aborts.
 
 
 
-<a name="0x1_other_other"></a>
+<a id="0x1_other_other"></a>
 
 #### Function `other`
 
@@ -124,13 +124,13 @@ This script does also abort.
 
 
 
-<a name="@Some_other_scripts_from_a_module_3"></a>
+<a id="@Some_other_scripts_from_a_module_3"></a>
 
 ## Some other scripts from a module
 
 
 
-<a name="0x1_OneTypeOfScript"></a>
+<a id="0x1_OneTypeOfScript"></a>
 
 ### Module `0x1::OneTypeOfScript`
 
@@ -140,7 +140,7 @@ This script does also abort.
 
 
 
-<a name="0x1_OneTypeOfScript_script1"></a>
+<a id="0x1_OneTypeOfScript_script1"></a>
 
 #### Function `script1`
 
@@ -160,7 +160,7 @@ This is a script
 
 
 
-<a name="0x1_OneTypeOfScript_script2"></a>
+<a id="0x1_OneTypeOfScript_script2"></a>
 
 #### Function `script2`
 
@@ -184,7 +184,7 @@ This is another script
 This is another module full of script funs too:
 
 
-<a name="0x1_AnotherTypeOfScript"></a>
+<a id="0x1_AnotherTypeOfScript"></a>
 
 ### Module `0x1::AnotherTypeOfScript`
 
@@ -194,7 +194,7 @@ This is another module full of script funs too:
 
 
 
-<a name="0x1_AnotherTypeOfScript_script3"></a>
+<a id="0x1_AnotherTypeOfScript_script3"></a>
 
 #### Function `script3`
 
@@ -214,7 +214,7 @@ This is a script
 
 
 
-<a name="0x1_AnotherTypeOfScript_script4"></a>
+<a id="0x1_AnotherTypeOfScript_script4"></a>
 
 #### Function `script4`
 
@@ -236,7 +236,7 @@ This is another script
 
 
 
-<a name="@Index_4"></a>
+<a id="@Index_4"></a>
 
 ## Index
 

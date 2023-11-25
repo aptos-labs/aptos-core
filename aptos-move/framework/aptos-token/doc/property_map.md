@@ -1,5 +1,5 @@
 
-<a name="0x3_property_map"></a>
+<a id="0x3_property_map"></a>
 
 # Module `0x3::property_map`
 
@@ -71,7 +71,7 @@ It also supports deserializing property value to it original type.
 
 
 
-<a name="0x3_property_map_PropertyMap"></a>
+<a id="0x3_property_map_PropertyMap"></a>
 
 ## Struct `PropertyMap`
 
@@ -98,7 +98,7 @@ It also supports deserializing property value to it original type.
 
 </details>
 
-<a name="0x3_property_map_PropertyValue"></a>
+<a id="0x3_property_map_PropertyValue"></a>
 
 ## Struct `PropertyValue`
 
@@ -131,12 +131,12 @@ It also supports deserializing property value to it original type.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x3_property_map_EKEY_AREADY_EXIST_IN_PROPERTY_MAP"></a>
+<a id="0x3_property_map_EKEY_AREADY_EXIST_IN_PROPERTY_MAP"></a>
 
 The property key already exists
 
@@ -146,7 +146,7 @@ The property key already exists
 
 
 
-<a name="0x3_property_map_EKEY_COUNT_NOT_MATCH_TYPE_COUNT"></a>
+<a id="0x3_property_map_EKEY_COUNT_NOT_MATCH_TYPE_COUNT"></a>
 
 Property key and type count don't match
 
@@ -156,7 +156,7 @@ Property key and type count don't match
 
 
 
-<a name="0x3_property_map_EKEY_COUNT_NOT_MATCH_VALUE_COUNT"></a>
+<a id="0x3_property_map_EKEY_COUNT_NOT_MATCH_VALUE_COUNT"></a>
 
 Property key and value count don't match
 
@@ -166,7 +166,7 @@ Property key and value count don't match
 
 
 
-<a name="0x3_property_map_EPROPERTY_MAP_NAME_TOO_LONG"></a>
+<a id="0x3_property_map_EPROPERTY_MAP_NAME_TOO_LONG"></a>
 
 The name (key) of the property is too long
 
@@ -176,7 +176,7 @@ The name (key) of the property is too long
 
 
 
-<a name="0x3_property_map_EPROPERTY_NOT_EXIST"></a>
+<a id="0x3_property_map_EPROPERTY_NOT_EXIST"></a>
 
 The property doesn't exist
 
@@ -186,7 +186,7 @@ The property doesn't exist
 
 
 
-<a name="0x3_property_map_EPROPERTY_NUMBER_EXCEED_LIMIT"></a>
+<a id="0x3_property_map_EPROPERTY_NUMBER_EXCEED_LIMIT"></a>
 
 The number of property exceeds the limit
 
@@ -196,7 +196,7 @@ The number of property exceeds the limit
 
 
 
-<a name="0x3_property_map_ETYPE_NOT_MATCH"></a>
+<a id="0x3_property_map_ETYPE_NOT_MATCH"></a>
 
 Property type doesn't match
 
@@ -206,7 +206,7 @@ Property type doesn't match
 
 
 
-<a name="0x3_property_map_MAX_PROPERTY_MAP_SIZE"></a>
+<a id="0x3_property_map_MAX_PROPERTY_MAP_SIZE"></a>
 
 The maximal number of property that can be stored in property map
 
@@ -216,7 +216,7 @@ The maximal number of property that can be stored in property map
 
 
 
-<a name="0x3_property_map_MAX_PROPERTY_NAME_LENGTH"></a>
+<a id="0x3_property_map_MAX_PROPERTY_NAME_LENGTH"></a>
 
 
 
@@ -225,7 +225,7 @@ The maximal number of property that can be stored in property map
 
 
 
-<a name="0x3_property_map_new"></a>
+<a id="0x3_property_map_new"></a>
 
 ## Function `new`
 
@@ -271,7 +271,7 @@ The maximal number of property that can be stored in property map
 
 </details>
 
-<a name="0x3_property_map_new_with_key_and_property_value"></a>
+<a id="0x3_property_map_new_with_key_and_property_value"></a>
 
 ## Function `new_with_key_and_property_value`
 
@@ -313,7 +313,7 @@ Create property map directly from key and property value
 
 </details>
 
-<a name="0x3_property_map_empty"></a>
+<a id="0x3_property_map_empty"></a>
 
 ## Function `empty`
 
@@ -339,7 +339,7 @@ Create property map directly from key and property value
 
 </details>
 
-<a name="0x3_property_map_contains_key"></a>
+<a id="0x3_property_map_contains_key"></a>
 
 ## Function `contains_key`
 
@@ -363,7 +363,7 @@ Create property map directly from key and property value
 
 </details>
 
-<a name="0x3_property_map_add"></a>
+<a id="0x3_property_map_add"></a>
 
 ## Function `add`
 
@@ -389,7 +389,7 @@ Create property map directly from key and property value
 
 </details>
 
-<a name="0x3_property_map_length"></a>
+<a id="0x3_property_map_length"></a>
 
 ## Function `length`
 
@@ -413,7 +413,7 @@ Create property map directly from key and property value
 
 </details>
 
-<a name="0x3_property_map_borrow"></a>
+<a id="0x3_property_map_borrow"></a>
 
 ## Function `borrow`
 
@@ -439,7 +439,7 @@ Create property map directly from key and property value
 
 </details>
 
-<a name="0x3_property_map_keys"></a>
+<a id="0x3_property_map_keys"></a>
 
 ## Function `keys`
 
@@ -464,7 +464,7 @@ Return all the keys in the property map in the order they are added.
 
 </details>
 
-<a name="0x3_property_map_types"></a>
+<a id="0x3_property_map_types"></a>
 
 ## Function `types`
 
@@ -492,7 +492,7 @@ Return the types of all properties in the property map in the order they are add
 
 </details>
 
-<a name="0x3_property_map_values"></a>
+<a id="0x3_property_map_values"></a>
 
 ## Function `values`
 
@@ -520,7 +520,7 @@ Return the values of all properties in the property map in the order they are ad
 
 </details>
 
-<a name="0x3_property_map_read_string"></a>
+<a id="0x3_property_map_read_string"></a>
 
 ## Function `read_string`
 
@@ -546,7 +546,7 @@ Return the values of all properties in the property map in the order they are ad
 
 </details>
 
-<a name="0x3_property_map_read_u8"></a>
+<a id="0x3_property_map_read_u8"></a>
 
 ## Function `read_u8`
 
@@ -572,7 +572,7 @@ Return the values of all properties in the property map in the order they are ad
 
 </details>
 
-<a name="0x3_property_map_read_u64"></a>
+<a id="0x3_property_map_read_u64"></a>
 
 ## Function `read_u64`
 
@@ -598,7 +598,7 @@ Return the values of all properties in the property map in the order they are ad
 
 </details>
 
-<a name="0x3_property_map_read_address"></a>
+<a id="0x3_property_map_read_address"></a>
 
 ## Function `read_address`
 
@@ -624,7 +624,7 @@ Return the values of all properties in the property map in the order they are ad
 
 </details>
 
-<a name="0x3_property_map_read_u128"></a>
+<a id="0x3_property_map_read_u128"></a>
 
 ## Function `read_u128`
 
@@ -650,7 +650,7 @@ Return the values of all properties in the property map in the order they are ad
 
 </details>
 
-<a name="0x3_property_map_read_bool"></a>
+<a id="0x3_property_map_read_bool"></a>
 
 ## Function `read_bool`
 
@@ -676,7 +676,7 @@ Return the values of all properties in the property map in the order they are ad
 
 </details>
 
-<a name="0x3_property_map_borrow_value"></a>
+<a id="0x3_property_map_borrow_value"></a>
 
 ## Function `borrow_value`
 
@@ -700,7 +700,7 @@ Return the values of all properties in the property map in the order they are ad
 
 </details>
 
-<a name="0x3_property_map_borrow_type"></a>
+<a id="0x3_property_map_borrow_type"></a>
 
 ## Function `borrow_type`
 
@@ -724,7 +724,7 @@ Return the values of all properties in the property map in the order they are ad
 
 </details>
 
-<a name="0x3_property_map_remove"></a>
+<a id="0x3_property_map_remove"></a>
 
 ## Function `remove`
 
@@ -753,7 +753,7 @@ Return the values of all properties in the property map in the order they are ad
 
 </details>
 
-<a name="0x3_property_map_update_property_map"></a>
+<a id="0x3_property_map_update_property_map"></a>
 
 ## Function `update_property_map`
 
@@ -803,7 +803,7 @@ Allow updating existing keys' value and add new key-value pairs
 
 </details>
 
-<a name="0x3_property_map_update_property_value"></a>
+<a id="0x3_property_map_update_property_value"></a>
 
 ## Function `update_property_value`
 
@@ -832,7 +832,7 @@ Allow updating existing keys' value and add new key-value pairs
 
 </details>
 
-<a name="0x3_property_map_create_property_value_raw"></a>
+<a id="0x3_property_map_create_property_value_raw"></a>
 
 ## Function `create_property_value_raw`
 
@@ -862,7 +862,7 @@ Allow updating existing keys' value and add new key-value pairs
 
 </details>
 
-<a name="0x3_property_map_create_property_value"></a>
+<a id="0x3_property_map_create_property_value"></a>
 
 ## Function `create_property_value`
 
@@ -899,7 +899,7 @@ create a property value from generic type data
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -913,7 +913,7 @@ create a property value from generic type data
 
 
 
-<a name="@Specification_1_new"></a>
+<a id="@Specification_1_new"></a>
 
 ### Function `new`
 
@@ -933,7 +933,7 @@ create a property value from generic type data
 
 
 
-<a name="@Specification_1_new_with_key_and_property_value"></a>
+<a id="@Specification_1_new_with_key_and_property_value"></a>
 
 ### Function `new_with_key_and_property_value`
 
@@ -952,7 +952,7 @@ create a property value from generic type data
 
 
 
-<a name="@Specification_1_empty"></a>
+<a id="@Specification_1_empty"></a>
 
 ### Function `empty`
 
@@ -968,7 +968,7 @@ create a property value from generic type data
 
 
 
-<a name="@Specification_1_contains_key"></a>
+<a id="@Specification_1_contains_key"></a>
 
 ### Function `contains_key`
 
@@ -984,7 +984,7 @@ create a property value from generic type data
 
 
 
-<a name="@Specification_1_add"></a>
+<a id="@Specification_1_add"></a>
 
 ### Function `add`
 
@@ -1002,7 +1002,7 @@ create a property value from generic type data
 
 
 
-<a name="@Specification_1_length"></a>
+<a id="@Specification_1_length"></a>
 
 ### Function `length`
 
@@ -1018,7 +1018,7 @@ create a property value from generic type data
 
 
 
-<a name="@Specification_1_borrow"></a>
+<a id="@Specification_1_borrow"></a>
 
 ### Function `borrow`
 
@@ -1034,7 +1034,7 @@ create a property value from generic type data
 
 
 
-<a name="@Specification_1_keys"></a>
+<a id="@Specification_1_keys"></a>
 
 ### Function `keys`
 
@@ -1050,7 +1050,7 @@ create a property value from generic type data
 
 
 
-<a name="@Specification_1_types"></a>
+<a id="@Specification_1_types"></a>
 
 ### Function `types`
 
@@ -1066,7 +1066,7 @@ create a property value from generic type data
 
 
 
-<a name="@Specification_1_values"></a>
+<a id="@Specification_1_values"></a>
 
 ### Function `values`
 
@@ -1082,7 +1082,7 @@ create a property value from generic type data
 
 
 
-<a name="@Specification_1_read_string"></a>
+<a id="@Specification_1_read_string"></a>
 
 ### Function `read_string`
 
@@ -1106,7 +1106,7 @@ to <code>prop.type</code>
 
 
 
-<a name="0x3_property_map_spec_utf8"></a>
+<a id="0x3_property_map_spec_utf8"></a>
 
 
 <pre><code><b>fun</b> <a href="property_map.md#0x3_property_map_spec_utf8">spec_utf8</a>(bytes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): String {
@@ -1116,7 +1116,7 @@ to <code>prop.type</code>
 
 
 
-<a name="@Specification_1_read_u8"></a>
+<a id="@Specification_1_read_u8"></a>
 
 ### Function `read_u8`
 
@@ -1137,7 +1137,7 @@ to <code>prop.type</code>
 
 
 
-<a name="@Specification_1_read_u64"></a>
+<a id="@Specification_1_read_u64"></a>
 
 ### Function `read_u64`
 
@@ -1158,7 +1158,7 @@ to <code>prop.type</code>
 
 
 
-<a name="@Specification_1_read_address"></a>
+<a id="@Specification_1_read_address"></a>
 
 ### Function `read_address`
 
@@ -1179,7 +1179,7 @@ to <code>prop.type</code>
 
 
 
-<a name="@Specification_1_read_u128"></a>
+<a id="@Specification_1_read_u128"></a>
 
 ### Function `read_u128`
 
@@ -1200,7 +1200,7 @@ to <code>prop.type</code>
 
 
 
-<a name="@Specification_1_read_bool"></a>
+<a id="@Specification_1_read_bool"></a>
 
 ### Function `read_bool`
 
@@ -1221,7 +1221,7 @@ to <code>prop.type</code>
 
 
 
-<a name="@Specification_1_borrow_value"></a>
+<a id="@Specification_1_borrow_value"></a>
 
 ### Function `borrow_value`
 
@@ -1237,7 +1237,7 @@ to <code>prop.type</code>
 
 
 
-<a name="@Specification_1_borrow_type"></a>
+<a id="@Specification_1_borrow_type"></a>
 
 ### Function `borrow_type`
 
@@ -1253,7 +1253,7 @@ to <code>prop.type</code>
 
 
 
-<a name="@Specification_1_remove"></a>
+<a id="@Specification_1_remove"></a>
 
 ### Function `remove`
 
@@ -1269,7 +1269,7 @@ to <code>prop.type</code>
 
 
 
-<a name="@Specification_1_update_property_map"></a>
+<a id="@Specification_1_update_property_map"></a>
 
 ### Function `update_property_map`
 
@@ -1290,7 +1290,7 @@ to <code>prop.type</code>
 
 
 
-<a name="@Specification_1_update_property_value"></a>
+<a id="@Specification_1_update_property_value"></a>
 
 ### Function `update_property_value`
 
@@ -1306,7 +1306,7 @@ to <code>prop.type</code>
 
 
 
-<a name="@Specification_1_create_property_value_raw"></a>
+<a id="@Specification_1_create_property_value_raw"></a>
 
 ### Function `create_property_value_raw`
 
@@ -1322,7 +1322,7 @@ to <code>prop.type</code>
 
 
 
-<a name="@Specification_1_create_property_value"></a>
+<a id="@Specification_1_create_property_value"></a>
 
 ### Function `create_property_value`
 

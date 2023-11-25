@@ -1,5 +1,5 @@
 
-<a name="0x1_chain_status"></a>
+<a id="0x1_chain_status"></a>
 
 # Module `0x1::chain_status`
 
@@ -28,7 +28,7 @@ which reflect that the system has been successfully initialized.
 
 
 
-<a name="0x1_chain_status_GenesisEndMarker"></a>
+<a id="0x1_chain_status_GenesisEndMarker"></a>
 
 ## Resource `GenesisEndMarker`
 
@@ -56,12 +56,12 @@ Marker to publish at the end of genesis.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_chain_status_ENOT_GENESIS"></a>
+<a id="0x1_chain_status_ENOT_GENESIS"></a>
 
 The blockchain is not in the genesis status.
 
@@ -71,7 +71,7 @@ The blockchain is not in the genesis status.
 
 
 
-<a name="0x1_chain_status_ENOT_OPERATING"></a>
+<a id="0x1_chain_status_ENOT_OPERATING"></a>
 
 The blockchain is not in the operating status.
 
@@ -81,7 +81,7 @@ The blockchain is not in the operating status.
 
 
 
-<a name="0x1_chain_status_set_genesis_end"></a>
+<a id="0x1_chain_status_set_genesis_end"></a>
 
 ## Function `set_genesis_end`
 
@@ -107,7 +107,7 @@ Marks that genesis has finished.
 
 </details>
 
-<a name="0x1_chain_status_is_genesis"></a>
+<a id="0x1_chain_status_is_genesis"></a>
 
 ## Function `is_genesis`
 
@@ -133,7 +133,7 @@ Helper function to determine if Aptos is in genesis state.
 
 </details>
 
-<a name="0x1_chain_status_is_operating"></a>
+<a id="0x1_chain_status_is_operating"></a>
 
 ## Function `is_operating`
 
@@ -161,7 +161,7 @@ Testing <code><a href="chain_status.md#0x1_chain_status_is_operating">is_operati
 
 </details>
 
-<a name="0x1_chain_status_assert_operating"></a>
+<a id="0x1_chain_status_assert_operating"></a>
 
 ## Function `assert_operating`
 
@@ -186,7 +186,7 @@ Helper function to assert operating (not genesis) state.
 
 </details>
 
-<a name="0x1_chain_status_assert_genesis"></a>
+<a id="0x1_chain_status_assert_genesis"></a>
 
 ## Function `assert_genesis`
 
@@ -211,7 +211,7 @@ Helper function to assert genesis state.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -223,7 +223,7 @@ Helper function to assert genesis state.
 
 
 
-<a name="@Specification_1_set_genesis_end"></a>
+<a id="@Specification_1_set_genesis_end"></a>
 
 ### Function `set_genesis_end`
 
@@ -235,12 +235,16 @@ Helper function to assert genesis state.
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
+<b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+<b>aborts_if</b> addr != @aptos_framework;
+<b>aborts_if</b> <b>exists</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">GenesisEndMarker</a>&gt;(@aptos_framework);
+<b>ensures</b> <b>global</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">GenesisEndMarker</a>&gt;(@aptos_framework) == <a href="chain_status.md#0x1_chain_status_GenesisEndMarker">GenesisEndMarker</a> {};
 </code></pre>
 
 
 
 
-<a name="0x1_chain_status_RequiresIsOperating"></a>
+<a id="0x1_chain_status_RequiresIsOperating"></a>
 
 
 <pre><code><b>schema</b> <a href="chain_status.md#0x1_chain_status_RequiresIsOperating">RequiresIsOperating</a> {
@@ -250,7 +254,7 @@ Helper function to assert genesis state.
 
 
 
-<a name="@Specification_1_assert_operating"></a>
+<a id="@Specification_1_assert_operating"></a>
 
 ### Function `assert_operating`
 
@@ -266,7 +270,7 @@ Helper function to assert genesis state.
 
 
 
-<a name="@Specification_1_assert_genesis"></a>
+<a id="@Specification_1_assert_genesis"></a>
 
 ### Function `assert_genesis`
 

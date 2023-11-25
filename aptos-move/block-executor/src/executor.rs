@@ -21,6 +21,7 @@ use aptos_aggregator::{
     delta_change_set::serialize,
     types::{code_invariant_error, expect_ok, PanicOr},
 };
+use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_logger::{debug, error, info};
 use aptos_mvhashmap::{
     types::{Incarnation, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
@@ -31,6 +32,7 @@ use aptos_mvhashmap::{
 use aptos_state_view::TStateView;
 use aptos_types::{
     aggregator::PanicError,
+    block_executor::config::BlockExecutorConfig,
     contract_event::TransactionEvent,
     executable::Executable,
     fee_statement::FeeStatement,
@@ -73,20 +75,19 @@ where
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
     pub fn new(
-        concurrency_level: usize,
+        config: BlockExecutorConfig,
         executor_thread_pool: Arc<ThreadPool>,
-        maybe_block_gas_limit: Option<u64>,
         transaction_commit_hook: Option<L>,
     ) -> Self {
         assert!(
-            concurrency_level > 0 && concurrency_level <= num_cpus::get(),
+            config.local.concurrency_level > 0 && config.local.concurrency_level <= num_cpus::get(),
             "Parallel execution concurrency level {} should be between 1 and number of CPUs",
-            concurrency_level
+            config.local.concurrency_level
         );
         Self {
-            concurrency_level,
+            concurrency_level: config.local.concurrency_level,
             executor_thread_pool,
-            maybe_block_gas_limit,
+            maybe_block_gas_limit: config.onchain.block_gas_limit_type.block_gas_limit(),
             transaction_commit_hook,
             phantom: PhantomData,
         }
@@ -1117,13 +1118,8 @@ where
             }
         });
         drop(timer);
-        self.executor_thread_pool.spawn(move || {
-            // Explicit async drops.
-            drop(last_input_output);
-            drop(scheduler);
-            // TODO: re-use the code cache.
-            drop(versioned_cache);
-        });
+        // Explicit async drops.
+        DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
         let (_, _, maybe_error) = shared_commit_state.into_inner();
         match maybe_error {
             Some(err) => Err(err),

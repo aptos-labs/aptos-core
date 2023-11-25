@@ -12,8 +12,8 @@ use crate::{
     builder::builtins,
     intrinsics::IntrinsicDecl,
     model::{
-        FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId, SpecFunId,
-        SpecVarId, StructId, TypeParameter,
+        FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId, QualifiedInstId,
+        SpecFunId, SpecVarId, StructId, TypeParameter,
     },
     symbol::Symbol,
     ty::{Constraint, Type},
@@ -353,6 +353,38 @@ impl<'env> ModelBuilder<'env> {
                 );
                 Type::Error
             })
+    }
+
+    /// Looks up the fields of a structure, with instantiated field types.
+    pub fn lookup_struct_fields(&self, id: QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type> {
+        let entry = self.lookup_struct_entry(id.to_qualified_id());
+        entry
+            .fields
+            .as_ref()
+            .map(|f| {
+                f.iter()
+                    .map(|(n, (_, _, field_ty))| (*n, field_ty.instantiate(&id.inst)))
+                    .collect::<BTreeMap<_, _>>()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Get all the structs which have been build so far.
+    pub fn get_struct_ids(&self) -> impl Iterator<Item = QualifiedId<StructId>> + '_ {
+        self.struct_table
+            .values()
+            .map(|e| e.module_id.qualified(e.struct_id))
+    }
+
+    /// Looks up the StructEntry for a qualified id.
+    pub fn lookup_struct_entry(&self, id: QualifiedId<StructId>) -> &StructEntry {
+        let struct_name = self
+            .reverse_struct_table
+            .get(&(id.module_id, id.id))
+            .expect("invalid Type::Struct");
+        self.struct_table
+            .get(struct_name)
+            .expect("invalid Type::Struct")
     }
 
     // Generate warnings about unused schemas.

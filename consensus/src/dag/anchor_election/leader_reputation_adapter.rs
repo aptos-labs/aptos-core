@@ -133,7 +133,11 @@ impl LeaderReputationAdapter {
         &self,
         round: u64,
     ) -> (f64, Option<&aptos_config::config::ChainHealthBackoffValues>) {
-        let voting_power_ratio = self.reputation.get_voting_power_participation_ratio(round);
+        let mut voting_power_ratio = self.reputation.get_voting_power_participation_ratio(round);
+        // TODO: fix this once leader reputation is fixed
+        if voting_power_ratio < 0.67 {
+            voting_power_ratio = 1.0;
+        }
 
         let chain_health_backoff = self
             .chain_health_backoff_config

@@ -4,7 +4,7 @@ use super::dag_test::MockStorage;
 use crate::dag::{
     dag_fetcher::FetchRequestHandler,
     dag_store::Dag,
-    tests::helpers::{new_certified_node, TEST_DAG_WINDOW},
+    tests::helpers::{new_certified_node, MockPayloadManager, TEST_DAG_WINDOW},
     types::{DagSnapshotBitmask, FetchResponse, RemoteFetchRequest},
     RpcHandler,
 };
@@ -24,6 +24,7 @@ async fn test_dag_fetcher_receiver() {
     let dag = Arc::new(RwLock::new(Dag::new(
         epoch_state.clone(),
         storage,
+        Arc::new(MockPayloadManager {}),
         0,
         TEST_DAG_WINDOW,
     )));

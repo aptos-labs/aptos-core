@@ -1,5 +1,5 @@
 
-<a name="0x1_staking_contract"></a>
+<a id="0x1_staking_contract"></a>
 
 # Module `0x1::staking_contract`
 
@@ -127,7 +127,7 @@ pool.
 
 
 
-<a name="0x1_staking_contract_StakingGroupContainer"></a>
+<a id="0x1_staking_contract_StakingGroupContainer"></a>
 
 ## Struct `StakingGroupContainer`
 
@@ -155,7 +155,7 @@ pool.
 
 </details>
 
-<a name="0x1_staking_contract_StakingContract"></a>
+<a id="0x1_staking_contract_StakingContract"></a>
 
 ## Struct `StakingContract`
 
@@ -212,7 +212,7 @@ pool.
 
 </details>
 
-<a name="0x1_staking_contract_Store"></a>
+<a id="0x1_staking_contract_Store"></a>
 
 ## Resource `Store`
 
@@ -293,7 +293,7 @@ pool.
 
 </details>
 
-<a name="0x1_staking_contract_BeneficiaryForOperator"></a>
+<a id="0x1_staking_contract_BeneficiaryForOperator"></a>
 
 ## Resource `BeneficiaryForOperator`
 
@@ -320,7 +320,7 @@ pool.
 
 </details>
 
-<a name="0x1_staking_contract_UpdateCommissionEvent"></a>
+<a id="0x1_staking_contract_UpdateCommissionEvent"></a>
 
 ## Struct `UpdateCommissionEvent`
 
@@ -365,7 +365,7 @@ pool.
 
 </details>
 
-<a name="0x1_staking_contract_StakingGroupUpdateCommissionEvent"></a>
+<a id="0x1_staking_contract_StakingGroupUpdateCommissionEvent"></a>
 
 ## Resource `StakingGroupUpdateCommissionEvent`
 
@@ -393,7 +393,7 @@ pool.
 
 </details>
 
-<a name="0x1_staking_contract_CreateStakingContractEvent"></a>
+<a id="0x1_staking_contract_CreateStakingContractEvent"></a>
 
 ## Struct `CreateStakingContractEvent`
 
@@ -444,7 +444,7 @@ pool.
 
 </details>
 
-<a name="0x1_staking_contract_UpdateVoterEvent"></a>
+<a id="0x1_staking_contract_UpdateVoterEvent"></a>
 
 ## Struct `UpdateVoterEvent`
 
@@ -489,7 +489,7 @@ pool.
 
 </details>
 
-<a name="0x1_staking_contract_ResetLockupEvent"></a>
+<a id="0x1_staking_contract_ResetLockupEvent"></a>
 
 ## Struct `ResetLockupEvent`
 
@@ -522,7 +522,7 @@ pool.
 
 </details>
 
-<a name="0x1_staking_contract_AddStakeEvent"></a>
+<a id="0x1_staking_contract_AddStakeEvent"></a>
 
 ## Struct `AddStakeEvent`
 
@@ -561,7 +561,7 @@ pool.
 
 </details>
 
-<a name="0x1_staking_contract_RequestCommissionEvent"></a>
+<a id="0x1_staking_contract_RequestCommissionEvent"></a>
 
 ## Struct `RequestCommissionEvent`
 
@@ -606,7 +606,7 @@ pool.
 
 </details>
 
-<a name="0x1_staking_contract_UnlockStakeEvent"></a>
+<a id="0x1_staking_contract_UnlockStakeEvent"></a>
 
 ## Struct `UnlockStakeEvent`
 
@@ -651,7 +651,7 @@ pool.
 
 </details>
 
-<a name="0x1_staking_contract_SwitchOperatorEvent"></a>
+<a id="0x1_staking_contract_SwitchOperatorEvent"></a>
 
 ## Struct `SwitchOperatorEvent`
 
@@ -690,7 +690,7 @@ pool.
 
 </details>
 
-<a name="0x1_staking_contract_AddDistributionEvent"></a>
+<a id="0x1_staking_contract_AddDistributionEvent"></a>
 
 ## Struct `AddDistributionEvent`
 
@@ -729,7 +729,7 @@ pool.
 
 </details>
 
-<a name="0x1_staking_contract_DistributeEvent"></a>
+<a id="0x1_staking_contract_DistributeEvent"></a>
 
 ## Struct `DistributeEvent`
 
@@ -774,7 +774,7 @@ pool.
 
 </details>
 
-<a name="0x1_staking_contract_SetBeneficiaryForOperator"></a>
+<a id="0x1_staking_contract_SetBeneficiaryForOperator"></a>
 
 ## Struct `SetBeneficiaryForOperator`
 
@@ -814,12 +814,12 @@ pool.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_staking_contract_EINVALID_COMMISSION_PERCENTAGE"></a>
+<a id="0x1_staking_contract_EINVALID_COMMISSION_PERCENTAGE"></a>
 
 Commission percentage has to be between 0 and 100.
 
@@ -829,7 +829,7 @@ Commission percentage has to be between 0 and 100.
 
 
 
-<a name="0x1_staking_contract_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED"></a>
+<a id="0x1_staking_contract_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED"></a>
 
 Chaning beneficiaries for operators is not supported.
 
@@ -839,7 +839,7 @@ Chaning beneficiaries for operators is not supported.
 
 
 
-<a name="0x1_staking_contract_ECANT_MERGE_STAKING_CONTRACTS"></a>
+<a id="0x1_staking_contract_ECANT_MERGE_STAKING_CONTRACTS"></a>
 
 Staking contracts can't be merged.
 
@@ -849,7 +849,7 @@ Staking contracts can't be merged.
 
 
 
-<a name="0x1_staking_contract_EINSUFFICIENT_ACTIVE_STAKE_TO_WITHDRAW"></a>
+<a id="0x1_staking_contract_EINSUFFICIENT_ACTIVE_STAKE_TO_WITHDRAW"></a>
 
 Not enough active stake to withdraw. Some stake might still pending and will be active in the next epoch.
 
@@ -859,7 +859,7 @@ Not enough active stake to withdraw. Some stake might still pending and will be 
 
 
 
-<a name="0x1_staking_contract_EINSUFFICIENT_STAKE_AMOUNT"></a>
+<a id="0x1_staking_contract_EINSUFFICIENT_STAKE_AMOUNT"></a>
 
 Store amount must be at least the min stake required for a stake pool to join the validator set.
 
@@ -869,7 +869,7 @@ Store amount must be at least the min stake required for a stake pool to join th
 
 
 
-<a name="0x1_staking_contract_ENOT_STAKER_OR_OPERATOR_OR_BENEFICIARY"></a>
+<a id="0x1_staking_contract_ENOT_STAKER_OR_OPERATOR_OR_BENEFICIARY"></a>
 
 Caller must be either the staker, operator, or beneficiary.
 
@@ -879,7 +879,7 @@ Caller must be either the staker, operator, or beneficiary.
 
 
 
-<a name="0x1_staking_contract_ENO_STAKING_CONTRACT_FOUND_FOR_OPERATOR"></a>
+<a id="0x1_staking_contract_ENO_STAKING_CONTRACT_FOUND_FOR_OPERATOR"></a>
 
 No staking contract between the staker and operator found.
 
@@ -889,7 +889,7 @@ No staking contract between the staker and operator found.
 
 
 
-<a name="0x1_staking_contract_ENO_STAKING_CONTRACT_FOUND_FOR_STAKER"></a>
+<a id="0x1_staking_contract_ENO_STAKING_CONTRACT_FOUND_FOR_STAKER"></a>
 
 Staker has no staking contracts.
 
@@ -899,7 +899,7 @@ Staker has no staking contracts.
 
 
 
-<a name="0x1_staking_contract_ESTAKING_CONTRACT_ALREADY_EXISTS"></a>
+<a id="0x1_staking_contract_ESTAKING_CONTRACT_ALREADY_EXISTS"></a>
 
 The staking contract already exists and cannot be re-created.
 
@@ -909,7 +909,7 @@ The staking contract already exists and cannot be re-created.
 
 
 
-<a name="0x1_staking_contract_MAXIMUM_PENDING_DISTRIBUTIONS"></a>
+<a id="0x1_staking_contract_MAXIMUM_PENDING_DISTRIBUTIONS"></a>
 
 Maximum number of distributions a stake pool can support.
 
@@ -919,7 +919,7 @@ Maximum number of distributions a stake pool can support.
 
 
 
-<a name="0x1_staking_contract_SALT"></a>
+<a id="0x1_staking_contract_SALT"></a>
 
 
 
@@ -928,7 +928,7 @@ Maximum number of distributions a stake pool can support.
 
 
 
-<a name="0x1_staking_contract_stake_pool_address"></a>
+<a id="0x1_staking_contract_stake_pool_address"></a>
 
 ## Function `stake_pool_address`
 
@@ -959,7 +959,7 @@ This errors out the staking contract with the provided staker and operator doesn
 
 </details>
 
-<a name="0x1_staking_contract_last_recorded_principal"></a>
+<a id="0x1_staking_contract_last_recorded_principal"></a>
 
 ## Function `last_recorded_principal`
 
@@ -990,7 +990,7 @@ This errors out the staking contract with the provided staker and operator doesn
 
 </details>
 
-<a name="0x1_staking_contract_commission_percentage"></a>
+<a id="0x1_staking_contract_commission_percentage"></a>
 
 ## Function `commission_percentage`
 
@@ -1021,7 +1021,7 @@ This errors out the staking contract with the provided staker and operator doesn
 
 </details>
 
-<a name="0x1_staking_contract_staking_contract_amounts"></a>
+<a id="0x1_staking_contract_staking_contract_amounts"></a>
 
 ## Function `staking_contract_amounts`
 
@@ -1055,7 +1055,7 @@ This errors out the staking contract with the provided staker and operator doesn
 
 </details>
 
-<a name="0x1_staking_contract_pending_distribution_counts"></a>
+<a id="0x1_staking_contract_pending_distribution_counts"></a>
 
 ## Function `pending_distribution_counts`
 
@@ -1085,7 +1085,7 @@ This errors out the staking contract with the provided staker and operator doesn
 
 </details>
 
-<a name="0x1_staking_contract_staking_contract_exists"></a>
+<a id="0x1_staking_contract_staking_contract_exists"></a>
 
 ## Function `staking_contract_exists`
 
@@ -1116,7 +1116,7 @@ Return true if the staking contract between the provided staker and operator exi
 
 </details>
 
-<a name="0x1_staking_contract_beneficiary_for_operator"></a>
+<a id="0x1_staking_contract_beneficiary_for_operator"></a>
 
 ## Function `beneficiary_for_operator`
 
@@ -1146,7 +1146,7 @@ Return the beneficiary address of the operator.
 
 </details>
 
-<a name="0x1_staking_contract_get_expected_stake_pool_address"></a>
+<a id="0x1_staking_contract_get_expected_stake_pool_address"></a>
 
 ## Function `get_expected_stake_pool_address`
 
@@ -1177,7 +1177,7 @@ Return the address of the stake pool to be created with the provided staker, ope
 
 </details>
 
-<a name="0x1_staking_contract_create_staking_contract"></a>
+<a id="0x1_staking_contract_create_staking_contract"></a>
 
 ## Function `create_staking_contract`
 
@@ -1212,7 +1212,7 @@ Staker can call this function to create a simple staking contract with a specifi
 
 </details>
 
-<a name="0x1_staking_contract_create_staking_contract_with_coins"></a>
+<a id="0x1_staking_contract_create_staking_contract_with_coins"></a>
 
 ## Function `create_staking_contract_with_coins`
 
@@ -1295,7 +1295,7 @@ Staker can call this function to create a simple staking contract with a specifi
 
 </details>
 
-<a name="0x1_staking_contract_add_stake"></a>
+<a id="0x1_staking_contract_add_stake"></a>
 
 ## Function `add_stake`
 
@@ -1335,7 +1335,7 @@ Add more stake to an existing staking contract.
 
 </details>
 
-<a name="0x1_staking_contract_update_voter"></a>
+<a id="0x1_staking_contract_update_voter"></a>
 
 ## Function `update_voter`
 
@@ -1372,7 +1372,7 @@ Convenient function to allow the staker to update the voter address in a staking
 
 </details>
 
-<a name="0x1_staking_contract_reset_lockup"></a>
+<a id="0x1_staking_contract_reset_lockup"></a>
 
 ## Function `reset_lockup`
 
@@ -1405,7 +1405,7 @@ Convenient function to allow the staker to reset their stake pool's lockup perio
 
 </details>
 
-<a name="0x1_staking_contract_update_commision"></a>
+<a id="0x1_staking_contract_update_commision"></a>
 
 ## Function `update_commision`
 
@@ -1456,7 +1456,7 @@ TODO: fix the typo in function name. commision -> commission
 
 </details>
 
-<a name="0x1_staking_contract_request_commission"></a>
+<a id="0x1_staking_contract_request_commission"></a>
 
 ## Function `request_commission`
 
@@ -1506,7 +1506,7 @@ Only staker, operator or beneficiary can call this.
 
 </details>
 
-<a name="0x1_staking_contract_request_commission_internal"></a>
+<a id="0x1_staking_contract_request_commission_internal"></a>
 
 ## Function `request_commission_internal`
 
@@ -1558,7 +1558,7 @@ Only staker, operator or beneficiary can call this.
 
 </details>
 
-<a name="0x1_staking_contract_unlock_stake"></a>
+<a id="0x1_staking_contract_unlock_stake"></a>
 
 ## Function `unlock_stake`
 
@@ -1625,7 +1625,7 @@ This also triggers paying commission to the operator for accounting simplicity.
 
 </details>
 
-<a name="0x1_staking_contract_unlock_rewards"></a>
+<a id="0x1_staking_contract_unlock_rewards"></a>
 
 ## Function `unlock_rewards`
 
@@ -1656,7 +1656,7 @@ Unlock all accumulated rewards since the last recorded principals.
 
 </details>
 
-<a name="0x1_staking_contract_switch_operator_with_same_commission"></a>
+<a id="0x1_staking_contract_switch_operator_with_same_commission"></a>
 
 ## Function `switch_operator_with_same_commission`
 
@@ -1689,7 +1689,7 @@ Allows staker to switch operator without going through the lenghthy process to u
 
 </details>
 
-<a name="0x1_staking_contract_switch_operator"></a>
+<a id="0x1_staking_contract_switch_operator"></a>
 
 ## Function `switch_operator`
 
@@ -1752,7 +1752,7 @@ Allows staker to switch operator without going through the lenghthy process to u
 
 </details>
 
-<a name="0x1_staking_contract_set_beneficiary_for_operator"></a>
+<a id="0x1_staking_contract_set_beneficiary_for_operator"></a>
 
 ## Function `set_beneficiary_for_operator`
 
@@ -1796,7 +1796,7 @@ the beneficiary. An operator can set one beneficiary for staking contract pools,
 
 </details>
 
-<a name="0x1_staking_contract_distribute"></a>
+<a id="0x1_staking_contract_distribute"></a>
 
 ## Function `distribute`
 
@@ -1825,7 +1825,7 @@ not need to be restricted to just the staker or operator.
 
 </details>
 
-<a name="0x1_staking_contract_distribute_internal"></a>
+<a id="0x1_staking_contract_distribute_internal"></a>
 
 ## Function `distribute_internal`
 
@@ -1893,7 +1893,7 @@ Distribute all unlocked (inactive) funds according to distribution shares.
 
 </details>
 
-<a name="0x1_staking_contract_assert_staking_contract_exists"></a>
+<a id="0x1_staking_contract_assert_staking_contract_exists"></a>
 
 ## Function `assert_staking_contract_exists`
 
@@ -1923,7 +1923,7 @@ Assert that a staking_contract exists for the staker/operator pair.
 
 </details>
 
-<a name="0x1_staking_contract_add_distribution"></a>
+<a id="0x1_staking_contract_add_distribution"></a>
 
 ## Function `add_distribution`
 
@@ -1964,7 +1964,7 @@ Add a new distribution for <code>recipient</code> and <code>amount</code> to the
 
 </details>
 
-<a name="0x1_staking_contract_get_staking_contract_amounts_internal"></a>
+<a id="0x1_staking_contract_get_staking_contract_amounts_internal"></a>
 
 ## Function `get_staking_contract_amounts_internal`
 
@@ -1998,7 +1998,7 @@ Calculate accumulated rewards and commissions since last update.
 
 </details>
 
-<a name="0x1_staking_contract_create_stake_pool"></a>
+<a id="0x1_staking_contract_create_stake_pool"></a>
 
 ## Function `create_stake_pool`
 
@@ -2039,7 +2039,7 @@ Calculate accumulated rewards and commissions since last update.
 
 </details>
 
-<a name="0x1_staking_contract_update_distribution_pool"></a>
+<a id="0x1_staking_contract_update_distribution_pool"></a>
 
 ## Function `update_distribution_pool`
 
@@ -2092,7 +2092,7 @@ Calculate accumulated rewards and commissions since last update.
 
 </details>
 
-<a name="0x1_staking_contract_create_resource_account_seed"></a>
+<a id="0x1_staking_contract_create_resource_account_seed"></a>
 
 ## Function `create_resource_account_seed`
 
@@ -2128,7 +2128,7 @@ Create the seed to derive the resource account address.
 
 </details>
 
-<a name="0x1_staking_contract_new_staking_contracts_holder"></a>
+<a id="0x1_staking_contract_new_staking_contracts_holder"></a>
 
 ## Function `new_staking_contracts_holder`
 
@@ -2165,7 +2165,7 @@ Create a new staking_contracts resource.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -2177,7 +2177,7 @@ Create a new staking_contracts resource.
 
 
 
-<a name="@Specification_1_stake_pool_address"></a>
+<a id="@Specification_1_stake_pool_address"></a>
 
 ### Function `stake_pool_address`
 
@@ -2196,7 +2196,7 @@ Create a new staking_contracts resource.
 
 
 
-<a name="@Specification_1_last_recorded_principal"></a>
+<a id="@Specification_1_last_recorded_principal"></a>
 
 ### Function `last_recorded_principal`
 
@@ -2216,7 +2216,7 @@ Staking_contract exists the stacker/operator pair.
 
 
 
-<a name="@Specification_1_commission_percentage"></a>
+<a id="@Specification_1_commission_percentage"></a>
 
 ### Function `commission_percentage`
 
@@ -2236,7 +2236,7 @@ Staking_contract exists the stacker/operator pair.
 
 
 
-<a name="@Specification_1_staking_contract_amounts"></a>
+<a id="@Specification_1_staking_contract_amounts"></a>
 
 ### Function `staking_contract_amounts`
 
@@ -2267,7 +2267,7 @@ Staking_contract exists the stacker/operator pair.
 
 
 
-<a name="@Specification_1_pending_distribution_counts"></a>
+<a id="@Specification_1_pending_distribution_counts"></a>
 
 ### Function `pending_distribution_counts`
 
@@ -2289,7 +2289,7 @@ Staking_contract exists the stacker/operator pair.
 
 
 
-<a name="@Specification_1_staking_contract_exists"></a>
+<a id="@Specification_1_staking_contract_exists"></a>
 
 ### Function `staking_contract_exists`
 
@@ -2308,7 +2308,7 @@ Staking_contract exists the stacker/operator pair.
 
 
 
-<a name="0x1_staking_contract_spec_staking_contract_exists"></a>
+<a id="0x1_staking_contract_spec_staking_contract_exists"></a>
 
 
 <pre><code><b>fun</b> <a href="staking_contract.md#0x1_staking_contract_spec_staking_contract_exists">spec_staking_contract_exists</a>(staker: <b>address</b>, operator: <b>address</b>): bool {
@@ -2323,7 +2323,7 @@ Staking_contract exists the stacker/operator pair.
 
 
 
-<a name="@Specification_1_beneficiary_for_operator"></a>
+<a id="@Specification_1_beneficiary_for_operator"></a>
 
 ### Function `beneficiary_for_operator`
 
@@ -2340,7 +2340,7 @@ Staking_contract exists the stacker/operator pair.
 
 
 
-<a name="@Specification_1_create_staking_contract"></a>
+<a id="@Specification_1_create_staking_contract"></a>
 
 ### Function `create_staking_contract`
 
@@ -2361,7 +2361,7 @@ Account is not frozen and sufficient to withdraw.
 
 
 
-<a name="@Specification_1_create_staking_contract_with_coins"></a>
+<a id="@Specification_1_create_staking_contract_with_coins"></a>
 
 ### Function `create_staking_contract_with_coins`
 
@@ -2384,7 +2384,7 @@ Cannot create the staking contract if it already exists.
 
 
 
-<a name="@Specification_1_add_stake"></a>
+<a id="@Specification_1_add_stake"></a>
 
 ### Function `add_stake`
 
@@ -2416,7 +2416,7 @@ Staking_contract exists the stacker/operator pair.
 
 
 
-<a name="@Specification_1_update_voter"></a>
+<a id="@Specification_1_update_voter"></a>
 
 ### Function `update_voter`
 
@@ -2439,7 +2439,7 @@ Staking_contract exists the stacker/operator pair.
 
 
 
-<a name="@Specification_1_reset_lockup"></a>
+<a id="@Specification_1_reset_lockup"></a>
 
 ### Function `reset_lockup`
 
@@ -2459,7 +2459,7 @@ Only active validator can update locked_until_secs.
 
 
 
-<a name="@Specification_1_update_commision"></a>
+<a id="@Specification_1_update_commision"></a>
 
 ### Function `update_commision`
 
@@ -2478,7 +2478,7 @@ Only active validator can update locked_until_secs.
 
 
 
-<a name="@Specification_1_request_commission"></a>
+<a id="@Specification_1_request_commission"></a>
 
 ### Function `request_commission`
 
@@ -2498,7 +2498,7 @@ Only staker or operator can call this.
 
 
 
-<a name="@Specification_1_request_commission_internal"></a>
+<a id="@Specification_1_request_commission_internal"></a>
 
 ### Function `request_commission_internal`
 
@@ -2515,7 +2515,7 @@ Only staker or operator can call this.
 
 
 
-<a name="@Specification_1_unlock_stake"></a>
+<a id="@Specification_1_unlock_stake"></a>
 
 ### Function `unlock_stake`
 
@@ -2534,7 +2534,7 @@ Only staker or operator can call this.
 
 
 
-<a name="@Specification_1_unlock_rewards"></a>
+<a id="@Specification_1_unlock_rewards"></a>
 
 ### Function `unlock_rewards`
 
@@ -2556,7 +2556,7 @@ Staking_contract exists the stacker/operator pair.
 
 
 
-<a name="@Specification_1_switch_operator_with_same_commission"></a>
+<a id="@Specification_1_switch_operator_with_same_commission"></a>
 
 ### Function `switch_operator_with_same_commission`
 
@@ -2575,7 +2575,7 @@ Staking_contract exists the stacker/operator pair.
 
 
 
-<a name="@Specification_1_switch_operator"></a>
+<a id="@Specification_1_switch_operator"></a>
 
 ### Function `switch_operator`
 
@@ -2597,7 +2597,7 @@ Staking_contract exists the stacker/operator pair.
 
 
 
-<a name="@Specification_1_set_beneficiary_for_operator"></a>
+<a id="@Specification_1_set_beneficiary_for_operator"></a>
 
 ### Function `set_beneficiary_for_operator`
 
@@ -2613,7 +2613,7 @@ Staking_contract exists the stacker/operator pair.
 
 
 
-<a name="@Specification_1_distribute"></a>
+<a id="@Specification_1_distribute"></a>
 
 ### Function `distribute`
 
@@ -2631,7 +2631,7 @@ Staking_contract exists the stacker/operator pair.
 
 
 
-<a name="@Specification_1_distribute_internal"></a>
+<a id="@Specification_1_distribute_internal"></a>
 
 ### Function `distribute_internal`
 
@@ -2654,7 +2654,7 @@ The value of inactive and pending_inactive in the stake_pool is up to MAX_U64.
 
 
 
-<a name="@Specification_1_assert_staking_contract_exists"></a>
+<a id="@Specification_1_assert_staking_contract_exists"></a>
 
 ### Function `assert_staking_contract_exists`
 
@@ -2671,7 +2671,7 @@ Staking_contract exists the stacker/operator pair.
 
 
 
-<a name="@Specification_1_add_distribution"></a>
+<a id="@Specification_1_add_distribution"></a>
 
 ### Function `add_distribution`
 
@@ -2687,7 +2687,7 @@ Staking_contract exists the stacker/operator pair.
 
 
 
-<a name="@Specification_1_get_staking_contract_amounts_internal"></a>
+<a id="@Specification_1_get_staking_contract_amounts_internal"></a>
 
 ### Function `get_staking_contract_amounts_internal`
 
@@ -2714,7 +2714,7 @@ The StakePool exists under the pool_address of StakingContract.
 
 
 
-<a name="@Specification_1_create_stake_pool"></a>
+<a id="@Specification_1_create_stake_pool"></a>
 
 ### Function `create_stake_pool`
 
@@ -2750,7 +2750,7 @@ The StakePool exists under the pool_address of StakingContract.
 
 
 
-<a name="@Specification_1_update_distribution_pool"></a>
+<a id="@Specification_1_update_distribution_pool"></a>
 
 ### Function `update_distribution_pool`
 
@@ -2766,7 +2766,7 @@ The StakePool exists under the pool_address of StakingContract.
 
 
 
-<a name="@Specification_1_new_staking_contracts_holder"></a>
+<a id="@Specification_1_new_staking_contracts_holder"></a>
 
 ### Function `new_staking_contracts_holder`
 
@@ -2785,7 +2785,7 @@ The guid_creation_num of the ccount resource is up to MAX_U64.
 
 
 
-<a name="0x1_staking_contract_NewStakingContractsHolderAbortsIf"></a>
+<a id="0x1_staking_contract_NewStakingContractsHolderAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="staking_contract.md#0x1_staking_contract_NewStakingContractsHolderAbortsIf">NewStakingContractsHolderAbortsIf</a> {
@@ -2803,7 +2803,7 @@ The Store exists under the staker.
 a staking_contract exists for the staker/operator pair.
 
 
-<a name="0x1_staking_contract_ContractExistsAbortsIf"></a>
+<a id="0x1_staking_contract_ContractExistsAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="staking_contract.md#0x1_staking_contract_ContractExistsAbortsIf">ContractExistsAbortsIf</a> {
@@ -2818,7 +2818,7 @@ a staking_contract exists for the staker/operator pair.
 
 
 
-<a name="0x1_staking_contract_UpdateVoterSchema"></a>
+<a id="0x1_staking_contract_UpdateVoterSchema"></a>
 
 
 <pre><code><b>schema</b> <a href="staking_contract.md#0x1_staking_contract_UpdateVoterSchema">UpdateVoterSchema</a> {
@@ -2836,7 +2836,7 @@ a staking_contract exists for the staker/operator pair.
 
 
 
-<a name="0x1_staking_contract_WithdrawAbortsIf"></a>
+<a id="0x1_staking_contract_WithdrawAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="staking_contract.md#0x1_staking_contract_WithdrawAbortsIf">WithdrawAbortsIf</a>&lt;CoinType&gt; {

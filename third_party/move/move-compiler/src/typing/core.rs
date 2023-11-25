@@ -295,7 +295,7 @@ impl<'env> Context<'env> {
             .expect("ICE should have failed in naming")
     }
 
-    fn struct_definition(&self, m: &ModuleIdent, n: &StructName) -> &StructDefinition {
+    pub fn struct_definition(&self, m: &ModuleIdent, n: &StructName) -> &StructDefinition {
         let minfo = self.module_info(m);
         minfo
             .structs
@@ -1574,7 +1574,7 @@ fn join_tvar(
     }
 }
 
-fn forward_tvar(subst: &Subst, id: TVar) -> TVar {
+pub fn forward_tvar(subst: &Subst, id: TVar) -> TVar {
     let mut cur = id;
     loop {
         match subst.get(cur) {

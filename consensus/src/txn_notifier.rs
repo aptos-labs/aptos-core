@@ -21,6 +21,7 @@ pub trait TxnNotifier: Send + Sync {
         &self,
         txns: Vec<SignedTransaction>,
         compute_results: &StateComputeResult,
+        block_gas_limit_enabled: bool,
     ) -> Result<(), MempoolError>;
 }
 
@@ -48,28 +49,40 @@ impl MempoolNotifier {
 impl TxnNotifier for MempoolNotifier {
     async fn notify_failed_txn(
         &self,
-        txns: Vec<SignedTransaction>,
+        user_txns: Vec<SignedTransaction>,
         compute_results: &StateComputeResult,
+        block_gas_limit_enabled: bool,
     ) -> Result<(), MempoolError> {
         let mut rejected_txns = vec![];
 
-        if txns.is_empty() {
+        if user_txns.is_empty() {
             return Ok(());
         }
         let compute_status = compute_results.compute_status();
-        if txns.len() + 2 != compute_status.len() {
+        let expected_len = if compute_results.has_reconfiguration() && block_gas_limit_enabled {
+            // when block gas is enabled, reconfiguration blocks don't have state checkpoint but only blockmetadata,
+            // so the length of compute_status is user_txns.len() + 1
+            user_txns.len() + 1
+        } else {
+            // otherwise, the length of compute_status is user_txns.len() + 2 due to having both blockmetadata and state checkpoint
+            user_txns.len() + 2
+        };
+        if expected_len != compute_status.len() {
             // reconfiguration suffix blocks don't have any transactions
             if compute_status.is_empty() {
                 return Ok(());
             }
             return Err(format_err!(
-                "Block meta and state checkpoint txns are expected. txns len: {}, compute status len: {}",
-                txns.len(),
+                "Expected compute_status length and actual compute_status length mismatch! user_txns len: {}, expected compute_status len: {}, compute_status len: {}, block_gas_limit_enabled: {}, has_reconfiguration: {}",
+                user_txns.len(),
+                expected_len,
                 compute_status.len(),
+                block_gas_limit_enabled,
+                compute_results.has_reconfiguration(),
             ).into());
         }
-        let user_txn_status = &compute_status[1..txns.len() + 1];
-        for (txn, status) in txns.iter().zip_eq(user_txn_status) {
+        let user_txn_status = &compute_status[1..user_txns.len() + 1];
+        for (txn, status) in user_txns.iter().zip_eq(user_txn_status) {
             if let TransactionStatus::Discard(reason) = status {
                 rejected_txns.push(RejectedTransactionSummary {
                     sender: txn.sender(),

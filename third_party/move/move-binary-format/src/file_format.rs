@@ -886,6 +886,17 @@ pub struct AccessSpecifier {
     pub address: AddressSpecifier,
 }
 
+impl AccessSpecifier {
+    // Old style of acquires is by default for bytecode version 6 or below.
+    // New style of acquires was introduced in AIP-56: Resource Access Control
+    pub fn is_old_style_acquires(&self) -> bool {
+        self.kind == AccessKind::Acquires
+            && !self.negated
+            && self.address == AddressSpecifier::Any
+            && matches!(self.resource, ResourceSpecifier::Resource(_))
+    }
+}
+
 /// The kind of specified access.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]

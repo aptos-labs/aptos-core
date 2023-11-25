@@ -32,13 +32,7 @@ error[E04010]: cannot infer type
    ┌─ tests/move_check/typing/invalid_type_acquire.move:30:9
    │
 30 │         destroy(account, move_from(a));
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Could not infer this type. Try adding an annotation
-
-error[E04010]: cannot infer type
-   ┌─ tests/move_check/typing/invalid_type_acquire.move:30:26
-   │
-30 │         destroy(account, move_from(a));
-   │                          ^^^^^^^^^^^^ Could not infer this type. Try adding an annotation
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot infer the type parameter `T` for generic function `0x2::M::destroy`. Try providing a type parameter.
 
 error[E04009]: expected specific type
    ┌─ tests/move_check/typing/invalid_type_acquire.move:31:26
@@ -173,7 +167,7 @@ error[E04010]: cannot infer type
    ┌─ tests/move_check/typing/invalid_type_acquire.move:48:9
    │
 48 │         exists(a);
-   │         ^^^^^^^^^ Could not infer this type. Try adding an annotation
+   │         ^^^^^^^^^ Cannot infer a type parameter for built-in function `exists`
 
 error[E04009]: expected specific type
    ┌─ tests/move_check/typing/invalid_type_acquire.move:49:9
@@ -218,13 +212,7 @@ error[E04010]: cannot infer type
    ┌─ tests/move_check/typing/invalid_type_acquire.move:54:9
    │
 54 │         move_to(account, any());
-   │         ^^^^^^^^^^^^^^^^^^^^^^^ Could not infer this type. Try adding an annotation
-
-error[E04010]: cannot infer type
-   ┌─ tests/move_check/typing/invalid_type_acquire.move:54:26
-   │
-54 │         move_to(account, any());
-   │                          ^^^^^ Could not infer this type. Try adding an annotation
+   │         ^^^^^^^^^^^^^^^^^^^^^^^ Cannot infer a type parameter for built-in function `move_to`
 
 error[E04009]: expected specific type
    ┌─ tests/move_check/typing/invalid_type_acquire.move:55:9

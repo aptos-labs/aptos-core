@@ -307,7 +307,21 @@ module std::features {
         is_enabled(OPERATOR_BENEFICIARY_CHANGE)
     }
 
-    const RECONFIGURE_WITH_DKG: u64 = 42;
+    const VM_BINARY_FORMAT_V7: u64 = 40;
+
+    const RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM: u64 = 41;
+
+    /// Whether the operator commission rate change in delegation pool is enabled.
+    /// Lifetime: transient
+    const COMMISSION_CHANGE_DELEGATION_POOL: u64 = 42;
+
+    public fun get_commission_change_delegation_pool_feature(): u64 { COMMISSION_CHANGE_DELEGATION_POOL }
+
+    public fun commission_change_delegation_pool_enabled(): bool acquires Features {
+        is_enabled(COMMISSION_CHANGE_DELEGATION_POOL)
+    }
+    
+    const RECONFIGURE_WITH_DKG: u64 = 43;
     public fun get_reconfigure_with_dkg_feature(): u64 { RECONFIGURE_WITH_DKG }
     public fun reconfigure_with_dkg_enabled(): bool acquires Features {
         is_enabled(RECONFIGURE_WITH_DKG)

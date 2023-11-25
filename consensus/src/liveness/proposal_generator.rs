@@ -24,9 +24,18 @@ use aptos_consensus_types::{
     common::{Author, DKGPayload, Payload, PayloadFilter, Round},
     quorum_cert::QuorumCert,
 };
-use aptos_logger::{error, sample, sample::SampleRate, warn, debug};
+use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_logger::{debug, error, sample, sample::SampleRate, warn};
+use aptos_types::system_txn::{
+    pool::{SystemTransactionFilter, SystemTransactionPoolClient},
+    SystemTransaction,
+};
 use futures::future::BoxFuture;
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use std::{
+    collections::{BTreeMap, HashSet},
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 #[cfg(test)]
 #[path = "proposal_generator_test.rs"]
@@ -170,6 +179,8 @@ pub struct ProposalGenerator {
     last_round_generated: Round,
     quorum_store_enabled: bool,
 
+    sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
+    should_propose_sys_txns: bool,
     // Proposal generator will fetch the DKG aggregated node from the DKG manager
     dkg_manager_wrapper: Arc<DKGManagerWrapper>,
 }
@@ -187,6 +198,8 @@ impl ProposalGenerator {
         pipeline_backpressure_config: PipelineBackpressureConfig,
         chain_health_backoff_config: ChainHealthBackoffConfig,
         quorum_store_enabled: bool,
+        sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
+        should_propose_sys_txns: bool,
         dkg_manager_wrapper: Arc<DKGManagerWrapper>,
     ) -> Self {
         Self {
@@ -202,6 +215,8 @@ impl ProposalGenerator {
             chain_health_backoff_config,
             last_round_generated: 0,
             quorum_store_enabled,
+            sys_txn_pool_client,
+            should_propose_sys_txns,
             dkg_manager_wrapper,
         }
     }
@@ -251,14 +266,15 @@ impl ProposalGenerator {
 
         let hqc = self.ensure_highest_quorum_cert(round)?;
 
-        let (payload, timestamp) = if hqc.certified_block().has_reconfiguration() {
+        let (sys_txns, payload, timestamp) = if hqc.certified_block().has_reconfiguration() {
             // Reconfiguration rule - we propose empty blocks with parents' timestamp
             // after reconfiguration until it's committed
             (
+                vec![],
                 Payload::empty(self.quorum_store_enabled),
                 hqc.certified_block().timestamp_usecs(),
             )
-        } else if self.dkg_manager_wrapper.ready() {            
+        } else if self.dkg_manager_wrapper.ready() {
             // generate DKG payload
             // the block contains just one DKG aggregate node
             // dkg todo: handle the bad path where the submitted dkg payload does not get committed, i.e., when the validator sees its dkg payload is discarded, it needs to re-propose
@@ -267,7 +283,7 @@ impl ProposalGenerator {
             debug!("[DKG]: epoch {} node {} generates DKG payload", dkg_agg_node.epoch(), self.author);
             let payload = Payload::DKG(DKGPayload::new(dkg_agg_node, pvss_config.clone()));
             let timestamp = self.time_service.get_current_timestamp();
-            (payload, timestamp.as_micros() as u64)
+            (vec![], payload, timestamp.as_micros() as u64) //dkg todo: dkg result should be a system txn
         } else {
             // One needs to hold the blocks with the references to the payloads while get_block is
             // being executed: pending blocks vector keeps all the pending ancestors of the extended branch.
@@ -301,9 +317,32 @@ impl ProposalGenerator {
 
             let voting_power_ratio = proposer_election.get_voting_power_participation_ratio(round);
 
-            let (max_block_txns, max_block_bytes, proposal_delay) = self
+            let (mut max_block_txns, mut max_block_bytes, mut proposal_delay) = self
                 .calculate_max_block_sizes(voting_power_ratio, timestamp)
                 .await;
+
+            let sys_txn_pull_timer = Instant::now();
+            let sys_txns = if self.should_propose_sys_txns {
+                let pending_sys_txn_hashes: HashSet<HashValue> = pending_blocks
+                    .iter()
+                    .filter_map(|block| block.sys_txns())
+                    .flatten()
+                    .map(SystemTransaction::hash)
+                    .collect();
+
+                self.sys_txn_pool_client.pull(
+                    max_block_txns as usize,
+                    max_block_bytes as usize,
+                    SystemTransactionFilter::PendingTxnHashSet(pending_sys_txn_hashes),
+                )
+            } else {
+                vec![]
+            };
+
+            let sys_txn_total_bytes = sys_txns.iter().map(|txn| txn.size_in_bytes() as u64).sum();
+            max_block_txns = max_block_txns.saturating_sub(sys_txns.len() as u64);
+            max_block_bytes = max_block_bytes.saturating_sub(sys_txn_total_bytes);
+            proposal_delay = proposal_delay.saturating_sub(sys_txn_pull_timer.elapsed());
 
             PROPOSER_DELAY_PROPOSAL.set(proposal_delay.as_secs_f64());
             if !proposal_delay.is_zero() {
@@ -341,7 +380,7 @@ impl ProposalGenerator {
                 .context("Fail to retrieve payload")?;
             println!("DKG debug: node {} generates QS payload {}", self.author, payload.len());
 
-            (payload, timestamp.as_micros() as u64)
+            (sys_txns, payload, timestamp.as_micros() as u64)
         };
 
         let quorum_cert = hqc.as_ref().clone();
@@ -351,15 +390,29 @@ impl ProposalGenerator {
             false,
             proposer_election,
         );
-        // create block proposal
-        Ok(BlockData::new_proposal(
-            payload,
-            self.author,
-            failed_authors,
-            round,
-            timestamp,
-            quorum_cert,
-        ))
+
+        let block = if self.should_propose_sys_txns {
+            BlockData::new_proposal_ext(
+                sys_txns,
+                payload,
+                self.author,
+                failed_authors,
+                round,
+                timestamp,
+                quorum_cert,
+            )
+        } else {
+            BlockData::new_proposal(
+                payload,
+                self.author,
+                failed_authors,
+                round,
+                timestamp,
+                quorum_cert,
+            )
+        };
+
+        Ok(block)
     }
 
     async fn calculate_max_block_sizes(

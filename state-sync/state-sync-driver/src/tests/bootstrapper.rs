@@ -12,7 +12,8 @@ use crate::{
         },
         utils::{
             create_data_stream_listener, create_empty_epoch_state, create_epoch_ending_ledger_info,
-            create_full_node_driver_configuration, create_global_summary,
+            create_epoch_ending_ledger_info_for_epoch, create_full_node_driver_configuration,
+            create_global_summary, create_global_summary_with_version,
             create_output_list_with_proof, create_random_epoch_ending_ledger_info,
             create_transaction_list_with_proof,
         },
@@ -70,6 +71,145 @@ async fn test_bootstrap_genesis_waypoint() {
         .await
         .unwrap_err();
     assert_matches!(error, Error::AlreadyBootstrapped(_));
+}
+
+#[tokio::test]
+async fn test_bootstrap_genesis_waypoint_ahead_of_peers() {
+    // Create a driver configuration with a genesis waypoint
+    let driver_configuration = create_full_node_driver_configuration();
+
+    // Create the mock streaming client and metadata storage
+    let mock_streaming_client = create_mock_streaming_client();
+    let metadata_storage = MockMetadataStorage::new();
+
+    // Create the test data for the bootstrapper
+    let synced_version = 100;
+    let synced_epoch = 10;
+
+    // Create the bootstrapper at the specified synced epoch and version
+    let mut bootstrapper = create_bootstrapper_with_storage(
+        driver_configuration,
+        mock_streaming_client,
+        metadata_storage,
+        Some(synced_epoch),
+        synced_version,
+        true,
+    );
+
+    // Verify the bootstrapper is not yet bootstrapped
+    assert!(!bootstrapper.is_bootstrapped());
+
+    // Subscribe to a bootstrapped notification
+    let (bootstrap_notification_sender, bootstrap_notification_receiver) = oneshot::channel();
+    bootstrapper
+        .subscribe_to_bootstrap_notifications(bootstrap_notification_sender)
+        .await
+        .unwrap();
+
+    // Create a global data summary where only epoch 0 has ended
+    let global_data_summary = create_global_summary(0);
+
+    // Drive progress and verify we're now bootstrapped
+    drive_progress(&mut bootstrapper, &global_data_summary, true)
+        .await
+        .unwrap();
+    assert!(bootstrapper.is_bootstrapped());
+    verify_bootstrap_notification(bootstrap_notification_receiver);
+
+    // Drive progress again and verify we get an error (we're already bootstrapped!)
+    let error = drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap_err();
+    assert_matches!(error, Error::AlreadyBootstrapped(_));
+}
+
+#[tokio::test]
+async fn test_bootstrap_waypoint_satisfiability_check_failed() {
+    // Create a driver configuration
+    let mut driver_configuration = create_full_node_driver_configuration();
+
+    // Update the driver configuration to use a waypoint in the future
+    let waypoint_version = 1000;
+    let waypoint_epoch = 100;
+    let waypoint = create_random_epoch_ending_ledger_info(waypoint_version, waypoint_epoch);
+    driver_configuration.waypoint = Waypoint::new_any(waypoint.ledger_info());
+
+    // Create the mock streaming client and metadata storage
+    let mock_streaming_client = create_mock_streaming_client();
+    let metadata_storage = MockMetadataStorage::new();
+
+    // Create the test data for the bootstrapper
+    let synced_version = 100;
+    let synced_epoch = 10;
+
+    // Create the bootstrapper at the specified synced epoch and version
+    let mut bootstrapper = create_bootstrapper_with_storage(
+        driver_configuration,
+        mock_streaming_client,
+        metadata_storage,
+        Some(synced_epoch),
+        synced_version,
+        true,
+    );
+
+    // Verify the bootstrapper is not yet bootstrapped
+    assert!(!bootstrapper.is_bootstrapped());
+
+    // Create a global data summary that is missing version information
+    let advertised_epoch = 5;
+    let global_data_summary = create_global_summary(advertised_epoch);
+
+    // Drive progress and verify that an error is returned (waypoint
+    // satisfiability cannot be checked).
+    let error = drive_progress(&mut bootstrapper, &global_data_summary, true)
+        .await
+        .unwrap_err();
+    assert_matches!(error, Error::UnsatisfiableWaypoint(_));
+}
+
+#[tokio::test]
+async fn test_bootstrap_waypoint_unsatisfiable() {
+    // Create a driver configuration
+    let mut driver_configuration = create_full_node_driver_configuration();
+
+    // Update the driver configuration to use a waypoint in the future
+    let waypoint_version = 1000;
+    let waypoint_epoch = 100;
+    let waypoint = create_random_epoch_ending_ledger_info(waypoint_version, waypoint_epoch);
+    driver_configuration.waypoint = Waypoint::new_any(waypoint.ledger_info());
+
+    // Create the mock streaming client and metadata storage
+    let mock_streaming_client = create_mock_streaming_client();
+    let metadata_storage = MockMetadataStorage::new();
+
+    // Create the test data for the bootstrapper
+    let synced_version = 100;
+    let synced_epoch = 10;
+
+    // Create the bootstrapper at the specified synced epoch and version
+    let mut bootstrapper = create_bootstrapper_with_storage(
+        driver_configuration,
+        mock_streaming_client,
+        metadata_storage,
+        Some(synced_epoch),
+        synced_version,
+        true,
+    );
+
+    // Verify the bootstrapper is not yet bootstrapped
+    assert!(!bootstrapper.is_bootstrapped());
+
+    // Create a global data summary where the latest data is less than the waypoint
+    let advertised_version = waypoint_version - 1;
+    let advertised_epoch = 5;
+    let global_data_summary =
+        create_global_summary_with_version(advertised_version, advertised_epoch);
+
+    // Drive progress and verify that an error is returned (as the waypoint is not satisfiable)
+    let error = drive_progress(&mut bootstrapper, &global_data_summary, true)
+        .await
+        .unwrap_err();
+    assert_matches!(error, Error::UnsatisfiableWaypoint(_));
 }
 
 #[tokio::test]
@@ -691,6 +831,7 @@ async fn test_snapshot_sync_epoch_change() {
         driver_configuration,
         mock_streaming_client,
         metadata_storage,
+        None,
         synced_version,
         true,
     );
@@ -745,6 +886,7 @@ async fn test_snapshot_sync_epoch_change_genesis() {
         driver_configuration,
         mock_streaming_client,
         metadata_storage,
+        None,
         synced_version,
         true,
     );
@@ -811,6 +953,7 @@ async fn test_snapshot_sync_epoch_change_genesis_restart() {
         driver_configuration,
         mock_streaming_client,
         metadata_storage,
+        None,
         synced_version,
         true,
     );
@@ -898,6 +1041,7 @@ async fn test_snapshot_sync_existing_state() {
         driver_configuration,
         mock_streaming_client,
         metadata_storage,
+        None,
         synced_version,
         true,
     );
@@ -969,6 +1113,7 @@ async fn test_snapshot_sync_fresh_state() {
         driver_configuration,
         mock_streaming_client,
         metadata_storage,
+        None,
         synced_version,
         true,
     );
@@ -1023,6 +1168,7 @@ async fn test_snapshot_sync_invalid_state() {
         driver_configuration,
         mock_streaming_client,
         metadata_storage,
+        None,
         synced_version,
         true,
     );
@@ -1069,6 +1215,7 @@ async fn test_snapshot_sync_lag() {
         driver_configuration,
         mock_streaming_client,
         metadata_storage,
+        None,
         synced_version,
         true,
     );
@@ -1119,6 +1266,7 @@ async fn test_snapshot_sync_lag_panic() {
         driver_configuration,
         mock_streaming_client,
         metadata_storage,
+        None,
         synced_version,
         true,
     );
@@ -1256,7 +1404,7 @@ async fn test_waypoint_satisfiable() {
     let error = drive_progress(&mut bootstrapper, &global_data_summary, false)
         .await
         .unwrap_err();
-    assert_matches!(error, Error::AdvertisedDataError(_));
+    assert_matches!(error, Error::UnsatisfiableWaypoint(_));
 
     // Update the global data summary with advertised data lower than the waypoint
     global_data_summary.advertised_data.synced_ledger_infos =
@@ -1266,7 +1414,7 @@ async fn test_waypoint_satisfiable() {
     let error = drive_progress(&mut bootstrapper, &global_data_summary, false)
         .await
         .unwrap_err();
-    assert_matches!(error, Error::AdvertisedDataError(_));
+    assert_matches!(error, Error::UnsatisfiableWaypoint(_));
 }
 
 /// Creates a bootstrapper for testing
@@ -1326,6 +1474,7 @@ fn create_bootstrapper_with_storage(
     driver_configuration: DriverConfiguration,
     mock_streaming_client: MockStreamingClient,
     mock_metadata_storage: MockMetadataStorage,
+    latest_synced_epoch: Option<u64>,
     latest_synced_version: Version,
     expect_reset_executor: bool,
 ) -> Bootstrapper<MockMetadataStorage, MockStorageSynchronizer, MockStreamingClient> {
@@ -1335,14 +1484,26 @@ fn create_bootstrapper_with_storage(
     // Create the mock storage synchronizer
     let mock_storage_synchronizer = create_ready_storage_synchronizer(expect_reset_executor);
 
-    // Create the mock db reader with only genesis loaded
+    // Determine the epoch state and ledger info
+    let (epoch_state, epoch_ending_ledger_info) = match latest_synced_epoch {
+        Some(latest_synced_epoch) => (
+            create_empty_epoch_state(),
+            create_epoch_ending_ledger_info_for_epoch(latest_synced_epoch, latest_synced_version),
+        ),
+        None => (
+            create_empty_epoch_state(),
+            create_epoch_ending_ledger_info(),
+        ),
+    };
+
+    // Create the mock db reader and set the expectations
     let mut mock_database_reader = create_mock_db_reader();
     mock_database_reader
         .expect_get_latest_epoch_state()
-        .returning(|| Ok(create_empty_epoch_state()));
+        .returning(move || Ok(epoch_state.clone()));
     mock_database_reader
         .expect_get_latest_ledger_info()
-        .returning(|| Ok(create_epoch_ending_ledger_info()));
+        .returning(move || Ok(epoch_ending_ledger_info.clone()));
     mock_database_reader
         .expect_get_latest_version()
         .returning(move || Ok(latest_synced_version));

@@ -692,8 +692,8 @@ pub type Sequence = (
 pub enum SequenceItem_ {
     // e;
     Seq(Box<Exp>),
-    // let b : t = e;
-    // let b = e;
+    // let b : t;
+    // let b;
     Declare(BindList, Option<Type>),
     // let b : t = e;
     // let b = e;

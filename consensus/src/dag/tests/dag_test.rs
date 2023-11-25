@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::helpers::MockPayloadManager;
 use crate::dag::{
     dag_store::Dag,
     storage::{CommitEvent, DAGStorage},
@@ -115,7 +116,14 @@ fn setup() -> (Vec<ValidatorSigner>, Arc<EpochState>, Dag, Arc<MockStorage>) {
         verifier: validator_verifier,
     });
     let storage = Arc::new(MockStorage::new());
-    let dag = Dag::new(epoch_state.clone(), storage.clone(), 1, TEST_DAG_WINDOW);
+    let payload_manager = Arc::new(MockPayloadManager {});
+    let dag = Dag::new(
+        epoch_state.clone(),
+        storage.clone(),
+        payload_manager,
+        1,
+        TEST_DAG_WINDOW,
+    );
     (signers, epoch_state, dag, storage)
 }
 
@@ -203,7 +211,13 @@ fn test_dag_recover_from_storage() {
             assert!(dag.add_node(node).is_ok());
         }
     }
-    let new_dag = Dag::new(epoch_state.clone(), storage.clone(), 0, TEST_DAG_WINDOW);
+    let new_dag = Dag::new(
+        epoch_state.clone(),
+        storage.clone(),
+        Arc::new(MockPayloadManager {}),
+        0,
+        TEST_DAG_WINDOW,
+    );
 
     for metadata in &metadatas {
         assert!(new_dag.exists(metadata));
@@ -214,7 +228,13 @@ fn test_dag_recover_from_storage() {
         verifier: epoch_state.verifier.clone(),
     });
 
-    let _new_epoch_dag = Dag::new(new_epoch_state, storage.clone(), 0, TEST_DAG_WINDOW);
+    let _new_epoch_dag = Dag::new(
+        new_epoch_state,
+        storage.clone(),
+        Arc::new(MockPayloadManager {}),
+        0,
+        TEST_DAG_WINDOW,
+    );
     assert!(storage.certified_node_data.lock().is_empty());
 }
 

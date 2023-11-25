@@ -1,5 +1,5 @@
 
-<a name="0x1_randomness"></a>
+<a id="0x1_randomness"></a>
 
 # Module `0x1::randomness`
 
@@ -27,7 +27,7 @@ On-chain randomness Move API as specified in [AIP-41](https://github.com/aptos-f
 
 
 
-<a name="0x1_randomness_BlockRandomness"></a>
+<a id="0x1_randomness_BlockRandomness"></a>
 
 ## Resource `BlockRandomness`
 
@@ -59,12 +59,12 @@ Use the public functions in this module instead.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_randomness_DST"></a>
+<a id="0x1_randomness_DST"></a>
 
 
 
@@ -73,7 +73,7 @@ Use the public functions in this module instead.
 
 
 
-<a name="0x1_randomness_EUT_FAILURE"></a>
+<a id="0x1_randomness_EUT_FAILURE"></a>
 
 
 
@@ -82,7 +82,7 @@ Use the public functions in this module instead.
 
 
 
-<a name="0x1_randomness_on_new_block"></a>
+<a id="0x1_randomness_on_new_block"></a>
 
 ## Function `on_new_block`
 
@@ -113,7 +113,7 @@ Invoked in <code>block_prologue_ext()</code> to update the block-level seed rand
 
 </details>
 
-<a name="0x1_randomness_next_blob"></a>
+<a id="0x1_randomness_next_blob"></a>
 
 ## Function `next_blob`
 
@@ -142,7 +142,7 @@ Generate 32 random bytes.
 
 </details>
 
-<a name="0x1_randomness_u64_integer"></a>
+<a id="0x1_randomness_u64_integer"></a>
 
 ## Function `u64_integer`
 
@@ -174,7 +174,7 @@ Generates a u64 uniformly at random.
 
 </details>
 
-<a name="0x1_randomness_u256_integer"></a>
+<a id="0x1_randomness_u256_integer"></a>
 
 ## Function `u256_integer`
 
@@ -206,7 +206,7 @@ Generates a u256 uniformly at random.
 
 </details>
 
-<a name="0x1_randomness_u64_range"></a>
+<a id="0x1_randomness_u64_range"></a>
 
 ## Function `u64_range`
 
@@ -236,7 +236,7 @@ If you need perfect uniformty, consider implement your own with <code><a href="r
 
 </details>
 
-<a name="0x1_randomness_u256_range"></a>
+<a id="0x1_randomness_u256_range"></a>
 
 ## Function `u256_range`
 
@@ -279,7 +279,7 @@ If you need perfect uniformty, consider implement your own with <code><a href="r
 
 </details>
 
-<a name="0x1_randomness_permutation"></a>
+<a id="0x1_randomness_permutation"></a>
 
 ## Function `permutation`
 
@@ -321,7 +321,7 @@ Generate a permutation of <code>[0, 1, ..., n-1]</code> uniformly at random.
 
 </details>
 
-<a name="0x1_randomness_safe_add_mod"></a>
+<a id="0x1_randomness_safe_add_mod"></a>
 
 ## Function `safe_add_mod`
 
@@ -351,7 +351,7 @@ Compute <code>(a + b) % m</code>, assuming <code>m &gt;= 1, 0 &lt;= a &lt; m, 0&
 
 </details>
 
-<a name="0x1_randomness_get_and_add_txn_local_state"></a>
+<a id="0x1_randomness_get_and_add_txn_local_state"></a>
 
 ## Function `get_and_add_txn_local_state`
 

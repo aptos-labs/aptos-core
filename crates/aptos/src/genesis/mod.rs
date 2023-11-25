@@ -254,7 +254,7 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
             voting_power_increase_limit: layout.voting_power_increase_limit,
             employee_vesting_start: layout.employee_vesting_start,
             employee_vesting_period_duration: layout.employee_vesting_period_duration,
-            consensus_config: OnChainConsensusConfig::default(),
+            consensus_config: OnChainConsensusConfig::default_for_genesis(),
             execution_config: OnChainExecutionConfig::default_for_genesis(),
             gas_schedule: default_gas_schedule(),
         },

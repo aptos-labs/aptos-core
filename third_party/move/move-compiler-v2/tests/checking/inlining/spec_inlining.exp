@@ -1,0 +1,62 @@
+// ---- Model Dump
+module 0x42::Test {
+    public fun test_apply() {
+        {
+          let r1: bool = {
+            let (v: u64) = Tuple(0);
+            spec {
+              assert Ge($t0, 0);
+            }
+            ;
+            {
+              let (v: u64) = Tuple(v);
+              Ge<u64>(v, 0)
+            }
+          };
+          spec {
+            assert r1;
+          }
+          ;
+          if r1 {
+            Tuple()
+          } else {
+            Abort(1)
+          };
+          {
+            let r2: bool = {
+              let (v: u64) = Tuple(0);
+              spec {
+                assert Ge($t0, 0);
+              }
+              ;
+              {
+                let (v: u64) = Tuple(v);
+                Neq<u64>(v, 0)
+              }
+            };
+            spec {
+              assert r2;
+            }
+            ;
+            if r2 {
+              Tuple()
+            } else {
+              Abort(2)
+            };
+            Tuple()
+          }
+        }
+    }
+    spec fun $apply(v: u64,predicate: |u64|bool): bool {
+        (predicate)(v)
+    }
+    spec fun $test_apply() {
+        {
+          let r1: bool = Test::$apply(0, |v: num| Ge(v, 0));
+          {
+            let r2: bool = Test::$apply(0, |v: u256| Neq<u256>(v, 0));
+            Tuple()
+          }
+        }
+    }
+} // end 0x42::Test

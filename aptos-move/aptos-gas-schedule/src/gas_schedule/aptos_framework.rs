@@ -208,6 +208,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [aggregator_v2_snapshot_base: InternalGas, {12.. => "aggregator_v2.snapshot.base"}, 6000],
 
         [aggregator_v2_create_snapshot_base: InternalGas, {11.. => "aggregator_v2.create_snapshot.base"}, 6000],
+        [aggregator_v2_create_snapshot_per_byte: InternalGasPerByte, { 12.. =>"aggregator_v2.create_snapshot.per_byte" }, 20],
         [aggregator_v2_copy_snapshot_base: InternalGas, {11.. => "aggregator_v2.copy_snapshot.base"}, 6000],
         [aggregator_v2_read_snapshot_base: InternalGas, {11.. => "aggregator_v2.read_snapshot.base"}, 12000],
         [aggregator_v2_string_concat_base: InternalGas, {11.. => "aggregator_v2.string_concat.base"}, 6000],

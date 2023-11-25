@@ -1,5 +1,5 @@
 
-<a name="0x1_voting"></a>
+<a id="0x1_voting"></a>
 
 # Module `0x1::voting`
 
@@ -103,7 +103,7 @@ the resolution process.
 
 
 
-<a name="0x1_voting_Proposal"></a>
+<a id="0x1_voting_Proposal"></a>
 
 ## Struct `Proposal`
 
@@ -209,7 +209,7 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
 
 </details>
 
-<a name="0x1_voting_VotingForum"></a>
+<a id="0x1_voting_VotingForum"></a>
 
 ## Resource `VotingForum`
 
@@ -249,7 +249,7 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
 
 </details>
 
-<a name="0x1_voting_VotingEvents"></a>
+<a id="0x1_voting_VotingEvents"></a>
 
 ## Struct `VotingEvents`
 
@@ -294,7 +294,7 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
 
 </details>
 
-<a name="0x1_voting_CreateProposalEvent"></a>
+<a id="0x1_voting_CreateProposalEvent"></a>
 
 ## Struct `CreateProposalEvent`
 
@@ -351,7 +351,7 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
 
 </details>
 
-<a name="0x1_voting_RegisterForumEvent"></a>
+<a id="0x1_voting_RegisterForumEvent"></a>
 
 ## Struct `RegisterForumEvent`
 
@@ -384,7 +384,7 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
 
 </details>
 
-<a name="0x1_voting_VoteEvent"></a>
+<a id="0x1_voting_VoteEvent"></a>
 
 ## Struct `VoteEvent`
 
@@ -417,7 +417,7 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
 
 </details>
 
-<a name="0x1_voting_ResolveProposal"></a>
+<a id="0x1_voting_ResolveProposal"></a>
 
 ## Struct `ResolveProposal`
 
@@ -462,12 +462,12 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_voting_EINVALID_MIN_VOTE_THRESHOLD"></a>
+<a id="0x1_voting_EINVALID_MIN_VOTE_THRESHOLD"></a>
 
 Minimum vote threshold cannot be higher than early resolution threshold.
 
@@ -477,7 +477,7 @@ Minimum vote threshold cannot be higher than early resolution threshold.
 
 
 
-<a name="0x1_voting_EMULTI_STEP_PROPOSAL_CANNOT_USE_SINGLE_STEP_RESOLVE_FUNCTION"></a>
+<a id="0x1_voting_EMULTI_STEP_PROPOSAL_CANNOT_USE_SINGLE_STEP_RESOLVE_FUNCTION"></a>
 
 If a proposal is multi-step, we need to use <code><a href="voting.md#0x1_voting_resolve_proposal_v2">resolve_proposal_v2</a>()</code> to resolve it.
 If we use <code><a href="voting.md#0x1_voting_resolve">resolve</a>()</code> to resolve a multi-step proposal, it will fail with EMULTI_STEP_PROPOSAL_CANNOT_USE_SINGLE_STEP_RESOLVE_FUNCTION.
@@ -488,7 +488,7 @@ If we use <code><a href="voting.md#0x1_voting_resolve">resolve</a>()</code> to r
 
 
 
-<a name="0x1_voting_EMULTI_STEP_PROPOSAL_IN_EXECUTION"></a>
+<a id="0x1_voting_EMULTI_STEP_PROPOSAL_IN_EXECUTION"></a>
 
 Cannot vote if the specified multi-step proposal is in execution.
 
@@ -498,7 +498,7 @@ Cannot vote if the specified multi-step proposal is in execution.
 
 
 
-<a name="0x1_voting_EPROPOSAL_ALREADY_RESOLVED"></a>
+<a id="0x1_voting_EPROPOSAL_ALREADY_RESOLVED"></a>
 
 Proposal cannot be resolved more than once
 
@@ -508,7 +508,7 @@ Proposal cannot be resolved more than once
 
 
 
-<a name="0x1_voting_EPROPOSAL_CANNOT_BE_RESOLVED"></a>
+<a id="0x1_voting_EPROPOSAL_CANNOT_BE_RESOLVED"></a>
 
 Proposal cannot be resolved. Either voting duration has not passed, not enough votes, or fewer yes than no votes
 
@@ -518,7 +518,7 @@ Proposal cannot be resolved. Either voting duration has not passed, not enough v
 
 
 
-<a name="0x1_voting_EPROPOSAL_EMPTY_EXECUTION_HASH"></a>
+<a id="0x1_voting_EPROPOSAL_EMPTY_EXECUTION_HASH"></a>
 
 Proposal cannot contain an empty execution script hash
 
@@ -528,7 +528,7 @@ Proposal cannot contain an empty execution script hash
 
 
 
-<a name="0x1_voting_EPROPOSAL_EXECUTION_HASH_NOT_MATCHING"></a>
+<a id="0x1_voting_EPROPOSAL_EXECUTION_HASH_NOT_MATCHING"></a>
 
 Current script's execution hash does not match the specified proposal's
 
@@ -538,7 +538,7 @@ Current script's execution hash does not match the specified proposal's
 
 
 
-<a name="0x1_voting_EPROPOSAL_IS_SINGLE_STEP"></a>
+<a id="0x1_voting_EPROPOSAL_IS_SINGLE_STEP"></a>
 
 Cannot call <code><a href="voting.md#0x1_voting_is_multi_step_proposal_in_execution">is_multi_step_proposal_in_execution</a>()</code> on single-step proposals.
 
@@ -548,7 +548,7 @@ Cannot call <code><a href="voting.md#0x1_voting_is_multi_step_proposal_in_execut
 
 
 
-<a name="0x1_voting_EPROPOSAL_VOTING_ALREADY_ENDED"></a>
+<a id="0x1_voting_EPROPOSAL_VOTING_ALREADY_ENDED"></a>
 
 Proposal's voting period has already ended.
 
@@ -558,7 +558,7 @@ Proposal's voting period has already ended.
 
 
 
-<a name="0x1_voting_ERESOLUTION_CANNOT_BE_ATOMIC"></a>
+<a id="0x1_voting_ERESOLUTION_CANNOT_BE_ATOMIC"></a>
 
 Resolution of a proposal cannot happen atomically in the same transaction as the last vote.
 
@@ -568,7 +568,7 @@ Resolution of a proposal cannot happen atomically in the same transaction as the
 
 
 
-<a name="0x1_voting_ESINGLE_STEP_PROPOSAL_CANNOT_HAVE_NEXT_EXECUTION_HASH"></a>
+<a id="0x1_voting_ESINGLE_STEP_PROPOSAL_CANNOT_HAVE_NEXT_EXECUTION_HASH"></a>
 
 If we call <code><a href="voting.md#0x1_voting_resolve_proposal_v2">resolve_proposal_v2</a>()</code> to resolve a single-step proposal, the <code>next_execution_hash</code> parameter should be an empty vector.
 
@@ -578,7 +578,7 @@ If we call <code><a href="voting.md#0x1_voting_resolve_proposal_v2">resolve_prop
 
 
 
-<a name="0x1_voting_EVOTING_FORUM_ALREADY_REGISTERED"></a>
+<a id="0x1_voting_EVOTING_FORUM_ALREADY_REGISTERED"></a>
 
 Voting forum has already been registered.
 
@@ -588,7 +588,7 @@ Voting forum has already been registered.
 
 
 
-<a name="0x1_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY"></a>
+<a id="0x1_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY"></a>
 
 Key used to track if the multi-step proposal is in execution / resolving in progress.
 
@@ -598,7 +598,7 @@ Key used to track if the multi-step proposal is in execution / resolving in prog
 
 
 
-<a name="0x1_voting_IS_MULTI_STEP_PROPOSAL_KEY"></a>
+<a id="0x1_voting_IS_MULTI_STEP_PROPOSAL_KEY"></a>
 
 Key used to track if the proposal is multi-step
 
@@ -608,7 +608,7 @@ Key used to track if the proposal is multi-step
 
 
 
-<a name="0x1_voting_PROPOSAL_STATE_FAILED"></a>
+<a id="0x1_voting_PROPOSAL_STATE_FAILED"></a>
 
 Proposal has failed because either the min vote threshold is not met or majority voted no.
 
@@ -618,7 +618,7 @@ Proposal has failed because either the min vote threshold is not met or majority
 
 
 
-<a name="0x1_voting_PROPOSAL_STATE_PENDING"></a>
+<a id="0x1_voting_PROPOSAL_STATE_PENDING"></a>
 
 ProposalStateEnum representing proposal state.
 
@@ -628,7 +628,7 @@ ProposalStateEnum representing proposal state.
 
 
 
-<a name="0x1_voting_PROPOSAL_STATE_SUCCEEDED"></a>
+<a id="0x1_voting_PROPOSAL_STATE_SUCCEEDED"></a>
 
 
 
@@ -637,7 +637,7 @@ ProposalStateEnum representing proposal state.
 
 
 
-<a name="0x1_voting_RESOLVABLE_TIME_METADATA_KEY"></a>
+<a id="0x1_voting_RESOLVABLE_TIME_METADATA_KEY"></a>
 
 Key used to track the resolvable time in the proposal's metadata.
 
@@ -647,7 +647,7 @@ Key used to track the resolvable time in the proposal's metadata.
 
 
 
-<a name="0x1_voting_register"></a>
+<a id="0x1_voting_register"></a>
 
 ## Function `register`
 
@@ -693,7 +693,7 @@ Key used to track the resolvable time in the proposal's metadata.
 
 </details>
 
-<a name="0x1_voting_create_proposal"></a>
+<a id="0x1_voting_create_proposal"></a>
 
 ## Function `create_proposal`
 
@@ -748,7 +748,7 @@ this proposal.
 
 </details>
 
-<a name="0x1_voting_create_proposal_v2"></a>
+<a id="0x1_voting_create_proposal_v2"></a>
 
 ## Function `create_proposal_v2`
 
@@ -850,7 +850,7 @@ resolve this proposal.
 
 </details>
 
-<a name="0x1_voting_vote"></a>
+<a id="0x1_voting_vote"></a>
 
 ## Function `vote`
 
@@ -920,7 +920,7 @@ This guarantees that voting eligibility and voting power are controlled by the r
 
 </details>
 
-<a name="0x1_voting_is_proposal_resolvable"></a>
+<a id="0x1_voting_is_proposal_resolvable"></a>
 
 ## Function `is_proposal_resolvable`
 
@@ -963,7 +963,7 @@ Common checks on if a proposal is resolvable, regardless if the proposal is sing
 
 </details>
 
-<a name="0x1_voting_resolve"></a>
+<a id="0x1_voting_resolve"></a>
 
 ## Function `resolve`
 
@@ -1022,7 +1022,7 @@ there are more yes votes than no. If either of these conditions is not met, this
 
 </details>
 
-<a name="0x1_voting_resolve_proposal_v2"></a>
+<a id="0x1_voting_resolve_proposal_v2"></a>
 
 ## Function `resolve_proposal_v2`
 
@@ -1108,7 +1108,7 @@ there are more yes votes than no. If either of these conditions is not met, this
 
 </details>
 
-<a name="0x1_voting_next_proposal_id"></a>
+<a id="0x1_voting_next_proposal_id"></a>
 
 ## Function `next_proposal_id`
 
@@ -1135,7 +1135,7 @@ Return the next unassigned proposal id
 
 </details>
 
-<a name="0x1_voting_get_proposer"></a>
+<a id="0x1_voting_get_proposer"></a>
 
 ## Function `get_proposer`
 
@@ -1161,7 +1161,7 @@ Return the next unassigned proposal id
 
 </details>
 
-<a name="0x1_voting_is_voting_closed"></a>
+<a id="0x1_voting_is_voting_closed"></a>
 
 ## Function `is_voting_closed`
 
@@ -1187,7 +1187,7 @@ Return the next unassigned proposal id
 
 </details>
 
-<a name="0x1_voting_can_be_resolved_early"></a>
+<a id="0x1_voting_can_be_resolved_early"></a>
 
 ## Function `can_be_resolved_early`
 
@@ -1218,7 +1218,7 @@ Return true if the proposal has reached early resolution threshold (if specified
 
 </details>
 
-<a name="0x1_voting_get_proposal_metadata"></a>
+<a id="0x1_voting_get_proposal_metadata"></a>
 
 ## Function `get_proposal_metadata`
 
@@ -1247,7 +1247,7 @@ Return true if the proposal has reached early resolution threshold (if specified
 
 </details>
 
-<a name="0x1_voting_get_proposal_metadata_value"></a>
+<a id="0x1_voting_get_proposal_metadata_value"></a>
 
 ## Function `get_proposal_metadata_value`
 
@@ -1277,7 +1277,7 @@ Return true if the proposal has reached early resolution threshold (if specified
 
 </details>
 
-<a name="0x1_voting_get_proposal_state"></a>
+<a id="0x1_voting_get_proposal_state"></a>
 
 ## Function `get_proposal_state`
 
@@ -1322,7 +1322,7 @@ Return the state of the proposal with given id.
 
 </details>
 
-<a name="0x1_voting_get_proposal_creation_secs"></a>
+<a id="0x1_voting_get_proposal_creation_secs"></a>
 
 ## Function `get_proposal_creation_secs`
 
@@ -1352,7 +1352,7 @@ Return the proposal's creation time.
 
 </details>
 
-<a name="0x1_voting_get_proposal_expiration_secs"></a>
+<a id="0x1_voting_get_proposal_expiration_secs"></a>
 
 ## Function `get_proposal_expiration_secs`
 
@@ -1382,7 +1382,7 @@ Return the proposal's expiration time.
 
 </details>
 
-<a name="0x1_voting_get_execution_hash"></a>
+<a id="0x1_voting_get_execution_hash"></a>
 
 ## Function `get_execution_hash`
 
@@ -1412,7 +1412,7 @@ Return the proposal's execution hash.
 
 </details>
 
-<a name="0x1_voting_get_min_vote_threshold"></a>
+<a id="0x1_voting_get_min_vote_threshold"></a>
 
 ## Function `get_min_vote_threshold`
 
@@ -1442,7 +1442,7 @@ Return the proposal's minimum vote threshold
 
 </details>
 
-<a name="0x1_voting_get_early_resolution_vote_threshold"></a>
+<a id="0x1_voting_get_early_resolution_vote_threshold"></a>
 
 ## Function `get_early_resolution_vote_threshold`
 
@@ -1472,7 +1472,7 @@ Return the proposal's early resolution minimum vote threshold (optionally set)
 
 </details>
 
-<a name="0x1_voting_get_votes"></a>
+<a id="0x1_voting_get_votes"></a>
 
 ## Function `get_votes`
 
@@ -1502,7 +1502,7 @@ Return the proposal's current vote count (yes_votes, no_votes)
 
 </details>
 
-<a name="0x1_voting_is_resolved"></a>
+<a id="0x1_voting_is_resolved"></a>
 
 ## Function `is_resolved`
 
@@ -1532,7 +1532,7 @@ Return true if the governance proposal has already been resolved.
 
 </details>
 
-<a name="0x1_voting_get_resolution_time_secs"></a>
+<a id="0x1_voting_get_resolution_time_secs"></a>
 
 ## Function `get_resolution_time_secs`
 
@@ -1561,7 +1561,7 @@ Return true if the governance proposal has already been resolved.
 
 </details>
 
-<a name="0x1_voting_is_multi_step_proposal_in_execution"></a>
+<a id="0x1_voting_is_multi_step_proposal_in_execution"></a>
 
 ## Function `is_multi_step_proposal_in_execution`
 
@@ -1594,7 +1594,7 @@ Return true if the multi-step governance proposal is in execution.
 
 </details>
 
-<a name="0x1_voting_is_voting_period_over"></a>
+<a id="0x1_voting_is_voting_period_over"></a>
 
 ## Function `is_voting_period_over`
 
@@ -1619,7 +1619,7 @@ Return true if the voting period of the given proposal has already ended.
 
 </details>
 
-<a name="0x1_voting_get_proposal"></a>
+<a id="0x1_voting_get_proposal"></a>
 
 ## Function `get_proposal`
 
@@ -1647,7 +1647,7 @@ Return true if the voting period of the given proposal has already ended.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -1659,7 +1659,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_register"></a>
+<a id="@Specification_1_register"></a>
 
 ### Function `register`
 
@@ -1682,7 +1682,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_create_proposal"></a>
+<a id="@Specification_1_create_proposal"></a>
 
 ### Function `create_proposal`
 
@@ -1700,7 +1700,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_create_proposal_v2"></a>
+<a id="@Specification_1_create_proposal_v2"></a>
 
 ### Function `create_proposal_v2`
 
@@ -1719,7 +1719,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="0x1_voting_CreateProposalAbortsIfAndEnsures"></a>
+<a id="0x1_voting_CreateProposalAbortsIfAndEnsures"></a>
 
 
 <pre><code><b>schema</b> <a href="voting.md#0x1_voting_CreateProposalAbortsIfAndEnsures">CreateProposalAbortsIfAndEnsures</a>&lt;ProposalType&gt; {
@@ -1756,7 +1756,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_vote"></a>
+<a id="@Specification_1_vote"></a>
 
 ### Function `vote`
 
@@ -1795,7 +1795,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_is_proposal_resolvable"></a>
+<a id="@Specification_1_is_proposal_resolvable"></a>
 
 ### Function `is_proposal_resolvable`
 
@@ -1813,7 +1813,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="0x1_voting_IsProposalResolvableAbortsIf"></a>
+<a id="0x1_voting_IsProposalResolvableAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="voting.md#0x1_voting_IsProposalResolvableAbortsIf">IsProposalResolvableAbortsIf</a>&lt;ProposalType&gt; {
@@ -1836,7 +1836,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_resolve"></a>
+<a id="@Specification_1_resolve"></a>
 
 ### Function `resolve`
 
@@ -1868,7 +1868,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_resolve_proposal_v2"></a>
+<a id="@Specification_1_resolve_proposal_v2"></a>
 
 ### Function `resolve_proposal_v2`
 
@@ -1909,7 +1909,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_next_proposal_id"></a>
+<a id="@Specification_1_next_proposal_id"></a>
 
 ### Function `next_proposal_id`
 
@@ -1927,7 +1927,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_get_proposer"></a>
+<a id="@Specification_1_get_proposer"></a>
 
 ### Function `get_proposer`
 
@@ -1947,7 +1947,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_is_voting_closed"></a>
+<a id="@Specification_1_is_voting_closed"></a>
 
 ### Function `is_voting_closed`
 
@@ -1968,7 +1968,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="0x1_voting_spec_is_voting_closed"></a>
+<a id="0x1_voting_spec_is_voting_closed"></a>
 
 
 <pre><code><b>fun</b> <a href="voting.md#0x1_voting_spec_is_voting_closed">spec_is_voting_closed</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): bool {
@@ -1980,7 +1980,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_can_be_resolved_early"></a>
+<a id="@Specification_1_can_be_resolved_early"></a>
 
 ### Function `can_be_resolved_early`
 
@@ -1998,7 +1998,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="0x1_voting_spec_can_be_resolved_early"></a>
+<a id="0x1_voting_spec_can_be_resolved_early"></a>
 
 
 <pre><code><b>fun</b> <a href="voting.md#0x1_voting_spec_can_be_resolved_early">spec_can_be_resolved_early</a>&lt;ProposalType: store&gt;(proposal: <a href="voting.md#0x1_voting_Proposal">Proposal</a>&lt;ProposalType&gt;): bool {
@@ -2018,7 +2018,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="0x1_voting_spec_get_proposal_state"></a>
+<a id="0x1_voting_spec_get_proposal_state"></a>
 
 
 <pre><code><b>fun</b> <a href="voting.md#0x1_voting_spec_get_proposal_state">spec_get_proposal_state</a>&lt;ProposalType&gt;(
@@ -2042,7 +2042,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="0x1_voting_spec_get_proposal_expiration_secs"></a>
+<a id="0x1_voting_spec_get_proposal_expiration_secs"></a>
 
 
 <pre><code><b>fun</b> <a href="voting.md#0x1_voting_spec_get_proposal_expiration_secs">spec_get_proposal_expiration_secs</a>&lt;ProposalType: store&gt;(
@@ -2057,7 +2057,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_get_proposal_metadata"></a>
+<a id="@Specification_1_get_proposal_metadata"></a>
 
 ### Function `get_proposal_metadata`
 
@@ -2077,7 +2077,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_get_proposal_metadata_value"></a>
+<a id="@Specification_1_get_proposal_metadata_value"></a>
 
 ### Function `get_proposal_metadata_value`
 
@@ -2098,7 +2098,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_get_proposal_state"></a>
+<a id="@Specification_1_get_proposal_state"></a>
 
 ### Function `get_proposal_state`
 
@@ -2119,7 +2119,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_get_proposal_creation_secs"></a>
+<a id="@Specification_1_get_proposal_creation_secs"></a>
 
 ### Function `get_proposal_creation_secs`
 
@@ -2139,7 +2139,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_get_proposal_expiration_secs"></a>
+<a id="@Specification_1_get_proposal_expiration_secs"></a>
 
 ### Function `get_proposal_expiration_secs`
 
@@ -2157,7 +2157,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_get_execution_hash"></a>
+<a id="@Specification_1_get_execution_hash"></a>
 
 ### Function `get_execution_hash`
 
@@ -2177,7 +2177,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_get_min_vote_threshold"></a>
+<a id="@Specification_1_get_min_vote_threshold"></a>
 
 ### Function `get_min_vote_threshold`
 
@@ -2197,7 +2197,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_get_early_resolution_vote_threshold"></a>
+<a id="@Specification_1_get_early_resolution_vote_threshold"></a>
 
 ### Function `get_early_resolution_vote_threshold`
 
@@ -2217,7 +2217,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_get_votes"></a>
+<a id="@Specification_1_get_votes"></a>
 
 ### Function `get_votes`
 
@@ -2238,7 +2238,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_is_resolved"></a>
+<a id="@Specification_1_is_resolved"></a>
 
 ### Function `is_resolved`
 
@@ -2259,7 +2259,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="0x1_voting_AbortsIfNotContainProposalID"></a>
+<a id="0x1_voting_AbortsIfNotContainProposalID"></a>
 
 
 <pre><code><b>schema</b> <a href="voting.md#0x1_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt; {
@@ -2273,7 +2273,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_get_resolution_time_secs"></a>
+<a id="@Specification_1_get_resolution_time_secs"></a>
 
 ### Function `get_resolution_time_secs`
 
@@ -2293,7 +2293,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_is_multi_step_proposal_in_execution"></a>
+<a id="@Specification_1_is_multi_step_proposal_in_execution"></a>
 
 ### Function `is_multi_step_proposal_in_execution`
 
@@ -2318,7 +2318,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_is_voting_period_over"></a>
+<a id="@Specification_1_is_voting_period_over"></a>
 
 ### Function `is_voting_period_over`
 

@@ -114,7 +114,7 @@ impl<'a> FunctionGenerator<'a> {
             // Emit state machine to represent control flow.
             // TODO: Eliminate the need for this, see also
             //    https://medium.com/leaningtech/solving-the-structured-control-flow-problem-once-and-for-all-5123117b1ee2
-            if cfg.successors(entry_bb).iter().all(|b| cfg.is_dummmy(*b)) {
+            if cfg.successors(entry_bb).iter().all(|b| cfg.is_dummy(*b)) {
                 // In this trivial case, we have only one block and can omit the state machine
                 if let BlockContent::Basic { lower, upper } = cfg.content(entry_bb) {
                     for offs in *lower..*upper + 1 {
@@ -174,7 +174,7 @@ impl<'a> FunctionGenerator<'a> {
     /// Get the actual entry block, skipping trailing dummy blocks.
     fn get_actual_entry_block(cfg: &StacklessControlFlowGraph) -> BlockId {
         let mut entry_bb = cfg.entry_block();
-        while cfg.is_dummmy(entry_bb) {
+        while cfg.is_dummy(entry_bb) {
             assert_eq!(cfg.successors(entry_bb).len(), 1);
             entry_bb = *cfg.successors(entry_bb).iter().last().unwrap();
         }

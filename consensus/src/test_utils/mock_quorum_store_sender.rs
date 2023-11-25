@@ -78,4 +78,8 @@ impl QuorumStoreSender for MockQuorumStoreSender {
             .await
             .unwrap();
     }
+
+    async fn send_proof_of_store_msg_to_self(&mut self, _proof_of_stores: Vec<ProofOfStore>) {
+        unimplemented!()
+    }
 }

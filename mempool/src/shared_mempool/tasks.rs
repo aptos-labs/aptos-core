@@ -608,7 +608,8 @@ pub(crate) async fn process_config_update<V, P>(
     let consensus_config: anyhow::Result<OnChainConsensusConfig> = config_update.get();
     match consensus_config {
         Ok(consensus_config) => {
-            *broadcast_within_validator_network.write() = !consensus_config.quorum_store_enabled();
+            *broadcast_within_validator_network.write() =
+                !consensus_config.quorum_store_enabled() && !consensus_config.is_dag_enabled()
         },
         Err(e) => {
             error!(

@@ -221,14 +221,14 @@ module aptos_token_objects::token {
         creator: &signer,
         collection_name: String,
         description: String,
-        name_with_index_preffix: String,
+        name_with_index_prefix: String,
         name_with_index_suffix: String,
         royalty: Option<Royalty>,
         uri: String,
     ): ConstructorRef {
         let creator_address = signer::address_of(creator);
         let constructor_ref = object::create_object(creator_address);
-        create_common(&constructor_ref, creator_address, collection_name, description, name_with_index_preffix, option::some(name_with_index_suffix), royalty, uri);
+        create_common(&constructor_ref, creator_address, collection_name, description, name_with_index_prefix, option::some(name_with_index_suffix), royalty, uri);
         constructor_ref
     }
 

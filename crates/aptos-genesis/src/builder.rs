@@ -645,7 +645,7 @@ impl Builder {
             voting_power_increase_limit: 50,
             employee_vesting_start: None,
             employee_vesting_period_duration: None,
-            consensus_config: OnChainConsensusConfig::default(),
+            consensus_config: OnChainConsensusConfig::default_for_genesis(),
             execution_config: OnChainExecutionConfig::default_for_genesis(),
             gas_schedule: default_gas_schedule(),
         };

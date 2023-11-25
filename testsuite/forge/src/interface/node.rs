@@ -77,18 +77,27 @@ pub trait Node: Send + Sync {
 /// Trait used to represent a running Validator
 #[async_trait::async_trait]
 pub trait Validator: Node + Sync {
-    async fn check_connectivity(&self, expected_peers: usize) -> Result<bool> {
+    async fn check_connectivity(
+        &self,
+        network_id: NetworkId,
+        expected_peers: usize,
+    ) -> Result<bool> {
         if expected_peers == 0 {
             return Ok(true);
         }
 
-        self.get_connected_peers(NetworkId::Validator, None)
+        self.get_connected_peers(network_id, None)
             .await
             .map(|maybe_n| maybe_n.map(|n| n >= expected_peers as i64).unwrap_or(false))
     }
 
-    async fn wait_for_connectivity(&self, expected_peers: usize, deadline: Instant) -> Result<()> {
-        while !self.check_connectivity(expected_peers).await? {
+    async fn wait_for_connectivity(
+        &self,
+        network_id: NetworkId,
+        expected_peers: usize,
+        deadline: Instant,
+    ) -> Result<()> {
+        while !self.check_connectivity(network_id, expected_peers).await? {
             if Instant::now() > deadline {
                 return Err(anyhow!("waiting for connectivity timed out"));
             }

@@ -1,5 +1,5 @@
 
-<a name="0x1_ristretto255_pedersen"></a>
+<a id="0x1_ristretto255_pedersen"></a>
 
 # Module `0x1::ristretto255_pedersen`
 
@@ -37,7 +37,7 @@ A Pedersen commitment to a value <code>v</code> under _commitment key_ <code>(g,
 
 
 
-<a name="0x1_ristretto255_pedersen_Commitment"></a>
+<a id="0x1_ristretto255_pedersen_Commitment"></a>
 
 ## Struct `Commitment`
 
@@ -65,12 +65,12 @@ A Pedersen commitment to some value with some randomness.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_ristretto255_pedersen_BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE"></a>
+<a id="0x1_ristretto255_pedersen_BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE"></a>
 
 The default Pedersen randomness base <code>h</code> used in our underlying Bulletproofs library.
 This is obtained by hashing the compressed Ristretto255 basepoint using SHA3-512 (not SHA2-512).
@@ -81,7 +81,7 @@ This is obtained by hashing the compressed Ristretto255 basepoint using SHA3-512
 
 
 
-<a name="0x1_ristretto255_pedersen_new_commitment_from_bytes"></a>
+<a id="0x1_ristretto255_pedersen_new_commitment_from_bytes"></a>
 
 ## Function `new_commitment_from_bytes`
 
@@ -114,7 +114,7 @@ Creates a new public key from a serialized Ristretto255 point.
 
 </details>
 
-<a name="0x1_ristretto255_pedersen_commitment_to_bytes"></a>
+<a id="0x1_ristretto255_pedersen_commitment_to_bytes"></a>
 
 ## Function `commitment_to_bytes`
 
@@ -139,7 +139,7 @@ Returns a commitment as a serialized byte array
 
 </details>
 
-<a name="0x1_ristretto255_pedersen_commitment_from_point"></a>
+<a id="0x1_ristretto255_pedersen_commitment_from_point"></a>
 
 ## Function `commitment_from_point`
 
@@ -166,7 +166,7 @@ Moves a Ristretto point into a Pedersen commitment.
 
 </details>
 
-<a name="0x1_ristretto255_pedersen_commitment_from_compressed"></a>
+<a id="0x1_ristretto255_pedersen_commitment_from_compressed"></a>
 
 ## Function `commitment_from_compressed`
 
@@ -193,7 +193,7 @@ Deserializes a commitment from a compressed Ristretto point.
 
 </details>
 
-<a name="0x1_ristretto255_pedersen_new_commitment"></a>
+<a id="0x1_ristretto255_pedersen_new_commitment"></a>
 
 ## Function `new_commitment`
 
@@ -220,7 +220,7 @@ Returns a commitment <code>v * val_base + r * rand_base</code> where <code>(val_
 
 </details>
 
-<a name="0x1_ristretto255_pedersen_new_commitment_with_basepoint"></a>
+<a id="0x1_ristretto255_pedersen_new_commitment_with_basepoint"></a>
 
 ## Function `new_commitment_with_basepoint`
 
@@ -247,7 +247,7 @@ Returns a commitment <code>v * G + r * rand_base</code> where <code>G</code> is 
 
 </details>
 
-<a name="0x1_ristretto255_pedersen_new_commitment_for_bulletproof"></a>
+<a id="0x1_ristretto255_pedersen_new_commitment_for_bulletproof"></a>
 
 ## Function `new_commitment_for_bulletproof`
 
@@ -278,7 +278,7 @@ base used in the Bulletproofs library (i.e., <code><a href="ristretto255_pederse
 
 </details>
 
-<a name="0x1_ristretto255_pedersen_commitment_add"></a>
+<a id="0x1_ristretto255_pedersen_commitment_add"></a>
 
 ## Function `commitment_add`
 
@@ -306,7 +306,7 @@ Useful for re-randomizing the commitment or updating the committed value.
 
 </details>
 
-<a name="0x1_ristretto255_pedersen_commitment_add_assign"></a>
+<a id="0x1_ristretto255_pedersen_commitment_add_assign"></a>
 
 ## Function `commitment_add_assign`
 
@@ -331,7 +331,7 @@ Like <code>commitment_add</code> but assigns <code>lhs = lhs + rhs</code>.
 
 </details>
 
-<a name="0x1_ristretto255_pedersen_commitment_sub"></a>
+<a id="0x1_ristretto255_pedersen_commitment_sub"></a>
 
 ## Function `commitment_sub`
 
@@ -359,7 +359,7 @@ Useful for re-randomizing the commitment or updating the committed value.
 
 </details>
 
-<a name="0x1_ristretto255_pedersen_commitment_sub_assign"></a>
+<a id="0x1_ristretto255_pedersen_commitment_sub_assign"></a>
 
 ## Function `commitment_sub_assign`
 
@@ -384,7 +384,7 @@ Like <code>commitment_add</code> but assigns <code>lhs = lhs - rhs</code>.
 
 </details>
 
-<a name="0x1_ristretto255_pedersen_commitment_clone"></a>
+<a id="0x1_ristretto255_pedersen_commitment_clone"></a>
 
 ## Function `commitment_clone`
 
@@ -411,7 +411,7 @@ Creates a copy of this commitment.
 
 </details>
 
-<a name="0x1_ristretto255_pedersen_commitment_equals"></a>
+<a id="0x1_ristretto255_pedersen_commitment_equals"></a>
 
 ## Function `commitment_equals`
 
@@ -436,7 +436,7 @@ Returns true if the two commitments are identical: i.e., same value and same ran
 
 </details>
 
-<a name="0x1_ristretto255_pedersen_commitment_as_point"></a>
+<a id="0x1_ristretto255_pedersen_commitment_as_point"></a>
 
 ## Function `commitment_as_point`
 
@@ -461,7 +461,7 @@ Returns the underlying elliptic curve point representing the commitment as an in
 
 </details>
 
-<a name="0x1_ristretto255_pedersen_commitment_as_compressed_point"></a>
+<a id="0x1_ristretto255_pedersen_commitment_as_compressed_point"></a>
 
 ## Function `commitment_as_compressed_point`
 
@@ -486,7 +486,7 @@ Returns the Pedersen commitment as a <code>CompressedRistretto</code> point.
 
 </details>
 
-<a name="0x1_ristretto255_pedersen_commitment_into_point"></a>
+<a id="0x1_ristretto255_pedersen_commitment_into_point"></a>
 
 ## Function `commitment_into_point`
 
@@ -512,7 +512,7 @@ Moves the Commitment into a CompressedRistretto point.
 
 </details>
 
-<a name="0x1_ristretto255_pedersen_commitment_into_compressed_point"></a>
+<a id="0x1_ristretto255_pedersen_commitment_into_compressed_point"></a>
 
 ## Function `commitment_into_compressed_point`
 
@@ -537,7 +537,7 @@ Moves the Commitment into a <code>CompressedRistretto</code> point.
 
 </details>
 
-<a name="0x1_ristretto255_pedersen_randomness_base_for_bulletproof"></a>
+<a id="0x1_ristretto255_pedersen_randomness_base_for_bulletproof"></a>
 
 ## Function `randomness_base_for_bulletproof`
 

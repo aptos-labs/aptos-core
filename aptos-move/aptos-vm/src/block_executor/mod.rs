@@ -19,6 +19,7 @@ use aptos_block_executor::{
 use aptos_infallible::Mutex;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
+    block_executor::config::BlockExecutorConfig,
     contract_event::ContractEvent,
     executable::ExecutableTestType,
     fee_statement::FeeStatement,
@@ -303,8 +304,7 @@ impl BlockAptosVM {
         executor_thread_pool: Arc<ThreadPool>,
         signature_verified_block: &[SignatureVerifiedTransaction],
         state_view: &S,
-        concurrency_level: usize,
-        maybe_block_gas_limit: Option<u64>,
+        config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
@@ -315,19 +315,14 @@ impl BlockAptosVM {
             init_speculative_logs(num_txns);
         }
 
-        BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
+        BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
         let executor = BlockExecutor::<
             SignatureVerifiedTransaction,
             AptosExecutorTask<S>,
             S,
             L,
             ExecutableTestType,
-        >::new(
-            concurrency_level,
-            executor_thread_pool,
-            maybe_block_gas_limit,
-            transaction_commit_listener,
-        );
+        >::new(config, executor_thread_pool, transaction_commit_listener);
 
         let ret = executor.execute_block(state_view, signature_verified_block, state_view);
         match ret {

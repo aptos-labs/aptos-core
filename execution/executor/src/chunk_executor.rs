@@ -33,6 +33,7 @@ use aptos_storage_interface::{
     state_delta::StateDelta, DbReaderWriter, ExecutedTrees,
 };
 use aptos_types::{
+    block_executor::config::BlockExecutorConfigFromOnchain,
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     transaction::{
@@ -272,7 +273,11 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         let chunk_output = {
             let _timer = APTOS_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS.start_timer();
             // State sync executor shouldn't have block gas limit.
-            ChunkOutput::by_transaction_execution::<V>(sig_verified_txns.into(), state_view, None)?
+            ChunkOutput::by_transaction_execution::<V>(
+                sig_verified_txns.into(),
+                state_view,
+                BlockExecutorConfigFromOnchain::new_no_block_limit(),
+            )?
         };
 
         // Calcualte state snapshot
@@ -674,8 +679,11 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             .collect::<Vec<SignatureVerifiedTransaction>>();
 
         // State sync executor shouldn't have block gas limit.
-        let chunk_output =
-            ChunkOutput::by_transaction_execution::<V>(txns.into(), state_view, None)?;
+        let chunk_output = ChunkOutput::by_transaction_execution::<V>(
+            txns.into(),
+            state_view,
+            BlockExecutorConfigFromOnchain::new_no_block_limit(),
+        )?;
         // not `zip_eq`, deliberately
         for (version, txn_out, txn_info, write_set, events) in multizip((
             begin_version..end_version,

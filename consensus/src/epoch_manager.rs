@@ -86,6 +86,7 @@ use aptos_types::{
         LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
         OnChainExecutionConfig, ProposerElectionType, ValidatorSet, DKGState,
     },
+    system_txn::pool::SystemTransactionPoolClient,
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier, randomness::{RandConfig, RandKeys, WvufPP, WVUF}, contract_event::ContractEvent,
 };
@@ -145,6 +146,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     commit_state_computer: Arc<dyn StateComputer>,
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
+    sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
     reconfig_events: ReconfigNotificationListener<P>,
     dkg_events: EventNotificationListener,
     dkg_manager_wrapper: Arc<DKGManagerWrapper>,
@@ -194,6 +196,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         dkg_events: EventNotificationListener,
         bounded_executor: BoundedExecutor,
         aptos_time_service: aptos_time_service::TimeService,
+        sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -215,6 +218,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             commit_state_computer,
             storage,
             safety_rules_manager,
+            sys_txn_pool_client,
             reconfig_events,
             dkg_events,
             rand_manager_msg_tx: None,
@@ -766,10 +770,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         epoch_state: &EpochState,
         network_sender: NetworkSender,
+        consensus_config: &OnChainConsensusConfig,
     ) -> (Arc<PayloadManager>, QuorumStoreClient, QuorumStoreBuilder) {
         // Start QuorumStore
         let (consensus_to_quorum_store_tx, consensus_to_quorum_store_rx) =
             mpsc::channel(self.config.intra_consensus_channel_buffer_size);
+
+        let quorum_store_config = if consensus_config.is_dag_enabled() {
+            self.dag_config.quorum_store.clone()
+        } else {
+            self.config.quorum_store.clone()
+        };
 
         let mut quorum_store_builder = if self.quorum_store_enabled {
             info!("Building QuorumStore");
@@ -777,7 +788,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.epoch(),
                 self.author,
                 epoch_state.verifier.len() as u64,
-                self.config.quorum_store.clone(),
+                quorum_store_config,
                 consensus_to_quorum_store_rx,
                 self.quorum_store_to_mempool_sender.clone(),
                 self.config.mempool_txn_pull_timeout_ms,
@@ -786,6 +797,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 epoch_state.verifier.clone(),
                 self.config.safety_rules.backend.clone(),
                 self.quorum_store_storage.clone(),
+                !consensus_config.is_dag_enabled(),
             ))
         } else {
             info!("Building DirectMempool");
@@ -819,7 +831,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let randomness_enabled = features.as_ref().map(|f|f.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG)).unwrap_or(false);
         let transaction_shuffler =
             create_transaction_shuffler(onchain_execution_config.transaction_shuffler_type());
-        let block_gas_limit = onchain_execution_config.block_gas_limit();
+        let block_executor_onchain_config =
+            onchain_execution_config.block_executor_onchain_config();
         let transaction_deduper =
             create_transaction_deduper(onchain_execution_config.transaction_deduper_type());
 
@@ -862,7 +875,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             payload_manager,
             self.dkg_manager_wrapper.clone(),
             transaction_shuffler,
-            block_gas_limit,
+            block_executor_onchain_config,
             transaction_deduper,
             randomness_enabled,
         );
@@ -996,6 +1009,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
+            self.sys_txn_pool_client.clone(),
+            onchain_consensus_config.should_propose_system_txns(),
             self.dkg_manager_wrapper.clone(),
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
@@ -1182,7 +1197,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.quorum_store_enabled = self.enable_quorum_store(consensus_config);
         let network_sender = self.create_network_sender(epoch_state);
         let (payload_manager, payload_client, quorum_store_builder) = self
-            .init_payload_provider(epoch_state, network_sender.clone())
+            .init_payload_provider(epoch_state, network_sender.clone(), consensus_config)
             .await;
 
         self.init_commit_state_computer(epoch_state, payload_manager.clone(), execution_config, network_sender.clone(), features);
@@ -1295,6 +1310,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             payload_client,
             state_computer,
             block_tx,
+            onchain_consensus_config.quorum_store_enabled(),
         );
 
         let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);

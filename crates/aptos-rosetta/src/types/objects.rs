@@ -882,6 +882,7 @@ impl Transaction {
             BlockMetadata(_) => (TransactionType::BlockMetadata, None, txn.info, txn.events),
             BlockMetadataExt(_) => (TransactionType::BlockMetadata, None, txn.info, txn.events),
             StateCheckpoint(_) => (TransactionType::StateCheckpoint, None, txn.info, vec![]),
+            SystemTransaction(_) => todo!(),
         };
 
         // Operations must be sequential and operation index must always be in the same order

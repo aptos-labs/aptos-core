@@ -14,7 +14,10 @@ use move_model::{
         StructEnv, StructId,
     },
     pragmas::INTRINSIC_TYPE_MAP,
-    ty::{Type, TypeDisplayContext, TypeInstantiationDerivation, TypeUnificationAdapter, Variance},
+    ty::{
+        NoUnificationContext, Type, TypeDisplayContext, TypeInstantiationDerivation,
+        TypeUnificationAdapter, Variance,
+    },
     well_known::{
         TYPE_INFO_MOVE, TYPE_INFO_SPEC, TYPE_NAME_GET_MOVE, TYPE_NAME_GET_SPEC, TYPE_NAME_MOVE,
         TYPE_NAME_SPEC, TYPE_SPEC_IS_STRUCT,
@@ -326,7 +329,10 @@ impl<'a> Analyzer<'a> {
 
                     // make sure these two types unify before trying to instantiate them
                     let adapter = TypeUnificationAdapter::new_pair(&lhs_ty, &rhs_ty, true, true);
-                    if adapter.unify(Variance::SpecVariance, false).is_none() {
+                    if adapter
+                        .unify(&NoUnificationContext, Variance::SpecVariance, false)
+                        .is_none()
+                    {
                         continue;
                     }
 

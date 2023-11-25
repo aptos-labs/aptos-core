@@ -1,5 +1,5 @@
 
-<a name="0x1_bit_vector"></a>
+<a id="0x1_bit_vector"></a>
 
 # Module `0x1::bit_vector`
 
@@ -30,7 +30,7 @@
 
 
 
-<a name="0x1_bit_vector_BitVector"></a>
+<a id="0x1_bit_vector_BitVector"></a>
 
 ## Struct `BitVector`
 
@@ -63,12 +63,12 @@
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_bit_vector_EINDEX"></a>
+<a id="0x1_bit_vector_EINDEX"></a>
 
 The provided index is out of bounds
 
@@ -78,7 +78,7 @@ The provided index is out of bounds
 
 
 
-<a name="0x1_bit_vector_ELENGTH"></a>
+<a id="0x1_bit_vector_ELENGTH"></a>
 
 An invalid length of bitvector was given
 
@@ -88,7 +88,7 @@ An invalid length of bitvector was given
 
 
 
-<a name="0x1_bit_vector_MAX_SIZE"></a>
+<a id="0x1_bit_vector_MAX_SIZE"></a>
 
 The maximum allowed bitvector size
 
@@ -98,7 +98,7 @@ The maximum allowed bitvector size
 
 
 
-<a name="0x1_bit_vector_WORD_SIZE"></a>
+<a id="0x1_bit_vector_WORD_SIZE"></a>
 
 
 
@@ -107,7 +107,7 @@ The maximum allowed bitvector size
 
 
 
-<a name="0x1_bit_vector_new"></a>
+<a id="0x1_bit_vector_new"></a>
 
 ## Function `new`
 
@@ -151,7 +151,7 @@ The maximum allowed bitvector size
 
 </details>
 
-<a name="0x1_bit_vector_set"></a>
+<a id="0x1_bit_vector_set"></a>
 
 ## Function `set`
 
@@ -178,7 +178,7 @@ Set the bit at <code>bit_index</code> in the <code>bitvector</code> regardless o
 
 </details>
 
-<a name="0x1_bit_vector_unset"></a>
+<a id="0x1_bit_vector_unset"></a>
 
 ## Function `unset`
 
@@ -205,7 +205,7 @@ Unset the bit at <code>bit_index</code> in the <code>bitvector</code> regardless
 
 </details>
 
-<a name="0x1_bit_vector_shift_left"></a>
+<a id="0x1_bit_vector_shift_left"></a>
 
 ## Function `shift_left`
 
@@ -250,7 +250,7 @@ bitvector's length the bitvector will be zeroed out.
 
 </details>
 
-<a name="0x1_bit_vector_is_index_set"></a>
+<a id="0x1_bit_vector_is_index_set"></a>
 
 ## Function `is_index_set`
 
@@ -277,7 +277,7 @@ represents "1" and <code><b>false</b></code> represents a 0
 
 </details>
 
-<a name="0x1_bit_vector_length"></a>
+<a id="0x1_bit_vector_length"></a>
 
 ## Function `length`
 
@@ -302,7 +302,7 @@ Return the length (number of usable bits) of this bitvector
 
 </details>
 
-<a name="0x1_bit_vector_longest_set_sequence_starting_at"></a>
+<a id="0x1_bit_vector_longest_set_sequence_starting_at"></a>
 
 ## Function `longest_set_sequence_starting_at`
 
@@ -347,7 +347,7 @@ sequence, then <code>0</code> is returned.
 
 </details>
 
-<a name="0x1_bit_vector_shift_left_for_verification_only"></a>
+<a id="0x1_bit_vector_shift_left_for_verification_only"></a>
 
 ## Function `shift_left_for_verification_only`
 
@@ -419,12 +419,12 @@ sequence, then <code>0</code> is returned.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
 
-<a name="@Specification_1_BitVector"></a>
+<a id="@Specification_1_BitVector"></a>
 
 ### Struct `BitVector`
 
@@ -456,7 +456,7 @@ sequence, then <code>0</code> is returned.
 
 
 
-<a name="@Specification_1_new"></a>
+<a id="@Specification_1_new"></a>
 
 ### Function `new`
 
@@ -475,7 +475,7 @@ sequence, then <code>0</code> is returned.
 
 
 
-<a name="0x1_bit_vector_NewAbortsIf"></a>
+<a id="0x1_bit_vector_NewAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="bit_vector.md#0x1_bit_vector_NewAbortsIf">NewAbortsIf</a> {
@@ -487,7 +487,7 @@ sequence, then <code>0</code> is returned.
 
 
 
-<a name="@Specification_1_set"></a>
+<a id="@Specification_1_set"></a>
 
 ### Function `set`
 
@@ -505,7 +505,7 @@ sequence, then <code>0</code> is returned.
 
 
 
-<a name="0x1_bit_vector_SetAbortsIf"></a>
+<a id="0x1_bit_vector_SetAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="bit_vector.md#0x1_bit_vector_SetAbortsIf">SetAbortsIf</a> {
@@ -517,7 +517,7 @@ sequence, then <code>0</code> is returned.
 
 
 
-<a name="@Specification_1_unset"></a>
+<a id="@Specification_1_unset"></a>
 
 ### Function `unset`
 
@@ -535,7 +535,7 @@ sequence, then <code>0</code> is returned.
 
 
 
-<a name="0x1_bit_vector_UnsetAbortsIf"></a>
+<a id="0x1_bit_vector_UnsetAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="bit_vector.md#0x1_bit_vector_UnsetAbortsIf">UnsetAbortsIf</a> {
@@ -547,7 +547,7 @@ sequence, then <code>0</code> is returned.
 
 
 
-<a name="@Specification_1_shift_left"></a>
+<a id="@Specification_1_shift_left"></a>
 
 ### Function `shift_left`
 
@@ -563,7 +563,7 @@ sequence, then <code>0</code> is returned.
 
 
 
-<a name="@Specification_1_is_index_set"></a>
+<a id="@Specification_1_is_index_set"></a>
 
 ### Function `is_index_set`
 
@@ -581,7 +581,7 @@ sequence, then <code>0</code> is returned.
 
 
 
-<a name="0x1_bit_vector_IsIndexSetAbortsIf"></a>
+<a id="0x1_bit_vector_IsIndexSetAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="bit_vector.md#0x1_bit_vector_IsIndexSetAbortsIf">IsIndexSetAbortsIf</a> {
@@ -594,7 +594,7 @@ sequence, then <code>0</code> is returned.
 
 
 
-<a name="0x1_bit_vector_spec_is_index_set"></a>
+<a id="0x1_bit_vector_spec_is_index_set"></a>
 
 
 <pre><code><b>fun</b> <a href="bit_vector.md#0x1_bit_vector_spec_is_index_set">spec_is_index_set</a>(bitvector: <a href="bit_vector.md#0x1_bit_vector_BitVector">BitVector</a>, bit_index: u64): bool {
@@ -608,7 +608,7 @@ sequence, then <code>0</code> is returned.
 
 
 
-<a name="@Specification_1_longest_set_sequence_starting_at"></a>
+<a id="@Specification_1_longest_set_sequence_starting_at"></a>
 
 ### Function `longest_set_sequence_starting_at`
 
@@ -625,7 +625,7 @@ sequence, then <code>0</code> is returned.
 
 
 
-<a name="@Specification_1_shift_left_for_verification_only"></a>
+<a id="@Specification_1_shift_left_for_verification_only"></a>
 
 ### Function `shift_left_for_verification_only`
 

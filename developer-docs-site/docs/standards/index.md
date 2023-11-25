@@ -1,5 +1,5 @@
 ---
-title: "Embrace the Aptos Standards"
+title: "Aptos Standards"
 ---
 
 # Aptos Standards

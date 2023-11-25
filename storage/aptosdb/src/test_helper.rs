@@ -78,6 +78,7 @@ pub(crate) fn update_store(
                 &state_kv_metadata_batch,
                 /*put_state_value_indices=*/ false,
                 /*skip_usage=*/ false,
+                /*last_checkpoint_index=*/ None,
             )
             .unwrap();
         store

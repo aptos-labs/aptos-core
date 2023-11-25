@@ -559,7 +559,11 @@ impl CompiledPackage {
                 },
             )
             .collect::<Vec<_>>();
-        for (dep_package_name, _, _, _) in &transitive_dependencies {
+        let mut source_package_map: BTreeMap<String, Symbol> = BTreeMap::new();
+        for (dep_package_name, source_paths, _, _) in &transitive_dependencies {
+            for dep_path in source_paths.clone() {
+                source_package_map.insert(dep_path.as_str().to_string(), *dep_package_name);
+            }
             writeln!(
                 w,
                 "{} {}",
@@ -575,6 +579,9 @@ impl CompiledPackage {
             &resolved_package,
             transitive_dependencies,
         )?;
+        for source_path in &sources_package_paths.paths {
+            source_package_map.insert(source_path.as_str().to_string(), root_package_name);
+        }
         let mut flags = if resolution_graph.build_options.test_mode {
             Flags::testing()
         } else {
@@ -675,11 +682,30 @@ impl CompiledPackage {
         };
         let mut root_compiled_units = vec![];
         let mut deps_compiled_units = vec![];
+        let obtain_package_name =
+            |default_opt: Option<Symbol>, source_path_str: &str| -> Result<Symbol> {
+                if let Some(default) = default_opt {
+                    Ok(default)
+                } else if source_package_map.contains_key(source_path_str) {
+                    Ok(*source_package_map.get(source_path_str).unwrap())
+                } else {
+                    Err(anyhow::anyhow!("package name is none"))
+                }
+            };
         for annot_unit in all_compiled_units {
-            let source_path = PathBuf::from(file_map[&annot_unit.loc().file_hash()].0.as_str());
+            let source_path_str = file_map
+                .get(&annot_unit.loc().file_hash())
+                .ok_or(anyhow::anyhow!("invalid transaction script bytecode"))?
+                .0
+                .as_str();
+            let source_path = PathBuf::from(source_path_str);
             let package_name = match &annot_unit {
-                compiled_unit::CompiledUnitEnum::Module(m) => m.named_module.package_name.unwrap(),
-                compiled_unit::CompiledUnitEnum::Script(s) => s.named_script.package_name.unwrap(),
+                compiled_unit::CompiledUnitEnum::Module(m) => {
+                    obtain_package_name(m.named_module.package_name, source_path_str)?
+                },
+                compiled_unit::CompiledUnitEnum::Script(s) => {
+                    obtain_package_name(s.named_script.package_name, source_path_str)?
+                },
             };
             let unit = CompiledUnitWithSource {
                 unit: annot_unit.into_compiled_unit(),

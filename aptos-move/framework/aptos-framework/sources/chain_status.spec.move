@@ -4,8 +4,14 @@ spec aptos_framework::chain_status {
         pragma aborts_if_is_strict;
     }
 
-    spec set_genesis_end {
+    spec set_genesis_end(aptos_framework: &signer) {
+        use std::signer;
+        //TODO: It occured gloabl invariants not hold (property proved)
         pragma verify = false;
+        let addr = signer::address_of(aptos_framework);
+        aborts_if addr != @aptos_framework;
+        aborts_if exists<GenesisEndMarker>(@aptos_framework);
+        ensures global<GenesisEndMarker>(@aptos_framework) == GenesisEndMarker {};
     }
 
     spec schema RequiresIsOperating {

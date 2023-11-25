@@ -2,5 +2,5 @@ error[E04010]: cannot infer type
   ┌─ tests/move_check/typing/uninferred_type_call.move:3:9
   │
 3 │         foo()
-  │         ^^^^^ Could not infer this type. Try adding an annotation
+  │         ^^^^^ Cannot infer the type parameter `T` for generic function `0x8675309::M::foo`. Try providing a type parameter.
 

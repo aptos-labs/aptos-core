@@ -1,0 +1,15 @@
+
+Diagnostics:
+error: cyclic recursion involving only inline functions is not allowed: `Test::f` -> `Test::g` -> `Test::h` -> `Test::f`
+   ┌─ tests/checking/inlining/recursion.move:4:9
+   │
+ 4 │         g()
+   │         ^^^
+   │         │
+   │         call from `Test::f` to `Test::g`
+   ·
+ 8 │         h()
+   │         --- call from `Test::g` to `Test::h`
+   ·
+12 │         f()
+   │         --- call from `Test::h` to `Test::f`

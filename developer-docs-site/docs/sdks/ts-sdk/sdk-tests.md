@@ -28,7 +28,7 @@ An example of an e2e test for submitting a BCS transaction can be found in [`apt
 
 2. The second level of validation is fuzzing tests with test vectors. The test vectors are produced by the same code used by the Aptos blockchain. The test vectors are arrays of JSON objects. Each JSON object contains randomized inputs and the expected outputs. The Aptos SDKs can parse and load test vectors to validate their implementations of Transaction Builder and BCS.
 
-There are a two test vectors. Each covers one type of transaction payload:
+There are two test vectors. Each covers one type of transaction payload:
 
 - [EntryFunction](https://github.com/aptos-labs/aptos-core/blob/main/api/goldens/aptos_api__tests__transaction_vector_test__test_entry_function_payload.json) vector
 - [Script](https://github.com/aptos-labs/aptos-core/blob/main/api/goldens/aptos_api__tests__transaction_vector_test__test_script_payload.json) vector

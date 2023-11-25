@@ -137,6 +137,7 @@ module ambassador::ambassador {
         mint_ambassador_token(creator, description, name, uri, signer::address_of(user));
     }
 
+
     /// Mints an ambassador token. This function mints a new ambassador token and transfers it to the
     /// `soul_bound_to` address. The token is minted with level 0 and rank Bronze.
     public entry fun mint_ambassador_token(
@@ -146,20 +147,67 @@ module ambassador::ambassador {
         base_uri: String,
         soul_bound_to: address,
     ) {
+        mint_ambassador_token_impl(creator, description, name, base_uri, soul_bound_to, false);
+    }
+
+    public entry fun mint_numbered_ambassador_token_by_user(
+        user: &signer,
+        creator: &signer,
+        description: String,
+        name: String,
+        uri: String,
+    ) {
+        mint_numbered_ambassador_token(creator, description, name, uri, signer::address_of(user));
+    }
+
+    /// Mints an ambassador token. This function mints a new ambassador token and transfers it to the
+    /// `soul_bound_to` address. The token is minted with level 0 and rank Bronze.
+    public entry fun mint_numbered_ambassador_token(
+        creator: &signer,
+        description: String,
+        name: String,
+        base_uri: String,
+        soul_bound_to: address,
+    ) {
+        mint_ambassador_token_impl(creator, description, name, base_uri, soul_bound_to, true);
+    }
+
+    /// Mints an ambassador token. This function mints a new ambassador token and transfers it to the
+    /// `soul_bound_to` address. The token is minted with level 0 and rank Bronze.
+    fun mint_ambassador_token_impl(
+        creator: &signer,
+        description: String,
+        name: String,
+        base_uri: String,
+        soul_bound_to: address,
+        numbered: bool,
+    ) {
         // The collection name is used to locate the collection object and to create a new token object.
         let collection = string::utf8(COLLECTION_NAME);
         // Creates the ambassador token, and get the constructor ref of the token. The constructor ref
         // is used to generate the refs of the token.
         let uri = base_uri;
         string::append(&mut uri, string::utf8(RANK_BRONZE));
-        let constructor_ref = token::create_named_token(
-            creator,
-            collection,
-            description,
-            name,
-            option::none(),
-            uri,
-        );
+        let constructor_ref = if (numbered) {
+            token::create_numbered_token(
+                creator,
+                collection,
+                description,
+                name,
+                string::utf8(b""),
+                option::none(),
+                uri,
+            )
+        } else {
+            token::create_named_token(
+                creator,
+                collection,
+                description,
+                name,
+                option::none(),
+                uri,
+            )
+        };
 
         // Generates the object signer and the refs. The object signer is used to publish a resource
         // (e.g., AmbassadorLevel) under the token object address. The refs are used to manage the token.

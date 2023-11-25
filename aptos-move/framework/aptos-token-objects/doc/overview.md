@@ -1,5 +1,5 @@
 
-<a name="@Aptos_Token_Framework_0"></a>
+<a id="@Aptos_Token_Framework_0"></a>
 
 # Aptos Token Framework
 
@@ -7,7 +7,7 @@
 This is the reference documentation of the Aptos Token Objects framework.
 
 
-<a name="@Index_1"></a>
+<a id="@Index_1"></a>
 
 ## Index
 

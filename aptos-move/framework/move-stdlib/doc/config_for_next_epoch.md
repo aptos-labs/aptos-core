@@ -1,5 +1,5 @@
 
-<a name="0x1_config_for_next_epoch"></a>
+<a id="0x1_config_for_next_epoch"></a>
 
 # Module `0x1::config_for_next_epoch`
 
@@ -31,7 +31,7 @@ This wrapper helps store an on-chain config for the next epoch.
 
 
 
-<a name="0x1_config_for_next_epoch_ForNextEpoch"></a>
+<a id="0x1_config_for_next_epoch_ForNextEpoch"></a>
 
 ## Resource `ForNextEpoch`
 
@@ -59,7 +59,7 @@ This wrapper helps store an on-chain config for the next epoch.
 
 </details>
 
-<a name="0x1_config_for_next_epoch_UpsertLock"></a>
+<a id="0x1_config_for_next_epoch_UpsertLock"></a>
 
 ## Resource `UpsertLock`
 
@@ -94,7 +94,7 @@ We need to temporarily reject on-chain config changes during DKG.
 
 </details>
 
-<a name="0x1_config_for_next_epoch_ExtractPermit"></a>
+<a id="0x1_config_for_next_epoch_ExtractPermit"></a>
 
 ## Resource `ExtractPermit`
 
@@ -122,12 +122,12 @@ We need to allow extraction of pending configs ONLY when we are at the end of a 
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_config_for_next_epoch_EPERMISSION_DENIED"></a>
+<a id="0x1_config_for_next_epoch_EPERMISSION_DENIED"></a>
 
 
 
@@ -136,7 +136,7 @@ We need to allow extraction of pending configs ONLY when we are at the end of a 
 
 
 
-<a name="0x1_config_for_next_epoch_ERESOURCE_BUSY"></a>
+<a id="0x1_config_for_next_epoch_ERESOURCE_BUSY"></a>
 
 
 
@@ -145,7 +145,7 @@ We need to allow extraction of pending configs ONLY when we are at the end of a 
 
 
 
-<a name="0x1_config_for_next_epoch_ESTD_OR_VM_SIGNER_NEEDED"></a>
+<a id="0x1_config_for_next_epoch_ESTD_OR_VM_SIGNER_NEEDED"></a>
 
 
 
@@ -154,7 +154,7 @@ We need to allow extraction of pending configs ONLY when we are at the end of a 
 
 
 
-<a name="0x1_config_for_next_epoch_ESTD_SIGNER_NEEDED"></a>
+<a id="0x1_config_for_next_epoch_ESTD_SIGNER_NEEDED"></a>
 
 
 
@@ -163,7 +163,7 @@ We need to allow extraction of pending configs ONLY when we are at the end of a 
 
 
 
-<a name="0x1_config_for_next_epoch_EVM_SIGNER_NEEDED"></a>
+<a id="0x1_config_for_next_epoch_EVM_SIGNER_NEEDED"></a>
 
 
 
@@ -172,7 +172,7 @@ We need to allow extraction of pending configs ONLY when we are at the end of a 
 
 
 
-<a name="0x1_config_for_next_epoch_extracts_enabled"></a>
+<a id="0x1_config_for_next_epoch_extracts_enabled"></a>
 
 ## Function `extracts_enabled`
 
@@ -196,7 +196,7 @@ We need to allow extraction of pending configs ONLY when we are at the end of a 
 
 </details>
 
-<a name="0x1_config_for_next_epoch_enable_extracts"></a>
+<a id="0x1_config_for_next_epoch_enable_extracts"></a>
 
 ## Function `enable_extracts`
 
@@ -220,7 +220,7 @@ We need to allow extraction of pending configs ONLY when we are at the end of a 
 
 </details>
 
-<a name="0x1_config_for_next_epoch_disable_extracts"></a>
+<a id="0x1_config_for_next_epoch_disable_extracts"></a>
 
 ## Function `disable_extracts`
 
@@ -244,7 +244,7 @@ We need to allow extraction of pending configs ONLY when we are at the end of a 
 
 </details>
 
-<a name="0x1_config_for_next_epoch_upserts_enabled"></a>
+<a id="0x1_config_for_next_epoch_upserts_enabled"></a>
 
 ## Function `upserts_enabled`
 
@@ -268,7 +268,7 @@ We need to allow extraction of pending configs ONLY when we are at the end of a 
 
 </details>
 
-<a name="0x1_config_for_next_epoch_disable_upserts"></a>
+<a id="0x1_config_for_next_epoch_disable_upserts"></a>
 
 ## Function `disable_upserts`
 
@@ -293,7 +293,7 @@ Disable on-chain config updates. Only needed when a reconfiguration with DKG sta
 
 </details>
 
-<a name="0x1_config_for_next_epoch_enable_upserts"></a>
+<a id="0x1_config_for_next_epoch_enable_upserts"></a>
 
 ## Function `enable_upserts`
 
@@ -318,7 +318,7 @@ Enable on-chain config updates. Only needed when a reconfiguration with DKG fini
 
 </details>
 
-<a name="0x1_config_for_next_epoch_does_exist"></a>
+<a id="0x1_config_for_next_epoch_does_exist"></a>
 
 ## Function `does_exist`
 
@@ -343,7 +343,7 @@ Check whether there is a pending config payload for <code>T</code>.
 
 </details>
 
-<a name="0x1_config_for_next_epoch_upsert"></a>
+<a id="0x1_config_for_next_epoch_upsert"></a>
 
 ## Function `upsert`
 
@@ -375,7 +375,7 @@ Typically followed by a <code>aptos_framework::reconfigure::start_reconfigure_wi
 
 </details>
 
-<a name="0x1_config_for_next_epoch_extract"></a>
+<a id="0x1_config_for_next_epoch_extract"></a>
 
 ## Function `extract`
 
@@ -406,7 +406,7 @@ NOTE: The caller has to ensure updates are enabled using <code>enable_updates()<
 
 </details>
 
-<a name="0x1_config_for_next_epoch_upsert_lock_state"></a>
+<a id="0x1_config_for_next_epoch_upsert_lock_state"></a>
 
 ## Function `upsert_lock_state`
 
@@ -437,7 +437,7 @@ NOTE: The caller has to ensure updates are enabled using <code>enable_updates()<
 
 </details>
 
-<a name="0x1_config_for_next_epoch_latest_upsert_lock_state"></a>
+<a id="0x1_config_for_next_epoch_latest_upsert_lock_state"></a>
 
 ## Function `latest_upsert_lock_state`
 
@@ -467,7 +467,7 @@ NOTE: The caller has to ensure updates are enabled using <code>enable_updates()<
 
 </details>
 
-<a name="0x1_config_for_next_epoch_set_upsert_lock_state"></a>
+<a id="0x1_config_for_next_epoch_set_upsert_lock_state"></a>
 
 ## Function `set_upsert_lock_state`
 
@@ -503,7 +503,7 @@ NOTE: The caller has to ensure updates are enabled using <code>enable_updates()<
 
 </details>
 
-<a name="0x1_config_for_next_epoch_abort_unless_vm_or_std"></a>
+<a id="0x1_config_for_next_epoch_abort_unless_vm_or_std"></a>
 
 ## Function `abort_unless_vm_or_std`
 

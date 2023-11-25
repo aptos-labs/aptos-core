@@ -17,7 +17,7 @@ use move_model::{
         CONDITION_SUSPENDABLE_PROP, DELEGATE_INVARIANTS_TO_CALLER_PRAGMA,
         DISABLE_INVARIANTS_IN_BODY_PRAGMA, VERIFY_PRAGMA,
     },
-    ty::{TypeUnificationAdapter, Variance},
+    ty::{NoUnificationContext, TypeUnificationAdapter, Variance},
 };
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
@@ -584,7 +584,11 @@ impl VerificationAnalysisProcessor {
                     }
                     let adapter =
                         TypeUnificationAdapter::new_vec(&fun_mem.inst, &inv_mem.inst, true, true);
-                    let rel = adapter.unify(Variance::SpecVariance, /* shallow_subst */ false);
+                    let rel = adapter.unify(
+                        &NoUnificationContext,
+                        Variance::SpecVariance,
+                        /* shallow_subst */ false,
+                    );
                     if rel.is_some() {
                         inv_accessed.insert(inv.id);
 

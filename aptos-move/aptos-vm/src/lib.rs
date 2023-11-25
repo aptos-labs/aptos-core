@@ -126,7 +126,9 @@ pub use crate::aptos_vm::AptosVM;
 use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor};
 use aptos_state_view::StateView;
 use aptos_types::{
-    block_executor::partitioner::PartitionedTransactions,
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+    },
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
         TransactionOutput, VMValidatorResult,
@@ -157,7 +159,7 @@ pub trait VMExecutor: Send + Sync {
     fn execute_block(
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
 
     /// Executes a block of transactions using a sharded block executor and returns the results.
@@ -165,7 +167,7 @@ pub trait VMExecutor: Send + Sync {
         sharded_block_executor: &ShardedBlockExecutor<S, E>,
         transactions: PartitionedTransactions,
         state_view: Arc<S>,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
 }
 

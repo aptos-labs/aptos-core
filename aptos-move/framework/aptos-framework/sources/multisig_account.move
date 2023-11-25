@@ -1148,8 +1148,12 @@ module aptos_framework::multisig_account {
     use std::string::utf8;
     use std::features;
 
+    // TODO(#9330)
     #[test_only]
-    const PAYLOAD: vector<u8> = vector[1, 2, 3];
+    fun PAYLOAD(): vector<u8> {
+        vector[1, 2, 3]
+    }
+
     #[test_only]
     const ERROR_TYPE: vector<u8> = b"MoveAbort";
     #[test_only]
@@ -1187,9 +1191,9 @@ module aptos_framework::multisig_account {
         create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]);
 
         // Create three transactions.
-        create_transaction(owner_1, multisig_account, PAYLOAD);
-        create_transaction(owner_2, multisig_account, PAYLOAD);
-        create_transaction_with_hash(owner_3, multisig_account, sha3_256(PAYLOAD));
+        create_transaction(owner_1, multisig_account, PAYLOAD());
+        create_transaction(owner_2, multisig_account, PAYLOAD());
+        create_transaction_with_hash(owner_3, multisig_account, sha3_256(PAYLOAD()));
         assert!(get_pending_transactions(multisig_account) == vector[
             get_transaction(multisig_account, 1),
             get_transaction(multisig_account, 2),
@@ -1222,7 +1226,7 @@ module aptos_framework::multisig_account {
         ], 0);
 
         // Third transaction can be executed now but execution fails.
-        failed_transaction_execution_cleanup(owner_3_addr, multisig_account, PAYLOAD, execution_error());
+        failed_transaction_execution_cleanup(owner_3_addr, multisig_account, PAYLOAD(), execution_error());
         assert!(get_pending_transactions(multisig_account) == vector[], 0);
     }
 
@@ -1527,13 +1531,13 @@ module aptos_framework::multisig_account {
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]);
 
-        create_transaction(owner_1, multisig_account, PAYLOAD);
+        create_transaction(owner_1, multisig_account, PAYLOAD());
         let transaction = get_transaction(multisig_account, 1);
         assert!(transaction.creator == owner_1_addr, 0);
         assert!(option::is_some(&transaction.payload), 1);
         assert!(option::is_none(&transaction.payload_hash), 2);
         let payload = option::extract(&mut transaction.payload);
-        assert!(payload == PAYLOAD, 4);
+        assert!(payload == PAYLOAD(), 4);
         // Automatic yes vote from creator.
         assert!(simple_map::length(&transaction.votes) == 1, 5);
         assert!(*simple_map::borrow(&transaction.votes, &owner_1_addr), 5);
@@ -1558,7 +1562,7 @@ module aptos_framework::multisig_account {
         create_account(address_of(owner));
         create(owner,1, vector[], vector[]);
         let multisig_account = get_next_multisig_account_address(address_of(owner));
-        create_transaction(non_owner, multisig_account, PAYLOAD);
+        create_transaction(non_owner, multisig_account, PAYLOAD());
     }
 
     #[test(owner = @0x123)]
@@ -1568,7 +1572,7 @@ module aptos_framework::multisig_account {
         create_account(address_of(owner));
         create(owner,1, vector[], vector[]);
         let multisig_account = get_next_multisig_account_address(address_of(owner));
-        create_transaction_with_hash(owner, multisig_account, sha3_256(PAYLOAD));
+        create_transaction_with_hash(owner, multisig_account, sha3_256(PAYLOAD()));
     }
 
     #[test(owner = @0x123)]
@@ -1590,7 +1594,7 @@ module aptos_framework::multisig_account {
         create_account(address_of(owner));
         create(owner,1, vector[], vector[]);
         let multisig_account = get_next_multisig_account_address(address_of(owner));
-        create_transaction_with_hash(non_owner, multisig_account, sha3_256(PAYLOAD));
+        create_transaction_with_hash(non_owner, multisig_account, sha3_256(PAYLOAD()));
     }
 
     #[test(owner_1 = @0x123, owner_2 = @0x124, owner_3 = @0x125)]
@@ -1604,7 +1608,7 @@ module aptos_framework::multisig_account {
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]);
 
-        create_transaction(owner_1, multisig_account, PAYLOAD);
+        create_transaction(owner_1, multisig_account, PAYLOAD());
         approve_transaction(owner_2, multisig_account, 1);
         approve_transaction(owner_3, multisig_account, 1);
         let transaction = get_transaction(multisig_account, 1);
@@ -1626,7 +1630,7 @@ module aptos_framework::multisig_account {
         create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]);
 
         // Owner 1 and 2 approved but then owner 1 got removed.
-        create_transaction(owner_1, multisig_account, PAYLOAD);
+        create_transaction(owner_1, multisig_account, PAYLOAD());
         approve_transaction(owner_2, multisig_account, 1);
         // Before owner 1 is removed, the transaction technically has sufficient approvals.
         assert!(can_be_executed(multisig_account, 1), 0);
@@ -1646,7 +1650,7 @@ module aptos_framework::multisig_account {
         let multisig_account = get_next_multisig_account_address(address_of(owner));
         create(owner, 1, vector[], vector[]);
         // Transaction is created with id 1.
-        create_transaction(owner, multisig_account, PAYLOAD);
+        create_transaction(owner, multisig_account, PAYLOAD());
         approve_transaction(owner, multisig_account, 2);
     }
 
@@ -1659,7 +1663,7 @@ module aptos_framework::multisig_account {
         let multisig_account = get_next_multisig_account_address(address_of(owner));
         create(owner, 1, vector[], vector[]);
         // Transaction is created with id 1.
-        create_transaction(owner, multisig_account, PAYLOAD);
+        create_transaction(owner, multisig_account, PAYLOAD());
         approve_transaction(non_owner, multisig_account, 1);
     }
 
@@ -1672,7 +1676,7 @@ module aptos_framework::multisig_account {
         let multisig_account = get_next_multisig_account_address(owner_addr);
         create(owner, 1, vector[], vector[]);
 
-        create_transaction(owner, multisig_account, PAYLOAD);
+        create_transaction(owner, multisig_account, PAYLOAD());
         reject_transaction(owner, multisig_account, 1);
         approve_transaction(owner, multisig_account, 1);
         let transaction = get_transaction(multisig_account, 1);
@@ -1690,7 +1694,7 @@ module aptos_framework::multisig_account {
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]);
 
-        create_transaction(owner_1, multisig_account, PAYLOAD);
+        create_transaction(owner_1, multisig_account, PAYLOAD());
         reject_transaction(owner_1, multisig_account, 1);
         reject_transaction(owner_2, multisig_account, 1);
         reject_transaction(owner_3, multisig_account, 1);
@@ -1710,7 +1714,7 @@ module aptos_framework::multisig_account {
         let multisig_account = get_next_multisig_account_address(owner_addr);
         create(owner, 1, vector[], vector[]);
 
-        create_transaction(owner, multisig_account, PAYLOAD);
+        create_transaction(owner, multisig_account, PAYLOAD());
         reject_transaction(owner, multisig_account, 1);
         let transaction = get_transaction(multisig_account, 1);
         assert!(!*simple_map::borrow(&transaction.votes, &owner_addr), 1);
@@ -1725,7 +1729,7 @@ module aptos_framework::multisig_account {
         let multisig_account = get_next_multisig_account_address(address_of(owner));
         create(owner, 1, vector[], vector[]);
         // Transaction is created with id 1.
-        create_transaction(owner, multisig_account, PAYLOAD);
+        create_transaction(owner, multisig_account, PAYLOAD());
         reject_transaction(owner, multisig_account, 2);
     }
 
@@ -1751,7 +1755,7 @@ module aptos_framework::multisig_account {
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]);
 
-        create_transaction(owner_1, multisig_account, PAYLOAD);
+        create_transaction(owner_1, multisig_account, PAYLOAD());
         // Owner 1 doesn't need to explicitly approve as they created the transaction.
         approve_transaction(owner_2, multisig_account, 1);
         assert!(can_be_executed(multisig_account, 1), 1);
@@ -1770,7 +1774,7 @@ module aptos_framework::multisig_account {
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]);
 
-        create_transaction(owner_1, multisig_account, PAYLOAD);
+        create_transaction(owner_1, multisig_account, PAYLOAD());
         // Owner 1 doesn't need to explicitly approve as they created the transaction.
         approve_transaction(owner_2, multisig_account, 1);
         assert!(can_be_executed(multisig_account, 1), 1);
@@ -1789,12 +1793,12 @@ module aptos_framework::multisig_account {
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]);
 
-        create_transaction_with_hash(owner_3, multisig_account, sha3_256(PAYLOAD));
+        create_transaction_with_hash(owner_3, multisig_account, sha3_256(PAYLOAD()));
         // Owner 3 doesn't need to explicitly approve as they created the transaction.
         approve_transaction(owner_1, multisig_account, 1);
         assert!(can_be_executed(multisig_account, 1), 1);
         assert!(table::contains(&borrow_global<MultisigAccount>(multisig_account).transactions, 1), 0);
-        successful_transaction_execution_cleanup(owner_3_addr, multisig_account, PAYLOAD);
+        successful_transaction_execution_cleanup(owner_3_addr, multisig_account, PAYLOAD());
     }
 
     #[test(owner_1 = @0x123, owner_2 = @0x124, owner_3 = @0x125)]
@@ -1808,7 +1812,7 @@ module aptos_framework::multisig_account {
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]);
 
-        create_transaction(owner_1, multisig_account, PAYLOAD);
+        create_transaction(owner_1, multisig_account, PAYLOAD());
         reject_transaction(owner_2, multisig_account, 1);
         reject_transaction(owner_3, multisig_account, 1);
         assert!(can_be_rejected(multisig_account, 1), 1);
@@ -1825,7 +1829,7 @@ module aptos_framework::multisig_account {
         let multisig_account = get_next_multisig_account_address(address_of(owner));
         create(owner,1, vector[], vector[]);
 
-        create_transaction(owner, multisig_account, PAYLOAD);
+        create_transaction(owner, multisig_account, PAYLOAD());
         reject_transaction(owner, multisig_account, 1);
         execute_rejected_transaction(non_owner, multisig_account);
     }
@@ -1842,7 +1846,7 @@ module aptos_framework::multisig_account {
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]);
 
-        create_transaction(owner_1, multisig_account, PAYLOAD);
+        create_transaction(owner_1, multisig_account, PAYLOAD());
         reject_transaction(owner_2, multisig_account, 1);
         execute_rejected_transaction(owner_3, multisig_account);
     }

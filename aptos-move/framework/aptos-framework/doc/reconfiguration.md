@@ -1,5 +1,5 @@
 
-<a name="0x1_reconfiguration"></a>
+<a id="0x1_reconfiguration"></a>
 
 # Module `0x1::reconfiguration`
 
@@ -47,7 +47,7 @@ to synchronize configuration changes for the validators.
 
 
 
-<a name="0x1_reconfiguration_NewEpochEvent"></a>
+<a id="0x1_reconfiguration_NewEpochEvent"></a>
 
 ## Struct `NewEpochEvent`
 
@@ -77,7 +77,7 @@ with new configuration information. This is also called a
 
 </details>
 
-<a name="0x1_reconfiguration_Configuration"></a>
+<a id="0x1_reconfiguration_Configuration"></a>
 
 ## Resource `Configuration`
 
@@ -117,7 +117,7 @@ Holds information about state of reconfiguration
 
 </details>
 
-<a name="0x1_reconfiguration_DisableReconfiguration"></a>
+<a id="0x1_reconfiguration_DisableReconfiguration"></a>
 
 ## Resource `DisableReconfiguration`
 
@@ -146,12 +146,12 @@ aptos_framework system address
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_reconfiguration_ECONFIG"></a>
+<a id="0x1_reconfiguration_ECONFIG"></a>
 
 A <code>Reconfiguration</code> resource is in an invalid state
 
@@ -161,7 +161,7 @@ A <code>Reconfiguration</code> resource is in an invalid state
 
 
 
-<a name="0x1_reconfiguration_ECONFIGURATION"></a>
+<a id="0x1_reconfiguration_ECONFIGURATION"></a>
 
 The <code><a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a></code> resource is in an invalid state
 
@@ -171,7 +171,7 @@ The <code><a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configu
 
 
 
-<a name="0x1_reconfiguration_EINVALID_BLOCK_TIME"></a>
+<a id="0x1_reconfiguration_EINVALID_BLOCK_TIME"></a>
 
 An invalid block time was encountered.
 
@@ -181,7 +181,7 @@ An invalid block time was encountered.
 
 
 
-<a name="0x1_reconfiguration_EINVALID_GUID_FOR_EVENT"></a>
+<a id="0x1_reconfiguration_EINVALID_GUID_FOR_EVENT"></a>
 
 An invalid block time was encountered.
 
@@ -191,7 +191,7 @@ An invalid block time was encountered.
 
 
 
-<a name="0x1_reconfiguration_EMODIFY_CAPABILITY"></a>
+<a id="0x1_reconfiguration_EMODIFY_CAPABILITY"></a>
 
 A <code>ModifyConfigCapability</code> is in a different state than was expected
 
@@ -201,7 +201,7 @@ A <code>ModifyConfigCapability</code> is in a different state than was expected
 
 
 
-<a name="0x1_reconfiguration_initialize"></a>
+<a id="0x1_reconfiguration_initialize"></a>
 
 ## Function `initialize`
 
@@ -238,7 +238,7 @@ Publishes <code><a href="reconfiguration.md#0x1_reconfiguration_Configuration">C
 
 </details>
 
-<a name="0x1_reconfiguration_disable_reconfiguration"></a>
+<a id="0x1_reconfiguration_disable_reconfiguration"></a>
 
 ## Function `disable_reconfiguration`
 
@@ -266,7 +266,7 @@ This function should only be used for offline WriteSet generation purpose and sh
 
 </details>
 
-<a name="0x1_reconfiguration_enable_reconfiguration"></a>
+<a id="0x1_reconfiguration_enable_reconfiguration"></a>
 
 ## Function `enable_reconfiguration`
 
@@ -295,7 +295,7 @@ This function should only be used for offline WriteSet generation purpose and sh
 
 </details>
 
-<a name="0x1_reconfiguration_reconfiguration_enabled"></a>
+<a id="0x1_reconfiguration_reconfiguration_enabled"></a>
 
 ## Function `reconfiguration_enabled`
 
@@ -319,7 +319,7 @@ This function should only be used for offline WriteSet generation purpose and sh
 
 </details>
 
-<a name="0x1_reconfiguration_reconfigure"></a>
+<a id="0x1_reconfiguration_reconfigure"></a>
 
 ## Function `reconfigure`
 
@@ -404,7 +404,7 @@ Signal validators to start using new configuration. Must be called from friend c
 
 </details>
 
-<a name="0x1_reconfiguration_last_reconfiguration_time"></a>
+<a id="0x1_reconfiguration_last_reconfiguration_time"></a>
 
 ## Function `last_reconfiguration_time`
 
@@ -428,7 +428,7 @@ Signal validators to start using new configuration. Must be called from friend c
 
 </details>
 
-<a name="0x1_reconfiguration_current_epoch"></a>
+<a id="0x1_reconfiguration_current_epoch"></a>
 
 ## Function `current_epoch`
 
@@ -452,7 +452,7 @@ Signal validators to start using new configuration. Must be called from friend c
 
 </details>
 
-<a name="0x1_reconfiguration_emit_genesis_reconfiguration_event"></a>
+<a id="0x1_reconfiguration_emit_genesis_reconfiguration_event"></a>
 
 ## Function `emit_genesis_reconfiguration_event`
 
@@ -487,7 +487,7 @@ reconfiguration event.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -504,7 +504,7 @@ reconfiguration event.
 Make sure the signer address is @aptos_framework.
 
 
-<a name="0x1_reconfiguration_AbortsIfNotAptosFramework"></a>
+<a id="0x1_reconfiguration_AbortsIfNotAptosFramework"></a>
 
 
 <pre><code><b>schema</b> <a href="reconfiguration.md#0x1_reconfiguration_AbortsIfNotAptosFramework">AbortsIfNotAptosFramework</a> {
@@ -516,7 +516,7 @@ Make sure the signer address is @aptos_framework.
 
 
 
-<a name="@Specification_1_initialize"></a>
+<a id="@Specification_1_initialize"></a>
 
 ### Function `initialize`
 
@@ -551,7 +551,7 @@ Guid_creation_num should be 2 according to logic.
 
 
 
-<a name="@Specification_1_disable_reconfiguration"></a>
+<a id="@Specification_1_disable_reconfiguration"></a>
 
 ### Function `disable_reconfiguration`
 
@@ -569,7 +569,7 @@ Guid_creation_num should be 2 according to logic.
 
 
 
-<a name="@Specification_1_enable_reconfiguration"></a>
+<a id="@Specification_1_enable_reconfiguration"></a>
 
 ### Function `enable_reconfiguration`
 
@@ -588,7 +588,7 @@ Make sure the caller is admin and check the resource DisableReconfiguration.
 
 
 
-<a name="@Specification_1_reconfiguration_enabled"></a>
+<a id="@Specification_1_reconfiguration_enabled"></a>
 
 ### Function `reconfiguration_enabled`
 
@@ -605,7 +605,7 @@ Make sure the caller is admin and check the resource DisableReconfiguration.
 
 
 
-<a name="@Specification_1_reconfigure"></a>
+<a id="@Specification_1_reconfigure"></a>
 
 ### Function `reconfigure`
 
@@ -618,12 +618,12 @@ Make sure the caller is admin and check the resource DisableReconfiguration.
 
 <pre><code><b>pragma</b> verify_duration_estimate = 120;
 <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);
+<b>let</b> success = !(<a href="chain_status.md#0x1_chain_status_is_genesis">chain_status::is_genesis</a>() || <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() == 0 || !<a href="reconfiguration.md#0x1_reconfiguration_reconfiguration_enabled">reconfiguration_enabled</a>())
+    && <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() != <b>global</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework).last_reconfiguration_time;
 <b>include</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>() ==&gt; <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigEnabledRequirement">staking_config::StakingRewardsConfigEnabledRequirement</a>;
 <b>include</b> success ==&gt; <a href="aptos_coin.md#0x1_aptos_coin_ExistsAptosCoin">aptos_coin::ExistsAptosCoin</a>;
 <b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
 <b>aborts_if</b> <b>false</b>;
-<b>let</b> success = !(<a href="chain_status.md#0x1_chain_status_is_genesis">chain_status::is_genesis</a>() || <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() == 0 || !<a href="reconfiguration.md#0x1_reconfiguration_reconfiguration_enabled">reconfiguration_enabled</a>())
-    && <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() != <b>global</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework).last_reconfiguration_time;
 <b>ensures</b> success ==&gt; <b>global</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework).epoch == <b>old</b>(<b>global</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework).epoch) + 1;
 <b>ensures</b> success ==&gt; <b>global</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework).last_reconfiguration_time == <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>();
 <b>ensures</b> !success ==&gt; <b>global</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework).epoch == <b>old</b>(<b>global</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework).epoch);
@@ -631,7 +631,7 @@ Make sure the caller is admin and check the resource DisableReconfiguration.
 
 
 
-<a name="@Specification_1_last_reconfiguration_time"></a>
+<a id="@Specification_1_last_reconfiguration_time"></a>
 
 ### Function `last_reconfiguration_time`
 
@@ -648,7 +648,7 @@ Make sure the caller is admin and check the resource DisableReconfiguration.
 
 
 
-<a name="@Specification_1_current_epoch"></a>
+<a id="@Specification_1_current_epoch"></a>
 
 ### Function `current_epoch`
 
@@ -665,7 +665,7 @@ Make sure the caller is admin and check the resource DisableReconfiguration.
 
 
 
-<a name="@Specification_1_emit_genesis_reconfiguration_event"></a>
+<a id="@Specification_1_emit_genesis_reconfiguration_event"></a>
 
 ### Function `emit_genesis_reconfiguration_event`
 

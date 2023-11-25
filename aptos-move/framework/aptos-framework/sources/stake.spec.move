@@ -216,8 +216,8 @@ spec aptos_framework::stake {
     }
 
     spec update_stake_pool {
-        // TODO: set because of timeout in CI. The property is proved (inconsistency check also passes)
-        pragma verify = true;
+        // TODO: set because of timeout (property proved)
+        pragma verify_duration_estimate = 120;
         include ResourceRequirement;
         include staking_config::StakingRewardsConfigRequirement;
 

@@ -1,5 +1,5 @@
 
-<a name="0x1_capability"></a>
+<a id="0x1_capability"></a>
 
 # Module `0x1::capability`
 
@@ -9,7 +9,7 @@ A module which defines the basic concept of
 EXPERIMENTAL
 
 
-<a name="@Overview_0"></a>
+<a id="@Overview_0"></a>
 
 ## Overview
 
@@ -21,7 +21,7 @@ called within a transaction which has a capability as a parameter, it is guarant
 has been obtained via a proper signer-based authorization step previously in the transaction's execution.
 
 
-<a name="@Usage_1"></a>
+<a id="@Usage_1"></a>
 
 ### Usage
 
@@ -59,7 +59,7 @@ public fun do_something(_cap: Cap<Feature>) { ... }
 ```
 
 
-<a name="@Delegation_2"></a>
+<a id="@Delegation_2"></a>
 
 ### Delegation
 
@@ -124,7 +124,7 @@ is_valid_delegate_for_feature(d);
 
 
 
-<a name="0x1_capability_Cap"></a>
+<a id="0x1_capability_Cap"></a>
 
 ## Struct `Cap`
 
@@ -152,7 +152,7 @@ The token representing an acquired capability. Cannot be stored in memory, but c
 
 </details>
 
-<a name="0x1_capability_LinearCap"></a>
+<a id="0x1_capability_LinearCap"></a>
 
 ## Struct `LinearCap`
 
@@ -181,7 +181,7 @@ to be used only once for an authorization.
 
 </details>
 
-<a name="0x1_capability_CapState"></a>
+<a id="0x1_capability_CapState"></a>
 
 ## Resource `CapState`
 
@@ -209,7 +209,7 @@ An internal data structure for representing a configured capability.
 
 </details>
 
-<a name="0x1_capability_CapDelegateState"></a>
+<a id="0x1_capability_CapDelegateState"></a>
 
 ## Resource `CapDelegateState`
 
@@ -237,12 +237,12 @@ An internal data structure for representing a configured delegated capability.
 
 </details>
 
-<a name="@Constants_3"></a>
+<a id="@Constants_3"></a>
 
 ## Constants
 
 
-<a name="0x1_capability_ECAPABILITY_ALREADY_EXISTS"></a>
+<a id="0x1_capability_ECAPABILITY_ALREADY_EXISTS"></a>
 
 Capability resource already exists on the specified account
 
@@ -252,7 +252,7 @@ Capability resource already exists on the specified account
 
 
 
-<a name="0x1_capability_ECAPABILITY_NOT_FOUND"></a>
+<a id="0x1_capability_ECAPABILITY_NOT_FOUND"></a>
 
 Capability resource not found
 
@@ -262,7 +262,7 @@ Capability resource not found
 
 
 
-<a name="0x1_capability_EDELEGATE"></a>
+<a id="0x1_capability_EDELEGATE"></a>
 
 Account does not have delegated permissions
 
@@ -272,7 +272,7 @@ Account does not have delegated permissions
 
 
 
-<a name="0x1_capability_create"></a>
+<a id="0x1_capability_create"></a>
 
 ## Function `create`
 
@@ -300,7 +300,7 @@ they own the <code>Feature</code> type parameter.
 
 </details>
 
-<a name="0x1_capability_acquire"></a>
+<a id="0x1_capability_acquire"></a>
 
 ## Function `acquire`
 
@@ -328,7 +328,7 @@ parameter.
 
 </details>
 
-<a name="0x1_capability_acquire_linear"></a>
+<a id="0x1_capability_acquire_linear"></a>
 
 ## Function `acquire_linear`
 
@@ -355,7 +355,7 @@ whether to expose a linear or non-linear capability.
 
 </details>
 
-<a name="0x1_capability_validate_acquire"></a>
+<a id="0x1_capability_validate_acquire"></a>
 
 ## Function `validate_acquire`
 
@@ -392,7 +392,7 @@ Helper to validate an acquire. Returns the root address of the capability.
 
 </details>
 
-<a name="0x1_capability_root_addr"></a>
+<a id="0x1_capability_root_addr"></a>
 
 ## Function `root_addr`
 
@@ -418,7 +418,7 @@ of the feature can do this.
 
 </details>
 
-<a name="0x1_capability_linear_root_addr"></a>
+<a id="0x1_capability_linear_root_addr"></a>
 
 ## Function `linear_root_addr`
 
@@ -443,7 +443,7 @@ Returns the root address associated with the given linear capability token.
 
 </details>
 
-<a name="0x1_capability_delegate"></a>
+<a id="0x1_capability_delegate"></a>
 
 ## Function `delegate`
 
@@ -473,7 +473,7 @@ nothing.
 
 </details>
 
-<a name="0x1_capability_revoke"></a>
+<a id="0x1_capability_revoke"></a>
 
 ## Function `revoke`
 
@@ -502,7 +502,7 @@ Revokes a delegation relation. If no relation exists, this function does nothing
 
 </details>
 
-<a name="0x1_capability_remove_element"></a>
+<a id="0x1_capability_remove_element"></a>
 
 ## Function `remove_element`
 
@@ -530,7 +530,7 @@ Helper to remove an element from a vector.
 
 </details>
 
-<a name="0x1_capability_add_element"></a>
+<a id="0x1_capability_add_element"></a>
 
 ## Function `add_element`
 
@@ -557,14 +557,14 @@ Helper to add an element to a vector.
 
 </details>
 
-<a name="@Specification_4"></a>
+<a id="@Specification_4"></a>
 
 ## Specification
 
 Helper specification function to check whether a capability exists at address.
 
 
-<a name="0x1_capability_spec_has_cap"></a>
+<a id="0x1_capability_spec_has_cap"></a>
 
 
 <pre><code><b>fun</b> <a href="capability.md#0x1_capability_spec_has_cap">spec_has_cap</a>&lt;Feature&gt;(addr: <b>address</b>): bool {
@@ -576,7 +576,7 @@ Helper specification function to check whether a capability exists at address.
 Helper specification function to obtain the delegates of a capability.
 
 
-<a name="0x1_capability_spec_delegates"></a>
+<a id="0x1_capability_spec_delegates"></a>
 
 
 <pre><code><b>fun</b> <a href="capability.md#0x1_capability_spec_delegates">spec_delegates</a>&lt;Feature&gt;(addr: <b>address</b>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt; {
@@ -588,7 +588,7 @@ Helper specification function to obtain the delegates of a capability.
 Helper specification function to check whether a delegated capability exists at address.
 
 
-<a name="0x1_capability_spec_has_delegate_cap"></a>
+<a id="0x1_capability_spec_has_delegate_cap"></a>
 
 
 <pre><code><b>fun</b> <a href="capability.md#0x1_capability_spec_has_delegate_cap">spec_has_delegate_cap</a>&lt;Feature&gt;(addr: <b>address</b>): bool {
@@ -598,7 +598,7 @@ Helper specification function to check whether a delegated capability exists at 
 
 
 
-<a name="@Specification_4_create"></a>
+<a id="@Specification_4_create"></a>
 
 ### Function `create`
 
@@ -616,7 +616,7 @@ Helper specification function to check whether a delegated capability exists at 
 
 
 
-<a name="@Specification_4_acquire"></a>
+<a id="@Specification_4_acquire"></a>
 
 ### Function `acquire`
 
@@ -636,7 +636,7 @@ Helper specification function to check whether a delegated capability exists at 
 
 
 
-<a name="@Specification_4_acquire_linear"></a>
+<a id="@Specification_4_acquire_linear"></a>
 
 ### Function `acquire_linear`
 
@@ -657,7 +657,7 @@ Helper specification function to check whether a delegated capability exists at 
 
 
 
-<a name="0x1_capability_AcquireSchema"></a>
+<a id="0x1_capability_AcquireSchema"></a>
 
 
 <pre><code><b>schema</b> <a href="capability.md#0x1_capability_AcquireSchema">AcquireSchema</a>&lt;Feature&gt; {
@@ -671,7 +671,7 @@ Helper specification function to check whether a delegated capability exists at 
 
 
 
-<a name="@Specification_4_delegate"></a>
+<a id="@Specification_4_delegate"></a>
 
 ### Function `delegate`
 
@@ -690,7 +690,7 @@ Helper specification function to check whether a delegated capability exists at 
 
 
 
-<a name="@Specification_4_revoke"></a>
+<a id="@Specification_4_revoke"></a>
 
 ### Function `revoke`
 
@@ -706,7 +706,7 @@ Helper specification function to check whether a delegated capability exists at 
 
 
 
-<a name="@Specification_4_remove_element"></a>
+<a id="@Specification_4_remove_element"></a>
 
 ### Function `remove_element`
 
@@ -717,7 +717,7 @@ Helper specification function to check whether a delegated capability exists at 
 
 
 
-<a name="@Specification_4_add_element"></a>
+<a id="@Specification_4_add_element"></a>
 
 ### Function `add_element`
 

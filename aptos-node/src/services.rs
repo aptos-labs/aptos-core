@@ -25,7 +25,7 @@ use aptos_peer_monitoring_service_server::{
 use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
 use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_time_service::TimeService;
-use aptos_types::chain_id::ChainId;
+use aptos_types::{chain_id::ChainId, system_txn::pool::SystemTransactionPoolClient};
 use futures::channel::{mpsc, mpsc::Sender};
 use std::{sync::Arc, time::Instant};
 use tokio::runtime::{Handle, Runtime};
@@ -90,6 +90,7 @@ pub fn start_consensus_runtime(
     consensus_network_interfaces: ApplicationNetworkInterfaces<ConsensusMsg>,
     consensus_notifier: ConsensusNotifier,
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
+    sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let instant = Instant::now();
     let consensus = aptos_consensus::consensus_provider::start_consensus(
@@ -101,6 +102,7 @@ pub fn start_consensus_runtime(
         db_rw,
         consensus_reconfig_subscription
             .expect("Consensus requires a reconfiguration subscription!"),
+        sys_txn_pool_client,
         consensus_dkg_subscription
             .expect("Consensus requires a DKG subscription!"),
 

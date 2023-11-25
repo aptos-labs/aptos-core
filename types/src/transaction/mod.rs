@@ -51,7 +51,8 @@ pub mod signature_verified_transaction;
 
 use crate::{
     contract_event::TransactionEvent, executable::ModulePath, fee_statement::FeeStatement,
-    proof::accumulator::InMemoryEventAccumulator, write_set::TransactionWrite,
+    proof::accumulator::InMemoryEventAccumulator, system_txn::SystemTransaction,
+    write_set::TransactionWrite,
 };
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
@@ -1794,6 +1795,7 @@ pub enum Transaction {
     /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
     StateCheckpoint(HashValue),
 
+    SystemTransaction(SystemTransaction),
     /// `BlockMetadata` but also containing extra information. (E.g., on-chain randomness data).
     BlockMetadataExt(BlockMetadataExt),
 }
@@ -1826,6 +1828,8 @@ impl Transaction {
             Transaction::BlockMetadataExt(_block_metadata_ext) => String::from("block_metadata_ext"),
             // TODO: display proper information for client
             Transaction::StateCheckpoint(_) => String::from("state_checkpoint"),
+            // TODO: display proper information for client
+            Transaction::SystemTransaction(_) => String::from("system_transaction"),
         }
     }
 }

@@ -55,12 +55,6 @@ test = false
 doc = false
 
 [[bin]]
-name = "move_execute_entry_function"
-path = "fuzz_targets/move/execute_entry_function.rs"
-test = false
-doc = false
-
-[[bin]]
 name = "signed_transaction_deserialize"
 path = "fuzz_targets/signed_transaction_deserialize.rs"
 test = false

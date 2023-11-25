@@ -1,5 +1,5 @@
 
-<a name="0x1_copyable_any"></a>
+<a id="0x1_copyable_any"></a>
 
 # Module `0x1::copyable_any`
 
@@ -25,7 +25,7 @@
 
 
 
-<a name="0x1_copyable_any_Any"></a>
+<a id="0x1_copyable_any_Any"></a>
 
 ## Struct `Any`
 
@@ -59,12 +59,12 @@ The same as <code><a href="any.md#0x1_any_Any">any::Any</a></code> but with the 
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_copyable_any_ETYPE_MISMATCH"></a>
+<a id="0x1_copyable_any_ETYPE_MISMATCH"></a>
 
 The type provided for <code>unpack</code> is not the same as was given for <code>pack</code>.
 
@@ -74,7 +74,7 @@ The type provided for <code>unpack</code> is not the same as was given for <code
 
 
 
-<a name="0x1_copyable_any_pack"></a>
+<a id="0x1_copyable_any_pack"></a>
 
 ## Function `pack`
 
@@ -103,7 +103,7 @@ also required from <code>T</code>.
 
 </details>
 
-<a name="0x1_copyable_any_unpack"></a>
+<a id="0x1_copyable_any_unpack"></a>
 
 ## Function `unpack`
 
@@ -129,7 +129,7 @@ Unpack a value from the <code><a href="copyable_any.md#0x1_copyable_any_Any">Any
 
 </details>
 
-<a name="0x1_copyable_any_type_name"></a>
+<a id="0x1_copyable_any_type_name"></a>
 
 ## Function `type_name`
 
@@ -154,12 +154,12 @@ Returns the type name of this Any
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
 
-<a name="@Specification_1_pack"></a>
+<a id="@Specification_1_pack"></a>
 
 ### Function `pack`
 
@@ -179,7 +179,7 @@ Returns the type name of this Any
 
 
 
-<a name="@Specification_1_unpack"></a>
+<a id="@Specification_1_unpack"></a>
 
 ### Function `unpack`
 
@@ -197,7 +197,7 @@ Returns the type name of this Any
 
 
 
-<a name="@Specification_1_type_name"></a>
+<a id="@Specification_1_type_name"></a>
 
 ### Function `type_name`
 

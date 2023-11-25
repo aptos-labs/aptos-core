@@ -1,0 +1,6 @@
+error[E14003]: feature not supported in inlined functions
+   ┌─ tests/move_check/inlining/return_in_lambda.move:13:13
+   │
+13 │             return adder(x, y)
+   │             ^^^^^^^^^^^^^^^^^^ return statements currently not supported
+

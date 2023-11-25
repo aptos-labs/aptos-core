@@ -1,5 +1,5 @@
 
-<a name="0x1_some"></a>
+<a id="0x1_some"></a>
 
 # Module `0x1::some`
 
@@ -12,7 +12,7 @@
 
 
 
-<a name="0x1_some_some"></a>
+<a id="0x1_some_some"></a>
 
 ## Function `some`
 

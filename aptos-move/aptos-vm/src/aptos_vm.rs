@@ -29,14 +29,18 @@ use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
     account_config::new_block_event_key,
-    block_executor::partitioner::PartitionedTransactions,
+    block_executor::{
+        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
+        partitioner::PartitionedTransactions,
+    },
     block_metadata::BlockMetadata,
     fee_statement::FeeStatement,
     on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
+    system_txn::SystemTransaction,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction,
         EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
-        MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction,
+        MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
         Transaction::{
             GenesisTransaction, StateCheckpoint,
             UserTransaction,
@@ -1175,6 +1179,18 @@ impl AptosVM {
         )
     }
 
+    fn process_system_transaction(
+        &self,
+        _resolver: &impl AptosMoveResolver,
+        _txn: SystemTransaction,
+        _log_context: &AdapterLogSchema,
+    ) -> (VMStatus, VMOutput) {
+        (
+            VMStatus::Executed,
+            VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)),
+        )
+    }
+
     fn execute_user_transaction_impl(
         &self,
         resolver: &impl AptosMoveResolver,
@@ -1843,6 +1859,12 @@ impl AptosVM {
                 let output = VMOutput::empty_with_status(status);
                 (VMStatus::Executed, output, Some("state_checkpoint".into()))
             },
+            Transaction::SystemTransaction(txn) => {
+                fail_point!("aptos_vm::execution::system_transaction");
+                let (vm_status, output) =
+                    self.process_system_transaction(resolver, txn.clone(), log_context);
+                (vm_status, output, Some("system_transaction".to_string()))
+            },
         })
     }
 }
@@ -1857,7 +1879,7 @@ impl VMExecutor for AptosVM {
     fn execute_block(
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         fail_point!("move_adapter::execute_block", |_| {
             Err(VMStatus::error(
@@ -1880,8 +1902,12 @@ impl VMExecutor for AptosVM {
             Arc::clone(&RAYON_EXEC_POOL),
             transactions,
             state_view,
-            Self::get_concurrency_level(),
-            maybe_block_gas_limit,
+            BlockExecutorConfig {
+                local: BlockExecutorLocalConfig {
+                    concurrency_level: Self::get_concurrency_level(),
+                },
+                onchain: onchain_config,
+            },
             None,
         );
         if ret.is_ok() {
@@ -1895,7 +1921,7 @@ impl VMExecutor for AptosVM {
         sharded_block_executor: &ShardedBlockExecutor<S, C>,
         transactions: PartitionedTransactions,
         state_view: Arc<S>,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         info!(
@@ -1909,7 +1935,7 @@ impl VMExecutor for AptosVM {
             state_view,
             transactions,
             AptosVM::get_concurrency_level(),
-            maybe_block_gas_limit,
+            onchain_config,
         );
         if ret.is_ok() {
             // Record the histogram count for transactions per block.

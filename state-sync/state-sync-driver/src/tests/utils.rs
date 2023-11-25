@@ -56,6 +56,24 @@ pub fn create_epoch_ending_ledger_info() -> LedgerInfoWithSignatures {
     LedgerInfoWithSignatures::new(ledger_info, AggregateSignature::empty())
 }
 
+/// Creates a test epoch ending ledger info for the specified epoch and version
+pub fn create_epoch_ending_ledger_info_for_epoch(
+    epoch: u64,
+    version: u64,
+) -> LedgerInfoWithSignatures {
+    let block_info = BlockInfo::new(
+        epoch,
+        0,
+        HashValue::zero(),
+        HashValue::zero(),
+        version,
+        0,
+        Some(EpochState::empty()),
+    );
+    let ledger_info = LedgerInfo::new(block_info, HashValue::zero());
+    LedgerInfoWithSignatures::new(ledger_info, AggregateSignature::empty())
+}
+
 /// Creates a single test event
 pub fn create_event(event_key: Option<EventKey>) -> ContractEvent {
     let event_key = event_key.unwrap_or_else(EventKey::random);
@@ -81,6 +99,26 @@ pub fn create_global_summary(highest_ended_epoch: Epoch) -> GlobalDataSummary {
     global_data_summary
         .advertised_data
         .epoch_ending_ledger_infos = vec![CompleteDataRange::new(0, highest_ended_epoch).unwrap()];
+    global_data_summary
+}
+
+/// Creates a global data summary with the highest ended epoch and specified version
+pub fn create_global_summary_with_version(
+    highest_ended_epoch: Epoch,
+    highest_synced_version: Version,
+) -> GlobalDataSummary {
+    // Create an empty global data summary
+    let mut global_data_summary = GlobalDataSummary::empty();
+
+    // Update the highest synced ledger info
+    global_data_summary.advertised_data.synced_ledger_infos =
+        vec![create_ledger_info_at_version(highest_synced_version)];
+
+    // Update the highest synced epoch
+    global_data_summary
+        .advertised_data
+        .epoch_ending_ledger_infos = vec![CompleteDataRange::new(0, highest_ended_epoch).unwrap()];
+
     global_data_summary
 }
 

@@ -9,7 +9,7 @@ use crate::dag::{
     storage::DAGStorage,
     tests::{
         dag_test::MockStorage,
-        helpers::{new_node, TEST_DAG_WINDOW},
+        helpers::{new_node, MockPayloadManager, TEST_DAG_WINDOW},
     },
     types::NodeCertificate,
     NodeId, RpcHandler, Vote,
@@ -50,6 +50,7 @@ async fn test_node_broadcast_receiver_succeed() {
     let dag = Arc::new(RwLock::new(Dag::new(
         epoch_state.clone(),
         storage.clone(),
+        Arc::new(MockPayloadManager {}),
         0,
         TEST_DAG_WINDOW,
     )));
@@ -99,6 +100,7 @@ async fn test_node_broadcast_receiver_failure() {
             let dag = Arc::new(RwLock::new(Dag::new(
                 epoch_state.clone(),
                 storage.clone(),
+                Arc::new(MockPayloadManager {}),
                 0,
                 TEST_DAG_WINDOW,
             )));
@@ -178,6 +180,7 @@ async fn test_node_broadcast_receiver_storage() {
     let dag = Arc::new(RwLock::new(Dag::new(
         epoch_state.clone(),
         storage.clone(),
+        Arc::new(MockPayloadManager {}),
         0,
         TEST_DAG_WINDOW,
     )));

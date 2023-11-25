@@ -6,7 +6,7 @@ use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_executor_types::{parsed_transaction_output::TransactionsWithParsedOutput, ProofReader};
-use aptos_logger::info;
+use aptos_logger::{debug, info};
 use aptos_scratchpad::FrozenSparseMerkleTree;
 use aptos_storage_interface::{
     cached_state_view::{ShardedStateCache, StateCache},
@@ -451,10 +451,14 @@ impl InMemoryStateCalculatorV2 {
             "Base state is corrupted, updates_since_base is not empty at a checkpoint."
         );
 
+        for (idx, (txn, _txn_output)) in to_keep.iter().enumerate() {
+            println!("idx={}, txn={:?}", idx, txn);
+        }
+
         for (i, (txn, txn_output)) in to_keep.iter().enumerate() {
             ensure!(
                 TransactionsWithParsedOutput::need_checkpoint(txn, txn_output) ^ (i != num_txns - 1),
-                "Checkpoint is allowed iff it's the last txn in the block. index: {i}, is_last: {}, txn: {txn:?}, is_reconfig: {}",
+                "Checkpoint is allowed iff it's the last txn in the block. index: {i}, num_txns: {num_txns}, is_last: {}, txn: {txn:?}, is_reconfig: {}",
                 i == num_txns - 1,
                 txn_output.is_reconfig()
             );

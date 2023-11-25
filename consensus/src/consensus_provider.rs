@@ -23,6 +23,7 @@ use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
 use aptos_storage_interface::DbReaderWriter;
+use aptos_types::system_txn::pool::SystemTransactionPoolClient;
 use aptos_vm::AptosVM;
 use futures::channel::mpsc;
 use std::sync::Arc;
@@ -37,6 +38,7 @@ pub fn start_consensus(
     consensus_to_mempool_sender: mpsc::Sender<QuorumStoreRequest>,
     aptos_db: DbReaderWriter,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
+    sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
     dkg_events: EventNotificationListener,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let runtime = aptos_runtimes::spawn_named_runtime("consensus".into(), None);
@@ -78,6 +80,7 @@ pub fn start_consensus(
         dkg_events,
         bounded_executor,
         aptos_time_service::TimeService::real(),
+        sys_txn_pool_client,
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);

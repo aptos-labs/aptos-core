@@ -71,7 +71,7 @@ pub fn create_event_subscription_service(
     if node_config.base.role.is_validator() {
         Some(
             event_subscription_service
-                .subscribe_to_events(vec![on_chain_config::start_dkg_event_key()])
+                .subscribe_to_events(vec![on_chain_config::start_dkg_event_key()], vec![])
                 .expect("Consensus must subscribe to DKG events")
         )
     } else {

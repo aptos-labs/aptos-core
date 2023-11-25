@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: constant expression must be a literal
+  ┌─ tests/checking/typing/constant_folding.move:3:27
+  │
+3 │     const LN2_X_32: u64 = 32 * 2977044472;
+  │                           ^^^^^^^^^^^^^^^

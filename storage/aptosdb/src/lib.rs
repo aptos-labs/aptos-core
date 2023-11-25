@@ -1026,6 +1026,9 @@ impl AptosDB {
             // TODO(grao): remove after APIs migrated off the DB to the indexer.
             self.state_store.state_kv_db.enabled_sharding(),
             skip_index_and_usage,
+            txns_to_commit
+                .iter()
+                .rposition(|txn| txn.is_state_checkpoint()),
         )?;
 
         // Write block index if event index is skipped.

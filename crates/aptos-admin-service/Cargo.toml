@@ -30,6 +30,7 @@ http = { workspace = true }
 hyper = { workspace = true }
 lazy_static = { workspace = true }
 mime = { workspace = true }
+sha256 = { workspace = true }
 tokio = { workspace = true }
 tokio-scoped = { workspace = true }
 url = { workspace = true }

@@ -1466,13 +1466,13 @@ impl<'env> Docgen<'env> {
     /// Generate label.
     fn label(&self, label: &str) {
         emitln!(self.writer);
-        emitln!(self.writer, "<a name=\"{}\"></a>", label);
+        emitln!(self.writer, "<a id=\"{}\"></a>", label);
         emitln!(self.writer);
     }
 
     /// Generate label in code, without empty lines.
     fn label_in_code(&self, label: &str) {
-        emitln!(self.writer, "<a name=\"{}\"></a>", label);
+        emitln!(self.writer, "<a id=\"{}\"></a>", label);
     }
 
     /// Begins a collapsed section.

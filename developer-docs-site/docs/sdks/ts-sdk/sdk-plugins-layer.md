@@ -74,7 +74,7 @@ The main methods are:
 
 ## FaucetClient class
 
-The [FaucetClient](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/plugins/faucet_client.ts) class is a thin wrapper for the Aptos faucet that provides a way to funds Aptos accounts. The class provides a request method to request token for an Aptos acount.
+The [FaucetClient](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/plugins/faucet_client.ts) class is a thin wrapper for the Aptos faucet that provides a way to funds Aptos accounts. The class provides a request method to request token for an Aptos account.
 
 The main read methods are:
 

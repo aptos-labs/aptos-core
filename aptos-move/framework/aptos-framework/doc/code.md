@@ -1,5 +1,5 @@
 
-<a name="0x1_code"></a>
+<a id="0x1_code"></a>
 
 # Module `0x1::code`
 
@@ -52,7 +52,7 @@ This module supports functionality related to code management.
 
 
 
-<a name="0x1_code_PackageRegistry"></a>
+<a id="0x1_code_PackageRegistry"></a>
 
 ## Resource `PackageRegistry`
 
@@ -80,7 +80,7 @@ The package registry at the given address.
 
 </details>
 
-<a name="0x1_code_PackageMetadata"></a>
+<a id="0x1_code_PackageMetadata"></a>
 
 ## Struct `PackageMetadata`
 
@@ -152,7 +152,7 @@ Metadata for a package. All byte blobs are represented as base64-of-gzipped-byte
 
 </details>
 
-<a name="0x1_code_PackageDep"></a>
+<a id="0x1_code_PackageDep"></a>
 
 ## Struct `PackageDep`
 
@@ -186,7 +186,7 @@ A dependency to a package published at address
 
 </details>
 
-<a name="0x1_code_ModuleMetadata"></a>
+<a id="0x1_code_ModuleMetadata"></a>
 
 ## Struct `ModuleMetadata`
 
@@ -232,7 +232,7 @@ Metadata about a module in a package.
 
 </details>
 
-<a name="0x1_code_UpgradePolicy"></a>
+<a id="0x1_code_UpgradePolicy"></a>
 
 ## Struct `UpgradePolicy`
 
@@ -260,7 +260,7 @@ Describes an upgrade policy
 
 </details>
 
-<a name="0x1_code_AllowedDep"></a>
+<a id="0x1_code_AllowedDep"></a>
 
 ## Struct `AllowedDep`
 
@@ -296,12 +296,12 @@ A helper type for request_publish_with_allowed_deps
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_code_EDEP_ARBITRARY_NOT_SAME_ADDRESS"></a>
+<a id="0x1_code_EDEP_ARBITRARY_NOT_SAME_ADDRESS"></a>
 
 A dependency to an <code>arbitrary</code> package must be on the same address.
 
@@ -311,7 +311,7 @@ A dependency to an <code>arbitrary</code> package must be on the same address.
 
 
 
-<a name="0x1_code_EDEP_WEAKER_POLICY"></a>
+<a id="0x1_code_EDEP_WEAKER_POLICY"></a>
 
 A dependency cannot have a weaker upgrade policy.
 
@@ -321,7 +321,7 @@ A dependency cannot have a weaker upgrade policy.
 
 
 
-<a name="0x1_code_EINCOMPATIBLE_POLICY_DISABLED"></a>
+<a id="0x1_code_EINCOMPATIBLE_POLICY_DISABLED"></a>
 
 Creating a package with incompatible upgrade policy is disabled.
 
@@ -331,7 +331,7 @@ Creating a package with incompatible upgrade policy is disabled.
 
 
 
-<a name="0x1_code_EMODULE_MISSING"></a>
+<a id="0x1_code_EMODULE_MISSING"></a>
 
 Cannot delete a module that was published in the same package
 
@@ -341,7 +341,7 @@ Cannot delete a module that was published in the same package
 
 
 
-<a name="0x1_code_EMODULE_NAME_CLASH"></a>
+<a id="0x1_code_EMODULE_NAME_CLASH"></a>
 
 Package contains duplicate module names with existing modules publised in other packages on this address
 
@@ -351,7 +351,7 @@ Package contains duplicate module names with existing modules publised in other 
 
 
 
-<a name="0x1_code_EPACKAGE_DEP_MISSING"></a>
+<a id="0x1_code_EPACKAGE_DEP_MISSING"></a>
 
 Dependency could not be resolved to any published package.
 
@@ -361,7 +361,7 @@ Dependency could not be resolved to any published package.
 
 
 
-<a name="0x1_code_EUPGRADE_IMMUTABLE"></a>
+<a id="0x1_code_EUPGRADE_IMMUTABLE"></a>
 
 Cannot upgrade an immutable package
 
@@ -371,7 +371,7 @@ Cannot upgrade an immutable package
 
 
 
-<a name="0x1_code_EUPGRADE_WEAKER_POLICY"></a>
+<a id="0x1_code_EUPGRADE_WEAKER_POLICY"></a>
 
 Cannot downgrade a package's upgradability policy
 
@@ -381,7 +381,7 @@ Cannot downgrade a package's upgradability policy
 
 
 
-<a name="0x1_code_upgrade_policy_arbitrary"></a>
+<a id="0x1_code_upgrade_policy_arbitrary"></a>
 
 ## Function `upgrade_policy_arbitrary`
 
@@ -409,7 +409,7 @@ stored on chain.
 
 </details>
 
-<a name="0x1_code_upgrade_policy_compat"></a>
+<a id="0x1_code_upgrade_policy_compat"></a>
 
 ## Function `upgrade_policy_compat`
 
@@ -435,7 +435,7 @@ a new module has (a) the same public functions (b) for existing resources, no la
 
 </details>
 
-<a name="0x1_code_upgrade_policy_immutable"></a>
+<a id="0x1_code_upgrade_policy_immutable"></a>
 
 ## Function `upgrade_policy_immutable`
 
@@ -460,7 +460,7 @@ Whether the modules in the package are immutable and cannot be upgraded.
 
 </details>
 
-<a name="0x1_code_can_change_upgrade_policy_to"></a>
+<a id="0x1_code_can_change_upgrade_policy_to"></a>
 
 ## Function `can_change_upgrade_policy_to`
 
@@ -486,7 +486,7 @@ strengthened but not weakened.
 
 </details>
 
-<a name="0x1_code_initialize"></a>
+<a id="0x1_code_initialize"></a>
 
 ## Function `initialize`
 
@@ -518,7 +518,7 @@ Initialize package metadata for Genesis.
 
 </details>
 
-<a name="0x1_code_publish_package"></a>
+<a id="0x1_code_publish_package"></a>
 
 ## Function `publish_package`
 
@@ -596,7 +596,7 @@ package.
 
 </details>
 
-<a name="0x1_code_publish_package_txn"></a>
+<a id="0x1_code_publish_package_txn"></a>
 
 ## Function `publish_package_txn`
 
@@ -623,7 +623,7 @@ of current restrictions for txn parameters, the metadata needs to be passed in s
 
 </details>
 
-<a name="0x1_code_check_upgradability"></a>
+<a id="0x1_code_check_upgradability"></a>
 
 ## Function `check_upgradability`
 
@@ -660,7 +660,7 @@ Checks whether the given package is upgradable, and returns true if a compatibil
 
 </details>
 
-<a name="0x1_code_check_coexistence"></a>
+<a id="0x1_code_check_coexistence"></a>
 
 ## Function `check_coexistence`
 
@@ -694,7 +694,7 @@ Checks whether a new package with given names can co-exist with old package.
 
 </details>
 
-<a name="0x1_code_check_dependencies"></a>
+<a id="0x1_code_check_dependencies"></a>
 
 ## Function `check_dependencies`
 
@@ -765,7 +765,7 @@ is passed on to the native layer to verify that bytecode dependencies are actual
 
 </details>
 
-<a name="0x1_code_is_policy_exempted_address"></a>
+<a id="0x1_code_is_policy_exempted_address"></a>
 
 ## Function `is_policy_exempted_address`
 
@@ -793,7 +793,7 @@ requires to be upgradable for maintenance and evolution, and is configured to be
 
 </details>
 
-<a name="0x1_code_get_module_names"></a>
+<a id="0x1_code_get_module_names"></a>
 
 ## Function `get_module_names`
 
@@ -823,7 +823,7 @@ Get the names of the modules in a package.
 
 </details>
 
-<a name="0x1_code_request_publish"></a>
+<a id="0x1_code_request_publish"></a>
 
 ## Function `request_publish`
 
@@ -851,7 +851,7 @@ Native function to initiate module loading
 
 </details>
 
-<a name="0x1_code_request_publish_with_allowed_deps"></a>
+<a id="0x1_code_request_publish_with_allowed_deps"></a>
 
 ## Function `request_publish_with_allowed_deps`
 
@@ -880,7 +880,7 @@ Native function to initiate module loading, including a list of allowed dependen
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -892,7 +892,7 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 
-<a name="@Specification_1_initialize"></a>
+<a id="@Specification_1_initialize"></a>
 
 ### Function `initialize`
 
@@ -911,7 +911,7 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 
-<a name="@Specification_1_publish_package"></a>
+<a id="@Specification_1_publish_package"></a>
 
 ### Function `publish_package`
 
@@ -930,7 +930,7 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 
-<a name="@Specification_1_publish_package_txn"></a>
+<a id="@Specification_1_publish_package_txn"></a>
 
 ### Function `publish_package_txn`
 
@@ -946,7 +946,7 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 
-<a name="@Specification_1_check_upgradability"></a>
+<a id="@Specification_1_check_upgradability"></a>
 
 ### Function `check_upgradability`
 
@@ -964,7 +964,7 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 
-<a name="@Specification_1_check_coexistence"></a>
+<a id="@Specification_1_check_coexistence"></a>
 
 ### Function `check_coexistence`
 
@@ -980,7 +980,7 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 
-<a name="@Specification_1_check_dependencies"></a>
+<a id="@Specification_1_check_dependencies"></a>
 
 ### Function `check_dependencies`
 
@@ -996,7 +996,7 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 
-<a name="@Specification_1_get_module_names"></a>
+<a id="@Specification_1_get_module_names"></a>
 
 ### Function `get_module_names`
 
@@ -1015,7 +1015,7 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 
-<a name="@Specification_1_request_publish"></a>
+<a id="@Specification_1_request_publish"></a>
 
 ### Function `request_publish`
 
@@ -1031,7 +1031,7 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 
-<a name="@Specification_1_request_publish_with_allowed_deps"></a>
+<a id="@Specification_1_request_publish_with_allowed_deps"></a>
 
 ### Function `request_publish_with_allowed_deps`
 

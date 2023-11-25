@@ -1,0 +1,14 @@
+// ---- Model Dump
+module 0x42::m {
+    private fun foo() {
+        {
+          let i: u64 = 10;
+          spec {
+            assert forall j: num: Range(0, i): Lt(j, i);
+          }
+          ;
+          i: u64 = Add<u64>(i, 1)
+        }
+    }
+    spec fun $foo();
+} // end 0x42::m

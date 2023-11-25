@@ -152,6 +152,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     timestamp: timestamp.into(),
                 })
             },
+            SystemTransaction(_txn) => todo!(),
         })
     }
 

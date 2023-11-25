@@ -1,5 +1,5 @@
 
-<a name="0x4_property_map"></a>
+<a id="0x4_property_map"></a>
 
 # Module `0x4::property_map`
 
@@ -56,7 +56,7 @@ represent types and storing values in bcs format.
 
 
 
-<a name="0x4_property_map_PropertyMap"></a>
+<a id="0x4_property_map_PropertyMap"></a>
 
 ## Resource `PropertyMap`
 
@@ -86,7 +86,7 @@ should keep track of what keys are what types, and parse them accordingly.
 
 </details>
 
-<a name="0x4_property_map_PropertyValue"></a>
+<a id="0x4_property_map_PropertyValue"></a>
 
 ## Struct `PropertyValue`
 
@@ -120,7 +120,7 @@ A typed value for the <code><a href="property_map.md#0x4_property_map_PropertyMa
 
 </details>
 
-<a name="0x4_property_map_MutatorRef"></a>
+<a id="0x4_property_map_MutatorRef"></a>
 
 ## Struct `MutatorRef`
 
@@ -148,12 +148,12 @@ A mutator ref that allows for mutation of the property map
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x4_property_map_ETYPE_MISMATCH"></a>
+<a id="0x4_property_map_ETYPE_MISMATCH"></a>
 
 Property value does not match expected type
 
@@ -163,7 +163,7 @@ Property value does not match expected type
 
 
 
-<a name="0x4_property_map_ADDRESS"></a>
+<a id="0x4_property_map_ADDRESS"></a>
 
 
 
@@ -172,7 +172,7 @@ Property value does not match expected type
 
 
 
-<a name="0x4_property_map_BOOL"></a>
+<a id="0x4_property_map_BOOL"></a>
 
 
 
@@ -181,7 +181,7 @@ Property value does not match expected type
 
 
 
-<a name="0x4_property_map_BYTE_VECTOR"></a>
+<a id="0x4_property_map_BYTE_VECTOR"></a>
 
 
 
@@ -190,7 +190,7 @@ Property value does not match expected type
 
 
 
-<a name="0x4_property_map_EKEY_ALREADY_EXISTS_IN_PROPERTY_MAP"></a>
+<a id="0x4_property_map_EKEY_ALREADY_EXISTS_IN_PROPERTY_MAP"></a>
 
 The property key already exists
 
@@ -200,7 +200,7 @@ The property key already exists
 
 
 
-<a name="0x4_property_map_EKEY_TYPE_COUNT_MISMATCH"></a>
+<a id="0x4_property_map_EKEY_TYPE_COUNT_MISMATCH"></a>
 
 Property key and type counts do not match
 
@@ -210,7 +210,7 @@ Property key and type counts do not match
 
 
 
-<a name="0x4_property_map_EKEY_VALUE_COUNT_MISMATCH"></a>
+<a id="0x4_property_map_EKEY_VALUE_COUNT_MISMATCH"></a>
 
 Property key and value counts do not match
 
@@ -220,7 +220,7 @@ Property key and value counts do not match
 
 
 
-<a name="0x4_property_map_EPROPERTY_MAP_DOES_NOT_EXIST"></a>
+<a id="0x4_property_map_EPROPERTY_MAP_DOES_NOT_EXIST"></a>
 
 The property map does not exist
 
@@ -230,7 +230,7 @@ The property map does not exist
 
 
 
-<a name="0x4_property_map_EPROPERTY_MAP_KEY_TOO_LONG"></a>
+<a id="0x4_property_map_EPROPERTY_MAP_KEY_TOO_LONG"></a>
 
 The key of the property is too long
 
@@ -240,7 +240,7 @@ The key of the property is too long
 
 
 
-<a name="0x4_property_map_ETOO_MANY_PROPERTIES"></a>
+<a id="0x4_property_map_ETOO_MANY_PROPERTIES"></a>
 
 The number of properties exceeds the maximum
 
@@ -250,7 +250,7 @@ The number of properties exceeds the maximum
 
 
 
-<a name="0x4_property_map_ETYPE_INVALID"></a>
+<a id="0x4_property_map_ETYPE_INVALID"></a>
 
 Invalid value type specified
 
@@ -260,7 +260,7 @@ Invalid value type specified
 
 
 
-<a name="0x4_property_map_MAX_PROPERTY_MAP_SIZE"></a>
+<a id="0x4_property_map_MAX_PROPERTY_MAP_SIZE"></a>
 
 Maximum number of items in a <code><a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a></code>
 
@@ -270,7 +270,7 @@ Maximum number of items in a <code><a href="property_map.md#0x4_property_map_Pro
 
 
 
-<a name="0x4_property_map_MAX_PROPERTY_NAME_LENGTH"></a>
+<a id="0x4_property_map_MAX_PROPERTY_NAME_LENGTH"></a>
 
 Maximum number of characters in a property name
 
@@ -280,7 +280,7 @@ Maximum number of characters in a property name
 
 
 
-<a name="0x4_property_map_STRING"></a>
+<a id="0x4_property_map_STRING"></a>
 
 
 
@@ -289,7 +289,7 @@ Maximum number of characters in a property name
 
 
 
-<a name="0x4_property_map_U128"></a>
+<a id="0x4_property_map_U128"></a>
 
 
 
@@ -298,7 +298,7 @@ Maximum number of characters in a property name
 
 
 
-<a name="0x4_property_map_U16"></a>
+<a id="0x4_property_map_U16"></a>
 
 
 
@@ -307,7 +307,7 @@ Maximum number of characters in a property name
 
 
 
-<a name="0x4_property_map_U256"></a>
+<a id="0x4_property_map_U256"></a>
 
 
 
@@ -316,7 +316,7 @@ Maximum number of characters in a property name
 
 
 
-<a name="0x4_property_map_U32"></a>
+<a id="0x4_property_map_U32"></a>
 
 
 
@@ -325,7 +325,7 @@ Maximum number of characters in a property name
 
 
 
-<a name="0x4_property_map_U64"></a>
+<a id="0x4_property_map_U64"></a>
 
 
 
@@ -334,7 +334,7 @@ Maximum number of characters in a property name
 
 
 
-<a name="0x4_property_map_U8"></a>
+<a id="0x4_property_map_U8"></a>
 
 
 
@@ -343,7 +343,7 @@ Maximum number of characters in a property name
 
 
 
-<a name="0x4_property_map_init"></a>
+<a id="0x4_property_map_init"></a>
 
 ## Function `init`
 
@@ -368,7 +368,7 @@ Maximum number of characters in a property name
 
 </details>
 
-<a name="0x4_property_map_burn"></a>
+<a id="0x4_property_map_burn"></a>
 
 ## Function `burn`
 
@@ -393,7 +393,7 @@ Burns the entire property map
 
 </details>
 
-<a name="0x4_property_map_prepare_input"></a>
+<a id="0x4_property_map_prepare_input"></a>
 
 ## Function `prepare_input`
 
@@ -444,7 +444,7 @@ Helper for external entry functions to produce a valid container for property va
 
 </details>
 
-<a name="0x4_property_map_to_external_type"></a>
+<a id="0x4_property_map_to_external_type"></a>
 
 ## Function `to_external_type`
 
@@ -491,7 +491,7 @@ Maps <code>String</code> representation of types from their <code>u8</code> repr
 
 </details>
 
-<a name="0x4_property_map_to_internal_type"></a>
+<a id="0x4_property_map_to_internal_type"></a>
 
 ## Function `to_internal_type`
 
@@ -538,7 +538,7 @@ Maps the <code>String</code> representation of types to <code>u8</code>
 
 </details>
 
-<a name="0x4_property_map_type_info_to_internal_type"></a>
+<a id="0x4_property_map_type_info_to_internal_type"></a>
 
 ## Function `type_info_to_internal_type`
 
@@ -564,7 +564,7 @@ Maps Move type to <code>u8</code> representation
 
 </details>
 
-<a name="0x4_property_map_validate_type"></a>
+<a id="0x4_property_map_validate_type"></a>
 
 ## Function `validate_type`
 
@@ -611,7 +611,7 @@ Validates property value type against its expected type
 
 </details>
 
-<a name="0x4_property_map_generate_mutator_ref"></a>
+<a id="0x4_property_map_generate_mutator_ref"></a>
 
 ## Function `generate_mutator_ref`
 
@@ -635,7 +635,7 @@ Validates property value type against its expected type
 
 </details>
 
-<a name="0x4_property_map_contains_key"></a>
+<a id="0x4_property_map_contains_key"></a>
 
 ## Function `contains_key`
 
@@ -661,7 +661,7 @@ Validates property value type against its expected type
 
 </details>
 
-<a name="0x4_property_map_length"></a>
+<a id="0x4_property_map_length"></a>
 
 ## Function `length`
 
@@ -687,7 +687,7 @@ Validates property value type against its expected type
 
 </details>
 
-<a name="0x4_property_map_read"></a>
+<a id="0x4_property_map_read"></a>
 
 ## Function `read`
 
@@ -718,7 +718,7 @@ The preferred method is to use <code>read_&lt;type&gt;</code> where the type is 
 
 </details>
 
-<a name="0x4_property_map_assert_exists"></a>
+<a id="0x4_property_map_assert_exists"></a>
 
 ## Function `assert_exists`
 
@@ -745,7 +745,7 @@ The preferred method is to use <code>read_&lt;type&gt;</code> where the type is 
 
 </details>
 
-<a name="0x4_property_map_read_typed"></a>
+<a id="0x4_property_map_read_typed"></a>
 
 ## Function `read_typed`
 
@@ -775,7 +775,7 @@ Read a type and verify that the type is correct
 
 </details>
 
-<a name="0x4_property_map_read_bool"></a>
+<a id="0x4_property_map_read_bool"></a>
 
 ## Function `read_bool`
 
@@ -800,7 +800,7 @@ Read a type and verify that the type is correct
 
 </details>
 
-<a name="0x4_property_map_read_u8"></a>
+<a id="0x4_property_map_read_u8"></a>
 
 ## Function `read_u8`
 
@@ -825,7 +825,7 @@ Read a type and verify that the type is correct
 
 </details>
 
-<a name="0x4_property_map_read_u16"></a>
+<a id="0x4_property_map_read_u16"></a>
 
 ## Function `read_u16`
 
@@ -850,7 +850,7 @@ Read a type and verify that the type is correct
 
 </details>
 
-<a name="0x4_property_map_read_u32"></a>
+<a id="0x4_property_map_read_u32"></a>
 
 ## Function `read_u32`
 
@@ -875,7 +875,7 @@ Read a type and verify that the type is correct
 
 </details>
 
-<a name="0x4_property_map_read_u64"></a>
+<a id="0x4_property_map_read_u64"></a>
 
 ## Function `read_u64`
 
@@ -900,7 +900,7 @@ Read a type and verify that the type is correct
 
 </details>
 
-<a name="0x4_property_map_read_u128"></a>
+<a id="0x4_property_map_read_u128"></a>
 
 ## Function `read_u128`
 
@@ -925,7 +925,7 @@ Read a type and verify that the type is correct
 
 </details>
 
-<a name="0x4_property_map_read_u256"></a>
+<a id="0x4_property_map_read_u256"></a>
 
 ## Function `read_u256`
 
@@ -950,7 +950,7 @@ Read a type and verify that the type is correct
 
 </details>
 
-<a name="0x4_property_map_read_address"></a>
+<a id="0x4_property_map_read_address"></a>
 
 ## Function `read_address`
 
@@ -975,7 +975,7 @@ Read a type and verify that the type is correct
 
 </details>
 
-<a name="0x4_property_map_read_bytes"></a>
+<a id="0x4_property_map_read_bytes"></a>
 
 ## Function `read_bytes`
 
@@ -1000,7 +1000,7 @@ Read a type and verify that the type is correct
 
 </details>
 
-<a name="0x4_property_map_read_string"></a>
+<a id="0x4_property_map_read_string"></a>
 
 ## Function `read_string`
 
@@ -1025,7 +1025,7 @@ Read a type and verify that the type is correct
 
 </details>
 
-<a name="0x4_property_map_add"></a>
+<a id="0x4_property_map_add"></a>
 
 ## Function `add`
 
@@ -1052,7 +1052,7 @@ Add a property, already bcs encoded as a <code><a href="../../aptos-framework/..
 
 </details>
 
-<a name="0x4_property_map_add_typed"></a>
+<a id="0x4_property_map_add_typed"></a>
 
 ## Function `add_typed`
 
@@ -1078,7 +1078,7 @@ Add a property that isn't already encoded as a <code><a href="../../aptos-framew
 
 </details>
 
-<a name="0x4_property_map_add_internal"></a>
+<a id="0x4_property_map_add_internal"></a>
 
 ## Function `add_internal`
 
@@ -1104,7 +1104,7 @@ Add a property that isn't already encoded as a <code><a href="../../aptos-framew
 
 </details>
 
-<a name="0x4_property_map_update"></a>
+<a id="0x4_property_map_update"></a>
 
 ## Function `update`
 
@@ -1131,7 +1131,7 @@ Updates a property in place already bcs encoded
 
 </details>
 
-<a name="0x4_property_map_update_typed"></a>
+<a id="0x4_property_map_update_typed"></a>
 
 ## Function `update_typed`
 
@@ -1157,7 +1157,7 @@ Updates a property in place that is not already bcs encoded
 
 </details>
 
-<a name="0x4_property_map_update_internal"></a>
+<a id="0x4_property_map_update_internal"></a>
 
 ## Function `update_internal`
 
@@ -1184,7 +1184,7 @@ Updates a property in place that is not already bcs encoded
 
 </details>
 
-<a name="0x4_property_map_remove"></a>
+<a id="0x4_property_map_remove"></a>
 
 ## Function `remove`
 
