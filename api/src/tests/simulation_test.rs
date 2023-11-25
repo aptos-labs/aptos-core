@@ -7,11 +7,10 @@ use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_types::transaction::authenticator::TransactionAuthenticator;
 use serde_json::json;
 
-const TRANSFER_AMOUNT: u64 = 10;
-
 async fn simulate_aptos_transfer(
     context: &mut TestContext,
     use_valid_signature: bool,
+    transfer_amount: u64,
     expected_status: u16,
 ) -> serde_json::Value {
     let alice = &mut context.gen_account();
@@ -19,7 +18,7 @@ async fn simulate_aptos_transfer(
     let txn = context.mint_user_account(alice).await;
     context.commit_block(&vec![txn]).await;
 
-    let txn = context.account_transfer_to(alice, bob.address(), TRANSFER_AMOUNT);
+    let txn = context.account_transfer_to(alice, bob.address(), transfer_amount);
 
     if let TransactionAuthenticator::Ed25519 {
         public_key,
@@ -44,7 +43,7 @@ async fn simulate_aptos_transfer(
                         "function": "0x1::aptos_account::transfer",
                         "type_arguments": [],
                         "arguments": [
-                            bob.address().to_standard_string(), TRANSFER_AMOUNT.to_string(),
+                            bob.address().to_standard_string(), transfer_amount.to_string(),
                         ]
                     },
                     "signature": {
@@ -60,16 +59,26 @@ async fn simulate_aptos_transfer(
     }
 }
 
+const SMALL_TRANSFER_AMOUNT: u64 = 10;
+const LARGE_TRANSFER_AMOUNT: u64 = 1_000_000_000;
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_simulate_transaction_with_valid_signature() {
     let mut context = new_test_context(current_function_name!());
-    let resp = simulate_aptos_transfer(&mut context, true, 400).await;
+    let resp = simulate_aptos_transfer(&mut context, true, SMALL_TRANSFER_AMOUNT, 400).await;
     context.check_golden_output(resp);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_simulate_transaction_with_invalid_signature() {
+async fn test_simulate_transaction_with_not_valid_signature() {
     let mut context = new_test_context(current_function_name!());
-    let resp = simulate_aptos_transfer(&mut context, false, 200).await;
+    let resp = simulate_aptos_transfer(&mut context, false, SMALL_TRANSFER_AMOUNT, 200).await;
     assert!(resp[0]["success"].as_bool().is_some_and(|v| v));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_simulate_transaction_with_insufficient_balance() {
+    let mut context = new_test_context(current_function_name!());
+    let resp = simulate_aptos_transfer(&mut context, false, LARGE_TRANSFER_AMOUNT, 200).await;
+    assert!(!resp[0]["success"].as_bool().is_some_and(|v| v));
 }

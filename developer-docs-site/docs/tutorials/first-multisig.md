@@ -67,11 +67,11 @@ Bob:   0xcf21e85337a313bdac33d068960a3e52d22ce0e6190e9acc03a1c9930e1eaf3e
 Chad:  0xa1a2aef8525eb20655387d3ed50b9a3ea1531ef6117f579d0da4bcf5a2e1f76d
 ```
 
-For each user, note the [account address](../concepts/accounts.md#account-address) and [authentication key](../concepts/accounts.md#single-signer-authentication) are identical, but the [public key](../concepts/accounts.md#creating-an-account) is different.
+For each user, note the [account address](../concepts/accounts.md#account-address) and [authentication key](../concepts/accounts.md#authentication-key) are identical, but the [public key](../concepts/accounts.md#creating-an-account) is different.
 
 ## Step 4: Generate a multisig account
 
-Next generate a [K-of-N multi-signer](../concepts/accounts.md#multi-signer-authentication) public key and account address for a multisig account requiring two of the three signatures:
+Next generate a [K-of-N multi-signer](../concepts/accounts.md#multied25519-authentication) public key and account address for a multisig account requiring two of the three signatures:
 
 ```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_2
@@ -124,7 +124,7 @@ Bob:   0x6305101f8f3ad5a75254a8fa74b0d9866756abbf359f9e4f2b54247917caf8c52798a36
 
 ### Step 6.2: Submit the multisig transaction
 
-Next generate a [multisig authenticator](../integration/sign-a-transaction.md#multisignature-transactions) and submit the transaction:
+Next generate a multisig authenticator and submit the transaction:
 
 
 ```python title="multisig.py snippet"

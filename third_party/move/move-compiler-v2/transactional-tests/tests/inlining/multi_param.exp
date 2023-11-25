@@ -1,0 +1,22 @@
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
++ task 0 'publish'. lines 1-29:
++ Error: compilation errors:
++  error: operand to `&mut` must be a field selection (`&mut s.f`) or a local (`&mut name`)
++    ┌─ TEMPFILE:24:40
++    │
++ 24 │         assert!(elem_for_each_ref(&mut vector[Elem{k:1, v:2}], |x,y| *x + *y) == 3, 0)
++    │                                        ^^^^^^
++ 
++ 
++ 
++ task 1 'run'. lines 31-31:
++ Error: Function execution failed with VMError: {
++     major_status: LINKER_ERROR,
++     sub_status: None,
++     location: undefined,
++     indices: redacted,
++     offsets: redacted,
++ }
++ 

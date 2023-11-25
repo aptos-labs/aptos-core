@@ -7,17 +7,17 @@ RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloa
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt update && apt-get --no-install-recommends install -y \
-        cmake \
-        curl \
-        clang \
-        git \
-        pkg-config \
-        libssl-dev \
-        libpq-dev \
-        libdw-dev \
-        binutils \
-        lld \
-        libudev-dev
+    cmake \
+    curl \
+    clang \
+    git \
+    pkg-config \
+    libssl-dev \
+    libpq-dev \
+    libdw-dev \
+    binutils \
+    lld \
+    libudev-dev
 
 ### Build Rust code ###
 FROM rust-base as builder-base
@@ -44,7 +44,7 @@ RUN ARCHITECTURE=$(uname -m | sed -e "s/arm64/arm_64/g" | sed -e "s/aarch64/aarc
     && chmod +x "/usr/local/bin/protoc" \
     && rm "protoc-21.5-linux-$ARCHITECTURE.zip"
 RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git_credentials \
-        git config --global credential.helper store
+    git config --global credential.helper store
 
 COPY --link . /aptos/
 
@@ -54,7 +54,7 @@ RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
     --mount=type=cache,target=/usr/local/cargo/git,id=node-builder-cargo-git-cache \
     --mount=type=cache,target=/usr/local/cargo/registry,id=node-builder-cargo-registry-cache \
     --mount=type=cache,target=/aptos/target,id=node-builder-target-cache \
-        docker/builder/build-node.sh
+    docker/builder/build-node.sh
 
 FROM builder-base as tools-builder
 
@@ -62,4 +62,12 @@ RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
     --mount=type=cache,target=/usr/local/cargo/git,id=tools-builder-cargo-git-cache \
     --mount=type=cache,target=/usr/local/cargo/registry,id=tools-builder-cargo-registry-cache \
     --mount=type=cache,target=/aptos/target,id=tools-builder-target-cache \
-        docker/builder/build-tools.sh
+    docker/builder/build-tools.sh
+
+FROM builder-base as indexer-builder
+
+RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
+    --mount=type=cache,target=/usr/local/cargo/git,id=indexer-builder-cargo-git-cache \
+    --mount=type=cache,target=/usr/local/cargo/registry,id=indexer-builder-cargo-registry-cache \
+    --mount=type=cache,target=/aptos/target,id=indexer-builder-target-cache \
+    docker/builder/build-indexer.sh

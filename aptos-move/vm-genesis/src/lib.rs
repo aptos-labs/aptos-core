@@ -119,7 +119,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
 
     // On-chain genesis process.
-    let consensus_config = OnChainConsensusConfig::default();
+    let consensus_config = OnChainConsensusConfig::default_for_genesis();
     let execution_config = OnChainExecutionConfig::default_for_genesis();
     let gas_schedule = default_gas_schedule();
     initialize(
@@ -435,6 +435,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION,
         FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
         FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
+        FeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
     ]
 }
 
@@ -820,7 +821,7 @@ pub fn generate_test_genesis(
             employee_vesting_start: 1663456089,
             employee_vesting_period_duration: 5 * 60, // 5 minutes
         },
-        &OnChainConsensusConfig::default(),
+        &OnChainConsensusConfig::default_for_genesis(),
         &OnChainExecutionConfig::default_for_genesis(),
         &default_gas_schedule(),
     );
@@ -842,7 +843,7 @@ pub fn generate_mainnet_genesis(
         framework,
         ChainId::test(),
         &mainnet_genesis_config(),
-        &OnChainConsensusConfig::default(),
+        &OnChainConsensusConfig::default_for_genesis(),
         &OnChainExecutionConfig::default_for_genesis(),
         &default_gas_schedule(),
     );

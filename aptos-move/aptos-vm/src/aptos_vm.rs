@@ -29,7 +29,10 @@ use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
     account_config::new_block_event_key,
-    block_executor::partitioner::PartitionedTransactions,
+    block_executor::{
+        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
+        partitioner::PartitionedTransactions,
+    },
     block_metadata::BlockMetadata,
     fee_statement::FeeStatement,
     on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
@@ -55,6 +58,7 @@ use aptos_vm_types::{
     resolver::{ExecutorView, ResourceGroupView},
     storage::{ChangeSetConfigs, StorageGasParameters},
 };
+use claims::assert_err;
 use fail::fail_point;
 use move_binary_format::{
     access::ModuleAccess,
@@ -138,11 +142,6 @@ impl AptosVM {
             is_simulation: false,
             vm_impl: AptosVMImpl::new(resolver),
         }
-    }
-
-    pub fn for_simulation(mut self) -> Self {
-        self.is_simulation = true;
-        self
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -1262,15 +1261,13 @@ impl AptosVM {
     fn process_system_transaction(
         &self,
         _resolver: &impl AptosMoveResolver,
-        txn: SystemTransaction,
+        _txn: SystemTransaction,
         _log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
-        match txn {
-            SystemTransaction::DummyTopic(_) => (
-                VMStatus::Executed,
-                VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)),
-            ),
-        }
+        (
+            VMStatus::Executed,
+            VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)),
+        )
     }
 
     fn execute_user_transaction_impl(
@@ -1737,12 +1734,17 @@ impl AptosVM {
             .any(|(event, _)| event.event_key() == Some(&new_epoch_event_key))
     }
 
+    /// Executes a single transaction (including user transactions, block
+    /// metadata and state checkpoint, etc.).
+    /// *Precondition:* VM has to be instantiated in execution mode.
     pub fn execute_single_transaction(
         &self,
         txn: &SignatureVerifiedTransaction,
         resolver: &impl AptosMoveResolver,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus> {
+        assert!(!self.is_simulation, "VM has to be created for execution");
+
         if let SignatureVerifiedTransaction::Invalid(_) = txn {
             let (vm_status, output) =
                 discard_error_vm_status(VMStatus::error(StatusCode::INVALID_SIGNATURE, None));
@@ -1867,7 +1869,7 @@ impl VMExecutor for AptosVM {
     fn execute_block(
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         fail_point!("move_adapter::execute_block", |_| {
             Err(VMStatus::error(
@@ -1890,8 +1892,12 @@ impl VMExecutor for AptosVM {
             Arc::clone(&RAYON_EXEC_POOL),
             transactions,
             state_view,
-            Self::get_concurrency_level(),
-            maybe_block_gas_limit,
+            BlockExecutorConfig {
+                local: BlockExecutorLocalConfig {
+                    concurrency_level: Self::get_concurrency_level(),
+                },
+                onchain: onchain_config,
+            },
             None,
         );
         if ret.is_ok() {
@@ -1905,7 +1911,7 @@ impl VMExecutor for AptosVM {
         sharded_block_executor: &ShardedBlockExecutor<S, C>,
         transactions: PartitionedTransactions,
         state_view: Arc<S>,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         info!(
@@ -1919,7 +1925,7 @@ impl VMExecutor for AptosVM {
             state_view,
             transactions,
             AptosVM::get_concurrency_level(),
-            maybe_block_gas_limit,
+            onchain_config,
         );
         if ret.is_ok() {
             // Record the histogram count for transactions per block.
@@ -1998,31 +2004,37 @@ impl VMValidator for AptosVM {
     }
 }
 
-impl VMSimulator for AptosVM {
-    fn simulate_signed_transaction(
-        &self,
+// Ensure encapsulation of AptosVM APIs by using a wrapper.
+pub struct AptosSimulationVM(AptosVM);
+
+impl AptosSimulationVM {
+    pub fn new(resolver: &impl AptosMoveResolver) -> Self {
+        let mut vm = AptosVM::new(resolver);
+        vm.is_simulation = true;
+        Self(vm)
+    }
+
+    /// Simulates a signed transaction (i.e., executes it without performing
+    /// signature verification) on a newly created VM instance.
+    /// *Precondition:* the transaction must **not** have a valid signature.
+    pub fn create_vm_and_simulate_signed_transaction(
         transaction: &SignedTransaction,
         state_view: &impl StateView,
-    ) -> Result<TransactionOutput, VMStatus> {
-        assert!(self.is_simulation, "VM has to be created for simulation");
-
-        // The caller must ensure that the signature is not invalid, as otherwise
-        // a malicious actor could execute the transaction without their knowledge.
-        if transaction.verify_signature().is_ok() {
-            return Err(VMStatus::error(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                Some("Simulated transaction should not have a valid signature".to_string()),
-            ));
-        }
+    ) -> (VMStatus, TransactionOutput) {
+        assert_err!(
+            transaction.verify_signature(),
+            "Simulated transaction should not have a valid signature"
+        );
 
         let resolver = state_view.as_move_resolver();
+        let vm = Self::new(&resolver);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let (vm_status, vm_output) =
-            self.execute_user_transaction(&resolver, transaction, &log_context);
-        match vm_status {
-            VMStatus::Executed => vm_output.try_into_transaction_output(&resolver),
-            vm_status => Err(vm_status),
-        }
+            vm.0.execute_user_transaction(&resolver, transaction, &log_context);
+        let txn_output = vm_output
+            .try_into_transaction_output(&resolver)
+            .expect("Materializing aggregator V1 deltas should never fail");
+        (vm_status, txn_output)
     }
 }

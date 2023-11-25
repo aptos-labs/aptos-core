@@ -27,6 +27,7 @@ async-trait = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
+once_cell = { workspace = true }
 rand = { workspace = true }
 random_word = { workspace = true }
 reqwest = { workspace = true }

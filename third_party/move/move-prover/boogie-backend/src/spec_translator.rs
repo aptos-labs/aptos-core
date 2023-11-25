@@ -1497,7 +1497,7 @@ impl<'env> SpecTranslator<'env> {
         );
         let (_, some_var) = self.require_range_var(&range.0);
         let free_vars = range_and_body
-            .free_vars(self.env)
+            .free_vars_with_types(self.env)
             .into_iter()
             .filter(|(s, _)| *s != some_var)
             .map(|(s, ty)| (s, self.inst(ty.skip_reference())))
