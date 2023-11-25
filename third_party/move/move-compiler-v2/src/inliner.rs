@@ -809,8 +809,10 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                 // TODO(10731): ideally, each Parameter has its own loc.  For now, we use the
                 // function location.  body should have types rewritten, other inlining complete,
                 // lambdas inlined, etc.
-                let id = env.new_node(function_loc.clone().inlined_from(call_site_loc),
-                                      ty.instantiate(self.type_args));
+                let id = env.new_node(
+                    function_loc.clone().inlined_from(call_site_loc),
+                    ty.instantiate(self.type_args)
+                );
                 if let Some(new_sym) = self.shadow_stack.get_shadow_symbol(*sym, true) {
                     Pattern::Var(id, new_sym)
                 } else {
