@@ -1,5 +1,5 @@
 
-<a name="0x1_aptos_account"></a>
+<a id="0x1_aptos_account"></a>
 
 # Module `0x1::aptos_account`
 
@@ -42,7 +42,7 @@
 
 
 
-<a name="0x1_aptos_account_DirectTransferConfig"></a>
+<a id="0x1_aptos_account_DirectTransferConfig"></a>
 
 ## Resource `DirectTransferConfig`
 
@@ -78,7 +78,7 @@ By default, this is enabled. Users can opt-out by disabling at any time.
 
 </details>
 
-<a name="0x1_aptos_account_DirectCoinTransferConfigUpdatedEvent"></a>
+<a id="0x1_aptos_account_DirectCoinTransferConfigUpdatedEvent"></a>
 
 ## Struct `DirectCoinTransferConfigUpdatedEvent`
 
@@ -106,12 +106,12 @@ Event emitted when an account's direct coins transfer config is updated.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_aptos_account_EACCOUNT_DOES_NOT_ACCEPT_DIRECT_COIN_TRANSFERS"></a>
+<a id="0x1_aptos_account_EACCOUNT_DOES_NOT_ACCEPT_DIRECT_COIN_TRANSFERS"></a>
 
 Account opted out of receiving coins that they did not register to receive.
 
@@ -121,7 +121,7 @@ Account opted out of receiving coins that they did not register to receive.
 
 
 
-<a name="0x1_aptos_account_EACCOUNT_DOES_NOT_ACCEPT_DIRECT_TOKEN_TRANSFERS"></a>
+<a id="0x1_aptos_account_EACCOUNT_DOES_NOT_ACCEPT_DIRECT_TOKEN_TRANSFERS"></a>
 
 Account opted out of directly receiving NFT tokens.
 
@@ -131,7 +131,7 @@ Account opted out of directly receiving NFT tokens.
 
 
 
-<a name="0x1_aptos_account_EACCOUNT_NOT_FOUND"></a>
+<a id="0x1_aptos_account_EACCOUNT_NOT_FOUND"></a>
 
 Account does not exist.
 
@@ -141,7 +141,7 @@ Account does not exist.
 
 
 
-<a name="0x1_aptos_account_EACCOUNT_NOT_REGISTERED_FOR_APT"></a>
+<a id="0x1_aptos_account_EACCOUNT_NOT_REGISTERED_FOR_APT"></a>
 
 Account is not registered to receive APT.
 
@@ -151,7 +151,7 @@ Account is not registered to receive APT.
 
 
 
-<a name="0x1_aptos_account_EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH"></a>
+<a id="0x1_aptos_account_EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH"></a>
 
 The lengths of the recipients and amounts lists don't match.
 
@@ -161,7 +161,7 @@ The lengths of the recipients and amounts lists don't match.
 
 
 
-<a name="0x1_aptos_account_create_account"></a>
+<a id="0x1_aptos_account_create_account"></a>
 
 ## Function `create_account`
 
@@ -187,7 +187,7 @@ Basic account creation methods.
 
 </details>
 
-<a name="0x1_aptos_account_batch_transfer"></a>
+<a id="0x1_aptos_account_batch_transfer"></a>
 
 ## Function `batch_transfer`
 
@@ -221,7 +221,7 @@ Batch version of APT transfer.
 
 </details>
 
-<a name="0x1_aptos_account_transfer"></a>
+<a id="0x1_aptos_account_transfer"></a>
 
 ## Function `transfer`
 
@@ -255,7 +255,7 @@ This would create the recipient account first, which also registers it to receiv
 
 </details>
 
-<a name="0x1_aptos_account_batch_transfer_coins"></a>
+<a id="0x1_aptos_account_batch_transfer_coins"></a>
 
 ## Function `batch_transfer_coins`
 
@@ -290,7 +290,7 @@ Batch version of transfer_coins.
 
 </details>
 
-<a name="0x1_aptos_account_transfer_coins"></a>
+<a id="0x1_aptos_account_transfer_coins"></a>
 
 ## Function `transfer_coins`
 
@@ -316,7 +316,7 @@ This would create the recipient account first and register it to receive the Coi
 
 </details>
 
-<a name="0x1_aptos_account_deposit_coins"></a>
+<a id="0x1_aptos_account_deposit_coins"></a>
 
 ## Function `deposit_coins`
 
@@ -357,7 +357,7 @@ This would create the recipient account first and register it to receive the Coi
 
 </details>
 
-<a name="0x1_aptos_account_assert_account_exists"></a>
+<a id="0x1_aptos_account_assert_account_exists"></a>
 
 ## Function `assert_account_exists`
 
@@ -381,7 +381,7 @@ This would create the recipient account first and register it to receive the Coi
 
 </details>
 
-<a name="0x1_aptos_account_assert_account_is_registered_for_apt"></a>
+<a id="0x1_aptos_account_assert_account_is_registered_for_apt"></a>
 
 ## Function `assert_account_is_registered_for_apt`
 
@@ -406,7 +406,7 @@ This would create the recipient account first and register it to receive the Coi
 
 </details>
 
-<a name="0x1_aptos_account_set_allow_direct_coin_transfers"></a>
+<a id="0x1_aptos_account_set_allow_direct_coin_transfers"></a>
 
 ## Function `set_allow_direct_coin_transfers`
 
@@ -452,7 +452,7 @@ Set whether <code><a href="account.md#0x1_account">account</a></code> can receiv
 
 </details>
 
-<a name="0x1_aptos_account_can_receive_direct_coin_transfers"></a>
+<a id="0x1_aptos_account_can_receive_direct_coin_transfers"></a>
 
 ## Function `can_receive_direct_coin_transfers`
 
@@ -482,7 +482,7 @@ By default, this returns true if an account has not explicitly set whether the c
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -493,7 +493,7 @@ By default, this returns true if an account has not explicitly set whether the c
 
 
 
-<a name="@Specification_1_create_account"></a>
+<a id="@Specification_1_create_account"></a>
 
 ### Function `create_account`
 
@@ -515,7 +515,7 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
-<a name="0x1_aptos_account_CreateAccountAbortsIf"></a>
+<a id="0x1_aptos_account_CreateAccountAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {
@@ -529,7 +529,7 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
-<a name="0x1_aptos_account_length_judgment"></a>
+<a id="0x1_aptos_account_length_judgment"></a>
 
 
 <pre><code><b>fun</b> <a href="aptos_account.md#0x1_aptos_account_length_judgment">length_judgment</a>(auth_key: <b>address</b>): bool {
@@ -542,7 +542,7 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
-<a name="@Specification_1_batch_transfer"></a>
+<a id="@Specification_1_batch_transfer"></a>
 
 ### Function `batch_transfer`
 
@@ -585,7 +585,7 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
-<a name="@Specification_1_transfer"></a>
+<a id="@Specification_1_transfer"></a>
 
 ### Function `transfer`
 
@@ -609,7 +609,7 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
-<a name="@Specification_1_batch_transfer_coins"></a>
+<a id="@Specification_1_batch_transfer_coins"></a>
 
 ### Function `batch_transfer_coins`
 
@@ -656,7 +656,7 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
-<a name="@Specification_1_transfer_coins"></a>
+<a id="@Specification_1_transfer_coins"></a>
 
 ### Function `transfer_coins`
 
@@ -682,7 +682,7 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
-<a name="0x1_aptos_account_CreateAccountTransferAbortsIf"></a>
+<a id="0x1_aptos_account_CreateAccountTransferAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_CreateAccountTransferAbortsIf">CreateAccountTransferAbortsIf</a> {
@@ -695,7 +695,7 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
-<a name="0x1_aptos_account_WithdrawAbortsIf"></a>
+<a id="0x1_aptos_account_WithdrawAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_WithdrawAbortsIf">WithdrawAbortsIf</a>&lt;CoinType&gt; {
@@ -713,7 +713,7 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
-<a name="0x1_aptos_account_GuidAbortsIf"></a>
+<a id="0x1_aptos_account_GuidAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_GuidAbortsIf">GuidAbortsIf</a>&lt;CoinType&gt; {
@@ -727,7 +727,7 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
-<a name="0x1_aptos_account_RegistCoinAbortsIf"></a>
+<a id="0x1_aptos_account_RegistCoinAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_RegistCoinAbortsIf">RegistCoinAbortsIf</a>&lt;CoinType&gt; {
@@ -742,7 +742,7 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
-<a name="@Specification_1_deposit_coins"></a>
+<a id="@Specification_1_deposit_coins"></a>
 
 ### Function `deposit_coins`
 
@@ -763,7 +763,7 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
-<a name="@Specification_1_assert_account_exists"></a>
+<a id="@Specification_1_assert_account_exists"></a>
 
 ### Function `assert_account_exists`
 
@@ -779,7 +779,7 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
-<a name="@Specification_1_assert_account_is_registered_for_apt"></a>
+<a id="@Specification_1_assert_account_is_registered_for_apt"></a>
 
 ### Function `assert_account_is_registered_for_apt`
 
@@ -798,7 +798,7 @@ Check if the AptosCoin under the address existed.
 
 
 
-<a name="@Specification_1_set_allow_direct_coin_transfers"></a>
+<a id="@Specification_1_set_allow_direct_coin_transfers"></a>
 
 ### Function `set_allow_direct_coin_transfers`
 
@@ -815,7 +815,7 @@ Check if the AptosCoin under the address existed.
 
 
 
-<a name="@Specification_1_can_receive_direct_coin_transfers"></a>
+<a id="@Specification_1_can_receive_direct_coin_transfers"></a>
 
 ### Function `can_receive_direct_coin_transfers`
 

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: expected a struct but found `T`
+  ┌─ tests/checking/inlining/resources_invalid.move:8:9
+  │
+8 │         borrow_global<T>(ref.addr)
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^

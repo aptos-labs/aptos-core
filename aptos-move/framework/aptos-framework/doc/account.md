@@ -1,5 +1,5 @@
 
-<a name="0x1_account"></a>
+<a id="0x1_account"></a>
 
 # Module `0x1::account`
 
@@ -108,7 +108,7 @@
 
 
 
-<a name="0x1_account_Account"></a>
+<a id="0x1_account_Account"></a>
 
 ## Resource `Account`
 
@@ -172,7 +172,7 @@ Resource representing an account.
 
 </details>
 
-<a name="0x1_account_KeyRotationEvent"></a>
+<a id="0x1_account_KeyRotationEvent"></a>
 
 ## Struct `KeyRotationEvent`
 
@@ -205,7 +205,7 @@ Resource representing an account.
 
 </details>
 
-<a name="0x1_account_CoinRegisterEvent"></a>
+<a id="0x1_account_CoinRegisterEvent"></a>
 
 ## Struct `CoinRegisterEvent`
 
@@ -232,7 +232,7 @@ Resource representing an account.
 
 </details>
 
-<a name="0x1_account_CapabilityOffer"></a>
+<a id="0x1_account_CapabilityOffer"></a>
 
 ## Struct `CapabilityOffer`
 
@@ -259,7 +259,7 @@ Resource representing an account.
 
 </details>
 
-<a name="0x1_account_RotationCapability"></a>
+<a id="0x1_account_RotationCapability"></a>
 
 ## Struct `RotationCapability`
 
@@ -286,7 +286,7 @@ Resource representing an account.
 
 </details>
 
-<a name="0x1_account_SignerCapability"></a>
+<a id="0x1_account_SignerCapability"></a>
 
 ## Struct `SignerCapability`
 
@@ -313,7 +313,7 @@ Resource representing an account.
 
 </details>
 
-<a name="0x1_account_OriginatingAddress"></a>
+<a id="0x1_account_OriginatingAddress"></a>
 
 ## Resource `OriginatingAddress`
 
@@ -351,7 +351,7 @@ This struct solves this problem by mapping the new authentication key <code>b</c
 
 </details>
 
-<a name="0x1_account_RotationProofChallenge"></a>
+<a id="0x1_account_RotationProofChallenge"></a>
 
 ## Struct `RotationProofChallenge`
 
@@ -401,7 +401,7 @@ context because they include the TXN's unique sequence number.
 
 </details>
 
-<a name="0x1_account_RotationCapabilityOfferProofChallenge"></a>
+<a id="0x1_account_RotationCapabilityOfferProofChallenge"></a>
 
 ## Struct `RotationCapabilityOfferProofChallenge`
 
@@ -435,7 +435,7 @@ Deprecated struct - newest version is <code><a href="account.md#0x1_account_Rota
 
 </details>
 
-<a name="0x1_account_SignerCapabilityOfferProofChallenge"></a>
+<a id="0x1_account_SignerCapabilityOfferProofChallenge"></a>
 
 ## Struct `SignerCapabilityOfferProofChallenge`
 
@@ -469,7 +469,7 @@ Deprecated struct - newest version is <code><a href="account.md#0x1_account_Sign
 
 </details>
 
-<a name="0x1_account_RotationCapabilityOfferProofChallengeV2"></a>
+<a id="0x1_account_RotationCapabilityOfferProofChallengeV2"></a>
 
 ## Struct `RotationCapabilityOfferProofChallengeV2`
 
@@ -517,7 +517,7 @@ This V2 struct adds the <code><a href="chain_id.md#0x1_chain_id">chain_id</a></c
 
 </details>
 
-<a name="0x1_account_SignerCapabilityOfferProofChallengeV2"></a>
+<a id="0x1_account_SignerCapabilityOfferProofChallengeV2"></a>
 
 ## Struct `SignerCapabilityOfferProofChallengeV2`
 
@@ -556,12 +556,12 @@ This V2 struct adds the <code><a href="chain_id.md#0x1_chain_id">chain_id</a></c
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_account_MAX_U64"></a>
+<a id="0x1_account_MAX_U64"></a>
 
 
 
@@ -570,7 +570,7 @@ This V2 struct adds the <code><a href="chain_id.md#0x1_chain_id">chain_id</a></c
 
 
 
-<a name="0x1_account_DERIVE_RESOURCE_ACCOUNT_SCHEME"></a>
+<a id="0x1_account_DERIVE_RESOURCE_ACCOUNT_SCHEME"></a>
 
 Scheme identifier used when hashing an account's address together with a seed to derive the address (not the
 authentication key) of a resource account. This is an abuse of the notion of a scheme identifier which, for now,
@@ -584,7 +584,7 @@ whose address matches an existing address of a MultiEd25519 wallet.
 
 
 
-<a name="0x1_account_EACCOUNT_ALREADY_EXISTS"></a>
+<a id="0x1_account_EACCOUNT_ALREADY_EXISTS"></a>
 
 Account already exists
 
@@ -594,7 +594,7 @@ Account already exists
 
 
 
-<a name="0x1_account_EACCOUNT_ALREADY_USED"></a>
+<a id="0x1_account_EACCOUNT_ALREADY_USED"></a>
 
 An attempt to create a resource account on an account that has a committed transaction
 
@@ -604,7 +604,7 @@ An attempt to create a resource account on an account that has a committed trans
 
 
 
-<a name="0x1_account_EACCOUNT_DOES_NOT_EXIST"></a>
+<a id="0x1_account_EACCOUNT_DOES_NOT_EXIST"></a>
 
 Account does not exist
 
@@ -614,7 +614,7 @@ Account does not exist
 
 
 
-<a name="0x1_account_ECANNOT_RESERVED_ADDRESS"></a>
+<a id="0x1_account_ECANNOT_RESERVED_ADDRESS"></a>
 
 Cannot create account because address is reserved
 
@@ -624,7 +624,7 @@ Cannot create account because address is reserved
 
 
 
-<a name="0x1_account_ED25519_SCHEME"></a>
+<a id="0x1_account_ED25519_SCHEME"></a>
 
 Scheme identifier for Ed25519 signatures used to derive authentication keys for Ed25519 public keys.
 
@@ -634,7 +634,7 @@ Scheme identifier for Ed25519 signatures used to derive authentication keys for 
 
 
 
-<a name="0x1_account_EEXCEEDED_MAX_GUID_CREATION_NUM"></a>
+<a id="0x1_account_EEXCEEDED_MAX_GUID_CREATION_NUM"></a>
 
 
 
@@ -643,7 +643,7 @@ Scheme identifier for Ed25519 signatures used to derive authentication keys for 
 
 
 
-<a name="0x1_account_EINVALID_ACCEPT_ROTATION_CAPABILITY"></a>
+<a id="0x1_account_EINVALID_ACCEPT_ROTATION_CAPABILITY"></a>
 
 The caller does not have a valid rotation capability offer from the other account
 
@@ -653,7 +653,7 @@ The caller does not have a valid rotation capability offer from the other accoun
 
 
 
-<a name="0x1_account_EINVALID_ORIGINATING_ADDRESS"></a>
+<a id="0x1_account_EINVALID_ORIGINATING_ADDRESS"></a>
 
 Abort the transaction if the expected originating address is different from the originating address on-chain
 
@@ -663,7 +663,7 @@ Abort the transaction if the expected originating address is different from the 
 
 
 
-<a name="0x1_account_EINVALID_PROOF_OF_KNOWLEDGE"></a>
+<a id="0x1_account_EINVALID_PROOF_OF_KNOWLEDGE"></a>
 
 Specified proof of knowledge required to prove ownership of a public key is invalid
 
@@ -673,7 +673,7 @@ Specified proof of knowledge required to prove ownership of a public key is inva
 
 
 
-<a name="0x1_account_EINVALID_SCHEME"></a>
+<a id="0x1_account_EINVALID_SCHEME"></a>
 
 Specified scheme required to proceed with the smart contract operation - can only be ED25519_SCHEME(0) OR MULTI_ED25519_SCHEME(1)
 
@@ -683,7 +683,7 @@ Specified scheme required to proceed with the smart contract operation - can onl
 
 
 
-<a name="0x1_account_EMALFORMED_AUTHENTICATION_KEY"></a>
+<a id="0x1_account_EMALFORMED_AUTHENTICATION_KEY"></a>
 
 The provided authentication key has an invalid length
 
@@ -693,7 +693,7 @@ The provided authentication key has an invalid length
 
 
 
-<a name="0x1_account_ENO_CAPABILITY"></a>
+<a id="0x1_account_ENO_CAPABILITY"></a>
 
 The caller does not have a digital-signature-based capability to call this function
 
@@ -703,7 +703,7 @@ The caller does not have a digital-signature-based capability to call this funct
 
 
 
-<a name="0x1_account_ENO_SIGNER_CAPABILITY_OFFERED"></a>
+<a id="0x1_account_ENO_SIGNER_CAPABILITY_OFFERED"></a>
 
 
 
@@ -712,7 +712,7 @@ The caller does not have a digital-signature-based capability to call this funct
 
 
 
-<a name="0x1_account_ENO_SUCH_ROTATION_CAPABILITY_OFFER"></a>
+<a id="0x1_account_ENO_SUCH_ROTATION_CAPABILITY_OFFER"></a>
 
 The specified rotation capablity offer does not exist at the specified offerer address
 
@@ -722,7 +722,7 @@ The specified rotation capablity offer does not exist at the specified offerer a
 
 
 
-<a name="0x1_account_ENO_SUCH_SIGNER_CAPABILITY"></a>
+<a id="0x1_account_ENO_SUCH_SIGNER_CAPABILITY"></a>
 
 The signer capability offer doesn't exist at the given address
 
@@ -732,7 +732,7 @@ The signer capability offer doesn't exist at the given address
 
 
 
-<a name="0x1_account_ENO_VALID_FRAMEWORK_RESERVED_ADDRESS"></a>
+<a id="0x1_account_ENO_VALID_FRAMEWORK_RESERVED_ADDRESS"></a>
 
 Address to create is not a valid reserved address for Aptos framework
 
@@ -742,7 +742,7 @@ Address to create is not a valid reserved address for Aptos framework
 
 
 
-<a name="0x1_account_EOFFERER_ADDRESS_DOES_NOT_EXIST"></a>
+<a id="0x1_account_EOFFERER_ADDRESS_DOES_NOT_EXIST"></a>
 
 Offerer address doesn't exist
 
@@ -752,7 +752,7 @@ Offerer address doesn't exist
 
 
 
-<a name="0x1_account_EOUT_OF_GAS"></a>
+<a id="0x1_account_EOUT_OF_GAS"></a>
 
 Transaction exceeded its allocated max gas
 
@@ -762,7 +762,7 @@ Transaction exceeded its allocated max gas
 
 
 
-<a name="0x1_account_ERESOURCE_ACCCOUNT_EXISTS"></a>
+<a id="0x1_account_ERESOURCE_ACCCOUNT_EXISTS"></a>
 
 An attempt to create a resource account on a claimed account
 
@@ -772,7 +772,7 @@ An attempt to create a resource account on a claimed account
 
 
 
-<a name="0x1_account_ESEQUENCE_NUMBER_TOO_BIG"></a>
+<a id="0x1_account_ESEQUENCE_NUMBER_TOO_BIG"></a>
 
 Sequence number exceeds the maximum value for a u64
 
@@ -782,7 +782,7 @@ Sequence number exceeds the maximum value for a u64
 
 
 
-<a name="0x1_account_EWRONG_CURRENT_PUBLIC_KEY"></a>
+<a id="0x1_account_EWRONG_CURRENT_PUBLIC_KEY"></a>
 
 Specified current public key is not correct
 
@@ -792,7 +792,7 @@ Specified current public key is not correct
 
 
 
-<a name="0x1_account_MAX_GUID_CREATION_NUM"></a>
+<a id="0x1_account_MAX_GUID_CREATION_NUM"></a>
 
 Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
 
@@ -802,7 +802,7 @@ Explicitly separate the GUID space between Object and Account to prevent acciden
 
 
 
-<a name="0x1_account_MULTI_ED25519_SCHEME"></a>
+<a id="0x1_account_MULTI_ED25519_SCHEME"></a>
 
 Scheme identifier for MultiEd25519 signatures used to derive authentication keys for MultiEd25519 public keys.
 
@@ -812,7 +812,7 @@ Scheme identifier for MultiEd25519 signatures used to derive authentication keys
 
 
 
-<a name="0x1_account_ZERO_AUTH_KEY"></a>
+<a id="0x1_account_ZERO_AUTH_KEY"></a>
 
 
 
@@ -821,7 +821,7 @@ Scheme identifier for MultiEd25519 signatures used to derive authentication keys
 
 
 
-<a name="0x1_account_initialize"></a>
+<a id="0x1_account_initialize"></a>
 
 ## Function `initialize`
 
@@ -849,7 +849,7 @@ Only called during genesis to initialize system resources for this module.
 
 </details>
 
-<a name="0x1_account_create_account_if_does_not_exist"></a>
+<a id="0x1_account_create_account_if_does_not_exist"></a>
 
 ## Function `create_account_if_does_not_exist`
 
@@ -875,7 +875,7 @@ Only called during genesis to initialize system resources for this module.
 
 </details>
 
-<a name="0x1_account_create_account"></a>
+<a id="0x1_account_create_account"></a>
 
 ## Function `create_account`
 
@@ -911,7 +911,7 @@ is returned. This way, the caller of this function can publish additional resour
 
 </details>
 
-<a name="0x1_account_create_account_unchecked"></a>
+<a id="0x1_account_create_account_unchecked"></a>
 
 ## Function `create_account_unchecked`
 
@@ -963,7 +963,7 @@ is returned. This way, the caller of this function can publish additional resour
 
 </details>
 
-<a name="0x1_account_exists_at"></a>
+<a id="0x1_account_exists_at"></a>
 
 ## Function `exists_at`
 
@@ -988,7 +988,7 @@ is returned. This way, the caller of this function can publish additional resour
 
 </details>
 
-<a name="0x1_account_get_guid_next_creation_num"></a>
+<a id="0x1_account_get_guid_next_creation_num"></a>
 
 ## Function `get_guid_next_creation_num`
 
@@ -1013,7 +1013,7 @@ is returned. This way, the caller of this function can publish additional resour
 
 </details>
 
-<a name="0x1_account_get_sequence_number"></a>
+<a id="0x1_account_get_sequence_number"></a>
 
 ## Function `get_sequence_number`
 
@@ -1038,7 +1038,7 @@ is returned. This way, the caller of this function can publish additional resour
 
 </details>
 
-<a name="0x1_account_increment_sequence_number"></a>
+<a id="0x1_account_increment_sequence_number"></a>
 
 ## Function `increment_sequence_number`
 
@@ -1069,7 +1069,7 @@ is returned. This way, the caller of this function can publish additional resour
 
 </details>
 
-<a name="0x1_account_get_authentication_key"></a>
+<a id="0x1_account_get_authentication_key"></a>
 
 ## Function `get_authentication_key`
 
@@ -1094,7 +1094,7 @@ is returned. This way, the caller of this function can publish additional resour
 
 </details>
 
-<a name="0x1_account_rotate_authentication_key_internal"></a>
+<a id="0x1_account_rotate_authentication_key_internal"></a>
 
 ## Function `rotate_authentication_key_internal`
 
@@ -1127,7 +1127,7 @@ the resource account.
 
 </details>
 
-<a name="0x1_account_rotate_authentication_key"></a>
+<a id="0x1_account_rotate_authentication_key"></a>
 
 ## Function `rotate_authentication_key`
 
@@ -1218,7 +1218,7 @@ to rotate his address to Alice's address in the first place.
 
 </details>
 
-<a name="0x1_account_rotate_authentication_key_with_rotation_capability"></a>
+<a id="0x1_account_rotate_authentication_key_with_rotation_capability"></a>
 
 ## Function `rotate_authentication_key_with_rotation_capability`
 
@@ -1268,7 +1268,7 @@ to rotate his address to Alice's address in the first place.
 
 </details>
 
-<a name="0x1_account_offer_rotation_capability"></a>
+<a id="0x1_account_offer_rotation_capability"></a>
 
 ## Function `offer_rotation_capability`
 
@@ -1347,7 +1347,7 @@ offer, calling this function will replace the previous <code>recipient_address</
 
 </details>
 
-<a name="0x1_account_is_rotation_capability_offered"></a>
+<a id="0x1_account_is_rotation_capability_offered"></a>
 
 ## Function `is_rotation_capability_offered`
 
@@ -1374,7 +1374,7 @@ Returns true if the account at <code>account_addr</code> has a rotation capabili
 
 </details>
 
-<a name="0x1_account_get_rotation_capability_offer_for"></a>
+<a id="0x1_account_get_rotation_capability_offer_for"></a>
 
 ## Function `get_rotation_capability_offer_for`
 
@@ -1405,7 +1405,7 @@ Returns the address of the account that has a rotation capability offer from the
 
 </details>
 
-<a name="0x1_account_revoke_rotation_capability"></a>
+<a id="0x1_account_revoke_rotation_capability"></a>
 
 ## Function `revoke_rotation_capability`
 
@@ -1434,7 +1434,7 @@ Revoke the rotation capability offer given to <code>to_be_revoked_recipient_addr
 
 </details>
 
-<a name="0x1_account_revoke_any_rotation_capability"></a>
+<a id="0x1_account_revoke_any_rotation_capability"></a>
 
 ## Function `revoke_any_rotation_capability`
 
@@ -1460,7 +1460,7 @@ Revoke any rotation capability offer in the specified account.
 
 </details>
 
-<a name="0x1_account_offer_signer_capability"></a>
+<a id="0x1_account_offer_signer_capability"></a>
 
 ## Function `offer_signer_capability`
 
@@ -1513,7 +1513,7 @@ to the account owner's signer capability).
 
 </details>
 
-<a name="0x1_account_is_signer_capability_offered"></a>
+<a id="0x1_account_is_signer_capability_offered"></a>
 
 ## Function `is_signer_capability_offered`
 
@@ -1540,7 +1540,7 @@ Returns true if the account at <code>account_addr</code> has a signer capability
 
 </details>
 
-<a name="0x1_account_get_signer_capability_offer_for"></a>
+<a id="0x1_account_get_signer_capability_offer_for"></a>
 
 ## Function `get_signer_capability_offer_for`
 
@@ -1571,7 +1571,7 @@ Returns the address of the account that has a signer capability offer from the a
 
 </details>
 
-<a name="0x1_account_revoke_signer_capability"></a>
+<a id="0x1_account_revoke_signer_capability"></a>
 
 ## Function `revoke_signer_capability`
 
@@ -1601,7 +1601,7 @@ has a signer capability offer from <code><a href="account.md#0x1_account">accoun
 
 </details>
 
-<a name="0x1_account_revoke_any_signer_capability"></a>
+<a id="0x1_account_revoke_any_signer_capability"></a>
 
 ## Function `revoke_any_signer_capability`
 
@@ -1627,7 +1627,7 @@ Revoke any signer capability offer in the specified account.
 
 </details>
 
-<a name="0x1_account_create_authorized_signer"></a>
+<a id="0x1_account_create_authorized_signer"></a>
 
 ## Function `create_authorized_signer`
 
@@ -1660,7 +1660,7 @@ at the offerer's address.
 
 </details>
 
-<a name="0x1_account_assert_valid_rotation_proof_signature_and_get_auth_key"></a>
+<a id="0x1_account_assert_valid_rotation_proof_signature_and_get_auth_key"></a>
 
 ## Function `assert_valid_rotation_proof_signature_and_get_auth_key`
 
@@ -1697,7 +1697,7 @@ Helper functions for authentication key rotation.
 
 </details>
 
-<a name="0x1_account_update_auth_key_and_originating_address_table"></a>
+<a id="0x1_account_update_auth_key_and_originating_address_table"></a>
 
 ## Function `update_auth_key_and_originating_address_table`
 
@@ -1759,7 +1759,7 @@ in the event of key recovery.
 
 </details>
 
-<a name="0x1_account_create_resource_address"></a>
+<a id="0x1_account_create_resource_address"></a>
 
 ## Function `create_resource_address`
 
@@ -1789,7 +1789,7 @@ involves the use of a cryptographic hash operation and should be use thoughtfull
 
 </details>
 
-<a name="0x1_account_create_resource_account"></a>
+<a id="0x1_account_create_resource_account"></a>
 
 ## Function `create_resource_account`
 
@@ -1846,7 +1846,7 @@ than <code>(1/2)^(256)</code>.
 
 </details>
 
-<a name="0x1_account_create_framework_reserved_account"></a>
+<a id="0x1_account_create_framework_reserved_account"></a>
 
 ## Function `create_framework_reserved_account`
 
@@ -1886,7 +1886,7 @@ create the account for system reserved addresses
 
 </details>
 
-<a name="0x1_account_create_guid"></a>
+<a id="0x1_account_create_guid"></a>
 
 ## Function `create_guid`
 
@@ -1918,7 +1918,7 @@ GUID management methods.
 
 </details>
 
-<a name="0x1_account_new_event_handle"></a>
+<a id="0x1_account_new_event_handle"></a>
 
 ## Function `new_event_handle`
 
@@ -1943,7 +1943,7 @@ GUID management methods.
 
 </details>
 
-<a name="0x1_account_register_coin"></a>
+<a id="0x1_account_register_coin"></a>
 
 ## Function `register_coin`
 
@@ -1974,7 +1974,7 @@ Coin management methods.
 
 </details>
 
-<a name="0x1_account_create_signer_with_capability"></a>
+<a id="0x1_account_create_signer_with_capability"></a>
 
 ## Function `create_signer_with_capability`
 
@@ -2000,7 +2000,7 @@ Capability based functions for efficient use.
 
 </details>
 
-<a name="0x1_account_get_signer_capability_address"></a>
+<a id="0x1_account_get_signer_capability_address"></a>
 
 ## Function `get_signer_capability_address`
 
@@ -2024,7 +2024,7 @@ Capability based functions for efficient use.
 
 </details>
 
-<a name="0x1_account_verify_signed_message"></a>
+<a id="0x1_account_verify_signed_message"></a>
 
 ## Function `verify_signed_message`
 
@@ -2084,7 +2084,7 @@ Capability based functions for efficient use.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -2096,7 +2096,7 @@ Capability based functions for efficient use.
 
 
 
-<a name="@Specification_1_initialize"></a>
+<a id="@Specification_1_initialize"></a>
 
 ### Function `initialize`
 
@@ -2117,7 +2117,7 @@ OriginatingAddress does not exist under <code>@aptos_framework</code> before the
 
 
 
-<a name="@Specification_1_create_account_if_does_not_exist"></a>
+<a id="@Specification_1_create_account_if_does_not_exist"></a>
 
 ### Function `create_account_if_does_not_exist`
 
@@ -2141,7 +2141,7 @@ Ensure that the account exists at the end of the call.
 
 
 
-<a name="@Specification_1_create_account"></a>
+<a id="@Specification_1_create_account"></a>
 
 ### Function `create_account`
 
@@ -2163,7 +2163,7 @@ Limit the new account address is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
-<a name="@Specification_1_create_account_unchecked"></a>
+<a id="@Specification_1_create_account_unchecked"></a>
 
 ### Function `create_account_unchecked`
 
@@ -2183,7 +2183,7 @@ The Account does not exist under the new address before creating the account.
 
 
 
-<a name="@Specification_1_exists_at"></a>
+<a id="@Specification_1_exists_at"></a>
 
 ### Function `exists_at`
 
@@ -2201,7 +2201,7 @@ The Account does not exist under the new address before creating the account.
 
 
 
-<a name="0x1_account_CreateAccountAbortsIf"></a>
+<a id="0x1_account_CreateAccountAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="account.md#0x1_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {
@@ -2215,7 +2215,7 @@ The Account does not exist under the new address before creating the account.
 
 
 
-<a name="@Specification_1_get_guid_next_creation_num"></a>
+<a id="@Specification_1_get_guid_next_creation_num"></a>
 
 ### Function `get_guid_next_creation_num`
 
@@ -2233,7 +2233,7 @@ The Account does not exist under the new address before creating the account.
 
 
 
-<a name="@Specification_1_get_sequence_number"></a>
+<a id="@Specification_1_get_sequence_number"></a>
 
 ### Function `get_sequence_number`
 
@@ -2251,7 +2251,7 @@ The Account does not exist under the new address before creating the account.
 
 
 
-<a name="@Specification_1_increment_sequence_number"></a>
+<a id="@Specification_1_increment_sequence_number"></a>
 
 ### Function `increment_sequence_number`
 
@@ -2274,7 +2274,7 @@ The sequence_number of the Account is up to MAX_U64.
 
 
 
-<a name="@Specification_1_get_authentication_key"></a>
+<a id="@Specification_1_get_authentication_key"></a>
 
 ### Function `get_authentication_key`
 
@@ -2292,7 +2292,7 @@ The sequence_number of the Account is up to MAX_U64.
 
 
 
-<a name="@Specification_1_rotate_authentication_key_internal"></a>
+<a id="@Specification_1_rotate_authentication_key_internal"></a>
 
 ### Function `rotate_authentication_key_internal`
 
@@ -2316,7 +2316,7 @@ The length of new_auth_key is 32.
 
 
 
-<a name="0x1_account_spec_assert_valid_rotation_proof_signature_and_get_auth_key"></a>
+<a id="0x1_account_spec_assert_valid_rotation_proof_signature_and_get_auth_key"></a>
 
 
 <pre><code><b>fun</b> <a href="account.md#0x1_account_spec_assert_valid_rotation_proof_signature_and_get_auth_key">spec_assert_valid_rotation_proof_signature_and_get_auth_key</a>(scheme: u8, public_key_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, signature: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, challenge: <a href="account.md#0x1_account_RotationProofChallenge">RotationProofChallenge</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
@@ -2324,7 +2324,7 @@ The length of new_auth_key is 32.
 
 
 
-<a name="@Specification_1_rotate_authentication_key"></a>
+<a id="@Specification_1_rotate_authentication_key"></a>
 
 ### Function `rotate_authentication_key`
 
@@ -2385,7 +2385,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
-<a name="@Specification_1_rotate_authentication_key_with_rotation_capability"></a>
+<a id="@Specification_1_rotate_authentication_key_with_rotation_capability"></a>
 
 ### Function `rotate_authentication_key_with_rotation_capability`
 
@@ -2428,7 +2428,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
-<a name="@Specification_1_offer_rotation_capability"></a>
+<a id="@Specification_1_offer_rotation_capability"></a>
 
 ### Function `offer_rotation_capability`
 
@@ -2478,7 +2478,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
-<a name="@Specification_1_is_rotation_capability_offered"></a>
+<a id="@Specification_1_is_rotation_capability_offered"></a>
 
 ### Function `is_rotation_capability_offered`
 
@@ -2495,7 +2495,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
-<a name="@Specification_1_get_rotation_capability_offer_for"></a>
+<a id="@Specification_1_get_rotation_capability_offer_for"></a>
 
 ### Function `get_rotation_capability_offer_for`
 
@@ -2514,7 +2514,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
-<a name="@Specification_1_revoke_rotation_capability"></a>
+<a id="@Specification_1_revoke_rotation_capability"></a>
 
 ### Function `revoke_rotation_capability`
 
@@ -2536,7 +2536,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
-<a name="@Specification_1_revoke_any_rotation_capability"></a>
+<a id="@Specification_1_revoke_any_rotation_capability"></a>
 
 ### Function `revoke_any_rotation_capability`
 
@@ -2555,7 +2555,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
-<a name="@Specification_1_offer_signer_capability"></a>
+<a id="@Specification_1_offer_signer_capability"></a>
 
 ### Function `offer_signer_capability`
 
@@ -2605,7 +2605,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME.
 
 
 
-<a name="@Specification_1_is_signer_capability_offered"></a>
+<a id="@Specification_1_is_signer_capability_offered"></a>
 
 ### Function `is_signer_capability_offered`
 
@@ -2622,7 +2622,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME.
 
 
 
-<a name="@Specification_1_get_signer_capability_offer_for"></a>
+<a id="@Specification_1_get_signer_capability_offer_for"></a>
 
 ### Function `get_signer_capability_offer_for`
 
@@ -2641,7 +2641,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME.
 
 
 
-<a name="@Specification_1_revoke_signer_capability"></a>
+<a id="@Specification_1_revoke_signer_capability"></a>
 
 ### Function `revoke_signer_capability`
 
@@ -2665,7 +2665,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<a name="@Specification_1_revoke_any_signer_capability"></a>
+<a id="@Specification_1_revoke_any_signer_capability"></a>
 
 ### Function `revoke_any_signer_capability`
 
@@ -2684,7 +2684,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<a name="@Specification_1_create_authorized_signer"></a>
+<a id="@Specification_1_create_authorized_signer"></a>
 
 ### Function `create_authorized_signer`
 
@@ -2709,7 +2709,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<a name="0x1_account_AccountContainsAddr"></a>
+<a id="0x1_account_AccountContainsAddr"></a>
 
 
 <pre><code><b>schema</b> <a href="account.md#0x1_account_AccountContainsAddr">AccountContainsAddr</a> {
@@ -2724,7 +2724,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<a name="@Specification_1_assert_valid_rotation_proof_signature_and_get_auth_key"></a>
+<a id="@Specification_1_assert_valid_rotation_proof_signature_and_get_auth_key"></a>
 
 ### Function `assert_valid_rotation_proof_signature_and_get_auth_key`
 
@@ -2743,7 +2743,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<a name="0x1_account_AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf"></a>
+<a id="0x1_account_AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="account.md#0x1_account_AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf">AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf</a> {
@@ -2772,7 +2772,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<a name="@Specification_1_update_auth_key_and_originating_address_table"></a>
+<a id="@Specification_1_update_auth_key_and_originating_address_table"></a>
 
 ### Function `update_auth_key_and_originating_address_table`
 
@@ -2790,7 +2790,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<a name="0x1_account_UpdateAuthKeyAndOriginatingAddressTableAbortsIf"></a>
+<a id="0x1_account_UpdateAuthKeyAndOriginatingAddressTableAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="account.md#0x1_account_UpdateAuthKeyAndOriginatingAddressTableAbortsIf">UpdateAuthKeyAndOriginatingAddressTableAbortsIf</a> {
@@ -2812,7 +2812,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<a name="@Specification_1_create_resource_address"></a>
+<a id="@Specification_1_create_resource_address"></a>
 
 ### Function `create_resource_address`
 
@@ -2834,7 +2834,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<a name="0x1_account_spec_create_resource_address"></a>
+<a id="0x1_account_spec_create_resource_address"></a>
 
 
 <pre><code><b>fun</b> <a href="account.md#0x1_account_spec_create_resource_address">spec_create_resource_address</a>(source: <b>address</b>, seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b>;
@@ -2842,7 +2842,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<a name="@Specification_1_create_resource_account"></a>
+<a id="@Specification_1_create_resource_account"></a>
 
 ### Function `create_resource_account`
 
@@ -2863,7 +2863,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<a name="@Specification_1_create_framework_reserved_account"></a>
+<a id="@Specification_1_create_framework_reserved_account"></a>
 
 ### Function `create_framework_reserved_account`
 
@@ -2886,7 +2886,7 @@ The system reserved addresses is @0x1 / @0x2 / @0x3 / @0x4 / @0x5  / @0x6 / @0x7
 
 
 
-<a name="0x1_account_spec_is_framework_address"></a>
+<a id="0x1_account_spec_is_framework_address"></a>
 
 
 <pre><code><b>fun</b> <a href="account.md#0x1_account_spec_is_framework_address">spec_is_framework_address</a>(addr: <b>address</b>): bool{
@@ -2905,7 +2905,7 @@ The system reserved addresses is @0x1 / @0x2 / @0x3 / @0x4 / @0x5  / @0x6 / @0x7
 
 
 
-<a name="@Specification_1_create_guid"></a>
+<a id="@Specification_1_create_guid"></a>
 
 ### Function `create_guid`
 
@@ -2928,7 +2928,7 @@ The guid_creation_num of the ccount resource is up to MAX_U64.
 
 
 
-<a name="@Specification_1_new_event_handle"></a>
+<a id="@Specification_1_new_event_handle"></a>
 
 ### Function `new_event_handle`
 
@@ -2947,7 +2947,7 @@ The guid_creation_num of the Account is up to MAX_U64.
 
 
 
-<a name="0x1_account_NewEventHandleAbortsIf"></a>
+<a id="0x1_account_NewEventHandleAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="account.md#0x1_account_NewEventHandleAbortsIf">NewEventHandleAbortsIf</a> {
@@ -2962,7 +2962,7 @@ The guid_creation_num of the Account is up to MAX_U64.
 
 
 
-<a name="@Specification_1_register_coin"></a>
+<a id="@Specification_1_register_coin"></a>
 
 ### Function `register_coin`
 
@@ -2980,7 +2980,7 @@ The guid_creation_num of the Account is up to MAX_U64.
 
 
 
-<a name="@Specification_1_create_signer_with_capability"></a>
+<a id="@Specification_1_create_signer_with_capability"></a>
 
 ### Function `create_signer_with_capability`
 
@@ -2998,7 +2998,7 @@ The guid_creation_num of the Account is up to MAX_U64.
 
 
 
-<a name="0x1_account_CreateResourceAccountAbortsIf"></a>
+<a id="0x1_account_CreateResourceAccountAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="account.md#0x1_account_CreateResourceAccountAbortsIf">CreateResourceAccountAbortsIf</a> {
@@ -3011,7 +3011,7 @@ The guid_creation_num of the Account is up to MAX_U64.
 
 
 
-<a name="@Specification_1_verify_signed_message"></a>
+<a id="@Specification_1_verify_signed_message"></a>
 
 ### Function `verify_signed_message`
 

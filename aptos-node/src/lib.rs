@@ -23,7 +23,7 @@ use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
-use aptos_types::chain_id::ChainId;
+use aptos_types::{chain_id::ChainId, system_txn::pool::SystemTransactionPool};
 use clap::Parser;
 use futures::channel::mpsc;
 use hex::{FromHex, FromHexError};
@@ -642,6 +642,8 @@ pub fn setup_environment_and_start_node(
             peers_and_metadata,
         );
 
+    let sys_txn_pool = Arc::new(SystemTransactionPool::new());
+
     // Create the consensus runtime (this blocks on state sync first)
     let consensus_runtime = consensus_network_interfaces.map(|consensus_network_interfaces| {
         // Wait until state sync has been initialized
@@ -657,6 +659,7 @@ pub fn setup_environment_and_start_node(
             consensus_network_interfaces,
             consensus_notifier,
             consensus_to_mempool_sender,
+            sys_txn_pool,
         );
         admin_service.set_consensus_dbs(consensus_db, quorum_store_db);
         runtime

@@ -2,7 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::db_access::{CoinStore, DbAccessUtil};
+use crate::{
+    db_access::{CoinStore, DbAccessUtil},
+    transaction_executor::BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
+};
 use anyhow::{Context, Result};
 use aptos_crypto::HashValue;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
@@ -16,7 +19,6 @@ use aptos_types::{
 use async_trait::async_trait;
 use std::{
     collections::HashMap,
-    iter::once,
     sync::{atomic::AtomicUsize, mpsc},
     time::Duration,
 };
@@ -56,7 +58,10 @@ impl ReliableTransactionSubmitter for DbReliableTransactionSubmitter {
         self.block_sender.send(
             txns.iter()
                 .map(|t| Transaction::UserTransaction(t.clone()))
-                .chain(once(Transaction::StateCheckpoint(HashValue::random())))
+                .chain(
+                    (!BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG.has_any_block_gas_limit())
+                        .then_some(Transaction::StateCheckpoint(HashValue::random())),
+                )
                 .collect(),
         )?;
 

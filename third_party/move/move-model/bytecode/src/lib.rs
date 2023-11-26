@@ -49,6 +49,9 @@ pub fn print_targets_with_annotations_for_test(
     let mut text = String::new();
     writeln!(&mut text, "============ {} ================", header).unwrap();
     for module_env in env.get_modules() {
+        if !module_env.is_target() {
+            continue;
+        }
         for func_env in module_env.get_functions() {
             if func_env.is_inline() {
                 continue;

@@ -1,5 +1,5 @@
 
-<a name="@Aptos_Framework_0"></a>
+<a id="@Aptos_Framework_0"></a>
 
 # Aptos Framework
 
@@ -7,7 +7,7 @@
 This is the reference documentation of the Aptos framework.
 
 
-<a name="@Index_1"></a>
+<a id="@Index_1"></a>
 
 ## Index
 
