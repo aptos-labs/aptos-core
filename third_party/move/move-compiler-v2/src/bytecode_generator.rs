@@ -895,44 +895,17 @@ impl<'env> Generator<'env> {
         &mut self,
         target: TempIndex,
         id: NodeId,
-        kind: ReferenceKind,
+        _kind: ReferenceKind,
         struct_id: QualifiedId<StructId>,
         field_id: FieldId,
         oper: &Exp,
     ) {
-        let (field_name, field_offset) = {
+        let field_offset = {
             let struct_env = self.env().get_struct(struct_id);
             let field_env = struct_env.get_field(field_id);
-            (field_env.get_name(), field_env.get_offset())
+            field_env.get_offset()
         };
         let temp = self.gen_arg(oper);
-        match kind {
-            ReferenceKind::Mutable => {
-                // Either the operand is a &mut, or a declared location
-                // which is not a reference
-                let ty = self.temp_type(temp);
-                if !(ty.is_mutable_reference()
-                    || matches!(
-                        oper.as_ref(),
-                        ExpData::LocalVar(..) | ExpData::Temporary(..)
-                    ) && !ty.is_reference())
-                {
-                    let struct_name = self.env().get_struct(struct_id).get_full_name_str();
-                    self.error(
-                        oper.node_id(),
-                        format!(
-                            "operand to `&mut _.{}` must have type `&mut {}` or be a local of type `{}`",
-                            field_name.display(self.env().symbol_pool()),
-                            struct_name,
-                            struct_name
-                        ),
-                    )
-                }
-            },
-            ReferenceKind::Immutable => {
-                // Currently no conditions for immutable, so we do allow `&fun().field`.
-            },
-        }
         // Get instantiation of field. It is not contained in the select expression but in the
         // type of its operand.
         if let Some((_, inst)) = self

@@ -50,4 +50,11 @@ module 0x42::fields {
     fun write_generic_val(x: &mut G<u64>, v: u64) {
         x.f = v
     }
+
+    fun write_local_via_ref_2(): S {
+        let x = S { f: 0, g: T { h: 0 } };
+        let r = &mut x.g.h;
+        *r = 42;
+        x
+    }
 }
