@@ -8,13 +8,14 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Transactions and States
 
-The two fundamental concepts at the heart of the Aptos blockchain are transactions and states:
+The Aptos blockchain stores three types of data:
 
-* **Transactions**: Transactions represent the exchange of data (e.g., Aptos Coins or NFTs) between accounts on the Aptos blockchain.
-* **States**: The state, i.e., the Aptos blockchain ledger state, represents the state of all the accounts in the Aptos blockchain. 
+* **Transactions**: Transactions represent an intended operation being performed by an account on the blockchain (e.g., transferring assets).
+* **States**: The (blockchain ledger) state represents the accumulation of the output of execution of transactions, the values stored within all [resources](./resources).
+* [**Events**](./events.md): Ancillary data published by the execution of a transaction.
 
 :::tip
-Only executing transactions can change the ledger state.
+Only transactions can change the ledger state.
 :::
 
 ## Transactions
