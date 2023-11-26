@@ -502,6 +502,19 @@ impl LifetimeState {
     }
 }
 
+impl LifetimeState {
+    /// Returns the locals borrowed
+    pub fn borrowed_locals(&self) -> impl Iterator<Item = TempIndex> {
+        self.local_to_label_map
+            .keys()
+    }
+
+    /// Chenks if the given local is borrowed
+    pub fn is_borrowed(&self, temp: TempIndex) -> bool {
+        self.borrowed_locals().contains(&temp)
+    }
+}
+
 // -------------------------------------------------------------------------------------------------
 // Lifetime Analysis
 
