@@ -411,6 +411,7 @@ impl Block {
     pub fn transactions_to_execute(
         &self,
         validators: &[AccountAddress],
+        sys_txns: Vec<SystemTransaction>,
         txns: Vec<SignedTransaction>,
         is_block_gas_limit: bool,
     ) -> Vec<Transaction> {
@@ -420,6 +421,7 @@ impl Block {
             once(Transaction::BlockMetadata(
                 self.new_block_metadata(validators),
             ))
+            .chain(sys_txns.into_iter().map(Transaction::SystemTransaction))
             .chain(txns.into_iter().map(Transaction::UserTransaction))
             .collect()
         } else {
@@ -428,6 +430,7 @@ impl Block {
             once(Transaction::BlockMetadata(
                 self.new_block_metadata(validators),
             ))
+            .chain(sys_txns.into_iter().map(Transaction::SystemTransaction))
             .chain(txns.into_iter().map(Transaction::UserTransaction))
             .chain(once(Transaction::StateCheckpoint(self.id)))
             .collect()

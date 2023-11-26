@@ -5,32 +5,45 @@
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters,
-    error::StateSyncError,
+    error::{MempoolError, StateSyncError},
     execution_pipeline::ExecutionPipeline,
     monitor,
     payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
-    transaction_deduper::TransactionDeduper,
+    transaction_deduper::{NoOpDeduper, TransactionDeduper},
     transaction_filter::TransactionFilter,
-    transaction_shuffler::TransactionShuffler,
+    transaction_shuffler::{NoOpShuffler, TransactionShuffler},
     txn_notifier::TxnNotifier,
 };
 use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
-use aptos_consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock};
+use aptos_consensus_types::{
+    block::Block,
+    block_data::{BlockData, BlockType},
+    common::{Author, Payload, Round},
+    executed_block::ExecutedBlock,
+    proposal_ext::ProposalExt,
+    quorum_cert::QuorumCert,
+};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResult};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
-    contract_event::ContractEvent, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::OnChainExecutionConfig, transaction::Transaction,
+    account_address::AccountAddress,
+    block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableTransactions},
+    contract_event::ContractEvent,
+    epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
+    on_chain_config::OnChainExecutionConfig,
+    system_txn::SystemTransaction,
+    transaction::{SignedTransaction, Transaction},
 };
+use claims::assert_matches;
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
 use std::{boxed::Box, sync::Arc};
-use tokio::sync::Mutex as AsyncMutex;
+use tokio::{runtime::Handle, sync::Mutex as AsyncMutex};
 
 pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<StateComputeResult>>;
 
@@ -133,14 +146,15 @@ impl StateComputer for ExecutionProxy {
         let txn_deduper = self.transaction_deduper.lock().as_ref().unwrap().clone();
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
         let txn_notifier = self.txn_notifier.clone();
-        let txns = match payload_manager.get_transactions(block).await {
+        let sys_txns = block.sys_txns().map_or(vec![], Vec::clone);
+        let user_txns = match payload_manager.get_transactions(block).await {
             Ok(txns) => txns,
             Err(err) => return Box::pin(async move { Err(err) }),
         };
 
-        let filtered_txns = self
-            .transaction_filter
-            .filter(block_id, block.timestamp_usecs(), txns);
+        let filtered_txns =
+            self.transaction_filter
+                .filter(block_id, block.timestamp_usecs(), user_txns);
         let deduped_txns = txn_deduper.dedup(filtered_txns);
         let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
@@ -150,6 +164,7 @@ impl StateComputer for ExecutionProxy {
         let timestamp = block.timestamp_usecs();
         let transactions_to_execute = block.transactions_to_execute(
             &self.validators.lock(),
+            sys_txns,
             shuffled_txns.clone(),
             block_executor_onchain_config.has_any_block_gas_limit(),
         );
@@ -222,6 +237,7 @@ impl StateComputer for ExecutionProxy {
                 payloads.push(payload.clone());
             }
 
+            let sys_txns = block.sys_txns().map_or(vec![], Vec::clone);
             let signed_txns = payload_manager.get_transactions(block.block()).await?;
             let filtered_txns =
                 self.transaction_filter
@@ -231,6 +247,7 @@ impl StateComputer for ExecutionProxy {
 
             txns.extend(block.transactions_to_commit(
                 &self.validators.lock(),
+                sys_txns,
                 shuffled_txns,
                 block_executor_onchain_config.has_any_block_gas_limit(),
             ));
@@ -500,4 +517,163 @@ async fn test_commit_sync_race() {
     assert_eq!(*recorded_commit.time.lock(), LogicalTime::new(1, 10));
     assert!(executor.sync_to(generate_li(2, 8)).await.is_ok());
     assert_eq!(*recorded_commit.time.lock(), LogicalTime::new(2, 8));
+}
+
+#[tokio::test]
+async fn schedule_compute_should_recognize_sys_txns() {
+    use aptos_config::config::transaction_filter_type::Filter;
+    use aptos_consensus_notifications::Error;
+    use aptos_executor_types::state_checkpoint_output::StateCheckpointOutput;
+    use aptos_types::block_executor::partitioner::ExecutableBlock;
+
+    struct DummyBlockExecutor {
+        blocks_received: Mutex<Vec<ExecutableBlock>>,
+    }
+
+    impl DummyBlockExecutor {
+        fn new() -> Self {
+            Self {
+                blocks_received: Mutex::new(vec![]),
+            }
+        }
+    }
+
+    struct DummyTxnNotifier {}
+
+    #[async_trait::async_trait]
+    impl TxnNotifier for DummyTxnNotifier {
+        async fn notify_failed_txn(
+            &self,
+            _txns: Vec<SignedTransaction>,
+            _compute_results: &StateComputeResult,
+            _block_gas_limit_enabled: bool,
+        ) -> Result<(), MempoolError> {
+            Ok(())
+        }
+    }
+
+    impl BlockExecutorTrait for DummyBlockExecutor {
+        fn committed_block_id(&self) -> HashValue {
+            HashValue::zero()
+        }
+
+        fn reset(&self) -> Result<()> {
+            Ok(())
+        }
+
+        fn execute_block(
+            &self,
+            _block: ExecutableBlock,
+            _parent_block_id: HashValue,
+            _onchain_config: BlockExecutorConfigFromOnchain,
+        ) -> ExecutorResult<StateComputeResult> {
+            Ok(StateComputeResult::new_dummy())
+        }
+
+        fn execute_and_state_checkpoint(
+            &self,
+            block: ExecutableBlock,
+            _parent_block_id: HashValue,
+            _onchain_config: BlockExecutorConfigFromOnchain,
+        ) -> ExecutorResult<StateCheckpointOutput> {
+            self.blocks_received.lock().push(block);
+            Ok(StateCheckpointOutput::default())
+        }
+
+        fn ledger_update(
+            &self,
+            _block_id: HashValue,
+            _parent_block_id: HashValue,
+            _state_checkpoint_output: StateCheckpointOutput,
+        ) -> ExecutorResult<StateComputeResult> {
+            Ok(StateComputeResult::new_dummy())
+        }
+
+        fn commit_blocks_ext(
+            &self,
+            _block_ids: Vec<HashValue>,
+            _ledger_info_with_sigs: LedgerInfoWithSignatures,
+            _save_state_snapshots: bool,
+        ) -> ExecutorResult<()> {
+            todo!()
+        }
+
+        fn finish(&self) {}
+    }
+
+    struct DummyStateSyncNotifier {}
+
+    #[async_trait::async_trait]
+    impl ConsensusNotificationSender for DummyStateSyncNotifier {
+        async fn notify_new_commit(
+            &self,
+            _transactions: Vec<Transaction>,
+            _reconfiguration_events: Vec<ContractEvent>,
+        ) -> std::result::Result<(), Error> {
+            Ok(())
+        }
+
+        async fn sync_to_target(
+            &self,
+            target: LedgerInfoWithSignatures,
+        ) -> std::result::Result<(), Error> {
+            todo!()
+        }
+    }
+
+    let executor = Arc::new(DummyBlockExecutor {
+        blocks_received: Mutex::new(vec![]),
+    });
+
+    let execution_policy = ExecutionProxy::new(
+        executor.clone(),
+        Arc::new(DummyTxnNotifier {}),
+        Arc::new(DummyStateSyncNotifier {}),
+        &tokio::runtime::Handle::current(),
+        TransactionFilter::new(Filter::empty()),
+    );
+
+    let sys_txn = SystemTransaction::dummy(vec![0xFF; 10]);
+
+    let block = Block::new_for_testing(
+        HashValue::zero(),
+        BlockData::new_for_testing(
+            1,
+            1,
+            1,
+            QuorumCert::default(),
+            BlockType::ProposalExt(ProposalExt::V0 {
+                sys_txns: vec![sys_txn.clone()],
+                payload: Payload::empty(false),
+                author: Author::random(),
+                failed_authors: vec![],
+            }),
+        ),
+        None,
+    );
+    let epoch_state = EpochState::default();
+    let payload_manager = Arc::new(PayloadManager::DirectMempool);
+    let shuffler = Arc::new(NoOpShuffler {});
+    let deduper = Arc::new(NoOpDeduper {});
+    execution_policy.new_epoch(
+        &epoch_state,
+        payload_manager,
+        shuffler,
+        BlockExecutorConfigFromOnchain::new_no_block_limit(),
+        deduper,
+    );
+
+    // Ensure the dummy executor has received the txns.
+    let _ = execution_policy
+        .schedule_compute(&block, HashValue::zero())
+        .await
+        .await;
+
+    // Get the txns from the view of the dummy executor.
+    let txns = executor.blocks_received.lock()[0]
+        .transactions
+        .clone()
+        .into_txns();
+    let supposed_sys_txn = txns[1].expect_valid().try_as_system_txn().unwrap();
+    assert_eq!(&sys_txn, supposed_sys_txn);
 }

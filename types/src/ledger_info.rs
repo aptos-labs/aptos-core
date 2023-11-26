@@ -40,7 +40,7 @@ use std::{
 /// LedgerInfo with the `version` being the latest version that will be committed if B gets 2f+1
 /// votes. It sets `consensus_data_hash` to represent B so that if those 2f+1 votes are gathered a
 /// QC is formed on B.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct LedgerInfo {
     commit_info: BlockInfo,
@@ -57,6 +57,13 @@ impl Display for LedgerInfo {
 }
 
 impl LedgerInfo {
+    pub fn empty() -> Self {
+        Self {
+            commit_info: BlockInfo::empty(),
+            consensus_data_hash: HashValue::zero(),
+        }
+    }
+
     /// Constructs a `LedgerInfo` object based on the given commit info and vote data hash.
     pub fn new(commit_info: BlockInfo, consensus_data_hash: HashValue) -> Self {
         Self {
@@ -143,6 +150,12 @@ pub enum LedgerInfoWithSignatures {
     V0(LedgerInfoWithV0),
 }
 
+impl Default for LedgerInfoWithSignatures {
+    fn default() -> Self {
+        Self::V0(LedgerInfoWithV0::default())
+    }
+}
+
 impl Display for LedgerInfoWithSignatures {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
@@ -213,7 +226,7 @@ impl DerefMut for LedgerInfoWithSignatures {
 /// the LedgerInfo element since the validator node doesn't need to know the signatures
 /// again when the client performs a query, those are only there for the client
 /// to be able to verify the state
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct LedgerInfoWithV0 {
     ledger_info: LedgerInfo,
     /// Aggregated BLS signature of all the validators that signed the message. The bitmask in the
