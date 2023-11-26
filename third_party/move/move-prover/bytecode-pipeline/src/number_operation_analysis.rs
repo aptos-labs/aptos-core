@@ -341,7 +341,7 @@ impl<'a> NumberOperationAnalysis<'a> {
                                     ret_vec.push(Bottom);
                                     if callee_spec_fun.body.is_some() {
                                         let body_exp = callee_spec_fun.body.as_ref().unwrap();
-                                        let local_map = body_exp.free_local_vars_with_node_id();
+                                        let local_map = body_exp.bound_local_vars_with_node_id();
                                         for (i, Parameter(sym, _)) in
                                             callee_spec_fun.params.iter().enumerate()
                                         {

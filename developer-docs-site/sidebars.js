@@ -44,6 +44,7 @@ const sidebars = {
           collapsed: true,
           items: ["concepts/validator-nodes", "concepts/fullnodes", "concepts/node-networks-sync"],
         },
+        "concepts/move",
         "concepts/accounts",
         "concepts/resources",
         "concepts/events",
@@ -63,23 +64,7 @@ const sidebars = {
       ],
     },
     "guides/explore-aptos",
-    {
-      type: "category",
-      label: "Latest Releases",
-      collapsible: true,
-      collapsed: true,
-      link: { type: "doc", id: "releases/index" },
-      items: [
-        {
-          type: "category",
-          label: "Node and Framework Release",
-          collapsible: true,
-          collapsed: true,
-          link: { type: "doc", id: "releases/mainnet-release" },
-          items: ["releases/mainnet-release", "releases/testnet-release", "releases/devnet-release"],
-        },
-      ],
-    },
+    "releases/index",
     "nodes/networks",
     "guides/system-integrators-guide",
   ],
@@ -112,20 +97,6 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
-        {
-          type: "category",
-          label: "Move on Aptos",
-          link: { type: "doc", id: "move/move-on-aptos" },
-          collapsible: true,
-          collapsed: true,
-          items: [
-            "move/move-on-aptos/resource-accounts",
-            "move/move-on-aptos/modules-on-aptos",
-            "move/move-on-aptos/move-scripts",
-            "move/move-on-aptos/cli",
-            "move/move-on-aptos/cryptography",
-          ],
-        },
         {
           type: "category",
           label: "The Move Book",
@@ -193,6 +164,25 @@ const sidebars = {
               collapsed: true,
               items: ["move/book/standard-library", "move/book/coding-conventions"],
             },
+          ],
+        },
+        {
+          type: "category",
+          label: "Advanced Move Guides",
+          collapsible: true,
+          collapsed: true,
+          link: {
+            type: "generated-index",
+            title: "Advanced Move Guides",
+            description: "Take the next step into building complex Move applications on Aptos.",
+            slug: "move/aptos-move",
+          },
+          items: [
+            "move/move-on-aptos/resource-accounts",
+            "move/move-on-aptos/modules-on-aptos",
+            "move/move-on-aptos/move-scripts",
+            "move/move-on-aptos/cli",
+            "move/move-on-aptos/cryptography",
           ],
         },
         {
@@ -287,7 +277,7 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
-        "integration/sign-a-transaction",
+        "integration/wallet-adapter-concept",
         {
           type: "category",
           label: "Integrate with Wallets",

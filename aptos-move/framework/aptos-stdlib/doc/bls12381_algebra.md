@@ -1,5 +1,5 @@
 
-<a name="0x1_bls12381_algebra"></a>
+<a id="0x1_bls12381_algebra"></a>
 
 # Module `0x1::bls12381_algebra`
 
@@ -81,7 +81,7 @@ It contains the prime-order subgroup $G_2$ used in pairing.
 
 
 
-<a name="0x1_bls12381_algebra_Fq12"></a>
+<a id="0x1_bls12381_algebra_Fq12"></a>
 
 ## Struct `Fq12`
 
@@ -110,7 +110,7 @@ which is an extension field of <code>Fq6</code> (defined in the module documenta
 
 </details>
 
-<a name="0x1_bls12381_algebra_FormatFq12LscLsb"></a>
+<a id="0x1_bls12381_algebra_FormatFq12LscLsb"></a>
 
 ## Struct `FormatFq12LscLsb`
 
@@ -144,7 +144,7 @@ NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 </details>
 
-<a name="0x1_bls12381_algebra_G1"></a>
+<a id="0x1_bls12381_algebra_G1"></a>
 
 ## Struct `G1`
 
@@ -175,7 +175,7 @@ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
 
 </details>
 
-<a name="0x1_bls12381_algebra_FormatG1Uncompr"></a>
+<a id="0x1_bls12381_algebra_FormatG1Uncompr"></a>
 
 ## Struct `FormatG1Uncompr`
 
@@ -225,7 +225,7 @@ NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 </details>
 
-<a name="0x1_bls12381_algebra_FormatG1Compr"></a>
+<a id="0x1_bls12381_algebra_FormatG1Compr"></a>
 
 ## Struct `FormatG1Compr`
 
@@ -277,7 +277,7 @@ NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 </details>
 
-<a name="0x1_bls12381_algebra_G2"></a>
+<a id="0x1_bls12381_algebra_G2"></a>
 
 ## Struct `G2`
 
@@ -308,7 +308,7 @@ It is a subgroup of <code>G2Full</code> (defined in the module documentation) wi
 
 </details>
 
-<a name="0x1_bls12381_algebra_FormatG2Uncompr"></a>
+<a id="0x1_bls12381_algebra_FormatG2Uncompr"></a>
 
 ## Struct `FormatG2Uncompr`
 
@@ -358,7 +358,7 @@ NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 </details>
 
-<a name="0x1_bls12381_algebra_FormatG2Compr"></a>
+<a id="0x1_bls12381_algebra_FormatG2Compr"></a>
 
 ## Struct `FormatG2Compr`
 
@@ -410,7 +410,7 @@ NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 </details>
 
-<a name="0x1_bls12381_algebra_Gt"></a>
+<a id="0x1_bls12381_algebra_Gt"></a>
 
 ## Struct `Gt`
 
@@ -442,7 +442,7 @@ The identity of <code><a href="bls12381_algebra.md#0x1_bls12381_algebra_Gt">Gt</
 
 </details>
 
-<a name="0x1_bls12381_algebra_FormatGt"></a>
+<a id="0x1_bls12381_algebra_FormatGt"></a>
 
 ## Struct `FormatGt`
 
@@ -476,7 +476,7 @@ NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 </details>
 
-<a name="0x1_bls12381_algebra_Fr"></a>
+<a id="0x1_bls12381_algebra_Fr"></a>
 
 ## Struct `Fr`
 
@@ -505,7 +505,7 @@ associated with the groups $G_1$, $G_2$, $G_t$ in BLS12-381-based pairing.
 
 </details>
 
-<a name="0x1_bls12381_algebra_FormatFrLsb"></a>
+<a id="0x1_bls12381_algebra_FormatFrLsb"></a>
 
 ## Struct `FormatFrLsb`
 
@@ -536,7 +536,7 @@ NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0, blst-0.3.7
 
 </details>
 
-<a name="0x1_bls12381_algebra_FormatFrMsb"></a>
+<a id="0x1_bls12381_algebra_FormatFrMsb"></a>
 
 ## Struct `FormatFrMsb`
 
@@ -567,7 +567,7 @@ NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0, blst-0.3.7
 
 </details>
 
-<a name="0x1_bls12381_algebra_HashG1XmdSha256SswuRo"></a>
+<a id="0x1_bls12381_algebra_HashG1XmdSha256SswuRo"></a>
 
 ## Struct `HashG1XmdSha256SswuRo`
 
@@ -597,7 +597,7 @@ Full specification is defined in https://datatracker.ietf.org/doc/html/draft-irt
 
 </details>
 
-<a name="0x1_bls12381_algebra_HashG2XmdSha256SswuRo"></a>
+<a id="0x1_bls12381_algebra_HashG2XmdSha256SswuRo"></a>
 
 ## Struct `HashG2XmdSha256SswuRo`
 

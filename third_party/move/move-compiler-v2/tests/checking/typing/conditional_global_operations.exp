@@ -24,7 +24,7 @@ module 0x42::M {
         MoveTo<M::Box<M::R>>(s, pack M::Box<M::R>(pack M::R(false)));
         BorrowGlobal(Immutable)<M::Box<T>>(a1);
         BorrowGlobal(Mutable)<M::Box<M::Box<T>>>(a1);
-        M::Pair<?11, ?12>{ f1: _, f2: _ } = MoveFrom<M::Pair<M::S, M::R>>(a1);
+        M::Pair<M::S, M::R>{ f1: _, f2: _ } = MoveFrom<M::Pair<M::S, M::R>>(a1);
         exists<M::Pair<M::Box<T>, M::S>>(a1);
         BorrowGlobal(Immutable)<M::Box<M::K>>(a1);
         BorrowGlobal(Mutable)<M::Pair<M::S, M::K>>(a1);

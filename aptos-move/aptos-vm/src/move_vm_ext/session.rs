@@ -77,11 +77,11 @@ pub enum SessionId {
 }
 
 impl SessionId {
-    pub fn txn_meta(txn_data: &TransactionMetadata) -> Self {
+    pub fn txn_meta(txn_metadata: &TransactionMetadata) -> Self {
         Self::Txn {
-            sender: txn_data.sender,
-            sequence_number: txn_data.sequence_number,
-            script_hash: txn_data.script_hash.clone(),
+            sender: txn_metadata.sender,
+            sequence_number: txn_metadata.sequence_number,
+            script_hash: txn_metadata.script_hash.clone(),
         }
     }
 
@@ -95,19 +95,19 @@ impl SessionId {
         }
     }
 
-    pub fn prologue_meta(txn_data: &TransactionMetadata) -> Self {
+    pub fn prologue_meta(txn_metadata: &TransactionMetadata) -> Self {
         Self::Prologue {
-            sender: txn_data.sender,
-            sequence_number: txn_data.sequence_number,
-            script_hash: txn_data.script_hash.clone(),
+            sender: txn_metadata.sender,
+            sequence_number: txn_metadata.sequence_number,
+            script_hash: txn_metadata.script_hash.clone(),
         }
     }
 
-    pub fn epilogue_meta(txn_data: &TransactionMetadata) -> Self {
+    pub fn epilogue_meta(txn_metadata: &TransactionMetadata) -> Self {
         Self::Epilogue {
-            sender: txn_data.sender,
-            sequence_number: txn_data.sequence_number,
-            script_hash: txn_data.script_hash.clone(),
+            sender: txn_metadata.sender,
+            sequence_number: txn_metadata.sequence_number,
+            script_hash: txn_metadata.script_hash.clone(),
         }
     }
 

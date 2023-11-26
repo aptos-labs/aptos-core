@@ -1,5 +1,5 @@
 
-<a name="0x1_staking_proxy"></a>
+<a id="0x1_staking_proxy"></a>
 
 # Module `0x1::staking_proxy`
 
@@ -32,7 +32,7 @@
 
 
 
-<a name="0x1_staking_proxy_set_operator"></a>
+<a id="0x1_staking_proxy_set_operator"></a>
 
 ## Function `set_operator`
 
@@ -58,7 +58,7 @@
 
 </details>
 
-<a name="0x1_staking_proxy_set_voter"></a>
+<a id="0x1_staking_proxy_set_voter"></a>
 
 ## Function `set_voter`
 
@@ -84,7 +84,7 @@
 
 </details>
 
-<a name="0x1_staking_proxy_set_vesting_contract_operator"></a>
+<a id="0x1_staking_proxy_set_vesting_contract_operator"></a>
 
 ## Function `set_vesting_contract_operator`
 
@@ -116,7 +116,7 @@
 
 </details>
 
-<a name="0x1_staking_proxy_set_staking_contract_operator"></a>
+<a id="0x1_staking_proxy_set_staking_contract_operator"></a>
 
 ## Function `set_staking_contract_operator`
 
@@ -144,7 +144,7 @@
 
 </details>
 
-<a name="0x1_staking_proxy_set_stake_pool_operator"></a>
+<a id="0x1_staking_proxy_set_stake_pool_operator"></a>
 
 ## Function `set_stake_pool_operator`
 
@@ -171,7 +171,7 @@
 
 </details>
 
-<a name="0x1_staking_proxy_set_vesting_contract_voter"></a>
+<a id="0x1_staking_proxy_set_vesting_contract_voter"></a>
 
 ## Function `set_vesting_contract_voter`
 
@@ -202,7 +202,7 @@
 
 </details>
 
-<a name="0x1_staking_proxy_set_staking_contract_voter"></a>
+<a id="0x1_staking_proxy_set_staking_contract_voter"></a>
 
 ## Function `set_staking_contract_voter`
 
@@ -229,7 +229,7 @@
 
 </details>
 
-<a name="0x1_staking_proxy_set_stake_pool_voter"></a>
+<a id="0x1_staking_proxy_set_stake_pool_voter"></a>
 
 ## Function `set_stake_pool_voter`
 
@@ -255,7 +255,7 @@
 
 </details>
 
-<a name="@Specification_0"></a>
+<a id="@Specification_0"></a>
 
 ## Specification
 
@@ -267,7 +267,7 @@
 
 
 
-<a name="@Specification_0_set_operator"></a>
+<a id="@Specification_0_set_operator"></a>
 
 ### Function `set_operator`
 
@@ -287,7 +287,7 @@ Aborts if conditions of SetStakePoolOperator are not met
 
 
 
-<a name="@Specification_0_set_voter"></a>
+<a id="@Specification_0_set_voter"></a>
 
 ### Function `set_voter`
 
@@ -306,7 +306,7 @@ Aborts if conditions of SetStackingContractVoter and SetStackPoolVoterAbortsIf a
 
 
 
-<a name="@Specification_0_set_vesting_contract_operator"></a>
+<a id="@Specification_0_set_vesting_contract_operator"></a>
 
 ### Function `set_vesting_contract_operator`
 
@@ -322,7 +322,7 @@ Aborts if conditions of SetStackingContractVoter and SetStackPoolVoterAbortsIf a
 
 
 
-<a name="@Specification_0_set_staking_contract_operator"></a>
+<a id="@Specification_0_set_staking_contract_operator"></a>
 
 ### Function `set_staking_contract_operator`
 
@@ -341,7 +341,7 @@ Aborts if conditions of SetStackingContractVoter and SetStackPoolVoterAbortsIf a
 
 
 
-<a name="0x1_staking_proxy_SetStakingContractOperator"></a>
+<a id="0x1_staking_proxy_SetStakingContractOperator"></a>
 
 
 <pre><code><b>schema</b> <a href="staking_proxy.md#0x1_staking_proxy_SetStakingContractOperator">SetStakingContractOperator</a> {
@@ -376,7 +376,7 @@ Aborts if conditions of SetStackingContractVoter and SetStackPoolVoterAbortsIf a
 
 
 
-<a name="@Specification_0_set_stake_pool_operator"></a>
+<a id="@Specification_0_set_stake_pool_operator"></a>
 
 ### Function `set_stake_pool_operator`
 
@@ -395,7 +395,7 @@ One of them are not exists
 
 
 
-<a name="0x1_staking_proxy_SetStakePoolOperator"></a>
+<a id="0x1_staking_proxy_SetStakePoolOperator"></a>
 
 
 <pre><code><b>schema</b> <a href="staking_proxy.md#0x1_staking_proxy_SetStakePoolOperator">SetStakePoolOperator</a> {
@@ -411,7 +411,7 @@ One of them are not exists
 
 
 
-<a name="@Specification_0_set_vesting_contract_voter"></a>
+<a id="@Specification_0_set_vesting_contract_voter"></a>
 
 ### Function `set_vesting_contract_voter`
 
@@ -427,7 +427,7 @@ One of them are not exists
 
 
 
-<a name="@Specification_0_set_staking_contract_voter"></a>
+<a id="@Specification_0_set_staking_contract_voter"></a>
 
 ### Function `set_staking_contract_voter`
 
@@ -446,7 +446,7 @@ Make sure staking_contract_exists first
 Then abort if the resource is not exist
 
 
-<a name="0x1_staking_proxy_SetStakingContractVoter"></a>
+<a id="0x1_staking_proxy_SetStakingContractVoter"></a>
 
 
 <pre><code><b>schema</b> <a href="staking_proxy.md#0x1_staking_proxy_SetStakingContractVoter">SetStakingContractVoter</a> {
@@ -469,7 +469,7 @@ Then abort if the resource is not exist
 
 
 
-<a name="@Specification_0_set_stake_pool_voter"></a>
+<a id="@Specification_0_set_stake_pool_voter"></a>
 
 ### Function `set_stake_pool_voter`
 
@@ -486,7 +486,7 @@ Then abort if the resource is not exist
 
 
 
-<a name="0x1_staking_proxy_SetStakePoolVoterAbortsIf"></a>
+<a id="0x1_staking_proxy_SetStakePoolVoterAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="staking_proxy.md#0x1_staking_proxy_SetStakePoolVoterAbortsIf">SetStakePoolVoterAbortsIf</a> {

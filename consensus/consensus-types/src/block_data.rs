@@ -4,6 +4,7 @@
 
 use crate::{
     common::{Author, Payload, Round},
+    proposal_ext::ProposalExt,
     quorum_cert::QuorumCert,
     vote_data::VoteData,
 };
@@ -14,6 +15,7 @@ use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    system_txn::SystemTransaction,
 };
 use mirai_annotations::*;
 use serde::{Deserialize, Serialize};
@@ -43,6 +45,10 @@ pub enum BlockType {
     /// from the previous epoch.  The genesis block is used as the first root block of the
     /// BlockTree for all epochs.
     Genesis,
+
+    /// Proposal with extensions (e.g. system transactions).
+    ProposalExt(ProposalExt),
+
     /// A virtual block that's constructed by nodes from DAG, this is purely a local thing so
     /// we hide it from serde
     #[serde(skip_deserializing)]
@@ -91,8 +97,11 @@ pub struct BlockData {
 
 impl BlockData {
     pub fn author(&self) -> Option<Author> {
-        match self.block_type {
-            BlockType::Proposal { author, .. } | BlockType::DAGBlock { author, .. } => Some(author),
+        match &self.block_type {
+            BlockType::Proposal { author, .. } | BlockType::DAGBlock { author, .. } => {
+                Some(*author)
+            },
+            BlockType::ProposalExt(p) => Some(*p.author()),
             _ => None,
         }
     }
@@ -121,7 +130,18 @@ impl BlockData {
             BlockType::Proposal { payload, .. } | BlockType::DAGBlock { payload, .. } => {
                 Some(payload)
             },
+            BlockType::ProposalExt(p) => p.payload(),
             _ => None,
+        }
+    }
+
+    pub fn sys_txns(&self) -> Option<&Vec<SystemTransaction>> {
+        match &self.block_type {
+            BlockType::ProposalExt(proposal_ext) => proposal_ext.sys_txns(),
+            BlockType::Proposal { .. }
+            | BlockType::NilBlock { .. }
+            | BlockType::Genesis
+            | BlockType::DAGBlock { .. } => None,
         }
     }
 
@@ -164,6 +184,7 @@ impl BlockData {
             BlockType::Proposal { failed_authors, .. }
             | BlockType::NilBlock { failed_authors, .. }
             | BlockType::DAGBlock { failed_authors, .. } => Some(failed_authors),
+            BlockType::ProposalExt(p) => Some(p.failed_authors()),
             BlockType::Genesis => None,
         }
     }
@@ -292,6 +313,29 @@ impl BlockData {
                 author,
                 failed_authors,
             },
+        }
+    }
+
+    pub fn new_proposal_ext(
+        sys_txns: Vec<SystemTransaction>,
+        payload: Payload,
+        author: Author,
+        failed_authors: Vec<(Round, Author)>,
+        round: Round,
+        timestamp_usecs: u64,
+        quorum_cert: QuorumCert,
+    ) -> Self {
+        Self {
+            epoch: quorum_cert.certified_block().epoch(),
+            round,
+            timestamp_usecs,
+            quorum_cert,
+            block_type: BlockType::ProposalExt(ProposalExt::V0 {
+                sys_txns,
+                payload,
+                author,
+                failed_authors,
+            }),
         }
     }
 

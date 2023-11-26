@@ -1,0 +1,6 @@
+bug[ICE12001]: BYTECODE GENERATION FAILED
+  ┌─ tests/move_check/inlining/inline_accessing_constant.move:9:18
+  │
+9 │ module 0xc0ffee::dummy2 {
+  │                  ^^^^^^ IR ERROR: Missing constant definition for CC
+
