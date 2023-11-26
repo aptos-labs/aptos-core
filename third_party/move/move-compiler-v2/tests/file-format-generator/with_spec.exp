@@ -1,0 +1,83 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::bar() {
+  0: assert true
+  1: return ()
+}
+
+
+[variant baseline]
+public fun m::foo($t0: &m::S): u8 {
+     var $t1: u8
+     var $t2: &m::E
+     var $t3: &vector<m::E>
+     var $t4: vector<m::E>
+     var $t5: u64
+     var $t6: &u8
+  0: $t3 := borrow_local($t4)
+  1: $t5 := 0
+  2: $t2 := vector::borrow<m::E>($t3, $t5)
+  3: $t6 := borrow_field<m::E>.k($t2)
+  4: $t1 := read_ref($t6)
+  5: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::bar() {
+     # live vars:
+  0: assert true
+     # live vars:
+  1: return ()
+}
+
+
+[variant baseline]
+public fun m::foo($t0: &m::S): u8 {
+     var $t1: u8
+     var $t2: &m::E
+     var $t3: &vector<m::E>
+     var $t4: vector<m::E>
+     var $t5: u64
+     var $t6: &u8
+     # live vars: $t4
+  0: $t3 := borrow_local($t4)
+     # live vars: $t3
+  1: $t5 := 0
+     # live vars: $t3, $t5
+  2: $t2 := vector::borrow<m::E>($t3, $t5)
+     # live vars: $t2
+  3: $t6 := borrow_field<m::E>.k($t2)
+     # live vars: $t6
+  4: $t1 := read_ref($t6)
+     # live vars: $t1
+  5: return $t1
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.m {
+struct E {
+	k: u8
+}
+struct S {
+	data: vector<E>
+}
+
+bar() {
+B0:
+	0: Ret
+}
+public foo(Arg0: &S): u8 {
+B0:
+	0: ImmBorrowLoc[1](loc0: vector<E>)
+	1: LdU64(0)
+	2: VecImmBorrow(3)
+	3: ImmBorrowField[0](E.k: u8)
+	4: ReadRef
+	5: Ret
+}
+}
