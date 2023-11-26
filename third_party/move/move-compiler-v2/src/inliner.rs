@@ -1167,17 +1167,39 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
     }
 
     fn rewrite_pattern(&mut self, pat: &Pattern, entering_scope: bool) -> Option<Pattern> {
+        // Rewrite type instantiation in pattern node id
+        let old_id = pat.node_id();
+        let new_id = ExpData::instantiate_node(self.env, old_id, self.type_args);
         match pat {
-            Pattern::Var(node_id, sym) => self
+            Pattern::Var(_, sym) => self
                 .shadow_stack
                 .get_shadow_symbol(*sym, entering_scope)
-                .map(|new_sym| Pattern::Var(*node_id, new_sym)),
-            Pattern::Tuple(node_id, pattern_vec) => self
+                .map(|new_sym| Pattern::Var(new_id.unwrap_or(old_id), new_sym))
+                .or_else(|| new_id.map(|id| Pattern::Var(id, *sym))),
+            Pattern::Tuple(_, pattern_vec) => self
                 .rewrite_pattern_vector(pattern_vec, entering_scope)
-                .map(|rewritten_vec| Pattern::Tuple(*node_id, rewritten_vec)),
-            Pattern::Struct(node_id, struct_id, pattern_vec) => self
-                .rewrite_pattern_vector(pattern_vec, entering_scope)
-                .map(|rewritten_vec| Pattern::Struct(*node_id, struct_id.clone(), rewritten_vec)),
+                .map(|rewritten_vec| Pattern::Tuple(new_id.unwrap_or(old_id), rewritten_vec))
+                .or_else(|| new_id.map(|id| Pattern::Tuple(id, pattern_vec.clone()))),
+            Pattern::Struct(_, struct_id, pattern_vec) => {
+                let new_struct_id = struct_id.clone().instantiate(self.type_args);
+                self.rewrite_pattern_vector(pattern_vec, entering_scope)
+                    .map(|rewritten_vec| {
+                        Pattern::Struct(
+                            new_id.unwrap_or(old_id),
+                            new_struct_id.clone(),
+                            rewritten_vec,
+                        )
+                    })
+                    .or_else(|| {
+                        // Always create a new struct, both the node id and the struct id may
+                        // have changed
+                        Some(Pattern::Struct(
+                            new_id.unwrap_or(old_id),
+                            new_struct_id,
+                            pattern_vec.clone(),
+                        ))
+                    })
+            },
             Pattern::Wildcard(_) => None,
             Pattern::Error(_) => None,
         }
