@@ -7,6 +7,7 @@ use crate::{
     counters::*,
     data_cache::{AsMoveResolver, StorageAdapter},
     errors::expect_only_successful_execution,
+    gas::{check_gas, get_gas_config_from_storage},
     move_vm_ext::{
         get_max_binary_format_version, AptosMoveResolver, MoveVmExt, RespawnedSession, SessionExt,
         SessionId,
@@ -20,11 +21,10 @@ use anyhow::{anyhow, Result};
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::{natives::code::PublishRequest, RuntimeModuleMetadataV1};
-use aptos_gas_algebra::{Gas, GasExpression};
+use aptos_gas_algebra::Gas;
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{
-    AptosGasParameters, FromOnChainGasSchedule, MiscGasParameters, NativeGasParameters,
-    VMGasParameters,
+    AptosGasParameters, MiscGasParameters, NativeGasParameters, VMGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
@@ -41,14 +41,13 @@ use aptos_types::{
     chain_id::ChainId,
     fee_statement::FeeStatement,
     on_chain_config::{
-        new_epoch_event_key, ApprovedExecutionHashes, ConfigStorage, ConfigurationResource,
-        FeatureFlag, Features, GasSchedule, GasScheduleV2, OnChainConfig, TimedFeatureOverride,
-        TimedFeatures, TimedFeaturesBuilder,
+        new_epoch_event_key, ConfigurationResource, FeatureFlag, Features, OnChainConfig,
+        TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,
     },
     system_txn::SystemTransaction,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction,
-        AbortInfo, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
+        EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
         MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
         Transaction::{
             BlockMetadata as BlockMetadataTransaction, GenesisTransaction, StateCheckpoint,
@@ -60,9 +59,7 @@ use aptos_types::{
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use aptos_utils::{aptos_try, return_on_failure};
-use aptos_vm_logging::{
-    log_schema::AdapterLogSchema, speculative_error, speculative_log, speculative_warn,
-};
+use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
 use aptos_vm_types::{
     change_set::VMChangeSet,
     output::VMOutput,
@@ -84,7 +81,7 @@ use move_core_types::{
     gas_algebra::NumArgs,
     ident_str,
     identifier::Identifier,
-    language_storage::{ModuleId, TypeTag, CORE_CODE_ADDRESS},
+    language_storage::{ModuleId, TypeTag},
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
     vm_status::StatusType,
@@ -157,28 +154,6 @@ fn get_transaction_output(
     ))
 }
 
-pub(crate) fn gas_config(
-    config_storage: &impl ConfigStorage,
-) -> (Result<AptosGasParameters, String>, u64) {
-    match GasScheduleV2::fetch_config(config_storage) {
-        Some(gas_schedule) => {
-            let feature_version = gas_schedule.feature_version;
-            let map = gas_schedule.to_btree_map();
-            (
-                AptosGasParameters::from_on_chain_gas_schedule(&map, feature_version),
-                feature_version,
-            )
-        },
-        None => match GasSchedule::fetch_config(config_storage) {
-            Some(gas_schedule) => {
-                let map = gas_schedule.to_btree_map();
-                (AptosGasParameters::from_on_chain_gas_schedule(&map, 0), 0)
-            },
-            None => (Err("Neither gas schedule v2 nor v1 exists.".to_string()), 0),
-        },
-    }
-}
-
 pub struct AptosVM {
     is_simulation: bool,
     move_vm: MoveVmExt,
@@ -193,7 +168,7 @@ impl AptosVM {
     pub fn new(resolver: &impl AptosMoveResolver) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
         // Get the gas parameters.
-        let (mut gas_params, gas_feature_version) = gas_config(resolver);
+        let (mut gas_params, gas_feature_version) = get_gas_config_from_storage(resolver);
 
         let storage_gas_params = match &mut gas_params {
             Ok(gas_params) => {
@@ -306,139 +281,6 @@ impl AptosVM {
             speculative_error!(log_context, msg.clone());
             VMStatus::error(StatusCode::VM_STARTUP_FAILURE, Some(msg))
         })
-    }
-
-    fn check_gas(
-        &self,
-        resolver: &impl AptosMoveResolver,
-        txn_data: &TransactionMetadata,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(), VMStatus> {
-        let gas_params = self.get_gas_parameters(log_context)?;
-        let txn_gas_params = &gas_params.vm.txn;
-        let raw_bytes_len = txn_data.transaction_size;
-        // The transaction is too large.
-        if txn_data.transaction_size > txn_gas_params.max_transaction_size_in_bytes {
-            let data =
-                resolver.get_resource(&CORE_CODE_ADDRESS, &ApprovedExecutionHashes::struct_tag());
-
-            let valid = if let Ok(Some(data)) = data {
-                let approved_execution_hashes =
-                    bcs::from_bytes::<ApprovedExecutionHashes>(&data).ok();
-                let valid = approved_execution_hashes
-                    .map(|aeh| {
-                        aeh.entries
-                            .into_iter()
-                            .any(|(_, hash)| hash == txn_data.script_hash)
-                    })
-                    .unwrap_or(false);
-                const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
-                valid
-                    // If it is valid ensure that it is only the approved payload that exceeds the
-                    // maximum. The (unknown) user input should be restricted to the original
-                    // maximum transaction size.
-                    && (txn_data.script_size + txn_gas_params.max_transaction_size_in_bytes
-                    >= txn_data.transaction_size)
-                    // Since an approved transaction can be sent by anyone, the system is safer by
-                    // enforcing an upper limit on governance transactions just so something really
-                    // bad doesn't happen.
-                    && txn_data.transaction_size <= MAXIMUM_APPROVED_TRANSACTION_SIZE.into()
-            } else {
-                false
-            };
-
-            if !valid {
-                speculative_warn!(
-                    log_context,
-                    format!(
-                        "[VM] Transaction size too big {} (max {})",
-                        raw_bytes_len, txn_gas_params.max_transaction_size_in_bytes
-                    ),
-                );
-                return Err(VMStatus::error(
-                    StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE,
-                    None,
-                ));
-            }
-        }
-
-        // The submitted max gas units that the transaction can consume is greater than the
-        // maximum number of gas units bound that we have set for any
-        // transaction.
-        if txn_data.max_gas_amount() > txn_gas_params.maximum_number_of_gas_units {
-            speculative_warn!(
-                log_context,
-                format!(
-                    "[VM] Gas unit error; max {}, submitted {}",
-                    txn_gas_params.maximum_number_of_gas_units,
-                    txn_data.max_gas_amount()
-                ),
-            );
-            return Err(VMStatus::error(
-                StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
-                None,
-            ));
-        }
-
-        // The submitted transactions max gas units needs to be at least enough to cover the
-        // intrinsic cost of the transaction as calculated against the size of the
-        // underlying `RawTransaction`
-        let intrinsic_gas = txn_gas_params
-            .calculate_intrinsic_gas(raw_bytes_len)
-            .evaluate(self.gas_feature_version, &gas_params.vm)
-            .to_unit_round_up_with_params(txn_gas_params);
-
-        if txn_data.max_gas_amount() < intrinsic_gas {
-            speculative_warn!(
-                log_context,
-                format!(
-                    "[VM] Gas unit error; min {}, submitted {}",
-                    intrinsic_gas,
-                    txn_data.max_gas_amount()
-                ),
-            );
-            return Err(VMStatus::error(
-                StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS,
-                None,
-            ));
-        }
-
-        // The submitted gas price is less than the minimum gas unit price set by the VM.
-        // NB: MIN_PRICE_PER_GAS_UNIT may equal zero, but need not in the future. Hence why
-        // we turn off the clippy warning.
-        #[allow(clippy::absurd_extreme_comparisons)]
-        let below_min_bound = txn_data.gas_unit_price() < txn_gas_params.min_price_per_gas_unit;
-        if below_min_bound {
-            speculative_warn!(
-                log_context,
-                format!(
-                    "[VM] Gas unit error; min {}, submitted {}",
-                    txn_gas_params.min_price_per_gas_unit,
-                    txn_data.gas_unit_price()
-                ),
-            );
-            return Err(VMStatus::error(
-                StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND,
-                None,
-            ));
-        }
-
-        // The submitted gas price is greater than the maximum gas unit price set by the VM.
-        if txn_data.gas_unit_price() > txn_gas_params.max_price_per_gas_unit {
-            speculative_warn!(
-                log_context,
-                format!(
-                    "[VM] Gas unit error; min {}, submitted {}",
-                    txn_gas_params.max_price_per_gas_unit,
-                    txn_data.gas_unit_price()
-                ),
-            );
-            return Err(VMStatus::error(
-                StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
-                None,
-            ));
-        }
-        Ok(())
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -645,7 +487,9 @@ impl AptosVM {
                         code,
                         ..
                     } => {
-                        let info = self.extract_abort_info(&module, code);
+                        let info = self
+                            .extract_module_metadata(&module)
+                            .and_then(|m| m.extract_abort_info(code));
                         ExecutionStatus::MoveAbort {
                             location: AbortLocation::Module(module),
                             code,
@@ -1889,14 +1733,6 @@ impl AptosVM {
         Ok((VMStatus::Executed, output))
     }
 
-    fn extract_abort_info(&self, module: &ModuleId, abort_code: u64) -> Option<AbortInfo> {
-        if let Some(m) = self.extract_module_metadata(module) {
-            m.extract_abort_info(abort_code)
-        } else {
-            None
-        }
-    }
-
     fn extract_module_metadata(&self, module: &ModuleId) -> Option<Arc<RuntimeModuleMetadataV1>> {
         if self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
             aptos_framework::get_vm_metadata(&self.move_vm, module)
@@ -1962,16 +1798,34 @@ impl AptosVM {
     ) -> Result<(), VMStatus> {
         match payload {
             TransactionPayload::Script(_) => {
-                self.check_gas(resolver, txn_data, log_context)?;
+                check_gas(
+                    self.get_gas_parameters(log_context)?,
+                    self.gas_feature_version,
+                    resolver,
+                    txn_data,
+                    log_context,
+                )?;
                 transaction_validation::run_script_prologue(session, txn_data, log_context)
             },
             TransactionPayload::EntryFunction(_) => {
                 // NOTE: Script and EntryFunction shares the same prologue
-                self.check_gas(resolver, txn_data, log_context)?;
+                check_gas(
+                    self.get_gas_parameters(log_context)?,
+                    self.gas_feature_version,
+                    resolver,
+                    txn_data,
+                    log_context,
+                )?;
                 transaction_validation::run_script_prologue(session, txn_data, log_context)
             },
             TransactionPayload::Multisig(multisig_payload) => {
-                self.check_gas(resolver, txn_data, log_context)?;
+                check_gas(
+                    self.get_gas_parameters(log_context)?,
+                    self.gas_feature_version,
+                    resolver,
+                    txn_data,
+                    log_context,
+                )?;
                 // Still run script prologue for multisig transaction to ensure the same tx
                 // validations are still run for this multisig execution tx, which is submitted by
                 // one of the owners.
@@ -1996,14 +1850,20 @@ impl AptosVM {
                 if MODULE_BUNDLE_DISALLOWED.load(Ordering::Relaxed) {
                     return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
                 }
-                self.check_gas(resolver, txn_data, log_context)?;
+                check_gas(
+                    self.get_gas_parameters(log_context)?,
+                    self.gas_feature_version,
+                    resolver,
+                    txn_data,
+                    log_context,
+                )?;
                 transaction_validation::run_module_prologue(session, txn_data, log_context)
             },
         }
     }
 
     pub fn should_restart_execution(vm_output: &VMOutput) -> bool {
-        let new_epoch_event_key = aptos_types::on_chain_config::new_epoch_event_key();
+        let new_epoch_event_key = new_epoch_event_key();
         vm_output
             .change_set()
             .events()

@@ -1,0 +1,170 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+use crate::{move_vm_ext::AptosMoveResolver, transaction_metadata::TransactionMetadata};
+use aptos_gas_algebra::GasExpression;
+use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
+use aptos_logger::{enabled, Level};
+use aptos_types::on_chain_config::{
+    ApprovedExecutionHashes, ConfigStorage, GasSchedule, GasScheduleV2, OnChainConfig,
+};
+use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_log, speculative_warn};
+use move_core_types::{
+    language_storage::CORE_CODE_ADDRESS,
+    vm_status::{StatusCode, VMStatus},
+};
+
+const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
+
+pub(crate) fn get_gas_config_from_storage(
+    config_storage: &impl ConfigStorage,
+) -> (Result<AptosGasParameters, String>, u64) {
+    match GasScheduleV2::fetch_config(config_storage) {
+        Some(gas_schedule) => {
+            let feature_version = gas_schedule.feature_version;
+            let map = gas_schedule.to_btree_map();
+            (
+                AptosGasParameters::from_on_chain_gas_schedule(&map, feature_version),
+                feature_version,
+            )
+        },
+        None => match GasSchedule::fetch_config(config_storage) {
+            Some(gas_schedule) => {
+                let map = gas_schedule.to_btree_map();
+                (AptosGasParameters::from_on_chain_gas_schedule(&map, 0), 0)
+            },
+            None => (Err("Neither gas schedule v2 nor v1 exists.".to_string()), 0),
+        },
+    }
+}
+
+pub(crate) fn check_gas(
+    gas_params: &AptosGasParameters,
+    gas_feature_version: u64,
+    resolver: &impl AptosMoveResolver,
+    txn_metadata: &TransactionMetadata,
+    log_context: &AdapterLogSchema,
+) -> Result<(), VMStatus> {
+    let txn_gas_params = &gas_params.vm.txn;
+    let raw_bytes_len = txn_metadata.transaction_size;
+    // The transaction is too large.
+    if txn_metadata.transaction_size > txn_gas_params.max_transaction_size_in_bytes {
+        let data =
+            resolver.get_resource(&CORE_CODE_ADDRESS, &ApprovedExecutionHashes::struct_tag());
+
+        let valid = if let Ok(Some(data)) = data {
+            let approved_execution_hashes = bcs::from_bytes::<ApprovedExecutionHashes>(&data).ok();
+            let valid = approved_execution_hashes
+                .map(|aeh| {
+                    aeh.entries
+                        .into_iter()
+                        .any(|(_, hash)| hash == txn_metadata.script_hash)
+                })
+                .unwrap_or(false);
+            valid
+                // If it is valid ensure that it is only the approved payload that exceeds the
+                // maximum. The (unknown) user input should be restricted to the original
+                // maximum transaction size.
+                && (txn_metadata.script_size + txn_gas_params.max_transaction_size_in_bytes
+                >= txn_metadata.transaction_size)
+                // Since an approved transaction can be sent by anyone, the system is safer by
+                // enforcing an upper limit on governance transactions just so something really
+                // bad doesn't happen.
+                && txn_metadata.transaction_size <= MAXIMUM_APPROVED_TRANSACTION_SIZE.into()
+        } else {
+            false
+        };
+
+        if !valid {
+            speculative_warn!(
+                log_context,
+                format!(
+                    "[VM] Transaction size too big {} (max {})",
+                    raw_bytes_len, txn_gas_params.max_transaction_size_in_bytes
+                ),
+            );
+            return Err(VMStatus::error(
+                StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE,
+                None,
+            ));
+        }
+    }
+
+    // The submitted max gas units that the transaction can consume is greater than the
+    // maximum number of gas units bound that we have set for any
+    // transaction.
+    if txn_metadata.max_gas_amount() > txn_gas_params.maximum_number_of_gas_units {
+        speculative_warn!(
+            log_context,
+            format!(
+                "[VM] Gas unit error; max {}, submitted {}",
+                txn_gas_params.maximum_number_of_gas_units,
+                txn_metadata.max_gas_amount()
+            ),
+        );
+        return Err(VMStatus::error(
+            StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
+            None,
+        ));
+    }
+
+    // The submitted transactions max gas units needs to be at least enough to cover the
+    // intrinsic cost of the transaction as calculated against the size of the
+    // underlying `RawTransaction`
+    let intrinsic_gas = txn_gas_params
+        .calculate_intrinsic_gas(raw_bytes_len)
+        .evaluate(gas_feature_version, &gas_params.vm)
+        .to_unit_round_up_with_params(txn_gas_params);
+
+    if txn_metadata.max_gas_amount() < intrinsic_gas {
+        speculative_warn!(
+            log_context,
+            format!(
+                "[VM] Gas unit error; min {}, submitted {}",
+                intrinsic_gas,
+                txn_metadata.max_gas_amount()
+            ),
+        );
+        return Err(VMStatus::error(
+            StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS,
+            None,
+        ));
+    }
+
+    // The submitted gas price is less than the minimum gas unit price set by the VM.
+    // NB: MIN_PRICE_PER_GAS_UNIT may equal zero, but need not in the future. Hence why
+    // we turn off the clippy warning.
+    #[allow(clippy::absurd_extreme_comparisons)]
+    let below_min_bound = txn_metadata.gas_unit_price() < txn_gas_params.min_price_per_gas_unit;
+    if below_min_bound {
+        speculative_warn!(
+            log_context,
+            format!(
+                "[VM] Gas unit error; min {}, submitted {}",
+                txn_gas_params.min_price_per_gas_unit,
+                txn_metadata.gas_unit_price()
+            ),
+        );
+        return Err(VMStatus::error(
+            StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND,
+            None,
+        ));
+    }
+
+    // The submitted gas price is greater than the maximum gas unit price set by the VM.
+    if txn_metadata.gas_unit_price() > txn_gas_params.max_price_per_gas_unit {
+        speculative_warn!(
+            log_context,
+            format!(
+                "[VM] Gas unit error; min {}, submitted {}",
+                txn_gas_params.max_price_per_gas_unit,
+                txn_metadata.gas_unit_price()
+            ),
+        );
+        return Err(VMStatus::error(
+            StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
+            None,
+        ));
+    }
+    Ok(())
+}

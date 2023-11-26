@@ -110,6 +110,7 @@ pub mod data_cache;
 pub mod aptos_vm;
 pub mod block_executor;
 mod errors;
+mod gas;
 pub mod move_vm_ext;
 pub mod natives;
 pub mod sharded_block_executor;
