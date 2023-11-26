@@ -1256,8 +1256,8 @@ impl LifetimeAnnotation {
 /// Annotation present at each code offset
 #[derive(Debug, Clone)]
 pub struct LifetimeInfoAtCodeOffset {
-    before: LifetimeState,
-    after: LifetimeState,
+    pub before: LifetimeState,
+    pub after: LifetimeState,
 }
 
 /// Public functions on lifetime info
