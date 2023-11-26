@@ -232,6 +232,18 @@ impl BlockData {
         }
     }
 
+    pub fn dummy_with_system_txns(sys_txns: Vec<SystemTransaction>) -> Self {
+        Self::new_proposal_ext(
+            sys_txns,
+            Payload::empty(false),
+            Author::ONE,
+            vec![],
+            1,
+            1,
+            QuorumCert::default(),
+        )
+    }
+
     pub fn new_genesis(timestamp_usecs: u64, quorum_cert: QuorumCert) -> Self {
         assume!(quorum_cert.certified_block().epoch() < u64::max_value()); // unlikely to be false in this universe
         Self {

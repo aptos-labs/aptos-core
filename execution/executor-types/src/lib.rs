@@ -37,6 +37,7 @@ use std::{
         Arc,
     },
 };
+use aptos_types::transaction::ExecutionStatus;
 
 mod error;
 mod executed_chunk;
@@ -293,7 +294,7 @@ pub struct ChunkCommitNotification {
 /// of success / failure of the transactions.
 /// Note that the specific details of compute_status are opaque to StateMachineReplication,
 /// which is going to simply pass the results between StateComputer and PayloadClient.
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct StateComputeResult {
     /// transaction accumulator root hash is identified as `state_id` in Consensus.
     root_hash: HashValue,
@@ -316,7 +317,7 @@ pub struct StateComputeResult {
     /// The compute status (success/failure) of the given payload. The specific details are opaque
     /// for StateMachineReplication, which is merely passing it between StateComputer and
     /// PayloadClient.
-    compute_status: Vec<TransactionStatus>,
+    pub compute_status: Vec<TransactionStatus>,
 
     /// The transaction info hashes of all success txns.
     transaction_info_hashes: Vec<HashValue>,
@@ -366,6 +367,19 @@ impl StateComputeResult {
         }
     }
 
+    pub fn new_dummy_with_num_txns(num_txns: usize) -> Self {
+        Self {
+            root_hash: HashValue::zero(),
+            frozen_subtree_roots: vec![],
+            num_leaves: 0,
+            parent_frozen_subtree_roots: vec![],
+            parent_num_leaves: 0,
+            epoch_state: None,
+            compute_status: vec![TransactionStatus::Keep(ExecutionStatus::Success); num_txns],
+            transaction_info_hashes: vec![],
+            reconfig_events: vec![],
+        }
+    }
     /// generate a new dummy state compute result with ACCUMULATOR_PLACEHOLDER_HASH as the root hash.
     /// this function is used in ordering_state_computer as a dummy state compute result,
     /// where the real compute result is generated after ordering_state_computer.commit pushes
