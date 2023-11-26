@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
 /// VoteData keeps the information about the block, and its parent.
-#[derive(Default, Deserialize, Serialize, Clone, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
 pub struct VoteData {
     /// Contains all the block information needed for voting for the proposed round.
     proposed: BlockInfo,
@@ -37,6 +37,13 @@ impl VoteData {
     /// Constructs a new VoteData from the block information of a proposed block and the block it extends.
     pub fn new(proposed: BlockInfo, parent: BlockInfo) -> Self {
         Self { proposed, parent }
+    }
+
+    pub fn dummy() -> Self {
+        Self {
+            proposed: BlockInfo::empty(),
+            parent: BlockInfo::empty(),
+        }
     }
 
     /// Returns block information associated to the block being extended by the proposal.

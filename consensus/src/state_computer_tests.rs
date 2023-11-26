@@ -1,34 +1,31 @@
 // Copyright © Aptos Foundation
 
+use crate::{
+    error::MempoolError, payload_manager::PayloadManager, state_computer::ExecutionProxy,
+    state_replication::StateComputer, transaction_deduper::NoOpDeduper,
+    transaction_filter::TransactionFilter, transaction_shuffler::NoOpShuffler,
+    txn_notifier::TxnNotifier,
+};
+use aptos_config::config::transaction_filter_type::Filter;
+use aptos_consensus_notifications::{ConsensusNotificationSender, Error};
+use aptos_consensus_types::{block::Block, block_data::BlockData, executed_block::ExecutedBlock};
+use aptos_crypto::HashValue;
+use aptos_executor_types::{
+    state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorResult,
+    StateComputeResult,
+};
+use aptos_infallible::Mutex;
+use aptos_types::{
+    block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
+    contract_event::ContractEvent,
+    epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
+    system_txn::SystemTransaction,
+    transaction::{ExecutionStatus, SignedTransaction, Transaction, TransactionStatus},
+};
+use futures_channel::oneshot;
 use std::sync::Arc;
 use tokio::runtime::Handle;
-use aptos_consensus_notifications::ConsensusNotificationSender;
-use aptos_consensus_types::block::Block;
-use aptos_consensus_types::block_data::BlockData;
-use aptos_consensus_types::executed_block::ExecutedBlock;
-use aptos_crypto::HashValue;
-use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResult};
-use aptos_executor_types::state_checkpoint_output::StateCheckpointOutput;
-use aptos_infallible::Mutex;
-use aptos_types::block_executor::config::BlockExecutorConfigFromOnchain;
-use aptos_types::block_executor::partitioner::ExecutableBlock;
-use aptos_types::contract_event::ContractEvent;
-use aptos_types::epoch_state::EpochState;
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
-use aptos_types::system_txn::SystemTransaction;
-use aptos_types::transaction::{ExecutionStatus, SignedTransaction, Transaction, TransactionStatus};
-use futures_channel::oneshot;
-use crate::error::MempoolError;
-use crate::payload_manager::PayloadManager;
-use crate::state_computer::ExecutionProxy;
-use crate::state_replication::StateComputer;
-use crate::transaction_deduper::NoOpDeduper;
-use crate::transaction_filter::TransactionFilter;
-use crate::transaction_shuffler::NoOpShuffler;
-use crate::txn_notifier::TxnNotifier;
-use aptos_consensus_notifications::Error;
-use aptos_config::config::transaction_filter_type::Filter;
-
 
 struct DummyStateSyncNotifier {
     invocations: Mutex<Vec<Vec<Transaction>>>,
@@ -53,10 +50,7 @@ impl ConsensusNotificationSender for DummyStateSyncNotifier {
         Ok(())
     }
 
-    async fn sync_to_target(
-        &self,
-        _target: LedgerInfoWithSignatures,
-    ) -> Result<(), Error> {
+    async fn sync_to_target(&self, _target: LedgerInfoWithSignatures) -> Result<(), Error> {
         unreachable!()
     }
 }
@@ -130,7 +124,7 @@ impl BlockExecutorTrait for DummyBlockExecutor {
         _ledger_info_with_sigs: LedgerInfoWithSignatures,
         _save_state_snapshots: bool,
     ) -> ExecutorResult<()> {
-        unreachable!()
+        Ok(())
     }
 
     fn finish(&self) {}
@@ -207,7 +201,8 @@ async fn commit_should_discover_sys_txns() {
     );
 
     let mut state_compute_result = StateComputeResult::new_dummy();
-    state_compute_result.compute_status = vec![TransactionStatus::Keep(ExecutionStatus::Success); 4]; // Eventually 4 txns: block metadata, sys txn 0, sys txn 1, state checkpoint.
+    state_compute_result.compute_status =
+        vec![TransactionStatus::Keep(ExecutionStatus::Success); 4]; // Eventually 4 txns: block metadata, sys txn 0, sys txn 1, state checkpoint.
 
     let blocks = vec![Arc::new(ExecutedBlock::new(block, state_compute_result))];
     let epoch_state = EpochState::empty();
@@ -222,11 +217,19 @@ async fn commit_should_discover_sys_txns() {
 
     let (tx, rx) = oneshot::channel::<()>();
 
-    let callback = Box::new(move |_a: &[Arc<ExecutedBlock>], _b: LedgerInfoWithSignatures| {
-        tx.send(()).unwrap();
-    });
+    let callback = Box::new(
+        move |_a: &[Arc<ExecutedBlock>], _b: LedgerInfoWithSignatures| {
+            tx.send(()).unwrap();
+        },
+    );
 
-    let _ = execution_policy.commit(blocks.as_slice(), LedgerInfoWithSignatures::default(), callback).await;
+    let _ = execution_policy
+        .commit(
+            blocks.as_slice(),
+            LedgerInfoWithSignatures::dummy(),
+            callback,
+        )
+        .await;
 
     // Wait until state sync is notified.
     let _ = rx.await;

@@ -562,7 +562,12 @@ impl ExecutableTransactions {
     pub fn into_txns(self) -> Vec<SignatureVerifiedTransaction> {
         match self {
             ExecutableTransactions::Unsharded(txns) => txns,
-            ExecutableTransactions::Sharded(partitioned) => PartitionedTransactions::flatten(partitioned).into_iter().map(|t|t.into_txn()).collect(),
+            ExecutableTransactions::Sharded(partitioned) => {
+                PartitionedTransactions::flatten(partitioned)
+                    .into_iter()
+                    .map(|t| t.into_txn())
+                    .collect()
+            },
         }
     }
 }

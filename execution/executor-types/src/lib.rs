@@ -18,8 +18,8 @@ use aptos_types::{
     proof::{AccumulatorExtensionProof, SparseMerkleProofExt},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        Transaction, TransactionInfo, TransactionListWithProof, TransactionOutputListWithProof,
-        TransactionStatus, Version,
+        ExecutionStatus, Transaction, TransactionInfo, TransactionListWithProof,
+        TransactionOutputListWithProof, TransactionStatus, Version,
     },
     write_set::WriteSet,
 };
@@ -37,7 +37,6 @@ use std::{
         Arc,
     },
 };
-use aptos_types::transaction::ExecutionStatus;
 
 mod error;
 mod executed_chunk;
@@ -380,6 +379,7 @@ impl StateComputeResult {
             reconfig_events: vec![],
         }
     }
+
     /// generate a new dummy state compute result with ACCUMULATOR_PLACEHOLDER_HASH as the root hash.
     /// this function is used in ordering_state_computer as a dummy state compute result,
     /// where the real compute result is generated after ordering_state_computer.commit pushes

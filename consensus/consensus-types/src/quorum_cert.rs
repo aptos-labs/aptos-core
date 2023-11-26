@@ -15,7 +15,7 @@ use aptos_types::{
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Deserialize, Serialize, Clone, Debug, Eq, PartialEq)]
 pub struct QuorumCert {
     /// The vote information certified by the quorum.
     vote_data: VoteData,
@@ -38,6 +38,13 @@ impl QuorumCert {
         QuorumCert {
             vote_data,
             signed_ledger_info,
+        }
+    }
+
+    pub fn dummy() -> Self {
+        Self {
+            vote_data: VoteData::dummy(),
+            signed_ledger_info: LedgerInfoWithSignatures::dummy(),
         }
     }
 

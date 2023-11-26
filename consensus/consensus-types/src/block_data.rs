@@ -240,7 +240,7 @@ impl BlockData {
             vec![],
             1,
             1,
-            QuorumCert::default(),
+            QuorumCert::dummy(),
         )
     }
 

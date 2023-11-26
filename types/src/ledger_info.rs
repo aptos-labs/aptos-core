@@ -40,7 +40,7 @@ use std::{
 /// LedgerInfo with the `version` being the latest version that will be committed if B gets 2f+1
 /// votes. It sets `consensus_data_hash` to represent B so that if those 2f+1 votes are gathered a
 /// QC is formed on B.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct LedgerInfo {
     commit_info: BlockInfo,
@@ -57,7 +57,7 @@ impl Display for LedgerInfo {
 }
 
 impl LedgerInfo {
-    pub fn empty() -> Self {
+    pub fn dummy() -> Self {
         Self {
             commit_info: BlockInfo::empty(),
             consensus_data_hash: HashValue::zero(),
@@ -150,12 +150,6 @@ pub enum LedgerInfoWithSignatures {
     V0(LedgerInfoWithV0),
 }
 
-impl Default for LedgerInfoWithSignatures {
-    fn default() -> Self {
-        Self::V0(LedgerInfoWithV0::default())
-    }
-}
-
 impl Display for LedgerInfoWithSignatures {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
@@ -168,6 +162,10 @@ impl Display for LedgerInfoWithSignatures {
 impl LedgerInfoWithSignatures {
     pub fn new(ledger_info: LedgerInfo, signatures: AggregateSignature) -> Self {
         LedgerInfoWithSignatures::V0(LedgerInfoWithV0::new(ledger_info, signatures))
+    }
+
+    pub fn dummy() -> Self {
+        Self::V0(LedgerInfoWithV0::dummy())
     }
 
     pub fn genesis(genesis_state_root_hash: HashValue, validator_set: ValidatorSet) -> Self {
@@ -226,7 +224,7 @@ impl DerefMut for LedgerInfoWithSignatures {
 /// the LedgerInfo element since the validator node doesn't need to know the signatures
 /// again when the client performs a query, those are only there for the client
 /// to be able to verify the state
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct LedgerInfoWithV0 {
     ledger_info: LedgerInfo,
     /// Aggregated BLS signature of all the validators that signed the message. The bitmask in the
@@ -245,6 +243,13 @@ impl LedgerInfoWithV0 {
         LedgerInfoWithV0 {
             ledger_info,
             signatures,
+        }
+    }
+
+    pub fn dummy() -> Self {
+        Self {
+            ledger_info: LedgerInfo::dummy(),
+            signatures: AggregateSignature::empty(),
         }
     }
 

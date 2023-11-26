@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::tracing::{BlockStage, observe_block},
+    block_storage::tracing::{observe_block, BlockStage},
     counters,
-    error::{MempoolError, StateSyncError},
+    error::StateSyncError,
     execution_pipeline::ExecutionPipeline,
     monitor,
     payload_manager::PayloadManager,
@@ -17,30 +17,20 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
-use aptos_consensus_types::{
-    block::Block,
-    common::Round,
-    executed_block::ExecutedBlock,
-};
+use aptos_consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResult};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    account_address::AccountAddress,
-    block_executor::config::BlockExecutorConfigFromOnchain,
-    contract_event::ContractEvent,
-    epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::OnChainExecutionConfig,
-    transaction::{SignedTransaction, Transaction},
+    account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
+    contract_event::ContractEvent, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
+    on_chain_config::OnChainExecutionConfig, transaction::Transaction,
 };
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
 use std::{boxed::Box, sync::Arc};
 use tokio::sync::Mutex as AsyncMutex;
-use aptos_executor_types::state_checkpoint_output::StateCheckpointOutput;
-use aptos_types::block_executor::partitioner::ExecutableBlock;
 
 pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<StateComputeResult>>;
 
