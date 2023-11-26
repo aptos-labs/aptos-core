@@ -621,6 +621,8 @@ impl<'env> Generator<'env> {
             Operation::Ge => self.gen_op_call(targets, id, BytecodeOperation::Ge, args),
             Operation::Not => self.gen_op_call(targets, id, BytecodeOperation::Not, args),
 
+            Operation::NoOp => {}, // do nothing
+
             // Non-supported specification related operations
             Operation::Exists(Some(_))
             | Operation::SpecFunction(_, _, _)
@@ -665,8 +667,7 @@ impl<'env> Generator<'env> {
             | Operation::EmptyEventStore
             | Operation::ExtendEventStore
             | Operation::EventStoreIncludes
-            | Operation::EventStoreIncludedIn
-            | Operation::NoOp => self.internal_error(
+            | Operation::EventStoreIncludedIn => self.internal_error(
                 id,
                 format!("unsupported specification construct: `{:?}`", op),
             ),
