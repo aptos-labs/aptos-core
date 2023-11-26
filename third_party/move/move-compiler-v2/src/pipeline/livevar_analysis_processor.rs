@@ -52,6 +52,14 @@ pub struct LiveVarInfoAtCodeOffset {
     pub after: BTreeMap<TempIndex, LiveVarInfo>,
 }
 
+impl LiveVarInfoAtCodeOffset {
+    pub fn released_temps(&self) -> impl Iterator<Item = TempIndex> {
+        self.before
+            .keys()
+            .filter(|t| !self.after.contains_key(t))
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
 pub struct LiveVarInfo {
     /// The usage of a given temporary after this program point, inclusive of locations where
