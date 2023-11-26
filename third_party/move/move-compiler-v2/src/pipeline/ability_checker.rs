@@ -89,7 +89,6 @@ fn check_bytecode(target: &FunctionTarget, bytecode: &Bytecode) {
                 BorrowGlobal(_, _, _) => todo!(),
                 Destroy => todo!(),
                 ReadRef => {
-					// todo: may need to check drop for dst
 					let src = srcs[0];
 					check_copy_for_temp(
 						target,
