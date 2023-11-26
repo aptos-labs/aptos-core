@@ -14,7 +14,7 @@ use crate::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
-    transaction_validation, verifier, VMExecutor, VMSimulator, VMValidator,
+    transaction_validation, verifier, VMExecutor, VMValidator,
 };
 use anyhow::{anyhow, Result};
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
@@ -2278,7 +2278,6 @@ impl VMValidator for AptosVM {
         result
     }
 }
-
 
 // Ensure encapsulation of AptosVM APIs by using a wrapper.
 pub struct AptosSimulationVM(AptosVM);

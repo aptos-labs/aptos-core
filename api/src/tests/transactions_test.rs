@@ -1387,7 +1387,7 @@ async fn test_simulation_failure_error_message() {
     //     }
     // }
 
-    let resp = context.simulate_transaction(&admin0, json!({
+    let output = context.simulate_transaction(&admin0, json!({
         "type": "script_payload",
         "code": {
             "bytecode": "a11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102",
