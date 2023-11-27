@@ -30,7 +30,8 @@ module tournament::rps_unit_tests {
 
     struct PlayerConfig has key {
         // Configuration of the player for each tournament.
-        player_configs: Table<address, Object<Token>>
+        player_tokens: Table<address, Object<Token>>,
+        game_addresses: Table<address, address>
     }
 
     // fun get_signer(account_address: address): signer acquires PlayerConfig {
@@ -74,12 +75,13 @@ module tournament::rps_unit_tests {
         );
         if (exists<PlayerConfig>(user_address)) {
             move_to(user, PlayerConfig {
-                player_configs: table::new()
+                player_tokens: table::new(),
+                game_addresses: table::new()
             })
         };
         // TODO: Can a resource be inserted and modified in the same transaction?
         let player_config = borrow_global_mut<PlayerConfig>(user_address);
-        table::upsert(&mut player_config.player_configs, tournament_address, player_token);
+        table::upsert(&mut player_config.player_tokens, tournament_address, player_token);
     }
 
     public entry fun start_new_round(admin: &signer, player_addresses: vector<address>) acquires PlayerConfig, TournamentConfig, PlayerToGameMapping {
@@ -89,7 +91,7 @@ module tournament::rps_unit_tests {
 
         let player_tokens: vector<Object<Token>> = vector::map_ref(&player_addresses, |player_address| {
             let player_config = borrow_global_mut<PlayerConfig>(*player_address);
-            table::remove(&mut player_config.player_configs, admin_address)
+            table::remove(&mut player_config.player_tokens, admin_address)
         });
         // TODO: Should this be done every round, or only once in the beginning?
         let game_addresses = aptos_tournament::add_players_to_game_returning(
@@ -98,9 +100,12 @@ module tournament::rps_unit_tests {
             player_tokens
         );
         let player_to_game_mapping = rock_paper_scissor::get_player_to_game_mapping(&game_addresses);
-        move_to<PlayerToGameMapping>(admin, PlayerToGameMapping {
-            mapping: player_to_game_mapping
+        vector::for_each(&player_to_game_mapping, |(player_addr, game_addr)| {
+            table::upsert(borrow_global_mut<PlayerConfig>(player_addr).game_addresses, admin_address, player_addr);
         });
+        // move_to<PlayerToGameMapping>(admin, PlayerToGameMapping {
+        //     mapping: player_to_game_mapping
+        // });
         // let (player_addrs, game_addrs) = simple_map::to_vec_pair(player_to_game_mapping);
         // let i = 0;
         // let len = vector::length(&player_addrs);

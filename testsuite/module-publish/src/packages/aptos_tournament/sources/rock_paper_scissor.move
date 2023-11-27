@@ -64,12 +64,14 @@ module tournament::rock_paper_scissor {
 
     public fun get_player_to_game_mapping(
         game_addresses: &vector<address>
-    ): Table<address, address> {
+    ): vector<(address, address)> {
         let player_to_game_mapping = table::new();
+        // let player_to_game_mapping = vector::new();
         vector::for_each_ref(game_addresses, |game_address| {
             let game = borrow_global<RockPaperScissor>(*game_address);
-            table::upsert(&mut player_to_game_mapping, game.player1.address, game_address);
-            table::upsert(&mut player_to_game_mapping, game.player2.address, game_address);
+            vector::push(&mut player_to_game_mapping, (game.player1.address, game_address));
+            vector::push(&mut player_to_game_mapping, (game.player2.address, game_address));
+            // table::upsert(&mut player_to_game_mapping, game.player2.address, game_address);
         });
         player_to_game_mapping
     }
