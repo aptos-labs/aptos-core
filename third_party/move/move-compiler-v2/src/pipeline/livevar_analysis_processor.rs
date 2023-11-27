@@ -53,6 +53,8 @@ pub struct LiveVarInfoAtCodeOffset {
 }
 
 impl LiveVarInfoAtCodeOffset {
+    /// Returns the locals that lives before the program point
+    /// and dies after
     pub fn released_temps(&self) -> impl Iterator<Item = TempIndex> {
         self.before
             .keys()
