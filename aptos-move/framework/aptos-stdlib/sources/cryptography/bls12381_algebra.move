@@ -770,10 +770,11 @@ module aptos_std::bls12381_algebra {
         multi_scalar_mul(&elements, &scalars);
     }
 
+    #[test_only]
     /// The maximum number of `G1` elements that can be created in a transaction,
     /// calculated by the current memory limit (1MB) and the in-mem G1 representation size (144 bytes per element).
-    #[test_only]
     const G1_NUM_MAX_NUMERATOR: u64 = 1048576; // TODO(#9330)
+
     #[test_only]
     const G1_NUM_MAX_DENOMINATOR: u64 = 144; // TODO(#9330)
 
