@@ -26,7 +26,7 @@ use std::{collections::HashMap, path::PathBuf};
 fn load_packages_to_executor(
     executor: &mut FakeExecutor,
     package_info: &PackageInfo,
-    compiled_package_cache: &mut HashMap<PackageInfo, CompiledPackage>,
+    compiled_package_cache: &HashMap<PackageInfo, CompiledPackage>,
 ) {
     let compiled_package = compiled_package_cache.get(package_info).unwrap();
     let root_modules = compiled_package.all_modules();
@@ -40,7 +40,7 @@ fn load_packages_to_executor(
 
 fn load_aptos_packages_to_executor(
     executor: &mut FakeExecutor,
-    compiled_package_map: &mut HashMap<PackageInfo, CompiledPackage>,
+    compiled_package_map: &HashMap<PackageInfo, CompiledPackage>,
 ) {
     for package in APTOS_PACKAGES {
         let package_info = PackageInfo {
@@ -222,37 +222,32 @@ impl Execution {
         state: &FakeDataStore,
         features: &Features,
         txn_idx: &TxnIndex,
-        compiled_package_cache: &mut HashMap<PackageInfo, CompiledPackage>,
-        compiled_package_cache_v2: &mut HashMap<PackageInfo, CompiledPackage>,
+        compiled_package_cache: &HashMap<PackageInfo, CompiledPackage>,
+        compiled_package_cache_v2: &HashMap<PackageInfo, CompiledPackage>,
     ) {
-        let mut res_1_opt = None;
-        let mut res_2_opt = None;
-        if self.execution_mode.is_v1() || self.execution_mode.is_compare() {
-            res_1_opt = self.execute_code(
-                state,
-                features,
-                &txn_idx.package_info,
-                &txn_idx.txn,
-                compiled_package_cache,
-            );
+        let mut package_cache_main = compiled_package_cache;
+        let package_cache_other = compiled_package_cache_v2;
+        if self.execution_mode.is_v2() {
+            package_cache_main = compiled_package_cache_v2;
         }
-        if self.execution_mode.is_v2() || self.execution_mode.is_compare() {
-            res_2_opt = self.execute_code(
-                state,
-                features,
-                &txn_idx.package_info,
-                &txn_idx.txn,
-                compiled_package_cache_v2,
-            );
-        }
+        let res_main_opt = self.execute_code(
+            state,
+            features,
+            &txn_idx.package_info,
+            &txn_idx.txn,
+            package_cache_main,
+        );
         if self.execution_mode.is_compare() {
-            Self::print_mismatches(cur_version, &res_1_opt.unwrap(), &res_2_opt.unwrap());
+            let res_other_opt = self.execute_code(
+                state,
+                features,
+                &txn_idx.package_info,
+                &txn_idx.txn,
+                package_cache_other,
+            );
+            Self::print_mismatches(cur_version, &res_main_opt.unwrap(), &res_other_opt.unwrap());
         } else {
-            let res = if let Some(res_1) = res_1_opt {
-                res_1
-            } else {
-                res_2_opt.unwrap()
-            };
+            let res = res_main_opt.unwrap();
             if let Ok(res_ok) = res {
                 println!(
                     "version:{}\nwrite set:{:?}\n events:{:?}\n",
@@ -274,7 +269,7 @@ impl Execution {
         features: &Features,
         package_info: &PackageInfo,
         txn: &Transaction,
-        compiled_package_cache: &mut HashMap<PackageInfo, CompiledPackage>,
+        compiled_package_cache: &HashMap<PackageInfo, CompiledPackage>,
     ) -> Option<Result<(WriteSet, Vec<ContractEvent>), VMStatus>> {
         let executor = FakeExecutor::no_genesis();
         let mut executor = executor.set_not_parallel();
@@ -309,66 +304,57 @@ impl Execution {
         res_1: &Result<(WriteSet, Vec<ContractEvent>), VMStatus>,
         res_2: &Result<(WriteSet, Vec<ContractEvent>), VMStatus>,
     ) {
-        if res_1.is_err() && res_2.is_err() {
-            let res_1_err = res_1.as_ref().unwrap_err();
-            let res_2_err = res_2.as_ref().unwrap_err();
-            if res_1_err != res_2_err {
-                println!("error is different at {}", cur_version);
-                println!("error {} is raised from V1", res_1_err);
-                println!("error {} is raised from V2", res_2_err);
-            }
-        } else if res_1.is_err() && res_2.is_ok() {
-            println!(
-                "error {} is raised from V1 at {}",
-                res_1.as_ref().unwrap_err(),
-                cur_version
-            );
-            let res_2_unwrapped = res_2.as_ref().unwrap();
-            println!(
-                "output from V2 at version:{}\nwrite set:{:?}\n events:{:?}\n",
-                cur_version, res_2_unwrapped.0, res_2_unwrapped.1
-            );
-        } else if res_1.is_ok() && res_2.is_err() {
-            println!(
-                "error {} is raised from V2 at {}",
-                res_2.as_ref().unwrap_err(),
-                cur_version
-            );
-            let res_1_unwrapped = res_1.as_ref().unwrap();
-            println!(
-                "output from V1 at version:{}\nwrite set:{:?}\n events:{:?}\n",
-                cur_version, res_1_unwrapped.0, res_1_unwrapped.1
-            );
-        } else {
-            let res_1 = res_1.as_ref().unwrap();
-            let res_2 = res_2.as_ref().unwrap();
-            // compare events
-            for idx in 0..res_1.1.len() {
-                let event_1 = &res_1.1[idx];
-                let event_2 = &res_2.1[idx];
-                if event_1 != event_2 {
-                    println!("event is different at version {}", cur_version);
-                    println!("event raised from V1: {} at index:{}", event_1, idx);
-                    println!("event raised from V2: {} at index:{}", event_2, idx);
+        match (res_1, res_2) {
+            (Err(e1), Err(e2)) => {
+                if e1 != e2 {
+                    println!("error is different at {}", cur_version);
+                    println!("error {} is raised from V1", e1);
+                    println!("error {} is raised from V2", e2);
                 }
-            }
-            // compare write set
-            let res_1_write_set_vec = res_1.0.iter().collect_vec();
-            let res_2_write_set_vec = res_2.0.iter().collect_vec();
-            for idx in 0..res_1_write_set_vec.len() {
-                let write_set_1 = res_1_write_set_vec[0];
-                let write_set_2 = res_2_write_set_vec[0];
-                if write_set_1.0 != write_set_2.0 {
-                    println!("write set key is different at version {}", cur_version);
-                    println!("state key at V1: {:?} at index:{}", write_set_1.0, idx);
-                    println!("state key at V2: {:?} at index:{}", write_set_2.0, idx);
+            },
+            (Err(e), Ok(res)) => {
+                println!("error {} is raised from V1 at {}", e, cur_version);
+                println!(
+                    "output from V2 at version:{}\nwrite set:{:?}\n events:{:?}\n",
+                    cur_version, res.0, res.1
+                );
+            },
+            (Ok(res), Err(e)) => {
+                println!("error {} is raised from V2 at {}", e, cur_version);
+                println!(
+                    "output from V1 at version:{}\nwrite set:{:?}\n events:{:?}\n",
+                    cur_version, res.0, res.1
+                );
+            },
+            (Ok(res_1), Ok(res_2)) => {
+                // compare events
+                for idx in 0..res_1.1.len() {
+                    let event_1 = &res_1.1[idx];
+                    let event_2 = &res_2.1[idx];
+                    if event_1 != event_2 {
+                        println!("event is different at version {}", cur_version);
+                        println!("event raised from V1: {} at index:{}", event_1, idx);
+                        println!("event raised from V2: {} at index:{}", event_2, idx);
+                    }
                 }
-                if write_set_1.1 != write_set_2.1 {
-                    println!("write set value is different at version {}", cur_version);
-                    println!("state value at V1: {:?} at index {}", write_set_1.1, idx);
-                    println!("state value at V2: {:?} at index {}", write_set_2.1, idx);
+                // compare write set
+                let res_1_write_set_vec = res_1.0.iter().collect_vec();
+                let res_2_write_set_vec = res_2.0.iter().collect_vec();
+                for idx in 0..res_1_write_set_vec.len() {
+                    let write_set_1 = res_1_write_set_vec[0];
+                    let write_set_2 = res_2_write_set_vec[0];
+                    if write_set_1.0 != write_set_2.0 {
+                        println!("write set key is different at version {}", cur_version);
+                        println!("state key at V1: {:?} at index:{}", write_set_1.0, idx);
+                        println!("state key at V2: {:?} at index:{}", write_set_2.0, idx);
+                    }
+                    if write_set_1.1 != write_set_2.1 {
+                        println!("write set value is different at version {}", cur_version);
+                        println!("state value at V1: {:?} at index {}", write_set_1.1, idx);
+                        println!("state value at V2: {:?} at index {}", write_set_2.1, idx);
+                    }
                 }
-            }
+            },
         }
     }
 }

@@ -245,7 +245,7 @@ impl DataCollection {
                         Self::dump_txn_index(
                             &mut data_manager.lock().unwrap(),
                             version_idx,
-                            &state_view.data_read_stake_keys.unwrap().lock().unwrap(),
+                            &state_view.get_state_keys().lock().unwrap(),
                             epoch_result_res,
                             dump_write_set,
                         );

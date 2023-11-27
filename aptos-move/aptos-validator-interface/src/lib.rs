@@ -151,7 +151,7 @@ pub struct DebuggerStateView {
         )>,
     >,
     version: Version,
-    pub data_read_stake_keys: Option<Arc<Mutex<HashMap<StateKey, StateValue>>>>,
+    data_read_state_keys: Option<Arc<Mutex<HashMap<StateKey, StateValue>>>>,
 }
 
 async fn handler_thread<'a>(
@@ -201,7 +201,7 @@ impl DebuggerStateView {
         Self {
             query_sender: Mutex::new(query_sender),
             version,
-            data_read_stake_keys: None,
+            data_read_state_keys: None,
         }
     }
 
@@ -214,7 +214,7 @@ impl DebuggerStateView {
         Self {
             query_sender: Mutex::new(fake_query_sender),
             version,
-            data_read_stake_keys: Some(Arc::new(Mutex::new(HashMap::new()))),
+            data_read_state_keys: Some(Arc::new(Mutex::new(HashMap::new()))),
         }
     }
 
@@ -246,6 +246,10 @@ impl DebuggerStateView {
         } else {
             ret
         }
+    }
+
+    pub fn get_state_keys(self) -> Arc<Mutex<HashMap<StateKey, StateValue>>> {
+        self.data_read_state_keys.unwrap()
     }
 }
 
