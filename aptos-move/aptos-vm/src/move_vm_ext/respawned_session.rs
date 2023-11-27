@@ -109,7 +109,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
                 session.take(),
                 "VM session cannot be finished more than once.",
             )?
-            .finish(&mut (), change_set_configs)
+            .finish(change_set_configs)
             .map_err(|e| e.into_vm_status())
         })?;
         if additional_change_set.has_creation() {
