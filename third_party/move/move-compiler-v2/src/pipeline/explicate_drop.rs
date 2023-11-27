@@ -6,7 +6,7 @@ use move_binary_format::file_format::CodeOffset;
 use move_model::{ast::TempIndex, model::FunctionEnv};
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
-    function_target_pipeline::FunctionTargetProcessor,
+    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
     stackless_bytecode::{AttrId, Bytecode, Operation},
 };
 use std::collections::BTreeSet;
@@ -18,7 +18,7 @@ impl FunctionTargetProcessor for ExplicateDrop {
         &self,
         _targets: &mut FunctionTargetsHolder,
         fun_env: &FunctionEnv,
-        mut data: FunctionData,
+        data: FunctionData,
         _scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
         if fun_env.is_native() {
@@ -35,12 +35,12 @@ impl FunctionTargetProcessor for ExplicateDrop {
             .expect("lifetime annotation");
         let mut transformer = ExplicateDropTransformer {
             fun_env,
-            fun_data: data,
+            fun_data: data.clone(),
             live_var_annot: live_var_annotation,
             lifetime_annot: lifetime_annotation,
         };
         transformer.transform();
-        transformer.data
+        transformer.fun_data
     }
 
     fn name(&self) -> String {
@@ -62,12 +62,12 @@ impl<'a> ExplicateDropTransformer<'a> {
         for (code_offset, bytecode) in bytecodes.into_iter().enumerate() {
             let attr_id = bytecode.get_attr_id();
             self.emit_bytecode(bytecode);
-            self.explicate_drops_at(code_offset, attr_id);
+            self.explicate_drops_at(code_offset as CodeOffset, attr_id);
         }
     }
 
     // add drops at given code offset
-    fn explicate_drops_at(&mut self, code_offest: CodeOffset, attr_id: AttrId) {
+    fn explicate_drops_at(&mut self, code_offset: CodeOffset, attr_id: AttrId) {
         let released_temps = self.released_temps_at(code_offset);
         for t in released_temps {
             let drop_t = Bytecode::Call(
@@ -90,7 +90,7 @@ impl<'a> ExplicateDropTransformer<'a> {
         let lifetime_info = self
             .lifetime_annot
             .get_info_at(code_offset);
-        released_temps(live_var_info, life_time_info)
+        released_temps(live_var_info, lifetime_info)
     }
 
     fn emit_bytecode(&mut self, bytecode: Bytecode) {
@@ -107,13 +107,13 @@ fn released_temps(
     // use set to avoid duplicate dropping
     let mut released_temps = BTreeSet::new();
     for t in live_var_info.released_temps() {
-        if !life_time_info.after.temp_is_borrowed(t) {
-            released_temps.insert(t)
+        if !life_time_info.after.is_borrowed(t) {
+            released_temps.insert(t);
         }
     }
     for t in life_time_info.released_temps() {
-        if !live_var_info.after.contains_key(key) {
-            released_temps.insert(t)
+        if !live_var_info.after.contains_key(&t) {
+            released_temps.insert(t);
         }
     }
     released_temps
