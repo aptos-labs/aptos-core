@@ -1,28 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::grpc_response_stream::GrpcResponseStream;
+use crate::{grpc_response_stream::GrpcResponseStream, SERVICE_TYPE};
 use aptos_indexer_grpc_data_access::StorageClient;
+use aptos_indexer_grpc_utils::counters::IndexerGrpcStep;
 use aptos_protos::indexer::v1::{
     raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse,
 };
 use futures::Stream;
-use serde::{Deserialize, Serialize};
 use std::{pin::Pin, time::Duration};
 use tonic::{Request, Response, Status};
-use tracing::error;
+use tracing::{error, info};
 type ResponseStream = Pin<Box<dyn Stream<Item = Result<TransactionsResponse, Status>> + Send>>;
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
-struct RequestMetadata {
-    pub processor_name: String,
-    pub request_email: String,
-    pub request_user_classification: String,
-    pub request_api_key_name: String,
-    // Token is no longer needed behind api gateway.
-    #[deprecated]
-    pub request_token: String,
-}
 #[allow(dead_code)]
 const MOVING_AVERAGE_WINDOW_SIZE: u64 = 10_000;
 // When trying to fetch beyond the current head of cache, the server will retry after this duration.
@@ -39,12 +29,6 @@ const TRANSIENT_DATA_ERROR_RETRY_SLEEP_DURATION_MS: u64 = 1000;
 const RESPONSE_CHANNEL_SEND_TIMEOUT: Duration = Duration::from_secs(120);
 #[allow(dead_code)]
 const SHORT_CONNECTION_DURATION_IN_SECS: u64 = 10;
-#[allow(dead_code)]
-const REQUEST_HEADER_APTOS_EMAIL_HEADER: &str = "x-aptos-email";
-#[allow(dead_code)]
-const REQUEST_HEADER_APTOS_USER_CLASSIFICATION_HEADER: &str = "x-aptos-user-classification";
-#[allow(dead_code)]
-const REQUEST_HEADER_APTOS_API_KEY_NAME: &str = "x-aptos-api-key-name";
 
 pub struct RawDataServerWrapper {
     pub storages: Vec<StorageClient>,
@@ -80,6 +64,7 @@ impl RawData for RawDataServerWrapper {
         &self,
         req: Request<GetTransactionsRequest>,
     ) -> Result<Response<Self::GetTransactionsStream>, Status> {
+        let request_metadata = crate::RequestMetadata::new(&req);
         let req = req.into_inner();
         let starting_version = req.starting_version.unwrap_or(0);
         let transactions_count = req.transactions_count;
@@ -88,6 +73,7 @@ impl RawData for RawDataServerWrapper {
             transactions_count,
             Some(self.data_service_response_channel_size),
             self.storages.as_slice(),
+            request_metadata.clone(),
         ) {
             Ok(grpc_response_stream) => grpc_response_stream,
             Err(e) => {
@@ -95,6 +81,21 @@ impl RawData for RawDataServerWrapper {
                 return Err(Status::internal("Failed to create response stream"));
             },
         };
+
+        info!(
+            request_name = request_metadata.processor_name.as_str(),
+            request_email = request_metadata.request_email.as_str(),
+            request_api_key_name = request_metadata.request_api_key_name.as_str(),
+            processor_name = request_metadata.processor_name.as_str(),
+            connection_id = request_metadata.connection_id.as_str(),
+            request_user_classification = request_metadata.user_classification.as_str(),
+            service_type = SERVICE_TYPE,
+            start_version = starting_version,
+            num_of_transactions = ?transactions_count,
+            step = IndexerGrpcStep::DataServiceNewRequestReceived.get_step(),
+            "{}",
+            IndexerGrpcStep::DataServiceNewRequestReceived.get_label(),
+        );
 
         //         let file_store_operator: Box<dyn FileStoreOperator> = match &self.file_store_config {
         //             IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => {

@@ -14,6 +14,8 @@ use crate::access_trait::{
     AccessMetadata, StorageReadError, StorageReadStatus, StorageTransactionRead,
 };
 
+pub const SERVICE_TYPE: &str = "data_service";
+
 #[enum_dispatch::enum_dispatch]
 #[derive(Clone)]
 pub enum StorageClient {

@@ -1,8 +1,11 @@
 // Copyright © Aptos Foundation
 
-use crate::{access_trait::AccessMetadata, REDIS_CHAIN_ID, REDIS_ENDING_VERSION_EXCLUSIVE_KEY};
+use crate::{
+    access_trait::AccessMetadata, REDIS_CHAIN_ID, REDIS_ENDING_VERSION_EXCLUSIVE_KEY, SERVICE_TYPE,
+};
 use anyhow::Context;
 use aptos_indexer_grpc_utils::{
+    counters::IndexerGrpcStep,
     storage::{CacheEntry, CacheEntryKey, StorageFormat},
     types::RedisUrl,
 };
@@ -154,6 +157,7 @@ where
                     as usize
             }
         };
+
         // 2. Use MGET to fetch the transactions in batches.
         let starting_version = redis_ending_version_exclusive - redis_fetch_size as u64;
         let ending_version = redis_ending_version_exclusive;
@@ -164,6 +168,8 @@ where
             .chunks(REDIS_FETCH_MGET_BATCH_SIZE)
             .map(|x| x.to_vec())
             .collect();
+
+        let mut cache_entries = vec![];
         for keys in keys_batches {
             let redis_transactions: Vec<Vec<u8>> = conn
                 .mget(keys)
@@ -171,7 +177,7 @@ where
                 .context("Failed to MGET from redis.")
                 .expect("Failed to MGET from redis.");
 
-            let cache_entries = redis_transactions
+            let redis_cache_entries = redis_transactions
                 .into_iter()
                 .map(|redis_transaction| match storage_format {
                     StorageFormat::Bz2CompressedProto => {
@@ -186,7 +192,24 @@ where
                     _ => panic!("Unsupported storage format."),
                 })
                 .collect::<Vec<CacheEntry>>();
-            let transactions = cache_entries
+
+            cache_entries.push(redis_cache_entries);
+        }
+
+        tracing::info!(
+            redis_fetch_size = redis_fetch_size,
+            duration_in_secs = start_time.elapsed().as_secs_f64(),
+            start_version = starting_version,
+            end_version = ending_version,
+            service = SERVICE_TYPE,
+            step = IndexerGrpcStep::InMemoryCacheFetchedTxns.get_step(),
+            "{}",
+            IndexerGrpcStep::InMemoryCacheFetchedTxns.get_label(),
+        );
+
+        // 3. Decode the transactions
+        for batch_cache_entries in cache_entries {
+            let transactions = batch_cache_entries
                 .into_iter()
                 .map(|cache_entry| {
                     // TODO: avoid unwrap here.
@@ -198,7 +221,53 @@ where
                 transactions_map.insert(transaction.version, Arc::new(transaction));
             }
         }
-        // 3. Update the metadata.
+
+        tracing::info!(
+            redis_fetch_size = redis_fetch_size,
+            duration_in_secs = start_time.elapsed().as_secs_f64(),
+            start_version = starting_version,
+            end_version = ending_version,
+            service = SERVICE_TYPE,
+            step = IndexerGrpcStep::InMemoryCacheDecodedTxns.get_step(),
+            "{}",
+            IndexerGrpcStep::InMemoryCacheDecodedTxns.get_label(),
+        );
+        // for keys in keys_batches {
+        //     let redis_transactions: Vec<Vec<u8>> = conn
+        //         .mget(keys)
+        //         .await
+        //         .context("Failed to MGET from redis.")
+        //         .expect("Failed to MGET from redis.");
+
+        //     let cache_entries = redis_transactions
+        //         .into_iter()
+        //         .map(|redis_transaction| match storage_format {
+        //             StorageFormat::Bz2CompressedProto => {
+        //                 CacheEntry::Bz2CompressedProto(redis_transaction)
+        //             },
+        //             StorageFormat::GzipCompressionProto => {
+        //                 CacheEntry::GzipCompressionProto(redis_transaction)
+        //             },
+        //             StorageFormat::Base64UncompressedProto => {
+        //                 CacheEntry::Base64UncompressedProto(redis_transaction)
+        //             },
+        //             _ => panic!("Unsupported storage format."),
+        //         })
+        //         .collect::<Vec<CacheEntry>>();
+        //     let transactions = cache_entries
+        //         .into_iter()
+        //         .map(|cache_entry| {
+        //             // TODO: avoid unwrap here.
+        //             Transaction::try_from(cache_entry).expect("Failed to decode transaction.")
+        //         })
+        //         .collect::<Vec<Transaction>>();
+
+        //     for transaction in transactions {
+        //         transactions_map.insert(transaction.version, Arc::new(transaction));
+        //     }
+        // }
+
+        // 4. Update the metadata.
         {
             let mut current_metadata = metadata.write().unwrap();
             *current_metadata = Some(new_metadata.clone());
@@ -219,10 +288,11 @@ where
         );
         tracing::info!(
             redis_fetch_size = redis_fetch_size,
-            time_spent_in_seconds = start_time.elapsed().as_secs_f64(),
-            fetch_starting_version = new_metadata.next_version - redis_fetch_size as u64,
-            fetch_ending_version_inclusive = new_metadata.next_version - 1,
-            "Fetching transactions from Redis."
+            duration_in_secs = start_time.elapsed().as_secs_f64(),
+            start_version = new_metadata.next_version - redis_fetch_size as u64,
+            end_version = new_metadata.next_version - 1,
+            service = SERVICE_TYPE,
+            "[In-memory Cache] Processed transactions from Redis."
         );
     }
 }

@@ -2,10 +2,13 @@
 
 use crate::{
     access_trait::{AccessMetadata, StorageReadError, StorageReadStatus, StorageTransactionRead},
-    FileMetadata,
+    FileMetadata, SERVICE_TYPE,
 };
 use anyhow::Context;
-use aptos_indexer_grpc_utils::storage::{FileEntry, FileEntryKey, StorageFormat};
+use aptos_indexer_grpc_utils::{
+    counters::IndexerGrpcStep,
+    storage::{FileEntry, FileEntryKey, StorageFormat},
+};
 use aptos_protos::{indexer::v1::TransactionsInStorage, transaction::v1::Transaction};
 use google_cloud_storage::{
     client::{Client, ClientConfig},
@@ -148,6 +151,7 @@ impl<T: GcsClientTrait + Sync + Send + Clone> StorageTransactionRead for GcsInte
         batch_starting_version: u64,
         _size_hint: Option<usize>,
     ) -> Result<StorageReadStatus, StorageReadError> {
+        let start_time = std::time::Instant::now();
         let file_name = FileEntryKey::new(batch_starting_version, self.storage_format).to_string();
         let result = self
             .gcs_client
@@ -169,6 +173,16 @@ impl<T: GcsClientTrait + Sync + Send + Clone> StorageTransactionRead for GcsInte
             Err(e) => Err(e)?,
             _ => result?,
         };
+
+        tracing::info!(
+            duration_in_secs = start_time.elapsed().as_secs_f64(),
+            start_version = batch_starting_version,
+            service = SERVICE_TYPE,
+            step = IndexerGrpcStep::FilestoreFetchedTxns.get_step(),
+            "{}",
+            IndexerGrpcStep::FilestoreFetchedTxns.get_label(),
+        );
+
         let file_entry = match self.storage_format {
             StorageFormat::JsonBase64UncompressedProto => {
                 FileEntry::JsonBase64UncompressedProto(file)
@@ -185,6 +199,16 @@ impl<T: GcsClientTrait + Sync + Send + Clone> StorageTransactionRead for GcsInte
             .into_iter()
             .filter(|x| x.version >= batch_starting_version)
             .collect::<Vec<Transaction>>();
+
+        tracing::info!(
+            duration_in_secs = start_time.elapsed().as_secs_f64(),
+            start_version = batch_starting_version,
+            service = SERVICE_TYPE,
+            step = IndexerGrpcStep::FilestoreDecodedTxns.get_step(),
+            "{}",
+            IndexerGrpcStep::FilestoreDecodedTxns.get_label(),
+        );
+
         Ok(StorageReadStatus::Ok(transactions))
     }
 

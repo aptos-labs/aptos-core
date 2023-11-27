@@ -2,10 +2,11 @@
 
 use crate::{
     access_trait::{AccessMetadata, StorageReadError, StorageReadStatus, StorageTransactionRead},
-    REDIS_CHAIN_ID, REDIS_ENDING_VERSION_EXCLUSIVE_KEY,
+    REDIS_CHAIN_ID, REDIS_ENDING_VERSION_EXCLUSIVE_KEY, SERVICE_TYPE,
 };
 use anyhow::Context;
 use aptos_indexer_grpc_utils::{
+    counters::IndexerGrpcStep,
     storage::{CacheEntry, CacheEntryKey, StorageFormat},
     types::RedisUrl,
 };
@@ -82,6 +83,7 @@ impl<C: ConnectionLike + Sync + Send + Clone> StorageTransactionRead for RedisCl
         batch_starting_version: u64,
         size_hint: Option<usize>,
     ) -> Result<StorageReadStatus, StorageReadError> {
+        let start_time = std::time::Instant::now();
         // Check the latest version of the cache.
         let mut conn = self.redis_connection.clone();
         let redis_ending_version_exclusive: u64 =
@@ -104,6 +106,18 @@ impl<C: ConnectionLike + Sync + Send + Clone> StorageTransactionRead for RedisCl
             .map(|version| CacheEntryKey::new(version, self.storage_format).to_string())
             .collect::<Vec<String>>();
         let result = conn.mget::<Vec<String>, Vec<Vec<u8>>>(keys).await;
+
+        tracing::info!(
+            duration_in_secs = start_time.elapsed().as_secs_f64(),
+            start_version = batch_starting_version,
+            end_version = batch_ending_version_exclusive,
+            num_of_transactions = batch_ending_version_exclusive - batch_starting_version + 1,
+            service = SERVICE_TYPE,
+            step = IndexerGrpcStep::RedisCacheFetchedTxns.get_step(),
+            "{}",
+            IndexerGrpcStep::RedisCacheFetchedTxns.get_label(),
+        );
+
         match result {
             Ok(serialized_transactions) => {
                 // if any of the transactions are missing, return NotFound.
@@ -113,31 +127,42 @@ impl<C: ConnectionLike + Sync + Send + Clone> StorageTransactionRead for RedisCl
                 {
                     return Ok(StorageReadStatus::NotFound);
                 }
-                Ok(StorageReadStatus::Ok(
-                    serialized_transactions
-                        .into_iter()
-                        .map(|serialized_transaction| {
-                            let cache_entry = match self.storage_format {
-                                StorageFormat::Base64UncompressedProto => {
-                                    CacheEntry::Base64UncompressedProto(serialized_transaction)
-                                },
-                                StorageFormat::Bz2CompressedProto => {
-                                    CacheEntry::Bz2CompressedProto(serialized_transaction)
-                                },
-                                StorageFormat::GzipCompressionProto => {
-                                    CacheEntry::GzipCompressionProto(serialized_transaction)
-                                },
-                                _ => {
-                                    panic!("Unsupported storage format: {:?}", self.storage_format)
-                                },
-                            };
-                            let transaction: Transaction = cache_entry
-                                .try_into()
-                                .expect("Failed to deserialize transaction.");
-                            transaction
-                        })
-                        .collect::<Vec<Transaction>>(),
-                ))
+                let deserialized_transactions = serialized_transactions
+                    .into_iter()
+                    .map(|serialized_transaction| {
+                        let cache_entry = match self.storage_format {
+                            StorageFormat::Base64UncompressedProto => {
+                                CacheEntry::Base64UncompressedProto(serialized_transaction)
+                            },
+                            StorageFormat::Bz2CompressedProto => {
+                                CacheEntry::Bz2CompressedProto(serialized_transaction)
+                            },
+                            StorageFormat::GzipCompressionProto => {
+                                CacheEntry::GzipCompressionProto(serialized_transaction)
+                            },
+                            _ => {
+                                panic!("Unsupported storage format: {:?}", self.storage_format)
+                            },
+                        };
+                        let transaction: Transaction = cache_entry
+                            .try_into()
+                            .expect("Failed to deserialize transaction.");
+                        transaction
+                    })
+                    .collect::<Vec<Transaction>>();
+
+                tracing::info!(
+                    duration_in_secs = start_time.elapsed().as_secs_f64(),
+                    start_version = batch_starting_version,
+                    end_version = batch_ending_version_exclusive,
+                    num_of_transactions =
+                        batch_ending_version_exclusive - batch_starting_version + 1,
+                    service = SERVICE_TYPE,
+                    step = IndexerGrpcStep::RedisCacheDecodedTxns.get_step(),
+                    "{}",
+                    IndexerGrpcStep::RedisCacheDecodedTxns.get_label(),
+                );
+                Ok(StorageReadStatus::Ok(deserialized_transactions))
             },
             Err(err) => {
                 match err.kind() {

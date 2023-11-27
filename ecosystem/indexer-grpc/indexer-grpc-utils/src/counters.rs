@@ -5,10 +5,22 @@ use aptos_metrics_core::{register_gauge_vec, register_int_gauge_vec, GaugeVec, I
 use once_cell::sync::Lazy;
 
 pub enum IndexerGrpcStep {
-    DataServiceNewRequestReceived,   // [Data Service] New request received.
-    DataServiceDataFetchedCache,     // [Data Service] Fetched data from Redis cache.
+    DataServiceNewRequestReceived, // [Data Service] New request received.
+
+    DataServiceDataFetchedInMemory, // [Data Service] Fetched data from in-memory cache.
+    InMemoryCacheFetchedTxns,       // [In-memory Cache] In-memory cache fetched transactions.
+    InMemoryCacheDecodedTxns,       // [In-memory Cache] In-memory cache decoded transactions.
+
+    DataServiceDataFetchedCache, // [Data Service] Fetched data from Redis cache.
+    RedisCacheFetchedTxns,       // [Redis Cache] Redis cache fetched transactions.
+    RedisCacheDecodedTxns,       // [Redis Cache] Redis cache decoded transactions.
+
     DataServiceDataFetchedFilestore, // [Data Service] Fetched data from Filestore.
-    DataServiceTxnsDecoded,          // [Data Service] Decoded transactions.
+    FilestoreFetchedTxns,            // [Filestore] Filestore fetched transactions.
+    FilestoreDecodedTxns,            // [Filestore] Filestore decoded transactions.
+
+    DataServiceDataFetchedUnknown, // [Data Service] Fetched data from unknown source.
+    DataServiceTxnsDecoded,        // [Data Service] Decoded transactions.
     DataServiceChunkSent, // [Data Service] One chunk of transactions sent to GRPC response channel.
     DataServiceAllChunksSent, // [Data Service] All chunks of transactions sent to GRPC response channel. Current batch finished.
 
@@ -28,8 +40,16 @@ impl IndexerGrpcStep {
         match self {
             // Data service steps
             IndexerGrpcStep::DataServiceNewRequestReceived => "1",
+            IndexerGrpcStep::DataServiceDataFetchedInMemory => "2.0",
+            IndexerGrpcStep::InMemoryCacheFetchedTxns => "2.0.1",
+            IndexerGrpcStep::InMemoryCacheDecodedTxns => "2.0.2",
             IndexerGrpcStep::DataServiceDataFetchedCache => "2.1",
+            IndexerGrpcStep::RedisCacheFetchedTxns => "2.1.1",
+            IndexerGrpcStep::RedisCacheDecodedTxns => "2.1.2",
             IndexerGrpcStep::DataServiceDataFetchedFilestore => "2.2",
+            IndexerGrpcStep::FilestoreFetchedTxns => "2.2.1",
+            IndexerGrpcStep::FilestoreDecodedTxns => "2.2.2",
+            IndexerGrpcStep::DataServiceDataFetchedUnknown => "2.x",
             IndexerGrpcStep::DataServiceTxnsDecoded => "3.1",
             IndexerGrpcStep::DataServiceChunkSent => "3.2",
             IndexerGrpcStep::DataServiceAllChunksSent => "4",
@@ -52,9 +72,21 @@ impl IndexerGrpcStep {
             IndexerGrpcStep::DataServiceNewRequestReceived => {
                 "[Data Service] New request received."
             }
+            IndexerGrpcStep::DataServiceDataFetchedInMemory => {
+                "[Data Service] Data fetched from in-memory cache."
+            }
+            IndexerGrpcStep::InMemoryCacheFetchedTxns => "[In-memory Cache] In-memory cache fetched transactions.",
+            IndexerGrpcStep::InMemoryCacheDecodedTxns => "[In-memory Cache] In-memory cache decoded transactions.",
             IndexerGrpcStep::DataServiceDataFetchedCache => "[Data Service] Data fetched from redis cache.",
+            IndexerGrpcStep ::RedisCacheFetchedTxns => "[Redis Cache] Redis cache fetched transactions.",
+            IndexerGrpcStep::RedisCacheDecodedTxns => "[Redis Cache] Redis cache decoded transactions.",
             IndexerGrpcStep::DataServiceDataFetchedFilestore => {
                 "[Data Service] Data fetched from file store."
+            }
+            IndexerGrpcStep::FilestoreFetchedTxns => "[Filestore] Filestore fetched transactions.",
+            IndexerGrpcStep::FilestoreDecodedTxns => "[Filestore] Filestore decoded transactions.",
+            IndexerGrpcStep::DataServiceDataFetchedUnknown => {
+                "[Data Service] Data fetched from unknown source."
             }
             IndexerGrpcStep::DataServiceTxnsDecoded => "[Data Service] Transactions decoded.",
             IndexerGrpcStep::DataServiceChunkSent => "[Data Service] One chunk of transactions sent to GRPC response channel.",
