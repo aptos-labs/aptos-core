@@ -28,6 +28,8 @@ mod execution;
 
 pub use data_collection::*;
 pub use execution::*;
+use move_compiler::compiled_unit::CompiledUnitEnum;
+use move_core_types::language_storage::ModuleId;
 use move_package::{
     compilation::compiled_package::CompiledPackage,
     source_package::{
@@ -364,26 +366,46 @@ struct TxnIndex {
     package_info: PackageInfo,
 }
 
+fn generate_compiled_blob(
+    package_info: &PackageInfo,
+    compiled_package: &CompiledPackage,
+    compiled_blobs: &mut HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
+) {
+    if compiled_blobs.contains_key(package_info) {
+        return;
+    }
+    let root_modules = compiled_package.all_modules();
+    let mut blob_map = HashMap::new();
+    for compiled_module in root_modules {
+        if let CompiledUnitEnum::Module(module) = &compiled_module.unit {
+            let module_blob = compiled_module.unit.serialize(None);
+            blob_map.insert(module.module.self_id(), module_blob);
+        }
+    }
+    compiled_blobs.insert(package_info.clone(), blob_map);
+}
+
 fn compile_aptos_packages(
     aptos_commons_path: &Path,
-    compiled_package_map: &mut HashMap<PackageInfo, CompiledPackage>,
+    compiled_package_map: &mut HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
     v2_flag: bool,
 ) -> anyhow::Result<()> {
     for package in APTOS_PACKAGES {
-        let mut build_options = BuildOptions::default();
         let root_package_dir = aptos_commons_path.join(get_aptos_dir(package).unwrap());
-        if v2_flag {
-            build_options.compiler_version = Some(CompilerVersion::V2);
-        }
-        let compiled_package = BuiltPackage::build(root_package_dir, build_options);
+        let compiler_verion = if v2_flag {
+            Some(CompilerVersion::V2)
+        } else {
+            None
+        };
+        // For simplicity, all packages including aptos token are stored under 0x1 in the map
+        let package_info = PackageInfo {
+            address: AccountAddress::ONE,
+            package_name: package.to_string(),
+            upgrade_number: None,
+        };
+        let compiled_package = compile_package(root_package_dir, &package_info, compiler_verion);
         if let Ok(built_package) = compiled_package {
-            let package_info = PackageInfo {
-                address: AccountAddress::ONE,
-                package_name: package.to_string(),
-                upgrade_number: None,
-            };
-            // For simplicity, all packages including aptos token are stored under 0x1 in the map
-            compiled_package_map.insert(package_info, built_package.package);
+            generate_compiled_blob(&package_info, &built_package, compiled_package_map);
         } else {
             return Err(anyhow::Error::msg(format!(
                 "package {} cannot be compiled",

@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    check_aptos_packages_availability, compile_aptos_packages, compile_package, is_aptos_package,
-    DataManager, IndexReader, PackageInfo, TxnIndex, APTOS_COMMONS,
+    check_aptos_packages_availability, compile_aptos_packages, compile_package,
+    generate_compiled_blob, is_aptos_package, DataManager, IndexReader, PackageInfo, TxnIndex,
+    APTOS_COMMONS,
 };
 use anyhow::Result;
 use aptos_framework::APTOS_PACKAGES;
@@ -18,29 +19,24 @@ use aptos_types::{
 use aptos_vm::{data_cache::AsMoveResolver, transaction_metadata::TransactionMetadata};
 use clap::ValueEnum;
 use itertools::Itertools;
-use move_compiler::compiled_unit::CompiledUnitEnum;
-use move_core_types::account_address::AccountAddress;
-use move_package::{compilation::compiled_package::CompiledPackage, CompilerVersion};
+use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
+use move_package::CompilerVersion;
 use std::{collections::HashMap, path::PathBuf};
 
 fn load_packages_to_executor(
     executor: &mut FakeExecutor,
     package_info: &PackageInfo,
-    compiled_package_cache: &HashMap<PackageInfo, CompiledPackage>,
+    compiled_package_cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
 ) {
     let compiled_package = compiled_package_cache.get(package_info).unwrap();
-    let root_modules = compiled_package.all_modules();
-    for compiled_module in root_modules {
-        if let CompiledUnitEnum::Module(module) = &compiled_module.unit {
-            let module_blob = compiled_module.unit.serialize(None);
-            executor.add_module(&module.module.self_id(), module_blob);
-        }
+    for (module_id, module_blob) in compiled_package {
+        executor.add_module(module_id, module_blob.clone());
     }
 }
 
 fn load_aptos_packages_to_executor(
     executor: &mut FakeExecutor,
-    compiled_package_map: &HashMap<PackageInfo, CompiledPackage>,
+    compiled_package_map: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
 ) {
     for package in APTOS_PACKAGES {
         let package_info = PackageInfo {
@@ -109,8 +105,10 @@ impl Execution {
             return Err(anyhow::Error::msg("aptos packages are missing"));
         }
 
-        let mut compiled_package_cache: HashMap<PackageInfo, CompiledPackage> = HashMap::new();
-        let mut compiled_package_cache_v2: HashMap<PackageInfo, CompiledPackage> = HashMap::new();
+        let mut compiled_package_cache: HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>> =
+            HashMap::new();
+        let mut compiled_package_cache_v2: HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>> =
+            HashMap::new();
         if self.execution_mode.is_v1() || self.execution_mode.is_compare() {
             compile_aptos_packages(&aptos_commons_path, &mut compiled_package_cache, false)?;
         }
@@ -155,8 +153,8 @@ impl Execution {
     fn compile_code(
         &self,
         txn_idx: &TxnIndex,
-        compiled_package_cache: &mut HashMap<PackageInfo, CompiledPackage>,
-        compiled_package_cache_v2: &mut HashMap<PackageInfo, CompiledPackage>,
+        compiled_package_cache: &mut HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
+        compiled_package_cache_v2: &mut HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
     ) -> Result<()> {
         if !txn_idx.package_info.is_compilable() {
             return Err(anyhow::Error::msg("not compilable"));
@@ -170,14 +168,14 @@ impl Execution {
             && !compiled_package_cache.contains_key(&package_info)
         {
             let compiled_res = compile_package(package_dir.clone(), &package_info, None)?;
-            compiled_package_cache.insert(package_info.clone(), compiled_res);
+            generate_compiled_blob(&package_info, &compiled_res, compiled_package_cache);
         }
         if (self.execution_mode.is_compare() || self.execution_mode.is_v2())
             && !compiled_package_cache_v2.contains_key(&package_info)
         {
             let compiled_res =
                 compile_package(package_dir, &package_info, Some(CompilerVersion::V2))?;
-            compiled_package_cache_v2.insert(package_info.clone(), compiled_res);
+            generate_compiled_blob(&package_info, &compiled_res, compiled_package_cache_v2);
         }
         Ok(())
     }
@@ -186,8 +184,8 @@ impl Execution {
         &self,
         cur_version: Version,
         data_manager: &DataManager,
-        compiled_package_cache: &mut HashMap<PackageInfo, CompiledPackage>,
-        compiled_package_cache_v2: &mut HashMap<PackageInfo, CompiledPackage>,
+        compiled_package_cache: &mut HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
+        compiled_package_cache_v2: &mut HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
     ) -> Result<()> {
         if let Some(txn_idx) = data_manager.get_txn_index(cur_version) {
             // compile the code if the source code is available
@@ -222,8 +220,8 @@ impl Execution {
         state: &FakeDataStore,
         features: &Features,
         txn_idx: &TxnIndex,
-        compiled_package_cache: &HashMap<PackageInfo, CompiledPackage>,
-        compiled_package_cache_v2: &HashMap<PackageInfo, CompiledPackage>,
+        compiled_package_cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
+        compiled_package_cache_v2: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
     ) {
         let mut package_cache_main = compiled_package_cache;
         let package_cache_other = compiled_package_cache_v2;
@@ -269,7 +267,7 @@ impl Execution {
         features: &Features,
         package_info: &PackageInfo,
         txn: &Transaction,
-        compiled_package_cache: &HashMap<PackageInfo, CompiledPackage>,
+        compiled_package_cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
     ) -> Option<Result<(WriteSet, Vec<ContractEvent>), VMStatus>> {
         let executor = FakeExecutor::no_genesis();
         let mut executor = executor.set_not_parallel();
