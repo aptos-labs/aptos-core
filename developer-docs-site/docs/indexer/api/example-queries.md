@@ -14,8 +14,7 @@ import BetaNotice from '../../../src/components/_indexer_beta_notice.mdx';
 1. Paste the **Query** code from an example into the main query section, and the **Query Variables** code from the same example into the Query Variables section (below the main query section).
 
 ## More Examples
-
-You can find many more example queries in the [TypeScript SDK](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk/src/indexer/queries). Indeed if you're using the TypeScript SDK, you should look at the [IndexerClient](../../sdks/ts-sdk/v1/typescript-sdk-indexer-client-class).
+You can find many more example queries in the [TypeScript SDK](https://github.com/aptos-labs/aptos-ts-sdk/tree/main/src/internal/queries). Indeed if you're using the TypeScript SDK, you should look at the [API](https://github.com/aptos-labs/aptos-ts-sdk/tree/main/src/api).
 
 ## Example Token Queries
 
@@ -26,12 +25,8 @@ Getting all tokens currently in account.
 ```graphql
 query CurrentTokens($owner_address: String, $offset: Int) {
   current_token_ownerships(
-    where: {
-      owner_address: { _eq: $owner_address }
-      amount: { _gt: "0" }
-      table_type: { _eq: "0x3::token::TokenStore" }
-    }
-    order_by: [{ last_transaction_version: desc }, { token_data_id: desc }]
+    where: {owner_address: {_eq: $owner_address}, amount: {_gt: "0"}, table_type: {_eq: "0x3::token::TokenStore"}}
+    order_by: [{last_transaction_version: desc}, {token_data_id: desc}]
     offset: $offset
   ) {
     token_data_id_hash
@@ -44,7 +39,6 @@ query CurrentTokens($owner_address: String, $offset: Int) {
 ```
 
 **Query Variables**
-
 ```json
 {
   "owner_address": "0xaa921481e07b82a26dbd5d3bc472b9ad82d3e5bfd248bacac160eac51687c2ff",
@@ -61,9 +55,9 @@ Getting all token activities for a particular token. **Note** that to get the `t
 ```graphql
 query TokenActivities($token_id_hash: String, $offset: Int) {
   token_activities(
-    where: { token_data_id_hash: { _eq: $token_id_hash } }
+    where: {token_data_id_hash: {_eq: $token_id_hash}}
     # Needed for pagination
-    order_by: [{ last_transaction_version: desc }, { event_index: asc }]
+    order_by: [{last_transaction_version: desc}, {event_index: asc}]
     # Optional for pagination
     offset: $offset
   ) {
@@ -95,9 +89,9 @@ Getting current token offered to account.
 ```graphql
 query CurrentOffers($to_address: String, $offset: Int) {
   current_token_pending_claims(
-    where: { to_address: { _eq: $to_address }, amount: { _gt: "0" } }
+    where: {to_address: {_eq: $to_address}, amount: {_gt: "0"}}
     # Needed for pagination
-    order_by: [{ last_transaction_version: desc }, { token_data_id: desc }]
+    order_by: [{last_transaction_version: desc}, {token_data_id: desc}]
     # Optional for pagination
     offset: $offset
   ) {
@@ -129,9 +123,9 @@ Getting coin activities (including gas fees).
 ```graphql
 query CoinActivity($owner_address: String, $offset: Int) {
   coin_activities(
-    where: { owner_address: { _eq: $owner_address } }
+    where: {owner_address: {_eq: $owner_address}}
     # Needed for pagination
-    order_by: [{ last_transaction_version: desc }, { event_index: asc }]
+    order_by: [{last_transaction_version: desc}, {event_index: asc}]
     # Optional for pagination
     offset: $offset
   ) {
@@ -193,7 +187,7 @@ Getting all user transaction versions (to filter on user transaction for block e
 
 ```graphql
 query UserTransactions($limit: Int) {
-  user_transactions(limit: $limit, order_by: { version: desc }) {
+  user_transactions(limit: $limit, order_by: {version: desc}) {
     version
   }
 }

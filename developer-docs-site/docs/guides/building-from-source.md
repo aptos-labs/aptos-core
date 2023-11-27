@@ -13,24 +13,25 @@ import TabItem from '@theme/TabItem';
 
 Aptos can be built on various operating systems, including Linux, macOS. and Windows. Aptos is tested extensively on Linux and macOS, and less so on Windows. Here are the versions we use:
 
-- Linux - Ubuntu version 20.04 and 22.04
-- macOS - macOS Monterey and later
-- Microsoft Windows - Windows 10, 11 and Windows Server 2022+
+* Linux - Ubuntu version 20.04 and 22.04
+* macOS - macOS Monterey and later
+* Microsoft Windows - Windows 10, 11 and Windows Server 2022+
 
 ## Clone the Aptos-core repo
 
-1. Install [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git). Git is required to clone the aptos-core repo, and will need to be installed prior to continuing. You can install it with the instructions on the official [Git website](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git).
 
-1. Clone the Aptos repository. To clone the Aptos repository (repo), you first need to open a command line prompt (Terminal on Mac / Linux, Powershell on Windows). Then run the following command to clone the Git repository from GitHub.
+1. Install [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git). Git is required to clone the aptos-core repo, and will need to be installed prior to continuing.  You can install it with the instructions on the official [Git website](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git).
 
-   ```
-   git clone https://github.com/aptos-labs/aptos-core.git
-   ```
+1. Clone the Aptos repository. To clone the Aptos repository (repo), you first need to open a command line prompt (Terminal on Mac / Linux, Powershell on Windows).  Then run the following command to clone the Git repository from GitHub.
 
-1. Now let's go into the newly created directory `aptos-core` by _changing directory_ or `cd`ing into it:
-   ```
-   cd aptos-core
-   ```
+      ```
+      git clone https://github.com/aptos-labs/aptos-core.git
+      ```
+
+1. Now let's go into the newly created directory `aptos-core` by *changing directory* or `cd`ing into it:
+    ```
+    cd aptos-core
+    ```
 
 ### (Optional) Check out release branch
 
@@ -107,6 +108,7 @@ If the script above does not work for you, you can install these manually, but i
 1. [LLVM](https://releases.llvm.org/).
 1. [libssl-dev](https://packages.ubuntu.com/jammy/libssl-dev) and [libclang-dev](https://packages.ubuntu.com/jammy/libclang-dev)
 
+
 </details>
 
 <details>
@@ -120,7 +122,7 @@ If the script above does not work for you, you can install these manually, but i
 **> Manual installation of dependencies**
 
 1. Install [Rust](https://www.rust-lang.org/tools/install).
-1. Install [LLVM](https://releases.llvm.org/). Visit their GitHub repository for the [latest prebuilt release](https://github.com/llvm/llvm-project/releases/tag/llvmorg-15.0.7).
+1. Install [LLVM](https://releases.llvm.org/).  Visit their GitHub repository for the [latest prebuilt release](https://github.com/llvm/llvm-project/releases/tag/llvmorg-15.0.7).
 1. Install [Microsoft Visual Studio Build Tools for Windows](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022). During setup, select "Desktop development with C++" and three additional options: MSVC C++ build tools, Windows 10/11 SDK, and C++ CMake tools for Windows.
 1. If on Windows ARM, install [Visual Studio](https://visualstudio.microsoft.com/vs).
 1. If not already installed during Visual Studio/Build Tools installation, install [CMake](https://cmake.org/download/).
@@ -134,27 +136,24 @@ If the script above does not work for you, you can install these manually, but i
 If you used `scripts/dev_setup.sh` for MacOS or Linux setup, additional tools are optionally available.
 
 #### TypeScript
-
 Typically only needed for _developing_ the TypeScript SDK.
-[Using the released SDK can be achieved from npm/pnpm/yarn](../sdks/ts-sdk/v1/index).
-
+[Using the released SDK can be achieved from npm/pnpm/yarn](../sdks/ts-sdk/index).
 ```bash
 scripts/dev_setup.sh -J
 ```
 
 #### PostgreSQL
-
 Used in the Indexer.
-
 ```bash
 scripts/dev_setup.sh -P
 ```
 
 #### Move Prover Tools
-
 ```bash
 scripts/dev_setup.sh -y -p
 ```
+
+
 
 Now your basic Aptos development environment is ready. Head over to our [Developer Tutorials](../tutorials/index.md) to get started in Aptos.
 
@@ -171,7 +170,7 @@ If you installed the Move Prover Tools above then you don't need to skip the pro
 
 Other documentation of specific tools has recommended patterns for `cargo build` and `cargo run`
 
-- [Run a Local Development Network](../guides/local-development-network.md)
-- [Indxer](../indexer/legacy/indexer-fullnode.md)
-- [Node Health Checker](../nodes/measure/node-health-checker.md)
-- [Running a Local Multinode Network](running-a-local-multi-node-network.md)
+* [Run a Local Development Network](../guides/local-development-network.md)
+* [Indxer](../indexer/legacy/indexer-fullnode.md)
+* [Node Health Checker](../nodes/measure/node-health-checker.md)
+* [Running a Local Multinode Network](running-a-local-multi-node-network.md)
