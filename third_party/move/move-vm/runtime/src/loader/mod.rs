@@ -802,7 +802,7 @@ impl Loader {
                     .module_cache
                     .read()
                     // GOOD module was loaded above
-                    .resolve_struct_by_name(&struct_tag.name, &module_id)
+                    .get_struct_type_by_identifier(&struct_tag.name, &module_id)
                     .map_err(|e| e.finish(Location::Undefined))?;
                 if struct_type.type_parameters.is_empty() && struct_tag.type_params.is_empty() {
                     Type::Struct {
@@ -1232,7 +1232,7 @@ impl Loader {
     ) -> PartialVMResult<Arc<StructType>> {
         self.module_cache
             .read()
-            .resolve_struct_by_name(&name.name, &name.module)
+            .get_struct_type_by_identifier(&name.name, &name.module)
     }
 
     pub(crate) fn get_struct_type_by_idx(
@@ -1242,7 +1242,7 @@ impl Loader {
         let name = self.name_cache.idx_to_identifier(idx);
         self.module_cache
             .read()
-            .resolve_struct_by_name(&name.name, &name.module)
+            .get_struct_type_by_identifier(&name.name, &name.module)
     }
 }
 
@@ -1624,7 +1624,7 @@ impl Script {
             let module_handle = script.module_handle_at(struct_handle.module);
             let module_id = script.module_id_for_handle(module_handle);
             cache
-                .resolve_struct_by_name(struct_name, &module_id)
+                .get_struct_type_by_identifier(struct_name, &module_id)
                 .map_err(|err| err.finish(Location::Script))?
                 .check_compatibility(struct_handle)
                 .map_err(|err| err.finish(Location::Script))?;
@@ -1917,16 +1917,14 @@ impl Loader {
             Type::Address => TypeTag::Address,
             Type::Signer => TypeTag::Signer,
             Type::Vector(ty) => TypeTag::Vector(Box::new(self.type_to_type_tag(ty)?)),
-            Type::Struct { idx: name, .. } => TypeTag::Struct(Box::new(
-                self.struct_name_to_type_tag(*name, &[], gas_context)?,
-            )),
-            Type::StructInstantiation {
-                idx: name, ty_args, ..
-            } => TypeTag::Struct(Box::new(self.struct_name_to_type_tag(
-                *name,
-                ty_args,
+            Type::Struct { idx, .. } => TypeTag::Struct(Box::new(self.struct_name_to_type_tag(
+                *idx,
+                &[],
                 gas_context,
             )?)),
+            Type::StructInstantiation { idx, ty_args, .. } => TypeTag::Struct(Box::new(
+                self.struct_name_to_type_tag(*idx, ty_args, gas_context)?,
+            )),
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -2120,20 +2118,18 @@ impl Loader {
                     has_identifier_mappings,
                 )
             },
-            Type::Struct { idx: name, .. } => {
+            Type::Struct { idx, .. } => {
                 *count += 1;
                 // Note depth is incread inside struct_name_to_type_layout instead.
                 let (layout, has_identifier_mappings) =
-                    self.struct_name_to_type_layout(*name, &[], count, depth)?;
+                    self.struct_name_to_type_layout(*idx, &[], count, depth)?;
                 (MoveTypeLayout::Struct(layout), has_identifier_mappings)
             },
-            Type::StructInstantiation {
-                idx: name, ty_args, ..
-            } => {
+            Type::StructInstantiation { idx, ty_args, .. } => {
                 *count += 1;
                 // Note depth is incread inside struct_name_to_type_layout instead.
                 let (layout, has_identifier_mappings) =
-                    self.struct_name_to_type_layout(*name, ty_args, count, depth)?;
+                    self.struct_name_to_type_layout(*idx, ty_args, count, depth)?;
                 (MoveTypeLayout::Struct(layout), has_identifier_mappings)
             },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
@@ -2233,8 +2229,8 @@ impl Loader {
             Type::Vector(ty) => MoveTypeLayout::Vector(Box::new(
                 self.type_to_fully_annotated_layout_impl(ty, count, depth + 1)?,
             )),
-            Type::Struct { idx: name, .. } => MoveTypeLayout::Struct(
-                self.struct_name_to_fully_annotated_layout(*name, &[], count, depth)?,
+            Type::Struct { idx, .. } => MoveTypeLayout::Struct(
+                self.struct_name_to_fully_annotated_layout(*idx, &[], count, depth)?,
             ),
             Type::StructInstantiation {
                 idx: name, ty_args, ..
@@ -2303,15 +2299,13 @@ impl Loader {
                 inner
             },
             Type::TyParam(ty_idx) => DepthFormula::type_parameter(*ty_idx),
-            Type::Struct { idx: name, .. } => {
-                let mut struct_formula = self.calculate_depth_of_struct(*name)?;
+            Type::Struct { idx, .. } => {
+                let mut struct_formula = self.calculate_depth_of_struct(*idx)?;
                 debug_assert!(struct_formula.terms.is_empty());
                 struct_formula.scale(1);
                 struct_formula
             },
-            Type::StructInstantiation {
-                idx: name, ty_args, ..
-            } => {
+            Type::StructInstantiation { idx, ty_args, .. } => {
                 let ty_arg_map = ty_args
                     .iter()
                     .enumerate()
@@ -2320,7 +2314,7 @@ impl Loader {
                         Ok((var, self.calculate_depth_of_type(ty)?))
                     })
                     .collect::<PartialVMResult<BTreeMap<_, _>>>()?;
-                let struct_formula = self.calculate_depth_of_struct(*name)?;
+                let struct_formula = self.calculate_depth_of_struct(*idx)?;
                 let mut subst_struct_formula = struct_formula.subst(ty_arg_map)?;
                 subst_struct_formula.scale(1);
                 subst_struct_formula

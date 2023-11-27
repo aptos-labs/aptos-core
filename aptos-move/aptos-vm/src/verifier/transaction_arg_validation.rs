@@ -197,12 +197,10 @@ pub(crate) fn is_valid_txn_arg(
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
         Vector(inner) => is_valid_txn_arg(session, inner, allowed_structs),
         Struct { idx, .. } | StructInstantiation { idx, .. } => {
-            if let Some(st) = session.get_struct_type(*idx) {
+            session.get_struct_type(*idx).is_some_and(|st| {
                 let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
                 allowed_structs.contains_key(&full_name)
-            } else {
-                false
-            }
+            })
         },
         Signer | Reference(_) | MutableReference(_) | TyParam(_) => false,
     }
@@ -326,8 +324,7 @@ pub(crate) fn recursively_construct_arg(
             let st = session
                 .get_struct_type(*idx)
                 .ok_or_else(invalid_signature)?;
-            // validate the struct value, we use `expect()` because that check was already
-            // performed in `is_valid_txn_arg`
+
             let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
             let constructor = allowed_structs
                 .get(&full_name)

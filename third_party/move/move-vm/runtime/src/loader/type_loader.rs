@@ -5,7 +5,7 @@ use move_binary_format::{
     binary_views::BinaryIndexedView, errors::PartialVMResult, file_format::SignatureToken,
 };
 use move_vm_types::loaded_data::runtime_types::{AbilityInfo, StructNameIndex, Type};
-use triomphe::Arc;
+use triomphe::Arc as TriompheArc;
 
 // `intern_type` converts a signature token into the in memory type representation used by the MoveVM.
 pub fn intern_type(
@@ -26,7 +26,7 @@ pub fn intern_type(
         SignatureToken::TypeParameter(idx) => Type::TyParam(*idx),
         SignatureToken::Vector(inner_tok) => {
             let inner_type = intern_type(module, inner_tok, struct_name_table)?;
-            Type::Vector(Arc::new(inner_type))
+            Type::Vector(TriompheArc::new(inner_type))
         },
         SignatureToken::Reference(inner_tok) => {
             let inner_type = intern_type(module, inner_tok, struct_name_table)?;
@@ -51,7 +51,7 @@ pub fn intern_type(
             let struct_handle = module.struct_handle_at(*sh_idx);
             Type::StructInstantiation {
                 idx: struct_name_table[sh_idx.0 as usize],
-                ty_args: Arc::new(type_args),
+                ty_args: TriompheArc::new(type_args),
                 ability: AbilityInfo::generic_struct(
                     struct_handle.abilities,
                     struct_handle

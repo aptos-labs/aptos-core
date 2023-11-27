@@ -15,7 +15,7 @@ use move_core_types::{
 };
 use smallbitvec::SmallBitVec;
 use std::{cmp::max, collections::BTreeMap, fmt::Debug};
-use triomphe::Arc;
+use triomphe::Arc as TriompheArc;
 
 pub const TYPE_DEPTH_MAX: usize = 256;
 
@@ -175,14 +175,14 @@ pub enum Type {
     U128,
     Address,
     Signer,
-    Vector(Arc<Type>),
+    Vector(TriompheArc<Type>),
     Struct {
         idx: StructNameIndex,
         ability: AbilityInfo,
     },
     StructInstantiation {
         idx: StructNameIndex,
-        ty_args: Arc<Vec<Type>>,
+        ty_args: TriompheArc<Vec<Type>>,
         ability: AbilityInfo,
     },
     Reference(Box<Type>),
@@ -256,7 +256,7 @@ impl Type {
             Type::U256 => Type::U256,
             Type::Address => Type::Address,
             Type::Signer => Type::Signer,
-            Type::Vector(ty) => Type::Vector(Arc::new(ty.apply_subst(subst, depth + 1)?)),
+            Type::Vector(ty) => Type::Vector(TriompheArc::new(ty.apply_subst(subst, depth + 1)?)),
             Type::Reference(ty) => Type::Reference(Box::new(ty.apply_subst(subst, depth + 1)?)),
             Type::MutableReference(ty) => {
                 Type::MutableReference(Box::new(ty.apply_subst(subst, depth + 1)?))
@@ -276,7 +276,7 @@ impl Type {
                 }
                 Type::StructInstantiation {
                     idx: *idx,
-                    ty_args: Arc::new(inst),
+                    ty_args: TriompheArc::new(inst),
                     ability: ability.clone(),
                 }
             },
@@ -334,7 +334,7 @@ impl Type {
             S::U128 => L::U128,
             S::U256 => L::U256,
             S::Address => L::Address,
-            S::Vector(inner) => L::Vector(Arc::new(Self::from_const_signature(inner)?)),
+            S::Vector(inner) => L::Vector(TriompheArc::new(Self::from_const_signature(inner)?)),
             // Not yet supported
             S::Struct(_) | S::StructInstantiation(_, _) => {
                 return Err(

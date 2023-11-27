@@ -129,7 +129,7 @@ impl ModuleCache {
 
     // Given a ModuleId::struct_name, retrieve the `StructType` and the index associated.
     // Return and error if the type has not been loaded
-    pub(crate) fn resolve_struct_by_name(
+    pub(crate) fn get_struct_type_by_identifier(
         &self,
         struct_name: &IdentStr,
         module_id: &ModuleId,
@@ -278,7 +278,7 @@ impl Module {
 
                 if module_handle != module.self_handle() {
                     cache
-                        .resolve_struct_by_name(struct_name, &module_id)?
+                        .get_struct_type_by_identifier(struct_name, &module_id)?
                         .check_compatibility(struct_handle)?;
                 }
                 struct_idxs.push(name_cache.insert_or_get(StructIdentifier {
