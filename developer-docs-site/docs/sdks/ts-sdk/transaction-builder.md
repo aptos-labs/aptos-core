@@ -198,3 +198,37 @@ const [userTransactionResponse] = await aptos.simulate.multiAgentTransaction({
   feePayerPublicKey: feePayerAccount.publicKey,
 });
 ```
+
+## Transaction Management
+
+The TypeScript SDK provides a transaction management layer to submit as many transaction for a single account as possible while respecting a high throughput.
+
+Read more about it [here](https://aptos.dev/guides/transaction-management)
+
+In the SDK, the transaction management layer implements 2 components
+
+- `AccountSequenceNumber` that handles and manages an account sequence number.
+- `TransactionWorker` that provides a simple framework for receiving payloads to be processed
+
+To use and leverage the transaction management layer, we provide an array of payloads to the batch function that in turns pass it into the worker to process and generate transactions and submit it to chain.
+
+```ts
+const aptos = new Aptos();
+const sender = Account.generate();
+await aptos.fundAccount({ accountAddress: sender.accountAddress, amount: 10000000000 })
+// recipients is an array of accounts
+const recipients = [Account.generate(),Account.generate(),Account.generate()]
+
+// create payloads
+const payloads: InputGenerateTransactionPayloadData[] = [];
+
+for (let i = 0; i < recipients.length; i += 1) {
+  const txn: InputGenerateTransactionPayloadData = {
+    function: "0x1::aptos_account::transfer",
+    functionArguments: [recipients[i].accountAddress, 10],
+  };
+  payloads.push(txn);
+}
+
+await aptos.batchTransactionsForSingleAccount({ sender, data: payloads }));
+```
