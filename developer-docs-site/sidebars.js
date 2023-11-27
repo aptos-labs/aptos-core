@@ -277,7 +277,7 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
-        "integration/wallet-adapter-concept",
+        "guides/nfts/aptos-token-overview",
         {
           type: "category",
           label: "Integrate with Wallets",
@@ -287,6 +287,7 @@ const sidebars = {
           collapsed: true,
         },
         "integration/aptos-names-service-package",
+        "reference/error-codes",
       ],
     },
     {
@@ -374,20 +375,6 @@ const sidebars = {
         },
         "guides/building-from-source",
       ],
-    },
-    {
-      type: "category",
-      label: "Create NFTs",
-      collapsible: true,
-      collapsed: true,
-      link: {
-        type: "generated-index",
-        title: "Create Tokens on Aptos",
-        description: "Learn the various ways to mint and exchange tokens.",
-        slug: "/category/nft",
-        keywords: ["nft"],
-      },
-      items: ["guides/nfts/aptos-token-comparison", "guides/nfts/mint-nft-cli", "guides/nfts/mint-onchain-data"],
     },
     {
       type: "category",

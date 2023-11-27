@@ -390,6 +390,7 @@ cli
 clippy
 cn
 codebase
+composability
 composable
 config
 configs
@@ -401,6 +402,7 @@ cryptographically
 cryptosystem
 cryptosystems
 crytographic
+customizability
 customizable
 dApp
 dApps

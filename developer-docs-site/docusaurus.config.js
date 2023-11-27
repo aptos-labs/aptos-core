@@ -320,12 +320,28 @@ const config = {
       {
         redirects: [
           {
-            to: "/tools/aptos-cli/install-cli",
-            from: "/releases/cli-release",
+            from: "/category/nft",
+            to: "/guides/nfts/aptos-token-overview",
           },
           {
-            to: "/sdks/index",
+            from: "/guides/nfts/mint-nft-cli",
+            to: "/guides/nfts/aptos-token-overview",
+          },
+          {
+            from: "/guides/nfts/mint-onchain-data",
+            to: "/guides/nfts/aptos-token-overview",
+          },
+          {
+            from: "/guides/nfts/aptos-token-overview",
+            to: "/guides/nfts/aptos-token-overview",
+          },
+          {
+            from: "/releases/cli-release",
+            to: "/tools/aptos-cli/install-cli",
+          },
+          {
             from: "/releases/sdk-release",
+            to: "/sdks/index",
           },
           {
             from: "/integration/indexing",

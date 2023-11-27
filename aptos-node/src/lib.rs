@@ -552,7 +552,7 @@ pub fn setup_environment_and_start_node(
     logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) -> anyhow::Result<AptosHandle> {
     // Log the node config at node startup
-    info!("Using node config {:?}", &node_config);
+    node_config.log_all_configs();
 
     // Starts the admin service
     let admin_service = services::start_admin_service(&node_config);

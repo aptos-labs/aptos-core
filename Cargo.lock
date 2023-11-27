@@ -784,6 +784,7 @@ dependencies = [
  "poem-openapi",
  "rand 0.7.3",
  "serde",
+ "serde_json",
  "serde_merge",
  "serde_yaml 0.8.26",
  "thiserror",
