@@ -1032,18 +1032,14 @@ impl<'env> Generator<'env> {
                     }
                 }
             },
-            ExpData::Call(id, Operation::MoveFunction(mid, fid), args) => {
-                // The type checker has ensured that this function returns a tuple
+            _ => {
+                // The type checker has ensured that this expression represents  tuple
                 let (temps, cont_assigns) = self.flatten_patterns(pats, next_scope);
-                self.gen_function_call(temps, *id, mid.qualified(*fid), args);
+                self.gen(temps, exp);
                 for (cont_id, cont_pat, cont_temp) in cont_assigns {
                     self.gen_assign_from_temp(cont_id, &cont_pat, cont_temp, next_scope)
                 }
             },
-            _ => self.error(
-                id,
-                "assignment to tuple must be tuple itself or a function call",
-            ),
         }
     }
 
