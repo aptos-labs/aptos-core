@@ -506,16 +506,8 @@ impl LifetimeState {
     /// Returns the locals borrowed
     pub fn borrowed_locals(&self) -> impl Iterator<Item = TempIndex> + '_ {
         self.local_to_label_map
-            .iter()
-            .filter_map(
-                |(local, label)| {
-                    if !self.is_effective_leaf(label) {
-                        Some(*local)
-                    } else {
-                        None
-                    }
-                }
-            )
+            .keys()
+            .cloned()
     }
 
     /// Checks if the given local is borrowed
