@@ -44,6 +44,11 @@ use std::{
     sync::Arc,
 };
 
+fn unwrap_or_invariant_violation<T>(value: Option<T>, msg: &str) -> Result<T, VMStatus> {
+    value
+        .ok_or_else(|| VMStatus::error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, err_msg(msg)))
+}
+
 /// We finish the session after the user transaction is done running to get the change set and
 /// charge gas and storage fee based on it before running storage refunds and the transaction
 /// epilogue. The latter needs to see the state view as if the change set is applied on top of
@@ -83,16 +88,30 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         .build())
     }
 
-    pub fn execute<R>(&mut self, fun: impl FnOnce(&mut SessionExt) -> R) -> R {
-        self.with_session_mut(|session| fun(session.as_mut().unwrap()))
+    pub fn execute<T>(
+        &mut self,
+        fun: impl FnOnce(&mut SessionExt) -> Result<T, VMStatus>,
+    ) -> Result<T, VMStatus> {
+        self.with_session_mut(|session| {
+            fun(unwrap_or_invariant_violation(
+                session.as_mut(),
+                "VM respawned session has to be set for execution.",
+            )?)
+        })
     }
 
     pub fn finish(
         mut self,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<VMChangeSet, VMStatus> {
-        let additional_change_set =
-            self.with_session_mut(|session| session.take().unwrap().finish(change_set_configs))?;
+        let additional_change_set = self.with_session_mut(|session| {
+            unwrap_or_invariant_violation(
+                session.take(),
+                "VM session cannot be finished more than once.",
+            )?
+            .finish(change_set_configs)
+            .map_err(|e| e.into_vm_status())
+        })?;
         if additional_change_set.has_creation() {
             // After respawning, for example, in the epilogue, there shouldn't be new slots
             // created, otherwise there's a potential vulnerability like this:
