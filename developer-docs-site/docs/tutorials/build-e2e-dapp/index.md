@@ -24,11 +24,11 @@ After meeting the [prerequisites](#prerequisites) and [getting set up](#setup) a
 
 You must have:
 
-- [Aptos CLI](../../tools/aptos-cli/install-cli/index.md) `@1.0.4` or later
-- [Aptos TypeScript SDK](../../sdks/ts-sdk/v1/index.md) `@1.7.1` or later
-- [Aptos Wallet Adapter](../../integration/wallet-adapter-concept.md) `@1.0.2` or later
-- [Create React App](https://create-react-app.dev/)
-- [node and npm](https://nodejs.org/en/)
+* [Aptos CLI](../../tools/aptos-cli/install-cli/index.md) `@1.0.4` or later
+* [Aptos TypeScript SDK](../../sdks/ts-sdk/index.md) `@1.7.1` or later
+* [Aptos Wallet Adapter](../../integration/wallet-adapter-concept.md) `@1.0.2` or later
+* [Create React App](https://create-react-app.dev/)
+* [node and npm](https://nodejs.org/en/)
 
 Although we will explain some React decisions, we are not going to deep dive into how React works; so we assume you have some previous experience with React.
 
@@ -38,15 +38,12 @@ In this section, we will create a `my-first-dapp` directory to hold our project 
 
 1. Open a terminal and navigate to the desired directory for the project (for example, the `Desktop` directory).
 2. Create a new directory called `my-first-dapp`, for example:
-
-```shell
-mkdir my-first-dapp
-```
-
+  ```shell
+  mkdir my-first-dapp
+  ```
 3. Navigate into that directory:
+  ```shell
+  cd my-first-dapp
+  ```
 
-```shell
-cd my-first-dapp
-```
-
-Now let's [create a smart contract](./1-create-smart-contract.md).
+  Now let's [create a smart contract](./1-create-smart-contract.md).
