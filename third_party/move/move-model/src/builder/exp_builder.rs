@@ -2653,7 +2653,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     Operation::BorrowGlobal(_) if self.mode != ExpTranslationMode::Impl => {
                         Operation::Global(None)
                     },
-                    _ => cand.get_operation(),
+                    other => other,
                 };
 
                 if let Operation::SpecFunction(module_id, spec_fun_id, None) = oper {
