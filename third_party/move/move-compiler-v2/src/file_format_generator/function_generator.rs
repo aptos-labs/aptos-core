@@ -280,9 +280,9 @@ impl<'a> FunctionGenerator<'a> {
             Bytecode::SaveMem(_, _, _)
             | Bytecode::Call(_, _, _, _, Some(_))
             | Bytecode::SaveSpecVar(_, _, _)
-            | Bytecode::Prop(_, _, _) => ctx
-                .fun_ctx
-                .internal_error("unexpected specification bytecode"),
+            | Bytecode::Prop(_, _, _) => {
+                // do nothing -- skip specification ops
+            },
         }
     }
 

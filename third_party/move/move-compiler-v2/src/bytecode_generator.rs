@@ -621,6 +621,8 @@ impl<'env> Generator<'env> {
             Operation::Ge => self.gen_op_call(targets, id, BytecodeOperation::Ge, args),
             Operation::Not => self.gen_op_call(targets, id, BytecodeOperation::Not, args),
 
+            Operation::NoOp => {}, // do nothing
+
             // Non-supported specification related operations
             Operation::Exists(Some(_))
             | Operation::SpecFunction(_, _, _)
@@ -665,8 +667,7 @@ impl<'env> Generator<'env> {
             | Operation::EmptyEventStore
             | Operation::ExtendEventStore
             | Operation::EventStoreIncludes
-            | Operation::EventStoreIncludedIn
-            | Operation::NoOp => self.internal_error(
+            | Operation::EventStoreIncludedIn => self.internal_error(
                 id,
                 format!("unsupported specification construct: `{:?}`", op),
             ),
@@ -875,20 +876,11 @@ impl<'env> Generator<'env> {
             ExpData::Temporary(_arg_id, temp) => return self.gen_borrow_temp(target, id, *temp),
             _ => {},
         }
-        if kind == ReferenceKind::Mutable {
-            // Operand is neither field selection nor local. We can take an immutable reference
-            // of such anonymous (stack) locations, but cannot mutate them.
-            self.error(
-                arg.node_id(),
-                "operand to `&mut` must be a field selection (`&mut s.f`) or a local (`&mut name`)",
-            );
-        } else {
-            // Borrow the temporary, allowing to do e.g. `&(1+2)`. Note to match
-            // this capability in the stack machine, we need to keep those temps in locals
-            // and can't manage them on the stack during stackification.
-            let temp = self.gen_arg(arg);
-            self.gen_borrow_temp(target, id, temp)
-        }
+        // Borrow the temporary, allowing to do e.g. `&(1+2)`. Note to match
+        // this capability in the stack machine, we need to keep those temps in locals
+        // and can't manage them on the stack during stackification.
+        let temp = self.gen_arg(arg);
+        self.gen_borrow_temp(target, id, temp)
     }
 
     fn gen_borrow_local(&mut self, target: TempIndex, id: NodeId, name: Symbol) {
@@ -903,44 +895,17 @@ impl<'env> Generator<'env> {
         &mut self,
         target: TempIndex,
         id: NodeId,
-        kind: ReferenceKind,
+        _kind: ReferenceKind,
         struct_id: QualifiedId<StructId>,
         field_id: FieldId,
         oper: &Exp,
     ) {
-        let (field_name, field_offset) = {
+        let field_offset = {
             let struct_env = self.env().get_struct(struct_id);
             let field_env = struct_env.get_field(field_id);
-            (field_env.get_name(), field_env.get_offset())
+            field_env.get_offset()
         };
         let temp = self.gen_arg(oper);
-        match kind {
-            ReferenceKind::Mutable => {
-                // Either the operand is a &mut, or a declared location
-                // which is not a reference
-                let ty = self.temp_type(temp);
-                if !(ty.is_mutable_reference()
-                    || matches!(
-                        oper.as_ref(),
-                        ExpData::LocalVar(..) | ExpData::Temporary(..)
-                    ) && !ty.is_reference())
-                {
-                    let struct_name = self.env().get_struct(struct_id).get_full_name_str();
-                    self.error(
-                        oper.node_id(),
-                        format!(
-                            "operand to `&mut _.{}` must have type `&mut {}` or be a local of type `{}`",
-                            field_name.display(self.env().symbol_pool()),
-                            struct_name,
-                            struct_name
-                        ),
-                    )
-                }
-            },
-            ReferenceKind::Immutable => {
-                // Currently no conditions for immutable, so we do allow `&fun().field`.
-            },
-        }
         // Get instantiation of field. It is not contained in the select expression but in the
         // type of its operand.
         if let Some((_, inst)) = self
@@ -1067,18 +1032,14 @@ impl<'env> Generator<'env> {
                     }
                 }
             },
-            ExpData::Call(id, Operation::MoveFunction(mid, fid), args) => {
-                // The type checker has ensured that this function returns a tuple
+            _ => {
+                // The type checker has ensured that this expression represents  tuple
                 let (temps, cont_assigns) = self.flatten_patterns(pats, next_scope);
-                self.gen_function_call(temps, *id, mid.qualified(*fid), args);
+                self.gen(temps, exp);
                 for (cont_id, cont_pat, cont_temp) in cont_assigns {
                     self.gen_assign_from_temp(cont_id, &cont_pat, cont_temp, next_scope)
                 }
             },
-            _ => self.error(
-                id,
-                "assignment to tuple must be tuple itself or a function call",
-            ),
         }
     }
 
