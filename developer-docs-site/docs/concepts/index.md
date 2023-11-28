@@ -8,6 +8,7 @@ Start here to get into the core concepts of the Aptos blockchain. Then review ou
 
 - ### [Aptos White Paper](../aptos-white-paper/index.md)
 - ### [Aptos Blockchain Deep Dive](./blockchain.md)
+- ### [Move - A Web3 Language and Runtime](./move.md)
 - ### [Accounts](./accounts.md)
 - ### [Resources](./resources.md)
 - ### [Events](./events.md)

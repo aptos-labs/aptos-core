@@ -2644,36 +2644,16 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
                 // Check result type against expected type.
                 let ty = self.check_type(loc, &result_type, expected_type, "");
-                // calls to built-in functions might have additional requirements on the types
-                let oper = cand.get_operation();
-                match oper {
-                    Operation::Exists(_)
-                    | Operation::Global(_)
-                    | Operation::BorrowGlobal(_)
-                    | Operation::MoveFrom
-                    | Operation::MoveTo => {
-                        // The instantiation must be a struct
-                        let inst = self.subs.specialize(&instantiation[0]);
-                        self.add_constraint_and_report(
-                            loc,
-                            &inst,
-                            Constraint::SomeStruct(BTreeMap::new()),
-                        );
-                    },
-                    _ => (),
-                };
-
-                // Construct result.
                 let id = self.new_node_id_with_type_loc(&ty, loc);
                 self.set_node_instantiation(id, instantiation);
 
                 // Map implementation operations to specification ops if compiling function as spec
                 // function.
-                let oper = match oper {
+                let oper = match cand.get_operation() {
                     Operation::BorrowGlobal(_) if self.mode != ExpTranslationMode::Impl => {
                         Operation::Global(None)
                     },
-                    _ => oper,
+                    other => other,
                 };
 
                 if let Operation::SpecFunction(module_id, spec_fun_id, None) = oper {
@@ -2834,6 +2814,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 
     /// Adds a single constraint and reports error if the constraint is not satisfied.
+    #[allow(unused)]
     fn add_constraint_and_report(&mut self, loc: &Loc, ty: &Type, c: Constraint) {
         if let Err(e) = self.subs.eval_constraint(
             &self.unification_context,
