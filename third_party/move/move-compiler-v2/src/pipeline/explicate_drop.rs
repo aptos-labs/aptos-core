@@ -5,7 +5,7 @@ use super::{
 use move_binary_format::file_format::CodeOffset;
 use move_model::{ast::TempIndex, model::FunctionEnv};
 use move_stackless_bytecode::{
-    function_target::{FunctionData, FunctionTarget},
+    function_target::FunctionData,
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
     stackless_bytecode::{AttrId, Bytecode, Operation},
 };
@@ -24,21 +24,7 @@ impl FunctionTargetProcessor for ExplicateDrop {
         if fun_env.is_native() {
             return data;
         }
-        let target = FunctionTarget::new(fun_env, &data);
-        let live_var_annotation = target
-            .get_annotations()
-            .get::<LiveVarAnnotation>()
-            .expect("livevar annotation");
-        let lifetime_annotation = target
-            .get_annotations()
-            .get::<LifetimeAnnotation>()
-            .expect("lifetime annotation");
-        let mut transformer = ExplicateDropTransformer {
-            fun_env,
-            fun_data: data.clone(),
-            live_var_annot: live_var_annotation,
-            lifetime_annot: lifetime_annotation,
-        };
+        let mut transformer = ExplicateDropTransformer::new(&data);
         transformer.transform();
         transformer.fun_data
     }
@@ -49,13 +35,28 @@ impl FunctionTargetProcessor for ExplicateDrop {
 }
 
 struct ExplicateDropTransformer<'a> {
-    fun_env: &'a FunctionEnv<'a>,
     fun_data: FunctionData,
     live_var_annot: &'a LiveVarAnnotation,
     lifetime_annot: &'a LifetimeAnnotation,
 }
 
 impl<'a> ExplicateDropTransformer<'a> {
+    pub fn new(fun_data: &'a FunctionData) -> Self {
+        let live_var_annot = fun_data
+            .annotations
+            .get::<LiveVarAnnotation>()
+            .expect("livevar annotation");
+        let lifetime_annot = fun_data
+            .annotations
+            .get::<LifetimeAnnotation>()
+            .expect("lifetime annotation");
+        ExplicateDropTransformer {
+            fun_data: fun_data.clone(),
+            live_var_annot,
+            lifetime_annot,
+        }
+    }
+
     // Add explicit drop instructions
     pub fn transform(&mut self) {
         let bytecodes = std::mem::take(&mut self.fun_data.code);
@@ -70,13 +71,7 @@ impl<'a> ExplicateDropTransformer<'a> {
     fn explicate_drops_at(&mut self, code_offset: CodeOffset, attr_id: AttrId) {
         let released_temps = self.released_temps_at(code_offset);
         for t in released_temps {
-            let drop_t = Bytecode::Call(
-                attr_id,
-                Vec::new(),
-                Operation::Destroy,
-                vec![t],
-                None
-            );
+            let drop_t = Bytecode::Call(attr_id, Vec::new(), Operation::Destroy, vec![t], None);
             self.emit_bytecode(drop_t)
         }
     }
@@ -87,9 +82,7 @@ impl<'a> ExplicateDropTransformer<'a> {
             .live_var_annot
             .get_live_var_info_at(code_offset)
             .expect("live var info");
-        let lifetime_info = self
-            .lifetime_annot
-            .get_info_at(code_offset);
+        let lifetime_info = self.lifetime_annot.get_info_at(code_offset);
         released_temps(live_var_info, lifetime_info)
     }
 
