@@ -2347,6 +2347,7 @@ dependencies = [
  "aptos-native-interface",
  "aptos-proptest-helpers",
  "aptos-state-view",
+ "aptos-temppath",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
