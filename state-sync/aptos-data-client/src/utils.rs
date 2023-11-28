@@ -70,17 +70,18 @@ pub fn is_priority_peer(
     false
 }
 
-/// Chooses a peer with the lowest distance from the validator set weighted by
+/// Chooses peers with the lowest distance from the validator set weighted by
 /// latency (from the given set of peers). We prioritize distance over latency
 /// as we want to avoid close but not up-to-date peers.
 ///
 /// Peer selection is done by: (i) identifying all peers with the same lowest
-/// distance; and (ii) selecting a single peer weighted by latencies (i.e.,
+/// distance; and (ii) selecting peers weighted by latencies (i.e.,
 /// the lower the latency, the higher the probability of selection).
-pub fn choose_random_peer_by_distance_and_latency(
+pub fn choose_random_peers_by_distance_and_latency(
     peers: HashSet<PeerNetworkId>,
     peers_and_metadata: Arc<PeersAndMetadata>,
-) -> Option<PeerNetworkId> {
+    num_peers_to_choose: u64,
+) -> Option<HashSet<PeerNetworkId>> {
     // Group peers and latency weights by validator distance, i.e., distance -> [(peer, latency weight)]
     let mut peers_and_latencies_by_distance = BTreeMap::new();
     for peer in peers {
@@ -95,14 +96,14 @@ pub fn choose_random_peer_by_distance_and_latency(
         }
     }
 
-    // Find the peers with the lowest distance and select a single peer.
+    // Find the peers with the lowest distance and select multiple peers.
     // Note: BTreeMaps are sorted by key, so the first entry will be for the lowest distance.
     if let Some((_, peers_and_latencies)) = peers_and_latencies_by_distance.into_iter().next() {
-        let random_peer_by_latency = choose_random_peers_by_weight(1, peers_and_latencies);
-        return random_peer_by_latency.into_iter().next(); // Return the randomly selected peer
+        let peers = choose_random_peers_by_weight(num_peers_to_choose, peers_and_latencies);
+        return Some(peers); // Return the randomly selected peers
     }
 
-    // Otherwise, no peer was selected
+    // Otherwise, no peers were selected
     None
 }
 

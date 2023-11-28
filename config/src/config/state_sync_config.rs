@@ -298,6 +298,33 @@ impl Default for AptosDataPollerConfig {
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
+pub struct AptosDataMultiFetchConfig {
+    /// Whether or not to enable multi-fetch for data client requests
+    pub enable_multi_fetch: bool,
+    /// The number of additional requests to send per peer bucket
+    pub additional_requests_per_peer_bucket: u64,
+    /// The minimum number of peers for each multi-fetch request
+    pub min_peers_for_multi_fetch: u64,
+    /// The maximum number of peers for each multi-fetch request
+    pub max_peers_for_multi_fetch: u64,
+    /// The number of peers per multi-fetch bucket
+    pub multi_fetch_peer_bucket_size: u64,
+}
+
+impl Default for AptosDataMultiFetchConfig {
+    fn default() -> Self {
+        Self {
+            enable_multi_fetch: true,
+            additional_requests_per_peer_bucket: 1,
+            min_peers_for_multi_fetch: 2,
+            max_peers_for_multi_fetch: 4,
+            multi_fetch_peer_bucket_size: 10,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct AptosLatencyFilteringConfig {
     /// The reduction factor for latency filtering when selecting peers
     pub latency_filtering_reduction_factor: u64,
@@ -322,6 +349,8 @@ impl Default for AptosLatencyFilteringConfig {
 pub struct AptosDataClientConfig {
     /// The aptos data poller config for the data client
     pub data_poller_config: AptosDataPollerConfig,
+    /// The aptos data multi-fetch config for the data client
+    pub data_multi_fetch_config: AptosDataMultiFetchConfig,
     /// The aptos latency filtering config for the data client
     pub latency_filtering_config: AptosLatencyFilteringConfig,
     /// The interval (milliseconds) at which to refresh the latency monitor
@@ -356,6 +385,7 @@ impl Default for AptosDataClientConfig {
     fn default() -> Self {
         Self {
             data_poller_config: AptosDataPollerConfig::default(),
+            data_multi_fetch_config: AptosDataMultiFetchConfig::default(),
             latency_filtering_config: AptosLatencyFilteringConfig::default(),
             latency_monitor_loop_interval_ms: 100,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
