@@ -206,10 +206,10 @@ impl NodeSetup {
         local_consensus_config: ConsensusConfig,
     ) -> Self {
         let _entered_runtime = executor.enter();
-        let epoch_state = EpochState {
+        let epoch_state = Arc::new(EpochState {
             epoch: 1,
             verifier: storage.get_validator_set().into(),
-        };
+        });
         let validators = epoch_state.verifier.clone();
         let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
