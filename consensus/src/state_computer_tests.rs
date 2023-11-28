@@ -16,18 +16,17 @@ use aptos_executor_types::{
 };
 use aptos_infallible::Mutex;
 use aptos_types::{
+    aggregate_signature::AggregateSignature,
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     contract_event::ContractEvent,
     epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     system_txn::SystemTransaction,
     transaction::{ExecutionStatus, SignedTransaction, Transaction, TransactionStatus},
 };
 use futures_channel::oneshot;
 use std::sync::Arc;
 use tokio::runtime::Handle;
-use aptos_types::aggregate_signature::AggregateSignature;
-use aptos_types::ledger_info::LedgerInfo;
 
 struct DummyStateSyncNotifier {
     invocations: Mutex<Vec<Vec<Transaction>>>,
@@ -204,8 +203,7 @@ async fn commit_should_discover_sys_txns() {
     );
 
     // Eventually 4 txns: block metadata, sys txn 0, sys txn 1, state checkpoint.
-    let state_compute_result =
-        StateComputeResult::new_dummy_with_compute_status(vec![
+    let state_compute_result = StateComputeResult::new_dummy_with_compute_status(vec![
             TransactionStatus::Keep(
                 ExecutionStatus::Success
             );

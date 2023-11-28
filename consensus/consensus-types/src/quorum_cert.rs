@@ -45,7 +45,10 @@ impl QuorumCert {
     pub fn dummy() -> Self {
         Self {
             vote_data: VoteData::dummy(),
-            signed_ledger_info: LedgerInfoWithSignatures::new(LedgerInfo::dummy(), AggregateSignature::empty()),
+            signed_ledger_info: LedgerInfoWithSignatures::new(
+                LedgerInfo::dummy(),
+                AggregateSignature::empty(),
+            ),
         }
     }
 
