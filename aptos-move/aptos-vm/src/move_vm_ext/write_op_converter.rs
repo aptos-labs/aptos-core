@@ -11,7 +11,10 @@ use aptos_types::{
     },
     write_set::WriteOp,
 };
-use aptos_vm_types::change_set::GroupWrite;
+use aptos_vm_types::{
+    change_set::GroupWrite, resolver::ResourceGroupSizeInfo,
+    resource_group_adapter::group_tagged_resource_size,
+};
 use bytes::Bytes;
 use move_core_types::{
     effects::Op as MoveStorageOp,
@@ -100,12 +103,44 @@ impl<'r> WriteOpConverter<'r> {
         let state_value_metadata_result = self.remote.get_resource_state_value_metadata(state_key);
         // Currently, due to read-before-write and a gas charge on the first read that is based
         // on the group size, this should simply re-read a cached (speculative) group size.
-        let pre_group_size = self.remote.resource_group_size(state_key).map_err(|_| {
+        let pre_group_size_info = self.remote.resource_group_size(state_key).map_err(|_| {
             VMStatus::error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                 err_msg("Error querying resource group size"),
             )
         })?;
+
+        let (pre_group_tag_count, pre_group_tags_size) = match pre_group_size_info {
+            ResourceGroupSizeInfo::Concrete ( _ ) => return Err(VMStatus::error(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                err_msg(format!("Unexpected ResourceGroupSizeInfo::Concrete in convert_resource_group_v1 for {:?}", state_key)),
+            )),
+            ResourceGroupSizeInfo::Combined { num_tagged_resources, all_tagged_resources_size } => (num_tagged_resources, all_tagged_resources_size)
+        };
+
+        if let Ok(None) = state_value_metadata_result {
+            assert_eq!(
+                pre_group_tag_count, 0,
+                "Group tag count should be 0 for a new group: {:?}",
+                state_key
+            );
+            assert_eq!(
+                pre_group_tags_size, 0,
+                "Group size should be 0 for a new group: {:?}",
+                state_key
+            );
+        } else {
+            assert_ne!(
+                pre_group_tag_count, 0,
+                "Group tag count shouldn't be 0 for an existing group: {:?}",
+                state_key
+            );
+            assert_ne!(
+                pre_group_tags_size, 0,
+                "Group size shouldn't be 0 for an existing group: {:?}",
+                state_key
+            );
+        }
 
         let mut inner_ops = BTreeMap::new();
 
@@ -114,6 +149,7 @@ impl<'r> WriteOpConverter<'r> {
         // is a more serious error and block execution must abort).
         // BlockExecutor is responsible with handling this error.
         let group_size_arithmetics_error = || {
+            println!("SPECULATIVE_EXECUTION_ABORT_ERROR: group_size_arithmetics_error");
             VMStatus::error(
                 StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                 err_msg("Group size underflow while applying updates"),
@@ -125,64 +161,69 @@ impl<'r> WriteOpConverter<'r> {
                 err_msg("Tag serialization error"),
             )
         };
-        let post_group_size =
-            group_changes
-                .into_iter()
-                .try_fold(pre_group_size, |cur_size, (tag, current_op)| {
-                    let tag_size =
-                        bcs::serialized_size(&tag).map_err(tag_serialization_error)? as u64;
 
-                    // We go over the resources in the group change-set, query their previous size,
-                    // and subtract those from the speculative group size prior to the transaction
-                    // (then, we add the new sizes from the change-set). The reason we do not instead
-                    // get and add the sizes of the resources in the group but not in the change-set
-                    // is to avoid creating unnecessary R/W conflicts (the resources in the change-set
-                    // are already read, but the other resources are not).
-                    let cur_size = if !matches!(current_op, MoveStorageOp::New(_)) {
-                        let old_size = self
-                            .remote
-                            .resource_size_in_group(state_key, &tag)
-                            .map_err(|_| {
-                                VMStatus::error(
-                                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                                    err_msg("Error querying resource group size"),
-                                )
-                            })?
-                            + tag_size;
-                        cur_size
-                            .checked_sub(old_size)
-                            .ok_or_else(group_size_arithmetics_error)?
-                    } else {
-                        cur_size
-                    };
+        let mut post_group_tag_count = pre_group_tag_count;
+        let mut post_group_tags_size = pre_group_tags_size;
 
-                    let (new_size, legacy_op) = match current_op {
-                        MoveStorageOp::Delete => (cur_size, (WriteOp::Deletion, None)),
-                        MoveStorageOp::Modify((new_data, maybe_layout)) => (
-                            cur_size
-                                .checked_add(new_data.len() as u64 + tag_size)
-                                .ok_or_else(group_size_arithmetics_error)?,
-                            (WriteOp::Modification(new_data), maybe_layout),
-                        ),
-                        MoveStorageOp::New((data, maybe_layout)) => (
-                            cur_size
-                                .checked_add(data.len() as u64 + tag_size)
-                                .ok_or_else(group_size_arithmetics_error)?,
-                            (WriteOp::Creation(data), maybe_layout),
-                        ),
-                    };
-                    inner_ops.insert(tag, legacy_op);
-                    Ok::<u64, VMStatus>(new_size)
-                })?;
+        for (tag, current_op) in group_changes {
+            // We go over the resources in the group change-set, query their previous size,
+            // and subtract those from the speculative group size prior to the transaction
+            // (then, we add the new sizes from the change-set). The reason we do not instead
+            // get and add the sizes of the resources in the group but not in the change-set
+            // is to avoid creating unnecessary R/W conflicts (the resources in the change-set
+            // are already read, but the other resources are not).
+            if !matches!(current_op, MoveStorageOp::New(_)) {
+                let old_tagged_value_size = self
+                    .remote
+                    .resource_size_in_group(state_key, &tag)
+                    .map_err(|_| {
+                        VMStatus::error(
+                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                            err_msg("Error querying resource group size"),
+                        )
+                    })?;
+                let old_size = group_tagged_resource_size(&tag, old_tagged_value_size)
+                    .map_err(tag_serialization_error)?;
+                post_group_tags_size = post_group_tags_size
+                    .checked_sub(old_size)
+                    .ok_or_else(group_size_arithmetics_error)?;
+                post_group_tag_count = post_group_tag_count
+                    .checked_sub(1)
+                    .ok_or_else(group_size_arithmetics_error)?;
+            }
+
+            match &current_op {
+                MoveStorageOp::Modify((data, _)) | MoveStorageOp::New((data, _)) => {
+                    let new_size = group_tagged_resource_size(&tag, data.len())
+                        .map_err(tag_serialization_error)?;
+                    post_group_tags_size = post_group_tags_size
+                        .checked_add(new_size)
+                        .ok_or_else(group_size_arithmetics_error)?;
+                    post_group_tag_count = post_group_tag_count
+                        .checked_add(1)
+                        .ok_or_else(group_size_arithmetics_error)?;
+                },
+                _ => {},
+            };
+
+            let legacy_op = match current_op {
+                MoveStorageOp::Delete => (WriteOp::Deletion, None),
+                MoveStorageOp::Modify((new_data, maybe_layout)) => {
+                    (WriteOp::Modification(new_data), maybe_layout)
+                },
+                MoveStorageOp::New((data, maybe_layout)) => (WriteOp::Creation(data), maybe_layout),
+            };
+            inner_ops.insert(tag, legacy_op);
+        }
 
         // Create the op that would look like a combined V0 resource group MoveStorageOp,
         // except it encodes the (speculative) size of the group after applying the updates
         // which is used for charging storage fees. Moreover, the metadata computation occurs
         // fully backwards compatibly, and lets obtain final storage op by replacing bytes.
         // TODO[agg_v2](fix) fix layout for RG
-        let metadata_op = if post_group_size == 0 {
+        let metadata_op = if post_group_tag_count == 0 {
             MoveStorageOp::Delete
-        } else if pre_group_size == 0 {
+        } else if pre_group_tag_count == 0 {
             MoveStorageOp::New((Bytes::new(), None))
         } else {
             MoveStorageOp::Modify((Bytes::new(), None))
@@ -192,7 +233,11 @@ impl<'r> WriteOpConverter<'r> {
             // TODO[agg_v2](fix): Converting the inner ops from Vec to BTreeMap. Try to have
             // uniform datastructure to represent the inner ops.
             inner_ops.into_iter().collect(),
-            post_group_size,
+            ResourceGroupSizeInfo::Combined {
+                num_tagged_resources: post_group_tag_count,
+                all_tagged_resources_size: post_group_tags_size,
+            }
+            .group_size(),
         ))
     }
 
@@ -266,7 +311,10 @@ impl<'r> WriteOpConverter<'r> {
         let maybe_existing_metadata = self
             .remote
             .get_aggregator_v1_state_value_metadata(state_key)
-            .map_err(|_| VMStatus::error(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR, None))?;
+            .map_err(|e| {
+                println!("SPECULATIVE_EXECUTION_ABORT_ERROR: convert_aggregator_modification failed {:?}", e);
+                VMStatus::error(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR, Some(format!("convert_aggregator_modification failed {:?}", e).to_string()))
+            })?;
         let data = serialize(&value).into();
 
         let op = match maybe_existing_metadata {
@@ -302,7 +350,7 @@ mod tests {
         account_address::AccountAddress,
         state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     };
-    use aptos_vm_types::resource_group_adapter::GroupSizeKind;
+    use aptos_vm_types::resource_group_adapter::{group_size_as_sum, GroupSizeKind};
     use claims::{assert_none, assert_some_eq};
     use move_core_types::{
         identifier::Identifier,
@@ -380,18 +428,15 @@ mod tests {
             StateValue::new_with_metadata(bcs::to_bytes(&group).unwrap().into(), metadata.clone()),
         )]);
 
-        let expected_size = bcs::serialized_size(&mock_tag_0()).unwrap()
-            + bcs::serialized_size(&mock_tag_1()).unwrap()
-            + bcs::serialized_size(&mock_tag_2()).unwrap()
-            + 6; // values bytes size: 1 + 2 + 3.
+        let expected_size = group_size_as_sum(
+            vec![(&mock_tag_0(), 1), (&mock_tag_1(), 2), (&mock_tag_2(), 3)].into_iter(),
+        )
+        .unwrap();
 
         let s = MockStateView::new(data);
         let resolver = as_resolver_with_group_size_kind(&s, GroupSizeKind::AsSum);
 
-        assert_eq!(
-            resolver.resource_group_size(&key).unwrap(),
-            expected_size as u64
-        );
+        assert_eq!(resolver.resource_group_size(&key).unwrap(), expected_size);
         // TODO: Layout hardcoded to None. Test with layout = Some(..)
         let group_changes = BTreeMap::from([
             (mock_tag_0(), MoveStorageOp::Delete),

@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::resolver::{ResourceGroupView, TResourceGroupView, TResourceView};
+use crate::resolver::{
+    size_u32_as_uleb128, ResourceGroupSizeInfo, ResourceGroupView, TResourceGroupView,
+    TResourceView,
+};
 use anyhow::Error;
 use aptos_types::state_store::state_key::StateKey;
 use bytes::Bytes;
@@ -41,16 +44,57 @@ impl GroupSizeKind {
     }
 }
 
-/// Utility method to compute the size of the group as GroupSizeKind::AsSum.
-pub fn group_size_as_sum<T: Serialize>(
-    mut group: impl Iterator<Item = (T, usize)>,
+pub fn group_tagged_resource_size<T: Serialize + Clone + Debug>(
+    tag: &T,
+    value_byte_len: usize,
 ) -> anyhow::Result<u64> {
-    group
-        .try_fold(0, |len, (tag, size_in_bytes)| {
-            let delta = bcs::serialized_size(&tag)? + size_in_bytes;
-            Ok(len + delta as u64)
+    Ok((bcs::serialized_size(&tag)? + value_byte_len + size_u32_as_uleb128(value_byte_len)) as u64)
+}
+
+/// Utility method to compute the size of the group as GroupSizeKind::AsSum.
+pub fn group_size_as_sum<T: Serialize + Clone + Debug>(
+    mut group: impl Iterator<Item = (T, usize)>,
+) -> anyhow::Result<ResourceGroupSizeInfo> {
+    let (count, len) = group
+        .try_fold((0, 0), |(count, len), (tag, value_byte_len)| {
+            let delta = group_tagged_resource_size(&tag, value_byte_len)?;
+            Ok((count + 1, len + delta))
         })
-        .map_err(|_: Error| anyhow::Error::msg("Resource group member tag serialization error"))
+        .map_err(|_: Error| anyhow::Error::msg("Resource group member tag serialization error"))?;
+
+    Ok(ResourceGroupSizeInfo::Combined {
+        num_tagged_resources: count,
+        all_tagged_resources_size: len,
+    })
+}
+
+#[test]
+fn test_group_size_same_as_bcs() {
+    use aptos_types::PeerId;
+    use move_core_types::identifier::Identifier;
+
+    for i in [1, 2, 3, 5, 15, 100, 1000, 10000] {
+        let mut map = BTreeMap::new();
+
+        for j in 0..i {
+            map.insert(
+                StructTag {
+                    address: PeerId::ONE,
+                    module: Identifier::new("a").unwrap(),
+                    name: Identifier::new(format!("a_{}", j)).unwrap(),
+                    type_params: vec![],
+                },
+                Bytes::from(vec![5; j]),
+            );
+        }
+
+        assert_eq!(
+            bcs::serialized_size(&map).unwrap() as u64,
+            group_size_as_sum(map.into_iter().map(|(k, v)| (k, v.len())))
+                .unwrap()
+                .group_size()
+        );
+    }
 }
 
 /// Handles the resolution of ResourceGroupView interfaces. If the gas feature version is
@@ -66,7 +110,7 @@ pub struct ResourceGroupAdapter<'r> {
     maybe_resource_group_view: Option<&'r dyn ResourceGroupView>,
     resource_view: &'r dyn TResourceView<Key = StateKey, Layout = MoveTypeLayout>,
     group_size_kind: GroupSizeKind,
-    group_cache: RefCell<HashMap<StateKey, (BTreeMap<StructTag, Bytes>, u64)>>,
+    group_cache: RefCell<HashMap<StateKey, (BTreeMap<StructTag, Bytes>, ResourceGroupSizeInfo)>>,
 }
 
 impl<'r> ResourceGroupAdapter<'r> {
@@ -128,8 +172,8 @@ impl<'r> ResourceGroupAdapter<'r> {
         )?;
 
         let group_size = match self.group_size_kind {
-            GroupSizeKind::None => 0,
-            GroupSizeKind::AsBlob => blob_len,
+            GroupSizeKind::None => ResourceGroupSizeInfo::Concrete(0),
+            GroupSizeKind::AsBlob => ResourceGroupSizeInfo::Concrete(blob_len),
             GroupSizeKind::AsSum => {
                 group_size_as_sum(group_data.iter().map(|(t, v)| (t, v.len())))?
             },
@@ -153,9 +197,12 @@ impl TResourceGroupView for ResourceGroupAdapter<'_> {
         self.group_size_kind == GroupSizeKind::AsSum
     }
 
-    fn resource_group_size(&self, group_key: &Self::GroupKey) -> anyhow::Result<u64> {
+    fn resource_group_size(
+        &self,
+        group_key: &Self::GroupKey,
+    ) -> anyhow::Result<ResourceGroupSizeInfo> {
         if self.group_size_kind == GroupSizeKind::None {
-            return Ok(0);
+            return Ok(ResourceGroupSizeInfo::zero_concrete());
         }
 
         if let Some(group_view) = self.maybe_resource_group_view {
@@ -222,25 +269,29 @@ mod tests {
     use aptos_types::state_store::{
         state_storage_usage::StateStorageUsage, state_value::StateValue,
     };
-    use claims::{assert_gt, assert_lt, assert_none, assert_ok_eq, assert_some, assert_some_eq};
+    use claims::{assert_gt, assert_none, assert_ok_eq, assert_some, assert_some_eq};
     use std::cmp::max;
     use test_case::test_case;
 
     struct MockGroup {
         blob: Vec<u8>,
         contents: BTreeMap<StructTag, Vec<u8>>,
-        size_as_sum: usize,
+        size_as_sum: ResourceGroupSizeInfo,
     }
 
     impl MockGroup {
         fn new(contents: BTreeMap<StructTag, Vec<u8>>) -> Self {
-            let mut size_as_sum = 0;
-            for (tag, v) in &contents {
-                // Compute size indirectly, by first serializing.
-                let serialized_tag = bcs::to_bytes(&tag).unwrap();
-                size_as_sum += v.len() + serialized_tag.len();
-            }
+            let size_as_sum =
+                group_size_as_sum(contents.iter().map(|(tag, v)| (tag, v.len()))).unwrap();
             let blob = bcs::to_bytes(&contents).unwrap();
+            assert_eq!(
+                size_as_sum.group_size(),
+                if contents.is_empty() {
+                    0
+                } else {
+                    blob.len() as u64
+                }
+            );
 
             Self {
                 blob,
@@ -299,12 +350,15 @@ mod tests {
             true
         }
 
-        fn resource_group_size(&self, group_key: &Self::GroupKey) -> anyhow::Result<u64> {
+        fn resource_group_size(
+            &self,
+            group_key: &Self::GroupKey,
+        ) -> anyhow::Result<ResourceGroupSizeInfo> {
             Ok(self
                 .group
                 .get(group_key)
-                .map(|entry| entry.size_as_sum as u64)
-                .unwrap_or(0))
+                .map(|entry| entry.size_as_sum)
+                .unwrap_or(ResourceGroupSizeInfo::zero_combined()))
         }
 
         fn get_resource_from_group(
@@ -323,7 +377,7 @@ mod tests {
             &self,
             _group_key: &Self::GroupKey,
             _resource_tag: &Self::ResourceTag,
-        ) -> anyhow::Result<u64> {
+        ) -> anyhow::Result<usize> {
             unimplemented!("Currently resolved by ResourceGroupAdapter");
         }
 
@@ -454,8 +508,12 @@ mod tests {
         let key_1 = StateKey::raw(vec![1]);
         let key_2 = StateKey::raw(vec![2]);
 
-        let key_0_blob_len = state_view.group.get(&key_0).unwrap().blob.len() as u64;
-        let key_1_blob_len = state_view.group.get(&key_1).unwrap().blob.len() as u64;
+        let key_0_blob_len = ResourceGroupSizeInfo::Concrete(
+            state_view.group.get(&key_0).unwrap().blob.len() as u64,
+        );
+        let key_1_blob_len = ResourceGroupSizeInfo::Concrete(
+            state_view.group.get(&key_1).unwrap().blob.len() as u64,
+        );
 
         assert_ok_eq!(adapter.resource_group_size(&key_1), key_1_blob_len);
 
@@ -466,7 +524,10 @@ mod tests {
 
         assert_ok_eq!(adapter.resource_group_size(&key_0), key_0_blob_len);
         assert_ok_eq!(adapter.resource_group_size(&key_1), key_1_blob_len);
-        assert_ok_eq!(adapter.resource_group_size(&key_2), 0);
+        assert_ok_eq!(
+            adapter.resource_group_size(&key_2),
+            ResourceGroupSizeInfo::Concrete(0)
+        );
 
         let cache = adapter.release_group_cache().unwrap();
         assert_eq!(cache.len(), 3);
@@ -495,8 +556,8 @@ mod tests {
         let key_1 = StateKey::raw(vec![1]);
         let key_2 = StateKey::raw(vec![2]);
 
-        let key_0_size_as_sum = state_view.group.get(&key_0).unwrap().size_as_sum as u64;
-        let key_1_size_as_sum = state_view.group.get(&key_1).unwrap().size_as_sum as u64;
+        let key_0_size_as_sum = state_view.group.get(&key_0).unwrap().size_as_sum;
+        let key_1_size_as_sum = state_view.group.get(&key_1).unwrap().size_as_sum;
 
         assert_ok_eq!(adapter.resource_group_size(&key_1), key_1_size_as_sum);
 
@@ -504,19 +565,22 @@ mod tests {
 
         assert_ok_eq!(adapter.resource_group_size(&key_0), key_0_size_as_sum);
         assert_ok_eq!(adapter.resource_group_size(&key_1), key_1_size_as_sum);
-        assert_ok_eq!(adapter.resource_group_size(&key_2), 0);
+        assert_ok_eq!(
+            adapter.resource_group_size(&key_2),
+            ResourceGroupSizeInfo::zero_combined()
+        );
 
         assert_eq!(adapter.group_cache.borrow().len(), 0);
 
-        // Sanity check the size numbers, at the time of writing the test 1582 and 1587.
+        // Sanity check the size numbers, at the time of writing the test 1587.
         let key_1_blob_size = state_view.group.get(&key_1).unwrap().blob.len() as u64;
-        assert_lt!(
-            key_1_size_as_sum,
+        assert_eq!(
+            key_1_size_as_sum.group_size(),
             key_1_blob_size,
-            "size as sum must be less than BTreeMap blob size",
+            "size as sum must be equal to BTreeMap blob size",
         );
         assert_gt!(
-            key_1_size_as_sum,
+            key_1_size_as_sum.group_size(),
             max(1000, key_1_blob_size - 100),
             "size as sum may not be too small"
         );
@@ -532,15 +596,27 @@ mod tests {
         let key_1 = StateKey::raw(vec![1]);
         let key_2 = StateKey::raw(vec![2]);
 
-        assert_ok_eq!(adapter.resource_group_size(&key_1), 0);
+        assert_ok_eq!(
+            adapter.resource_group_size(&key_1),
+            ResourceGroupSizeInfo::Concrete(0)
+        );
         // Test releasing the cache via trait method.
         let cache = adapter.release_group_cache().unwrap();
         // GroupSizeKind::None does not cache on size queries.
         assert_eq!(cache.len(), 0);
 
-        assert_ok_eq!(adapter.resource_group_size(&key_0), 0);
-        assert_ok_eq!(adapter.resource_group_size(&key_1), 0);
-        assert_ok_eq!(adapter.resource_group_size(&key_2), 0);
+        assert_ok_eq!(
+            adapter.resource_group_size(&key_0),
+            ResourceGroupSizeInfo::Concrete(0)
+        );
+        assert_ok_eq!(
+            adapter.resource_group_size(&key_1),
+            ResourceGroupSizeInfo::Concrete(0)
+        );
+        assert_ok_eq!(
+            adapter.resource_group_size(&key_2),
+            ResourceGroupSizeInfo::Concrete(0)
+        );
 
         let cache = adapter.release_group_cache().unwrap();
         assert_eq!(cache.len(), 0);
@@ -594,12 +670,12 @@ mod tests {
             .get_resource_from_group(&key_1, &tag_0, None)
             .unwrap()
             .unwrap()
-            .len() as u64;
+            .len();
         let key_1_tag_1_len = adapter
             .get_resource_from_group(&key_1, &tag_1, None)
             .unwrap()
             .unwrap()
-            .len() as u64;
+            .len();
 
         assert_ok_eq!(
             adapter.resource_size_in_group(&key_1, &tag_0),

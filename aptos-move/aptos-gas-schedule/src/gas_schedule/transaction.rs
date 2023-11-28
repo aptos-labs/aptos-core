@@ -198,18 +198,13 @@ impl TransactionGasParameters {
         use WriteOpSize::*;
 
         match op {
-            Creation(_) => self.storage_fee_per_state_slot_create * NumSlots::new(1),
-            Modification(_) | Deletion | DeletionWithDeposit(_) => 0.into(),
+            Creation { .. } => self.storage_fee_per_state_slot_create * NumSlots::new(1),
+            Modification { .. } | Deletion | DeletionWithDeposit { .. } => 0.into(),
         }
     }
 
     pub fn storage_fee_refund_for_slot(&self, op: &WriteOpSize) -> Fee {
-        use WriteOpSize::*;
-
-        match op {
-            DeletionWithDeposit(deposit) => Fee::new(*deposit),
-            Creation(..) | Modification(..) | Deletion => 0.into(),
-        }
+        op.deletion_deposit().map_or(0.into(), Fee::new)
     }
 
     /// Maybe value size is None for deletion Ops.

@@ -145,25 +145,27 @@ impl WriteOp {
 }
 
 pub enum WriteOpSize {
-    Creation(u64),
-    Modification(u64),
+    Creation { write_len: u64 },
+    Modification { write_len: u64 },
     Deletion,
-    DeletionWithDeposit(u64),
+    DeletionWithDeposit { deposit: u64 },
 }
 
 impl From<&WriteOp> for WriteOpSize {
     fn from(value: &WriteOp) -> Self {
         use WriteOp::*;
         match value {
-            Creation(data) | CreationWithMetadata { data, .. } => {
-                WriteOpSize::Creation(data.len() as u64)
+            Creation(data) | CreationWithMetadata { data, .. } => WriteOpSize::Creation {
+                write_len: data.len() as u64,
             },
             Modification(data) | ModificationWithMetadata { data, .. } => {
-                WriteOpSize::Modification(data.len() as u64)
+                WriteOpSize::Modification {
+                    write_len: data.len() as u64,
+                }
             },
             Deletion => WriteOpSize::Deletion,
-            DeletionWithMetadata { metadata } => {
-                WriteOpSize::DeletionWithDeposit(metadata.deposit())
+            DeletionWithMetadata { metadata } => WriteOpSize::DeletionWithDeposit {
+                deposit: metadata.deposit(),
             },
         }
     }
@@ -172,8 +174,19 @@ impl From<&WriteOp> for WriteOpSize {
 impl WriteOpSize {
     pub fn write_len(&self) -> Option<u64> {
         match self {
-            WriteOpSize::Creation(size) | WriteOpSize::Modification(size) => Some(*size),
+            WriteOpSize::Creation { write_len } | WriteOpSize::Modification { write_len } => {
+                Some(*write_len)
+            },
             WriteOpSize::Deletion | WriteOpSize::DeletionWithDeposit { .. } => None,
+        }
+    }
+
+    pub fn deletion_deposit(&self) -> Option<u64> {
+        match self {
+            WriteOpSize::DeletionWithDeposit { deposit } => Some(*deposit),
+            WriteOpSize::Creation { .. }
+            | WriteOpSize::Modification { .. }
+            | WriteOpSize::Deletion => None,
         }
     }
 }

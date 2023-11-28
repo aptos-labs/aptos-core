@@ -32,8 +32,8 @@ use aptos_types::{
 };
 use aptos_vm_types::{
     resolver::{
-        ExecutorView, ResourceGroupView, StateStorageView, StateValueMetadataResolver,
-        TResourceGroupView, TResourceView,
+        ExecutorView, ResourceGroupSizeInfo, ResourceGroupView, StateStorageView,
+        StateValueMetadataResolver, TResourceGroupView, TResourceView,
     },
     resource_group_adapter::ResourceGroupAdapter,
 };
@@ -160,6 +160,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
                 self.resource_group_view
                     .resource_group_size(&key)
                     .map_err(common_error)?
+                    .group_size()
             } else {
                 0
             };
@@ -191,7 +192,7 @@ impl<'e, E: ExecutorView> ResourceGroupResolver for StorageAdapter<'e, E> {
         self.resource_group_view.release_group_cache()
     }
 
-    fn resource_group_size(&self, group_key: &StateKey) -> anyhow::Result<u64> {
+    fn resource_group_size(&self, group_key: &StateKey) -> anyhow::Result<ResourceGroupSizeInfo> {
         self.resource_group_view.resource_group_size(group_key)
     }
 
@@ -199,7 +200,7 @@ impl<'e, E: ExecutorView> ResourceGroupResolver for StorageAdapter<'e, E> {
         &self,
         group_key: &StateKey,
         resource_tag: &StructTag,
-    ) -> anyhow::Result<u64> {
+    ) -> anyhow::Result<usize> {
         self.resource_group_view
             .resource_size_in_group(group_key, resource_tag)
     }

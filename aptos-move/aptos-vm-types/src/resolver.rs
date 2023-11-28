@@ -85,7 +85,10 @@ pub trait TResourceGroupView {
     /// the parallel execution setting, as a wrong value will be (later) caught by validation.
     /// Thus, R/W conflicts are avoided, as long as the estimates are correct (e.g. updating
     /// struct members of a fixed size).
-    fn resource_group_size(&self, group_key: &Self::GroupKey) -> anyhow::Result<u64>;
+    fn resource_group_size(
+        &self,
+        group_key: &Self::GroupKey,
+    ) -> anyhow::Result<ResourceGroupSizeInfo>;
 
     fn get_resource_from_group(
         &self,
@@ -103,10 +106,10 @@ pub trait TResourceGroupView {
         &self,
         group_key: &Self::GroupKey,
         resource_tag: &Self::ResourceTag,
-    ) -> anyhow::Result<u64> {
+    ) -> anyhow::Result<usize> {
         Ok(self
             .get_resource_from_group(group_key, resource_tag, None)?
-            .map_or(0, |bytes| bytes.len() as u64))
+            .map_or(0, |bytes| bytes.len()))
     }
 
     /// Needed for backwards compatibility with the additional safety mechanism for resource
@@ -282,4 +285,52 @@ pub trait StateValueMetadataResolver {
         &self,
         state_key: &StateKey,
     ) -> anyhow::Result<Option<StateValueMetadataKind>>;
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ResourceGroupSizeInfo {
+    Concrete(u64),
+    Combined {
+        num_tagged_resources: usize,
+        all_tagged_resources_size: u64,
+    },
+}
+
+pub fn size_u32_as_uleb128(mut value: usize) -> usize {
+    let mut len = 1;
+    while value >= 0x80 {
+        // Write 7 (lowest) bits of data and set the 8th bit to 1.
+        len += 1;
+        value >>= 7;
+    }
+    len
+}
+
+impl ResourceGroupSizeInfo {
+    pub fn zero_combined() -> Self {
+        Self::Combined {
+            num_tagged_resources: 0,
+            all_tagged_resources_size: 0,
+        }
+    }
+
+    pub fn zero_concrete() -> Self {
+        Self::Concrete(0)
+    }
+
+    pub fn group_size(&self) -> u64 {
+        match self {
+            Self::Concrete(size) => *size,
+            Self::Combined {
+                num_tagged_resources,
+                all_tagged_resources_size,
+            } => {
+                if *num_tagged_resources == 0 {
+                    0
+                } else {
+                    size_u32_as_uleb128(*num_tagged_resources) as u64 + *all_tagged_resources_size
+                }
+            },
+        }
+    }
 }

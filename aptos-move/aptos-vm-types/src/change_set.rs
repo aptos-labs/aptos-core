@@ -80,15 +80,17 @@ impl AbstractResourceWriteOp {
             }) => {
                 use WriteOp::*;
                 match write_op {
-                    Creation(_) | CreationWithMetadata { .. } => {
-                        WriteOpSize::Creation(materialized_size.unwrap())
+                    Creation(_) | CreationWithMetadata { .. } => WriteOpSize::Creation {
+                        write_len: materialized_size.unwrap(),
                     },
                     Modification(_) | ModificationWithMetadata { .. } => {
-                        WriteOpSize::Modification(materialized_size.unwrap())
+                        WriteOpSize::Modification {
+                            write_len: materialized_size.unwrap(),
+                        }
                     },
                     Deletion => WriteOpSize::Deletion,
-                    DeletionWithMetadata { metadata } => {
-                        WriteOpSize::DeletionWithDeposit(metadata.deposit())
+                    DeletionWithMetadata { metadata } => WriteOpSize::DeletionWithDeposit {
+                        deposit: metadata.deposit(),
                     },
                 }
             },
@@ -98,7 +100,9 @@ impl AbstractResourceWriteOp {
             | ResourceGroupInPlaceDelayedFieldChange(ResourceGroupInPlaceDelayedFieldChangeOp {
                 materialized_size,
                 ..
-            }) => WriteOpSize::Modification(*materialized_size),
+            }) => WriteOpSize::Modification {
+                write_len: *materialized_size,
+            },
         }
     }
 
@@ -567,7 +571,7 @@ impl VMChangeSet {
                     let old_length = o.get().materialized_size().write_len();
                     if new_length != old_length {
                         return Err(code_invariant_error(format!(
-                            "Trying to patch the value that changed size during materialization: {:?}: {:?} into {:?}.", o.key(), old_length, new_length
+                            "Trying to patch the value that changed size during materialization: {:?}: {:?} into {:?}. \nValues {:?} into {:?}.", o.key(), old_length, new_length, o.get(), new_write,
                         )));
                     }
 
@@ -1030,7 +1034,7 @@ impl VMChangeSet {
         )
         .map_err(|e| {
             VMStatus::error(
-                StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                 err_msg(format!("Error while squashing two write ops: {:?}.", e)),
             )
         })?;
@@ -1049,7 +1053,7 @@ impl VMChangeSet {
 
     pub fn has_creation(&self) -> bool {
         self.write_set_size_iter()
-            .any(|(_key, op_size)| matches!(op_size, WriteOpSize::Creation(..)))
+            .any(|(_key, op_size)| matches!(op_size, WriteOpSize::Creation { .. }))
     }
 }
 

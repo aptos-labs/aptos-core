@@ -69,14 +69,14 @@ impl StoragePricingV1 {
         }
 
         match op {
-            Creation(value_size) => {
+            Creation { write_len } => {
                 cost += self.write_data_per_new_item * NumArgs::new(1)
-                    + self.write_data_per_byte_in_val * NumBytes::new(*value_size);
+                    + self.write_data_per_byte_in_val * NumBytes::new(*write_len);
             },
-            Modification(value_size) => {
-                cost += self.write_data_per_byte_in_val * NumBytes::new(*value_size);
+            Modification { write_len } => {
+                cost += self.write_data_per_byte_in_val * NumBytes::new(*write_len);
             },
-            Deletion | DeletionWithDeposit(_) => (),
+            Deletion | DeletionWithDeposit { .. } => (),
         }
 
         cost
@@ -151,15 +151,15 @@ impl StoragePricingV2 {
         use aptos_types::write_set::WriteOpSize::*;
 
         match &op {
-            Creation(value_size) => {
+            Creation { write_len } => {
                 self.per_item_create * NumArgs::new(1)
-                    + self.write_op_size(key, *value_size) * self.per_byte_create
+                    + self.write_op_size(key, *write_len) * self.per_byte_create
             },
-            Modification(value_size) => {
+            Modification { write_len } => {
                 self.per_item_write * NumArgs::new(1)
-                    + self.write_op_size(key, *value_size) * self.per_byte_write
+                    + self.write_op_size(key, *write_len) * self.per_byte_write
             },
-            Deletion | DeletionWithDeposit(_) => 0.into(),
+            Deletion | DeletionWithDeposit { .. } => 0.into(),
         }
     }
 }
@@ -193,15 +193,15 @@ impl StoragePricingV3 {
         key: &StateKey,
         op: &WriteOpSize,
     ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
-        use WriteOpSize::*;
-
-        match op {
-            Creation(value_size) | Modification(value_size) => Either::Left(
-                STORAGE_IO_PER_STATE_SLOT_WRITE * NumArgs::new(1)
-                    + STORAGE_IO_PER_STATE_BYTE_WRITE * self.write_op_size(key, *value_size),
-            ),
-            Deletion | DeletionWithDeposit(..) => Either::Right(InternalGas::zero()),
-        }
+        op.write_len().map_or_else(
+            || Either::Right(InternalGas::zero()),
+            |write_len| {
+                Either::Left(
+                    STORAGE_IO_PER_STATE_SLOT_WRITE * NumArgs::new(1)
+                        + STORAGE_IO_PER_STATE_BYTE_WRITE * self.write_op_size(key, write_len),
+                )
+            },
+        )
     }
 }
 

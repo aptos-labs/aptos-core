@@ -465,9 +465,9 @@ fn write_op_type(op: &WriteOpSize) -> WriteOpType {
     use WriteOpType as T;
 
     match op {
-        O::Creation(..) => T::Creation,
-        O::Modification(..) => T::Modification,
-        O::Deletion | O::DeletionWithDeposit(_) => T::Deletion,
+        O::Creation { .. } => T::Creation,
+        O::Modification { .. } => T::Modification,
+        O::Deletion | O::DeletionWithDeposit { .. } => T::Deletion,
     }
 }
 

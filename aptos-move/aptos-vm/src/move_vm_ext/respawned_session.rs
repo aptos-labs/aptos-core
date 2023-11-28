@@ -28,8 +28,8 @@ use aptos_types::{
 use aptos_vm_types::{
     change_set::{AbstractResourceWriteOp, VMChangeSet, WriteWithDelayedFieldsOp},
     resolver::{
-        ExecutorView, ResourceGroupView, StateStorageView, TModuleView, TResourceGroupView,
-        TResourceView,
+        ExecutorView, ResourceGroupSizeInfo, ResourceGroupView, StateStorageView, TModuleView,
+        TResourceGroupView, TResourceView,
     },
     storage::ChangeSetConfigs,
 };
@@ -348,9 +348,12 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
     type Layout = MoveTypeLayout;
     type ResourceTag = StructTag;
 
-    fn resource_group_size(&self, _group_key: &Self::GroupKey) -> anyhow::Result<u64> {
+    fn resource_group_size(
+        &self,
+        _group_key: &Self::GroupKey,
+    ) -> anyhow::Result<ResourceGroupSizeInfo> {
         // In respawned session, gas is irrelevant, so we return 0 (GroupSizeKind::None).
-        Ok(0)
+        Ok(ResourceGroupSizeInfo::zero_concrete())
     }
 
     fn get_resource_from_group(

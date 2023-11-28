@@ -393,11 +393,26 @@ fn test_failed_conversion_to_change_set() {
     );
 
     // Unchecked conversion ignores deltas.
-    let storage_change_set = change_set.clone().into_storage_change_set_forced();
-    assert_eq!(storage_change_set.write_set().clone().into_mut().len(), 1);
-
     let vm_status = change_set.try_into_storage_change_set();
     assert_matches!(vm_status, Err(PanicError::CodeInvariantError(_)));
+}
+
+#[test]
+#[should_panic]
+fn test_forced_conversion_to_change_set_panics() {
+    let resource_write_set = vec![mock_delete_with_layout("a")];
+    let aggregator_delta_set = vec![mock_add("b", 100)];
+    let change_set = build_change_set(
+        resource_write_set,
+        vec![],
+        vec![],
+        vec![],
+        aggregator_delta_set,
+    );
+
+    // forced call panics
+    let storage_change_set = change_set.clone().into_storage_change_set_forced();
+    assert_eq!(storage_change_set.write_set().clone().into_mut().len(), 1);
 }
 
 #[test]
