@@ -824,10 +824,24 @@ impl GlobalEnv {
         msg: &str,
         labels: Vec<(Loc, String)>,
     ) {
+        self.diag_with_primary_and_labels(severity, loc, msg, "", labels)
+    }
+
+    /// Adds a diagnostic of given severity to this environment, with primary and secondary labels.
+    pub fn diag_with_primary_and_labels(
+        &self,
+        severity: Severity,
+        loc: &Loc,
+        msg: &str,
+        primary: &str,
+        labels: Vec<(Loc, String)>,
+    ) {
         let new_msg = Self::add_backtrace(msg, severity == Severity::Bug);
         let diag = Diagnostic::new(severity)
             .with_message(new_msg)
-            .with_labels(vec![Label::primary(loc.file_id, loc.span)]);
+            .with_labels(vec![
+                Label::primary(loc.file_id, loc.span).with_message(primary)
+            ]);
         let labels = labels
             .into_iter()
             .map(|(l, m)| Label::secondary(l.file_id, l.span).with_message(m))
@@ -3752,16 +3766,19 @@ impl<'env> FunctionEnv<'env> {
         self.data.access_specifiers.as_deref()
     }
 
-    /// Get the name to be used for a local by index, if a compiled module and source map
-    /// is attached. If the local is an argument, use that for naming, otherwise generate
-    /// a unique name.
-    pub fn get_local_name(&self, idx: usize) -> Option<Symbol> {
-        // Try to obtain user name
+    /// Get the name to be used for a local by index, if available.
+    /// Otherwise generate a unique name.
+    pub fn get_local_name(&self, idx: usize) -> Symbol {
         if let Some(source_map) = &self.module_env.data.source_map {
+            // Try to obtain user name from source map
             if idx < self.data.params.len() {
-                return Some(self.data.params[idx].0);
+                return self.data.params[idx].0;
             }
-            if let Ok(fmap) = source_map.get_function_source_map(self.data.def_idx?) {
+            if let Some(fmap) = self
+                .data
+                .def_idx
+                .and_then(|idx| source_map.get_function_source_map(idx).ok())
+            {
                 if let Some((ident, _)) = fmap.get_parameter_or_local_name(idx as u64) {
                     // The Move compiler produces temporary names of the form `<foo>%#<num>`,
                     // where <num> seems to be generated non-deterministically.
@@ -3771,11 +3788,11 @@ impl<'env> FunctionEnv<'env> {
                     } else {
                         ident
                     };
-                    return Some(self.module_env.env.symbol_pool.make(clean_ident.as_str()));
+                    return self.module_env.env.symbol_pool.make(clean_ident.as_str());
                 }
             }
         }
-        Some(self.module_env.env.symbol_pool.make(&format!("$t{}", idx)))
+        self.module_env.env.symbol_pool.make(&format!("$t{}", idx))
     }
 
     /// Returns true if the index is for a temporary, not user declared local. Requires an
@@ -3784,7 +3801,7 @@ impl<'env> FunctionEnv<'env> {
         if idx >= self.get_local_count()? {
             return Some(true);
         }
-        let name = self.get_local_name(idx)?;
+        let name = self.get_local_name(idx);
         Some(self.symbol_pool().string(name).contains("tmp#$"))
     }
 
@@ -4155,5 +4172,11 @@ where
             write!(f, ">")?;
         }
         Ok(())
+    }
+}
+
+impl<'a> fmt::Display for EnvDisplay<'a, Symbol> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.val.display(self.env.symbol_pool()))
     }
 }

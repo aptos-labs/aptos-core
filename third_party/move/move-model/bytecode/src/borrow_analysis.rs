@@ -617,7 +617,7 @@ impl<'a> TransferFunctions for BorrowAnalysis<'a> {
 
                 let src_node = self.borrow_node(*src);
                 match kind {
-                    AssignKind::Move => {
+                    AssignKind::Move | AssignKind::Inferred => {
                         assert!(!self.func_target.get_local_type(*src).is_reference());
                         assert!(!self.func_target.get_local_type(*dest).is_reference());
                         state.del_node(&src_node);
