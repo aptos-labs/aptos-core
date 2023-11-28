@@ -18,15 +18,16 @@ impl FunctionTargetProcessor for ExplicateDrop {
         &self,
         _targets: &mut FunctionTargetsHolder,
         fun_env: &FunctionEnv,
-        data: FunctionData,
+        mut data: FunctionData,
         _scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
         if fun_env.is_native() {
             return data;
         }
-        let mut transformer = ExplicateDropTransformer::new(&data);
+        let mut transformer = ExplicateDropTransformer::new(std::mem::take(&mut data.code), &data);
         transformer.transform();
-        transformer.fun_data
+        data.code = transformer.codes;
+        data
     }
 
     fn name(&self) -> String {
@@ -35,13 +36,13 @@ impl FunctionTargetProcessor for ExplicateDrop {
 }
 
 struct ExplicateDropTransformer<'a> {
-    fun_data: FunctionData,
+    codes: Vec<Bytecode>,
     live_var_annot: &'a LiveVarAnnotation,
     lifetime_annot: &'a LifetimeAnnotation,
 }
 
 impl<'a> ExplicateDropTransformer<'a> {
-    pub fn new(fun_data: &'a FunctionData) -> Self {
+    pub fn new(codes: Vec<Bytecode>, fun_data: &'a FunctionData) -> Self {
         let live_var_annot = fun_data
             .annotations
             .get::<LiveVarAnnotation>()
@@ -51,7 +52,7 @@ impl<'a> ExplicateDropTransformer<'a> {
             .get::<LifetimeAnnotation>()
             .expect("lifetime annotation");
         ExplicateDropTransformer {
-            fun_data: fun_data.clone(),
+            codes,
             live_var_annot,
             lifetime_annot,
         }
@@ -59,7 +60,7 @@ impl<'a> ExplicateDropTransformer<'a> {
 
     // Add explicit drop instructions
     pub fn transform(&mut self) {
-        let bytecodes = std::mem::take(&mut self.fun_data.code);
+        let bytecodes = std::mem::take(&mut self.codes);
         for (code_offset, bytecode) in bytecodes.into_iter().enumerate() {
             let attr_id = bytecode.get_attr_id();
             self.emit_bytecode(bytecode);
@@ -87,7 +88,7 @@ impl<'a> ExplicateDropTransformer<'a> {
     }
 
     fn emit_bytecode(&mut self, bytecode: Bytecode) {
-        self.fun_data.code.push(bytecode)
+        self.codes.push(bytecode)
     }
 }
 
