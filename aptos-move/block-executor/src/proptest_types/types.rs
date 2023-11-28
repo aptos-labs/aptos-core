@@ -9,6 +9,7 @@ use crate::{
 use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
+    resolver::TAggregatorV1View,
     types::DelayedFieldID,
 };
 use aptos_mvhashmap::types::TxnIndex;
@@ -840,7 +841,6 @@ where
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
-        _materialize_deltas: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
         match txn {
             MockTransaction::Write {
@@ -1091,6 +1091,12 @@ where
             materialized_delta_writes: OnceCell::new(),
             total_gas: 0,
         }
+    }
+
+    fn materialize_agg_v1(
+        &self,
+        _view: &impl TAggregatorV1View<Identifier = <Self::Txn as Transaction>::Key>,
+    ) {
     }
 
     fn incorporate_materialized_txn_output(

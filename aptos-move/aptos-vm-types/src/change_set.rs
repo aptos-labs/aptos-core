@@ -441,18 +441,9 @@ impl VMChangeSet {
     /// Materializes this change set: all aggregator v1 deltas are converted into writes and
     /// are combined with existing aggregator writes. The aggregator v2 changeset is not touched.
     pub fn try_materialize_aggregator_v1_delta_set(
-        self,
+        &mut self,
         resolver: &impl AggregatorV1Resolver,
-    ) -> anyhow::Result<Self, VMStatus> {
-        let Self {
-            resource_write_set,
-            module_write_set,
-            mut aggregator_v1_write_set,
-            aggregator_v1_delta_set,
-            delayed_field_change_set,
-            events,
-        } = self;
-
+    ) -> anyhow::Result<(), VMStatus> {
         let into_write =
             |(state_key, delta): (StateKey, DeltaOp)| -> anyhow::Result<(StateKey, WriteOp), VMStatus> {
                 // Materialization is needed when committing a transaction, so
@@ -462,20 +453,15 @@ impl VMChangeSet {
                 Ok((state_key, write))
             };
 
+        let aggregator_v1_delta_set = std::mem::take(&mut self.aggregator_v1_delta_set);
         let materialized_aggregator_delta_set = aggregator_v1_delta_set
             .into_iter()
             .map(into_write)
             .collect::<anyhow::Result<BTreeMap<StateKey, WriteOp>, VMStatus>>()?;
-        aggregator_v1_write_set.extend(materialized_aggregator_delta_set);
+        self.aggregator_v1_write_set
+            .extend(materialized_aggregator_delta_set);
 
-        Ok(Self {
-            resource_write_set,
-            module_write_set,
-            aggregator_v1_write_set,
-            aggregator_v1_delta_set: BTreeMap::new(),
-            delayed_field_change_set,
-            events,
-        })
+        Ok(())
     }
 
     fn squash_additional_aggregator_v1_changes(

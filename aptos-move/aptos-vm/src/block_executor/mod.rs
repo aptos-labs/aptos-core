@@ -9,7 +9,8 @@ use crate::{
     counters::{BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS},
 };
 use aptos_aggregator::{
-    delayed_change::DelayedChange, delta_change_set::DeltaOp, types::DelayedFieldID,
+    delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
+    types::DelayedFieldID,
 };
 use aptos_block_executor::{
     errors::Error, executor::BlockExecutor,
@@ -252,6 +253,18 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .change_set()
             .events()
             .to_vec()
+    }
+
+    fn materialize_agg_v1(
+        &self,
+        view: &impl TAggregatorV1View<Identifier = <Self::Txn as BlockExecutableTransaction>::Key>,
+    ) {
+        self.vm_output
+            .lock()
+            .as_mut()
+            .expect("Output must be set to incorporate materialized data")
+            .try_materialize(view)
+            .expect("Delta materialization failed");
     }
 
     fn incorporate_materialized_txn_output(
