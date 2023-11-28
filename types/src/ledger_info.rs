@@ -164,10 +164,6 @@ impl LedgerInfoWithSignatures {
         LedgerInfoWithSignatures::V0(LedgerInfoWithV0::new(ledger_info, signatures))
     }
 
-    pub fn dummy() -> Self {
-        Self::V0(LedgerInfoWithV0::dummy())
-    }
-
     pub fn genesis(genesis_state_root_hash: HashValue, validator_set: ValidatorSet) -> Self {
         LedgerInfoWithSignatures::V0(LedgerInfoWithV0::genesis(
             genesis_state_root_hash,

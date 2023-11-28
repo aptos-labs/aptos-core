@@ -26,6 +26,8 @@ use aptos_types::{
 use futures_channel::oneshot;
 use std::sync::Arc;
 use tokio::runtime::Handle;
+use aptos_types::aggregate_signature::AggregateSignature;
+use aptos_types::ledger_info::LedgerInfo;
 
 struct DummyStateSyncNotifier {
     invocations: Mutex<Vec<Vec<Transaction>>>,
@@ -232,7 +234,7 @@ async fn commit_should_discover_sys_txns() {
     let _ = execution_policy
         .commit(
             blocks.as_slice(),
-            LedgerInfoWithSignatures::dummy(),
+            LedgerInfoWithSignatures::new(LedgerInfo::dummy(), AggregateSignature::empty()),
             callback,
         )
         .await;

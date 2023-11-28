@@ -121,16 +121,6 @@ impl<'de> Deserialize<'de> for ValidatorVerifier {
 }
 
 impl ValidatorVerifier {
-    #[cfg(test)]
-    pub fn dummy() -> Self {
-        Self {
-            validator_infos: vec![],
-            quorum_voting_power: 0,
-            total_voting_power: 0,
-            address_to_validator_index: HashMap::new(),
-        }
-    }
-
     /// Private constructor to calculate the in-memory index
     fn build_index(
         validator_infos: Vec<ValidatorConsensusInfo>,
