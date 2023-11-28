@@ -64,14 +64,21 @@ impl BlockPreparationStage {
         let block: ExecutableBlock = match &self.maybe_partitioner {
             None => (block_id, sig_verified_txns).into(),
             Some(partitioner) => {
-                let last_txn = sig_verified_txns.pop().unwrap();
+                let last_txn = if let Some(SignatureVerifiedTransaction::Valid(Transaction::StateCheckpoint(_))) = sig_verified_txns.last() {
+                    Some(sig_verified_txns.pop().unwrap())
+                } else {
+                    None
+                };
+
                 let analyzed_transactions =
                     sig_verified_txns.into_iter().map(|t| t.into()).collect();
                 let timer = TIMER.with_label_values(&["partition"]).start_timer();
                 let mut partitioned_txns =
                     partitioner.partition(analyzed_transactions, self.num_executor_shards);
                 timer.stop_and_record();
-                partitioned_txns.add_checkpoint_txn(last_txn);
+                if let Some(last_txn) = last_txn {
+                    partitioned_txns.add_checkpoint_txn(last_txn);
+                }
                 ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(partitioned_txns))
             },
         };
