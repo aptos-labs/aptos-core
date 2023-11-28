@@ -20,6 +20,7 @@ use crate::{
     network_interface::ConsensusMsg,
     state_replication::StateComputerCommitCallBackType,
 };
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_consensus_types::{
     common::Author, executed_block::ExecutedBlock, experimental::commit_decision::CommitDecision,
 };
@@ -28,8 +29,8 @@ use aptos_logger::prelude::*;
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_address::AccountAddress, epoch_change::EpochChangeProof,
-    ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
+    account_address::AccountAddress, epoch_change::EpochChangeProof, epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
 };
 use futures::{
     channel::{
@@ -97,7 +98,9 @@ pub struct BufferManager {
     reliable_broadcast: ReliableBroadcast<CommitMessage, ExponentialBackoff>,
     commit_proof_rb_handle: Option<DropGuard>,
 
-    commit_msg_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, IncomingCommitRequest>,
+    // message received from the network
+    commit_msg_rx:
+        Option<aptos_channels::aptos_channel::Receiver<AccountAddress, IncomingCommitRequest>>,
 
     // we don't hear back from the persisting phase
     persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
@@ -106,7 +109,7 @@ pub struct BufferManager {
     reset_rx: UnboundedReceiver<ResetRequest>,
     stop: bool,
 
-    verifier: ValidatorVerifier,
+    epoch_state: Arc<EpochState>,
 
     ongoing_tasks: Arc<AtomicU64>,
     // Since proposal_generator is not aware of reconfiguration any more, the suffix blocks
@@ -139,7 +142,7 @@ impl BufferManager {
         persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
         block_rx: UnboundedReceiver<OrderedBlocks>,
         reset_rx: UnboundedReceiver<ResetRequest>,
-        verifier: ValidatorVerifier,
+        epoch_state: Arc<EpochState>,
         ongoing_tasks: Arc<AtomicU64>,
         reset_flag: Arc<AtomicBool>,
     ) -> Self {
@@ -164,7 +167,7 @@ impl BufferManager {
             signing_phase_rx,
 
             reliable_broadcast: ReliableBroadcast::new(
-                verifier.get_ordered_account_addresses(),
+                epoch_state.verifier.get_ordered_account_addresses(),
                 commit_msg_tx.clone(),
                 rb_backoff_policy,
                 TimeService::real(),
@@ -172,7 +175,7 @@ impl BufferManager {
             ),
             commit_proof_rb_handle: None,
             commit_msg_tx,
-            commit_msg_rx,
+            commit_msg_rx: Some(commit_msg_rx),
 
             persisting_phase_tx,
 
@@ -180,7 +183,7 @@ impl BufferManager {
             reset_rx,
             stop: false,
 
-            verifier,
+            epoch_state,
             ongoing_tasks,
             end_epoch_timestamp: OnceCell::new(),
             previous_commit_time: Instant::now(),
@@ -192,7 +195,11 @@ impl BufferManager {
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let task = self.reliable_broadcast.broadcast(
             message,
-            AckState::new(self.verifier.get_ordered_account_addresses_iter()),
+            AckState::new(
+                self.epoch_state
+                    .verifier
+                    .get_ordered_account_addresses_iter(),
+            ),
         );
         tokio::spawn(Abortable::new(task, abort_registration));
         DropGuard::new(abort_handle)
@@ -460,7 +467,7 @@ impl BufferManager {
         let item = self.buffer.take(&current_cursor);
         let new_item = item.advance_to_executed_or_aggregated(
             executed_blocks,
-            &self.verifier,
+            &self.epoch_state.verifier,
             self.end_epoch_timestamp.get().cloned(),
         );
         let aggregated = new_item.is_aggregated();
@@ -535,10 +542,6 @@ impl BufferManager {
             protocol,
             response_sender,
         } = commit_msg;
-        if let Err(e) = req.verify(&self.verifier) {
-            warn!("Invalid commit message: {}", e);
-            return None;
-        }
         match req {
             CommitMessage::Vote(vote) => {
                 // find the corresponding item
@@ -558,7 +561,7 @@ impl BufferManager {
                             if let Ok(bytes) = protocol.to_bytes(&response) {
                                 let _ = response_sender.send(Ok(bytes.into()));
                             }
-                            item.try_advance_to_aggregated(&self.verifier)
+                            item.try_advance_to_aggregated(&self.epoch_state.verifier)
                         },
                         Err(e) => {
                             error!(
@@ -692,9 +695,28 @@ impl BufferManager {
             .set(pending_aggregated as i64);
     }
 
-    pub async fn start(mut self) {
+    pub async fn start(mut self, bounded_executor: BoundedExecutor) {
         info!("Buffer manager starts.");
+        let (verified_commit_msg_tx, mut verified_commit_msg_rx) = create_channel();
         let mut interval = tokio::time::interval(Duration::from_millis(LOOP_INTERVAL_MS));
+        let mut commit_msg_rx = self.commit_msg_rx.take().expect("commit msg rx must exist");
+        let epoch_state = self.epoch_state.clone();
+        spawn_named!("buffer manager verification", async move {
+            while let Some(commit_msg) = commit_msg_rx.next().await {
+                let tx = verified_commit_msg_tx.clone();
+                let epoch_state_clone = epoch_state.clone();
+                bounded_executor
+                    .spawn(async move {
+                        match commit_msg.req.verify(&epoch_state_clone.verifier) {
+                            Ok(_) => {
+                                let _ = tx.unbounded_send(commit_msg);
+                            },
+                            Err(e) => warn!("Invalid commit message: {}", e),
+                        }
+                    })
+                    .await;
+            }
+        });
         while !self.stop {
             // advancing the root will trigger sending requests to the pipeline
             ::futures::select! {
@@ -727,9 +749,9 @@ impl BufferManager {
                     self.advance_signing_root().await
                     })
                 },
-                commit_msg = self.commit_msg_rx.select_next_some() => {
+                rpc_request = verified_commit_msg_rx.select_next_some() => {
                     monitor!("buffer_manager_process_commit_message",
-                    if let Some(aggregated_block_id) = self.process_commit_message(commit_msg) {
+                    if let Some(aggregated_block_id) = self.process_commit_message(rpc_request) {
                         self.advance_head(aggregated_block_id).await;
                         if self.execution_root.is_none() {
                             self.advance_execution_root().await;
@@ -738,7 +760,7 @@ impl BufferManager {
                             self.advance_signing_root().await;
                         }
                     });
-                },
+                }
                 _ = interval.tick().fuse() => {
                     monitor!("buffer_manager_process_interval_tick", {
                     self.update_buffer_manager_metrics();
