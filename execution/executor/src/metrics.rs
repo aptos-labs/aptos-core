@@ -211,10 +211,11 @@ pub static APTOS_PROCESSED_USER_TRANSACTIONS_CORE_EVENTS: Lazy<IntCounterVec> = 
     .unwrap()
 });
 
-pub static APTOS_PROCESSED_TXNS_OUTPUT_SIZE: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
+pub static APTOS_PROCESSED_TXNS_OUTPUT_SIZE: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
         "aptos_processed_txns_output_size",
-        "Total size of all trnsaction outputs thus far",
+        "Histogram of transaction outputs",
+        exponential_buckets(/*start=*/ 1.0, /*factor=*/ 2.0, /*count=*/ 25).unwrap()
     )
     .unwrap()
 });

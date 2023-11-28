@@ -147,7 +147,7 @@ where
                 let start_time = Instant::now();
                 let mut executed = 0;
                 let start_gas_measurement = GasMeasuring::start();
-                let start_output_size = APTOS_PROCESSED_TXNS_OUTPUT_SIZE.get();
+                let start_output_size = APTOS_PROCESSED_TXNS_OUTPUT_SIZE.get_sample_sum();
                 while let Ok(msg) = executable_block_receiver.recv() {
                     let ExecuteBlockMessage {
                         current_block_start_time,
@@ -165,7 +165,8 @@ where
                 }
 
                 let delta_gas = start_gas_measurement.end();
-                let delta_output_size = APTOS_PROCESSED_TXNS_OUTPUT_SIZE.get() - start_output_size;
+                let delta_output_size =
+                    APTOS_PROCESSED_TXNS_OUTPUT_SIZE.get_sample_sum() - start_output_size;
 
                 let elapsed = start_time.elapsed().as_secs_f64();
                 info!(
@@ -196,7 +197,7 @@ where
                 );
                 info!(
                     "Overall execution output: {} bytes/s",
-                    delta_output_size as f64 / elapsed
+                    delta_output_size / elapsed
                 );
 
                 start_commit_tx.map(|tx| tx.send(()));
