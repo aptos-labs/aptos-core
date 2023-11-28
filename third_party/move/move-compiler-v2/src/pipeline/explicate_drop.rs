@@ -58,7 +58,8 @@ impl<'a> ExplicateDropTransformer<'a> {
         }
     }
 
-    // Add explicit drop instructions
+    /// Add explicit drop instructions
+    /// note that this will invalidate existing analyses
     pub fn transform(&mut self) {
         let bytecodes = std::mem::take(&mut self.codes);
         for (code_offset, bytecode) in bytecodes.into_iter().enumerate() {
