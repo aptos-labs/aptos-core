@@ -64,7 +64,7 @@ async fn compression_mismatch_disabled() {
             .get_transactions_with_proof(100, 50, 100, false, request_timeout)
             .await
             .unwrap_err();
-        assert_matches!(response, Error::InvalidResponse(_));
+        assert_matches!(response, Error::DataIsUnavailable(_));
     }
 }
 
@@ -113,7 +113,7 @@ async fn compression_mismatch_enabled() {
             .get_transactions_with_proof(100, 50, 100, false, request_timeout)
             .await
             .unwrap_err();
-        assert_matches!(response, Error::InvalidResponse(_));
+        assert_matches!(response, Error::DataIsUnavailable(_));
     }
 }
 

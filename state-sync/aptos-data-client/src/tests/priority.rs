@@ -25,7 +25,10 @@ use claims::assert_matches;
 use maplit::hashset;
 use ordered_float::OrderedFloat;
 use rand::Rng;
-use std::{cmp::Ordering, collections::HashMap};
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+};
 
 #[tokio::test]
 async fn all_peer_request_selection() {
@@ -59,10 +62,9 @@ async fn all_peer_request_selection() {
     client.update_peer_storage_summary(regular_peer_1, utils::create_storage_summary(100));
     verify_peer_selected_for_request(&client, regular_peer_1, &storage_request);
 
-    // Advertise the data for the priority peer and verify the priority peer is selected
+    // Advertise the data for priority peer 2 and verify the peer is selected
     client.update_peer_storage_summary(priority_peer_2, utils::create_storage_summary(100));
-    let peer_for_request = client.choose_peer_for_request(&storage_request).unwrap();
-    assert_eq!(peer_for_request, priority_peer_2);
+    verify_peer_selected_for_request(&client, priority_peer_2, &storage_request);
 
     // Reconnect priority peer 1 and remove the advertised data for priority peer 2
     mock_network.reconnect_peer(priority_peer_1);
@@ -71,15 +73,17 @@ async fn all_peer_request_selection() {
     // Request the data again and verify the regular peer is chosen
     verify_peer_selected_for_request(&client, regular_peer_1, &storage_request);
 
-    // Advertise the data for priority peer 1 and verify the priority peer is selected
+    // Advertise the data for priority peer 1 and verify the peer is selected
     client.update_peer_storage_summary(priority_peer_1, utils::create_storage_summary(100));
-    let peer_for_request = client.choose_peer_for_request(&storage_request).unwrap();
-    assert_eq!(peer_for_request, priority_peer_1);
+    verify_peer_selected_for_request(&client, priority_peer_1, &storage_request);
 
-    // Advertise the data for priority peer 2 and verify either priority peer is selected
+    // Advertise the data for priority peer 2 and verify both priority peers are selected
     client.update_peer_storage_summary(priority_peer_2, utils::create_storage_summary(100));
-    let peer_for_request = client.choose_peer_for_request(&storage_request).unwrap();
-    assert!(peer_for_request == priority_peer_1 || peer_for_request == priority_peer_2);
+    let peers_for_request = client.choose_peers_for_request(&storage_request).unwrap();
+    assert_eq!(peers_for_request, hashset![
+        priority_peer_1,
+        priority_peer_2
+    ]);
 }
 
 #[tokio::test]
@@ -147,20 +151,22 @@ async fn prioritized_peer_request_latency_filtering() {
 
         // Add several peers (enough to trigger latency filtering)
         let num_peers = min_peers_for_latency_filtering + 10;
-        let mut peers = vec![];
+        let mut peers = hashset![];
         for _ in 0..num_peers {
             let peer = mock_network.add_peer(poll_priority_peers);
-            peers.push(peer);
+            peers.insert(peer);
         }
 
-        // Select a peer to service the request multiple times
+        // Select peers to service the request multiple times
         let mut peers_and_selection_counts = HashMap::new();
         for _ in 0..20_000 {
-            // Select a peer to service the request
-            let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+            // Select peers to service the request
+            let selected_peers = client.choose_peers_for_request(&storage_request).unwrap();
 
             // Update the peer selection counts
-            *peers_and_selection_counts.entry(selected_peer).or_insert(0) += 1;
+            for selected_peer in selected_peers {
+                *peers_and_selection_counts.entry(selected_peer).or_insert(0) += 1;
+            }
         }
 
         // Verify the highest selected peers are the lowest latency peers
@@ -226,20 +232,22 @@ async fn prioritized_peer_request_latency_filtering_ratio() {
 
         // Add several peers (enough to satisfy the minimum number of peers)
         let num_peers = min_peers_for_latency_filtering * 2;
-        let mut peers = vec![];
+        let mut peers = hashset![];
         for _ in 0..num_peers {
             let peer = mock_network.add_peer(poll_priority_peers);
-            peers.push(peer);
+            peers.insert(peer);
         }
 
-        // Select a peer to service the request multiple times
+        // Select peers to service the request multiple times
         let mut peers_and_selection_counts = HashMap::new();
         for _ in 0..20_000 {
-            // Select a peer to service the request
-            let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+            // Select peers to service the request
+            let selected_peers = client.choose_peers_for_request(&storage_request).unwrap();
 
             // Update the peer selection counts
-            *peers_and_selection_counts.entry(selected_peer).or_insert(0) += 1;
+            for selected_peer in selected_peers {
+                *peers_and_selection_counts.entry(selected_peer).or_insert(0) += 1;
+            }
         }
 
         // Verify the highest selected peers are the lowest latency peers
@@ -281,20 +289,22 @@ async fn prioritized_peer_request_latency_selection() {
 
         // Add several peers (but not enough to trigger latency filtering)
         let num_peers = min_peers_for_latency_filtering - 1;
-        let mut peers = vec![];
+        let mut peers = hashset![];
         for _ in 0..num_peers {
             let peer = mock_network.add_peer(poll_priority_peers);
-            peers.push(peer);
+            peers.insert(peer);
         }
 
-        // Select a peer to service the request multiple times
+        // Select peers to service the request multiple times
         let mut peers_and_selection_counts = HashMap::new();
         for _ in 0..20_000 {
-            // Select a peer to service the request
-            let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+            // Select peers to service the request
+            let selected_peers = client.choose_peers_for_request(&storage_request).unwrap();
 
             // Update the peer selection counts
-            *peers_and_selection_counts.entry(selected_peer).or_insert(0) += 1;
+            for selected_peer in selected_peers {
+                *peers_and_selection_counts.entry(selected_peer).or_insert(0) += 1;
+            }
         }
 
         // Verify the highest selected peers are the lowest latency peers
@@ -351,14 +361,16 @@ async fn prioritized_peer_request_missing_latencies() {
             peers_with_missing_latencies.push(*peer);
         }
 
-        // Select a peer to service the request multiple times
+        // Select peers to service the request multiple times
         let mut peers_and_selection_counts = HashMap::new();
         for _ in 0..20_000 {
-            // Select a peer to service the request
-            let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+            // Select peers to service the request
+            let selected_peers = client.choose_peers_for_request(&storage_request).unwrap();
 
             // Update the peer selection counts
-            *peers_and_selection_counts.entry(selected_peer).or_insert(0) += 1;
+            for selected_peer in selected_peers {
+                *peers_and_selection_counts.entry(selected_peer).or_insert(0) += 1;
+            }
         }
 
         // Verify the highest selected peers are the lowest latency peers
@@ -400,24 +412,26 @@ async fn prioritized_peer_request_no_latencies() {
 
         // Add several peers and remove their latency metadata
         let num_peers = min_peers_for_latency_filtering + 10;
-        let mut peers = vec![];
+        let mut peers = hashset![];
         for _ in 0..num_peers {
             // Add a peer
             let peer = mock_network.add_peer(poll_priority_peers);
-            peers.push(peer);
+            peers.insert(peer);
 
             // Remove the latency metadata for the peer
             utils::remove_latency_metadata(&client, peer)
         }
 
-        // Select a peer to service the request multiple times
+        // Select peers to service the request multiple times
         let mut peers_and_selection_counts = HashMap::new();
         for _ in 0..20_000 {
-            // Select a peer to service the request
-            let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+            // Select peers to service the request
+            let selected_peers = client.choose_peers_for_request(&storage_request).unwrap();
 
             // Update the peer selection counts
-            *peers_and_selection_counts.entry(selected_peer).or_insert(0) += 1;
+            for selected_peer in selected_peers {
+                *peers_and_selection_counts.entry(selected_peer).or_insert(0) += 1;
+            }
         }
 
         // Verify that peers are still selected even though there are no recorded latencies
@@ -549,11 +563,11 @@ async fn prioritized_peer_optimistic_fetch_distance_latency_selection() {
         let storage_request = StorageServiceRequest::new(data_request, true);
 
         // Add several regular peers and verify the peers cannot service the request
-        let mut regular_peers = vec![];
+        let mut regular_peers = hashset![];
         for _ in 0..5 {
             // Add a regular peer
             let regular_peer = mock_network.add_peer(false);
-            regular_peers.push(regular_peer);
+            regular_peers.insert(regular_peer);
 
             // Verify the peer cannot service the request
             verify_request_is_unserviceable(&client, &storage_request);
@@ -563,34 +577,34 @@ async fn prioritized_peer_optimistic_fetch_distance_latency_selection() {
         let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
         update_storage_summaries_for_peers(&client, &regular_peers, known_version, timestamp_usecs);
 
-        // Verify the peer is selected by distance and latency
-        let selected_peer = verify_peer_selected_by_distance_and_latency(
+        // Verify the peers are selected by distance and latency
+        let selected_peers = verify_peers_selected_by_distance_and_latency(
             &mut mock_network,
             &client,
             &storage_request,
             &mut regular_peers,
         );
 
-        // Disconnect the selected peer and remove it from the list of regular peers
-        disconnect_and_remove_peer(&mut mock_network, &mut regular_peers, selected_peer);
+        // Disconnect the selected peers and remove them from the list of regular peers
+        disconnect_and_remove_peers(&mut mock_network, &mut regular_peers, &selected_peers);
 
-        // Verify the next peer is selected by distance and latency
-        let selected_peer = verify_peer_selected_by_distance_and_latency(
+        // Verify the next set of peers are selected by distance and latency
+        let selected_peers = verify_peers_selected_by_distance_and_latency(
             &mut mock_network,
             &client,
             &storage_request,
             &mut regular_peers,
         );
 
-        // Add several priority peers and verify the regular peer is still selected
-        let mut priority_peers = vec![];
+        // Add several priority peers and verify the regular peers are still selected
+        let mut priority_peers = hashset![];
         for _ in 0..3 {
             // Add a priority peer
             let priority_peer = mock_network.add_peer(true);
-            priority_peers.push(priority_peer);
+            priority_peers.insert(priority_peer);
 
-            // Verify the regular peer is still selected
-            verify_peer_selected_for_request(&client, selected_peer, &storage_request);
+            // Verify the regular peers are still selected
+            verify_peers_selected_for_request(&client, &selected_peers, &storage_request);
         }
 
         // Advertise the data for the priority peers
@@ -602,7 +616,7 @@ async fn prioritized_peer_optimistic_fetch_distance_latency_selection() {
         );
 
         // Verify the priority peers are selected by distance and latency
-        verify_peer_selected_by_distance_and_latency(
+        verify_peers_selected_by_distance_and_latency(
             &mut mock_network,
             &client,
             &storage_request,
@@ -610,7 +624,7 @@ async fn prioritized_peer_optimistic_fetch_distance_latency_selection() {
         );
 
         // Disconnect all but one priority peer and remove them from the list of priority peers
-        let last_priority_peer = priority_peers[0];
+        let last_priority_peer = *priority_peers.iter().next().unwrap();
         for priority_peer in priority_peers.clone() {
             if priority_peer != last_priority_peer {
                 mock_network.disconnect_peer(priority_peer);
@@ -622,10 +636,12 @@ async fn prioritized_peer_optimistic_fetch_distance_latency_selection() {
         verify_peer_selected_for_request(&client, last_priority_peer, &storage_request);
 
         // Disconnect the final priority peer and remove it from the list of priority peers
-        disconnect_and_remove_peer(&mut mock_network, &mut priority_peers, last_priority_peer);
+        disconnect_and_remove_peers(&mut mock_network, &mut priority_peers, &hashset![
+            last_priority_peer
+        ]);
 
         // Verify a regular peer is selected by distance and latency
-        verify_peer_selected_by_distance_and_latency(
+        verify_peers_selected_by_distance_and_latency(
             &mut mock_network,
             &client,
             &storage_request,
@@ -666,11 +682,11 @@ async fn prioritized_peer_optimistic_fetch_distance_latency_weights() {
                 MockNetwork::new(None, Some(data_client_config), None);
 
             // Add several peers and verify the peers cannot service the request
-            let mut peers = vec![];
+            let mut peers = hashset![];
             for _ in 0..50 {
                 // Add a peer
                 let peer = mock_network.add_peer(priority_peers);
-                peers.push(peer);
+                peers.insert(peer);
 
                 // Verify the peer cannot service the request
                 verify_request_is_unserviceable(&client, &storage_request);
@@ -685,14 +701,16 @@ async fn prioritized_peer_optimistic_fetch_distance_latency_weights() {
             let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
             update_storage_summaries_for_peers(&client, &peers, known_version, timestamp_usecs);
 
-            // Select a peer to service the request multiple times
+            // Select peers to service the request multiple times
             let mut peers_and_selection_counts = HashMap::new();
             for _ in 0..20_000 {
-                // Select a peer to service the request
-                let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+                // Select peers to service the request
+                let selected_peers = client.choose_peers_for_request(&storage_request).unwrap();
 
                 // Update the peer selection counts
-                *peers_and_selection_counts.entry(selected_peer).or_insert(0) += 1;
+                for selected_peer in selected_peers {
+                    *peers_and_selection_counts.entry(selected_peer).or_insert(0) += 1;
+                }
             }
 
             // Verify all of the selected peers have the lowest distance
@@ -733,11 +751,11 @@ async fn prioritized_peer_optimistic_fetch_missing_distances() {
         let storage_request = StorageServiceRequest::new(data_request, true);
 
         // Add several regular peers and remove their distance metadata
-        let mut regular_peers = vec![];
+        let mut regular_peers = hashset![];
         for _ in 0..5 {
             // Add a regular peer
             let regular_peer = mock_network.add_peer(false);
-            regular_peers.push(regular_peer);
+            regular_peers.insert(regular_peer);
 
             // Remove the distance metadata for the peer
             utils::remove_distance_metadata(&client, regular_peer);
@@ -747,30 +765,30 @@ async fn prioritized_peer_optimistic_fetch_missing_distances() {
         let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
         update_storage_summaries_for_peers(&client, &regular_peers, known_version, timestamp_usecs);
 
-        // Verify that a random peer is selected for the request
-        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
-        assert!(regular_peers.contains(&selected_peer));
+        // Verify that random regular peers are selected for the request
+        let selected_peers = client.choose_peers_for_request(&storage_request).unwrap();
+        assert!(regular_peers.is_superset(&selected_peers));
 
-        // Disconnect the selected peer and verify another peer is selected
-        disconnect_and_remove_peer(&mut mock_network, &mut regular_peers, selected_peer);
-        let another_selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
-        assert_ne!(selected_peer, another_selected_peer);
-        assert!(regular_peers.contains(&another_selected_peer));
+        // Disconnect the selected peers and verify other peers are selected
+        disconnect_and_remove_peers(&mut mock_network, &mut regular_peers, &selected_peers);
+        let other_selected_peers = client.choose_peers_for_request(&storage_request).unwrap();
+        assert_ne!(selected_peers, other_selected_peers);
+        assert!(regular_peers.is_superset(&other_selected_peers));
 
         // Add several priority peers and remove their distance metadata
-        let mut priority_peers = vec![];
+        let mut priority_peers = hashset![];
         for _ in 0..3 {
             // Add a priority peer
             let priority_peer = mock_network.add_peer(true);
-            priority_peers.push(priority_peer);
+            priority_peers.insert(priority_peer);
 
             // Remove the distance metadata for the peer
             utils::remove_distance_metadata(&client, priority_peer);
         }
 
-        // Verify that a random regular peer is selected for the request
-        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
-        assert!(regular_peers.contains(&selected_peer));
+        // Verify that regular peers are selected for the request
+        let selected_peers = client.choose_peers_for_request(&storage_request).unwrap();
+        assert!(regular_peers.is_superset(&selected_peers));
 
         // Advertise the data for the priority peers
         update_storage_summaries_for_peers(
@@ -780,23 +798,19 @@ async fn prioritized_peer_optimistic_fetch_missing_distances() {
             timestamp_usecs,
         );
 
-        // Verify that a random priority peer is now selected for the request
-        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
-        assert!(priority_peers.contains(&selected_peer));
+        // Verify that priority peers are now selected for the request
+        let selected_peers = client.choose_peers_for_request(&storage_request).unwrap();
+        assert!(priority_peers.is_superset(&selected_peers));
 
-        // Disconnect the priority peer and verify a random priority peer is selected
-        disconnect_and_remove_peer(&mut mock_network, &mut priority_peers, selected_peer);
-        let another_selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
-        assert_ne!(selected_peer, another_selected_peer);
-        assert!(priority_peers.contains(&another_selected_peer));
+        // Disconnect the priority peers and verify more priority peers are selected
+        disconnect_and_remove_peers(&mut mock_network, &mut priority_peers, &selected_peers);
+        let other_selected_peers = client.choose_peers_for_request(&storage_request).unwrap();
+        assert_ne!(selected_peers, other_selected_peers);
+        assert!(priority_peers.is_superset(&other_selected_peers));
 
         // Disconnect and remove all regular and priority peers
-        for regular_peer in regular_peers.clone() {
-            disconnect_and_remove_peer(&mut mock_network, &mut regular_peers, regular_peer);
-        }
-        for priority_peer in priority_peers.clone() {
-            disconnect_and_remove_peer(&mut mock_network, &mut priority_peers, priority_peer);
-        }
+        disconnect_and_remove_all_peers(&mut mock_network, &mut regular_peers);
+        disconnect_and_remove_all_peers(&mut mock_network, &mut priority_peers);
 
         // Verify no peers can service the request
         verify_request_is_unserviceable(&client, &storage_request);
@@ -825,11 +839,11 @@ async fn prioritized_peer_optimistic_fetch_missing_latencies() {
         let storage_request = StorageServiceRequest::new(data_request, true);
 
         // Add several regular peers and remove their latency metadata
-        let mut regular_peers = vec![];
+        let mut regular_peers = hashset![];
         for _ in 0..5 {
             // Add a regular peer
             let regular_peer = mock_network.add_peer(false);
-            regular_peers.push(regular_peer);
+            regular_peers.insert(regular_peer);
 
             // Remove the latency metadata for the peer
             utils::remove_latency_metadata(&client, regular_peer);
@@ -839,30 +853,30 @@ async fn prioritized_peer_optimistic_fetch_missing_latencies() {
         let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
         update_storage_summaries_for_peers(&client, &regular_peers, known_version, timestamp_usecs);
 
-        // Verify that a random peer is selected for the request
-        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
-        assert!(regular_peers.contains(&selected_peer));
+        // Verify that random regular peers are selected for the request
+        let selected_peers = client.choose_peers_for_request(&storage_request).unwrap();
+        assert!(regular_peers.is_superset(&selected_peers));
 
-        // Disconnect the selected peer and verify another peer is selected
-        disconnect_and_remove_peer(&mut mock_network, &mut regular_peers, selected_peer);
-        let another_selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
-        assert_ne!(selected_peer, another_selected_peer);
-        assert!(regular_peers.contains(&another_selected_peer));
+        // Disconnect the selected peers and verify other peers are selected
+        disconnect_and_remove_peers(&mut mock_network, &mut regular_peers, &selected_peers);
+        let other_selected_peers = client.choose_peers_for_request(&storage_request).unwrap();
+        assert_ne!(selected_peers, other_selected_peers);
+        assert!(regular_peers.is_superset(&other_selected_peers));
 
         // Add several priority peers and remove their latency metadata
-        let mut priority_peers = vec![];
+        let mut priority_peers = hashset![];
         for _ in 0..3 {
             // Add a priority peer
             let priority_peer = mock_network.add_peer(true);
-            priority_peers.push(priority_peer);
+            priority_peers.insert(priority_peer);
 
             // Remove the latency metadata for the peer
             utils::remove_latency_metadata(&client, priority_peer);
         }
 
-        // Verify that a random regular peer is selected for the request
-        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
-        assert!(regular_peers.contains(&selected_peer));
+        // Verify that random regular peers are selected for the request
+        let selected_peers = client.choose_peers_for_request(&storage_request).unwrap();
+        assert!(regular_peers.is_superset(&selected_peers));
 
         // Advertise the data for the priority peers
         update_storage_summaries_for_peers(
@@ -872,23 +886,19 @@ async fn prioritized_peer_optimistic_fetch_missing_latencies() {
             timestamp_usecs,
         );
 
-        // Verify that a random priority peer is now selected for the request
-        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
-        assert!(priority_peers.contains(&selected_peer));
+        // Verify that random priority peers are now selected for the request
+        let selected_peers = client.choose_peers_for_request(&storage_request).unwrap();
+        assert!(priority_peers.is_superset(&selected_peers));
 
-        // Disconnect the priority peer and verify a random priority peer is selected
-        disconnect_and_remove_peer(&mut mock_network, &mut priority_peers, selected_peer);
-        let another_selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
-        assert_ne!(selected_peer, another_selected_peer);
-        assert!(priority_peers.contains(&another_selected_peer));
+        // Disconnect the priority peers and verify more priority peers are selected
+        disconnect_and_remove_peers(&mut mock_network, &mut priority_peers, &selected_peers);
+        let other_selected_peers = client.choose_peers_for_request(&storage_request).unwrap();
+        assert_ne!(selected_peers, other_selected_peers);
+        assert!(priority_peers.is_superset(&other_selected_peers));
 
         // Disconnect and remove all regular and priority peers
-        for regular_peer in regular_peers.clone() {
-            disconnect_and_remove_peer(&mut mock_network, &mut regular_peers, regular_peer);
-        }
-        for priority_peer in priority_peers.clone() {
-            disconnect_and_remove_peer(&mut mock_network, &mut priority_peers, priority_peer);
-        }
+        disconnect_and_remove_all_peers(&mut mock_network, &mut regular_peers);
+        disconnect_and_remove_all_peers(&mut mock_network, &mut priority_peers);
 
         // Verify no peers can service the request
         verify_request_is_unserviceable(&client, &storage_request);
@@ -937,12 +947,15 @@ async fn prioritized_peer_subscription_requests() {
         }
 
         // Verify a priority peer is selected
-        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
-        assert!(selected_peer == priority_peer_1 || selected_peer == priority_peer_2);
+        let selected_peer = client.choose_peers_for_request(&storage_request).unwrap();
+        assert!(
+            selected_peer == hashset![priority_peer_1]
+                || selected_peer == hashset![priority_peer_2]
+        );
 
         // Make several more requests and verify the same priority peer is selected
         for _ in 0..10 {
-            let current_selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+            let current_selected_peer = client.choose_peers_for_request(&storage_request).unwrap();
             assert_eq!(selected_peer, current_selected_peer);
         }
 
@@ -954,7 +967,7 @@ async fn prioritized_peer_subscription_requests() {
         // Advertise new data for all peers (except the selected peer)
         let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
         for peer in [priority_peer_1, priority_peer_2, regular_peer_1] {
-            if peer != selected_peer {
+            if hashset![peer] != selected_peer {
                 client.update_peer_storage_summary(
                     peer,
                     utils::create_storage_summary_with_timestamp(known_version, timestamp_usecs),
@@ -968,19 +981,25 @@ async fn prioritized_peer_subscription_requests() {
 
         // Verify the other priority peer is now select (as the
         // previous request will terminate the subscription).
-        let next_selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+        let next_selected_peer = client.choose_peers_for_request(&storage_request).unwrap();
         assert_ne!(selected_peer, next_selected_peer);
-        assert!(selected_peer == priority_peer_1 || selected_peer == priority_peer_2);
+        assert!(
+            selected_peer == hashset![priority_peer_1]
+                || selected_peer == hashset![priority_peer_2]
+        );
 
         // Update the request's subscription ID and verify the other priority peer is selected
         let storage_request = update_subscription_request_id(&storage_request);
-        let next_selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+        let next_selected_peer = client.choose_peers_for_request(&storage_request).unwrap();
         assert_ne!(selected_peer, next_selected_peer);
-        assert!(next_selected_peer == priority_peer_1 || next_selected_peer == priority_peer_2);
+        assert!(
+            next_selected_peer == hashset![priority_peer_1]
+                || next_selected_peer == hashset![priority_peer_2]
+        );
 
         // Make several more requests and verify the same priority peer is selected
         for _ in 0..10 {
-            let current_select_peer = client.choose_peer_for_request(&storage_request).unwrap();
+            let current_select_peer = client.choose_peers_for_request(&storage_request).unwrap();
             assert_eq!(current_select_peer, next_selected_peer);
         }
 
@@ -1014,11 +1033,11 @@ async fn prioritized_peer_subscription_distance_latency_selection() {
         let storage_request = StorageServiceRequest::new(data_request, true);
 
         // Add several regular peers and verify the peers cannot service the request
-        let mut regular_peers = vec![];
+        let mut regular_peers = hashset![];
         for _ in 0..5 {
             // Add a regular peer
             let regular_peer = mock_network.add_peer(false);
-            regular_peers.push(regular_peer);
+            regular_peers.insert(regular_peer);
 
             // Verify the peer cannot service the request
             verify_request_is_unserviceable(&client, &storage_request);
@@ -1028,23 +1047,25 @@ async fn prioritized_peer_subscription_distance_latency_selection() {
         let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
         update_storage_summaries_for_peers(&client, &regular_peers, known_version, timestamp_usecs);
 
-        // Verify the peer is selected by distance and latency
-        let selected_peer = verify_peer_selected_by_distance_and_latency(
+        // Verify the regular peer is selected by distance and latency
+        let selected_peers = verify_peers_selected_by_distance_and_latency(
             &mut mock_network,
             &client,
             &storage_request,
             &mut regular_peers,
         );
+        assert_eq!(selected_peers.len(), 1);
+        let regular_peer = selected_peers.iter().next().unwrap();
 
         // Add several priority peers and verify the regular peer is still selected
-        let mut priority_peers = vec![];
+        let mut priority_peers = hashset![];
         for _ in 0..3 {
             // Add a priority peer
             let priority_peer = mock_network.add_peer(true);
-            priority_peers.push(priority_peer);
+            priority_peers.insert(priority_peer);
 
             // Verify the regular peer is still selected
-            verify_peer_selected_for_request(&client, selected_peer, &storage_request);
+            verify_peer_selected_for_request(&client, *regular_peer, &storage_request);
         }
 
         // Advertise the data for the priority peers
@@ -1059,9 +1080,9 @@ async fn prioritized_peer_subscription_distance_latency_selection() {
         verify_request_is_unserviceable(&client, &storage_request);
 
         // Update the request's subscription ID and verify
-        // the peer is selected by distance and latency.
+        // the priority peer is selected by distance and latency.
         let storage_request = update_subscription_request_id(&storage_request);
-        verify_peer_selected_by_distance_and_latency(
+        verify_peers_selected_by_distance_and_latency(
             &mut mock_network,
             &client,
             &storage_request,
@@ -1069,7 +1090,7 @@ async fn prioritized_peer_subscription_distance_latency_selection() {
         );
 
         // Disconnect all but one priority peer and remove them from the list of priority peers
-        let last_priority_peer = priority_peers[0];
+        let last_priority_peer = *priority_peers.iter().next().unwrap();
         for priority_peer in priority_peers.clone() {
             if priority_peer != last_priority_peer {
                 mock_network.disconnect_peer(priority_peer);
@@ -1078,9 +1099,9 @@ async fn prioritized_peer_subscription_distance_latency_selection() {
         priority_peers.retain(|peer| *peer == last_priority_peer);
 
         // Update the request's subscription ID and verify the
-        // peer is selected by distance and latency.
+        // priority peer is selected by distance and latency.
         let storage_request = update_subscription_request_id(&storage_request);
-        verify_peer_selected_by_distance_and_latency(
+        verify_peers_selected_by_distance_and_latency(
             &mut mock_network,
             &client,
             &storage_request,
@@ -1088,15 +1109,17 @@ async fn prioritized_peer_subscription_distance_latency_selection() {
         );
 
         // Disconnect the final priority peer and remove it from the list of priority peers
-        disconnect_and_remove_peer(&mut mock_network, &mut priority_peers, last_priority_peer);
+        disconnect_and_remove_peers(&mut mock_network, &mut priority_peers, &hashset![
+            last_priority_peer
+        ]);
 
         // Verify the request is unserviceable (the last request went to the priority peer)
         verify_request_is_unserviceable(&client, &storage_request);
 
         // Update the request's subscription ID and verify the
-        // peer is selected by distance and latency.
+        // regular peer is selected by distance and latency.
         let storage_request = update_subscription_request_id(&storage_request);
-        verify_peer_selected_by_distance_and_latency(
+        verify_peers_selected_by_distance_and_latency(
             &mut mock_network,
             &client,
             &storage_request,
@@ -1137,11 +1160,11 @@ async fn prioritized_peer_subscription_distance_latency_weights() {
                 MockNetwork::new(None, Some(data_client_config), None);
 
             // Add several peers and verify the peers cannot service the request
-            let mut peers = vec![];
+            let mut peers = hashset![];
             for _ in 0..50 {
                 // Add a peer
                 let peer = mock_network.add_peer(priority_peers);
-                peers.push(peer);
+                peers.insert(peer);
 
                 // Verify the peer cannot service the request
                 verify_request_is_unserviceable(&client, &storage_request);
@@ -1160,10 +1183,12 @@ async fn prioritized_peer_subscription_distance_latency_weights() {
             let mut peers_and_selection_counts = HashMap::new();
             for _ in 0..20_000 {
                 // Select a peer to service the request
-                let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+                let selected_peers = client.choose_peers_for_request(&storage_request).unwrap();
 
                 // Update the peer selection counts
-                *peers_and_selection_counts.entry(selected_peer).or_insert(0) += 1;
+                for selected_peer in selected_peers {
+                    *peers_and_selection_counts.entry(selected_peer).or_insert(0) += 1;
+                }
             }
 
             // Verify all of the selected peers have the lowest distance
@@ -1204,11 +1229,11 @@ async fn prioritized_peer_subscription_missing_distances() {
         let storage_request = StorageServiceRequest::new(data_request, true);
 
         // Add several priority peers and remove their distance metadata
-        let mut priority_peers = vec![];
+        let mut priority_peers = hashset![];
         for _ in 0..3 {
             // Add a priority peer
             let priority_peer = mock_network.add_peer(true);
-            priority_peers.push(priority_peer);
+            priority_peers.insert(priority_peer);
 
             // Remove the distance metadata for the peer
             utils::remove_distance_metadata(&client, priority_peer);
@@ -1224,70 +1249,73 @@ async fn prioritized_peer_subscription_missing_distances() {
         );
 
         // Verify that a random priority peer is selected for the request
-        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
-        assert!(priority_peers.contains(&selected_peer));
+        let selected_peer = client.choose_peers_for_request(&storage_request).unwrap();
+        verify_peer_in_set(&selected_peer, &priority_peers);
 
         // Disconnect the selected peer and update the request's subscription ID
-        disconnect_and_remove_peer(&mut mock_network, &mut priority_peers, selected_peer);
+        disconnect_and_remove_peers(&mut mock_network, &mut priority_peers, &selected_peer);
         let storage_request = update_subscription_request_id(&storage_request);
 
         // Verify that another priority peer is selected for the request
-        let another_selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+        let another_selected_peer = client.choose_peers_for_request(&storage_request).unwrap();
         assert_ne!(selected_peer, another_selected_peer);
-        assert!(priority_peers.contains(&another_selected_peer));
+        verify_peer_in_set(&another_selected_peer, &priority_peers);
 
         // Add several regular peers and remove their distance metadata
-        let mut regular_peers = vec![];
+        let mut regular_peers = hashset![];
         for _ in 0..10 {
             // Add a regular peer
             let regular_peer = mock_network.add_peer(false);
-            regular_peers.push(regular_peer);
+            regular_peers.insert(regular_peer);
 
             // Remove the distance metadata for the peer
             utils::remove_distance_metadata(&client, regular_peer);
         }
 
         // Verify that a priority peer is still selected for the request
-        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
-        assert!(priority_peers.contains(&selected_peer));
+        let selected_peer = client.choose_peers_for_request(&storage_request).unwrap();
+        verify_peer_in_set(&selected_peer, &priority_peers);
 
         // Advertise the data for the regular peers and update the request's subscription ID
         update_storage_summaries_for_peers(&client, &regular_peers, known_version, timestamp_usecs);
         let storage_request = update_subscription_request_id(&storage_request);
 
         // Verify that a random priority peer is still selected for the request
-        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
-        assert!(priority_peers.contains(&selected_peer));
+        let selected_peer = client.choose_peers_for_request(&storage_request).unwrap();
+        verify_peer_in_set(&selected_peer, &priority_peers);
 
         // Disconnect and remove all priority peers
-        for priority_peer in priority_peers.clone() {
-            disconnect_and_remove_peer(&mut mock_network, &mut priority_peers, priority_peer);
-        }
+        disconnect_and_remove_all_peers(&mut mock_network, &mut priority_peers);
 
         // Update the request's subscription ID and verify that a random regular peer is selected
         let storage_request = update_subscription_request_id(&storage_request);
-        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
-        assert!(regular_peers.contains(&selected_peer));
+        let selected_peer = client.choose_peers_for_request(&storage_request).unwrap();
+        verify_peer_in_set(&selected_peer, &regular_peers);
 
         // Disconnect the selected peer and update the request's subscription ID
-        disconnect_and_remove_peer(&mut mock_network, &mut regular_peers, selected_peer);
+        disconnect_and_remove_peers(&mut mock_network, &mut regular_peers, &selected_peer);
         let storage_request = update_subscription_request_id(&storage_request);
 
         // Verify that another regular peer is selected for the request
-        let another_selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+        let another_selected_peer = client.choose_peers_for_request(&storage_request).unwrap();
         assert_ne!(selected_peer, another_selected_peer);
-        assert!(regular_peers.contains(&another_selected_peer));
+        verify_peer_in_set(&another_selected_peer, &regular_peers);
 
         // Disconnect and remove all regular peers
-        for regular_peer in regular_peers.clone() {
-            disconnect_and_remove_peer(&mut mock_network, &mut regular_peers, regular_peer);
-        }
+        disconnect_and_remove_all_peers(&mut mock_network, &mut regular_peers);
 
         // Verify no peers can service the request
         for _ in 0..10 {
             verify_request_is_unserviceable(&client, &storage_request);
         }
     }
+}
+
+/// Verifies that the given peer set contains a single entry
+/// and that the single peer is in the superset.
+fn verify_peer_in_set(single_peer: &HashSet<PeerNetworkId>, peers: &HashSet<PeerNetworkId>) {
+    assert_eq!(single_peer.len(), 1);
+    assert!(peers.is_superset(single_peer));
 }
 
 #[tokio::test]
@@ -1312,11 +1340,11 @@ async fn prioritized_peer_subscription_missing_latencies() {
         let storage_request = StorageServiceRequest::new(data_request, true);
 
         // Add several priority peers and remove their latency metadata
-        let mut priority_peers = vec![];
+        let mut priority_peers = hashset![];
         for _ in 0..3 {
             // Add a priority peer
             let priority_peer = mock_network.add_peer(true);
-            priority_peers.push(priority_peer);
+            priority_peers.insert(priority_peer);
 
             // Remove the latency metadata for the peer
             utils::remove_latency_metadata(&client, priority_peer);
@@ -1332,64 +1360,60 @@ async fn prioritized_peer_subscription_missing_latencies() {
         );
 
         // Verify that a random priority peer is selected for the request
-        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
-        assert!(priority_peers.contains(&selected_peer));
+        let selected_peer = client.choose_peers_for_request(&storage_request).unwrap();
+        verify_peer_in_set(&selected_peer, &priority_peers);
 
         // Disconnect the selected peer and update the request's subscription ID
-        disconnect_and_remove_peer(&mut mock_network, &mut priority_peers, selected_peer);
+        disconnect_and_remove_peers(&mut mock_network, &mut priority_peers, &selected_peer);
         let storage_request = update_subscription_request_id(&storage_request);
 
         // Verify that another priority peer is selected for the request
-        let another_selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+        let another_selected_peer = client.choose_peers_for_request(&storage_request).unwrap();
         assert_ne!(selected_peer, another_selected_peer);
-        assert!(priority_peers.contains(&another_selected_peer));
+        verify_peer_in_set(&another_selected_peer, &priority_peers);
 
         // Add several regular peers and remove their latency metadata
-        let mut regular_peers = vec![];
+        let mut regular_peers = hashset![];
         for _ in 0..10 {
             // Add a regular peer
             let regular_peer = mock_network.add_peer(false);
-            regular_peers.push(regular_peer);
+            regular_peers.insert(regular_peer);
 
             // Remove the latency metadata for the peer
             utils::remove_latency_metadata(&client, regular_peer);
         }
 
         // Verify that a priority peer is still selected for the request
-        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
-        assert!(priority_peers.contains(&selected_peer));
+        let selected_peer = client.choose_peers_for_request(&storage_request).unwrap();
+        verify_peer_in_set(&selected_peer, &priority_peers);
 
         // Advertise the data for the regular peers and update the request's subscription ID
         update_storage_summaries_for_peers(&client, &regular_peers, known_version, timestamp_usecs);
         let storage_request = update_subscription_request_id(&storage_request);
 
         // Verify that a random priority peer is still selected for the request
-        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
-        assert!(priority_peers.contains(&selected_peer));
+        let selected_peer = client.choose_peers_for_request(&storage_request).unwrap();
+        verify_peer_in_set(&selected_peer, &priority_peers);
 
         // Disconnect and remove all priority peers
-        for priority_peer in priority_peers.clone() {
-            disconnect_and_remove_peer(&mut mock_network, &mut priority_peers, priority_peer);
-        }
+        disconnect_and_remove_all_peers(&mut mock_network, &mut priority_peers);
 
         // Update the request's subscription ID and verify that a random regular peer is selected
         let storage_request = update_subscription_request_id(&storage_request);
-        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
-        assert!(regular_peers.contains(&selected_peer));
+        let selected_peer = client.choose_peers_for_request(&storage_request).unwrap();
+        verify_peer_in_set(&selected_peer, &regular_peers);
 
         // Disconnect the selected peer and update the request's subscription ID
-        disconnect_and_remove_peer(&mut mock_network, &mut regular_peers, selected_peer);
+        disconnect_and_remove_peers(&mut mock_network, &mut regular_peers, &selected_peer);
         let storage_request = update_subscription_request_id(&storage_request);
 
         // Verify that another regular peer is selected for the request
-        let another_selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+        let another_selected_peer = client.choose_peers_for_request(&storage_request).unwrap();
         assert_ne!(selected_peer, another_selected_peer);
-        assert!(regular_peers.contains(&another_selected_peer));
+        verify_peer_in_set(&another_selected_peer, &regular_peers);
 
         // Disconnect and remove all regular peers
-        for regular_peer in regular_peers.clone() {
-            disconnect_and_remove_peer(&mut mock_network, &mut regular_peers, regular_peer);
-        }
+        disconnect_and_remove_all_peers(&mut mock_network, &mut regular_peers);
 
         // Verify no peers can service the request
         for _ in 0..10 {
@@ -1522,7 +1546,7 @@ async fn validator_peer_prioritization() {
     let validator_peer = mock_network.add_peer_with_network_id(NetworkId::Validator, false);
     let (priority_peers, regular_peers) = client.get_priority_and_regular_peers().unwrap();
     assert_eq!(priority_peers, hashset![validator_peer]);
-    assert_eq!(regular_peers, hashset![]);
+    assert!(regular_peers.is_empty());
 
     // Add a vfn peer and ensure it's not prioritized
     let vfn_peer = mock_network.add_peer_with_network_id(NetworkId::Vfn, true);
@@ -1546,7 +1570,7 @@ async fn vfn_peer_prioritization() {
     let validator_peer = mock_network.add_peer_with_network_id(NetworkId::Vfn, false);
     let (priority_peers, regular_peers) = client.get_priority_and_regular_peers().unwrap();
     assert_eq!(priority_peers, hashset![validator_peer]);
-    assert_eq!(regular_peers, hashset![]);
+    assert!(regular_peers.is_empty());
 
     // Add a pfn peer and ensure it's not prioritized
     let pfn_peer = mock_network.add_peer_with_network_id(NetworkId::Public, true);
@@ -1570,7 +1594,7 @@ async fn pfn_peer_prioritization() {
     // Add an inbound pfn peer and ensure it's not prioritized
     let inbound_peer = mock_network.add_peer_with_network_id(NetworkId::Public, false);
     let (priority_peers, regular_peers) = client.get_priority_and_regular_peers().unwrap();
-    assert_eq!(priority_peers, hashset![]);
+    assert!(priority_peers.is_empty());
     assert_eq!(regular_peers, hashset![inbound_peer]);
 
     // Add an outbound pfn peer and ensure it's prioritized
@@ -1580,17 +1604,33 @@ async fn pfn_peer_prioritization() {
     assert_eq!(regular_peers, hashset![inbound_peer]);
 }
 
-/// Disconnects the given peer and removes it from the list of specified peers
-fn disconnect_and_remove_peer(
+/// Disconnects all the given peers and removes them from the list of specified peers
+fn disconnect_and_remove_all_peers(
     mock_network: &mut MockNetwork,
-    peers: &mut Vec<PeerNetworkId>,
-    peer_to_disconnect: PeerNetworkId,
+    peers: &mut HashSet<PeerNetworkId>,
 ) {
-    // Disconnect the peer
-    mock_network.disconnect_peer(peer_to_disconnect);
+    // Disconnect all the given peers
+    for peer in peers.iter() {
+        mock_network.disconnect_peer(*peer);
+    }
 
-    // Remove the peer from the list of given peers
-    peers.retain(|peer| *peer != peer_to_disconnect);
+    // Remove all peers from the list of given peers
+    peers.clear();
+}
+
+/// Disconnects the given peers and removes them from the list of specified peers
+fn disconnect_and_remove_peers(
+    mock_network: &mut MockNetwork,
+    peers: &mut HashSet<PeerNetworkId>,
+    peers_to_disconnect: &HashSet<PeerNetworkId>,
+) {
+    for peer_to_disconnect in peers_to_disconnect {
+        // Disconnect the peer
+        mock_network.disconnect_peer(*peer_to_disconnect);
+
+        // Remove the peer from the list of given peers
+        peers.retain(|peer| *peer != *peer_to_disconnect);
+    }
 }
 
 /// Enumerates all optimistic fetch request types
@@ -1671,10 +1711,10 @@ fn enumerate_subscription_requests(known_version: u64, known_epoch: u64) -> Vec<
 
 /// Returns the peers with the lowest validator distance from the given list of peers
 fn get_lowest_distance_peers(
-    peers: &[PeerNetworkId],
+    peers: &HashSet<PeerNetworkId>,
     mock_network: &mut MockNetwork,
-) -> Vec<PeerNetworkId> {
-    let mut lowest_distance_peers = vec![];
+) -> HashSet<PeerNetworkId> {
+    let mut lowest_distance_peers = hashset![];
     let mut lowest_distance = u64::MAX;
 
     // Identify the peers with the lowest distance
@@ -1686,12 +1726,12 @@ fn get_lowest_distance_peers(
         match distance.cmp(&lowest_distance) {
             Ordering::Equal => {
                 // Add the peer to the list of lowest distance peers
-                lowest_distance_peers.push(*peer)
+                lowest_distance_peers.insert(*peer);
             },
             Ordering::Less => {
                 // We found a new lowest distance!
                 lowest_distance = distance;
-                lowest_distance_peers = vec![*peer];
+                lowest_distance_peers = hashset![*peer];
             },
             Ordering::Greater => {
                 // The peer is not a lowest distance peer
@@ -1706,7 +1746,7 @@ fn get_lowest_distance_peers(
 /// version and timestamp.
 fn update_storage_summaries_for_peers(
     client: &AptosDataClient,
-    peers: &[PeerNetworkId],
+    peers: &HashSet<PeerNetworkId>,
     known_version: u64,
     timestamp_usecs: u64,
 ) {
@@ -1745,26 +1785,27 @@ fn update_subscription_request_id(
     storage_service_request
 }
 
-/// Verifies that a low distance and latency peer is selected for
+/// Verifies that low distance and latency peers are selected for
 /// the given request (from the specified list of potential peers)
-/// and returns the select peer.
-fn verify_peer_selected_by_distance_and_latency(
+/// and returns the selected peers.
+fn verify_peers_selected_by_distance_and_latency(
     mock_network: &mut MockNetwork,
     client: &AptosDataClient,
     storage_request: &StorageServiceRequest,
-    potential_peers: &mut [PeerNetworkId],
-) -> PeerNetworkId {
-    // Select a peer for the given request
-    let selected_peer = client.choose_peer_for_request(storage_request).unwrap();
+    potential_peers: &mut HashSet<PeerNetworkId>,
+) -> HashSet<PeerNetworkId> {
+    // Select peers for the given request
+    let selected_peers = client.choose_peers_for_request(storage_request).unwrap();
+    for selected_peer in &selected_peers {
+        // Verify the selected peer is in the list of potential peers
+        assert!(potential_peers.contains(selected_peer));
 
-    // Verify the selected peer is in the list of potential peers
-    assert!(potential_peers.contains(&selected_peer));
+        // Verify the selected peer has the lowest distance
+        let lowest_distance_peers = get_lowest_distance_peers(potential_peers, mock_network);
+        assert!(lowest_distance_peers.contains(selected_peer));
+    }
 
-    // Verify the selected peer has the lowest distance
-    let lowest_distance_peers = get_lowest_distance_peers(potential_peers, mock_network);
-    assert!(lowest_distance_peers.contains(&selected_peer));
-
-    selected_peer
+    selected_peers
 }
 
 /// Verifies that the peer is selected to service the given request
@@ -1773,13 +1814,24 @@ fn verify_peer_selected_for_request(
     peer: PeerNetworkId,
     request: &StorageServiceRequest,
 ) {
-    assert_eq!(client.choose_peer_for_request(request), Ok(peer));
+    let selected_peers = client.choose_peers_for_request(request).unwrap();
+    assert_eq!(selected_peers, hashset![peer]);
+}
+
+/// Verifies that the peers are selected to service the given request
+fn verify_peers_selected_for_request(
+    client: &AptosDataClient,
+    peers: &HashSet<PeerNetworkId>,
+    request: &StorageServiceRequest,
+) {
+    let selected_peers = client.choose_peers_for_request(request).unwrap();
+    assert_eq!(selected_peers, *peers);
 }
 
 /// Verifies that the given request is unserviceable
 fn verify_request_is_unserviceable(client: &AptosDataClient, request: &StorageServiceRequest) {
     assert_matches!(
-        client.choose_peer_for_request(request),
+        client.choose_peers_for_request(request),
         Err(Error::DataIsUnavailable(_))
     );
 }
