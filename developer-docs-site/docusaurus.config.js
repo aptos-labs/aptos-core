@@ -159,10 +159,6 @@ const config = {
               to: "/category/environment",
             },
             {
-              label: "Create NFTs",
-              to: "/category/nft",
-            },
-            {
               label: "Build E2E Dapp on Aptos",
               to: "tutorials/build-e2e-dapp/e2e-dapp-index",
             },
