@@ -1301,15 +1301,22 @@ fn at_start_of_exp(context: &mut Context) -> bool {
 
 // Parse an expression:
 //      Exp =
-//            <LambdaBindList> <Exp>        spec only
+//            <LambdaBindList> <Exp>
 //          | <Quantifier>                  spec only
 //          | <BinOpExp>
 //          | <UnaryExp> "=" <Exp>
 fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
-    let exp = match context.tokens.peek() {
-        Tok::Pipe => {
-            let bindings = parse_lambda_bind_list(context)?;
+    let token = context.tokens.peek();
+    let exp = match token {
+        Tok::Pipe | Tok::PipePipe => {
+            let bindings = if token == Tok::Pipe {
+                parse_lambda_bind_list(context)?
+            } else {
+                // token is Tok::PipePipe, i.e., empty bind list in this context.
+                consume_token(context.tokens, Tok::PipePipe)?;
+                spanned(context.tokens.file_hash(), start_loc, start_loc + 1, vec![])
+            };
             let body = Box::new(parse_exp(context)?);
             Exp_::Lambda(bindings, body)
         },
@@ -1706,11 +1713,12 @@ fn make_builtin_call(loc: Loc, name: Symbol, type_args: Option<Vec<Type>>, args:
 //          <NameAccessChain> ('<' Comma<Type> ">")?
 //          | "&" <Type>
 //          | "&mut" <Type>
-//          | "|" Comma<Type> "|" Type   (spec only)
+//          | "|" Comma<Type> "|" Type
 //          | "(" Comma<Type> ")"
 fn parse_type(context: &mut Context) -> Result<Type, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
-    let t = match context.tokens.peek() {
+    let token = context.tokens.peek();
+    let t = match token {
         Tok::LParen => {
             let mut ts = parse_comma_list(context, Tok::LParen, Tok::RParen, parse_type, "a type")?;
             match ts.len() {
@@ -1729,8 +1737,14 @@ fn parse_type(context: &mut Context) -> Result<Type, Box<Diagnostic>> {
             let t = parse_type(context)?;
             Type_::Ref(true, Box::new(t))
         },
-        Tok::Pipe => {
-            let args = parse_comma_list(context, Tok::Pipe, Tok::Pipe, parse_type, "a type")?;
+        Tok::Pipe | Tok::PipePipe => {
+            let args = if token == Tok::Pipe {
+                parse_comma_list(context, Tok::Pipe, Tok::Pipe, parse_type, "a type")?
+            } else {
+                // token is Tok::PipePipe, i.e., empty param type list in this context.
+                consume_token(context.tokens, Tok::PipePipe)?;
+                vec![]
+            };
             let result = if is_start_of_type(context) {
                 parse_type(context)?
             } else {
