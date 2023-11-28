@@ -232,6 +232,7 @@ impl BlockData {
         }
     }
 
+    #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy_with_system_txns(sys_txns: Vec<SystemTransaction>) -> Self {
         Self::new_proposal_ext(
             sys_txns,

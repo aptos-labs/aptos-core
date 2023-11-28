@@ -316,7 +316,7 @@ pub struct StateComputeResult {
     /// The compute status (success/failure) of the given payload. The specific details are opaque
     /// for StateMachineReplication, which is merely passing it between StateComputer and
     /// PayloadClient.
-    pub compute_status: Vec<TransactionStatus>,
+    compute_status: Vec<TransactionStatus>,
 
     /// The transaction info hashes of all success txns.
     transaction_info_hashes: Vec<HashValue>,
@@ -386,6 +386,13 @@ impl StateComputeResult {
     /// the blocks and the finality proof to the execution phase.
     pub fn new_dummy() -> Self {
         StateComputeResult::new_dummy_with_root_hash(*ACCUMULATOR_PLACEHOLDER_HASH)
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn new_dummy_with_compute_status(compute_status: Vec<TransactionStatus>) -> Self {
+        let mut ret = Self::new_dummy();
+        ret.compute_status = compute_status;
+        ret
     }
 }
 

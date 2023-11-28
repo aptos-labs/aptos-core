@@ -133,7 +133,7 @@ impl StateComputer for ExecutionProxy {
         let txn_deduper = self.transaction_deduper.lock().as_ref().unwrap().clone();
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
         let txn_notifier = self.txn_notifier.clone();
-        let sys_txns = block.sys_txns().map_or(vec![], Vec::clone);
+        let sys_txns = block.sys_txns().cloned().unwrap_or_default();
         let user_txns = match payload_manager.get_transactions(block).await {
             Ok(txns) => txns,
             Err(err) => return Box::pin(async move { Err(err) }),

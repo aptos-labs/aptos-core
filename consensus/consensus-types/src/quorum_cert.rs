@@ -41,6 +41,7 @@ impl QuorumCert {
         }
     }
 
+    #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy() -> Self {
         Self {
             vote_data: VoteData::dummy(),

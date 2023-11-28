@@ -131,6 +131,7 @@ impl BlockExecutorTrait for DummyBlockExecutor {
 }
 
 #[tokio::test]
+#[cfg(test)]
 async fn schedule_compute_should_discover_sys_txns() {
     let executor = Arc::new(DummyBlockExecutor::new());
 
@@ -200,9 +201,14 @@ async fn commit_should_discover_sys_txns() {
         None,
     );
 
-    let mut state_compute_result = StateComputeResult::new_dummy();
-    state_compute_result.compute_status =
-        vec![TransactionStatus::Keep(ExecutionStatus::Success); 4]; // Eventually 4 txns: block metadata, sys txn 0, sys txn 1, state checkpoint.
+    // Eventually 4 txns: block metadata, sys txn 0, sys txn 1, state checkpoint.
+    let state_compute_result =
+        StateComputeResult::new_dummy_with_compute_status(vec![
+            TransactionStatus::Keep(
+                ExecutionStatus::Success
+            );
+            4
+        ]);
 
     let blocks = vec![Arc::new(ExecutedBlock::new(block, state_compute_result))];
     let epoch_state = EpochState::empty();
