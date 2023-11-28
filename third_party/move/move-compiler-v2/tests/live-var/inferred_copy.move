@@ -28,7 +28,7 @@ module 0x42::m {
         some(y);
     }
 
-    fun f4_ok() {
+    fun f4_fail() {
         let r = R { v: 0 };
         let y = move r;
         some(r);

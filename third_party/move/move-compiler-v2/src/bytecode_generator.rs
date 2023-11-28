@@ -916,7 +916,7 @@ impl<'env> Generator<'env> {
         &mut self,
         target: TempIndex,
         id: NodeId,
-        _kind: ReferenceKind,
+        kind: ReferenceKind,
         struct_id: QualifiedId<StructId>,
         field_id: FieldId,
         oper: &Exp,

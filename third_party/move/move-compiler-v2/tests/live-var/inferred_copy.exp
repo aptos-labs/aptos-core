@@ -44,7 +44,7 @@ fun m::f3_ok() {
 
 
 [variant baseline]
-fun m::f4_ok() {
+fun m::f4_fail() {
      var $t0: m::R
      var $t1: m::R
      var $t2: u64
@@ -160,7 +160,7 @@ fun m::f3_ok() {
 
 
 [variant baseline]
-fun m::f4_ok() {
+fun m::f4_fail() {
      var $t0: m::R
      var $t1: m::R
      var $t2: u64

@@ -34,7 +34,7 @@ fun borrow::mut_expr($t0: u64): u64 {
   0: $t5 := 1
   1: $t4 := +($t0, $t5)
   2: $t3 := borrow_local($t4)
-  3: $t2 := move($t3)
+  3: $t2 := infer($t3)
   4: $t6 := 22
   5: write_ref($t2, $t6)
   6: $t1 := read_ref($t2)
@@ -49,7 +49,7 @@ fun borrow::mut_field($t0: &borrow::S): u64 {
      var $t3: &mut u64
      var $t4: u64
   0: $t3 := borrow_field<borrow::S>.f($t0)
-  1: $t2 := move($t3)
+  1: $t2 := infer($t3)
   2: $t4 := 22
   3: write_ref($t2, $t4)
   4: $t1 := read_ref($t2)
