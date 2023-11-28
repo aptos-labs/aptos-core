@@ -576,13 +576,15 @@ There are plans to loosen some of these restrictions in the future, but for now,
 
 - Only inline functions can have function parameters.
 - Only explicit lambda expressions can be passed as an argument to an inline function's function parameters.
-- Inline functions and lambda expressions cannot have `return` expressions.
+- Inline functions and lambda expressions cannot have `return`, `break`, or `continue` expressions.
 - Inline functions or lambda expressions cannot return lambda expressions.
 - Cyclic recursion involving only inline functions is not allowed.
 - Parameters in lambda expressions must not be type annotated (e.g., `|x: u64| x + 1` is not allowed): their types are inferred.
 
 ### Additional considerations
 
-- Avoid using private constants in public inline functions.
-  When code outside of the inline-function-defining module calls such an inline function, an in-place expansion of the inline function leads to invalid access of the private constant.
-
+- Avoid using module-private constants/methods in public inline functions.
+  When such inline functions are called outside of that module, an in-place expansion at call site leads to invalid access of the private constants/methods.
+- Avoid marking large functions that are called at different locations as inline. Also avoid inline functions calling lots of other inline functions transitively.
+  These may lead to excessive inlining and increase the bytecode size.
+- Inline functions can be useful for returning references to global storage, which non-inline functions cannot do.
