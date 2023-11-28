@@ -36,13 +36,19 @@ pub struct ReadyServerArgs {
 #[derive(Clone, Debug)]
 pub struct ReadyServerManager {
     config: ReadyServerArgs,
+    bind_to: Ipv4Addr,
     health_checkers: HashSet<HealthChecker>,
 }
 
 impl ReadyServerManager {
-    pub fn new(args: &RunLocalTestnet, health_checkers: HashSet<HealthChecker>) -> Result<Self> {
+    pub fn new(
+        args: &RunLocalTestnet,
+        bind_to: Ipv4Addr,
+        health_checkers: HashSet<HealthChecker>,
+    ) -> Result<Self> {
         Ok(ReadyServerManager {
             config: args.ready_server_args.clone(),
+            bind_to,
             health_checkers,
         })
     }
@@ -65,7 +71,7 @@ impl ServiceManager for ReadyServerManager {
     }
 
     async fn run_service(self: Box<ReadyServerManager>) -> Result<()> {
-        run_ready_server(self.health_checkers, self.config).await
+        run_ready_server(self.health_checkers, self.config, self.bind_to).await
     }
 }
 
@@ -74,13 +80,14 @@ impl ServiceManager for ReadyServerManager {
 pub async fn run_ready_server(
     health_checkers: HashSet<HealthChecker>,
     config: ReadyServerArgs,
+    bind_to: Ipv4Addr,
 ) -> Result<()> {
     let app = Route::new()
         .at("/", get(root))
         .data(HealthCheckers { health_checkers })
         .with(Tracing);
     Server::new(TcpListener::bind(SocketAddrV4::new(
-        Ipv4Addr::new(0, 0, 0, 0),
+        bind_to,
         config.ready_server_listen_port,
     )))
     .name("ready-server")
