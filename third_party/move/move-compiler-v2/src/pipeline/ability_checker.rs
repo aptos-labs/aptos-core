@@ -48,24 +48,24 @@ impl FunctionTargetProcessor for AbilityChecker {
         data: FunctionData,
         _scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
-        let fun_target = FunctionTarget::new(fun_env, &data);
-        todo!()
+        if fun_env.is_native() {
+            return data;
+        }
+        let target = FunctionTarget::new(fun_env, &data);
+        for bytecode in target.get_bytecode() {
+            check_bytecode(&target, bytecode)
+        }
+        data
     }
 
     fn name(&self) -> String {
-        "Ability Checker".to_owned()
+        "AbilityChecker".to_owned()
     }
 }
 
 fn check_bytecode(target: &FunctionTarget, bytecode: &Bytecode) {
     match bytecode {
         Bytecode::Assign(attr_id, src, dst, kind) => {
-            // let src_ty = target.get_local_type(*src);
-            // if !has_drop(target, src_ty) {
-            //     let loc = target.get_bytecode_loc(*attr_id);
-            //     target.global_env().error(&loc, &format!("cannot drop"))
-            // }
-
             if matches!(kind, AssignKind::Copy | AssignKind::Store) {
                 let src_ty = target.get_local_type(*src);
                 if !has_copy(target, src_ty) {
