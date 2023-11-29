@@ -55,7 +55,8 @@ impl AptosValidatorInterface for RestDebuggerInterface {
                 RestError::Api(AptosErrorResponse {
                     error:
                         AptosError {
-                            error_code: AptosErrorCode::StateValueNotFound,
+                            error_code:
+                                AptosErrorCode::StateValueNotFound | AptosErrorCode::TableItemNotFound, /* bug in pre 1.9 nodes */
                             ..
                         },
                     ..
