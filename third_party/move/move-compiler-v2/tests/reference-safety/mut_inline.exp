@@ -1,0 +1,80 @@
+// ---- Model Dump
+module 0x42::m {
+    use 0x1::vector; // resolved as: 0x1::vector
+    private fun foo(): u64 {
+        {
+          let v: vector<u64> = Vector<u64>(1, 2, 3);
+          {
+            let r: &mut vector<u64> = Borrow(Mutable)(v);
+            {
+              let (v: &mut vector<u64>) = Tuple(r);
+              {
+                let i: u64 = 0;
+                {
+                  let len: u64 = vector::length<u64>(v);
+                  loop {
+                    if Lt<u64>(i, len) {
+                      if Not({
+                        let (e: &u64) = Tuple(vector::borrow<u64>(v, i));
+                        Gt<u64>(Deref(e), 1)
+                      }) {
+                        break
+                      } else {
+                        Tuple()
+                      };
+                      i: u64 = Add<u64>(i, 1);
+                      Tuple()
+                    } else {
+                      break
+                    }
+                  };
+                  {
+                    let p: u64 = i;
+                    i: u64 = Add<u64>(i, 1);
+                    loop {
+                      if Lt<u64>(i, len) {
+                        if {
+                          let (e: &u64) = Tuple(vector::borrow<u64>(v, i));
+                          Gt<u64>(Deref(e), 1)
+                        } {
+                          vector::swap<u64>(v, p, i);
+                          p: u64 = Add<u64>(p, 1);
+                          Tuple()
+                        } else {
+                          Tuple()
+                        };
+                        i: u64 = Add<u64>(i, 1);
+                        Tuple()
+                      } else {
+                        break
+                      }
+                    };
+                    p
+                  }
+                }
+              }
+            };
+            Deref(vector::borrow<u64>(r, 0))
+          }
+        }
+    }
+    spec fun $foo(): u64;
+    spec fun $partition<Element>(v: &mut vector<#0>,pred: |&#0|bool): u64;
+} // end 0x42::m
+
+
+Diagnostics:
+error: implicit copy of mutable reference in local `r` which is used later
+   ┌─ tests/reference-safety/mut_inline.move:5:5
+   │
+ 5 │ ╭     inline fun partition<Element>(
+ 6 │ │         v: &mut vector<Element>,
+ 7 │ │         pred: |&Element|bool
+ 8 │ │     ): u64 {
+   · │
+24 │ │         p
+25 │ │     }
+   │ ╰─────^ implicitly copied here
+   · │
+31 │           *vector::borrow(r, 0)
+   │                           - used here

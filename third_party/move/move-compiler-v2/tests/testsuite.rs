@@ -139,7 +139,7 @@ impl TestConfig {
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             Self {
                 type_check_only: false,
-                dump_ast: verbose,
+                dump_ast: true, // verbose,
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: verbose,
