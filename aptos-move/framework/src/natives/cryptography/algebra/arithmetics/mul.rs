@@ -4,8 +4,8 @@ use crate::{
     abort_unless_arithmetics_enabled_for_structure, abort_unless_feature_flag_enabled,
     ark_binary_op_internal,
     natives::cryptography::algebra::{
-        abort_invariant_violated, feature_flag_from_structure, AlgebraContext, Structure,
-        E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        abort_invariant_violated, feature_flag_from_structure, AlgebraContext, BN254Structure,
+        Structure, E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
     },
     safe_borrow_element, store_element, structure_from_ty_arg,
 };
@@ -38,6 +38,43 @@ pub fn mul_internal(
             mul,
             ALGEBRA_ARK_BLS12_381_FQ12_MUL
         ),
+        Some(Structure::BN254(s)) => mul_internal_bn254(context, args, s),
+        _ => Err(SafeNativeError::Abort {
+            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        }),
+    }
+}
+
+fn mul_internal_bn254(
+    context: &mut SafeNativeContext,
+    mut args: VecDeque<Value>,
+    structure: BN254Structure,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    match structure {
+        BN254Structure::BN254Fr => {
+            ark_binary_op_internal!(context, args, ark_bn254::Fr, mul, ALGEBRA_ARK_BN254_FR_MUL)
+        },
+        BN254Structure::BN254Fq => {
+            ark_binary_op_internal!(context, args, ark_bn254::Fq, mul, ALGEBRA_ARK_BN254_FQ_MUL)
+        },
+        BN254Structure::BN254Fq2 => {
+            ark_binary_op_internal!(
+                context,
+                args,
+                ark_bn254::Fq2,
+                mul,
+                ALGEBRA_ARK_BN254_FQ2_MUL
+            )
+        },
+        BN254Structure::BN254Fq12 => {
+            ark_binary_op_internal!(
+                context,
+                args,
+                ark_bn254::Fq12,
+                mul,
+                ALGEBRA_ARK_BN254_FQ12_MUL
+            )
+        },
         _ => Err(SafeNativeError::Abort {
             abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         }),

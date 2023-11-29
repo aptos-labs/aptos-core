@@ -55,6 +55,8 @@ return true.
 -  [Function `cryptography_algebra_enabled`](#0x1_features_cryptography_algebra_enabled)
 -  [Function `get_bls12_381_strutures_feature`](#0x1_features_get_bls12_381_strutures_feature)
 -  [Function `bls12_381_structures_enabled`](#0x1_features_bls12_381_structures_enabled)
+-  [Function `get_bn254_strutures_feature`](#0x1_features_get_bn254_strutures_feature)
+-  [Function `bn254_structures_enabled`](#0x1_features_bn254_structures_enabled)
 -  [Function `get_periodical_reward_rate_decrease_feature`](#0x1_features_get_periodical_reward_rate_decrease_feature)
 -  [Function `periodical_reward_rate_decrease_enabled`](#0x1_features_periodical_reward_rate_decrease_enabled)
 -  [Function `get_partial_governance_voting`](#0x1_features_get_partial_governance_voting)
@@ -203,6 +205,18 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_BLS12_381_STRUCTURES">BLS12_381_STRUCTURES</a>: u64 = 13;
+</code></pre>
+
+
+
+<a id="0x1_features_BN254_STRUCTURES"></a>
+
+Whether the generic algebra implementation for BN254 operations are enabled.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_BN254_STRUCTURES">BN254_STRUCTURES</a>: u64 = 43;
 </code></pre>
 
 
@@ -1110,6 +1124,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bls12_381_structures_enabled">bls12_381_structures_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BLS12_381_STRUCTURES">BLS12_381_STRUCTURES</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_bn254_strutures_feature"></a>
+
+## Function `get_bn254_strutures_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bn254_strutures_feature">get_bn254_strutures_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bn254_strutures_feature">get_bn254_strutures_feature</a>(): u64 { <a href="features.md#0x1_features_BN254_STRUCTURES">BN254_STRUCTURES</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_bn254_structures_enabled"></a>
+
+## Function `bn254_structures_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bn254_structures_enabled">bn254_structures_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bn254_structures_enabled">bn254_structures_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BN254_STRUCTURES">BN254_STRUCTURES</a>)
 }
 </code></pre>
 

@@ -3,9 +3,9 @@
 use crate::{
     abort_unless_feature_flag_enabled,
     natives::cryptography::algebra::{
-        abort_invariant_violated, AlgebraContext, SerializationFormat, Structure,
-        BLS12381_R_SCALAR, E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
-        MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        abort_invariant_violated, AlgebraContext, BN254SerializationFormat, BN254Structure,
+        SerializationFormat, Structure, BLS12381_R_SCALAR, BN254_R_SCALAR, E_TOO_MUCH_MEMORY_USED,
+        MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
     },
     safe_borrow_element, store_element, structure_from_ty_arg,
 };
@@ -37,6 +37,7 @@ pub fn feature_flag_of_serialization_format(
         | Some(SerializationFormat::BLS12381G2Uncompressed)
         | Some(SerializationFormat::BLS12381G2Compressed)
         | Some(SerializationFormat::BLS12381Gt) => Some(FeatureFlag::BLS12_381_STRUCTURES),
+        Some(SerializationFormat::BN254(_)) => Some(FeatureFlag::BN254_STRUCTURES),
         _ => None,
     }
 }
@@ -65,6 +66,10 @@ pub fn serialize_internal(
     let format_opt = format_from_ty_arg!(context, &ty_args[1]);
     abort_unless_serialization_format_enabled!(context, format_opt);
     match (structure_opt, format_opt) {
+        (
+            Some(Structure::BN254(bn254_structure)),
+            Some(SerializationFormat::BN254(bn254_format)),
+        ) => serialize_internal_bn254(context, args, bn254_structure, bn254_format),
         (Some(Structure::BLS12381Fr), Some(SerializationFormat::BLS12381FrLsb)) => {
             let handle = safely_pop_arg!(args, u64) as usize;
             safe_borrow_element!(context, handle, ark_bls12_381::Fr, element_ptr, element);
@@ -180,6 +185,161 @@ pub fn serialize_internal(
     }
 }
 
+fn serialize_internal_bn254(
+    context: &mut SafeNativeContext,
+    mut args: VecDeque<Value>,
+    structure: BN254Structure,
+    format: BN254SerializationFormat,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    match (structure, format) {
+        (BN254Structure::BN254Fr, BN254SerializationFormat::BN254FrLsb) => {
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(context, handle, ark_bn254::Fr, element_ptr, element);
+            let mut buf = vec![];
+            context.charge(ALGEBRA_ARK_BN254_FR_SERIALIZE)?;
+            element
+                .serialize_uncompressed(&mut buf)
+                .map_err(|_e| abort_invariant_violated())?;
+            Ok(smallvec![Value::vector_u8(buf)])
+        },
+        (BN254Structure::BN254Fr, BN254SerializationFormat::BN254FrMsb) => {
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(context, handle, ark_bn254::Fr, element_ptr, element);
+            let mut buf = vec![];
+            context.charge(ALGEBRA_ARK_BN254_FR_SERIALIZE)?;
+            element
+                .serialize_uncompressed(&mut buf)
+                .map_err(|_e| abort_invariant_violated())?;
+            buf.reverse();
+            Ok(smallvec![Value::vector_u8(buf)])
+        },
+        (BN254Structure::BN254Fq, BN254SerializationFormat::BN254FrLsb) => {
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(context, handle, ark_bn254::Fq, element_ptr, element);
+            let mut buf = vec![];
+            context.charge(ALGEBRA_ARK_BN254_FQ_SERIALIZE)?;
+            element
+                .serialize_uncompressed(&mut buf)
+                .map_err(|_e| abort_invariant_violated())?;
+            Ok(smallvec![Value::vector_u8(buf)])
+        },
+        (BN254Structure::BN254Fq, BN254SerializationFormat::BN254FqMsb) => {
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(context, handle, ark_bn254::Fq, element_ptr, element);
+            let mut buf = vec![];
+            context.charge(ALGEBRA_ARK_BN254_FQ_SERIALIZE)?;
+            element
+                .serialize_uncompressed(&mut buf)
+                .map_err(|_e| abort_invariant_violated())?;
+            buf.reverse();
+            Ok(smallvec![Value::vector_u8(buf)])
+        },
+        (BN254Structure::BN254Fq2, BN254SerializationFormat::BN254Fq2LscLsb) => {
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(context, handle, ark_bn254::Fq2, element_ptr, element);
+            let mut buf = vec![];
+            context.charge(ALGEBRA_ARK_BN254_FQ2_SERIALIZE)?;
+            element
+                .serialize_uncompressed(&mut buf)
+                .map_err(|_e| abort_invariant_violated())?;
+            buf.reverse();
+            Ok(smallvec![Value::vector_u8(buf)])
+        },
+        (BN254Structure::BN254Fq12, BN254SerializationFormat::BN254Fq12LscLsb) => {
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(context, handle, ark_bn254::Fq12, element_ptr, element);
+            let mut buf = vec![];
+            context.charge(ALGEBRA_ARK_BN254_FQ12_SERIALIZE)?;
+            element
+                .serialize_uncompressed(&mut buf)
+                .map_err(|_e| abort_invariant_violated())?;
+            buf.reverse();
+            Ok(smallvec![Value::vector_u8(buf)])
+        },
+        (BN254Structure::BN254G1, BN254SerializationFormat::BN254G1Uncompressed) => {
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(
+                context,
+                handle,
+                ark_bn254::G1Projective,
+                element_ptr,
+                element
+            );
+            let element_affine = element.into_affine();
+            let mut buf = Vec::new();
+            context.charge(ALGEBRA_ARK_BN254_G1_AFFINE_SERIALIZE_UNCOMP)?;
+            element_affine
+                .serialize_uncompressed(&mut buf)
+                .map_err(|_e| abort_invariant_violated())?;
+            Ok(smallvec![Value::vector_u8(buf)])
+        },
+        (BN254Structure::BN254G1, BN254SerializationFormat::BN254G1Compressed) => {
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(
+                context,
+                handle,
+                ark_bn254::G1Projective,
+                element_ptr,
+                element
+            );
+            let element_affine = element.into_affine();
+            let mut buf = Vec::new();
+            context.charge(ALGEBRA_ARK_BN254_G1_AFFINE_SERIALIZE_COMP)?;
+            element_affine
+                .serialize_compressed(&mut buf)
+                .map_err(|_e| abort_invariant_violated())?;
+            Ok(smallvec![Value::vector_u8(buf)])
+        },
+        (BN254Structure::BN254G2, BN254SerializationFormat::BN254G2Uncompressed) => {
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(
+                context,
+                handle,
+                ark_bn254::G2Projective,
+                element_ptr,
+                element
+            );
+            let element_affine = element.into_affine();
+            let mut buf = Vec::new();
+            context.charge(ALGEBRA_ARK_BN254_G2_AFFINE_SERIALIZE_UNCOMP)?;
+            element_affine
+                .serialize_uncompressed(&mut buf)
+                .map_err(|_e| abort_invariant_violated())?;
+            Ok(smallvec![Value::vector_u8(buf)])
+        },
+        (BN254Structure::BN254G2, BN254SerializationFormat::BN254G2Compressed) => {
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(
+                context,
+                handle,
+                ark_bn254::G2Projective,
+                element_ptr,
+                element
+            );
+            let element_affine = element.into_affine();
+            let mut buf = Vec::new();
+            context.charge(ALGEBRA_ARK_BN254_G2_AFFINE_SERIALIZE_COMP)?;
+            element_affine
+                .serialize_compressed(&mut buf)
+                .map_err(|_e| abort_invariant_violated())?;
+            Ok(smallvec![Value::vector_u8(buf)])
+        },
+        (BN254Structure::BN254Gt, BN254SerializationFormat::BN254Gt) => {
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(context, handle, ark_bn254::Fq12, element_ptr, element);
+            let mut buf = vec![];
+            context.charge(ALGEBRA_ARK_BN254_FQ12_SERIALIZE)?;
+            element
+                .serialize_uncompressed(&mut buf)
+                .map_err(|_e| abort_invariant_violated())?;
+            Ok(smallvec![Value::vector_u8(buf)])
+        },
+        _ => Err(SafeNativeError::Abort {
+            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        }),
+    }
+}
+
 /// Macros that implements `deserialize_internal()` using arkworks libraries.
 macro_rules! ark_deserialize_internal {
     ($context:expr, $bytes:expr, $ark_typ:ty, $ark_deser_func:ident, $gas:expr) => {{
@@ -233,6 +393,10 @@ pub fn deserialize_internal(
     let bytes_ref = vector_ref.as_bytes_ref();
     let bytes = bytes_ref.as_slice();
     match (structure_opt, format_opt) {
+        (
+            Some(Structure::BN254(bn254_structure)),
+            Some(SerializationFormat::BN254(bn254_format)),
+        ) => deserialize_internal_bn254(context, bn254_structure, bn254_format, bytes),
         (Some(Structure::BLS12381Fr), Some(SerializationFormat::BLS12381FrLsb)) => {
             // Valid BLS12381FrLsb serialization should be 32-byte.
             // NOTE: Arkworks deserialization cost grows as the input size grows.
@@ -341,6 +505,170 @@ pub fn deserialize_internal(
                         ALGEBRA_ARK_BLS12_381_FQ12_POW_U256 + ALGEBRA_ARK_BLS12_381_FQ12_EQ,
                     )?;
                     if element.pow(BLS12381_R_SCALAR.0) == ark_bls12_381::Fq12::one() {
+                        let handle = store_element!(context, element)?;
+                        Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
+                    } else {
+                        Ok(smallvec![Value::bool(false), Value::u64(0)])
+                    }
+                },
+                _ => Ok(smallvec![Value::bool(false), Value::u64(0)]),
+            }
+        },
+        _ => Err(SafeNativeError::Abort {
+            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        }),
+    }
+}
+
+pub fn deserialize_internal_bn254(
+    context: &mut SafeNativeContext,
+    structure: BN254Structure,
+    format: BN254SerializationFormat,
+    bytes: &[u8],
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    match (structure, format) {
+        (BN254Structure::BN254Fr, BN254SerializationFormat::BN254FrLsb) => {
+            if bytes.len() != 32 {
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
+            }
+            ark_deserialize_internal!(
+                context,
+                bytes,
+                ark_bn254::Fr,
+                deserialize_uncompressed,
+                ALGEBRA_ARK_BN254_FR_DESER
+            )
+        },
+        (BN254Structure::BN254Fr, BN254SerializationFormat::BN254FrMsb) => {
+            if bytes.len() != 32 {
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
+            }
+            let mut bytes_copy: Vec<u8> = bytes.to_vec();
+            bytes_copy.reverse();
+            let bytes = bytes_copy.as_slice();
+            ark_deserialize_internal!(
+                context,
+                bytes,
+                ark_bn254::Fr,
+                deserialize_uncompressed,
+                ALGEBRA_ARK_BN254_FR_DESER
+            )
+        },
+        (BN254Structure::BN254Fq, BN254SerializationFormat::BN254FqLsb) => {
+            if bytes.len() != 32 {
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
+            }
+            ark_deserialize_internal!(
+                context,
+                bytes,
+                ark_bn254::Fq,
+                deserialize_uncompressed,
+                ALGEBRA_ARK_BN254_FQ_DESER
+            )
+        },
+        (BN254Structure::BN254Fq, BN254SerializationFormat::BN254FqMsb) => {
+            if bytes.len() != 32 {
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
+            }
+            let mut bytes_copy: Vec<u8> = bytes.to_vec();
+            bytes_copy.reverse();
+            let bytes = bytes_copy.as_slice();
+            ark_deserialize_internal!(
+                context,
+                bytes,
+                ark_bn254::Fq,
+                deserialize_uncompressed,
+                ALGEBRA_ARK_BN254_FQ_DESER
+            )
+        },
+        (BN254Structure::BN254Fq2, BN254SerializationFormat::BN254Fq2LscLsb) => {
+            // Valid BN254Fq2LscLsb serialization should be 32*2 = 64-byte.
+            if bytes.len() != 64 {
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
+            }
+            ark_deserialize_internal!(
+                context,
+                bytes,
+                ark_bn254::Fq2,
+                deserialize_uncompressed,
+                ALGEBRA_ARK_BN254_FQ2_DESER
+            )
+        },
+        (BN254Structure::BN254Fq12, BN254SerializationFormat::BN254Fq12LscLsb) => {
+            // Valid BN254Fq12LscLsb serialization should be 32*12 = 64-byte.
+            if bytes.len() != 384 {
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
+            }
+            ark_deserialize_internal!(
+                context,
+                bytes,
+                ark_bn254::Fq12,
+                deserialize_uncompressed,
+                ALGEBRA_ARK_BN254_FQ12_DESER
+            )
+        },
+        (BN254Structure::BN254G1, BN254SerializationFormat::BN254G1Uncompressed) => {
+            // Valid BN254G1AffineUncompressed serialization should be 64-byte.
+            if bytes.len() != 64 {
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
+            }
+            ark_ec_point_deserialize_internal!(
+                context,
+                bytes,
+                ark_bn254::G1Affine,
+                deserialize_uncompressed,
+                ALGEBRA_ARK_BN254_G1_AFFINE_DESER_UNCOMP
+            )
+        },
+        (BN254Structure::BN254G1, BN254SerializationFormat::BN254G1Compressed) => {
+            // Valid BN254G1AffineCompressed serialization should be 32-byte.
+            if bytes.len() != 32 {
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
+            }
+            ark_ec_point_deserialize_internal!(
+                context,
+                bytes,
+                ark_bn254::G1Affine,
+                deserialize_compressed,
+                ALGEBRA_ARK_BN254_G1_AFFINE_DESER_COMP
+            )
+        },
+        (BN254Structure::BN254G2, BN254SerializationFormat::BN254G2Uncompressed) => {
+            // Valid BN254G2AffineUncompressed serialization should be 128-byte.
+            if bytes.len() != 128 {
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
+            }
+            ark_ec_point_deserialize_internal!(
+                context,
+                bytes,
+                ark_bn254::G2Affine,
+                deserialize_uncompressed,
+                ALGEBRA_ARK_BN254_G2_AFFINE_DESER_UNCOMP
+            )
+        },
+        (BN254Structure::BN254G2, BN254SerializationFormat::BN254G2Compressed) => {
+            // Valid BN254G2AffineCompressed serialization should be 64-byte.
+            if bytes.len() != 64 {
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
+            }
+            ark_ec_point_deserialize_internal!(
+                context,
+                bytes,
+                ark_bn254::G2Affine,
+                deserialize_compressed,
+                ALGEBRA_ARK_BN254_G2_AFFINE_DESER_COMP
+            )
+        },
+        (BN254Structure::BN254Gt, BN254SerializationFormat::BN254Gt) => {
+            // Valid BN254Gt serialization should be 32*12=384-byte.
+            if bytes.len() != 384 {
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
+            }
+            context.charge(ALGEBRA_ARK_BN254_FQ12_DESER)?;
+            match <ark_bn254::Fq12>::deserialize_uncompressed(bytes) {
+                Ok(element) => {
+                    context.charge(ALGEBRA_ARK_BN254_FQ12_POW_U256 + ALGEBRA_ARK_BN254_FQ12_EQ)?;
+                    if element.pow(BN254_R_SCALAR.0) == ark_bn254::Fq12::one() {
                         let handle = store_element!(context, element)?;
                         Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
                     } else {

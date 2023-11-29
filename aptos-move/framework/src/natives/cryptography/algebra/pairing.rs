@@ -3,9 +3,9 @@
 use crate::{
     abort_unless_feature_flag_enabled,
     natives::cryptography::algebra::{
-        abort_invariant_violated, AlgebraContext, Structure, E_TOO_MUCH_MEMORY_USED,
-        MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING,
-        MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        abort_invariant_violated, AlgebraContext, BN254Structure, Structure,
+        E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
+        MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
     },
     safe_borrow_element, store_element, structure_from_ty_arg,
 };
@@ -30,6 +30,11 @@ fn feature_flag_of_pairing(
         (Some(Structure::BLS12381G1), Some(Structure::BLS12381G2), Some(Structure::BLS12381Gt)) => {
             Some(FeatureFlag::BLS12_381_STRUCTURES)
         },
+        (
+            Some(Structure::BN254(BN254Structure::BN254G1)),
+            Some(Structure::BN254(BN254Structure::BN254G2)),
+            Some(Structure::BN254(BN254Structure::BN254Gt)),
+        ) => Some(FeatureFlag::BN254_STRUCTURES),
         _ => None,
     }
 }
@@ -104,6 +109,74 @@ pub fn multi_pairing_internal(
             let new_handle = store_element!(context, new_element)?;
             Ok(smallvec![Value::u64(new_handle as u64)])
         },
+        (Some(Structure::BN254(g1)), Some(Structure::BN254(g2)), Some(Structure::BN254(gt))) => {
+            multi_pairing_internal_bn254(context, args, g1, g2, gt)
+        },
+        _ => Err(SafeNativeError::Abort {
+            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        }),
+    }
+}
+
+fn multi_pairing_internal_bn254(
+    context: &mut SafeNativeContext,
+    mut args: VecDeque<Value>,
+    g1: BN254Structure,
+    g2: BN254Structure,
+    gt: BN254Structure,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    match (g1, g2, gt) {
+        (BN254Structure::BN254G1, BN254Structure::BN254G2, BN254Structure::BN254Gt) => {
+            let g2_element_handles = safely_pop_arg!(args, Vec<u64>);
+            let g1_element_handles = safely_pop_arg!(args, Vec<u64>);
+            let num_entries = g1_element_handles.len();
+            if num_entries != g2_element_handles.len() {
+                return Err(SafeNativeError::Abort {
+                    abort_code: MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING,
+                });
+            }
+
+            context.charge(
+                ALGEBRA_ARK_BN254_G1_PROJ_TO_AFFINE.per::<Arg>()
+                    * NumArgs::from(num_entries as u64),
+            )?;
+            let mut g1_elements_affine = Vec::with_capacity(num_entries);
+            for handle in g1_element_handles {
+                safe_borrow_element!(
+                    context,
+                    handle as usize,
+                    ark_bn254::G1Projective,
+                    ptr,
+                    element
+                );
+                g1_elements_affine.push(element.into_affine());
+            }
+
+            context.charge(
+                ALGEBRA_ARK_BN254_G2_PROJ_TO_AFFINE.per::<Arg>()
+                    * NumArgs::from(num_entries as u64),
+            )?;
+            let mut g2_elements_affine = Vec::with_capacity(num_entries);
+            for handle in g2_element_handles {
+                safe_borrow_element!(
+                    context,
+                    handle as usize,
+                    ark_bn254::G2Projective,
+                    ptr,
+                    element
+                );
+                g2_elements_affine.push(element.into_affine());
+            }
+
+            context.charge(
+                ALGEBRA_ARK_BN254_MULTI_PAIRING_BASE
+                    + ALGEBRA_ARK_BN254_MULTI_PAIRING_PER_PAIR * NumArgs::from(num_entries as u64),
+            )?;
+            let new_element =
+                ark_bn254::Bn254::multi_pairing(g1_elements_affine, g2_elements_affine).0;
+            let new_handle = store_element!(context, new_element)?;
+            Ok(smallvec![Value::u64(new_handle as u64)])
+        },
         _ => Err(SafeNativeError::Abort {
             abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         }),
@@ -145,6 +218,50 @@ pub fn pairing_internal(
             context.charge(ALGEBRA_ARK_BLS12_381_PAIRING)?;
             let new_element =
                 ark_bls12_381::Bls12_381::pairing(g1_element_affine, g2_element_affine).0;
+            let new_handle = store_element!(context, new_element)?;
+            Ok(smallvec![Value::u64(new_handle as u64)])
+        },
+        (Some(Structure::BN254(g1)), Some(Structure::BN254(g2)), Some(Structure::BN254(gt))) => {
+            pairing_internal_bn254(context, args, g1, g2, gt)
+        },
+
+        _ => Err(SafeNativeError::Abort {
+            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        }),
+    }
+}
+
+fn pairing_internal_bn254(
+    context: &mut SafeNativeContext,
+    mut args: VecDeque<Value>,
+    g1: BN254Structure,
+    g2: BN254Structure,
+    gt: BN254Structure,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    match (g1, g2, gt) {
+        (BN254Structure::BN254G1, BN254Structure::BN254G2, BN254Structure::BN254Gt) => {
+            let g2_element_handle = safely_pop_arg!(args, u64) as usize;
+            let g1_element_handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(
+                context,
+                g1_element_handle,
+                ark_bn254::G1Projective,
+                g1_element_ptr,
+                g1_element
+            );
+            context.charge(ALGEBRA_ARK_BN254_G1_PROJ_TO_AFFINE)?;
+            let g1_element_affine = g1_element.into_affine();
+            safe_borrow_element!(
+                context,
+                g2_element_handle,
+                ark_bn254::G2Projective,
+                g2_element_ptr,
+                g2_element
+            );
+            context.charge(ALGEBRA_ARK_BN254_G2_PROJ_TO_AFFINE)?;
+            let g2_element_affine = g2_element.into_affine();
+            context.charge(ALGEBRA_ARK_BN254_PAIRING)?;
+            let new_element = ark_bn254::Bn254::pairing(g1_element_affine, g2_element_affine).0;
             let new_handle = store_element!(context, new_element)?;
             Ok(smallvec![Value::u64(new_handle as u64)])
         },

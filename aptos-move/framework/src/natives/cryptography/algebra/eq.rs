@@ -3,8 +3,8 @@
 use crate::{
     abort_unless_arithmetics_enabled_for_structure, abort_unless_feature_flag_enabled,
     natives::cryptography::algebra::{
-        abort_invariant_violated, feature_flag_from_structure, AlgebraContext, Structure,
-        MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        abort_invariant_violated, feature_flag_from_structure, AlgebraContext, BN254Structure,
+        Structure, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
     },
     safe_borrow_element, structure_from_ty_arg,
 };
@@ -67,8 +67,51 @@ pub fn eq_internal(
             ark_bls12_381::Fq12,
             ALGEBRA_ARK_BLS12_381_FQ12_EQ
         ),
+        Some(Structure::BN254(bn254_structure)) => {
+            eq_internal_bn254(context, args, bn254_structure)
+        },
         _ => Err(SafeNativeError::Abort {
             abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         }),
+    }
+}
+
+fn eq_internal_bn254(
+    context: &mut SafeNativeContext,
+    mut args: VecDeque<Value>,
+    structure: BN254Structure,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    match structure {
+        BN254Structure::BN254Fr => {
+            ark_eq_internal!(context, args, ark_bn254::Fr, ALGEBRA_ARK_BN254_FR_EQ)
+        },
+        BN254Structure::BN254Fq => {
+            ark_eq_internal!(context, args, ark_bn254::Fq, ALGEBRA_ARK_BN254_FQ_EQ)
+        },
+        BN254Structure::BN254Fq2 => {
+            ark_eq_internal!(context, args, ark_bn254::Fq2, ALGEBRA_ARK_BN254_FQ2_EQ)
+        },
+        BN254Structure::BN254Fq12 => {
+            ark_eq_internal!(context, args, ark_bn254::Fq12, ALGEBRA_ARK_BN254_FQ12_EQ)
+        },
+        BN254Structure::BN254G1 => {
+            ark_eq_internal!(
+                context,
+                args,
+                ark_bn254::G1Projective,
+                ALGEBRA_ARK_BN254_G1_PROJ_EQ
+            )
+        },
+        BN254Structure::BN254G2 => {
+            ark_eq_internal!(
+                context,
+                args,
+                ark_bn254::G2Projective,
+                ALGEBRA_ARK_BN254_G2_PROJ_EQ
+            )
+        },
+        BN254Structure::BN254Gt => {
+            ark_eq_internal!(context, args, ark_bn254::Fq12, ALGEBRA_ARK_BN254_FQ12_EQ)
+        },
     }
 }
