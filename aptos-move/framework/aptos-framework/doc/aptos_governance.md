@@ -1713,8 +1713,8 @@ Return a signer for making changes to 0x1 as part of on-chain governance proposa
 <b>aborts_if</b> <b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceResponsbility">GovernanceResponsbility</a>&gt;(@aptos_framework) &&
     <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(signer_caps, signer_address);
 <b>ensures</b> <b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceResponsbility">GovernanceResponsbility</a>&gt;(@aptos_framework);
-<b>let</b> <b>post</b> p_signer_caps = <b>global</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceResponsbility">GovernanceResponsbility</a>&gt;(@aptos_framework).signer_caps;
-<b>ensures</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(p_signer_caps, signer_address);
+<b>let</b> <b>post</b> post_signer_caps = <b>global</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceResponsbility">GovernanceResponsbility</a>&gt;(@aptos_framework).signer_caps;
+<b>ensures</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(post_signer_caps, signer_address);
 </code></pre>
 
 
@@ -2072,7 +2072,7 @@ The delegated voter under the resource StakePool of the stake_pool must be the p
 Address @aptos_framework must exist GovernanceEvents.
 
 
-<a name="0x1_aptos_governance_CreateProposalAbortsIf"></a>
+<a id="0x1_aptos_governance_CreateProposalAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="aptos_governance.md#0x1_aptos_governance_CreateProposalAbortsIf">CreateProposalAbortsIf</a> {
@@ -2126,7 +2126,7 @@ Address @aptos_framework must exist GovernanceEvents.
 
 
 
-<a name="0x1_aptos_governance_VotingGetDelegatedVoterAbortsIf"></a>
+<a id="0x1_aptos_governance_VotingGetDelegatedVoterAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="aptos_governance.md#0x1_aptos_governance_VotingGetDelegatedVoterAbortsIf">VotingGetDelegatedVoterAbortsIf</a> {

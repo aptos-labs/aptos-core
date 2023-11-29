@@ -743,8 +743,7 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
-
-<a name="0x1_aptos_account_TransferEnsures"></a>
+<a id="0x1_aptos_account_TransferEnsures"></a>
 
 
 <pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_TransferEnsures">TransferEnsures</a>&lt;CoinType&gt; {
@@ -761,6 +760,10 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
     <b>ensures</b> if_exist_account && if_exist_coin ==&gt; coin_store_to.<a href="coin.md#0x1_coin">coin</a>.value + amount == p_coin_store_to.<a href="coin.md#0x1_coin">coin</a>.value;
 }
 </code></pre>
+
+
+
+<a id="@Specification_1_deposit_coins"></a>
 
 ### Function `deposit_coins`
 
