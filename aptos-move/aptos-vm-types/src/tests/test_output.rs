@@ -53,7 +53,9 @@ fn test_ok_output_equality_no_deltas() {
     //       simply merges writes for materialized deltas & combined groups.
     let mut materialized_vm_output = vm_output.clone();
     assert_ok!(materialized_vm_output.try_materialize(&state_view));
-    let txn_output_1 = assert_ok!(vm_output.clone().try_into_transaction_output(&state_view));
+    let txn_output_1 = assert_ok!(vm_output
+        .clone()
+        .try_materialize_into_transaction_output(&state_view));
     let txn_output_2 = assert_ok!(vm_output
         .clone()
         .into_transaction_output_with_materialized_write_set(vec![], vec![], vec![]));
@@ -81,7 +83,9 @@ fn test_ok_output_equality_with_deltas() {
 
     let mut materialized_vm_output = vm_output.clone();
     assert_ok!(materialized_vm_output.try_materialize(&state_view));
-    let txn_output_1 = assert_ok!(vm_output.clone().try_into_transaction_output(&state_view));
+    let txn_output_1 = assert_ok!(vm_output
+        .clone()
+        .try_materialize_into_transaction_output(&state_view));
     let txn_output_2 = vm_output
         .clone()
         .into_transaction_output_with_materialized_write_set(
@@ -130,7 +134,7 @@ fn test_err_output_equality_with_deltas() {
     )]);
 
     let vm_status_1 = assert_err!(vm_output.clone().try_materialize(&state_view));
-    let vm_status_2 = assert_err!(vm_output.try_into_transaction_output(&state_view));
+    let vm_status_2 = assert_err!(vm_output.try_materialize_into_transaction_output(&state_view));
 
     // Error should be consistent.
     assert_eq!(vm_status_1, vm_status_2);

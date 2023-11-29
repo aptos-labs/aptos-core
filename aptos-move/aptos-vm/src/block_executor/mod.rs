@@ -255,10 +255,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .to_vec()
     }
 
-    fn materialize_agg_v1(
-        &self,
-        view: &impl TAggregatorV1View<Identifier = <Self::Txn as BlockExecutableTransaction>::Key>,
-    ) {
+    fn materialize_agg_v1(&self, view: &impl TAggregatorV1View<Identifier = StateKey>) {
         self.vm_output
             .lock()
             .as_mut()

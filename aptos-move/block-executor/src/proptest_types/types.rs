@@ -1097,6 +1097,8 @@ where
         &self,
         _view: &impl TAggregatorV1View<Identifier = <Self::Txn as Transaction>::Key>,
     ) {
+        // TODO[agg_v2](tests): implement this method and compare
+        // against sequential execution results v. aggregator v1.
     }
 
     fn incorporate_materialized_txn_output(

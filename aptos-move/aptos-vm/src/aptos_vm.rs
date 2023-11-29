@@ -2019,7 +2019,7 @@ impl AptosSimulationVM {
         let (vm_status, vm_output) =
             vm.0.execute_user_transaction(&resolver, transaction, &log_context);
         let txn_output = vm_output
-            .try_into_transaction_output(&resolver)
+            .try_materialize_into_transaction_output(&resolver)
             .expect("Materializing aggregator V1 deltas should never fail");
         (vm_status, txn_output)
     }
