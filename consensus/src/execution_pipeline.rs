@@ -9,9 +9,10 @@ use aptos_executor_types::{
     state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorError,
     ExecutorResult, StateComputeResult,
 };
+use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::{debug, error};
 use aptos_types::{
-    block_executor::partitioner::ExecutableBlock,
+    block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     transaction::{signature_verified_transaction::SignatureVerifiedTransaction, Transaction},
 };
 use fail::fail_point;
@@ -38,7 +39,10 @@ impl ExecutionPipeline {
         let (prepare_block_tx, prepare_block_rx) = mpsc::unbounded_channel();
         let (execute_block_tx, execute_block_rx) = mpsc::unbounded_channel();
         let (ledger_apply_tx, ledger_apply_rx) = mpsc::unbounded_channel();
-        runtime.spawn(Self::prepare_block(prepare_block_rx, execute_block_tx));
+        runtime.spawn(Self::prepare_block_stage(
+            prepare_block_rx,
+            execute_block_tx,
+        ));
         runtime.spawn(Self::execute_stage(
             execute_block_rx,
             ledger_apply_tx,
@@ -53,14 +57,14 @@ impl ExecutionPipeline {
         block_id: HashValue,
         parent_block_id: HashValue,
         txns_to_execute: Vec<Transaction>,
-        maybe_block_gas_limit: Option<u64>,
+        block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     ) -> StateComputeResultFut {
         let (result_tx, result_rx) = oneshot::channel();
         self.prepare_block_tx
             .send(PrepareBlockCommand {
                 block_id,
                 txns_to_execute,
-                maybe_block_gas_limit,
+                block_executor_onchain_config,
                 parent_block_id,
                 result_tx,
             })
@@ -78,14 +82,14 @@ impl ExecutionPipeline {
         })
     }
 
-    async fn prepare_block(
+    async fn prepare_block_stage(
         mut prepare_block_rx: mpsc::UnboundedReceiver<PrepareBlockCommand>,
         execute_block_tx: mpsc::UnboundedSender<ExecuteBlockCommand>,
     ) {
         while let Some(PrepareBlockCommand {
             block_id,
             txns_to_execute,
-            maybe_block_gas_limit,
+            block_executor_onchain_config,
             parent_block_id,
             result_tx,
         }) = prepare_block_rx.recv().await
@@ -97,9 +101,10 @@ impl ExecutionPipeline {
                 tokio::task::spawn_blocking(move || {
                     let sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL
                         .install(|| {
+                            let num_txns = txns_to_execute.len();
                             txns_to_execute
                                 .into_par_iter()
-                                .with_min_len(25)
+                                .with_min_len(optimal_min_len(num_txns, 32))
                                 .map(|t| t.into())
                                 .collect::<Vec<_>>()
                         });
@@ -113,7 +118,7 @@ impl ExecutionPipeline {
                 .send(ExecuteBlockCommand {
                     block: (block_id, sig_verified_txns).into(),
                     parent_block_id,
-                    maybe_block_gas_limit,
+                    block_executor_onchain_config,
                     result_tx,
                 })
                 .expect("Failed to send block to execution pipeline.");
@@ -128,7 +133,7 @@ impl ExecutionPipeline {
         while let Some(ExecuteBlockCommand {
             block,
             parent_block_id,
-            maybe_block_gas_limit,
+            block_executor_onchain_config,
             result_tx,
         }) = block_rx.recv().await
         {
@@ -146,7 +151,7 @@ impl ExecutionPipeline {
                     executor.execute_and_state_checkpoint(
                         block,
                         parent_block_id,
-                        maybe_block_gas_limit,
+                        block_executor_onchain_config,
                     )
                 })
                 .await
@@ -203,7 +208,7 @@ impl ExecutionPipeline {
 struct PrepareBlockCommand {
     block_id: HashValue,
     txns_to_execute: Vec<Transaction>,
-    maybe_block_gas_limit: Option<u64>,
+    block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     // The parent block id.
     parent_block_id: HashValue,
     result_tx: oneshot::Sender<ExecutorResult<StateComputeResult>>,
@@ -212,7 +217,7 @@ struct PrepareBlockCommand {
 struct ExecuteBlockCommand {
     block: ExecutableBlock,
     parent_block_id: HashValue,
-    maybe_block_gas_limit: Option<u64>,
+    block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     result_tx: oneshot::Sender<ExecutorResult<StateComputeResult>>,
 }
 

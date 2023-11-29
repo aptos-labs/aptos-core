@@ -1,0 +1,18 @@
+[package]
+name = "aptos-protos"
+version = "1.1.2"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "Code generated from Aptos protobuf definitions"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = true
+edition = "2021"
+
+[dependencies]
+futures-core = { workspace = true }
+pbjson = { workspace = true }
+prost = { workspace = true }
+prost-types = { workspace = true }
+serde = { workspace = true }
+tonic = { workspace = true }

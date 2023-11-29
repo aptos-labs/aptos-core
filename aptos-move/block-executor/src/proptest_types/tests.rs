@@ -3,18 +3,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    errors::Error,
+    errors::{Error, IntentionalFallbackToSequential},
     executor::BlockExecutor,
     proptest_types::{
         baseline::BaselineOutput,
         types::{
             DeltaDataView, EmptyDataView, KeyType, MockEvent, MockOutput, MockTask,
-            MockTransaction, TransactionGen, TransactionGenParams, ValueType, MAX_GAS_PER_TXN,
+            MockTransaction, NonEmptyGroupDataView, TransactionGen, TransactionGenParams,
+            MAX_GAS_PER_TXN,
         },
     },
     txn_commit_hook::NoOpTransactionCommitHook,
 };
-use aptos_types::{contract_event::ReadWriteEvent, executable::ExecutableTestType};
+use aptos_aggregator::types::PanicOr;
+use aptos_types::{
+    block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
+    executable::ExecutableTestType,
+};
 use claims::assert_ok;
 use num_cpus;
 use proptest::{
@@ -26,6 +31,7 @@ use proptest::{
 };
 use rand::Rng;
 use std::{cmp::max, fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
+use test_case::test_case;
 
 fn run_transactions<K, V, E>(
     key_universe: &[K],
@@ -38,7 +44,7 @@ fn run_transactions<K, V, E>(
 ) where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
-    E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
+    E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
     Vec<u8>: From<V>,
 {
     let mut transactions: Vec<_> = transaction_gens
@@ -54,7 +60,7 @@ fn run_transactions<K, V, E>(
         *transactions.get_mut(i.index(length)).unwrap() = MockTransaction::SkipRest;
     }
 
-    let data_view = EmptyDataView::<KeyType<K>, ValueType> {
+    let data_view = EmptyDataView::<KeyType<K>> {
         phantom: PhantomData,
     };
 
@@ -67,21 +73,25 @@ fn run_transactions<K, V, E>(
 
     for _ in 0..num_repeat {
         let output = BlockExecutor::<
-            MockTransaction<KeyType<K>, ValueType, E>,
-            MockTask<KeyType<K>, ValueType, E>,
-            EmptyDataView<KeyType<K>, ValueType>,
-            NoOpTransactionCommitHook<MockOutput<KeyType<K>, ValueType, E>, usize>,
+            MockTransaction<KeyType<K>, E>,
+            MockTask<KeyType<K>, E>,
+            EmptyDataView<KeyType<K>>,
+            NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
             ExecutableTestType,
         >::new(
-            num_cpus::get(),
+            BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
             executor_thread_pool.clone(),
-            maybe_block_gas_limit,
             None,
         )
         .execute_transactions_parallel((), &transactions, &data_view);
 
         if module_access.0 && module_access.1 {
-            assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
+            assert_eq!(
+                output.unwrap_err(),
+                Error::FallbackToSequential(PanicOr::Or(
+                    IntentionalFallbackToSequential::ModulePathReadWrite
+                ))
+            );
             continue;
         }
 
@@ -189,7 +199,7 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
         .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false))
         .collect();
 
-    let data_view = DeltaDataView::<KeyType<[u8; 32]>, ValueType> {
+    let data_view = DeltaDataView::<KeyType<[u8; 32]>> {
         phantom: PhantomData,
     };
 
@@ -202,15 +212,14 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
 
     for _ in 0..20 {
         let output = BlockExecutor::<
-            MockTransaction<KeyType<[u8; 32]>, ValueType, MockEvent>,
-            MockTask<KeyType<[u8; 32]>, ValueType, MockEvent>,
-            DeltaDataView<KeyType<[u8; 32]>, ValueType>,
-            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType, MockEvent>, usize>,
+            MockTransaction<KeyType<[u8; 32]>, MockEvent>,
+            MockTask<KeyType<[u8; 32]>, MockEvent>,
+            DeltaDataView<KeyType<[u8; 32]>>,
+            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
             ExecutableTestType,
         >::new(
-            num_cpus::get(),
+            BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
             executor_thread_pool.clone(),
-            maybe_block_gas_limit,
             None,
         )
         .execute_transactions_parallel((), &transactions, &data_view);
@@ -234,7 +243,7 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
     .expect("creating a new value should succeed")
     .current();
 
-    let data_view = DeltaDataView::<KeyType<[u8; 32]>, ValueType> {
+    let data_view = DeltaDataView::<KeyType<[u8; 32]>> {
         phantom: PhantomData,
     };
 
@@ -253,15 +262,14 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
 
     for _ in 0..20 {
         let output = BlockExecutor::<
-            MockTransaction<KeyType<[u8; 32]>, ValueType, MockEvent>,
-            MockTask<KeyType<[u8; 32]>, ValueType, MockEvent>,
-            DeltaDataView<KeyType<[u8; 32]>, ValueType>,
-            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType, MockEvent>, usize>,
+            MockTransaction<KeyType<[u8; 32]>, MockEvent>,
+            MockTask<KeyType<[u8; 32]>, MockEvent>,
+            DeltaDataView<KeyType<[u8; 32]>>,
+            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
             ExecutableTestType,
         >::new(
-            num_cpus::get(),
+            BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
             executor_thread_pool.clone(),
-            maybe_block_gas_limit,
             None,
         )
         .execute_transactions_parallel((), &transactions, &data_view);
@@ -396,7 +404,7 @@ fn publishing_fixed_params_with_block_gas_limit(
         },
     };
 
-    let data_view = DeltaDataView::<KeyType<[u8; 32]>, ValueType> {
+    let data_view = DeltaDataView::<KeyType<[u8; 32]>> {
         phantom: PhantomData,
     };
 
@@ -409,15 +417,14 @@ fn publishing_fixed_params_with_block_gas_limit(
 
     // Confirm still no intersection
     let output = BlockExecutor::<
-        MockTransaction<KeyType<[u8; 32]>, ValueType, MockEvent>,
-        MockTask<KeyType<[u8; 32]>, ValueType, MockEvent>,
-        DeltaDataView<KeyType<[u8; 32]>, ValueType>,
-        NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType, MockEvent>, usize>,
+        MockTransaction<KeyType<[u8; 32]>, MockEvent>,
+        MockTask<KeyType<[u8; 32]>, MockEvent>,
+        DeltaDataView<KeyType<[u8; 32]>>,
+        NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
         ExecutableTestType,
     >::new(
-        num_cpus::get(),
+        BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
         executor_thread_pool,
-        maybe_block_gas_limit,
         None,
     )
     .execute_transactions_parallel((), &transactions, &data_view);
@@ -452,20 +459,124 @@ fn publishing_fixed_params_with_block_gas_limit(
 
     for _ in 0..200 {
         let output = BlockExecutor::<
-            MockTransaction<KeyType<[u8; 32]>, ValueType, MockEvent>,
-            MockTask<KeyType<[u8; 32]>, ValueType, MockEvent>,
-            DeltaDataView<KeyType<[u8; 32]>, ValueType>,
-            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType, MockEvent>, usize>,
+            MockTransaction<KeyType<[u8; 32]>, MockEvent>,
+            MockTask<KeyType<[u8; 32]>, MockEvent>,
+            DeltaDataView<KeyType<[u8; 32]>>,
+            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
             ExecutableTestType,
         >::new(
-            num_cpus::get(),
+            BlockExecutorConfig::new_maybe_block_limit(
+                num_cpus::get(),
+                Some(max(w_index, r_index) as u64 * MAX_GAS_PER_TXN + 1),
+            ),
             executor_thread_pool.clone(),
-            Some(max(w_index, r_index) as u64 * MAX_GAS_PER_TXN + 1),
             None,
         ) // Ensure enough gas limit to commit the module txns (4 is maximum gas per txn)
         .execute_transactions_parallel((), &transactions, &data_view);
 
-        assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
+        assert_eq!(
+            output.unwrap_err(),
+            Error::FallbackToSequential(PanicOr::Or(
+                IntentionalFallbackToSequential::ModulePathReadWrite
+            ))
+        );
+    }
+}
+
+#[test_case(1000, 100, 30, 15, 0)]
+#[test_case(1000, 50, 20, 10, 0)]
+#[test_case(1000, 15, 5, 5, 0)]
+#[test_case(1000, 20, 10, 5, 1)]
+#[test_case(1000, 20, 10, 5, 2)]
+#[test_case(1000, 20, 10, 5, 3)]
+#[test_case(1000, 20, 10, 5, 4)]
+fn non_empty_group(
+    num_txns: usize,
+    key_universe_len: usize,
+    num_repeat_parallel: usize,
+    num_repeat_sequential: usize,
+    group_size_testing: usize,
+) {
+    let mut runner = TestRunner::default();
+
+    let key_universe = vec(any::<[u8; 32]>(), key_universe_len)
+        .new_tree(&mut runner)
+        .expect("creating a new value should succeed")
+        .current();
+
+    let transaction_gen = vec(
+        any_with::<TransactionGen<[u8; 32]>>(TransactionGenParams::new_dynamic()),
+        num_txns,
+    )
+    .new_tree(&mut runner)
+    .expect("creating a new value should succeed")
+    .current();
+
+    // Determines the probability that any given incarnation of an executed txn will query
+    // the size of a given group (3 groups).
+    let group_size_pcts = match group_size_testing {
+        0 => [None, None, None],
+        1 => [Some(30), None, None],
+        2 => [Some(80), None, None],
+        3 => [Some(30), Some(80), None],
+        4 => [Some(30), Some(50), Some(70)],
+        _ => unreachable!("Unexpected test configuration"),
+    };
+
+    let transactions: Vec<_> = transaction_gen
+        .into_iter()
+        .map(|txn_gen| {
+            txn_gen.materialize_groups::<[u8; 32], MockEvent>(&key_universe, group_size_pcts)
+        })
+        .collect();
+
+    let data_view = NonEmptyGroupDataView::<KeyType<[u8; 32]>> {
+        group_keys: key_universe[(key_universe_len - 3)..key_universe_len]
+            .iter()
+            .map(|k| KeyType(*k, false))
+            .collect(),
+    };
+
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+
+    for _ in 0..num_repeat_parallel {
+        let output = BlockExecutor::<
+            MockTransaction<KeyType<[u8; 32]>, MockEvent>,
+            MockTask<KeyType<[u8; 32]>, MockEvent>,
+            NonEmptyGroupDataView<KeyType<[u8; 32]>>,
+            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
+            ExecutableTestType,
+        >::new(
+            BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+            executor_thread_pool.clone(),
+            None,
+        )
+        .execute_transactions_parallel((), &transactions, &data_view);
+
+        BaselineOutput::generate(&transactions, None).assert_output(&output);
+    }
+
+    for _ in 0..num_repeat_sequential {
+        let output = BlockExecutor::<
+            MockTransaction<KeyType<[u8; 32]>, MockEvent>,
+            MockTask<KeyType<[u8; 32]>, MockEvent>,
+            NonEmptyGroupDataView<KeyType<[u8; 32]>>,
+            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
+            ExecutableTestType,
+        >::new(
+            BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+            executor_thread_pool.clone(),
+            None,
+        )
+        .execute_transactions_sequential((), &transactions, &data_view, true);
+        // TODO: test dynamic disabled as well.
+
+        BaselineOutput::generate(&transactions, None).assert_output(&output);
     }
 }
 

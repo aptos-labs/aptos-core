@@ -10,13 +10,17 @@ use crate::sharded_block_executor::{
     messages::CrossShardMsg,
     sharded_aggregator_service,
     sharded_executor_service::ShardedExecutorService,
-    ExecutorShardCommand,
+    ExecutorShardCommand, ShardedBlockExecutor,
 };
 use aptos_logger::trace;
 use aptos_state_view::StateView;
 use aptos_types::{
-    block_executor::partitioner::{
-        PartitionedTransactions, RoundId, ShardId, GLOBAL_ROUND_ID, MAX_ALLOWED_PARTITIONING_ROUNDS,
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain,
+        partitioner::{
+            PartitionedTransactions, RoundId, ShardId, GLOBAL_ROUND_ID,
+            MAX_ALLOWED_PARTITIONING_ROUNDS,
+        },
     },
     transaction::TransactionOutput,
 };
@@ -147,6 +151,16 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorClient<S> {
         }
     }
 
+    pub fn create_local_sharded_block_executor(
+        num_shards: usize,
+        num_threads: Option<usize>,
+    ) -> ShardedBlockExecutor<S, LocalExecutorClient<S>> {
+        ShardedBlockExecutor::new(LocalExecutorService::setup_local_executor_shards(
+            num_shards,
+            num_threads,
+        ))
+    }
+
     fn get_output_from_shards(&self) -> Result<Vec<Vec<Vec<TransactionOutput>>>, VMStatus> {
         let _timer = WAIT_FOR_SHARDED_OUTPUT_SECONDS.start_timer();
         trace!("LocalExecutorClient Waiting for results");
@@ -171,7 +185,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
         state_view: Arc<S>,
         transactions: PartitionedTransactions,
         concurrency_level_per_shard: usize,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<ShardedExecutionOutput, VMStatus> {
         assert_eq!(transactions.num_shards(), self.num_shards());
         let (sub_blocks, global_txns) = transactions.into();
@@ -181,7 +195,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
                     state_view.clone(),
                     sub_blocks_for_shard,
                     concurrency_level_per_shard,
-                    maybe_block_gas_limit,
+                    onchain_config.clone(),
                 ))
                 .unwrap();
         }
@@ -193,7 +207,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
         let mut global_output = self.global_executor.execute_global_txns(
             global_txns,
             state_view.as_ref(),
-            maybe_block_gas_limit,
+            onchain_config,
         )?;
 
         let mut sharded_output = self.get_output_from_shards()?;
@@ -207,6 +221,8 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
 
         Ok(ShardedExecutionOutput::new(sharded_output, global_output))
     }
+
+    fn shutdown(&mut self) {}
 }
 
 impl<S: StateView + Sync + Send + 'static> Drop for LocalExecutorClient<S> {

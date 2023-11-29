@@ -1,34 +1,27 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{dag_fetcher::TFetchRequester, storage::DAGStorage, NodeId};
 use crate::dag::{
+    dag_fetcher::TFetchRequester,
     dag_network::RpcHandler,
     dag_store::Dag,
+    errors::NodeBroadcastHandleError,
     observability::{
         logging::{LogEvent, LogSchema},
         tracing::{observe_node, NodeStage},
     },
+    storage::DAGStorage,
     types::{Node, NodeCertificate, Vote},
+    NodeId,
 };
 use anyhow::{bail, ensure};
+use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
 use aptos_types::{epoch_state::EpochState, validator_signer::ValidatorSigner};
 use async_trait::async_trait;
 use std::{collections::BTreeMap, mem, sync::Arc};
-use thiserror::Error as ThisError;
-
-#[derive(ThisError, Debug)]
-pub enum NodeBroadcastHandleError {
-    #[error("invalid parent in node")]
-    InvalidParent,
-    #[error("missing parents")]
-    MissingParents,
-    #[error("stale round number")]
-    StaleRound(Round),
-}
 
 pub(crate) struct NodeBroadcastHandler {
     dag: Arc<RwLock<Dag>>,
@@ -37,6 +30,7 @@ pub(crate) struct NodeBroadcastHandler {
     epoch_state: Arc<EpochState>,
     storage: Arc<dyn DAGStorage>,
     fetch_requester: Arc<dyn TFetchRequester>,
+    payload_config: DagPayloadConfig,
 }
 
 impl NodeBroadcastHandler {
@@ -46,6 +40,7 @@ impl NodeBroadcastHandler {
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
         fetch_requester: Arc<dyn TFetchRequester>,
+        payload_config: DagPayloadConfig,
     ) -> Self {
         let epoch = epoch_state.epoch;
         let votes_by_round_peer = read_votes_from_storage(&storage, epoch);
@@ -57,6 +52,14 @@ impl NodeBroadcastHandler {
             epoch_state,
             storage,
             fetch_requester,
+            payload_config,
+        }
+    }
+
+    pub fn gc(&mut self) {
+        let lowest_round = self.dag.read().lowest_round();
+        if let Err(e) = self.gc_before_round(lowest_round) {
+            error!("Error deleting votes: {}", e);
         }
     }
 
@@ -76,6 +79,11 @@ impl NodeBroadcastHandler {
     }
 
     fn validate(&self, node: Node) -> anyhow::Result<Node> {
+        ensure!(node.payload().len() as u64 <= self.payload_config.max_receiving_txns_per_round);
+        ensure!(
+            node.payload().size() as u64 <= self.payload_config.max_receiving_size_per_round_bytes
+        );
+
         let current_round = node.metadata().round();
 
         let dag_reader = self.dag.read();

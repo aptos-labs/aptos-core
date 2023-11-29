@@ -13,7 +13,7 @@ pub mod test_utils;
 
 use anyhow::{anyhow, Result};
 use aptos_config::config::{
-    RocksdbConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
+    RocksdbConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::HashValue;
@@ -281,8 +281,9 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
         let replay_concurrency_level = opt.replay_concurrency_level.get();
         let run_mode = if let Some(db_dir) = &opt.db_dir {
             // for restore, we can always start state store with empty buffered_state since we will restore
+            // TODO(grao): Support path override here.
             let restore_handler = Arc::new(AptosDB::open_kv_only(
-                db_dir,
+                StorageDirPaths::from_path(db_dir),
                 false,                       /* read_only */
                 NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
                 opt.rocksdb_opt.clone().into(),

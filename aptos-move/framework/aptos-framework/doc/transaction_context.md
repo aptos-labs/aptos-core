@@ -1,5 +1,5 @@
 
-<a name="0x1_transaction_context"></a>
+<a id="0x1_transaction_context"></a>
 
 # Module `0x1::transaction_context`
 
@@ -25,7 +25,7 @@
 
 
 
-<a name="0x1_transaction_context_AUID"></a>
+<a id="0x1_transaction_context_AUID"></a>
 
 ## Struct `AUID`
 
@@ -54,12 +54,12 @@ for storing an address
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_transaction_context_EAUID_NOT_SUPPORTED"></a>
+<a id="0x1_transaction_context_EAUID_NOT_SUPPORTED"></a>
 
 AUID feature is not supported.
 
@@ -69,7 +69,7 @@ AUID feature is not supported.
 
 
 
-<a name="0x1_transaction_context_get_txn_hash"></a>
+<a id="0x1_transaction_context_get_txn_hash"></a>
 
 ## Function `get_txn_hash`
 
@@ -92,7 +92,7 @@ Return the transaction hash of the current transaction.
 
 </details>
 
-<a name="0x1_transaction_context_get_transaction_hash"></a>
+<a id="0x1_transaction_context_get_transaction_hash"></a>
 
 ## Function `get_transaction_hash`
 
@@ -120,7 +120,7 @@ This function is created for to feature gate the <code>get_txn_hash</code> funct
 
 </details>
 
-<a name="0x1_transaction_context_generate_unique_address"></a>
+<a id="0x1_transaction_context_generate_unique_address"></a>
 
 ## Function `generate_unique_address`
 
@@ -149,7 +149,7 @@ from other ways of generating unique addresses.
 
 </details>
 
-<a name="0x1_transaction_context_generate_auid_address"></a>
+<a id="0x1_transaction_context_generate_auid_address"></a>
 
 ## Function `generate_auid_address`
 
@@ -177,7 +177,7 @@ created for to feature gate the <code>generate_unique_address</code> function.
 
 </details>
 
-<a name="0x1_transaction_context_get_script_hash"></a>
+<a id="0x1_transaction_context_get_script_hash"></a>
 
 ## Function `get_script_hash`
 
@@ -200,7 +200,7 @@ Return the script hash of the current entry function.
 
 </details>
 
-<a name="0x1_transaction_context_generate_auid"></a>
+<a id="0x1_transaction_context_generate_auid"></a>
 
 ## Function `generate_auid`
 
@@ -229,7 +229,7 @@ the generated unique address wrapped in the AUID class.
 
 </details>
 
-<a name="0x1_transaction_context_auid_address"></a>
+<a id="0x1_transaction_context_auid_address"></a>
 
 ## Function `auid_address`
 
@@ -253,13 +253,13 @@ the generated unique address wrapped in the AUID class.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
 
 
-<a name="0x1_transaction_context_spec_get_txn_hash"></a>
+<a id="0x1_transaction_context_spec_get_txn_hash"></a>
 
 
 <pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_spec_get_txn_hash">spec_get_txn_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
@@ -267,7 +267,7 @@ the generated unique address wrapped in the AUID class.
 
 
 
-<a name="@Specification_1_get_txn_hash"></a>
+<a id="@Specification_1_get_txn_hash"></a>
 
 ### Function `get_txn_hash`
 
@@ -285,7 +285,7 @@ the generated unique address wrapped in the AUID class.
 
 
 
-<a name="@Specification_1_generate_unique_address"></a>
+<a id="@Specification_1_generate_unique_address"></a>
 
 ### Function `generate_unique_address`
 
@@ -303,7 +303,7 @@ the generated unique address wrapped in the AUID class.
 
 
 
-<a name="0x1_transaction_context_spec_generate_unique_address"></a>
+<a id="0x1_transaction_context_spec_generate_unique_address"></a>
 
 
 <pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_spec_generate_unique_address">spec_generate_unique_address</a>(): <b>address</b>;
@@ -311,7 +311,7 @@ the generated unique address wrapped in the AUID class.
 
 
 
-<a name="@Specification_1_get_script_hash"></a>
+<a id="@Specification_1_get_script_hash"></a>
 
 ### Function `get_script_hash`
 
@@ -330,7 +330,7 @@ the generated unique address wrapped in the AUID class.
 
 
 
-<a name="0x1_transaction_context_spec_get_script_hash"></a>
+<a id="0x1_transaction_context_spec_get_script_hash"></a>
 
 
 <pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_spec_get_script_hash">spec_get_script_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;

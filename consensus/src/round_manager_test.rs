@@ -28,7 +28,7 @@ use crate::{
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::ConsensusConfig,
+    config::{ConsensusConfig, QcAggregatorType},
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_consensus_types::{
@@ -63,7 +63,8 @@ use aptos_secure_storage::Storage;
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
-    on_chain_config::OnChainConsensusConfig,
+    on_chain_config::{ConsensusConfigV1Ext, ConsensusExtraFeature, OnChainConsensusConfig},
+    system_txn::{pool::SystemTransactionPool, SystemTransaction},
     transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
     validator_verifier::{generate_validator_verifier, random_validator_verifier},
@@ -75,6 +76,7 @@ use futures::{
     stream::select,
     FutureExt, Stream, StreamExt,
 };
+use futures_channel::mpsc::unbounded;
 use maplit::hashmap;
 use std::{
     iter::FromIterator,
@@ -104,6 +106,8 @@ pub struct NodeSetup {
     mock_state_computer: Arc<MockStateComputer>,
     _state_sync_receiver: mpsc::UnboundedReceiver<Vec<SignedTransaction>>,
     id: usize,
+    onchain_consensus_config: OnChainConsensusConfig,
+    local_consensus_config: ConsensusConfig,
 }
 
 impl NodeSetup {
@@ -111,7 +115,14 @@ impl NodeSetup {
         let base_timeout = Duration::new(60, 0);
         let time_interval = Box::new(ExponentialTimeInterval::fixed(base_timeout));
         let (round_timeout_sender, _) = aptos_channels::new_test(1_024);
-        RoundState::new(time_interval, time_service, round_timeout_sender)
+        let (delayed_qc_tx, _) = unbounded();
+        RoundState::new(
+            time_interval,
+            time_service,
+            round_timeout_sender,
+            delayed_qc_tx,
+            QcAggregatorType::NoDelay,
+        )
     }
 
     fn create_proposer_election(proposers: Vec<Author>) -> Arc<dyn ProposerElection + Send + Sync> {
@@ -123,7 +134,11 @@ impl NodeSetup {
         executor: Handle,
         num_nodes: usize,
         proposer_indices: Option<Vec<usize>>,
+        onchain_consensus_config: Option<OnChainConsensusConfig>,
+        local_consensus_config: Option<ConsensusConfig>,
     ) -> Vec<Self> {
+        let onchain_consensus_config = onchain_consensus_config.unwrap_or_default();
+        let local_consensus_config = local_consensus_config.unwrap_or_default();
         let (signers, validators) = random_validator_verifier(num_nodes, None, false);
         let proposers = proposer_indices
             .unwrap_or_else(|| vec![0])
@@ -171,6 +186,8 @@ impl NodeSetup {
                 initial_data,
                 safety_rules_manager,
                 id,
+                onchain_consensus_config.clone(),
+                local_consensus_config.clone(),
             ));
         }
         nodes
@@ -185,6 +202,8 @@ impl NodeSetup {
         initial_data: RecoveryData,
         safety_rules_manager: SafetyRulesManager,
         id: usize,
+        onchain_consensus_config: OnChainConsensusConfig,
+        local_consensus_config: ConsensusConfig,
     ) -> Self {
         let _entered_runtime = executor.enter();
         let epoch_state = EpochState {
@@ -253,6 +272,8 @@ impl NodeSetup {
             PipelineBackpressureConfig::new_no_backoff(),
             ChainHealthBackoffConfig::new_no_backoff(),
             false,
+            Arc::new(SystemTransactionPool::new()),
+            onchain_consensus_config.should_propose_system_txns(),
         );
 
         let round_state = Self::create_round_state(time_service);
@@ -271,9 +292,9 @@ impl NodeSetup {
             Arc::new(Mutex::new(safety_rules)),
             network,
             storage.clone(),
-            OnChainConsensusConfig::default(),
+            onchain_consensus_config.clone(),
             round_manager_tx,
-            ConsensusConfig::default(),
+            local_consensus_config.clone(),
         );
         block_on(round_manager.init(last_vote_sent));
         Self {
@@ -289,6 +310,8 @@ impl NodeSetup {
             mock_state_computer,
             _state_sync_receiver,
             id,
+            onchain_consensus_config,
+            local_consensus_config,
         }
     }
 
@@ -306,6 +329,8 @@ impl NodeSetup {
             recover_data,
             self.safety_rules_manager,
             self.id,
+            self.onchain_consensus_config.clone(),
+            self.local_consensus_config.clone(),
         )
     }
 
@@ -596,7 +621,14 @@ fn process_and_vote_on_proposal(
 fn new_round_on_quorum_cert() {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
-    let mut nodes = NodeSetup::create_nodes(&mut playground, runtime.handle().clone(), 1, None);
+    let mut nodes = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        1,
+        None,
+        None,
+        None,
+    );
     let node = &mut nodes[0];
     let genesis = node.block_store.ordered_root();
     timed_block_on(&runtime, async {
@@ -633,7 +665,14 @@ fn vote_on_successful_proposal() {
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
     // In order to observe the votes we're going to check proposal processing on the non-proposer
     // node (which will send the votes to the proposer).
-    let mut nodes = NodeSetup::create_nodes(&mut playground, runtime.handle().clone(), 1, None);
+    let mut nodes = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        1,
+        None,
+        None,
+        None,
+    );
     let node = &mut nodes[0];
 
     let genesis_qc = certificate_for_genesis();
@@ -670,7 +709,14 @@ fn delay_proposal_processing_in_sync_only() {
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
     // In order to observe the votes we're going to check proposal processing on the non-proposer
     // node (which will send the votes to the proposer).
-    let mut nodes = NodeSetup::create_nodes(&mut playground, runtime.handle().clone(), 1, None);
+    let mut nodes = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        1,
+        None,
+        None,
+        None,
+    );
     let node = &mut nodes[0];
 
     let genesis_qc = certificate_for_genesis();
@@ -731,7 +777,14 @@ fn no_vote_on_old_proposal() {
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
     // In order to observe the votes we're going to check proposal processing on the non-proposer
     // node (which will send the votes to the proposer).
-    let mut nodes = NodeSetup::create_nodes(&mut playground, runtime.handle().clone(), 1, None);
+    let mut nodes = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        1,
+        None,
+        None,
+        None,
+    );
     let node = &mut nodes[0];
     let genesis_qc = certificate_for_genesis();
     let new_block = Block::new_proposal(
@@ -780,9 +833,16 @@ fn no_vote_on_mismatch_round() {
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
     // In order to observe the votes we're going to check proposal processing on the non-proposer
     // node (which will send the votes to the proposer).
-    let mut node = NodeSetup::create_nodes(&mut playground, runtime.handle().clone(), 1, None)
-        .pop()
-        .unwrap();
+    let mut node = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        1,
+        None,
+        None,
+        None,
+    )
+    .pop()
+    .unwrap();
     let genesis_qc = certificate_for_genesis();
     let correct_block = Block::new_proposal(
         Payload::empty(false),
@@ -829,7 +889,14 @@ fn no_vote_on_mismatch_round() {
 fn sync_info_carried_on_timeout_vote() {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
-    let mut nodes = NodeSetup::create_nodes(&mut playground, runtime.handle().clone(), 1, None);
+    let mut nodes = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        1,
+        None,
+        None,
+        None,
+    );
     let mut node = nodes.pop().unwrap();
 
     timed_block_on(&runtime, async {
@@ -884,7 +951,14 @@ fn no_vote_on_invalid_proposer() {
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
     // In order to observe the votes we're going to check proposal processing on the non-proposer
     // node (which will send the votes to the proposer).
-    let mut nodes = NodeSetup::create_nodes(&mut playground, runtime.handle().clone(), 2, None);
+    let mut nodes = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        2,
+        None,
+        None,
+        None,
+    );
     let incorrect_proposer = nodes.pop().unwrap();
     let mut node = nodes.pop().unwrap();
     let genesis_qc = certificate_for_genesis();
@@ -935,9 +1009,16 @@ fn new_round_on_timeout_certificate() {
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
     // In order to observe the votes we're going to check proposal processing on the non-proposer
     // node (which will send the votes to the proposer).
-    let mut node = NodeSetup::create_nodes(&mut playground, runtime.handle().clone(), 1, None)
-        .pop()
-        .unwrap();
+    let mut node = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        1,
+        None,
+        None,
+        None,
+    )
+    .pop()
+    .unwrap();
     let genesis_qc = certificate_for_genesis();
     let correct_block = Block::new_proposal(
         Payload::empty(false),
@@ -994,9 +1075,16 @@ fn reject_invalid_failed_authors() {
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
     // In order to observe the votes we're going to check proposal processing on the non-proposer
     // node (which will send the votes to the proposer).
-    let mut node = NodeSetup::create_nodes(&mut playground, runtime.handle().clone(), 1, None)
-        .pop()
-        .unwrap();
+    let mut node = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        1,
+        None,
+        None,
+        None,
+    )
+    .pop()
+    .unwrap();
     let genesis_qc = certificate_for_genesis();
 
     let create_timeout = |round: Round| {
@@ -1081,9 +1169,16 @@ fn reject_invalid_failed_authors() {
 fn response_on_block_retrieval() {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
-    let mut node = NodeSetup::create_nodes(&mut playground, runtime.handle().clone(), 1, None)
-        .pop()
-        .unwrap();
+    let mut node = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        1,
+        None,
+        None,
+        None,
+    )
+    .pop()
+    .unwrap();
 
     let genesis_qc = certificate_for_genesis();
     let block = Block::new_proposal(
@@ -1185,9 +1280,16 @@ fn response_on_block_retrieval() {
 fn recover_on_restart() {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
-    let mut node = NodeSetup::create_nodes(&mut playground, runtime.handle().clone(), 1, None)
-        .pop()
-        .unwrap();
+    let mut node = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        1,
+        None,
+        None,
+        None,
+    )
+    .pop()
+    .unwrap();
     let inserter = TreeInserter::new_with_store(node.signer.clone(), node.block_store.clone());
 
     let genesis_qc = certificate_for_genesis();
@@ -1253,7 +1355,14 @@ fn recover_on_restart() {
 fn nil_vote_on_timeout() {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
-    let mut nodes = NodeSetup::create_nodes(&mut playground, runtime.handle().clone(), 1, None);
+    let mut nodes = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        1,
+        None,
+        None,
+        None,
+    );
     let node = &mut nodes[0];
     let genesis = node.block_store.ordered_root();
     timed_block_on(&runtime, async {
@@ -1287,7 +1396,14 @@ fn nil_vote_on_timeout() {
 fn vote_resent_on_timeout() {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
-    let mut nodes = NodeSetup::create_nodes(&mut playground, runtime.handle().clone(), 1, None);
+    let mut nodes = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        1,
+        None,
+        None,
+        None,
+    );
     let node = &mut nodes[0];
     timed_block_on(&runtime, async {
         let proposal_msg = node.next_proposal().await;
@@ -1319,7 +1435,14 @@ fn vote_resent_on_timeout() {
 fn sync_on_partial_newer_sync_info() {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
-    let mut nodes = NodeSetup::create_nodes(&mut playground, runtime.handle().clone(), 1, None);
+    let mut nodes = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        1,
+        None,
+        None,
+        None,
+    );
     let mut node = nodes.pop().unwrap();
     runtime.spawn(playground.start());
     timed_block_on(&runtime, async {
@@ -1371,7 +1494,14 @@ fn sync_on_partial_newer_sync_info() {
 fn safety_rules_crash() {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
-    let mut nodes = NodeSetup::create_nodes(&mut playground, runtime.handle().clone(), 1, None);
+    let mut nodes = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        1,
+        None,
+        None,
+        None,
+    );
     let mut node = nodes.pop().unwrap();
     runtime.spawn(playground.start());
 
@@ -1427,7 +1557,14 @@ fn safety_rules_crash() {
 fn echo_timeout() {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
-    let mut nodes = NodeSetup::create_nodes(&mut playground, runtime.handle().clone(), 4, None);
+    let mut nodes = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        4,
+        None,
+        None,
+        None,
+    );
     runtime.spawn(playground.start());
     timed_block_on(&runtime, async {
         // clear the message queue
@@ -1473,7 +1610,14 @@ fn echo_timeout() {
 fn no_next_test() {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
-    let mut nodes = NodeSetup::create_nodes(&mut playground, runtime.handle().clone(), 4, None);
+    let mut nodes = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        4,
+        None,
+        None,
+        None,
+    );
     runtime.spawn(playground.start());
 
     timed_block_on(&runtime, async {
@@ -1506,6 +1650,8 @@ fn commit_pipeline_test() {
         runtime.handle().clone(),
         7,
         Some(proposers.clone()),
+        None,
+        None,
     );
     runtime.spawn(playground.start());
     let behind_node = 6;
@@ -1543,6 +1689,8 @@ fn block_retrieval_test() {
         runtime.handle().clone(),
         4,
         Some(vec![0, 1]),
+        None,
+        None,
     );
     runtime.spawn(playground.start());
 
@@ -1609,6 +1757,8 @@ pub fn forking_retrieval_test() {
             proposal_node,
             proposal_node,
         ]),
+        None,
+        None,
     );
     runtime.spawn(playground.start());
 
@@ -1835,4 +1985,148 @@ pub fn forking_retrieval_test() {
         7,
         3,
     );
+}
+
+#[test]
+/// If ProposalExt feature is disabled, ProposalExt should be rejected
+/// No votes are sent, but the block is still added to the block tree.
+fn no_vote_on_proposal_ext_when_feature_disabled() {
+    let runtime = consensus_runtime();
+    let mut playground = NetworkPlayground::new(runtime.handle().clone());
+    // In order to observe the votes we're going to check proposal processing on the non-proposer
+    // node (which will send the votes to the proposer).
+    let mut nodes = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        1,
+        None,
+        None,
+        None,
+    );
+    let node = &mut nodes[0];
+    let genesis_qc = certificate_for_genesis();
+
+    let invalid_block = Block::new_proposal_ext(
+        vec![SystemTransaction::dummy(vec![0xFF]); 5],
+        Payload::empty(false),
+        1,
+        1,
+        genesis_qc.clone(),
+        &node.signer,
+        Vec::new(),
+    )
+    .unwrap();
+
+    let valid_block = Block::new_proposal(
+        Payload::empty(false),
+        1,
+        1,
+        genesis_qc,
+        &node.signer,
+        Vec::new(),
+    )
+    .unwrap();
+
+    timed_block_on(&runtime, async {
+        // clear the message queue
+        node.next_proposal().await;
+
+        assert!(node
+            .round_manager
+            .process_proposal(invalid_block)
+            .await
+            .is_err());
+
+        assert!(node
+            .round_manager
+            .process_proposal(valid_block)
+            .await
+            .is_ok());
+    });
+}
+
+#[test]
+/// If receiving txn num/block size limit is exceeded, ProposalExt should be rejected.
+fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
+    let runtime = consensus_runtime();
+    let mut playground = NetworkPlayground::new(runtime.handle().clone());
+
+    let mut onchain_config_inner = ConsensusConfigV1Ext::default_if_missing();
+    onchain_config_inner.update_extra_features(
+        vec![ConsensusExtraFeature::ProposalWithSystemTransactions],
+        vec![],
+    );
+
+    let local_config = ConsensusConfig {
+        max_receiving_block_txns_quorum_store_override: 10,
+        max_receiving_block_bytes_quorum_store_override: 256,
+        ..Default::default()
+    };
+
+    let mut nodes = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        1,
+        None,
+        Some(OnChainConsensusConfig::V3(onchain_config_inner)),
+        Some(local_config),
+    );
+    let node = &mut nodes[0];
+    let genesis_qc = certificate_for_genesis();
+
+    let block_too_many_txns = Block::new_proposal_ext(
+        vec![SystemTransaction::dummy(vec![0xFF; 20]); 11],
+        Payload::empty(false),
+        1,
+        1,
+        genesis_qc.clone(),
+        &node.signer,
+        Vec::new(),
+    )
+    .unwrap();
+
+    let block_too_large = Block::new_proposal_ext(
+        vec![SystemTransaction::dummy(vec![0xFF; 30]); 10],
+        Payload::empty(false),
+        1,
+        1,
+        genesis_qc.clone(),
+        &node.signer,
+        Vec::new(),
+    )
+    .unwrap();
+
+    let valid_block = Block::new_proposal_ext(
+        vec![SystemTransaction::dummy(vec![0xFF; 25]); 10], // 64 bytes in total
+        Payload::empty(false),
+        1,
+        1,
+        genesis_qc.clone(),
+        &node.signer,
+        Vec::new(),
+    )
+    .unwrap();
+
+    timed_block_on(&runtime, async {
+        // clear the message queue
+        node.next_proposal().await;
+
+        assert!(node
+            .round_manager
+            .process_proposal(block_too_many_txns)
+            .await
+            .is_err());
+
+        assert!(node
+            .round_manager
+            .process_proposal(block_too_large)
+            .await
+            .is_err());
+
+        assert!(node
+            .round_manager
+            .process_proposal(valid_block)
+            .await
+            .is_ok());
+    });
 }

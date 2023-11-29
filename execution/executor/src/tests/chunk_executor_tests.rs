@@ -17,8 +17,8 @@ use aptos_executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    test_helpers::transaction_test_helpers::{block, BLOCK_GAS_LIMIT},
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof},
+    test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
+    transaction::TransactionListWithProof,
 };
 use rand::Rng;
 
@@ -46,7 +46,7 @@ impl TestExecutor {
     }
 }
 
-fn execute_and_commit_chunk(
+fn execute_and_commit_chunks(
     chunks: Vec<TransactionListWithProof>,
     ledger_info: LedgerInfoWithSignatures,
     db: &DbReaderWriter,
@@ -70,24 +70,6 @@ fn execute_and_commit_chunk(
     assert_eq!(li.ledger_info().version(), 0);
     assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
 
-    // Execute an empty chunk. After that we should still get the genesis ledger info from DB.
-    executor
-        .execute_chunk(TransactionListWithProof::new_empty(), &ledger_info, None)
-        .unwrap();
-    executor.commit_chunk().unwrap();
-    let li = db.reader.get_latest_ledger_info().unwrap();
-    assert_eq!(li.ledger_info().version(), 0);
-    assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
-
-    // Execute the second chunk again. After that we should still get the same thing.
-    executor
-        .execute_chunk(chunks[1].clone(), &ledger_info, None)
-        .unwrap();
-    executor.commit_chunk().unwrap();
-    let li = db.reader.get_latest_ledger_info().unwrap();
-    assert_eq!(li.ledger_info().version(), 0);
-    assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
-
     // Execute the third chunk. After that we should get the new ledger info.
     executor
         .execute_chunk(chunks[2].clone(), &ledger_info, None)
@@ -103,11 +85,10 @@ fn test_executor_execute_or_apply_and_commit_chunk() {
     let first_batch_size = 30;
     let second_batch_size = 40;
     let third_batch_size = 20;
-    let overlapping_size = 5;
 
     let first_batch_start = 1;
     let second_batch_start = first_batch_start + first_batch_size;
-    let third_batch_start = second_batch_start + second_batch_size - overlapping_size;
+    let third_batch_start = second_batch_start + second_batch_size;
 
     let (chunks, ledger_info) = {
         tests::create_transaction_chunks(vec![
@@ -123,7 +104,7 @@ fn test_executor_execute_or_apply_and_commit_chunk() {
             db,
             executor,
         } = TestExecutor::new();
-        execute_and_commit_chunk(chunks, ledger_info.clone(), &db, &executor);
+        execute_and_commit_chunks(chunks, ledger_info.clone(), &db, &executor);
 
         let ledger_version = db.reader.get_latest_version().unwrap();
         let output1 = db
@@ -158,28 +139,6 @@ fn test_executor_execute_or_apply_and_commit_chunk() {
     assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
 
     // Execute the second chunk. After that we should still get the genesis ledger info from DB.
-    executor
-        .apply_chunk(chunks[1].clone(), &ledger_info, None)
-        .unwrap();
-    executor.commit_chunk().unwrap();
-    let li = db.reader.get_latest_ledger_info().unwrap();
-    assert_eq!(li.ledger_info().version(), 0);
-    assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
-
-    // Execute an empty chunk. After that we should still get the genesis ledger info from DB.
-    executor
-        .apply_chunk(
-            TransactionOutputListWithProof::new_empty(),
-            &ledger_info,
-            None,
-        )
-        .unwrap();
-    executor.commit_chunk().unwrap();
-    let li = db.reader.get_latest_ledger_info().unwrap();
-    assert_eq!(li.ledger_info().version(), 0);
-    assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
-
-    // Execute the second chunk again. After that we should still get the same thing.
     executor
         .apply_chunk(chunks[1].clone(), &ledger_info, None)
         .unwrap();
@@ -230,11 +189,13 @@ fn test_executor_execute_and_commit_chunk_restart() {
 
     // Then we restart executor and resume to the next chunk.
     {
+        println!("------------------------------------ CCC");
         let executor = ChunkExecutor::<MockVM>::new(db.clone());
 
         executor
             .execute_chunk(chunks[1].clone(), &ledger_info, None)
             .unwrap();
+        println!("------------------------------------ DDD");
         executor.commit_chunk().unwrap();
         let li = db.reader.get_latest_ledger_info().unwrap();
         assert_eq!(li, ledger_info);
@@ -274,9 +235,9 @@ fn test_executor_execute_and_commit_chunk_local_result_mismatch() {
             .collect::<Vec<_>>();
         let output = executor
             .execute_block(
-                (block_id, block(txns, BLOCK_GAS_LIMIT)).into(),
+                (block_id, block(txns, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG)).into(),
                 parent_block_id,
-                BLOCK_GAS_LIMIT,
+                TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
             )
             .unwrap();
         let ledger_info = tests::gen_ledger_info(5 + 1, output.root_hash(), block_id, 1);

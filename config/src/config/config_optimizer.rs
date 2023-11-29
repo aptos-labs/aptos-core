@@ -3,8 +3,8 @@
 
 use crate::{
     config::{
-        node_config_loader::NodeType, utils::get_config_name, Error, IndexerConfig,
-        InspectionServiceConfig, LoggerConfig, MempoolConfig, NodeConfig, Peer,
+        node_config_loader::NodeType, utils::get_config_name, AdminServiceConfig, Error,
+        IndexerConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig, NodeConfig, Peer,
         PeerMonitoringServiceConfig, PeerRole, PeerSet, StateSyncConfig,
     },
     network_id::NetworkId,
@@ -82,7 +82,7 @@ pub trait ConfigOptimizer {
         _node_config: &mut NodeConfig,
         _local_config_yaml: &Value,
         _node_type: NodeType,
-        _chain_id: ChainId,
+        _chain_id: Option<ChainId>,
     ) -> Result<bool, Error> {
         unimplemented!("optimize() must be implemented for each optimizer!");
     }
@@ -93,12 +93,15 @@ impl ConfigOptimizer for NodeConfig {
         node_config: &mut NodeConfig,
         local_config_yaml: &Value,
         node_type: NodeType,
-        chain_id: ChainId,
+        chain_id: Option<ChainId>,
     ) -> Result<bool, Error> {
         // Optimize only the relevant sub-configs
         let mut optimizers_with_modifications = vec![];
         if IndexerConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(IndexerConfig::get_optimizer_name());
+        }
+        if AdminServiceConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
+            optimizers_with_modifications.push(AdminServiceConfig::get_optimizer_name());
         }
         if InspectionServiceConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(InspectionServiceConfig::get_optimizer_name());
@@ -140,7 +143,7 @@ fn optimize_all_network_configs(
     node_config: &mut NodeConfig,
     _local_config_yaml: &Value,
     _node_type: NodeType,
-    _chain_id: ChainId,
+    _chain_id: Option<ChainId>,
 ) -> Result<bool, Error> {
     let mut modified_config = false;
 
@@ -164,7 +167,7 @@ fn optimize_public_network_config(
     node_config: &mut NodeConfig,
     local_config_yaml: &Value,
     node_type: NodeType,
-    chain_id: ChainId,
+    chain_id: Option<ChainId>,
 ) -> Result<bool, Error> {
     // We only need to optimize the public network config for VFNs and PFNs
     if node_type.is_validator() {
@@ -180,12 +183,14 @@ fn optimize_public_network_config(
         if fullnode_network_config.network_id == NetworkId::Public
             && local_network_config_yaml["seeds"].is_null()
         {
-            if chain_id.is_testnet() {
-                fullnode_network_config.seeds = create_seed_peers(TESTNET_SEED_PEERS.into())?;
-                modified_config = true;
-            } else if chain_id.is_mainnet() {
-                fullnode_network_config.seeds = create_seed_peers(MAINNET_SEED_PEERS.into())?;
-                modified_config = true;
+            if let Some(chain_id) = chain_id {
+                if chain_id.is_testnet() {
+                    fullnode_network_config.seeds = create_seed_peers(TESTNET_SEED_PEERS.into())?;
+                    modified_config = true;
+                } else if chain_id.is_mainnet() {
+                    fullnode_network_config.seeds = create_seed_peers(MAINNET_SEED_PEERS.into())?;
+                    modified_config = true;
+                }
             }
         }
     }
@@ -198,7 +203,7 @@ fn optimize_validator_network_config(
     node_config: &mut NodeConfig,
     local_config_yaml: &Value,
     _node_type: NodeType,
-    _chain_id: ChainId,
+    _chain_id: Option<ChainId>,
 ) -> Result<bool, Error> {
     let mut modified_config = false;
     if let Some(validator_network_config) = &mut node_config.validator_network {
@@ -299,7 +304,7 @@ mod tests {
             &mut node_config,
             &serde_yaml::from_str("{}").unwrap(), // An empty local config
             NodeType::ValidatorFullnode,
-            ChainId::mainnet(),
+            Some(ChainId::mainnet()),
         )
         .unwrap();
         assert!(modified_config);
@@ -344,7 +349,7 @@ mod tests {
             &mut node_config,
             &serde_yaml::from_str("{}").unwrap(), // An empty local config
             NodeType::PublicFullnode,
-            ChainId::testnet(),
+            Some(ChainId::testnet()),
         )
         .unwrap();
         assert!(modified_config);
@@ -403,7 +408,7 @@ mod tests {
             &mut node_config,
             &local_config_yaml,
             NodeType::PublicFullnode,
-            ChainId::testnet(),
+            Some(ChainId::testnet()),
         )
         .unwrap();
         assert!(!modified_config);
@@ -427,7 +432,7 @@ mod tests {
             &mut node_config,
             &serde_yaml::from_str("{}").unwrap(), // An empty local config
             NodeType::Validator,
-            ChainId::testnet(),
+            Some(ChainId::testnet()),
         )
         .unwrap();
         assert!(!modified_config);
@@ -438,7 +443,7 @@ mod tests {
             &mut node_config,
             &serde_yaml::from_str("{}").unwrap(), // An empty local config
             NodeType::PublicFullnode,
-            ChainId::test(),
+            Some(ChainId::test()),
         )
         .unwrap();
         assert!(!modified_config);
@@ -461,7 +466,7 @@ mod tests {
             &mut node_config,
             &serde_yaml::from_str("{}").unwrap(), // An empty local config
             NodeType::Validator,
-            ChainId::testnet(),
+            Some(ChainId::testnet()),
         )
         .unwrap();
         assert!(modified_config);
@@ -498,7 +503,7 @@ mod tests {
             &mut node_config,
             &local_config_yaml,
             NodeType::Validator,
-            ChainId::mainnet(),
+            Some(ChainId::mainnet()),
         )
         .unwrap();
         assert!(modified_config);
@@ -537,7 +542,7 @@ mod tests {
             &mut node_config,
             &local_config_yaml,
             NodeType::Validator,
-            ChainId::mainnet(),
+            Some(ChainId::mainnet()),
         )
         .unwrap();
         assert!(!modified_config);

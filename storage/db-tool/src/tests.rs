@@ -80,11 +80,12 @@ mod dbtool_tests {
         storage::{local_fs::LocalFs, BackupStorage},
         utils::test_utils::start_local_backup_service,
     };
-    use aptos_config::config::RocksdbConfigs;
+    use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
     use aptos_db::AptosDB;
     use aptos_executor_test_helpers::integration_test_impl::{
         test_execution_with_storage_impl, test_execution_with_storage_impl_inner,
     };
+    use aptos_storage_interface::DbReader;
     use aptos_temppath::TempPath;
     use aptos_types::{
         state_store::{state_key::StateKeyTag::AccessPath, state_key_prefix::StateKeyPrefix},
@@ -288,7 +289,6 @@ mod dbtool_tests {
         force_sharding: bool,
     ) -> (Runtime, String) {
         use aptos_db::utils::iterators::PrefixedStateValueIterator;
-        use aptos_storage_interface::DbReader;
         use itertools::zip_eq;
 
         let db = test_execution_with_storage_impl_inner(force_sharding, old_db_dir.as_path());
@@ -462,7 +462,8 @@ mod dbtool_tests {
             }
         };
         let (_ledger_db, tree_db, state_kv_db) =
-            AptosDB::open_dbs(new_db_dir, db_config, false, 0).unwrap();
+            AptosDB::open_dbs(&StorageDirPaths::from_path(new_db_dir), db_config, false, 0)
+                .unwrap();
 
         // assert the kv are the same in db and new_db
         // current all the kv are still stored in the ledger db

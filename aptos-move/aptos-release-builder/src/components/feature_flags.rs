@@ -79,11 +79,20 @@ pub enum FeatureFlag {
     ModuleEvent,
     EmitFeeStatement,
     StorageDeletionRefund,
-    AggregatorSnapshots,
+    AggregatorV2Api,
     SignatureCheckerV2ScriptFix,
     SaferResourceGroups,
     SaferMetadata,
-    Secp256k1ECDSAAuthenticator,
+    SingleSenderAuthenticator,
+    SponsoredAutomaticAccountCreation,
+    FeePayerAccountOptional,
+    AggregatorV2DelayedFields,
+    ConcurrentAssets,
+    LimitMaxIdentifierLength,
+    OperatorBeneficiaryChange,
+    VMBinaryFormatV7,
+    ResourceGroupsChargeAsSizeSum,
+    CommissionChangeDelegationPool,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -179,6 +188,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::AptosStdChainIdNatives => AptosFeatureFlag::APTOS_STD_CHAIN_ID_NATIVES,
             FeatureFlag::VMBinaryFormatV6 => AptosFeatureFlag::VM_BINARY_FORMAT_V6,
+            FeatureFlag::VMBinaryFormatV7 => AptosFeatureFlag::VM_BINARY_FORMAT_V7,
             FeatureFlag::MultiEd25519PkValidateV2Natives => {
                 AptosFeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES
             },
@@ -211,14 +221,28 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::ModuleEvent => AptosFeatureFlag::MODULE_EVENT,
             FeatureFlag::EmitFeeStatement => AptosFeatureFlag::EMIT_FEE_STATEMENT,
             FeatureFlag::StorageDeletionRefund => AptosFeatureFlag::STORAGE_DELETION_REFUND,
-            FeatureFlag::AggregatorSnapshots => AptosFeatureFlag::AGGREGATOR_SNAPSHOTS,
+            FeatureFlag::AggregatorV2Api => AptosFeatureFlag::AGGREGATOR_V2_API,
             FeatureFlag::SignatureCheckerV2ScriptFix => {
                 AptosFeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX
             },
             FeatureFlag::SaferResourceGroups => AptosFeatureFlag::SAFER_RESOURCE_GROUPS,
             FeatureFlag::SaferMetadata => AptosFeatureFlag::SAFER_METADATA,
-            FeatureFlag::Secp256k1ECDSAAuthenticator => {
-                AptosFeatureFlag::SECP256K1_ECDSA_AUTHENTICATOR
+            FeatureFlag::SingleSenderAuthenticator => AptosFeatureFlag::SINGLE_SENDER_AUTHENTICATOR,
+            FeatureFlag::SponsoredAutomaticAccountCreation => {
+                AptosFeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION
+            },
+            FeatureFlag::FeePayerAccountOptional => AptosFeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
+            FeatureFlag::AggregatorV2DelayedFields => {
+                AptosFeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS
+            },
+            FeatureFlag::ConcurrentAssets => AptosFeatureFlag::CONCURRENT_ASSETS,
+            FeatureFlag::LimitMaxIdentifierLength => AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
+            FeatureFlag::OperatorBeneficiaryChange => AptosFeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
+            FeatureFlag::ResourceGroupsChargeAsSizeSum => {
+                AptosFeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM
+            },
+            FeatureFlag::CommissionChangeDelegationPool => {
+                AptosFeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL
             },
         }
     }
@@ -238,6 +262,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::APTOS_STD_CHAIN_ID_NATIVES => FeatureFlag::AptosStdChainIdNatives,
             AptosFeatureFlag::VM_BINARY_FORMAT_V6 => FeatureFlag::VMBinaryFormatV6,
+            AptosFeatureFlag::VM_BINARY_FORMAT_V7 => FeatureFlag::VMBinaryFormatV7,
             AptosFeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES => {
                 FeatureFlag::MultiEd25519PkValidateV2Natives
             },
@@ -270,14 +295,28 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::MODULE_EVENT => FeatureFlag::ModuleEvent,
             AptosFeatureFlag::EMIT_FEE_STATEMENT => FeatureFlag::EmitFeeStatement,
             AptosFeatureFlag::STORAGE_DELETION_REFUND => FeatureFlag::StorageDeletionRefund,
-            AptosFeatureFlag::AGGREGATOR_SNAPSHOTS => FeatureFlag::AggregatorSnapshots,
+            AptosFeatureFlag::AGGREGATOR_V2_API => FeatureFlag::AggregatorV2Api,
             AptosFeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX => {
                 FeatureFlag::SignatureCheckerV2ScriptFix
             },
             AptosFeatureFlag::SAFER_RESOURCE_GROUPS => FeatureFlag::SaferResourceGroups,
             AptosFeatureFlag::SAFER_METADATA => FeatureFlag::SaferMetadata,
-            AptosFeatureFlag::SECP256K1_ECDSA_AUTHENTICATOR => {
-                FeatureFlag::Secp256k1ECDSAAuthenticator
+            AptosFeatureFlag::SINGLE_SENDER_AUTHENTICATOR => FeatureFlag::SingleSenderAuthenticator,
+            AptosFeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION => {
+                FeatureFlag::SponsoredAutomaticAccountCreation
+            },
+            AptosFeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL => FeatureFlag::FeePayerAccountOptional,
+            AptosFeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS => {
+                FeatureFlag::AggregatorV2DelayedFields
+            },
+            AptosFeatureFlag::CONCURRENT_ASSETS => FeatureFlag::ConcurrentAssets,
+            AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH => FeatureFlag::LimitMaxIdentifierLength,
+            AptosFeatureFlag::OPERATOR_BENEFICIARY_CHANGE => FeatureFlag::OperatorBeneficiaryChange,
+            AptosFeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM => {
+                FeatureFlag::ResourceGroupsChargeAsSizeSum
+            },
+            AptosFeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL => {
+                FeatureFlag::CommissionChangeDelegationPool
             },
         }
     }

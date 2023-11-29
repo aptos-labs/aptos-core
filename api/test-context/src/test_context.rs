@@ -10,7 +10,7 @@ use aptos_api_types::{
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::{
     config::{
-        NodeConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
+        NodeConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
     },
     keys::ConfigKey,
@@ -35,6 +35,7 @@ use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::{create_multisig_account_address, AccountAddress},
     aggregate_signature::AggregateSignature,
+    block_executor::config::BlockExecutorConfigFromOnchain,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -122,7 +123,7 @@ pub fn new_test_context(
     } else {
         DbReaderWriter::wrap(
             AptosDB::open(
-                &tmp_dir,
+                StorageDirPaths::from_path(&tmp_dir),
                 false,                       /* readonly */
                 NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
                 RocksdbConfigs::default(),
@@ -135,7 +136,7 @@ pub fn new_test_context(
     };
     let ret =
         db_bootstrapper::maybe_bootstrap::<AptosVM>(&db_rw, &genesis, genesis_waypoint).unwrap();
-    assert!(ret);
+    assert!(ret.is_some());
 
     let mempool = MockSharedMempool::new_in_runtime(&db_rw, VMValidator::new(db.clone()));
 
@@ -613,7 +614,7 @@ impl TestContext {
             .execute_block(
                 (metadata.id(), into_signature_verified_block(txns.clone())).into(),
                 parent_id,
-                None,
+                BlockExecutorConfigFromOnchain::new_no_block_limit(),
             )
             .unwrap();
         let mut compute_status = result.compute_status().clone();

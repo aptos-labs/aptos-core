@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::errors::DAGRpcError;
 use crate::{
     dag::observability::{
         logging::{LogEvent, LogSchema},
@@ -12,7 +13,6 @@ use crate::{
 use anyhow::{bail, ensure};
 use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_crypto::{
-    bls12381,
     bls12381::Signature,
     hash::{CryptoHash, CryptoHasher},
     CryptoMaterialError, HashValue,
@@ -467,12 +467,7 @@ impl CertifiedNodeMessage {
             self.certified_node.epoch(),
             self.ledger_info().commit_info().epoch()
         );
-        self.certified_node.verify(verifier)?;
-        if self.ledger_info.commit_info().round() > 0 {
-            Ok(self.ledger_info.verify_signatures(verifier)?)
-        } else {
-            Ok(())
-        }
+        self.certified_node.verify(verifier)
     }
 }
 
@@ -487,7 +482,7 @@ impl Deref for CertifiedNodeMessage {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Vote {
     metadata: NodeMetadata,
-    signature: bls12381::Signature,
+    signature: Signature,
 }
 
 impl Vote {
@@ -498,12 +493,26 @@ impl Vote {
         }
     }
 
-    pub fn signature(&self) -> &bls12381::Signature {
+    pub fn signature(&self) -> &Signature {
         &self.signature
     }
 
     pub fn verify(&self, author: Author, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         Ok(verifier.verify(author, &self.metadata, self.signature())?)
+    }
+}
+
+impl From<Vote> for DAGRpcResult {
+    fn from(vote: Vote) -> Self {
+        DAGRpcResult(Ok(DAGMessage::VoteMsg(vote)))
+    }
+}
+
+impl TryFrom<DAGRpcResult> for Vote {
+    type Error = anyhow::Error;
+
+    fn try_from(result: DAGRpcResult) -> Result<Self, Self::Error> {
+        result.0?.try_into()
     }
 }
 
@@ -523,7 +532,7 @@ impl SignatureBuilder {
     }
 }
 
-impl BroadcastStatus<DAGMessage> for SignatureBuilder {
+impl BroadcastStatus<DAGMessage, DAGRpcResult> for SignatureBuilder {
     type Ack = Vote;
     type Aggregated = NodeCertificate;
     type Message = Node;
@@ -577,7 +586,21 @@ impl CertifiedAck {
     }
 }
 
-impl BroadcastStatus<DAGMessage> for CertificateAckState {
+impl From<CertifiedAck> for DAGRpcResult {
+    fn from(ack: CertifiedAck) -> Self {
+        DAGRpcResult(Ok(DAGMessage::CertifiedAckMsg(ack)))
+    }
+}
+
+impl TryFrom<DAGRpcResult> for CertifiedAck {
+    type Error = anyhow::Error;
+
+    fn try_from(result: DAGRpcResult) -> Result<Self, Self::Error> {
+        result.0?.try_into()
+    }
+}
+
+impl BroadcastStatus<DAGMessage, DAGRpcResult> for CertificateAckState {
     type Ack = CertifiedAck;
     type Aggregated = ();
     type Message = CertifiedNodeMessage;
@@ -647,7 +670,7 @@ impl RemoteFetchRequest {
             "Target round is not consistent"
         );
         ensure!(
-            self.exists_bitmask.first_round() + self.exists_bitmask.bitmask.len() as u64
+            self.exists_bitmask.first_round() + self.exists_bitmask.bitmask.len() as u64 - 1
                 == target_round,
             "Bitmask length doesn't match, first_round {}, length {}, target {}",
             self.exists_bitmask.first_round(),
@@ -824,6 +847,41 @@ impl TryFrom<ConsensusMsg> for DAGMessage {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct DAGRpcResult(pub Result<DAGMessage, DAGRpcError>);
+
+impl TConsensusMsg for DAGRpcResult {
+    fn epoch(&self) -> u64 {
+        match &self.0 {
+            Ok(dag_message) => dag_message.epoch(),
+            Err(error) => error.epoch(),
+        }
+    }
+
+    fn into_network_message(self) -> ConsensusMsg {
+        ConsensusMsg::DAGMessage(DAGNetworkMessage {
+            epoch: self.epoch(),
+            data: bcs::to_bytes(&self).unwrap(),
+        })
+    }
+}
+
+impl RBMessage for DAGRpcResult {}
+
+impl Deref for DAGRpcResult {
+    type Target = Result<DAGMessage, DAGRpcError>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<Result<DAGMessage, DAGRpcError>> for DAGRpcResult {
+    fn from(result: Result<DAGMessage, DAGRpcError>) -> Self {
+        Self(result)
+    }
+}
+
 #[cfg(test)]
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct TestMessage(pub Vec<u8>);
@@ -866,5 +924,9 @@ impl DagSnapshotBitmask {
 
     pub fn first_round(&self) -> Round {
         self.first_round
+    }
+
+    pub fn len(&self) -> usize {
+        self.bitmask.len()
     }
 }

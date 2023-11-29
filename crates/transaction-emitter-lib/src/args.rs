@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, format_err, Result};
-use aptos::common::types::EncodingType;
 use aptos_config::keys::ConfigKey;
-use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_crypto::{ed25519::Ed25519PrivateKey, encoding_type::EncodingType};
 use aptos_sdk::types::chain_id::ChainId;
 use aptos_transaction_generator_lib::args::TransactionTypeArg;
 use clap::{ArgGroup, Parser};
@@ -70,10 +69,6 @@ pub struct ClusterArgs {
 
     #[clap(long, conflicts_with = "targets")]
     pub targets_file: Option<String>,
-
-    /// If set, try to use public peers instead of localhost.
-    #[clap(long)]
-    pub reuse_accounts: bool,
 
     #[clap(long, default_value_t = ChainId::test())]
     pub chain_id: ChainId,
@@ -176,6 +171,9 @@ pub struct EmitArgs {
     #[clap(long)]
     pub max_transactions_per_account: Option<usize>,
 
+    #[clap(long)]
+    pub latency_polling_interval_s: Option<f32>,
+
     // In cases you want to run txn emitter from multiple machines,
     // and want to make sure that initialization succeeds
     // (account minting and txn-specific initialization), before the
@@ -189,6 +187,28 @@ pub struct EmitArgs {
     //   basically creating a new source account (to then create seed accounts from).
     #[clap(long)]
     pub coordination_delay_between_instances: Option<u64>,
+
+    #[clap(long)]
+    pub account_minter_seed: Option<String>,
+
+    #[clap(long)]
+    pub coins_per_account_override: Option<u64>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
+pub struct CreateAccountsArgs {
+    /// Number of accounts to create
+    #[clap(long)]
+    pub count: usize,
+
+    /// The amount of gas needed to create an account
+    #[clap(long)]
+    pub max_gas_per_txn: u64,
+
+    /// Optional seed, which is compatible with emit-tx. If no seed is provided, a random seed is
+    /// used and printed.
+    #[clap(long)]
+    pub account_minter_seed: Option<String>,
 }
 
 fn parse_target(target: &str) -> Result<Url> {

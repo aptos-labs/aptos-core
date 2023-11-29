@@ -7,8 +7,11 @@
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_executor_service::{
+    local_executor_helper::SHARDED_BLOCK_EXECUTOR,
+    remote_executor_client::{get_remote_addresses, REMOTE_SHARDED_BLOCK_EXECUTOR},
+};
 use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, ExecutedChunk};
-use aptos_infallible::Mutex;
 use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
@@ -17,7 +20,10 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
-    block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions},
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain,
+        partitioner::{ExecutableTransactions, PartitionedTransactions},
+    },
     contract_event::ContractEvent,
     epoch_state::EpochState,
     transaction::{
@@ -26,24 +32,10 @@ use aptos_types::{
         TransactionStatus,
     },
 };
-use aptos_vm::{
-    sharded_block_executor::{
-        local_executor_shard::{LocalExecutorClient, LocalExecutorService},
-        ShardedBlockExecutor,
-    },
-    AptosVM, VMExecutor,
-};
+use aptos_vm::{AptosVM, VMExecutor};
 use fail::fail_point;
 use move_core_types::vm_status::StatusCode;
-use once_cell::sync::Lazy;
 use std::{ops::Deref, sync::Arc, time::Duration};
-
-pub static SHARDED_BLOCK_EXECUTOR: Lazy<
-    Arc<Mutex<ShardedBlockExecutor<CachedStateView, LocalExecutorClient<CachedStateView>>>>,
-> = Lazy::new(|| {
-    let client = LocalExecutorService::setup_local_executor_shards(AptosVM::get_num_shards(), None);
-    Arc::new(Mutex::new(ShardedBlockExecutor::new(client)))
-});
 
 pub struct ChunkOutput {
     /// Input transactions.
@@ -60,18 +52,14 @@ impl ChunkOutput {
     pub fn by_transaction_execution<V: VMExecutor>(
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Self> {
         match transactions {
             ExecutableTransactions::Unsharded(txns) => {
-                Self::by_transaction_execution_unsharded::<V>(
-                    txns,
-                    state_view,
-                    maybe_block_gas_limit,
-                )
+                Self::by_transaction_execution_unsharded::<V>(txns, state_view, onchain_config)
             },
             ExecutableTransactions::Sharded(txns) => {
-                Self::by_transaction_execution_sharded::<V>(txns, state_view, maybe_block_gas_limit)
+                Self::by_transaction_execution_sharded::<V>(txns, state_view, onchain_config)
             },
         }
     }
@@ -79,10 +67,10 @@ impl ChunkOutput {
     fn by_transaction_execution_unsharded<V: VMExecutor>(
         transactions: Vec<SignatureVerifiedTransaction>,
         state_view: CachedStateView,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Self> {
         let transaction_outputs =
-            Self::execute_block::<V>(&transactions, &state_view, maybe_block_gas_limit)?;
+            Self::execute_block::<V>(&transactions, &state_view, onchain_config)?;
 
         Ok(Self {
             transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
@@ -94,13 +82,13 @@ impl ChunkOutput {
     pub fn by_transaction_execution_sharded<V: VMExecutor>(
         transactions: PartitionedTransactions,
         state_view: CachedStateView,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Self> {
         let state_view_arc = Arc::new(state_view);
         let transaction_outputs = Self::execute_block_sharded::<V>(
             transactions.clone(),
             state_view_arc.clone(),
-            maybe_block_gas_limit,
+            onchain_config,
         )?;
 
         // TODO(skedia) add logic to emit counters per shard instead of doing it globally.
@@ -108,7 +96,6 @@ impl ChunkOutput {
         // Unwrapping here is safe because the execution has finished and it is guaranteed that
         // the state view is not used anymore.
         let state_view = Arc::try_unwrap(state_view_arc).unwrap();
-
         Ok(Self {
             transactions: PartitionedTransactions::flatten(transactions)
                 .into_iter()
@@ -147,7 +134,7 @@ impl ChunkOutput {
     pub fn apply_to_ledger(
         self,
         base_view: &ExecutedTrees,
-        state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
+        known_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
         append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
         fail_point!("executor::apply_to_ledger", |_| {
@@ -156,7 +143,7 @@ impl ChunkOutput {
         ApplyChunkOutput::apply_chunk(
             self,
             base_view,
-            state_checkpoint_hashes,
+            known_state_checkpoint_hashes,
             append_state_checkpoint_to_block,
         )
     }
@@ -171,12 +158,14 @@ impl ChunkOutput {
                 "Injected error in into_state_checkpoint_output."
             ))
         });
+
         // TODO(msmouse): If this code path is only used by block_executor, consider move it to the
         // caller side.
         ApplyChunkOutput::calculate_state_checkpoint(
             self,
             parent_state,
             append_state_checkpoint_to_block,
+            None,
             /*is_block=*/ true,
         )
     }
@@ -184,14 +173,23 @@ impl ChunkOutput {
     fn execute_block_sharded<V: VMExecutor>(
         partitioned_txns: PartitionedTransactions,
         state_view: Arc<CachedStateView>,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>> {
-        Ok(V::execute_block_sharded(
-            SHARDED_BLOCK_EXECUTOR.lock().deref(),
-            partitioned_txns,
-            state_view,
-            maybe_block_gas_limit,
-        )?)
+        if !get_remote_addresses().is_empty() {
+            Ok(V::execute_block_sharded(
+                REMOTE_SHARDED_BLOCK_EXECUTOR.lock().deref(),
+                partitioned_txns,
+                state_view,
+                onchain_config,
+            )?)
+        } else {
+            Ok(V::execute_block_sharded(
+                SHARDED_BLOCK_EXECUTOR.lock().deref(),
+                partitioned_txns,
+                state_view,
+                onchain_config,
+            )?)
+        }
     }
 
     /// Executes the block of [Transaction]s using the [VMExecutor] and returns
@@ -200,13 +198,9 @@ impl ChunkOutput {
     fn execute_block<V: VMExecutor>(
         transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>> {
-        Ok(V::execute_block(
-            transactions,
-            state_view,
-            maybe_block_gas_limit,
-        )?)
+        Ok(V::execute_block(transactions, state_view, onchain_config)?)
     }
 
     /// In consensus-only mode, executes the block of [Transaction]s using the
@@ -217,7 +211,7 @@ impl ChunkOutput {
     fn execute_block<V: VMExecutor>(
         transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>> {
         use aptos_state_view::{StateViewId, TStateView};
         use aptos_types::write_set::WriteSet;
@@ -225,7 +219,7 @@ impl ChunkOutput {
         let transaction_outputs = match state_view.id() {
             // this state view ID implies a genesis block in non-test cases.
             StateViewId::Miscellaneous => {
-                V::execute_block(transactions, state_view, maybe_block_gas_limit)?
+                V::execute_block(transactions, state_view, onchain_config)?
             },
             _ => transactions
                 .iter()
@@ -262,6 +256,12 @@ pub fn update_counters_for_processed_chunk<T, O>(
     }
 
     for (txn, output) in transactions.iter().zip(transaction_outputs.iter()) {
+        if detailed_counters {
+            if let Ok(size) = bcs::serialized_size(output.get_transaction_output()) {
+                metrics::APTOS_PROCESSED_TXNS_OUTPUT_SIZE.observe(size as f64);
+            }
+        }
+
         let (state, reason, error_code) = match output.get_transaction_output().status() {
             TransactionStatus::Keep(execution_status) => match execution_status {
                 ExecutionStatus::Success => ("keep_success", "", "".to_string()),
@@ -322,6 +322,7 @@ pub fn update_counters_for_processed_chunk<T, O>(
             Some(Transaction::GenesisTransaction(_)) => "genesis",
             Some(Transaction::BlockMetadata(_)) => "block_metadata",
             Some(Transaction::StateCheckpoint(_)) => "state_checkpoint",
+            Some(Transaction::SystemTransaction(_)) => "system_transaction",
             None => "unknown",
         };
 

@@ -24,6 +24,7 @@ spec aptos_framework::transaction_validation {
     /// Create a schema to reuse some code.
     /// Give some constraints that may abort according to the conditions.
     spec schema PrologueCommonAbortsIf {
+        use std::bcs;
         use aptos_framework::timestamp::{CurrentTimeMicroseconds};
         use aptos_framework::chain_id::{ChainId};
         use aptos_framework::account::{Account};
@@ -43,14 +44,29 @@ spec aptos_framework::transaction_validation {
         aborts_if !exists<ChainId>(@aptos_framework);
         aborts_if !(chain_id::get() == chain_id);
         let transaction_sender = signer::address_of(sender);
-        aborts_if !account::exists_at(transaction_sender);
-        aborts_if !(txn_sequence_number >= global<Account>(transaction_sender).sequence_number);
-        aborts_if !(txn_authentication_key == global<Account>(transaction_sender).authentication_key);
+
+        aborts_if (
+            !features::spec_is_enabled(features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
+            || account::exists_at(transaction_sender)
+            || transaction_sender == gas_payer
+            || txn_sequence_number > 0
+        ) && (
+            !(txn_sequence_number >= global<Account>(transaction_sender).sequence_number)
+            || !(txn_authentication_key == global<Account>(transaction_sender).authentication_key)
+            || !account::exists_at(transaction_sender)
+            || !(txn_sequence_number == global<Account>(transaction_sender).sequence_number)
+        );
+
+        aborts_if features::spec_is_enabled(features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
+            && transaction_sender != gas_payer
+            && txn_sequence_number == 0
+            && !account::exists_at(transaction_sender)
+            && txn_authentication_key != bcs::to_bytes(transaction_sender);
+
         aborts_if !(txn_sequence_number < (1u64 << 63));
 
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
         aborts_if max_transaction_fee > MAX_U64;
-        aborts_if !(txn_sequence_number == global<Account>(transaction_sender).sequence_number);
         aborts_if !exists<CoinStore<AptosCoin>>(gas_payer);
         // property 1: The sender of a transaction should have sufficient coin balance to pay the transaction fee.
         aborts_if !(global<CoinStore<AptosCoin>>(gas_payer).coin.value >= max_transaction_fee);
@@ -288,7 +304,6 @@ spec aptos_framework::transaction_validation {
         ensures total_supply_enabled ==> apt_supply_value - amount_to_burn == post_apt_supply_value;
 
         // Check minting.
-        //   (The total supply aggregator is not varified in `coin::mint`, use `coin::supply` variable instead.)
         let amount_to_mint = if (collect_fee_enabled) {
             storage_fee_refunded
         } else {
@@ -301,6 +316,10 @@ spec aptos_framework::transaction_validation {
         aborts_if amount_to_mint > 0 && !exists<AptosCoinMintCapability>(@aptos_framework);
         aborts_if amount_to_mint > 0 && total_supply + amount_to_mint > MAX_U128;
         ensures amount_to_mint > 0 ==> post_total_supply == total_supply + amount_to_mint;
+
+        let aptos_addr = type_info::type_of<AptosCoin>().account_address;
+        aborts_if (amount_to_mint != 0) && !exists<coin::CoinInfo<AptosCoin>>(aptos_addr);
+        include coin::CoinAddAbortsIf<AptosCoin> { amount: amount_to_mint };
 
     }
 }

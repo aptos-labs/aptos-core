@@ -33,8 +33,9 @@ use aptos_types::{
 use futures::channel::oneshot;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
-/// The expected version of the genesis transaction
-pub const GENESIS_TRANSACTION_VERSION: u64 = 0;
+// Useful bootstrapper constants
+const BOOTSTRAPPER_LOG_INTERVAL_SECS: u64 = 3;
+pub const GENESIS_TRANSACTION_VERSION: u64 = 0; // The expected version of the genesis transaction
 
 /// A simple container for verified epoch states and epoch ending ledger infos
 /// that have been fetched from the network.
@@ -83,7 +84,12 @@ impl VerifiedEpochStates {
     }
 
     /// Sets `verified_waypoint` to true
-    pub fn set_verified_waypoint(&mut self) {
+    pub fn set_verified_waypoint(&mut self, waypoint_version: Version) {
+        info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
+            "The waypoint has been verified! Waypoint version: {:?}.",
+            waypoint_version
+        )));
+
         self.verified_waypoint = true;
     }
 
@@ -145,7 +151,7 @@ impl VerifiedEpochStates {
             // Check if we've found the ledger info corresponding to the waypoint version
             if ledger_info_version == waypoint_version {
                 match waypoint.verify(ledger_info) {
-                    Ok(()) => self.set_verified_waypoint(),
+                    Ok(()) => self.set_verified_waypoint(waypoint_version),
                     Err(error) => {
                         return Err(Error::VerificationError(
                             format!("Failed to verify the waypoint: {:?}! Waypoint: {:?}, given ledger info: {:?}",
@@ -166,8 +172,8 @@ impl VerifiedEpochStates {
     ) -> Result<(), Error> {
         let ledger_info = epoch_ending_ledger_info.ledger_info();
         info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
-            "Adding a new epoch to the epoch ending ledger infos. Epoch: {:?}, Version: {:?}, Ends epoch: {:?}",
-            ledger_info.epoch(), ledger_info.version(), ledger_info.ends_epoch(),
+            "Adding a new epoch to the epoch ending ledger infos. Epoch: {:?}, Version: {:?}, Ends epoch: {:?}, Waypoint: {:?}",
+            ledger_info.epoch(), ledger_info.version(), ledger_info.ends_epoch(), Waypoint::new_epoch_boundary(ledger_info),
         )));
 
         // Insert the version to ledger info mapping
@@ -482,9 +488,13 @@ impl<
             return self.bootstrapping_complete().await;
         }
 
-        info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
-            "Highest synced version is {}, highest_known_ledger_info is {:?}, bootstrapping_mode is {:?}.",
-            highest_synced_version, highest_known_ledger_info, self.get_bootstrapping_mode())));
+        sample!(
+            SampleRate::Duration(Duration::from_secs(BOOTSTRAPPER_LOG_INTERVAL_SECS)),
+            info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
+                "Highest synced version is {}, highest_known_ledger_info is {:?}, bootstrapping_mode is {:?}.",
+                highest_synced_version, highest_known_ledger_info, self.get_bootstrapping_mode()))
+            );
+        );
 
         // Bootstrap according to the mode
         if self.get_bootstrapping_mode().is_fast_sync() {
@@ -827,14 +837,7 @@ impl<
         };
 
         // Compare the highest local epoch end to the highest advertised epoch end
-        if highest_local_epoch_end > highest_advertised_epoch_end {
-            let error_message =
-                format!(
-                    "The highest local epoch end is higher than the advertised epoch end! Local: {:?}, advertised: {:?}",
-                    highest_local_epoch_end, highest_advertised_epoch_end
-                );
-            return Err(Error::AdvertisedDataError(error_message));
-        } else if highest_local_epoch_end < highest_advertised_epoch_end {
+        if highest_local_epoch_end < highest_advertised_epoch_end {
             info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
                 "Found higher epoch ending ledger infos in the network! Local: {:?}, advertised: {:?}",
                    highest_local_epoch_end, highest_advertised_epoch_end
@@ -870,7 +873,8 @@ impl<
         let latest_ledger_info = utils::fetch_latest_synced_ledger_info(self.storage.clone())?;
         let waypoint_version = self.driver_configuration.waypoint.version();
         if latest_ledger_info.ledger_info().version() >= waypoint_version {
-            self.verified_epoch_states.set_verified_waypoint();
+            self.verified_epoch_states
+                .set_verified_waypoint(waypoint_version);
             return Ok(());
         }
 
@@ -879,17 +883,17 @@ impl<
             .advertised_data
             .highest_synced_ledger_info()
             .ok_or_else(|| {
-                Error::AdvertisedDataError(
-                    "No highest advertised ledger info found in the network!".into(),
+                Error::UnsatisfiableWaypoint(
+                    "Unable to check waypoint satisfiability! No highest advertised ledger info found in the network!".into(),
                 )
             })?;
         let highest_advertised_version = highest_advertised_ledger_info.ledger_info().version();
 
         // Compare the highest advertised version with our waypoint
         if highest_advertised_version < waypoint_version {
-            Err(Error::AdvertisedDataError(
+            Err(Error::UnsatisfiableWaypoint(
                 format!(
-                    "No advertised version higher than our waypoint! Highest version: {:?}, waypoint version: {:?}",
+                    "The waypoint is not satisfiable! No advertised version higher than our waypoint! Highest version: {:?}, waypoint version: {:?}.",
                     highest_advertised_version, waypoint_version
                 )
             ))

@@ -5,7 +5,10 @@
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters,
-    dag::{DAGMessage, DAGNetworkMessage, ProofNotifier, RpcWithFallback, TDAGNetworkSender},
+    dag::{
+        DAGMessage, DAGNetworkMessage, DAGRpcResult, ProofNotifier, RpcWithFallback,
+        TDAGNetworkSender,
+    },
     experimental::commit_reliable_broadcast::CommitMessage,
     logging::{LogEvent, LogSchema},
     monitor,
@@ -51,7 +54,7 @@ use std::{
 };
 use tokio::time::timeout;
 
-pub trait TConsensusMsg: Sized + Clone + Serialize + DeserializeOwned {
+pub trait TConsensusMsg: Sized + Serialize + DeserializeOwned {
     fn epoch(&self) -> u64;
 
     fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self> {
@@ -143,6 +146,8 @@ pub trait QuorumStoreSender: Send + Clone {
     async fn broadcast_batch_msg(&mut self, batches: Vec<Batch>);
 
     async fn broadcast_proof_of_store_msg(&mut self, proof_of_stores: Vec<ProofOfStore>);
+
+    async fn send_proof_of_store_msg_to_self(&mut self, proof_of_stores: Vec<ProofOfStore>);
 }
 
 /// Implements the actual networking support for all consensus messaging.
@@ -441,6 +446,12 @@ impl QuorumStoreSender for NetworkSender {
         let msg = ConsensusMsg::ProofOfStoreMsg(Box::new(ProofOfStoreMsg::new(proofs)));
         self.broadcast(msg).await
     }
+
+    async fn send_proof_of_store_msg_to_self(&mut self, proofs: Vec<ProofOfStore>) {
+        fail_point!("consensus::send::proof_of_store", |_| ());
+        let msg = ConsensusMsg::ProofOfStoreMsg(Box::new(ProofOfStoreMsg::new(proofs)));
+        self.send(msg, vec![self.author]).await
+    }
 }
 
 #[async_trait]
@@ -450,7 +461,7 @@ impl TDAGNetworkSender for NetworkSender {
         receiver: Author,
         message: DAGMessage,
         timeout: Duration,
-    ) -> anyhow::Result<DAGMessage> {
+    ) -> anyhow::Result<DAGRpcResult> {
         self.send_rpc(receiver, message.into_network_message(), timeout)
             .await
             .map_err(|e| anyhow!("invalid rpc response: {}", e))
@@ -465,6 +476,8 @@ impl TDAGNetworkSender for NetworkSender {
         message: DAGMessage,
         retry_interval: Duration,
         rpc_timeout: Duration,
+        min_concurrent_responders: u32,
+        max_concurrent_responders: u32,
     ) -> RpcWithFallback {
         RpcWithFallback::new(
             responders,
@@ -473,18 +486,20 @@ impl TDAGNetworkSender for NetworkSender {
             rpc_timeout,
             self.clone(),
             self.time_service.clone(),
+            min_concurrent_responders,
+            max_concurrent_responders,
         )
     }
 }
 
 #[async_trait]
-impl RBNetworkSender<DAGMessage> for NetworkSender {
+impl RBNetworkSender<DAGMessage, DAGRpcResult> for NetworkSender {
     async fn send_rb_rpc(
         &self,
         receiver: Author,
         message: DAGMessage,
         timeout: Duration,
-    ) -> anyhow::Result<DAGMessage> {
+    ) -> anyhow::Result<DAGRpcResult> {
         self.send_rpc(receiver, message.into_network_message(), timeout)
             .await
             .map_err(|e| anyhow!("invalid rpc response: {}", e))

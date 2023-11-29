@@ -241,14 +241,83 @@ module std::features {
     /// Lifetime: transient
     const SIGNATURE_CHECKER_V2_SCRIPT_FIX: u64 = 29;
 
-    /// Whether the aggregator snapshots feature is enabled.
+    /// Whether the Aggregator V2 API feature is enabled.
+    /// Once enabled, the functions from aggregator_v2.move will be available for use.
     /// Lifetime: transient
-    const AGGREGATOR_SNAPSHOTS: u64 = 30;
+    const AGGREGATOR_V2_API: u64 = 30;
 
-    public fun get_aggregator_snapshots_feature(): u64 { AGGREGATOR_SNAPSHOTS }
+    public fun get_aggregator_v2_api_feature(): u64 { AGGREGATOR_V2_API }
 
+    public fun aggregator_v2_api_enabled(): bool acquires Features {
+        is_enabled(AGGREGATOR_V2_API)
+    }
+
+    // Backed by same flag as get_aggregator_v2_api_feature
+    public fun get_aggregator_snapshots_feature(): u64 { AGGREGATOR_V2_API }
+
+    // Backed by same flag as aggregator_v2_api_enabled
     public fun aggregator_snapshots_enabled(): bool acquires Features {
-        is_enabled(AGGREGATOR_SNAPSHOTS)
+        is_enabled(AGGREGATOR_V2_API)
+    }
+
+    const SAFER_RESOURCE_GROUPS: u64 = 31;
+
+    const SAFER_METADATA: u64 = 32;
+
+    const SINGLE_SENDER_AUTHENTICATOR: u64 = 33;
+
+    /// Whether the automatic creation of accounts is enabled for sponsored transactions.
+    /// Lifetime: transient
+    const SPONSORED_AUTOMATIC_ACCOUNT_CREATION: u64 = 34;
+
+    public fun get_sponsored_automatic_account_creation(): u64 { SPONSORED_AUTOMATIC_ACCOUNT_CREATION }
+
+    public fun sponsored_automatic_account_creation_enabled(): bool acquires Features {
+        is_enabled(SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
+    }
+
+    const FEE_PAYER_ACCOUNT_OPTIONAL: u64 = 35;
+
+    /// Whether the Aggregator V2 delayed fields feature is enabled.
+    /// Once enabled, Aggregator V2 functions become parallel.
+    /// Lifetime: transient
+    const AGGREGATOR_V2_DELAYED_FIELDS: u64 = 36;
+
+    /// Whether enable TokenV2 collection creation and Fungible Asset creation
+    /// to create higher throughput concurrent variants.
+    /// Lifetime: transient
+    const CONCURRENT_ASSETS: u64 = 37;
+
+    public fun get_concurrent_assets_feature(): u64 { CONCURRENT_ASSETS }
+
+    public fun concurrent_assets_enabled(): bool acquires Features {
+        is_enabled(CONCURRENT_ASSETS)
+    }
+
+    const LIMIT_MAX_IDENTIFIER_LENGTH: u64 = 38;
+
+    /// Whether allow changing beneficiaries for operators.
+    /// Lifetime: transient
+    const OPERATOR_BENEFICIARY_CHANGE: u64 = 39;
+
+    public fun get_operator_beneficiary_change_feature(): u64 { OPERATOR_BENEFICIARY_CHANGE }
+
+    public fun operator_beneficiary_change_enabled(): bool acquires Features {
+        is_enabled(OPERATOR_BENEFICIARY_CHANGE)
+    }
+
+    const VM_BINARY_FORMAT_V7: u64 = 40;
+
+    const RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM: u64 = 41;
+
+    /// Whether the operator commission rate change in delegation pool is enabled.
+    /// Lifetime: transient
+    const COMMISSION_CHANGE_DELEGATION_POOL: u64 = 42;
+
+    public fun get_commission_change_delegation_pool_feature(): u64 { COMMISSION_CHANGE_DELEGATION_POOL }
+
+    public fun commission_change_delegation_pool_enabled(): bool acquires Features {
+        is_enabled(COMMISSION_CHANGE_DELEGATION_POOL)
     }
 
     // ============================================================================================
@@ -278,8 +347,9 @@ module std::features {
         });
     }
 
+    #[view]
     /// Check whether the feature is enabled.
-    fun is_enabled(feature: u64): bool acquires Features {
+    public fun is_enabled(feature: u64): bool acquires Features {
         exists<Features>(@std) &&
             contains(&borrow_global<Features>(@std).features, feature)
     }

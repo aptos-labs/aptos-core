@@ -5,7 +5,10 @@ use crate::{
     sharded_block_executor::{
         aggr_overridden_state_view::{AggregatorOverriddenStateView, TOTAL_SUPPLY_AGGR_BASE_VAL},
         coordinator_client::CoordinatorClient,
-        counters::{SHARDED_BLOCK_EXECUTION_BY_ROUNDS_SECONDS, SHARDED_BLOCK_EXECUTOR_TXN_COUNT},
+        counters::{
+            SHARDED_BLOCK_EXECUTION_BY_ROUNDS_SECONDS, SHARDED_BLOCK_EXECUTOR_TXN_COUNT,
+            SHARDED_EXECUTOR_SERVICE_SECONDS,
+        },
         cross_shard_client::{CrossShardClient, CrossShardCommitReceiver, CrossShardCommitSender},
         cross_shard_state_view::CrossShardStateView,
         messages::CrossShardMsg,
@@ -15,8 +18,9 @@ use crate::{
 use aptos_logger::{info, trace};
 use aptos_state_view::StateView;
 use aptos_types::{
-    block_executor::partitioner::{
-        ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies,
+    block_executor::{
+        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
+        partitioner::{ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies},
     },
     transaction::{
         analyzed_transaction::AnalyzedTransaction,
@@ -68,7 +72,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         round: usize,
         state_view: &S,
         concurrency_level: usize,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         disable_speculative_logging();
         trace!(
@@ -87,7 +91,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             round,
             state_view,
             concurrency_level,
-            maybe_block_gas_limit,
+            onchain_config,
         )
     }
 
@@ -100,7 +104,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         round: usize,
         state_view: &S,
         concurrency_level: usize,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let (callback, callback_receiver) = oneshot::channel();
 
@@ -136,8 +140,10 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     executor_thread_pool,
                     &signature_verified_transactions,
                     aggr_overridden_state_view.as_ref(),
-                    concurrency_level,
-                    maybe_block_gas_limit,
+                    BlockExecutorConfig {
+                        local: BlockExecutorLocalConfig { concurrency_level },
+                        onchain: onchain_config,
+                    },
                     cross_shard_commit_sender,
                 );
                 if let Some(shard_id) = shard_id {
@@ -173,7 +179,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         transactions: SubBlocksForShard<AnalyzedTransaction>,
         state_view: &S,
         concurrency_level: usize,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
         let mut result = vec![];
         for (round, sub_block) in transactions.into_sub_blocks().into_iter().enumerate() {
@@ -194,7 +200,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 round,
                 state_view,
                 concurrency_level,
-                maybe_block_gas_limit,
+                onchain_config.clone(),
             )?);
             trace!(
                 "Finished executing sub block for shard {} and round {}",
@@ -211,6 +217,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             self.shard_id,
             self.num_shards
         );
+        let mut num_txns = 0;
         loop {
             let command = self.coordinator_client.receive_execute_command();
             match command {
@@ -218,20 +225,29 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     state_view,
                     transactions,
                     concurrency_level_per_shard,
-                    maybe_block_gas_limit,
+                    onchain_config,
                 ) => {
+                    num_txns += transactions.num_txns();
                     trace!(
                         "Shard {} received ExecuteBlock command of block size {} ",
                         self.shard_id,
-                        transactions.num_txns()
+                        num_txns
                     );
+                    let exe_timer = SHARDED_EXECUTOR_SERVICE_SECONDS
+                        .with_label_values(&[&self.shard_id.to_string(), "execute_block"])
+                        .start_timer();
                     let ret = self.execute_block(
                         transactions,
                         state_view.as_ref(),
                         concurrency_level_per_shard,
-                        maybe_block_gas_limit,
+                        onchain_config,
                     );
                     drop(state_view);
+                    drop(exe_timer);
+
+                    let _result_tx_timer = SHARDED_EXECUTOR_SERVICE_SECONDS
+                        .with_label_values(&[&self.shard_id.to_string(), "result_tx"])
+                        .start_timer();
                     self.coordinator_client.send_execution_result(ret);
                 },
                 ExecutorShardCommand::Stop => {
@@ -239,6 +255,16 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 },
             }
         }
-        trace!("Shard {} is shutting down", self.shard_id);
+        let exe_time = SHARDED_EXECUTOR_SERVICE_SECONDS
+            .get_metric_with_label_values(&[&self.shard_id.to_string(), "execute_block"])
+            .unwrap()
+            .get_sample_sum();
+        info!(
+            "Shard {} is shutting down; On shard execution tps {} txns/s ({} txns / {} s)",
+            self.shard_id,
+            (num_txns as f64 / exe_time),
+            num_txns,
+            exe_time
+        );
     }
 }

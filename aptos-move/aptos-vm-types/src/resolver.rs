@@ -1,15 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::resolver::TAggregatorView;
+use aptos_aggregator::{
+    resolver::{TAggregatorV1View, TDelayedFieldView},
+    types::DelayedFieldID,
+};
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
-    aggregator::AggregatorID,
     state_store::{
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadataKind},
     },
+    write_set::WriteOp,
 };
 use bytes::Bytes;
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
@@ -63,6 +66,12 @@ pub trait TResourceGroupView {
     type ResourceTag;
     type Layout;
 
+    /// Some resolvers might not be capable of the optimization, and should return false.
+    /// Others might return based on the config or the run paramaters.
+    fn is_resource_group_split_in_change_set_capable(&self) -> bool {
+        false
+    }
+
     /// The size of the resource group, based on the sizes of the latest entries at observed
     /// tags. During parallel execution, this is an estimated value that will get validated,
     /// but as long as it is assumed correct, the transaction can deterministically derive
@@ -89,7 +98,7 @@ pub trait TResourceGroupView {
     /// the size of the resource group AFTER the changeset of the transaction is applied (while
     /// the resource_group_size method provides the total group size BEFORE). To compute the
     /// AFTER size, for each modified resources within the group, the prior size can be
-    /// determined by the following method.
+    /// determined by the following method (returns 0 for non-existent / deleted resources).
     fn resource_size_in_group(
         &self,
         group_key: &Self::GroupKey,
@@ -97,10 +106,7 @@ pub trait TResourceGroupView {
     ) -> anyhow::Result<u64> {
         Ok(self
             .get_resource_from_group(group_key, resource_tag, None)?
-            .map_or(0, |bytes| {
-                debug_assert!(!bytes.is_empty(), "Must be None instead of empty Bytes");
-                bytes.len() as u64
-            }))
+            .map_or(0, |bytes| bytes.len() as u64))
     }
 
     /// Needed for backwards compatibility with the additional safety mechanism for resource
@@ -122,17 +128,9 @@ pub trait TResourceGroupView {
             .map(|maybe_bytes| maybe_bytes.is_some())
     }
 
-    /// Executor view may internally implement a naive resource group cache when:
-    /// - ExecutorView is not based on block executor, such as ExecutorViewBase
-    /// - providing backwards compatibility (older gas versions) in storage adapter.
-    ///
-    /// The trait allows releasing the cache in such cases. Otherwise (default behavior),
-    /// if naive cache is not implemeneted (e.g. in block executor), None is returned.
     fn release_group_cache(
         &self,
-    ) -> Option<HashMap<Self::GroupKey, BTreeMap<Self::ResourceTag, Bytes>>> {
-        None
-    }
+    ) -> Option<HashMap<Self::GroupKey, BTreeMap<Self::ResourceTag, Bytes>>>;
 }
 
 /// Allows to query modules from the state.
@@ -188,25 +186,33 @@ pub trait StateStorageView {
 /// TODO: audit and reconsider the default implementation (e.g. should not
 /// resolve AggregatorV2 via the state-view based default implementation, as it
 /// doesn't provide a value exchange functionality).
-pub trait TExecutorView<K, T, L, I>:
+pub trait TExecutorView<K, T, L, I, V>:
     TResourceView<Key = K, Layout = L>
     + TModuleView<Key = K>
-    + TAggregatorView<IdentifierV1 = K, IdentifierV2 = I>
+    + TAggregatorV1View<Identifier = K>
+    + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T, ResourceValue = V>
     + StateStorageView
 {
 }
 
-impl<A, K, T, L, I> TExecutorView<K, T, L, I> for A where
+impl<A, K, T, L, I, V> TExecutorView<K, T, L, I, V> for A where
     A: TResourceView<Key = K, Layout = L>
         + TModuleView<Key = K>
-        + TAggregatorView<IdentifierV1 = K, IdentifierV2 = I>
+        + TAggregatorV1View<Identifier = K>
+        + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T, ResourceValue = V>
         + StateStorageView
 {
 }
 
-pub trait ExecutorView: TExecutorView<StateKey, StructTag, MoveTypeLayout, AggregatorID> {}
+pub trait ExecutorView:
+    TExecutorView<StateKey, StructTag, MoveTypeLayout, DelayedFieldID, WriteOp>
+{
+}
 
-impl<T> ExecutorView for T where T: TExecutorView<StateKey, StructTag, MoveTypeLayout, AggregatorID> {}
+impl<T> ExecutorView for T where
+    T: TExecutorView<StateKey, StructTag, MoveTypeLayout, DelayedFieldID, WriteOp>
+{
+}
 
 pub trait ResourceGroupView:
     TResourceGroupView<GroupKey = StateKey, ResourceTag = StructTag, Layout = MoveTypeLayout>
@@ -271,12 +277,8 @@ pub trait StateValueMetadataResolver {
         state_key: &StateKey,
     ) -> anyhow::Result<Option<StateValueMetadataKind>>;
 
+    /// Can also be used to get the metadata of a resource group at a provided group key.
     fn get_resource_state_value_metadata(
-        &self,
-        state_key: &StateKey,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>>;
-
-    fn get_resource_group_state_value_metadata(
         &self,
         state_key: &StateKey,
     ) -> anyhow::Result<Option<StateValueMetadataKind>>;

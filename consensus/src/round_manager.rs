@@ -29,7 +29,9 @@ use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
     block::Block,
+    block_data::BlockType,
     common::{Author, Round},
+    delayed_qc_msg::DelayedQcMsg,
     proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
@@ -49,6 +51,7 @@ use aptos_types::{
 };
 use fail::fail_point;
 use futures::{channel::oneshot, FutureExt, StreamExt};
+use futures_channel::mpsc::UnboundedReceiver;
 use serde::Serialize;
 use std::{mem::Discriminant, sync::Arc, time::Duration};
 use tokio::{
@@ -179,7 +182,7 @@ pub struct RoundManager {
     network: NetworkSender,
     storage: Arc<dyn PersistentLivenessStorage>,
     onchain_config: OnChainConsensusConfig,
-    checked_proposal_tx: aptos_channel::Sender<(), VerifiedEvent>,
+    buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
     local_config: ConsensusConfig,
 }
 
@@ -194,7 +197,7 @@ impl RoundManager {
         network: NetworkSender,
         storage: Arc<dyn PersistentLivenessStorage>,
         onchain_config: OnChainConsensusConfig,
-        checked_proposal_tx: aptos_channel::Sender<(), VerifiedEvent>,
+        buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
         local_config: ConsensusConfig,
     ) -> Self {
         // when decoupled execution is false,
@@ -215,7 +218,7 @@ impl RoundManager {
             network,
             storage,
             onchain_config,
-            checked_proposal_tx,
+            buffered_proposal_tx,
             local_config,
         }
     }
@@ -435,6 +438,26 @@ impl RoundManager {
         self.process_verified_proposal(proposal).await
     }
 
+    pub async fn process_delayed_qc_msg(&mut self, msg: DelayedQcMsg) -> anyhow::Result<()> {
+        ensure!(
+            msg.vote.vote_data().proposed().round() == self.round_state.current_round(),
+            "Discarding stale delayed QC for round {}, current round {}",
+            msg.vote.vote_data().proposed().round(),
+            self.round_state.current_round()
+        );
+        let vote = msg.vote().clone();
+        let vote_reception_result = self
+            .round_state
+            .process_delayed_qc_msg(&self.epoch_state.verifier, msg)
+            .await;
+        trace!(
+            "Received delayed QC message and vote reception result is {:?}",
+            vote_reception_result
+        );
+        self.process_vote_reception_result(&vote, vote_reception_result)
+            .await
+    }
+
     /// Sync to the sync info sending from peer if it has newer certificates.
     async fn sync_up(&mut self, sync_info: &SyncInfo, author: Author) -> anyhow::Result<()> {
         let local_sync_info = self.block_store.sync_info();
@@ -611,10 +634,27 @@ impl RoundManager {
             .author()
             .expect("Proposal should be verified having an author");
 
+        if !self.onchain_config.should_propose_system_txns()
+            && matches!(
+                proposal.block_data().block_type(),
+                BlockType::ProposalExt(_)
+            )
+        {
+            counters::UNEXPECTED_PROPOSAL_EXT_COUNT.inc();
+            bail!("ProposalExt unexpected while the feature is disabled.");
+        }
+
+        let (num_sys_txns, sys_txns_total_bytes): (usize, usize) =
+            proposal.sys_txns().map_or((0, 0), |txns| {
+                txns.iter().fold((0, 0), |(count_acc, size_acc), txn| {
+                    (count_acc + 1, size_acc + txn.size_in_bytes())
+                })
+            });
+
         let payload_len = proposal.payload().map_or(0, |payload| payload.len());
         let payload_size = proposal.payload().map_or(0, |payload| payload.size());
         ensure!(
-            payload_len as u64
+            num_sys_txns as u64 + payload_len as u64
                 <= self
                     .local_config
                     .max_receiving_block_txns(self.onchain_config.quorum_store_enabled()),
@@ -625,7 +665,7 @@ impl RoundManager {
         );
 
         ensure!(
-            payload_size as u64
+            sys_txns_total_bytes as u64 + payload_size as u64
                 <= self
                     .local_config
                     .max_receiving_block_bytes(self.onchain_config.quorum_store_enabled()),
@@ -684,6 +724,7 @@ impl RoundManager {
                 .context("[RoundManager] Failed to execute_and_insert the block")?;
             self.resend_verified_proposal_to_self(
                 proposal,
+                author,
                 BACK_PRESSURE_POLLING_INTERVAL_MS,
                 self.local_config.round_initial_timeout_ms,
             )
@@ -697,17 +738,18 @@ impl RoundManager {
     async fn resend_verified_proposal_to_self(
         &self,
         proposal: Block,
+        author: Author,
         polling_interval_ms: u64,
         timeout_ms: u64,
     ) {
         let start = Instant::now();
         let block_store = self.block_store.clone();
-        let self_sender = self.checked_proposal_tx.clone();
+        let self_sender = self.buffered_proposal_tx.clone();
         let event = VerifiedEvent::VerifiedProposalMsg(Box::new(proposal));
         tokio::spawn(async move {
             while start.elapsed() < Duration::from_millis(timeout_ms) {
                 if !block_store.vote_back_pressure() {
-                    if let Err(e) = self_sender.push((), event) {
+                    if let Err(e) = self_sender.push(author, event) {
                         error!("Failed to send event to round manager {:?}", e);
                     }
                     break;
@@ -848,11 +890,20 @@ impl RoundManager {
         {
             return Ok(());
         }
-        // Add the vote and check whether it completes a new QC or a TC
-        match self
+        let vote_reception_result = self
             .round_state
-            .insert_vote(vote, &self.epoch_state.verifier)
-        {
+            .insert_vote(vote, &self.epoch_state.verifier);
+        self.process_vote_reception_result(vote, vote_reception_result)
+            .await
+    }
+
+    async fn process_vote_reception_result(
+        &mut self,
+        vote: &Vote,
+        result: VoteReceptionResult,
+    ) -> anyhow::Result<()> {
+        let round = vote.vote_data().proposed().round();
+        match result {
             VoteReceptionResult::NewQuorumCertificate(qc) => {
                 if !vote.is_timeout() {
                     observe_block(
@@ -869,6 +920,7 @@ impl RoundManager {
                 self.process_local_timeout(round).await
             },
             VoteReceptionResult::VoteAdded(_)
+            | VoteReceptionResult::VoteAddedQCDelayed(_)
             | VoteReceptionResult::EchoTimeout(_)
             | VoteReceptionResult::DuplicateVote => Ok(()),
             e => Err(anyhow::anyhow!("{:?}", e)),
@@ -947,7 +999,8 @@ impl RoundManager {
             (Author, Discriminant<VerifiedEvent>),
             (Author, VerifiedEvent),
         >,
-        mut checked_proposal_rx: aptos_channel::Receiver<(), VerifiedEvent>,
+        mut buffered_proposal_rx: aptos_channel::Receiver<Author, VerifiedEvent>,
+        mut delayed_qc_rx: UnboundedReceiver<DelayedQcMsg>,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
         info!(epoch = self.epoch_state().epoch, "RoundManager started");
@@ -961,9 +1014,22 @@ impl RoundManager {
                     }
                     break;
                 }
-                proposal = checked_proposal_rx.select_next_some() => {
+                delayed_qc_msg = delayed_qc_rx.select_next_some() => {
+                    let result = monitor!(
+                        "process_delayed_qc",
+                        self.process_delayed_qc_msg(delayed_qc_msg).await
+                    );
+                    match result {
+                        Ok(_) => trace!(RoundStateLogSchema::new(self.round_state())),
+                        Err(e) => {
+                            counters::ERROR_COUNT.inc();
+                            warn!(error = ?e, kind = error_kind(&e), RoundStateLogSchema::new(self.round_state()));
+                        }
+                    }
+                },
+                proposal = buffered_proposal_rx.select_next_some() => {
                     let mut proposals = vec![proposal];
-                    while let Some(Some(proposal)) = checked_proposal_rx.next().now_or_never() {
+                    while let Some(Some(proposal)) = buffered_proposal_rx.next().now_or_never() {
                         proposals.push(proposal);
                     }
                     let get_round = |event: &VerifiedEvent| {

@@ -3,11 +3,14 @@
 
 use crate::{
     block_preparation::BlockPreparationStage, ledger_update_stage::LedgerUpdateStage,
-    GasMesurement, TransactionCommitter, TransactionExecutor,
+    metrics::NUM_TXNS, GasMeasuring, TransactionCommitter, TransactionExecutor,
 };
 use aptos_block_partitioner::v2::config::PartitionerV2Config;
 use aptos_crypto::HashValue;
-use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
+use aptos_executor::{
+    block_executor::{BlockExecutor, TransactionBlockExecutor},
+    metrics::APTOS_PROCESSED_TXNS_OUTPUT_SIZE,
+};
 use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait};
 use aptos_logger::info;
 use aptos_types::{
@@ -33,7 +36,7 @@ pub struct PipelineConfig {
     pub skip_commit: bool,
     pub allow_discards: bool,
     pub allow_aborts: bool,
-    #[derivative(Default(value = "1"))]
+    #[derivative(Default(value = "0"))]
     pub num_executor_shards: usize,
     pub use_global_executor: bool,
     #[derivative(Default(value = "4"))]
@@ -127,6 +130,9 @@ where
             .name("block_partitioning".to_string())
             .spawn(move || {
                 while let Ok(txns) = raw_block_receiver.recv() {
+                    NUM_TXNS
+                        .with_label_values(&["partition"])
+                        .inc_by(txns.len() as u64);
                     let exe_block_msg = partitioning_stage.process(txns);
                     executable_block_sender.send(exe_block_msg).unwrap();
                 }
@@ -140,7 +146,8 @@ where
                 start_execution_rx.map(|rx| rx.recv());
                 let start_time = Instant::now();
                 let mut executed = 0;
-                let start_gas_measurement = GasMesurement::start();
+                let start_gas_measurement = GasMeasuring::start();
+                let start_output_size = APTOS_PROCESSED_TXNS_OUTPUT_SIZE.get_sample_sum();
                 while let Ok(msg) = executable_block_receiver.recv() {
                     let ExecuteBlockMessage {
                         current_block_start_time,
@@ -148,29 +155,49 @@ where
                         block,
                     } = msg;
                     let block_size = block.transactions.num_transactions();
+                    NUM_TXNS
+                        .with_label_values(&["execution"])
+                        .inc_by(block_size as u64);
                     info!("Received block of size {:?} to execute", block_size);
                     executed += block_size;
                     exe.execute_block(current_block_start_time, partition_time, block);
                     info!("Finished executing block");
                 }
 
-                let (delta_gas, delta_gas_count) = start_gas_measurement.end();
+                let delta_gas = start_gas_measurement.end();
+                let delta_output_size =
+                    APTOS_PROCESSED_TXNS_OUTPUT_SIZE.get_sample_sum() - start_output_size;
 
                 let elapsed = start_time.elapsed().as_secs_f64();
                 info!(
-                    "Overall execution TPS: {} txn/s (over {} txns)",
+                    "Overall execution TPS: {} txn/s (over {} txns, in {} s)",
                     executed as f64 / elapsed,
-                    executed
+                    executed,
+                    elapsed
                 );
                 info!(
                     "Overall execution GPS: {} gas/s (over {} txns)",
-                    delta_gas / elapsed,
+                    delta_gas.gas / elapsed,
+                    executed
+                );
+                info!(
+                    "Overall execution ioGPS: {} gas/s (over {} txns)",
+                    delta_gas.io_gas / elapsed,
+                    executed
+                );
+                info!(
+                    "Overall execution executionGPS: {} gas/s (over {} txns)",
+                    delta_gas.execution_gas / elapsed,
                     executed
                 );
                 info!(
                     "Overall execution GPT: {} gas/txn (over {} txns)",
-                    delta_gas / (delta_gas_count as f64).max(1.0),
+                    delta_gas.gas / (delta_gas.gas_count as f64).max(1.0),
                     executed
+                );
+                info!(
+                    "Overall execution output: {} bytes/s",
+                    delta_output_size / elapsed
                 );
 
                 start_commit_tx.map(|tx| tx.send(()));
@@ -182,6 +209,13 @@ where
             .name("ledger_update".to_string())
             .spawn(move || {
                 while let Ok(ledger_update_msg) = ledger_update_receiver.recv() {
+                    let block_size = ledger_update_msg
+                        .state_checkpoint_output
+                        .txn_statuses()
+                        .len();
+                    NUM_TXNS
+                        .with_label_values(&["ledger_update"])
+                        .inc_by(block_size as u64);
                     ledger_update_stage.ledger_update(ledger_update_msg);
                 }
             })

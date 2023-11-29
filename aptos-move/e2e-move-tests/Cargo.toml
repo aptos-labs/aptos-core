@@ -30,6 +30,7 @@ aptos-types = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
 aptos-vm-genesis = { workspace = true }
 bcs = { workspace = true }
+claims = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
 move-binary-format = { workspace = true }
@@ -43,6 +44,11 @@ rand = { workspace = true }
 rstest = { workspace = true }
 serde = { workspace = true }
 tempfile = { workspace = true }
+test-case = { workspace = true }
+
+[dev-dependencies]
+claims = { workspace = true }
+test-case = { workspace = true }
 
 [lib]
 doctest = false

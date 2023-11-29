@@ -11,9 +11,9 @@ use crate::{
     logging::{LogEntry, LogSchema},
     metrics::{
         APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
-        APTOS_EXECUTOR_LEDGER_UPDATE_OTHER_SECONDS, APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS,
-        APTOS_EXECUTOR_OTHER_TIMERS_SECONDS, APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS,
-        APTOS_EXECUTOR_TRANSACTIONS_SAVED, APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
+        APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS, APTOS_EXECUTOR_OTHER_TIMERS_SECONDS,
+        APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS, APTOS_EXECUTOR_TRANSACTIONS_SAVED,
+        APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
 };
 use anyhow::Result;
@@ -31,7 +31,10 @@ use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
 };
 use aptos_types::{
-    block_executor::partitioner::{ExecutableBlock, ExecutableTransactions},
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain,
+        partitioner::{ExecutableBlock, ExecutableTransactions},
+    },
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValue,
 };
@@ -43,7 +46,7 @@ pub trait TransactionBlockExecutor: Send + Sync {
     fn execute_transaction_block(
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<ChunkOutput>;
 }
 
@@ -51,13 +54,9 @@ impl TransactionBlockExecutor for AptosVM {
     fn execute_transaction_block(
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<AptosVM>(
-            transactions,
-            state_view,
-            maybe_block_gas_limit,
-        )
+        ChunkOutput::by_transaction_execution::<AptosVM>(transactions, state_view, onchain_config)
     }
 }
 
@@ -115,14 +114,14 @@ where
         &self,
         block: ExecutableBlock,
         parent_block_id: HashValue,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<StateCheckpointOutput> {
         self.maybe_initialize()?;
         self.inner
             .read()
             .as_ref()
             .expect("BlockExecutor is not reset")
-            .execute_and_state_checkpoint(block, parent_block_id, maybe_block_gas_limit)
+            .execute_and_state_checkpoint(block, parent_block_id, onchain_config)
     }
 
     fn ledger_update(
@@ -193,7 +192,7 @@ where
         &self,
         block: ExecutableBlock,
         parent_block_id: HashValue,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<StateCheckpointOutput> {
         let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         let ExecutableBlock {
@@ -246,7 +245,7 @@ where
                             "Injected error in vm_execute_block"
                         )))
                     });
-                    V::execute_transaction_block(transactions, state_view, maybe_block_gas_limit)?
+                    V::execute_transaction_block(transactions, state_view, onchain_config.clone())?
                 };
 
                 let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
@@ -256,7 +255,7 @@ where
                 THREAD_MANAGER.get_exe_cpu_pool().install(|| {
                     chunk_output.into_state_checkpoint_output(
                         parent_output.state(),
-                        maybe_block_gas_limit.map(|_| block_id),
+                        onchain_config.has_any_block_gas_limit().then_some(block_id),
                     )
                 })?
             };
@@ -326,9 +325,6 @@ where
             output.ensure_ends_with_state_checkpoint()?;
         }
 
-        let _timer = APTOS_EXECUTOR_LEDGER_UPDATE_OTHER_SECONDS
-            .with_label_values(&["as_state_compute_result"])
-            .start_timer();
         let state_compute_result = output.as_state_compute_result(
             parent_accumulator,
             current_output.output.epoch_state().clone(),
@@ -404,7 +400,7 @@ where
             APTOS_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
 
             let result_in_memory_state = block.output.state().clone();
-            self.db.writer.save_transaction_block(
+            self.db.writer.save_transactions(
                 txns_to_commit,
                 first_version,
                 committed_block.output.state().base_version,
@@ -419,9 +415,9 @@ where
                 block
                     .output
                     .get_ledger_update()
-                    .state_updates_before_last_checkpoint
+                    .state_updates_until_last_checkpoint
                     .clone(),
-                &block.output.get_ledger_update().sharded_state_cache,
+                Some(&block.output.get_ledger_update().sharded_state_cache),
             )?;
             first_version += txns_to_commit.len() as u64;
             committed_block = block.clone();

@@ -26,12 +26,15 @@ AccountAuthenticator:
           - signature:
               TYPENAME: MultiEd25519Signature
     2:
-      Secp256k1Ecdsa:
+      SingleKey:
         STRUCT:
-          - public_key:
-              TYPENAME: Secp256k1EcdsaPublicKey
-          - signature:
-              TYPENAME: Secp256k1EcdsaSignature
+          - authenticator:
+              TYPENAME: SingleKeyAuthenticator
+    3:
+      MultiKey:
+        STRUCT:
+          - authenticator:
+              TYPENAME: MultiKeyAuthenticator
 AggregateSignature:
   STRUCT:
     - validator_bitmask:
@@ -45,6 +48,30 @@ AggregateSignatureWithRounds:
         TYPENAME: AggregateSignature
     - rounds:
         SEQ: U64
+AnyPublicKey:
+  ENUM:
+    0:
+      Ed25519:
+        STRUCT:
+          - public_key:
+              TYPENAME: Ed25519PublicKey
+    1:
+      Secp256k1Ecdsa:
+        STRUCT:
+          - public_key:
+              TYPENAME: Secp256k1EcdsaPublicKey
+AnySignature:
+  ENUM:
+    0:
+      Ed25519:
+        STRUCT:
+          - signature:
+              TYPENAME: Ed25519Signature
+    1:
+      Secp256k1Ecdsa:
+        STRUCT:
+          - signature:
+              TYPENAME: Secp256k1EcdsaSignature
 Batch:
   STRUCT:
     - batch_info:
@@ -180,6 +207,10 @@ BlockType:
                   - TYPENAME: AccountAddress
     2:
       Genesis: UNIT
+    3:
+      ProposalExt:
+        NEWTYPE:
+          TYPENAME: ProposalExt
 ChainId:
   NEWTYPESTRUCT: U8
 ChangeSet:
@@ -307,6 +338,9 @@ DAGNetworkMessage:
   STRUCT:
     - epoch: U64
     - data: BYTES
+DummySystemTransaction:
+  STRUCT:
+    - payload: BYTES
 Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
@@ -386,6 +420,21 @@ MultiEd25519PublicKey:
   NEWTYPESTRUCT: BYTES
 MultiEd25519Signature:
   NEWTYPESTRUCT: BYTES
+MultiKey:
+  STRUCT:
+    - public_keys:
+        SEQ:
+          TYPENAME: AnyPublicKey
+    - signatures_required: U8
+MultiKeyAuthenticator:
+  STRUCT:
+    - public_keys:
+        TYPENAME: MultiKey
+    - signatures:
+        SEQ:
+          TYPENAME: AnySignature
+    - signatures_bitmap:
+        TYPENAME: BitVec
 Multisig:
   STRUCT:
     - multisig_address:
@@ -426,6 +475,23 @@ ProofWithData:
     - proofs:
         SEQ:
           TYPENAME: ProofOfStore
+ProposalExt:
+  ENUM:
+    0:
+      V0:
+        STRUCT:
+          - sys_txns:
+              SEQ:
+                TYPENAME: SystemTransaction
+          - payload:
+              TYPENAME: Payload
+          - author:
+              TYPENAME: AccountAddress
+          - failed_authors:
+              SEQ:
+                TUPLE:
+                  - U64
+                  - TYPENAME: AccountAddress
 ProposalMsg:
   STRUCT:
     - proposal:
@@ -488,6 +554,12 @@ SignedTransaction:
         TYPENAME: RawTransaction
     - authenticator:
         TYPENAME: TransactionAuthenticator
+SingleKeyAuthenticator:
+  STRUCT:
+    - public_key:
+        TYPENAME: AnyPublicKey
+    - signature:
+        TYPENAME: AnySignature
 StateKey:
   ENUM:
     0:
@@ -533,6 +605,12 @@ SyncInfo:
     - highest_2chain_timeout_cert:
         OPTION:
           TYPENAME: TwoChainTimeoutCertificate
+SystemTransaction:
+  ENUM:
+    0:
+      DummyTopic:
+        NEWTYPE:
+          TYPENAME: DummySystemTransaction
 TableHandle:
   NEWTYPESTRUCT:
     TYPENAME: AccountAddress
@@ -554,6 +632,10 @@ Transaction:
       StateCheckpoint:
         NEWTYPE:
           TYPENAME: HashValue
+    4:
+      SystemTransaction:
+        NEWTYPE:
+          TYPENAME: SystemTransaction
 TransactionArgument:
   ENUM:
     0:
@@ -630,12 +712,10 @@ TransactionAuthenticator:
           - fee_payer_signer:
               TYPENAME: AccountAuthenticator
     4:
-      Secp256k1Ecdsa:
+      SingleSender:
         STRUCT:
-          - public_key:
-              TYPENAME: Secp256k1EcdsaPublicKey
-          - signature:
-              TYPENAME: Secp256k1EcdsaSignature
+          - sender:
+              TYPENAME: AccountAuthenticator
 TransactionPayload:
   ENUM:
     0:

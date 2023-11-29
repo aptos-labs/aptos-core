@@ -9,10 +9,12 @@ Any transaction execution on the Aptos blockchain requires a processing fee. As 
 1. Execution & IO costs
   - This covers your usage of transient computation resources, such as processing your transactions and propagating the validated record throughout the distributed network of the mainnet.
   - It is measured in Gas Units whose price may fluctuate according to the load of the network. This allows execution & io costs to be low when the network is less busy.
+  - This portion of gas is burned permanently upon the execution of a transaction.
 2. Storage fees
   - This covers the cost to persistently store validated record in the distributed blockchain storage.
-  - It is measured in fixed APT prices.
-  - In the future, such fees will evolve into deposits that are refundable, should you choose to delete the data you stored. The refunds can be full or partial, depending on the time frame.
+  - It is measured in fixed APT prices, so the permanent storage cost stays stable even as the gas unit price fluctuates with the network's transient load.
+  - The storage fee can be refunded when the allocated storage space is deleted. The refund amount may be full or partial, based on the size and duration of the storage used.
+  - To keep system implementation simple, this portion of gas is burned and minted again upon refund.
 
 :::tip
 Conceptually, this fee can be thought of as quite similar to how we pay for our home electric or water utilities.
@@ -27,6 +29,45 @@ See [How Base Gas Works](./base-gas.md) for a detailed description of gas fee ty
 :::tip Unit of gas
 👉 A **unit of gas** is a dimensionless number or a unit that is not associated with any one item such as a coin, expressed as an integer. The total gas units consumed by your transaction depend on the complexity of your transaction. The **gas price**, on the other hand, is expressed in terms of Aptos blockchain’s native coin (Octas). Also see [Transactions and States](txns-states.md) for how a transaction submitted to the Aptos blockchain looks like.
 :::
+
+## The Fee Statement
+
+As of Aptos Framework release 1.7, the breakdown of fee charges and refunds is emitted as a module event represented by struct `0x1::transaction_fee::FeeStatement`.
+
+```Rust
+    #[event]
+    /// Breakdown of fee charge and refund for a transaction.
+    /// The structure is:
+    ///
+    /// - Net charge or refund (not in the statement)
+    ///    - total charge: total_charge_gas_units, matches `gas_used` in the on-chain `TransactionInfo`.
+    ///      This is the sum of the sub-items below. Notice that there's potential precision loss when
+    ///      the conversion between internal and external gas units and between native token and gas
+    ///      units, so it's possible that the numbers don't add up exactly. -- This number is the final
+    ///      charge, while the break down is merely informational.
+    ///        - gas charge for execution (CPU time): `execution_gas_units`
+    ///        - gas charge for IO (storage random access): `io_gas_units`
+    ///        - storage fee charge (storage space): `storage_fee_octas`, to be included in
+    ///          `total_charge_gas_unit`, this number is converted to gas units according to the user
+    ///          specified `gas_unit_price` on the transaction.
+    ///    - storage deletion refund: `storage_fee_refund_octas`, this is not included in `gas_used` or
+    ///      `total_charge_gas_units`, the net charge / refund is calculated by
+    ///      `total_charge_gas_units` * `gas_unit_price` - `storage_fee_refund_octas`.
+    ///
+    /// This is meant to emitted as a module event.
+    struct FeeStatement has drop, store {
+        /// Total gas charge.
+        total_charge_gas_units: u64,
+        /// Execution gas charge.
+        execution_gas_units: u64,
+        /// IO gas charge.
+        io_gas_units: u64,
+        /// Storage fee charge.
+        storage_fee_octas: u64,
+        /// Storage fee refund.
+        storage_fee_refund_octas: u64,
+    }
+```
 
 ## Gas price and prioritizing transactions
 
@@ -45,9 +86,7 @@ However, within a block, the order of transaction execution is determined by the
 When a transaction is submitted to the Aptos blockchain, the transaction must contain the following mandatory gas fields:
 
 - `max_gas_amount`: The maximum number of gas units that the transaction sender is willing to spend to execute the transaction. This determines the maximum computational resources that can be consumed by the transaction.
-- `gas_price`: The gas price the transaction sender is willing to pay. It is expressed in Octa units, where:
-    - 1 Octa = 10<sup>-8</sup> APT and
-    - APT is the Aptos coin.
+- `gas_price`: The gas price the transaction sender is willing to pay. It is expressed in Octa units, where 1 Octa equals 10<sup>-8</sup> Aptos utility token.
 
   During the transaction execution, the total gas amount, expressed as:
   ```
@@ -90,6 +129,12 @@ Here is an example. Suppose we have a transaction that costs `100` gas units in 
 
 We are aware of the confusion this might create, and plan to present these as separate items in the future. However this will require some changes to the transaction output format and downstream clients, so please be patient while we work hard to make this happen.
 
+## Calculating Storage Deletion Refund
+
+If a transaction deletes state items, a refund is issued to the transaction payer for the released storage slots. Currently, a full refund is issued for the slot's fee, excluding any fees for excess bytes beyond a set quota (e.g., 1KB). However, fees for event emissions are not refundable.
+
+The refund amount is denominated in APT and is not converted to gas units or included in the total `gas_used`. Instead, this refund amount is specifically detailed in the `storage_fee_refund_octas` field of the [`FeeStatement`](#the-fee-statement). As a result, the transaction's net effect on the payer's APT balance is determined by `gas_used * gas_unit_price - storage_refund`. If the result is positive, there is a deduction from the account balance; if negative, there is a deposit.
+
 ## Examples
 
 ### Example 1: Account balance vs transaction fee
@@ -106,9 +151,13 @@ In a transaction, for example, transaction A, you are transferring 1000 coins fr
 
 ## Estimating gas consumption via simulation
 
-The gas used for a transaction can be estimated by simulating the transaction on chain as described here or locally via the [gas profiling](../move/move-on-aptos/cli/#profiling-gas-usage) feature of the Aptos CLI. The results of the simulated transaction represent the **exact** amount that is needed at the **exact** state of the blockchain at the time of the simulation. These gas units used may change based on the state of the chain.  For this reason, any amount coming out of the simulation is only an estimate, and when setting the max gas amount, it should include an appropriate amount of headroom based upon your comfort-level and historical behaviors. Setting the max gas amount too low will result in the transaction aborting and the account being charged for whatever gas was consumed.
+The gas used for a transaction can be estimated by simulating the transaction on chain as described here or locally via the gas profiling feature of the Aptos CLI. The results of the simulated transaction represent the **exact** amount that is needed at the **exact** state of the blockchain at the time of the simulation. These gas units used may change based on the state of the chain.  For this reason, any amount coming out of the simulation is only an estimate, and when setting the max gas amount, it should include an appropriate amount of headroom based upon your comfort-level and historical behaviors. Setting the max gas amount too low will result in the transaction aborting and the account being charged for whatever gas was consumed.
 
-Transactions can be simulated with the [`SimulateTransaction`](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/simulate_transaction) API. This API will run the exact transaction that you plan to run.
+To simulate transactions on chain, used the [`SimulateTransaction`](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/simulate_transaction) API. This API will run the exact transaction that you plan to run.
+
+To simulate the transaction locally, use the gas profiler, which is integrated into the Aptos CLI. 
+This will generate a web-based report to help you understand the precise gas usage of your transaction.
+See [Gas Profiling](../move/move-on-aptos/gas-profiling) for more details.
 
 :::tip
 Note that the `Signature` provided on the transaction must be all zeros. This is to prevent someone from using the valid signature.
@@ -134,4 +183,8 @@ The simulation steps for finding the correct amount of gas for a transaction are
 
 :::tip
 Prioritization is based upon buckets of `gas_unit_price`. The buckets are defined in [`mempool_config.rs`](https://github.com/aptos-labs/aptos-core/blob/30b385bf38d3dc8c4e8ee0ff045bc5d0d2f67a85/config/src/config/mempool_config.rs#L8). The current buckets are `[0, 150, 300, 500, 1000, 3000, 5000, 10000, 100000, 1000000]`. Therefore, a `gas_unit_price` of 150 and 299 would be prioritized nearly the same.
+:::
+
+:::tip
+Note that the `safety factor` only takes into consideration changes related to execution and IO. Unexpected creation of storage slots may not be sufficiently covered.
 :::

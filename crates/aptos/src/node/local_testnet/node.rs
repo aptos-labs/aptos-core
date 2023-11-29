@@ -11,7 +11,13 @@ use clap::Parser;
 use maplit::hashset;
 use rand::{rngs::StdRng, SeedableRng};
 use reqwest::Url;
-use std::{collections::HashSet, path::PathBuf, thread, time::Duration};
+use std::{
+    collections::HashSet,
+    net::{IpAddr, Ipv4Addr},
+    path::PathBuf,
+    thread,
+    time::Duration,
+};
 
 /// Args specific to running a node (and its components, e.g. the txn stream) in the
 /// local testnet.
@@ -57,7 +63,7 @@ pub struct NodeManager {
 }
 
 impl NodeManager {
-    pub fn new(args: &RunLocalTestnet, test_dir: PathBuf) -> Result<Self> {
+    pub fn new(args: &RunLocalTestnet, bind_to: Ipv4Addr, test_dir: PathBuf) -> Result<Self> {
         let rng = args
             .node_args
             .seed
@@ -93,6 +99,12 @@ impl NodeManager {
         // for the indexer GRPC stream on the node to work.
         node_config.storage.enable_indexer = run_txn_stream;
 
+        // Bind to the requested address.
+        node_config.api.address.set_ip(IpAddr::V4(bind_to));
+        node_config.indexer_grpc.address.set_ip(IpAddr::V4(bind_to));
+        node_config.admin_service.address = bind_to.to_string();
+        node_config.inspection_service.address = bind_to.to_string();
+
         Ok(NodeManager {
             config: node_config,
             test_dir,
@@ -101,6 +113,10 @@ impl NodeManager {
 
     pub fn get_node_api_url(&self) -> Url {
         socket_addr_to_url(&self.config.api.address, "http").unwrap()
+    }
+
+    pub fn get_data_service_url(&self) -> Url {
+        socket_addr_to_url(&self.config.indexer_grpc.address, "http").unwrap()
     }
 }
 
@@ -113,7 +129,7 @@ impl ServiceManager for NodeManager {
     /// We return health checkers for both the Node API and the txn stream (if enabled).
     /// As it is now, it is fine to make downstream services wait for both but if that
     /// changes we can refactor.
-    fn get_healthchecks(&self) -> HashSet<HealthChecker> {
+    fn get_health_checkers(&self) -> HashSet<HealthChecker> {
         let node_api_url = self.get_node_api_url();
         let mut checkers = HashSet::new();
         checkers.insert(HealthChecker::NodeApi(node_api_url));

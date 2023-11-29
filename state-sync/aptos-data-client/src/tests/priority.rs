@@ -24,7 +24,8 @@ use aptos_time_service::TimeServiceTrait;
 use claims::assert_matches;
 use maplit::hashset;
 use ordered_float::OrderedFloat;
-use std::collections::HashMap;
+use rand::Rng;
+use std::{cmp::Ordering, collections::HashMap};
 
 #[tokio::test]
 async fn all_peer_request_selection() {
@@ -514,7 +515,7 @@ async fn prioritized_peer_optimistic_fetch_selection() {
 }
 
 #[tokio::test]
-async fn prioritized_peer_optimistic_fetch_latency_selection() {
+async fn prioritized_peer_optimistic_fetch_distance_latency_selection() {
     // Create a data client with a max lag of 100
     let max_optimistic_fetch_lag_secs = 100;
     let data_client_config = AptosDataClientConfig {
@@ -549,19 +550,19 @@ async fn prioritized_peer_optimistic_fetch_latency_selection() {
         let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
         update_storage_summaries_for_peers(&client, &regular_peers, known_version, timestamp_usecs);
 
-        // Verify the lowest latency regular peer is selected for the request
-        let lowest_latency_peer = verify_lowest_latency_peer_selected(
+        // Verify the peer is selected by distance and latency
+        let selected_peer = verify_peer_selected_by_distance_and_latency(
             &mut mock_network,
             &client,
             &storage_request,
             &mut regular_peers,
         );
 
-        // Disconnect the lowest latency peer and remove it from the list of regular peers
-        disconnect_and_remove_peer(&mut mock_network, &mut regular_peers, lowest_latency_peer);
+        // Disconnect the selected peer and remove it from the list of regular peers
+        disconnect_and_remove_peer(&mut mock_network, &mut regular_peers, selected_peer);
 
-        // Verify the next lowest latency peer is now selected for the request
-        let lowest_latency_peer = verify_lowest_latency_peer_selected(
+        // Verify the next peer is selected by distance and latency
+        let selected_peer = verify_peer_selected_by_distance_and_latency(
             &mut mock_network,
             &client,
             &storage_request,
@@ -576,7 +577,7 @@ async fn prioritized_peer_optimistic_fetch_latency_selection() {
             priority_peers.push(priority_peer);
 
             // Verify the regular peer is still selected
-            verify_peer_selected_for_request(&client, lowest_latency_peer, &storage_request);
+            verify_peer_selected_for_request(&client, selected_peer, &storage_request);
         }
 
         // Advertise the data for the priority peers
@@ -587,8 +588,8 @@ async fn prioritized_peer_optimistic_fetch_latency_selection() {
             timestamp_usecs,
         );
 
-        // Verify the lowest latency priority peer is selected for the request
-        verify_lowest_latency_peer_selected(
+        // Verify the priority peers are selected by distance and latency
+        verify_peer_selected_by_distance_and_latency(
             &mut mock_network,
             &client,
             &storage_request,
@@ -610,8 +611,8 @@ async fn prioritized_peer_optimistic_fetch_latency_selection() {
         // Disconnect the final priority peer and remove it from the list of priority peers
         disconnect_and_remove_peer(&mut mock_network, &mut priority_peers, last_priority_peer);
 
-        // Verify the lowest latency regular peer is selected for the request
-        verify_lowest_latency_peer_selected(
+        // Verify a regular peer is selected by distance and latency
+        verify_peer_selected_by_distance_and_latency(
             &mut mock_network,
             &client,
             &storage_request,
@@ -622,6 +623,169 @@ async fn prioritized_peer_optimistic_fetch_latency_selection() {
         for regular_peer in regular_peers {
             mock_network.disconnect_peer(regular_peer);
         }
+        verify_request_is_unserviceable(&client, &storage_request);
+    }
+}
+
+#[tokio::test]
+async fn prioritized_peer_optimistic_fetch_distance_latency_weights() {
+    // Create a data client with a max lag of 50
+    let max_optimistic_fetch_lag_secs = 50;
+    let data_client_config = AptosDataClientConfig {
+        max_optimistic_fetch_lag_secs,
+        ..Default::default()
+    };
+
+    // Create test data
+    let known_version = 10000000;
+    let known_epoch = 10;
+    let min_validator_distance = 0;
+    let max_validator_distance = 2;
+
+    // Ensure the properties hold for both priority and non-priority peers
+    for priority_peers in [true, false] {
+        // Ensure the properties hold for all optimistic fetch requests
+        for data_request in enumerate_optimistic_fetch_requests(known_version, known_epoch) {
+            let storage_request = StorageServiceRequest::new(data_request, true);
+
+            // Create the mock network, time service and client
+            let (mut mock_network, time_service, client, _) =
+                MockNetwork::new(None, Some(data_client_config), None);
+
+            // Add several peers and verify the peers cannot service the request
+            let mut peers = vec![];
+            for _ in 0..50 {
+                // Add a peer
+                let peer = mock_network.add_peer(priority_peers);
+                peers.push(peer);
+
+                // Verify the peer cannot service the request
+                verify_request_is_unserviceable(&client, &storage_request);
+
+                // Generate a random distance for the peer and update the peer's distance metadata
+                let distance_from_validator =
+                    rand::thread_rng().gen_range(min_validator_distance..=max_validator_distance);
+                utils::update_distance_metadata(&client, peer, distance_from_validator as u64);
+            }
+
+            // Advertise the data for the peers
+            let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
+            update_storage_summaries_for_peers(&client, &peers, known_version, timestamp_usecs);
+
+            // Select a peer to service the request multiple times
+            let mut peers_and_selection_counts = HashMap::new();
+            for _ in 0..20_000 {
+                // Select a peer to service the request
+                let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+
+                // Update the peer selection counts
+                *peers_and_selection_counts.entry(selected_peer).or_insert(0) += 1;
+            }
+
+            // Verify all of the selected peers have the lowest distance
+            for peer in peers_and_selection_counts.keys() {
+                let distance_from_validator =
+                    utils::get_peer_distance_from_validators(&mut mock_network, *peer);
+                assert_eq!(distance_from_validator, min_validator_distance);
+            }
+
+            // Verify the highest selected peers are the lowest latency peers
+            utils::verify_highest_peer_selection_latencies(
+                &mut mock_network,
+                &mut peers_and_selection_counts,
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn prioritized_peer_optimistic_fetch_missing_distances() {
+    // Create a data client with a max lag of 1000
+    let max_optimistic_fetch_lag_secs = 1000;
+    let data_client_config = AptosDataClientConfig {
+        max_optimistic_fetch_lag_secs,
+        ..Default::default()
+    };
+
+    // Create the mock network, time service and client
+    let (mut mock_network, time_service, client, _) =
+        MockNetwork::new(None, Some(data_client_config), None);
+
+    // Create test data
+    let known_version = 5;
+    let known_epoch = 5;
+
+    // Ensure the properties hold for all optimistic fetch requests
+    for data_request in enumerate_optimistic_fetch_requests(known_version, known_epoch) {
+        let storage_request = StorageServiceRequest::new(data_request, true);
+
+        // Add several regular peers and remove their distance metadata
+        let mut regular_peers = vec![];
+        for _ in 0..5 {
+            // Add a regular peer
+            let regular_peer = mock_network.add_peer(false);
+            regular_peers.push(regular_peer);
+
+            // Remove the distance metadata for the peer
+            utils::remove_distance_metadata(&client, regular_peer);
+        }
+
+        // Advertise the data for the regular peers
+        let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
+        update_storage_summaries_for_peers(&client, &regular_peers, known_version, timestamp_usecs);
+
+        // Verify that a random peer is selected for the request
+        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+        assert!(regular_peers.contains(&selected_peer));
+
+        // Disconnect the selected peer and verify another peer is selected
+        disconnect_and_remove_peer(&mut mock_network, &mut regular_peers, selected_peer);
+        let another_selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+        assert_ne!(selected_peer, another_selected_peer);
+        assert!(regular_peers.contains(&another_selected_peer));
+
+        // Add several priority peers and remove their distance metadata
+        let mut priority_peers = vec![];
+        for _ in 0..3 {
+            // Add a priority peer
+            let priority_peer = mock_network.add_peer(true);
+            priority_peers.push(priority_peer);
+
+            // Remove the distance metadata for the peer
+            utils::remove_distance_metadata(&client, priority_peer);
+        }
+
+        // Verify that a random regular peer is selected for the request
+        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+        assert!(regular_peers.contains(&selected_peer));
+
+        // Advertise the data for the priority peers
+        update_storage_summaries_for_peers(
+            &client,
+            &priority_peers,
+            known_version,
+            timestamp_usecs,
+        );
+
+        // Verify that a random priority peer is now selected for the request
+        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+        assert!(priority_peers.contains(&selected_peer));
+
+        // Disconnect the priority peer and verify a random priority peer is selected
+        disconnect_and_remove_peer(&mut mock_network, &mut priority_peers, selected_peer);
+        let another_selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+        assert_ne!(selected_peer, another_selected_peer);
+        assert!(priority_peers.contains(&another_selected_peer));
+
+        // Disconnect and remove all regular and priority peers
+        for regular_peer in regular_peers.clone() {
+            disconnect_and_remove_peer(&mut mock_network, &mut regular_peers, regular_peer);
+        }
+        for priority_peer in priority_peers.clone() {
+            disconnect_and_remove_peer(&mut mock_network, &mut priority_peers, priority_peer);
+        }
+
+        // Verify no peers can service the request
         verify_request_is_unserviceable(&client, &storage_request);
     }
 }
@@ -816,7 +980,7 @@ async fn prioritized_peer_subscription_requests() {
 }
 
 #[tokio::test]
-async fn prioritized_peer_subscription_latency_selection() {
+async fn prioritized_peer_subscription_distance_latency_selection() {
     // Create a data client with a max lag of 500
     let max_subscription_lag_secs = 500;
     let data_client_config = AptosDataClientConfig {
@@ -851,8 +1015,8 @@ async fn prioritized_peer_subscription_latency_selection() {
         let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
         update_storage_summaries_for_peers(&client, &regular_peers, known_version, timestamp_usecs);
 
-        // Verify the lowest latency regular peer is selected for the request
-        let lowest_latency_peer = verify_lowest_latency_peer_selected(
+        // Verify the peer is selected by distance and latency
+        let selected_peer = verify_peer_selected_by_distance_and_latency(
             &mut mock_network,
             &client,
             &storage_request,
@@ -867,7 +1031,7 @@ async fn prioritized_peer_subscription_latency_selection() {
             priority_peers.push(priority_peer);
 
             // Verify the regular peer is still selected
-            verify_peer_selected_for_request(&client, lowest_latency_peer, &storage_request);
+            verify_peer_selected_for_request(&client, selected_peer, &storage_request);
         }
 
         // Advertise the data for the priority peers
@@ -881,10 +1045,10 @@ async fn prioritized_peer_subscription_latency_selection() {
         // Verify the request is unserviceable (the last request went to the regular peer)
         verify_request_is_unserviceable(&client, &storage_request);
 
-        // Update the request's subscription ID and verify the
-        // lowest latency priority peer is selected.
+        // Update the request's subscription ID and verify
+        // the peer is selected by distance and latency.
         let storage_request = update_subscription_request_id(&storage_request);
-        verify_lowest_latency_peer_selected(
+        verify_peer_selected_by_distance_and_latency(
             &mut mock_network,
             &client,
             &storage_request,
@@ -901,9 +1065,9 @@ async fn prioritized_peer_subscription_latency_selection() {
         priority_peers.retain(|peer| *peer == last_priority_peer);
 
         // Update the request's subscription ID and verify the
-        // lowest latency priority peer is selected.
+        // peer is selected by distance and latency.
         let storage_request = update_subscription_request_id(&storage_request);
-        verify_lowest_latency_peer_selected(
+        verify_peer_selected_by_distance_and_latency(
             &mut mock_network,
             &client,
             &storage_request,
@@ -917,9 +1081,9 @@ async fn prioritized_peer_subscription_latency_selection() {
         verify_request_is_unserviceable(&client, &storage_request);
 
         // Update the request's subscription ID and verify the
-        // lowest latency regular peer is selected.
+        // peer is selected by distance and latency.
         let storage_request = update_subscription_request_id(&storage_request);
-        verify_lowest_latency_peer_selected(
+        verify_peer_selected_by_distance_and_latency(
             &mut mock_network,
             &client,
             &storage_request,
@@ -931,6 +1095,185 @@ async fn prioritized_peer_subscription_latency_selection() {
             mock_network.disconnect_peer(regular_peer);
         }
         verify_request_is_unserviceable(&client, &storage_request);
+    }
+}
+
+#[tokio::test]
+async fn prioritized_peer_subscription_distance_latency_weights() {
+    // Create a data client with a max lag of 500
+    let max_subscription_lag_secs = 500;
+    let data_client_config = AptosDataClientConfig {
+        max_subscription_lag_secs,
+        ..Default::default()
+    };
+
+    // Create test data
+    let known_version = 1;
+    let known_epoch = 1;
+    let min_validator_distance = 1;
+    let max_validator_distance = 3;
+
+    // Ensure the properties hold for both priority and non-priority peers
+    for priority_peers in [true, false] {
+        // Ensure the properties hold for all subscription requests
+        for data_request in enumerate_subscription_requests(known_version, known_epoch) {
+            let storage_request = StorageServiceRequest::new(data_request, true);
+
+            // Create the mock network, time service and client
+            let (mut mock_network, time_service, client, _) =
+                MockNetwork::new(None, Some(data_client_config), None);
+
+            // Add several peers and verify the peers cannot service the request
+            let mut peers = vec![];
+            for _ in 0..50 {
+                // Add a peer
+                let peer = mock_network.add_peer(priority_peers);
+                peers.push(peer);
+
+                // Verify the peer cannot service the request
+                verify_request_is_unserviceable(&client, &storage_request);
+
+                // Generate a random distance for the peer and update the peer's distance metadata
+                let distance_from_validator =
+                    rand::thread_rng().gen_range(min_validator_distance..=max_validator_distance);
+                utils::update_distance_metadata(&client, peer, distance_from_validator as u64);
+            }
+
+            // Advertise the data for the peers
+            let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
+            update_storage_summaries_for_peers(&client, &peers, known_version, timestamp_usecs);
+
+            // Select a peer to service the request multiple times
+            let mut peers_and_selection_counts = HashMap::new();
+            for _ in 0..20_000 {
+                // Select a peer to service the request
+                let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+
+                // Update the peer selection counts
+                *peers_and_selection_counts.entry(selected_peer).or_insert(0) += 1;
+            }
+
+            // Verify all of the selected peers have the lowest distance
+            for peer in peers_and_selection_counts.keys() {
+                let distance_from_validator =
+                    utils::get_peer_distance_from_validators(&mut mock_network, *peer);
+                assert_eq!(distance_from_validator, min_validator_distance);
+            }
+
+            // Verify the highest selected peers are the lowest latency peers
+            utils::verify_highest_peer_selection_latencies(
+                &mut mock_network,
+                &mut peers_and_selection_counts,
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn prioritized_peer_subscription_missing_distances() {
+    // Create a data client with a max lag of 900
+    let max_subscription_lag_secs = 900;
+    let data_client_config = AptosDataClientConfig {
+        max_subscription_lag_secs,
+        ..Default::default()
+    };
+
+    // Create the mock network, time service and client
+    let (mut mock_network, time_service, client, _) =
+        MockNetwork::new(None, Some(data_client_config), None);
+
+    // Create test data
+    let known_version = 1;
+    let known_epoch = 1;
+
+    // Ensure the properties hold for all subscription requests
+    for data_request in enumerate_subscription_requests(known_version, known_epoch) {
+        let storage_request = StorageServiceRequest::new(data_request, true);
+
+        // Add several priority peers and remove their distance metadata
+        let mut priority_peers = vec![];
+        for _ in 0..3 {
+            // Add a priority peer
+            let priority_peer = mock_network.add_peer(true);
+            priority_peers.push(priority_peer);
+
+            // Remove the distance metadata for the peer
+            utils::remove_distance_metadata(&client, priority_peer);
+        }
+
+        // Advertise the data for the priority peers
+        let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
+        update_storage_summaries_for_peers(
+            &client,
+            &priority_peers,
+            known_version,
+            timestamp_usecs,
+        );
+
+        // Verify that a random priority peer is selected for the request
+        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+        assert!(priority_peers.contains(&selected_peer));
+
+        // Disconnect the selected peer and update the request's subscription ID
+        disconnect_and_remove_peer(&mut mock_network, &mut priority_peers, selected_peer);
+        let storage_request = update_subscription_request_id(&storage_request);
+
+        // Verify that another priority peer is selected for the request
+        let another_selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+        assert_ne!(selected_peer, another_selected_peer);
+        assert!(priority_peers.contains(&another_selected_peer));
+
+        // Add several regular peers and remove their distance metadata
+        let mut regular_peers = vec![];
+        for _ in 0..10 {
+            // Add a regular peer
+            let regular_peer = mock_network.add_peer(false);
+            regular_peers.push(regular_peer);
+
+            // Remove the distance metadata for the peer
+            utils::remove_distance_metadata(&client, regular_peer);
+        }
+
+        // Verify that a priority peer is still selected for the request
+        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+        assert!(priority_peers.contains(&selected_peer));
+
+        // Advertise the data for the regular peers and update the request's subscription ID
+        update_storage_summaries_for_peers(&client, &regular_peers, known_version, timestamp_usecs);
+        let storage_request = update_subscription_request_id(&storage_request);
+
+        // Verify that a random priority peer is still selected for the request
+        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+        assert!(priority_peers.contains(&selected_peer));
+
+        // Disconnect and remove all priority peers
+        for priority_peer in priority_peers.clone() {
+            disconnect_and_remove_peer(&mut mock_network, &mut priority_peers, priority_peer);
+        }
+
+        // Update the request's subscription ID and verify that a random regular peer is selected
+        let storage_request = update_subscription_request_id(&storage_request);
+        let selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+        assert!(regular_peers.contains(&selected_peer));
+
+        // Disconnect the selected peer and update the request's subscription ID
+        disconnect_and_remove_peer(&mut mock_network, &mut regular_peers, selected_peer);
+        let storage_request = update_subscription_request_id(&storage_request);
+
+        // Verify that another regular peer is selected for the request
+        let another_selected_peer = client.choose_peer_for_request(&storage_request).unwrap();
+        assert_ne!(selected_peer, another_selected_peer);
+        assert!(regular_peers.contains(&another_selected_peer));
+
+        // Disconnect and remove all regular peers
+        for regular_peer in regular_peers.clone() {
+            disconnect_and_remove_peer(&mut mock_network, &mut regular_peers, regular_peer);
+        }
+
+        // Verify no peers can service the request
+        for _ in 0..10 {
+            verify_request_is_unserviceable(&client, &storage_request);
+        }
     }
 }
 
@@ -1313,25 +1656,37 @@ fn enumerate_subscription_requests(known_version: u64, known_epoch: u64) -> Vec<
     ]
 }
 
-/// Returns the peer with the lowest latency from the given list of peers
-fn get_lowest_latency_peer(
+/// Returns the peers with the lowest validator distance from the given list of peers
+fn get_lowest_distance_peers(
     peers: &[PeerNetworkId],
     mock_network: &mut MockNetwork,
-) -> PeerNetworkId {
-    let mut lowest_latency_peer = peers[0];
-    let mut lowest_latency = f64::MAX;
-    for peer in peers {
-        // Get the peer's latency
-        let ping_latency = utils::get_peer_ping_latency(mock_network, *peer);
+) -> Vec<PeerNetworkId> {
+    let mut lowest_distance_peers = vec![];
+    let mut lowest_distance = u64::MAX;
 
-        // Update the lowest latency peer
-        if ping_latency < lowest_latency {
-            lowest_latency = ping_latency;
-            lowest_latency_peer = *peer;
+    // Identify the peers with the lowest distance
+    for peer in peers {
+        // Get the peer's distance
+        let distance = utils::get_peer_distance_from_validators(mock_network, *peer);
+
+        // Update the lowest distance peers
+        match distance.cmp(&lowest_distance) {
+            Ordering::Equal => {
+                // Add the peer to the list of lowest distance peers
+                lowest_distance_peers.push(*peer)
+            },
+            Ordering::Less => {
+                // We found a new lowest distance!
+                lowest_distance = distance;
+                lowest_distance_peers = vec![*peer];
+            },
+            Ordering::Greater => {
+                // The peer is not a lowest distance peer
+            },
         }
     }
 
-    lowest_latency_peer
+    lowest_distance_peers
 }
 
 /// Updates the storage summaries for the given peers using the specified
@@ -1377,21 +1732,26 @@ fn update_subscription_request_id(
     storage_service_request
 }
 
-/// Verifies that the lowest latency peer is selected for the given request
-/// and returns the lowest calculated latency peer.
-fn verify_lowest_latency_peer_selected(
+/// Verifies that a low distance and latency peer is selected for
+/// the given request (from the specified list of potential peers)
+/// and returns the select peer.
+fn verify_peer_selected_by_distance_and_latency(
     mock_network: &mut MockNetwork,
     client: &AptosDataClient,
     storage_request: &StorageServiceRequest,
-    regular_peers: &mut [PeerNetworkId],
+    potential_peers: &mut [PeerNetworkId],
 ) -> PeerNetworkId {
-    // Calculate the lowest latency peer
-    let lowest_latency_peer = get_lowest_latency_peer(regular_peers, mock_network);
+    // Select a peer for the given request
+    let selected_peer = client.choose_peer_for_request(storage_request).unwrap();
 
-    // Verify the lowest latency peer is selected for the given request
-    verify_peer_selected_for_request(client, lowest_latency_peer, storage_request);
+    // Verify the selected peer is in the list of potential peers
+    assert!(potential_peers.contains(&selected_peer));
 
-    lowest_latency_peer
+    // Verify the selected peer has the lowest distance
+    let lowest_distance_peers = get_lowest_distance_peers(potential_peers, mock_network);
+    assert!(lowest_distance_peers.contains(&selected_peer));
+
+    selected_peer
 }
 
 /// Verifies that the peer is selected to service the given request

@@ -7,7 +7,7 @@
 use anyhow::{format_err, Context, Result};
 use aptos_config::config::{
     BootstrappingMode, ConsensusConfig, ContinuousSyncingMode, MempoolConfig, NetbenchConfig,
-    NodeConfig, StateSyncConfig,
+    NodeConfig, QcAggregatorType, StateSyncConfig,
 };
 use aptos_forge::{
     args::TransactionTypeArg,
@@ -20,10 +20,15 @@ use aptos_forge::{
 };
 use aptos_logger::{info, Level};
 use aptos_rest_client::Client as RestClient;
-use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
+use aptos_sdk::{
+    move_types::account_address::AccountAddress,
+    transaction_builder::aptos_stdlib,
+    types::on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig},
+};
 use aptos_testcases::{
     compatibility_test::SimpleValidatorUpgrade,
     consensus_reliability_tests::ChangingWorkingQuorumTest,
+    dag_onchain_enable_test::DagOnChainEnableTest,
     forge_setup_test::ForgeSetupTest,
     framework_upgrade::FrameworkUpgrade,
     fullnode_reboot_stress_test::FullNodeRebootStressTest,
@@ -51,8 +56,9 @@ use aptos_testcases::{
     validator_reboot_stress_test::ValidatorRebootStressTest,
     CompositeNetworkTest,
 };
-use clap::{Parser, Subcommand, __derive_refs::once_cell::sync::Lazy};
+use clap::{Parser, Subcommand};
 use futures::stream::{FuturesUnordered, StreamExt};
+use once_cell::sync::Lazy;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use std::{
     env,
@@ -68,6 +74,10 @@ use std::{
 };
 use tokio::{runtime::Runtime, select};
 use url::Url;
+
+// Useful constants
+const KILOBYTE: usize = 1000;
+const MEGABYTE: usize = KILOBYTE * 1000;
 
 #[cfg(unix)]
 #[global_allocator]
@@ -475,20 +485,79 @@ fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String 
     }
 }
 
+// TODO: can we clean this function up?
+/// Returns the test suite for the given test name
 fn get_test_suite(
-    suite_name: &str,
+    test_name: &str,
     duration: Duration,
     test_cmd: &TestCommand,
 ) -> Result<ForgeConfig> {
-    match suite_name {
-        "local_test_suite" => Ok(local_test_suite()),
-        "pre_release" => Ok(pre_release_suite()),
-        "run_forever" => Ok(run_forever()),
+    // Check the test name against the multi-test suites
+    match test_name {
+        "local_test_suite" => return Ok(local_test_suite()),
+        "pre_release" => return Ok(pre_release_suite()),
+        "run_forever" => return Ok(run_forever()),
         // TODO(rustielin): verify each test suite
-        "k8s_suite" => Ok(k8s_test_suite()),
-        "chaos" => Ok(chaos_test_suite(duration)),
-        single_test => single_test_suite(single_test, duration, test_cmd),
+        "k8s_suite" => return Ok(k8s_test_suite()),
+        "chaos" => return Ok(chaos_test_suite(duration)),
+        _ => {}, // No multi-test suite matches!
+    };
+
+    // Otherwise, check the test name against the grouped test suites
+    if let Some(test_suite) = get_land_blocking_test(test_name, duration, test_cmd) {
+        return Ok(test_suite);
+    } else if let Some(test_suite) = get_multi_region_test(test_name) {
+        return Ok(test_suite);
+    } else if let Some(test_suite) = get_netbench_test(test_name) {
+        return Ok(test_suite);
+    } else if let Some(test_suite) = get_pfn_test(test_name, duration) {
+        return Ok(test_suite);
+    } else if let Some(test_suite) = get_realistic_env_test(test_name, duration, test_cmd) {
+        return Ok(test_suite);
+    } else if let Some(test_suite) = get_state_sync_test(test_name) {
+        return Ok(test_suite);
     }
+
+    // Otherwise, check the test name against the ungrouped test suites
+    let ungrouped_test_suite = match test_name {
+        "epoch_changer_performance" => epoch_changer_performance(),
+        "validators_join_and_leave" => validators_join_and_leave(),
+        "config" => ForgeConfig::default().add_network_test(ReconfigurationTest),
+        "network_partition" => network_partition(),
+        "network_bandwidth" => network_bandwidth(),
+        "setup_test" => setup_test(),
+        "single_vfn_perf" => single_vfn_perf(),
+        "validator_reboot_stress_test" => validator_reboot_stress_test(),
+        "fullnode_reboot_stress_test" => fullnode_reboot_stress_test(),
+        "workload_mix" => workload_mix_test(),
+        "account_creation" | "nft_mint" | "publishing" | "module_loading"
+        | "write_new_resource" => individual_workload_tests(test_name.into()),
+        "graceful_overload" => graceful_overload(),
+        // not scheduled on continuous
+        "load_vs_perf_benchmark" => load_vs_perf_benchmark(),
+        "workload_vs_perf_benchmark" => workload_vs_perf_benchmark(),
+        // maximizing number of rounds and epochs within a given time, to stress test consensus
+        // so using small constant traffic, small blocks and fast rounds, and short epochs.
+        // reusing changing_working_quorum_test just for invariants/asserts, but with max_down_nodes = 0.
+        "consensus_stress_test" => consensus_stress_test(),
+        "changing_working_quorum_test" => changing_working_quorum_test(),
+        "changing_working_quorum_test_high_load" => changing_working_quorum_test_high_load(),
+        // not scheduled on continuous
+        "large_test_only_few_nodes_down" => large_test_only_few_nodes_down(),
+        "different_node_speed_and_reliability_test" => different_node_speed_and_reliability_test(),
+        "state_sync_slow_processing_catching_up" => state_sync_slow_processing_catching_up(),
+        "state_sync_failures_catching_up" => state_sync_failures_catching_up(),
+        "twin_validator_test" => twin_validator_test(),
+        "large_db_simple_test" => large_db_simple_test(),
+        "consensus_only_realistic_env_max_tps" => run_consensus_only_realistic_env_max_tps(),
+        "quorum_store_reconfig_enable_test" => quorum_store_reconfig_enable_test(),
+        "mainnet_like_simulation_test" => mainnet_like_simulation_test(),
+        "dag_reconfig_enable_test" => dag_reconfig_enable_test(),
+        "gather_metrics" => gather_metrics(),
+        _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
+    };
+
+    Ok(ungrouped_test_suite)
 }
 
 /// Provides a forge config that runs the swarm forever (unless killed)
@@ -520,79 +589,122 @@ fn k8s_test_suite() -> ForgeConfig {
         .add_network_test(PerformanceBenchmark)
 }
 
-fn single_test_suite(
+/// Attempts to match the test name to a land-blocking test
+fn get_land_blocking_test(
     test_name: &str,
     duration: Duration,
     test_cmd: &TestCommand,
-) -> Result<ForgeConfig> {
-    let single_test_suite = match test_name {
-        // Land-blocking tests to be run on every PR:
-        "land_blocking" => land_blocking_test_suite(duration), // to remove land_blocking, superseeded by the below
+) -> Option<ForgeConfig> {
+    let test = match test_name {
+        "land_blocking" => land_blocking_test_suite(duration), // TODO: remove land_blocking, superseded by below
         "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
-        // Rest of the tests:
-        "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 20, 10),
-        "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
-        "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
-        "realistic_env_graceful_overload" => realistic_env_graceful_overload(),
-        "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
-        "epoch_changer_performance" => epoch_changer_performance(),
-        "state_sync_perf_fullnodes_apply_outputs" => state_sync_perf_fullnodes_apply_outputs(),
-        "state_sync_perf_fullnodes_execute_transactions" => {
-            state_sync_perf_fullnodes_execute_transactions()
+        _ => return None, // The test name does not match a land-blocking test
+    };
+    Some(test)
+}
+
+/// Attempts to match the test name to a network benchmark test
+fn get_netbench_test(test_name: &str) -> Option<ForgeConfig> {
+    let test = match test_name {
+        // Network tests without chaos
+        "net_bench_no_chaos_1000" => net_bench_no_chaos(MEGABYTE, 1000),
+        "net_bench_no_chaos_900" => net_bench_no_chaos(MEGABYTE, 900),
+        "net_bench_no_chaos_800" => net_bench_no_chaos(MEGABYTE, 800),
+        "net_bench_no_chaos_700" => net_bench_no_chaos(MEGABYTE, 700),
+        "net_bench_no_chaos_600" => net_bench_no_chaos(MEGABYTE, 600),
+        "net_bench_no_chaos_500" => net_bench_no_chaos(MEGABYTE, 500),
+        "net_bench_no_chaos_300" => net_bench_no_chaos(MEGABYTE, 300),
+        "net_bench_no_chaos_200" => net_bench_no_chaos(MEGABYTE, 200),
+        "net_bench_no_chaos_100" => net_bench_no_chaos(MEGABYTE, 100),
+        "net_bench_no_chaos_50" => net_bench_no_chaos(MEGABYTE, 50),
+        "net_bench_no_chaos_20" => net_bench_no_chaos(MEGABYTE, 20),
+        "net_bench_no_chaos_10" => net_bench_no_chaos(MEGABYTE, 10),
+        "net_bench_no_chaos_1" => net_bench_no_chaos(MEGABYTE, 1),
+
+        // Network tests with chaos
+        "net_bench_two_region_chaos_1000" => net_bench_two_region_chaos(MEGABYTE, 1000),
+        "net_bench_two_region_chaos_500" => net_bench_two_region_chaos(MEGABYTE, 500),
+        "net_bench_two_region_chaos_300" => net_bench_two_region_chaos(MEGABYTE, 300),
+        "net_bench_two_region_chaos_200" => net_bench_two_region_chaos(MEGABYTE, 200),
+        "net_bench_two_region_chaos_100" => net_bench_two_region_chaos(MEGABYTE, 100),
+        "net_bench_two_region_chaos_50" => net_bench_two_region_chaos(MEGABYTE, 50),
+        "net_bench_two_region_chaos_30" => net_bench_two_region_chaos(MEGABYTE, 30),
+        "net_bench_two_region_chaos_20" => net_bench_two_region_chaos(MEGABYTE, 20),
+        "net_bench_two_region_chaos_15" => net_bench_two_region_chaos(MEGABYTE, 15),
+        "net_bench_two_region_chaos_10" => net_bench_two_region_chaos(MEGABYTE, 10),
+        "net_bench_two_region_chaos_1" => net_bench_two_region_chaos(MEGABYTE, 1),
+
+        // Network tests with small messages
+        "net_bench_two_region_chaos_small_messages_5" => {
+            net_bench_two_region_chaos(100 * KILOBYTE, 50)
         },
-        "state_sync_perf_fullnodes_fast_sync" => state_sync_perf_fullnodes_fast_sync(),
-        "state_sync_perf_validators" => state_sync_perf_validators(),
-        "validators_join_and_leave" => validators_join_and_leave(),
-        "config" => ForgeConfig::default().add_network_test(ReconfigurationTest),
-        "network_partition" => network_partition(),
-        "three_region_simulation" => three_region_simulation(),
-        "three_region_simulation_with_different_node_speed" => {
-            three_region_simulation_with_different_node_speed()
+        "net_bench_two_region_chaos_small_messages_1" => {
+            net_bench_two_region_chaos(100 * KILOBYTE, 10)
         },
-        "network_bandwidth" => network_bandwidth(),
-        "setup_test" => setup_test(),
-        "single_vfn_perf" => single_vfn_perf(),
-        "validator_reboot_stress_test" => validator_reboot_stress_test(),
-        "fullnode_reboot_stress_test" => fullnode_reboot_stress_test(),
-        "workload_mix" => workload_mix_test(),
-        "account_creation" | "nft_mint" | "publishing" | "module_loading"
-        | "write_new_resource" => individual_workload_tests(test_name.into()),
-        "graceful_overload" => graceful_overload(),
-        // not scheduled on continuous
-        "load_vs_perf_benchmark" => load_vs_perf_benchmark(),
-        "workload_vs_perf_benchmark" => workload_vs_perf_benchmark(),
-        // maximizing number of rounds and epochs within a given time, to stress test consensus
-        // so using small constant traffic, small blocks and fast rounds, and short epochs.
-        // reusing changing_working_quorum_test just for invariants/asserts, but with max_down_nodes = 0.
-        "consensus_stress_test" => consensus_stress_test(),
-        "changing_working_quorum_test" => changing_working_quorum_test(),
-        "changing_working_quorum_test_high_load" => changing_working_quorum_test_high_load(),
-        // not scheduled on continuous
-        "large_test_only_few_nodes_down" => large_test_only_few_nodes_down(),
-        "different_node_speed_and_reliability_test" => different_node_speed_and_reliability_test(),
-        "state_sync_slow_processing_catching_up" => state_sync_slow_processing_catching_up(),
-        "state_sync_failures_catching_up" => state_sync_failures_catching_up(),
-        "twin_validator_test" => twin_validator_test(),
-        "large_db_simple_test" => large_db_simple_test(),
-        "consensus_only_realistic_env_max_tps" => run_consensus_only_realistic_env_max_tps(),
-        "quorum_store_reconfig_enable_test" => quorum_store_reconfig_enable_test(),
-        "mainnet_like_simulation_test" => mainnet_like_simulation_test(),
-        "multiregion_benchmark_test" => multiregion_benchmark_test(),
+
+        _ => return None, // The test name does not match a network benchmark test
+    };
+    Some(test)
+}
+
+/// Attempts to match the test name to a PFN test
+fn get_pfn_test(test_name: &str, duration: Duration) -> Option<ForgeConfig> {
+    let test = match test_name {
         "pfn_const_tps" => pfn_const_tps(duration, false, false, true),
         "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, false, true, false),
         "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true, false),
         "pfn_performance" => pfn_performance(duration, false, false, true),
         "pfn_performance_with_network_chaos" => pfn_performance(duration, false, true, false),
         "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true, false),
-        "gather_metrics" => gather_metrics(),
-        "net_bench" => net_bench(),
-        "net_bench_two_region_env" => net_bench_two_region_env(),
-        "net_bench_two_region_env_small_messages" => net_bench_two_region_env_small_messages(),
-        _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
+        _ => return None, // The test name does not match a PFN test
     };
-    Ok(single_test_suite)
+    Some(test)
+}
+
+/// Attempts to match the test name to a realistic-env test
+fn get_realistic_env_test(
+    test_name: &str,
+    duration: Duration,
+    test_cmd: &TestCommand,
+) -> Option<ForgeConfig> {
+    let test = match test_name {
+        "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 20, 10),
+        "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
+        "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
+        "realistic_env_graceful_overload" => realistic_env_graceful_overload(),
+        "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
+        _ => return None, // The test name does not match a realistic-env test
+    };
+    Some(test)
+}
+
+/// Attempts to match the test name to a state sync test
+fn get_state_sync_test(test_name: &str) -> Option<ForgeConfig> {
+    let test = match test_name {
+        "state_sync_perf_fullnodes_apply_outputs" => state_sync_perf_fullnodes_apply_outputs(),
+        "state_sync_perf_fullnodes_execute_transactions" => {
+            state_sync_perf_fullnodes_execute_transactions()
+        },
+        "state_sync_perf_fullnodes_fast_sync" => state_sync_perf_fullnodes_fast_sync(),
+        "state_sync_perf_validators" => state_sync_perf_validators(),
+        _ => return None, // The test name does not match a state sync test
+    };
+    Some(test)
+}
+
+/// Attempts to match the test name to a multi-region test
+fn get_multi_region_test(test_name: &str) -> Option<ForgeConfig> {
+    let test = match test_name {
+        "multiregion_benchmark_test" => multiregion_benchmark_test(),
+        "three_region_simulation" => three_region_simulation(),
+        "three_region_simulation_with_different_node_speed" => {
+            three_region_simulation_with_different_node_speed()
+        },
+        _ => return None, // The test name does not match a multi-region test
+    };
+    Some(test)
 }
 
 fn wrap_with_realistic_env<T: NetworkTest + 'static>(test: T) -> CompositeNetworkTest {
@@ -660,55 +772,7 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            mempool_config_practically_non_expiring(&mut config.mempool);
-            state_sync_config_execute_transactions(&mut config.state_sync);
-
-            config
-                .consensus
-                .max_sending_block_txns_quorum_store_override = 30000;
-            config
-                .consensus
-                .max_receiving_block_txns_quorum_store_override = 40000;
-            config
-                .consensus
-                .max_sending_block_bytes_quorum_store_override = 10 * 1024 * 1024;
-            config
-                .consensus
-                .max_receiving_block_bytes_quorum_store_override = 12 * 1024 * 1024;
-            config.consensus.pipeline_backpressure = vec![];
-            config.consensus.chain_health_backoff = vec![];
-
-            config
-                .consensus
-                .quorum_store
-                .back_pressure
-                .backlog_txn_limit_count = 200000;
-            config
-                .consensus
-                .quorum_store
-                .back_pressure
-                .backlog_per_validator_batch_limit_count = 50;
-            config
-                .consensus
-                .quorum_store
-                .back_pressure
-                .dynamic_min_txn_per_s = 2000;
-            config
-                .consensus
-                .quorum_store
-                .back_pressure
-                .dynamic_max_txn_per_s = 8000;
-
-            config.consensus.quorum_store.sender_max_batch_txns = 1000;
-            config.consensus.quorum_store.sender_max_batch_bytes = 4 * 1024 * 1024;
-            config.consensus.quorum_store.sender_max_num_batches = 100;
-            config.consensus.quorum_store.sender_max_total_txns = 4000;
-            config.consensus.quorum_store.sender_max_total_bytes = 8 * 1024 * 1024;
-            config.consensus.quorum_store.receiver_max_batch_txns = 1000;
-            config.consensus.quorum_store.receiver_max_batch_bytes = 4 * 1024 * 1024;
-            config.consensus.quorum_store.receiver_max_num_batches = 100;
-            config.consensus.quorum_store.receiver_max_total_txns = 4000;
-            config.consensus.quorum_store.receiver_max_total_bytes = 8 * 1024 * 1024;
+            optimize_for_maximum_throughput(config);
         }))
         // TODO(ibalajiarun): tune these success critiera after we have a better idea of the test behavior
         .with_success_criteria(
@@ -720,6 +784,57 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
                     max_round_gap: 6,
                 }),
         )
+}
+
+fn optimize_for_maximum_throughput(config: &mut NodeConfig) {
+    mempool_config_practically_non_expiring(&mut config.mempool);
+
+    config
+        .consensus
+        .max_sending_block_txns_quorum_store_override = 30000;
+    config
+        .consensus
+        .max_receiving_block_txns_quorum_store_override = 40000;
+    config
+        .consensus
+        .max_sending_block_bytes_quorum_store_override = 10 * 1024 * 1024;
+    config
+        .consensus
+        .max_receiving_block_bytes_quorum_store_override = 12 * 1024 * 1024;
+    config.consensus.pipeline_backpressure = vec![];
+    config.consensus.chain_health_backoff = vec![];
+
+    config
+        .consensus
+        .quorum_store
+        .back_pressure
+        .backlog_txn_limit_count = 200000;
+    config
+        .consensus
+        .quorum_store
+        .back_pressure
+        .backlog_per_validator_batch_limit_count = 50;
+    config
+        .consensus
+        .quorum_store
+        .back_pressure
+        .dynamic_min_txn_per_s = 2000;
+    config
+        .consensus
+        .quorum_store
+        .back_pressure
+        .dynamic_max_txn_per_s = 8000;
+
+    config.consensus.quorum_store.sender_max_batch_txns = 1000;
+    config.consensus.quorum_store.sender_max_batch_bytes = 4 * 1024 * 1024;
+    config.consensus.quorum_store.sender_max_num_batches = 100;
+    config.consensus.quorum_store.sender_max_total_txns = 4000;
+    config.consensus.quorum_store.sender_max_total_bytes = 8 * 1024 * 1024;
+    config.consensus.quorum_store.receiver_max_batch_txns = 1000;
+    config.consensus.quorum_store.receiver_max_batch_bytes = 4 * 1024 * 1024;
+    config.consensus.quorum_store.receiver_max_num_batches = 100;
+    config.consensus.quorum_store.receiver_max_total_txns = 4000;
+    config.consensus.quorum_store.receiver_max_total_bytes = 8 * 1024 * 1024;
 }
 
 fn large_db_simple_test() -> ForgeConfig {
@@ -930,7 +1045,7 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         criteria: [
             (3700, 0.35, 0.5, 0.8, 0.65),
             (2800, 0.35, 0.5, 1.2, 1.3),
-            (1800, 0.35, 0.5, 1.5, 2.7),
+            (1800, 0.35, 2.0, 1.5, 3.0),
             (950, 0.35, 0.65, 1.5, 2.9),
             // (150, 0.5, 1.0, 1.5, 0.65),
         ]
@@ -1111,11 +1226,6 @@ fn graceful_overload() -> ForgeConfig {
 fn realistic_env_graceful_overload() -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        // if we have full nodes for subset of validators, TPS drops.
-        // Validators without VFN are not creating batches,
-        // as no useful transaction reach their mempool.
-        // something to potentially improve upon.
-        // So having VFNs for all validators
         .with_initial_fullnode_count(20)
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
@@ -1141,7 +1251,7 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
         .with_success_criteria(
             SuccessCriteria::new(900)
                 .add_no_restarts()
-                .add_wait_for_catchup_s(120)
+                .add_wait_for_catchup_s(180) // 3 minutes
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // overload test uses more CPUs than others, so increase the limit
                     // Check that we don't use more than 18 CPU cores for 30% of the time.
@@ -1360,65 +1470,58 @@ fn gather_metrics() -> ForgeConfig {
         .add_network_test(GatherMetrics)
 }
 
-fn netbench_config_100_megabytes_per_sec(netbench_config: &mut NetbenchConfig) {
+/// Creates a netbench configuration for direct send using
+/// the specified message size and frequency.
+fn create_direct_send_netbench_config(
+    message_size: usize,
+    message_frequency: u64,
+) -> NetbenchConfig {
+    // Create the netbench config
+    let mut netbench_config = NetbenchConfig::default();
+
+    // Enable direct send network benchmarking
     netbench_config.enabled = true;
-    netbench_config.max_network_channel_size = 1000;
     netbench_config.enable_direct_send_testing = true;
-    netbench_config.direct_send_data_size = 100000;
-    netbench_config.direct_send_per_second = 1000;
+
+    // Configure the message sizes and frequency
+    netbench_config.direct_send_data_size = message_size;
+    netbench_config.direct_send_per_second = message_frequency;
+    netbench_config.max_network_channel_size = message_frequency * 2; // Double the channel size for an additional buffer
+
+    netbench_config
 }
 
-fn netbench_config_5_megabytes_per_sec_small_messages(netbench_config: &mut NetbenchConfig) {
-    netbench_config.enabled = true;
-    netbench_config.max_network_channel_size = 1000;
-    netbench_config.enable_direct_send_testing = true;
-    netbench_config.direct_send_data_size = 100000;
-    netbench_config.direct_send_per_second = 50;
-}
-
-/// Currently sending 16 MB/s outbound gets 12 MB/s inbound.
-fn netbench_config_16_megabytes_per_sec_large_messages(netbench_config: &mut NetbenchConfig) {
-    netbench_config.enabled = true;
-    netbench_config.max_network_channel_size = 1000;
-    netbench_config.enable_direct_send_testing = true;
-    netbench_config.direct_send_data_size = 1000000;
-    netbench_config.direct_send_per_second = 16;
-}
-
-fn net_bench() -> ForgeConfig {
+/// Performs direct send network benchmarking between 2 validators
+/// using the specified message size and frequency.
+fn net_bench_no_chaos(message_size: usize, message_frequency: u64) -> ForgeConfig {
     ForgeConfig::default()
         .add_network_test(Delay::new(180))
         .with_initial_validator_count(NonZeroUsize::new(2).unwrap())
-        .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            let mut netbench_config = NetbenchConfig::default();
-            netbench_config_100_megabytes_per_sec(&mut netbench_config);
+        .with_validator_override_node_config_fn(Arc::new(move |config, _| {
+            let netbench_config =
+                create_direct_send_netbench_config(message_size, message_frequency);
             config.netbench = Some(netbench_config);
         }))
 }
 
-fn net_bench_two_region_inner(
-    netbench_config_fn: Arc<dyn Fn(&mut NetbenchConfig) + Send + Sync>,
-) -> ForgeConfig {
+/// Performs direct send network benchmarking between 2 validators
+/// using the specified message size and frequency, with two-region chaos.
+fn net_bench_two_region_chaos(message_size: usize, message_frequency: u64) -> ForgeConfig {
+    net_bench_two_region_inner(create_direct_send_netbench_config(
+        message_size,
+        message_frequency,
+    ))
+}
+
+/// A simple utility function for creating a ForgeConfig with a
+/// two-region environment using the specified netbench config.
+fn net_bench_two_region_inner(netbench_config: NetbenchConfig) -> ForgeConfig {
     ForgeConfig::default()
         .add_network_test(wrap_with_two_region_env(Delay::new(180)))
         .with_initial_validator_count(NonZeroUsize::new(2).unwrap())
         .with_validator_override_node_config_fn(Arc::new(move |config, _| {
-            // Use a target that is not too much higher than the achievable throughput, to avoid
-            // throughput collapse
-            let mut netbench_config = NetbenchConfig::default();
-            netbench_config_fn(&mut netbench_config);
             config.netbench = Some(netbench_config);
         }))
-}
-
-fn net_bench_two_region_env() -> ForgeConfig {
-    net_bench_two_region_inner(Arc::new(
-        netbench_config_16_megabytes_per_sec_large_messages,
-    ))
-}
-
-fn net_bench_two_region_env_small_messages() -> ForgeConfig {
-    net_bench_two_region_inner(Arc::new(netbench_config_5_megabytes_per_sec_small_messages))
 }
 
 fn three_region_simulation_with_different_node_speed() -> ForgeConfig {
@@ -1667,12 +1770,25 @@ fn realistic_env_max_load_test(
                     mempool_backlog: 40000,
                 })
                 .init_gas_price_multiplier(20),
-            inner_success_criteria: SuccessCriteria::new(if ha_proxy { 4600 } else { 6800 }),
+            inner_success_criteria: SuccessCriteria::new(
+                if ha_proxy {
+                    4600
+                } else if long_running {
+                    7500
+                } else {
+                    7000
+                },
+            ),
         }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             // Have single epoch change in land blocking, and a few on long-running
             helm_values["chain"]["epoch_duration_secs"] =
                 (if long_running { 600 } else { 300 }).into();
+            helm_values["chain"]["on_chain_consensus_config"] =
+                serde_yaml::to_value(OnChainConsensusConfig::default()).expect("must serialize");
+            helm_values["chain"]["on_chain_execution_config"] =
+                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
+                    .expect("must serialize");
         }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
@@ -1689,25 +1805,31 @@ fn realistic_env_max_load_test(
                     (duration.as_secs() / 10).max(60),
                 )
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                    // Check that we don't use more than 14 CPU cores for 30% of the time.
-                    MetricsThreshold::new(14.0, max_cpu_threshold),
+                    // Check that we don't use more than 16 CPU cores for 30% of the time.
+                    MetricsThreshold::new(16.0, max_cpu_threshold),
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
                     MetricsThreshold::new_gb(10.0, 30),
                 ))
                 .add_latency_threshold(3.4, LatencyType::P50)
                 .add_latency_threshold(4.5, LatencyType::P90)
-                .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
-                    (LatencyBreakdownSlice::QsBatchToPos, 0.35),
-                    (
-                        LatencyBreakdownSlice::QsPosToProposal,
-                        if ha_proxy { 0.6 } else { 0.5 },
-                    ),
-                    (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.8),
-                    (
-                        LatencyBreakdownSlice::ConsensusOrderedToCommit,
-                        if ha_proxy { 1.2 } else { 0.65 },
-                    ),
-                ]))
+                .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_with_breach_pct(
+                    vec![
+                        (LatencyBreakdownSlice::QsBatchToPos, 0.35),
+                        // only reaches close to threshold during epoch change
+                        (
+                            LatencyBreakdownSlice::QsPosToProposal,
+                            if ha_proxy { 0.7 } else { 0.6 },
+                        ),
+                        // can be adjusted down if less backpressure
+                        (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
+                        // can be adjusted down if less backpressure
+                        (
+                            LatencyBreakdownSlice::ConsensusOrderedToCommit,
+                            if ha_proxy { 1.3 } else { 0.75 },
+                        ),
+                    ],
+                    5,
+                ))
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
@@ -1716,50 +1838,87 @@ fn realistic_env_max_load_test(
 }
 
 fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
-    ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(12).unwrap())
-        // if we have full nodes for subset of validators, TPS drops.
-        // Validators without VFN are not creating batches,
-        // as no useful transaction reach their mempool.
-        // something to potentially improve upon.
-        // So having VFNs for all validators
-        .with_initial_fullnode_count(12)
+    // THE MOST COMMONLY USED TUNE-ABLES:
+    const USE_CRAZY_MACHINES: bool = false;
+    const ENABLE_VFNS: bool = true;
+    const VALIDATOR_COUNT: usize = 12;
+
+    let mut forge_config = ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(VALIDATOR_COUNT).unwrap())
         .add_network_test(MultiRegionNetworkEmulationTest::default())
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-            mempool_backlog: 150000,
+            mempool_backlog: 500_000,
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            config
-                .consensus
-                .max_sending_block_txns_quorum_store_override = 10000;
-            config.consensus.pipeline_backpressure = vec![];
-            config.consensus.chain_health_backoff = vec![];
-            config
-                .consensus
-                .wait_for_full_blocks_above_recent_fill_threshold = 0.8;
-            config.consensus.wait_for_full_blocks_above_pending_blocks = 8;
+            // consensus and quorum store configs copied from the consensus-only suite
+            optimize_for_maximum_throughput(config);
 
+            // Other consensus / Quroum store configs
             config
                 .consensus
-                .quorum_store
-                .back_pressure
-                .backlog_txn_limit_count = 100000;
-            config
-                .consensus
-                .quorum_store
-                .back_pressure
-                .backlog_per_validator_batch_limit_count = 10;
-            config
-                .consensus
-                .quorum_store
-                .back_pressure
-                .dynamic_max_txn_per_s = 6000;
+                .wait_for_full_blocks_above_recent_fill_threshold = 0.2;
+            config.consensus.wait_for_full_blocks_above_pending_blocks = 8;
+            config.consensus.quorum_store_pull_timeout_ms = 200;
 
             // Experimental storage optimizations
             config.storage.rocksdb_configs.enable_storage_sharding = true;
+
+            // Experimental delayed QC aggregation
+            config.consensus.qc_aggregator_type = QcAggregatorType::default_delayed();
+
+            // Increase the concurrency level
+            if USE_CRAZY_MACHINES {
+                config.execution.concurrency_level = 48;
+            }
         }))
-        .with_success_criteria(
-            SuccessCriteria::new(8000)
+        .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["chain"]["on_chain_execution_config"] =
+                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
+                    .expect("must serialize");
+            helm_values["chain"]["on_chain_execution_config"]["V3"]["block_gas_limit"] =
+                serde_yaml::Value::Null;
+            helm_values["chain"]["on_chain_execution_config"]["V3"]["transaction_shuffler_type"]
+                ["sender_aware_v2"] = 256.into();
+        }));
+
+    if ENABLE_VFNS {
+        forge_config = forge_config
+            .with_initial_fullnode_count(VALIDATOR_COUNT)
+            .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+                // Experimental storage optimizations
+                config.storage.rocksdb_configs.enable_storage_sharding = true;
+
+                // Increase the concurrency level
+                if USE_CRAZY_MACHINES {
+                    config.execution.concurrency_level = 48;
+                }
+            }));
+    }
+
+    if USE_CRAZY_MACHINES {
+        forge_config = forge_config
+            .with_validator_resource_override(NodeResourceOverride {
+                cpu_cores: Some(58),
+                memory_gib: Some(200),
+            })
+            .with_fullnode_resource_override(NodeResourceOverride {
+                cpu_cores: Some(58),
+                memory_gib: Some(200),
+            })
+            .with_success_criteria(
+                SuccessCriteria::new(25000)
+                    .add_no_restarts()
+                    .add_wait_for_catchup_s(60),
+                /* Doesn't work without event indices
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 10.0,
+                    max_round_gap: 4,
+                }),
+                 */
+            );
+    } else {
+        forge_config = forge_config.with_success_criteria(
+            SuccessCriteria::new(12000)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(60)
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
@@ -1769,12 +1928,17 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                     MetricsThreshold::new(14.0, 30),
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
                     MetricsThreshold::new_gb(10.0, 30),
-                ))
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 10.0,
-                    max_round_gap: 4,
-                }),
-        )
+                )),
+            /* Doesn't work without event indices
+            .add_chain_progress(StateProgressThreshold {
+                max_no_progress_secs: 10.0,
+                max_round_gap: 4,
+            }),
+            */
+        );
+    }
+
+    forge_config
 }
 
 fn pre_release_suite() -> ForgeConfig {
@@ -1961,6 +2125,23 @@ fn quorum_store_reconfig_enable_test() -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_initial_fullnode_count(20)
         .add_network_test(QuorumStoreOnChainEnableTest {})
+        .with_success_criteria(
+            SuccessCriteria::new(5000)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(240)
+                .add_system_metrics_threshold(SYSTEM_12_CORES_10GB_THRESHOLD.clone())
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 10.0,
+                    max_round_gap: 4,
+                }),
+        )
+}
+
+fn dag_reconfig_enable_test() -> ForgeConfig {
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_fullnode_count(20)
+        .add_network_test(DagOnChainEnableTest {})
         .with_success_criteria(
             SuccessCriteria::new(5000)
                 .add_no_restarts()

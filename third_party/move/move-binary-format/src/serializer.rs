@@ -34,7 +34,7 @@ impl CompiledScript {
         bytecode_version: Option<u32>,
         binary: &mut Vec<u8>,
     ) -> Result<()> {
-        let version = bytecode_version.unwrap_or(VERSION_MAX);
+        let version = bytecode_version.unwrap_or(VERSION_DEFAULT);
         validate_version(version)?;
         let mut binary_data = BinaryData::from(binary.clone());
         let mut ser = ScriptSerializer::new(version);
@@ -200,6 +200,23 @@ fn serialize_local_index(binary: &mut BinaryData, idx: u8) -> Result<()> {
     write_as_uleb128(binary, idx, LOCAL_INDEX_MAX)
 }
 
+fn serialize_option<T>(
+    binary: &mut BinaryData,
+    option: &Option<T>,
+    value_serializer: impl Fn(&mut BinaryData, &T) -> Result<()>,
+) -> Result<()> {
+    if let Some(val) = option {
+        binary.push(SerializedOption::SOME as u8)?;
+        value_serializer(binary, val)
+    } else {
+        binary.push(SerializedOption::NONE as u8)
+    }
+}
+
+fn serialize_access_specifier_count(binary: &mut BinaryData, len: usize) -> Result<()> {
+    write_as_uleb128(binary, len as u64, ACCESS_SPECIFIER_COUNT_MAX)
+}
+
 fn validate_version(version: u32) -> Result<()> {
     if !(VERSION_MIN..=VERSION_MAX).contains(&version) {
         bail!(
@@ -226,7 +243,7 @@ impl CompiledModule {
         bytecode_version: Option<u32>,
         binary: &mut Vec<u8>,
     ) -> Result<()> {
-        let version = bytecode_version.unwrap_or(VERSION_MAX);
+        let version = bytecode_version.unwrap_or(VERSION_DEFAULT);
         validate_version(version)?;
         let mut binary_data = BinaryData::from(binary.clone());
         let mut ser = ModuleSerializer::new(version);
@@ -468,6 +485,7 @@ fn serialize_type_parameter(
 /// - `FunctionHandle.return_` as a ULEB128 (index into the `SignaturePool`)
 /// - `FunctionHandle.type_parameters` as a `Vec<u8>`
 fn serialize_function_handle(
+    major_version: u32,
     binary: &mut BinaryData,
     function_handle: &FunctionHandle,
 ) -> Result<()> {
@@ -475,7 +493,24 @@ fn serialize_function_handle(
     serialize_identifier_index(binary, &function_handle.name)?;
     serialize_signature_index(binary, &function_handle.parameters)?;
     serialize_signature_index(binary, &function_handle.return_)?;
-    serialize_ability_sets(binary, &function_handle.type_parameters)
+    serialize_ability_sets(binary, &function_handle.type_parameters)?;
+    if major_version >= VERSION_7 {
+        serialize_access_specifiers(binary, &function_handle.access_specifiers)
+    } else if function_handle.access_specifiers.is_some()
+        && function_handle
+            .access_specifiers
+            .as_ref()
+            .unwrap()
+            .iter()
+            .any(|sp| !sp.is_old_style_acquires())
+    {
+        Err(anyhow!(
+            "Access specifiers not supported in bytecode version {}",
+            major_version
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 fn serialize_function_instantiation(
@@ -714,6 +749,80 @@ fn serialize_ability_sets(binary: &mut BinaryData, sets: &[AbilitySet]) -> Resul
         serialize_ability_set(binary, *set)?;
     }
     Ok(())
+}
+
+fn serialize_access_specifiers(
+    binary: &mut BinaryData,
+    accesses: &Option<Vec<AccessSpecifier>>,
+) -> Result<()> {
+    serialize_option(binary, accesses, |binary, specs| {
+        serialize_access_specifier_count(binary, specs.len())?;
+        for acc in specs {
+            serialize_access_specifier(binary, acc)?
+        }
+        Ok(())
+    })
+}
+
+fn serialize_access_specifier(binary: &mut BinaryData, acc: &AccessSpecifier) -> Result<()> {
+    binary.push(match acc.kind {
+        AccessKind::Reads => SerializedAccessKind::READ,
+        AccessKind::Writes => SerializedAccessKind::WRITE,
+        AccessKind::Acquires => SerializedAccessKind::ACQUIRES,
+    } as u8)?;
+    binary.push(
+        if acc.negated {
+            SerializedBool::TRUE as u8
+        } else {
+            SerializedBool::FALSE as u8
+        },
+    )?;
+    serialize_resource_specifier(binary, &acc.resource)?;
+    serialize_address_specifier(binary, &acc.address)
+}
+
+fn serialize_resource_specifier(
+    binary: &mut BinaryData,
+    resource_spec: &ResourceSpecifier,
+) -> Result<()> {
+    match resource_spec {
+        ResourceSpecifier::Any => binary.push(SerializedResourceSpecifier::ANY as u8),
+        ResourceSpecifier::DeclaredAtAddress(addr) => {
+            binary.push(SerializedResourceSpecifier::AT_ADDRESS as u8)?;
+            serialize_address_identifier_index(binary, addr)
+        },
+        ResourceSpecifier::DeclaredInModule(handle) => {
+            binary.push(SerializedResourceSpecifier::IN_MODULE as u8)?;
+            serialize_module_handle_index(binary, handle)
+        },
+        ResourceSpecifier::Resource(handle) => {
+            binary.push(SerializedResourceSpecifier::RESOURCE as u8)?;
+            serialize_struct_handle_index(binary, handle)
+        },
+        ResourceSpecifier::ResourceInstantiation(handle, sign) => {
+            binary.push(SerializedResourceSpecifier::RESOURCE_INSTANTIATION as u8)?;
+            serialize_struct_handle_index(binary, handle)?;
+            serialize_signature_index(binary, sign)
+        },
+    }
+}
+
+fn serialize_address_specifier(
+    binary: &mut BinaryData,
+    addr_spec: &AddressSpecifier,
+) -> Result<()> {
+    match addr_spec {
+        AddressSpecifier::Any => binary.push(SerializedAddressSpecifier::ANY as u8),
+        AddressSpecifier::Literal(addr) => {
+            binary.push(SerializedAddressSpecifier::LITERAL as u8)?;
+            serialize_address_identifier_index(binary, addr)
+        },
+        AddressSpecifier::Parameter(param, deriver_opt) => {
+            binary.push(SerializedAddressSpecifier::PARAMETER as u8)?;
+            serialize_local_index(binary, *param)?;
+            serialize_option(binary, deriver_opt, serialize_function_inst_index)
+        },
+    }
 }
 
 /// Serializes a `CodeUnit`.
@@ -1133,7 +1242,7 @@ impl CommonSerializer {
             self.table_count += 1;
             self.function_handles.0 = check_index_in_binary(binary.len())?;
             for function_handle in function_handles {
-                serialize_function_handle(binary, function_handle)?;
+                serialize_function_handle(self.major_version, binary, function_handle)?;
             }
             self.function_handles.1 =
                 checked_calculate_table_size(binary, self.function_handles.0)?;

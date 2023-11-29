@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use aptos_types::{
-    block_executor::partitioner::{ShardId, SubBlocksForShard},
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain,
+        partitioner::{ShardId, SubBlocksForShard},
+    },
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
     vm_status::VMStatus,
@@ -9,10 +12,12 @@ use aptos_types::{
 use serde::{Deserialize, Serialize};
 
 mod error;
+pub mod local_executor_helper;
+mod metrics;
 pub mod process_executor_service;
 mod remote_cordinator_client;
 mod remote_cross_shard_client;
-mod remote_executor_client;
+pub mod remote_executor_client;
 pub mod remote_executor_service;
 mod remote_state_view;
 mod remote_state_view_service;
@@ -43,16 +48,18 @@ pub enum RemoteExecutionRequest {
 pub struct ExecuteBlockCommand {
     pub(crate) sub_blocks: SubBlocksForShard<AnalyzedTransaction>,
     pub(crate) concurrency_level: usize,
-    pub(crate) maybe_block_gas_limit: Option<u64>,
+    pub(crate) onchain_config: BlockExecutorConfigFromOnchain,
 }
 
 impl ExecuteBlockCommand {
-    pub fn into(self) -> (SubBlocksForShard<AnalyzedTransaction>, usize, Option<u64>) {
-        (
-            self.sub_blocks,
-            self.concurrency_level,
-            self.maybe_block_gas_limit,
-        )
+    pub fn into(
+        self,
+    ) -> (
+        SubBlocksForShard<AnalyzedTransaction>,
+        usize,
+        BlockExecutorConfigFromOnchain,
+    ) {
+        (self.sub_blocks, self.concurrency_level, self.onchain_config)
     }
 }
 

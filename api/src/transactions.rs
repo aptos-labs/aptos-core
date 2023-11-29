@@ -6,7 +6,7 @@ use crate::{
     accept_type::AcceptType,
     accounts::Account,
     bcs_payload::Bcs,
-    context::Context,
+    context::{api_spawn_blocking, Context},
     failpoint::fail_point_poem,
     generate_error_response, generate_success_response,
     page::Page,
@@ -18,7 +18,7 @@ use crate::{
     },
     ApiTags,
 };
-use anyhow::{anyhow, Context as AnyhowContext};
+use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     verify_function_identifier, verify_module_identifier, Address, AptosError, AptosErrorCode,
     AsConverter, EncodeSubmissionRequest, GasEstimation, GasEstimationBcs, HashValue,
@@ -30,7 +30,6 @@ use aptos_api_types::{
 use aptos_crypto::{hash::CryptoHash, signing_message};
 use aptos_types::{
     account_config::CoinStoreResource,
-    account_view::AccountView,
     mempool_status::MempoolStatusCode,
     transaction::{
         EntryFunction, ExecutionStatus, MultisigTransactionPayload, RawTransaction,
@@ -38,7 +37,8 @@ use aptos_types::{
     },
     vm_status::StatusCode,
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
+use aptos_vm::{data_cache::AsMoveResolver, AptosSimulationVM};
+use move_core_types::vm_status::VMStatus;
 use poem_openapi::{
     param::{Path, Query},
     payload::Json,
@@ -52,6 +52,7 @@ generate_error_response!(
     SubmitTransactionError,
     (400, BadRequest),
     (403, Forbidden),
+    (404, NotFound),
     (413, PayloadTooLarge),
     (500, Internal),
     (503, ServiceUnavailable),
@@ -128,6 +129,7 @@ impl VerifyInput for SubmitTransactionsBatchPost {
 }
 
 /// API for interacting with transactions
+#[derive(Clone)]
 pub struct TransactionsApi {
     pub context: Arc<Context>,
 }
@@ -168,7 +170,9 @@ impl TransactionsApi {
             limit.0,
             self.context.max_transactions_page_size(),
         );
-        self.list(&accept_type, page)
+
+        let api = self.clone();
+        api_spawn_blocking(move || api.list(&accept_type, page)).await
     }
 
     /// Get transaction by hash
@@ -224,8 +228,11 @@ impl TransactionsApi {
         fail_point_poem("endpoint_transaction_by_version")?;
         self.context
             .check_api_output_enabled("Get transactions by version", &accept_type)?;
-        self.get_transaction_by_version_inner(&accept_type, txn_version.0)
-            .await
+        let api = self.clone();
+        api_spawn_blocking(move || {
+            api.get_transaction_by_version_inner(&accept_type, txn_version.0)
+        })
+        .await
     }
 
     /// Get account transactions
@@ -264,7 +271,8 @@ impl TransactionsApi {
             limit.0,
             self.context.max_transactions_page_size(),
         );
-        self.list_by_account(&accept_type, page, address.0)
+        let api = self.clone();
+        api_spawn_blocking(move || api.list_by_account(&accept_type, page, address.0)).await
     }
 
     /// Submit transaction
@@ -428,101 +436,83 @@ impl TransactionsApi {
         }
         self.context
             .check_api_output_enabled("Simulate transaction", &accept_type)?;
-        let ledger_info = self.context.get_latest_ledger_info()?;
-        let mut signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
 
-        let estimated_gas_unit_price = match (
-            estimate_gas_unit_price.0.unwrap_or_default(),
-            estimate_prioritized_gas_unit_price.0.unwrap_or_default(),
-        ) {
-            (_, true) => {
-                let gas_estimation = self.context.estimate_gas_price(&ledger_info)?;
-                // The prioritized gas estimate should always be set, but if it's not use the gas estimate
-                Some(
-                    gas_estimation
-                        .prioritized_gas_estimate
-                        .unwrap_or(gas_estimation.gas_estimate),
-                )
-            },
-            (true, false) => Some(self.context.estimate_gas_price(&ledger_info)?.gas_estimate),
-            (false, false) => None,
-        };
+        let api = self.clone();
+        let context = self.context.clone();
+        api_spawn_blocking(move || {
+            let ledger_info = context.get_latest_ledger_info()?;
+            let mut signed_transaction = api.get_signed_transaction(&ledger_info, data)?;
 
-        // If estimate max gas amount is provided, we will just make it the maximum value
-        let estimated_max_gas_amount = if estimate_max_gas_amount.0.unwrap_or_default() {
-            // Retrieve max possible gas units
-            let (_, gas_params) = self.context.get_gas_schedule(&ledger_info)?;
-            let min_number_of_gas_units = u64::from(gas_params.vm.txn.min_transaction_gas_units)
-                / u64::from(gas_params.vm.txn.gas_unit_scaling_factor);
-            let max_number_of_gas_units = u64::from(gas_params.vm.txn.maximum_number_of_gas_units);
-
-            // Retrieve account balance to determine max gas available
-            let account_state = self
-                .context
-                .get_account_state(
-                    signed_transaction.sender(),
-                    ledger_info.version(),
-                    &ledger_info,
-                )?
-                .ok_or_else(|| {
-                    SubmitTransactionError::bad_request_with_code(
-                        "Account not found",
-                        AptosErrorCode::InvalidInput,
-                        &ledger_info,
+            let estimated_gas_unit_price = match (
+                estimate_gas_unit_price.0.unwrap_or_default(),
+                estimate_prioritized_gas_unit_price.0.unwrap_or_default(),
+            ) {
+                (_, true) => {
+                    let gas_estimation = context.estimate_gas_price(&ledger_info)?;
+                    // The prioritized gas estimate should always be set, but if it's not use the gas estimate
+                    Some(
+                        gas_estimation
+                            .prioritized_gas_estimate
+                            .unwrap_or(gas_estimation.gas_estimate),
                     )
-                })?;
-            let coin_store: CoinStoreResource = account_state
-                .get_coin_store_resource()
-                .and_then(|inner| {
-                    inner.ok_or_else(|| {
-                        anyhow!(
-                            "No coin store found for account {}",
-                            signed_transaction.sender()
-                        )
-                    })
-                })
-                .map_err(|err| {
-                    SubmitTransactionError::internal_with_code(
-                        format!("Failed to get coin store resource {}", err),
-                        AptosErrorCode::InternalError,
-                        &ledger_info,
-                    )
-                })?;
-
-            let gas_unit_price =
-                estimated_gas_unit_price.unwrap_or_else(|| signed_transaction.gas_unit_price());
-
-            // With 0 gas price, we set it to max gas units, since we can't divide by 0
-            let max_account_gas_units = if gas_unit_price == 0 {
-                coin_store.coin()
-            } else {
-                coin_store.coin() / gas_unit_price
+                },
+                (true, false) => Some(context.estimate_gas_price(&ledger_info)?.gas_estimate),
+                (false, false) => None,
             };
 
-            // To give better error messaging, we should not go below the minimum number of gas units
-            let max_account_gas_units =
-                std::cmp::max(min_number_of_gas_units, max_account_gas_units);
+            // If estimate max gas amount is provided, we will just make it the maximum value
+            let estimated_max_gas_amount = if estimate_max_gas_amount.0.unwrap_or_default() {
+                // Retrieve max possible gas units
+                let (_, gas_params) = context.get_gas_schedule(&ledger_info)?;
+                let min_number_of_gas_units =
+                    u64::from(gas_params.vm.txn.min_transaction_gas_units)
+                        / u64::from(gas_params.vm.txn.gas_unit_scaling_factor);
+                let max_number_of_gas_units =
+                    u64::from(gas_params.vm.txn.maximum_number_of_gas_units);
 
-            // Minimum of the max account and the max total needs to be used for estimation
-            Some(std::cmp::min(
-                max_account_gas_units,
-                max_number_of_gas_units,
-            ))
-        } else {
-            None
-        };
+                // Retrieve account balance to determine max gas available
+                let coin_store = context
+                    .expect_resource_poem::<CoinStoreResource, SubmitTransactionError>(
+                        signed_transaction.sender(),
+                        ledger_info.version(),
+                        &ledger_info,
+                    )?;
 
-        // If there is an estimation of either, replace the values
-        if estimated_max_gas_amount.is_some() || estimated_gas_unit_price.is_some() {
-            signed_transaction = override_gas_parameters(
-                &signed_transaction,
-                estimated_max_gas_amount,
-                estimated_gas_unit_price,
-            );
-        }
+                let gas_unit_price =
+                    estimated_gas_unit_price.unwrap_or_else(|| signed_transaction.gas_unit_price());
 
-        self.simulate(&accept_type, ledger_info, signed_transaction)
-            .await
+                // With 0 gas price, we set it to max gas units, since we can't divide by 0
+                let max_account_gas_units = if gas_unit_price == 0 {
+                    coin_store.coin()
+                } else {
+                    coin_store.coin() / gas_unit_price
+                };
+
+                // To give better error messaging, we should not go below the minimum number of gas units
+                let max_account_gas_units =
+                    std::cmp::max(min_number_of_gas_units, max_account_gas_units);
+
+                // Minimum of the max account and the max total needs to be used for estimation
+                Some(std::cmp::min(
+                    max_account_gas_units,
+                    max_number_of_gas_units,
+                ))
+            } else {
+                None
+            };
+
+            // If there is an estimation of either, replace the values
+            if estimated_max_gas_amount.is_some() || estimated_gas_unit_price.is_some() {
+                signed_transaction = override_gas_parameters(
+                    &signed_transaction,
+                    estimated_max_gas_amount,
+                    estimated_gas_unit_price,
+                );
+            }
+
+            api.simulate(&accept_type, ledger_info, signed_transaction)
+        })
+        .await
     }
 
     /// Encode submission
@@ -571,7 +561,8 @@ impl TransactionsApi {
         }
         self.context
             .check_api_output_enabled("Encode submission", &accept_type)?;
-        self.get_signing_message(&accept_type, data.0)
+        let api = self.clone();
+        api_spawn_blocking(move || api.get_signing_message(&accept_type, data.0)).await
     }
 
     /// Estimate gas price
@@ -597,26 +588,31 @@ impl TransactionsApi {
         fail_point_poem("endpoint_encode_submission")?;
         self.context
             .check_api_output_enabled("Estimate gas price", &accept_type)?;
-        let latest_ledger_info = self.context.get_latest_ledger_info()?;
-        let gas_estimation = self.context.estimate_gas_price(&latest_ledger_info)?;
 
-        match accept_type {
-            AcceptType::Json => BasicResponse::try_from_json((
-                gas_estimation,
-                &latest_ledger_info,
-                BasicResponseStatus::Ok,
-            )),
-            AcceptType::Bcs => {
-                let gas_estimation_bcs = GasEstimationBcs {
-                    gas_estimate: gas_estimation.gas_estimate,
-                };
-                BasicResponse::try_from_bcs((
-                    gas_estimation_bcs,
+        let context = self.context.clone();
+        api_spawn_blocking(move || {
+            let latest_ledger_info = context.get_latest_ledger_info()?;
+            let gas_estimation = context.estimate_gas_price(&latest_ledger_info)?;
+
+            match accept_type {
+                AcceptType::Json => BasicResponse::try_from_json((
+                    gas_estimation,
                     &latest_ledger_info,
                     BasicResponseStatus::Ok,
-                ))
-            },
-        }
+                )),
+                AcceptType::Bcs => {
+                    let gas_estimation_bcs = GasEstimationBcs {
+                        gas_estimate: gas_estimation.gas_estimate,
+                    };
+                    BasicResponse::try_from_bcs((
+                        gas_estimation_bcs,
+                        &latest_ledger_info,
+                        BasicResponseStatus::Ok,
+                    ))
+                },
+            }
+        })
+        .await
     }
 }
 
@@ -666,7 +662,11 @@ impl TransactionsApi {
         accept_type: &AcceptType,
         hash: HashValue,
     ) -> BasicResultWith404<Transaction> {
-        let ledger_info = self.context.get_latest_ledger_info()?;
+        let context = self.context.clone();
+        let accept_type = accept_type.clone();
+
+        let ledger_info = api_spawn_blocking(move || context.get_latest_ledger_info()).await?;
+
         let txn_data = self
             .get_by_hash(hash.into(), &ledger_info)
             .await
@@ -681,11 +681,12 @@ impl TransactionsApi {
             .context(format!("Failed to find transaction with hash: {}", hash))
             .map_err(|_| transaction_not_found_by_hash(hash, &ledger_info))?;
 
-        self.get_transaction_inner(accept_type, txn_data, &ledger_info)
+        let api = self.clone();
+        api_spawn_blocking(move || api.get_transaction_inner(&accept_type, txn_data, &ledger_info))
             .await
     }
 
-    async fn get_transaction_by_version_inner(
+    fn get_transaction_by_version_inner(
         &self,
         accept_type: &AcceptType,
         version: U64,
@@ -705,7 +706,6 @@ impl TransactionsApi {
         match txn_data {
             GetByVersionResponse::Found(txn_data) => {
                 self.get_transaction_inner(accept_type, txn_data, &ledger_info)
-                    .await
             },
             GetByVersionResponse::VersionTooNew => {
                 Err(transaction_not_found_by_version(version.0, &ledger_info))
@@ -715,7 +715,7 @@ impl TransactionsApi {
     }
 
     /// Converts a transaction into the outgoing type
-    async fn get_transaction_inner(
+    fn get_transaction_inner(
         &self,
         accept_type: &AcceptType,
         transaction_data: TransactionData,
@@ -792,9 +792,13 @@ impl TransactionsApi {
         hash: aptos_crypto::HashValue,
         ledger_info: &LedgerInfo,
     ) -> anyhow::Result<Option<TransactionData>> {
-        let from_db = self
-            .context
-            .get_transaction_by_hash(hash, ledger_info.version())?;
+        let context = self.context.clone();
+        let version = ledger_info.version();
+        let from_db =
+            tokio::task::spawn_blocking(move || context.get_transaction_by_hash(hash, version))
+                .await
+                .context("Failed to join task to read transaction by hash")?
+                .context("Failed to read transaction by hash from DB")?;
         Ok(match from_db {
             None => self
                 .context
@@ -1170,16 +1174,17 @@ impl TransactionsApi {
     ///
     /// Note: this returns a `Vec<UserTransaction>`, but for backwards compatibility, this can't
     /// be removed even though, there is only one possible transaction
-    pub async fn simulate(
+    pub fn simulate(
         &self,
         accept_type: &AcceptType,
         ledger_info: LedgerInfo,
         txn: SignedTransaction,
     ) -> SimulateTransactionResult<Vec<UserTransaction>> {
-        // Transactions shouldn't have a valid signature or this could be used to attack
-        if txn.signature_is_valid() {
+        // The caller must ensure that the signature is not valid, as otherwise
+        // a malicious actor could execute the transaction without their knowledge
+        if txn.verify_signature().is_ok() {
             return Err(SubmitTransactionError::bad_request_with_code(
-                "Simulated transactions must have a non-valid signature",
+                "Simulated transactions must not have a valid signature",
                 AptosErrorCode::InvalidInput,
                 &ledger_info,
             ));
@@ -1187,7 +1192,8 @@ impl TransactionsApi {
 
         // Simulate transaction
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
-        let (_, output) = AptosVM::simulate_signed_transaction(&txn, &state_view);
+        let (vm_status, output) =
+            AptosSimulationVM::create_vm_and_simulate_signed_transaction(&txn, &state_view);
         let version = ledger_info.version();
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)
@@ -1229,7 +1235,22 @@ impl TransactionsApi {
                 let mut user_transactions = Vec::new();
                 for transaction in transactions.into_iter() {
                     match transaction {
-                        Transaction::UserTransaction(user_txn) => user_transactions.push(*user_txn),
+                        Transaction::UserTransaction(user_txn) => {
+                            let mut txn = *user_txn;
+                            match &vm_status {
+                                VMStatus::Error {
+                                    message: Some(msg), ..
+                                }
+                                | VMStatus::ExecutionFailure {
+                                    message: Some(msg), ..
+                                } => {
+                                    txn.info.vm_status +=
+                                        format!("\nExecution failed with status: {}", msg).as_str();
+                                },
+                                _ => (),
+                            }
+                            user_transactions.push(txn);
+                        },
                         _ => {
                             return Err(SubmitTransactionError::internal_with_code(
                                 "Simulation transaction resulted in a non-UserTransaction",

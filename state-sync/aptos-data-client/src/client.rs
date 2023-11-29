@@ -145,6 +145,11 @@ impl AptosDataClient {
         self.storage_service_client.get_peers_and_metadata()
     }
 
+    /// Updates the logs and metrics for the peer request distributions
+    pub fn update_peer_request_logs_and_metrics(&self) {
+        self.peer_states.update_peer_request_logs_and_metrics();
+    }
+
     /// Update a peer's storage summary
     pub fn update_peer_storage_summary(&self, peer: PeerNetworkId, summary: StorageServerSummary) {
         self.peer_states.update_summary(peer, summary)
@@ -178,14 +183,15 @@ impl AptosDataClient {
         Ok(())
     }
 
-    /// Chooses the peer with the lowest latency from the given set of serviceable peers
-    fn choose_lowest_latency_peer(
+    /// Chooses a peer randomly weighted by distance and
+    /// latency from the given set of serviceable peers.
+    fn choose_random_peer_by_distance_and_latency(
         &self,
         request: &StorageServiceRequest,
         serviceable_peers: HashSet<PeerNetworkId>,
     ) -> Result<PeerNetworkId, Error> {
-        // Choose the peer with the lowest latency
-        if let Some(peer) = utils::choose_lowest_latency_peer(
+        // Choose a peer weighted by distance and latency
+        if let Some(peer) = utils::choose_random_peer_by_distance_and_latency(
             serviceable_peers.clone(),
             self.get_peers_and_metadata(),
         ) {
@@ -217,8 +223,8 @@ impl AptosDataClient {
             // Choose a peer to handle the subscription request
             self.choose_peer_for_subscription_request(request, serviceable_peers)
         } else if request.data_request.is_optimistic_fetch() {
-            // Choose the peer with the lowest latency for the optimistic fetch
-            self.choose_lowest_latency_peer(request, serviceable_peers)
+            // Choose a peer to handle the optimistic fetch request
+            self.choose_random_peer_by_distance_and_latency(request, serviceable_peers)
         } else {
             // Choose the peer randomly weighted by latency
             self.choose_random_peer_by_latency(request, serviceable_peers)
@@ -276,7 +282,8 @@ impl AptosDataClient {
         }
 
         // Otherwise, we need to choose a new peer and update the subscription state
-        let peer_network_id = self.choose_lowest_latency_peer(request, serviceable_peers)?;
+        let peer_network_id =
+            self.choose_random_peer_by_distance_and_latency(request, serviceable_peers)?;
         let subscription_state = SubscriptionState::new(peer_network_id, request_stream_id);
         *active_subscription_state = Some(subscription_state);
 
@@ -348,7 +355,7 @@ impl AptosDataClient {
     }
 
     /// Returns all priority and regular peers
-    pub(crate) fn get_priority_and_regular_peers(
+    pub fn get_priority_and_regular_peers(
         &self,
     ) -> crate::error::Result<(HashSet<PeerNetworkId>, HashSet<PeerNetworkId>), Error> {
         // Get all connected peers
@@ -452,7 +459,10 @@ impl AptosDataClient {
         request: StorageServiceRequest,
         request_timeout_ms: u64,
     ) -> crate::error::Result<Response<StorageServiceResponse>, Error> {
+        // Generate a unique id for the request
         let id = self.response_id_generator.next();
+
+        // Update the sent request metrics
         trace!(
             (LogSchema::new(LogEntry::StorageServiceRequest)
                 .event(LogEvent::SendRequest)
@@ -461,7 +471,7 @@ impl AptosDataClient {
                 .peer(&peer)
                 .request_data(&request))
         );
-        increment_request_counter(&metrics::SENT_REQUESTS, &request.get_label(), peer);
+        self.update_sent_request_metrics(peer, &request);
 
         // Send the request and process the result
         let result = self
@@ -482,7 +492,8 @@ impl AptosDataClient {
                         .peer(&peer))
                 );
 
-                increment_request_counter(&metrics::SUCCESS_RESPONSES, &request.get_label(), peer);
+                // Update the received response metrics
+                self.update_received_response_metrics(peer, &request);
 
                 // For now, record all responses that at least pass the data
                 // client layer successfully. An alternative might also have the
@@ -575,9 +586,32 @@ impl AptosDataClient {
             .await
     }
 
-    /// Returns a copy of the peer states for testing
-    #[cfg(test)]
-    pub(crate) fn get_peer_states(&self) -> Arc<PeerStates> {
+    /// Updates the metrics for the responses received via the data client
+    fn update_received_response_metrics(
+        &self,
+        peer: PeerNetworkId,
+        request: &StorageServiceRequest,
+    ) {
+        // Update the global received response metrics
+        increment_request_counter(&metrics::SUCCESS_RESPONSES, &request.get_label(), peer);
+
+        // Update the received response counter for the specific peer
+        self.peer_states
+            .increment_received_response_counter(peer, request);
+    }
+
+    /// Updates the metrics for the requests sent via the data client
+    fn update_sent_request_metrics(&self, peer: PeerNetworkId, request: &StorageServiceRequest) {
+        // Increment the global request counter
+        increment_request_counter(&metrics::SENT_REQUESTS, &request.get_label(), peer);
+
+        // Update the sent request counter for the specific peer
+        self.peer_states
+            .increment_sent_request_counter(peer, request);
+    }
+
+    /// Returns the peer states
+    pub fn get_peer_states(&self) -> Arc<PeerStates> {
         self.peer_states.clone()
     }
 }

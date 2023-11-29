@@ -19,8 +19,8 @@ fun pack_unpack::unpack($t0: pack_unpack::S): (u64, u64) {
      var $t5: pack_unpack::T
   0: ($t3, $t5) := unpack pack_unpack::S($t0)
   1: $t4 := unpack pack_unpack::T($t5)
-  2: $t1 := move($t3)
-  3: $t2 := move($t4)
+  2: $t1 := infer($t3)
+  3: $t2 := infer($t4)
   4: return ($t1, $t2)
 }
 
@@ -60,7 +60,7 @@ fun pack_unpack::unpack($t0: pack_unpack::S): (u64, u64) {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v4294967295
+// Move bytecode v7
 module 42.pack_unpack {
 struct T {
 	h: u64

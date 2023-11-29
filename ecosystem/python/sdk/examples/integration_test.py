@@ -5,6 +5,7 @@
 Provides a test harness for treating examples as integration tests.
 """
 
+import asyncio
 import os
 import unittest
 from typing import Optional
@@ -16,14 +17,20 @@ from aptos_sdk.aptos_cli_wrapper import AptosCLIWrapper, AptosInstance
 class Test(unittest.IsolatedAsyncioTestCase):
     _node: Optional[AptosInstance] = None
 
-    async def asyncSetUp(self):
+    @classmethod
+    def setUpClass(self):
         self._node = AptosCLIWrapper.start_node()
-        operational = await self._node.wait_until_operational()
+        operational = asyncio.run(self._node.wait_until_operational())
         if not operational:
             raise Exception("".join(self._node.errors()))
 
         os.environ["APTOS_NODE_URL"] = "http://127.0.0.1:8080/v1"
         os.environ["APTOS_FAUCET_URL"] = "http://127.0.0.1:8081"
+
+    async def test_fee_payer_transfer_coin(self):
+        from . import fee_payer_transfer_coin
+
+        await fee_payer_transfer_coin.main()
 
     async def test_hello_blockchain(self):
         from . import hello_blockchain
@@ -32,7 +39,7 @@ class Test(unittest.IsolatedAsyncioTestCase):
             "..", "..", "..", "aptos-move", "move-examples", "hello_blockchain"
         )
         AptosCLIWrapper.test_package(
-            hello_blockchain_dir, {"hello_blockchain": AccountAddress.from_str("0x0a")}
+            hello_blockchain_dir, {"hello_blockchain": AccountAddress.from_str("0xa")}
         )
         contract_address = await hello_blockchain.publish_contract(hello_blockchain_dir)
         await hello_blockchain.main(contract_address)
@@ -61,6 +68,11 @@ class Test(unittest.IsolatedAsyncioTestCase):
 
         await rotate_key.main()
 
+    async def test_secp256k1_ecdsa_transfer_coin(self):
+        from . import secp256k1_ecdsa_transfer_coin
+
+        await secp256k1_ecdsa_transfer_coin.main()
+
     async def test_simple_nft(self):
         from . import simple_nft
 
@@ -88,11 +100,12 @@ class Test(unittest.IsolatedAsyncioTestCase):
             "..", "..", "..", "aptos-move", "move-examples", "moon_coin"
         )
         AptosCLIWrapper.test_package(
-            moon_coin_path, {"MoonCoin": AccountAddress.from_str("0x0a")}
+            moon_coin_path, {"MoonCoin": AccountAddress.from_str("0xa")}
         )
         await your_coin.main(moon_coin_path)
 
-    def tearDown(self):
+    @classmethod
+    def tearDownClass(self):
         self._node.stop()
 
 

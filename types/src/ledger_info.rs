@@ -57,6 +57,13 @@ impl Display for LedgerInfo {
 }
 
 impl LedgerInfo {
+    pub fn dummy() -> Self {
+        Self {
+            commit_info: BlockInfo::empty(),
+            consensus_data_hash: HashValue::zero(),
+        }
+    }
+
     /// Constructs a `LedgerInfo` object based on the given commit info and vote data hash.
     pub fn new(commit_info: BlockInfo, consensus_data_hash: HashValue) -> Self {
         Self {
@@ -235,6 +242,13 @@ impl LedgerInfoWithV0 {
         }
     }
 
+    pub fn dummy() -> Self {
+        Self {
+            ledger_info: LedgerInfo::dummy(),
+            signatures: AggregateSignature::empty(),
+        }
+    }
+
     /// Create a new `LedgerInfoWithSignatures` at genesis with the given genesis
     /// state and initial validator set.
     ///
@@ -279,7 +293,7 @@ impl LedgerInfoWithV0 {
     pub fn check_voting_power(
         &self,
         validator: &ValidatorVerifier,
-    ) -> ::std::result::Result<(), VerifyError> {
+    ) -> ::std::result::Result<u128, VerifyError> {
         validator.check_voting_power(
             self.get_voters(&validator.get_ordered_account_addresses_iter().collect_vec())
                 .iter(),

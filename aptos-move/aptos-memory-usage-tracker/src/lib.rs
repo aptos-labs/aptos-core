@@ -467,7 +467,7 @@ where
 
         fn storage_fee_refund_for_state_slot(&self, op: &WriteOp) -> Fee;
 
-        fn storage_fee_for_state_bytes(&self, key: &StateKey, op: &WriteOp) -> Fee;
+        fn storage_fee_for_state_bytes(&self, key: &StateKey, maybe_value_size: Option<u64>) -> Fee;
 
         fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee;
 
@@ -480,6 +480,8 @@ where
         fn algebra_mut(&mut self) -> &mut Self::Algebra;
 
         fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOp) -> VMResult<()>;
+
+        fn charge_io_gas_for_group_write(&mut self, key: &StateKey, metadata_op: &WriteOp, maybe_group_size: Option<u64>) -> VMResult<()>;
 
         fn charge_storage_fee(
             &mut self,

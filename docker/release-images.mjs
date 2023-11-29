@@ -26,12 +26,29 @@
 //
 // Once you have all prerequisites fulfilled, you can run this script via:
 // GIT_SHA=${{ github.sha }} GCP_DOCKER_ARTIFACT_REPO="${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}" AWS_ACCOUNT_ID="${{ secrets.AWS_ECR_ACCOUNT_NUM }}" IMAGE_TAG_PREFIX="${{ inputs.image_tag_prefix }}" ./docker/release_images.sh --wait-for-image-seconds=1800
+//
+//
+// You can also run this script locally with the DRY_RUN flag to test it out:
+// IMAGE_TAG_PREFIX=devnet AWS_ACCOUNT_ID=bla GCP_DOCKER_ARTIFACT_REPO_US=bla GCP_DOCKER_ARTIFACT_REPO=bla GIT_SHA=bla ./docker/release-images.mjs --wait-for-image-seconds=3600 --dry-run
+//
+
+// When we release aptos-node, we also want to release related images for tooling, testing, etc. Similarly, other images have other related images
+// that we can release together, ie in a release group.
+const IMAGES_TO_RELEASE_BY_RELEASE_GROUP = {
+  "aptos-node": [
+    "validator",
+    "validator-testing",
+    "faucet",
+    "tools",
+  ],
+  "aptos-indexer-grpc": [
+    "indexer-grpc",
+  ],
+}
 
 const Features = {
   Default: "default",
-  Indexer: "indexer",
 };
-
 const IMAGES_TO_RELEASE_ONLY_INTERNAL = ["validator-testing"];
 const IMAGES_TO_RELEASE = {
   validator: {
@@ -40,7 +57,6 @@ const IMAGES_TO_RELEASE = {
     ],
     release: [
       Features.Default,
-      Features.Indexer,
     ],
   },
   "validator-testing": {
@@ -49,7 +65,6 @@ const IMAGES_TO_RELEASE = {
     ],
     release: [
       Features.Default,
-      Features.Indexer,
     ],
   },
   faucet: {
@@ -91,7 +106,7 @@ execSync("pnpm install --frozen-lockfile", { stdio: "inherit" });
 await import("zx/globals");
 
 const REQUIRED_ARGS = ["GIT_SHA", "GCP_DOCKER_ARTIFACT_REPO", "GCP_DOCKER_ARTIFACT_REPO_US", "AWS_ACCOUNT_ID", "IMAGE_TAG_PREFIX"];
-const OPTIONAL_ARGS = ["WAIT_FOR_IMAGE_SECONDS"];
+const OPTIONAL_ARGS = ["WAIT_FOR_IMAGE_SECONDS", "DRY_RUN"];
 
 const parsedArgs = {};
 
@@ -152,7 +167,23 @@ const ALL_TARGET_REGISTRIES = [
 // default 10 seconds
 parsedArgs.WAIT_FOR_IMAGE_SECONDS = parseInt(parsedArgs.WAIT_FOR_IMAGE_SECONDS ?? 10, 10);
 
-for (const [image, imageConfig] of Object.entries(IMAGES_TO_RELEASE)) {
+// dry run
+console.log(`INFO: dry run: ${parsedArgs.DRY_RUN}`);
+
+// get the appropriate release group based on the image tag prefix
+const imageReleaseGroup = getImageReleaseGroupByImageTagPrefix(parsedArgs.IMAGE_TAG_PREFIX);
+console.log(`INFO: image release group: ${imageReleaseGroup}`);
+
+// only release the images that are part of the release group
+const imageNamesToRelease = IMAGES_TO_RELEASE_BY_RELEASE_GROUP[imageReleaseGroup];
+console.log(`INFO: image names to release: ${JSON.stringify(imageNamesToRelease)}`);
+
+// iterate over all images to release, including their release configurations
+const imagesToRelease = {};
+for (const imageName of imageNamesToRelease) {
+  imagesToRelease[imageName] = IMAGES_TO_RELEASE[imageName];
+}
+for (const [image, imageConfig] of Object.entries(imagesToRelease)) {
   for (const [profile, features] of Object.entries(imageConfig)) {
     // build profiles that are not the default "release" will have a separate prefix
     const profilePrefix = profile === "release" ? "" : profile;
@@ -168,6 +199,9 @@ for (const [image, imageConfig] of Object.entries(IMAGES_TO_RELEASE)) {
         )}`;
         const imageTarget = `${targetRegistry}/${image}:${joinTagSegments(parsedArgs.IMAGE_TAG_PREFIX, profilePrefix, featureSuffix)}`;
         console.info(chalk.green(`INFO: copying ${imageSource} to ${imageTarget}`));
+        if (parsedArgs.DRY_RUN) {
+          continue;
+        }
         await waitForImageToBecomeAvailable(imageSource, parsedArgs.WAIT_FOR_IMAGE_SECONDS);
         await $`${crane} copy ${imageSource} ${imageTarget}`;
         await $`${crane} copy ${imageSource} ${joinTagSegments(imageTarget, parsedArgs.GIT_SHA)}`;
@@ -179,6 +213,21 @@ for (const [image, imageConfig] of Object.entries(IMAGES_TO_RELEASE)) {
 // joinTagSegments joins tag segments with a dash, but only if the segment is not empty
 function joinTagSegments(...segments) {
   return segments.filter((s) => s).join("_");
+}
+
+// The image tag prefix is used to determine the release group. Examples:
+// * tag a release as "aptos-node-vX.Y.Z"
+// * tag a release as "aptos-indexer-grpc-vX.Y.Z"
+function getImageReleaseGroupByImageTagPrefix(prefix) {
+  // iterate over the keys in IMAGES_TO_RELEASE_BY_RELEASE_GROUP
+  // if the prefix includes the release group, then return the release group
+  for (const [imageReleaseGroup, imagesToRelease] of Object.entries(IMAGES_TO_RELEASE_BY_RELEASE_GROUP)) {
+    if (prefix.includes(imageReleaseGroup)) {
+      return imageReleaseGroup;
+    }
+  }
+  // if there's no match, then release aptos-node by default
+  return "aptos-node";
 }
 
 async function waitForImageToBecomeAvailable(imageToWaitFor, waitForImageSeconds) {

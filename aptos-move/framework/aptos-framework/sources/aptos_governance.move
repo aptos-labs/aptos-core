@@ -311,7 +311,7 @@ module aptos_framework::aptos_governance {
     /// Create a single-step or multi-step proposal with the backing `stake_pool`.
     /// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
     /// only the exact script with matching hash can be successfully executed.
-    /// Return proposal_id when a proposal is sucessfully created.
+    /// Return proposal_id when a proposal is successfully created.
     public fun create_proposal_v2_impl(
         proposer: &signer,
         stake_pool: address,

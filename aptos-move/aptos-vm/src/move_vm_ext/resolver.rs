@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::resolver::AggregatorResolver;
+use aptos_aggregator::resolver::{AggregatorV1Resolver, DelayedFieldResolver};
 use aptos_table_natives::TableResolver;
 use aptos_types::{on_chain_config::ConfigStorage, state_store::state_key::StateKey};
 use aptos_vm_types::resolver::{
@@ -15,17 +15,36 @@ use std::collections::{BTreeMap, HashMap};
 /// top of storage, e.g. get resources from resource groups, etc.
 /// MoveResolver implements ResourceResolver and ModuleResolver
 pub trait AptosMoveResolver:
-    AggregatorResolver
+    AggregatorV1Resolver
     + ConfigStorage
+    + DelayedFieldResolver
     + MoveResolver
-    + TableResolver
+    + ResourceGroupResolver
     + StateValueMetadataResolver
     + StateStorageView
+    + TableResolver
     + AsExecutorView
     + AsResourceGroupView
 {
+}
+
+pub trait ResourceGroupResolver {
     fn release_resource_group_cache(&self)
         -> Option<HashMap<StateKey, BTreeMap<StructTag, Bytes>>>;
+
+    fn resource_group_size(&self, group_key: &StateKey) -> anyhow::Result<u64>;
+
+    fn resource_size_in_group(
+        &self,
+        group_key: &StateKey,
+        resource_tag: &StructTag,
+    ) -> anyhow::Result<u64>;
+
+    fn resource_exists_in_group(
+        &self,
+        group_key: &StateKey,
+        resource_tag: &StructTag,
+    ) -> anyhow::Result<bool>;
 }
 
 pub trait AsExecutorView {

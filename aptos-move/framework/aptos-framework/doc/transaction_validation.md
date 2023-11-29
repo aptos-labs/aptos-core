@@ -1,5 +1,5 @@
 
-<a name="0x1_transaction_validation"></a>
+<a id="0x1_transaction_validation"></a>
 
 # Module `0x1::transaction_validation`
 
@@ -30,6 +30,7 @@
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
 <b>use</b> <a href="aptos_coin.md#0x1_aptos_coin">0x1::aptos_coin</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
 <b>use</b> <a href="chain_id.md#0x1_chain_id">0x1::chain_id</a>;
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -42,7 +43,7 @@
 
 
 
-<a name="0x1_transaction_validation_TransactionValidation"></a>
+<a id="0x1_transaction_validation_TransactionValidation"></a>
 
 ## Resource `TransactionValidation`
 
@@ -101,12 +102,12 @@ correct chain-specific prologue and epilogue functions
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_transaction_validation_MAX_U64"></a>
+<a id="0x1_transaction_validation_MAX_U64"></a>
 
 MSB is used to indicate a gas payer tx
 
@@ -116,7 +117,7 @@ MSB is used to indicate a gas payer tx
 
 
 
-<a name="0x1_transaction_validation_EOUT_OF_GAS"></a>
+<a id="0x1_transaction_validation_EOUT_OF_GAS"></a>
 
 Transaction exceeded its allocated max gas
 
@@ -126,7 +127,7 @@ Transaction exceeded its allocated max gas
 
 
 
-<a name="0x1_transaction_validation_PROLOGUE_EACCOUNT_DOES_NOT_EXIST"></a>
+<a id="0x1_transaction_validation_PROLOGUE_EACCOUNT_DOES_NOT_EXIST"></a>
 
 
 
@@ -135,7 +136,7 @@ Transaction exceeded its allocated max gas
 
 
 
-<a name="0x1_transaction_validation_PROLOGUE_EBAD_CHAIN_ID"></a>
+<a id="0x1_transaction_validation_PROLOGUE_EBAD_CHAIN_ID"></a>
 
 
 
@@ -144,7 +145,7 @@ Transaction exceeded its allocated max gas
 
 
 
-<a name="0x1_transaction_validation_PROLOGUE_ECANT_PAY_GAS_DEPOSIT"></a>
+<a id="0x1_transaction_validation_PROLOGUE_ECANT_PAY_GAS_DEPOSIT"></a>
 
 
 
@@ -153,7 +154,7 @@ Transaction exceeded its allocated max gas
 
 
 
-<a name="0x1_transaction_validation_PROLOGUE_EFEE_PAYER_NOT_ENABLED"></a>
+<a id="0x1_transaction_validation_PROLOGUE_EFEE_PAYER_NOT_ENABLED"></a>
 
 
 
@@ -162,7 +163,7 @@ Transaction exceeded its allocated max gas
 
 
 
-<a name="0x1_transaction_validation_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY"></a>
+<a id="0x1_transaction_validation_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY"></a>
 
 Prologue errors. These are separated out from the other errors in this
 module since they are mapped separately to major VM statuses, and are
@@ -174,7 +175,7 @@ important to the semantics of the system.
 
 
 
-<a name="0x1_transaction_validation_PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH"></a>
+<a id="0x1_transaction_validation_PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH"></a>
 
 
 
@@ -183,7 +184,7 @@ important to the semantics of the system.
 
 
 
-<a name="0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG"></a>
+<a id="0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG"></a>
 
 
 
@@ -192,7 +193,7 @@ important to the semantics of the system.
 
 
 
-<a name="0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW"></a>
+<a id="0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW"></a>
 
 
 
@@ -201,7 +202,7 @@ important to the semantics of the system.
 
 
 
-<a name="0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD"></a>
+<a id="0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD"></a>
 
 
 
@@ -210,7 +211,7 @@ important to the semantics of the system.
 
 
 
-<a name="0x1_transaction_validation_PROLOGUE_ETRANSACTION_EXPIRED"></a>
+<a id="0x1_transaction_validation_PROLOGUE_ETRANSACTION_EXPIRED"></a>
 
 
 
@@ -219,7 +220,7 @@ important to the semantics of the system.
 
 
 
-<a name="0x1_transaction_validation_initialize"></a>
+<a id="0x1_transaction_validation_initialize"></a>
 
 ## Function `initialize`
 
@@ -259,7 +260,7 @@ Only called during genesis to initialize system resources for this module.
 
 </details>
 
-<a name="0x1_transaction_validation_prologue_common"></a>
+<a id="0x1_transaction_validation_prologue_common"></a>
 
 ## Function `prologue_common`
 
@@ -291,29 +292,47 @@ Only called during genesis to initialize system resources for this module.
     <b>assert</b>!(<a href="chain_id.md#0x1_chain_id_get">chain_id::get</a>() == <a href="chain_id.md#0x1_chain_id">chain_id</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EBAD_CHAIN_ID">PROLOGUE_EBAD_CHAIN_ID</a>));
 
     <b>let</b> transaction_sender = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&sender);
-    <b>assert</b>!(<a href="account.md#0x1_account_exists_at">account::exists_at</a>(transaction_sender), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EACCOUNT_DOES_NOT_EXIST">PROLOGUE_EACCOUNT_DOES_NOT_EXIST</a>));
-    <b>assert</b>!(
-        txn_authentication_key == <a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(transaction_sender),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY">PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY</a>),
-    );
 
-    <b>assert</b>!(
-        txn_sequence_number &lt; (1u64 &lt;&lt; 63),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG">PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG</a>)
-    );
+    <b>if</b> (
+        transaction_sender == gas_payer
+        || <a href="account.md#0x1_account_exists_at">account::exists_at</a>(transaction_sender)
+        || !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_sponsored_automatic_account_creation_enabled">features::sponsored_automatic_account_creation_enabled</a>()
+        || txn_sequence_number &gt; 0
+    ) {
+        <b>assert</b>!(<a href="account.md#0x1_account_exists_at">account::exists_at</a>(transaction_sender), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EACCOUNT_DOES_NOT_EXIST">PROLOGUE_EACCOUNT_DOES_NOT_EXIST</a>));
+        <b>assert</b>!(
+            txn_authentication_key == <a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(transaction_sender),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY">PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY</a>),
+        );
 
-    <b>let</b> account_sequence_number = <a href="account.md#0x1_account_get_sequence_number">account::get_sequence_number</a>(transaction_sender);
-    <b>assert</b>!(
-        txn_sequence_number &gt;= account_sequence_number,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD">PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD</a>)
-    );
+        <b>let</b> account_sequence_number = <a href="account.md#0x1_account_get_sequence_number">account::get_sequence_number</a>(transaction_sender);
+        <b>assert</b>!(
+            txn_sequence_number &lt; (1u64 &lt;&lt; 63),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG">PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG</a>)
+        );
 
-    // [PCA12]: Check that the transaction's sequence number matches the
-    // current sequence number. Otherwise sequence number is too new by [PCA11].
-    <b>assert</b>!(
-        txn_sequence_number == account_sequence_number,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW">PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW</a>)
-    );
+        <b>assert</b>!(
+            txn_sequence_number &gt;= account_sequence_number,
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD">PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD</a>)
+        );
+
+        <b>assert</b>!(
+            txn_sequence_number == account_sequence_number,
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW">PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW</a>)
+        );
+    } <b>else</b> {
+        // In this case, the transaction is sponsored and the <a href="account.md#0x1_account">account</a> does not exist, so ensure
+        // the default values match.
+        <b>assert</b>!(
+            txn_sequence_number == 0,
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW">PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW</a>)
+        );
+
+        <b>assert</b>!(
+            txn_authentication_key == <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&transaction_sender),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY">PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY</a>),
+        );
+    };
 
     <b>let</b> max_transaction_fee = txn_gas_price * txn_max_gas_units;
     <b>assert</b>!(
@@ -329,7 +348,7 @@ Only called during genesis to initialize system resources for this module.
 
 </details>
 
-<a name="0x1_transaction_validation_module_prologue"></a>
+<a id="0x1_transaction_validation_module_prologue"></a>
 
 ## Function `module_prologue`
 
@@ -362,7 +381,7 @@ Only called during genesis to initialize system resources for this module.
 
 </details>
 
-<a name="0x1_transaction_validation_script_prologue"></a>
+<a id="0x1_transaction_validation_script_prologue"></a>
 
 ## Function `script_prologue`
 
@@ -396,7 +415,7 @@ Only called during genesis to initialize system resources for this module.
 
 </details>
 
-<a name="0x1_transaction_validation_multi_agent_script_prologue"></a>
+<a id="0x1_transaction_validation_multi_agent_script_prologue"></a>
 
 ## Function `multi_agent_script_prologue`
 
@@ -441,7 +460,7 @@ Only called during genesis to initialize system resources for this module.
 
 </details>
 
-<a name="0x1_transaction_validation_multi_agent_common_prologue"></a>
+<a id="0x1_transaction_validation_multi_agent_common_prologue"></a>
 
 ## Function `multi_agent_common_prologue`
 
@@ -494,7 +513,7 @@ Only called during genesis to initialize system resources for this module.
 
 </details>
 
-<a name="0x1_transaction_validation_fee_payer_script_prologue"></a>
+<a id="0x1_transaction_validation_fee_payer_script_prologue"></a>
 
 ## Function `fee_payer_script_prologue`
 
@@ -545,7 +564,7 @@ Only called during genesis to initialize system resources for this module.
 
 </details>
 
-<a name="0x1_transaction_validation_epilogue"></a>
+<a id="0x1_transaction_validation_epilogue"></a>
 
 ## Function `epilogue`
 
@@ -578,7 +597,7 @@ Called by the Adapter
 
 </details>
 
-<a name="0x1_transaction_validation_epilogue_gas_payer"></a>
+<a id="0x1_transaction_validation_epilogue_gas_payer"></a>
 
 ## Function `epilogue_gas_payer`
 
@@ -651,7 +670,7 @@ Called by the Adapter
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -663,7 +682,7 @@ Called by the Adapter
 
 
 
-<a name="@Specification_1_initialize"></a>
+<a id="@Specification_1_initialize"></a>
 
 ### Function `initialize`
 
@@ -687,7 +706,7 @@ Create a schema to reuse some code.
 Give some constraints that may abort according to the conditions.
 
 
-<a name="0x1_transaction_validation_PrologueCommonAbortsIf"></a>
+<a id="0x1_transaction_validation_PrologueCommonAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="transaction_validation.md#0x1_transaction_validation_PrologueCommonAbortsIf">PrologueCommonAbortsIf</a> {
@@ -704,13 +723,25 @@ Give some constraints that may abort according to the conditions.
     <b>aborts_if</b> !<b>exists</b>&lt;ChainId&gt;(@aptos_framework);
     <b>aborts_if</b> !(<a href="chain_id.md#0x1_chain_id_get">chain_id::get</a>() == <a href="chain_id.md#0x1_chain_id">chain_id</a>);
     <b>let</b> transaction_sender = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
-    <b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(transaction_sender);
-    <b>aborts_if</b> !(txn_sequence_number &gt;= <b>global</b>&lt;Account&gt;(transaction_sender).sequence_number);
-    <b>aborts_if</b> !(txn_authentication_key == <b>global</b>&lt;Account&gt;(transaction_sender).authentication_key);
+    <b>aborts_if</b> (
+        !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_SPONSORED_AUTOMATIC_ACCOUNT_CREATION">features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION</a>)
+        || <a href="account.md#0x1_account_exists_at">account::exists_at</a>(transaction_sender)
+        || transaction_sender == gas_payer
+        || txn_sequence_number &gt; 0
+    ) && (
+        !(txn_sequence_number &gt;= <b>global</b>&lt;Account&gt;(transaction_sender).sequence_number)
+        || !(txn_authentication_key == <b>global</b>&lt;Account&gt;(transaction_sender).authentication_key)
+        || !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(transaction_sender)
+        || !(txn_sequence_number == <b>global</b>&lt;Account&gt;(transaction_sender).sequence_number)
+    );
+    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_SPONSORED_AUTOMATIC_ACCOUNT_CREATION">features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION</a>)
+        && transaction_sender != gas_payer
+        && txn_sequence_number == 0
+        && !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(transaction_sender)
+        && txn_authentication_key != <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(transaction_sender);
     <b>aborts_if</b> !(txn_sequence_number &lt; (1u64 &lt;&lt; 63));
     <b>let</b> max_transaction_fee = txn_gas_price * txn_max_gas_units;
     <b>aborts_if</b> max_transaction_fee &gt; <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>;
-    <b>aborts_if</b> !(txn_sequence_number == <b>global</b>&lt;Account&gt;(transaction_sender).sequence_number);
     <b>aborts_if</b> !<b>exists</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(gas_payer);
     <b>aborts_if</b> !(<b>global</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(gas_payer).<a href="coin.md#0x1_coin">coin</a>.value &gt;= max_transaction_fee);
 }
@@ -718,7 +749,7 @@ Give some constraints that may abort according to the conditions.
 
 
 
-<a name="@Specification_1_prologue_common"></a>
+<a id="@Specification_1_prologue_common"></a>
 
 ### Function `prologue_common`
 
@@ -734,7 +765,7 @@ Give some constraints that may abort according to the conditions.
 
 
 
-<a name="@Specification_1_module_prologue"></a>
+<a id="@Specification_1_module_prologue"></a>
 
 ### Function `module_prologue`
 
@@ -753,7 +784,7 @@ Give some constraints that may abort according to the conditions.
 
 
 
-<a name="@Specification_1_script_prologue"></a>
+<a id="@Specification_1_script_prologue"></a>
 
 ### Function `script_prologue`
 
@@ -773,7 +804,7 @@ Give some constraints that may abort according to the conditions.
 
 
 
-<a name="0x1_transaction_validation_MultiAgentPrologueCommonAbortsIf"></a>
+<a id="0x1_transaction_validation_MultiAgentPrologueCommonAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="transaction_validation.md#0x1_transaction_validation_MultiAgentPrologueCommonAbortsIf">MultiAgentPrologueCommonAbortsIf</a> {
@@ -794,7 +825,7 @@ Give some constraints that may abort according to the conditions.
 
 
 
-<a name="@Specification_1_multi_agent_script_prologue"></a>
+<a id="@Specification_1_multi_agent_script_prologue"></a>
 
 ### Function `multi_agent_script_prologue`
 
@@ -822,7 +853,7 @@ not equal the number of singers.
 
 
 
-<a name="@Specification_1_multi_agent_common_prologue"></a>
+<a id="@Specification_1_multi_agent_common_prologue"></a>
 
 ### Function `multi_agent_common_prologue`
 
@@ -841,7 +872,7 @@ not equal the number of singers.
 
 
 
-<a name="@Specification_1_fee_payer_script_prologue"></a>
+<a id="@Specification_1_fee_payer_script_prologue"></a>
 
 ### Function `fee_payer_script_prologue`
 
@@ -871,7 +902,7 @@ not equal the number of singers.
 
 
 
-<a name="@Specification_1_epilogue"></a>
+<a id="@Specification_1_epilogue"></a>
 
 ### Function `epilogue`
 
@@ -890,7 +921,7 @@ Skip transaction_fee::burn_fee verification.
 
 
 
-<a name="@Specification_1_epilogue_gas_payer"></a>
+<a id="@Specification_1_epilogue_gas_payer"></a>
 
 ### Function `epilogue_gas_payer`
 
@@ -910,7 +941,7 @@ Skip transaction_fee::burn_fee verification.
 
 
 
-<a name="0x1_transaction_validation_EpilogueGasPayerAbortsIf"></a>
+<a id="0x1_transaction_validation_EpilogueGasPayerAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="transaction_validation.md#0x1_transaction_validation_EpilogueGasPayerAbortsIf">EpilogueGasPayerAbortsIf</a> {
@@ -970,6 +1001,9 @@ Skip transaction_fee::burn_fee verification.
     <b>aborts_if</b> amount_to_mint &gt; 0 && !<b>exists</b>&lt;AptosCoinMintCapability&gt;(@aptos_framework);
     <b>aborts_if</b> amount_to_mint &gt; 0 && total_supply + amount_to_mint &gt; MAX_U128;
     <b>ensures</b> amount_to_mint &gt; 0 ==&gt; post_total_supply == total_supply + amount_to_mint;
+    <b>let</b> aptos_addr = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;AptosCoin&gt;().account_address;
+    <b>aborts_if</b> (amount_to_mint != 0) && !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">coin::CoinInfo</a>&lt;AptosCoin&gt;&gt;(aptos_addr);
+    <b>include</b> <a href="coin.md#0x1_coin_CoinAddAbortsIf">coin::CoinAddAbortsIf</a>&lt;AptosCoin&gt; { amount: amount_to_mint };
 }
 </code></pre>
 

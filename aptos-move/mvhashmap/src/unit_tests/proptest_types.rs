@@ -6,10 +6,12 @@ use super::{
     types::{test::KeyType, MVDataError, MVDataOutput, MVGroupError, TxnIndex},
     MVHashMap,
 };
+use crate::types::ValueWithLayout;
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp};
 use aptos_types::{
-    executable::ExecutableTestType, state_store::state_value::StateValue,
-    write_set::TransactionWrite,
+    executable::ExecutableTestType,
+    state_store::state_value::StateValue,
+    write_set::{TransactionWrite, WriteOpKind},
 };
 use bytes::Bytes;
 use claims::assert_none;
@@ -18,10 +20,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     fmt::Debug,
     hash::Hash,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 const DEFAULT_TIMEOUT: u64 = 30;
@@ -44,6 +43,7 @@ enum ExpectedOutput<V: Debug + Clone + PartialEq> {
     Failure,
 }
 
+#[derive(Debug, Clone)]
 struct Value<V> {
     maybe_value: Option<V>,
     maybe_bytes: Option<Bytes>,
@@ -63,9 +63,13 @@ impl<V: Into<Vec<u8>> + Clone> Value<V> {
     }
 }
 
-impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
+impl<V: Into<Vec<u8>> + Clone + Debug> TransactionWrite for Value<V> {
     fn bytes(&self) -> Option<&Bytes> {
         self.maybe_bytes.as_ref()
+    }
+
+    fn write_op_kind(&self) -> WriteOpKind {
+        unimplemented!("Irrelevant for the test")
     }
 
     fn from_state_value(_maybe_state_value: Option<StateValue>) -> Self {
@@ -74,6 +78,18 @@ impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
 
     fn as_state_value(&self) -> Option<StateValue> {
         unimplemented!("Irrelevant for the test")
+    }
+
+    fn set_bytes(&mut self, bytes: Bytes) {
+        self.maybe_bytes = Some(bytes);
+    }
+
+    fn convert_read_to_modification(&self) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        // If we have no bytes, no modification can be created.
+        self.maybe_bytes.as_ref().map(|_| self.clone())
     }
 }
 
@@ -211,7 +227,7 @@ where
 
     let baseline = Baseline::new(transactions.as_slice(), test_group);
     // Only testing data, provide executable type ().
-    let map = MVHashMap::<KeyType<K>, usize, Value<V>, ExecutableTestType>::new();
+    let map = MVHashMap::<KeyType<K>, usize, Value<V>, ExecutableTestType, ()>::new();
 
     // make ESTIMATE placeholders for all versions to be updated.
     // allows to test that correct values appear at the end of concurrent execution.
@@ -230,10 +246,10 @@ where
         let idx = idx as TxnIndex;
         if test_group {
             map.group_data()
-                .write(key.clone(), idx, 0, vec![(5, value)]);
+                .write(key.clone(), idx, 0, vec![(5, (value, None))]);
             map.group_data().mark_estimate(&key, idx);
         } else {
-            map.data().write(key.clone(), idx, 0, value);
+            map.data().write(key.clone(), idx, 0, (value, None));
             map.data().mark_estimate(&key, idx);
         }
     }
@@ -257,7 +273,11 @@ where
                         use MVDataOutput::*;
 
                         let baseline = baseline.get(key, idx as TxnIndex);
-                        let assert_value = |v: Arc<Value<V>>| match v.maybe_value.as_ref() {
+                        let assert_value = |v: ValueWithLayout<Value<V>>| match v
+                            .extract_value_no_layout()
+                            .maybe_value
+                            .as_ref()
+                        {
                             Some(w) => {
                                 assert_eq!(baseline, ExpectedOutput::Value(w.clone()), "{:?}", idx);
                             },
@@ -269,7 +289,7 @@ where
                         let mut retry_attempts = 0;
                         loop {
                             if test_group {
-                                match map.group_data().read_from_group(
+                                match map.group_data.fetch_tagged_data(
                                     &KeyType(key.clone()),
                                     &5,
                                     idx as TxnIndex,
@@ -335,9 +355,9 @@ where
                         let value = Value::new(None);
                         if test_group {
                             map.group_data()
-                                .write(key, idx as TxnIndex, 1, vec![(5, value)]);
+                                .write(key, idx as TxnIndex, 1, vec![(5, (value, None))]);
                         } else {
-                            map.data().write(key, idx as TxnIndex, 1, value);
+                            map.data().write(key, idx as TxnIndex, 1, (value, None));
                         }
                     },
                     Operator::Insert(v) => {
@@ -345,9 +365,9 @@ where
                         let value = Value::new(Some(v.clone()));
                         if test_group {
                             map.group_data()
-                                .write(key, idx as TxnIndex, 1, vec![(5, value)]);
+                                .write(key, idx as TxnIndex, 1, vec![(5, (value, None))]);
                         } else {
-                            map.data().write(key, idx as TxnIndex, 1, value);
+                            map.data().write(key, idx as TxnIndex, 1, (value, None));
                         }
                     },
                     Operator::Update(delta) => {
@@ -360,6 +380,7 @@ where
             })
         }
     });
+
     Ok(())
 }
 

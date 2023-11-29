@@ -45,8 +45,10 @@ Bünz
 CANCELLED
 CDH
 CDN
+Choco
 CLI
 CMake
+CoinFlipEvents
 CPU
 CPUs
 ChainID
@@ -77,6 +79,7 @@ DeleteRef
 Deref
 Destructuring
 Dev
+devs
 DevEx
 Devnet
 Diffie
@@ -124,6 +127,8 @@ EntryFunctionPayload
 Enums
 EpochChangeProof
 Ethereum
+EventHandle
+EventHandles
 ExtendRef
 ExternalMarkdown
 FA
@@ -150,6 +155,7 @@ GLTF
 GPU
 GPUs
 GRPC
+grpc
 GUID
 Gailly
 Garillot
@@ -238,12 +244,15 @@ Poelstra
 Pontem
 Postcondition
 Postgres
+postgresql
 PowerShell
 PropertyMap
 Prover
 PureEdDSA
 PyPi
 Quickstart
+ratelimits
+RawTransaction
 RBAC
 README
 READMEs
@@ -251,9 +260,9 @@ RESTful
 RIPEMD
 RPC
 RTT
-RawTransaction
 Recategorized
 Reusability
+Reproducibility
 Ristretto
 Romailler
 Ruleset
@@ -337,7 +346,6 @@ ZKRP
 Zxing
 accessors
 accountHasList
-acount
 addr
 ait
 allowfullscreen
@@ -381,6 +389,7 @@ cli
 clippy
 cn
 codebase
+composability
 composable
 config
 configs
@@ -392,6 +401,7 @@ cryptographically
 cryptosystem
 cryptosystems
 crytographic
+customizability
 customizable
 dApp
 dApps
@@ -597,6 +607,7 @@ subtype
 subtyping
 superset
 svg
+symlink
 synchronizer
 terraform
 testnet
@@ -655,3 +666,9 @@ yaml
 yamls
 zkSNARK
 zksnark
+observability
+Profiler
+profiler
+html
+Flamegraphs
+flamegraphs

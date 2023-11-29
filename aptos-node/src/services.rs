@@ -2,10 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{bootstrap_api, indexer, mpsc::Receiver, network::ApplicationNetworkInterfaces};
+use aptos_admin_service::AdminService;
 use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
-use aptos_consensus::network_interface::ConsensusMsg;
+use aptos_consensus::{
+    network_interface::ConsensusMsg, persistent_liveness_storage::StorageWriteProxy,
+    quorum_store::quorum_store_db::QuorumStoreDB,
+};
 use aptos_consensus_notifications::ConsensusNotifier;
+use aptos_data_client::client::AptosDataClient;
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_indexer_grpc_fullnode::runtime::bootstrap as bootstrap_indexer_grpc;
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
@@ -20,7 +25,7 @@ use aptos_peer_monitoring_service_server::{
 use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
 use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_time_service::TimeService;
-use aptos_types::chain_id::ChainId;
+use aptos_types::{chain_id::ChainId, system_txn::pool::SystemTransactionPoolClient};
 use futures::channel::{mpsc, mpsc::Sender};
 use std::{sync::Arc, time::Instant};
 use tokio::runtime::{Handle, Runtime};
@@ -84,9 +89,10 @@ pub fn start_consensus_runtime(
     consensus_network_interfaces: ApplicationNetworkInterfaces<ConsensusMsg>,
     consensus_notifier: ConsensusNotifier,
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
-) -> Runtime {
+    sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
+) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let instant = Instant::now();
-    let consensus_runtime = aptos_consensus::consensus_provider::start_consensus(
+    let consensus = aptos_consensus::consensus_provider::start_consensus(
         node_config,
         consensus_network_interfaces.network_client,
         consensus_network_interfaces.network_service_events,
@@ -95,9 +101,10 @@ pub fn start_consensus_runtime(
         db_rw,
         consensus_reconfig_subscription
             .expect("Consensus requires a reconfiguration subscription!"),
+        sys_txn_pool_client,
     );
     debug!("Consensus started in {} ms", instant.elapsed().as_millis());
-    consensus_runtime
+    consensus
 }
 
 /// Create the mempool runtime and start mempool
@@ -132,12 +139,22 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
     (mempool, consensus_to_mempool_sender)
 }
 
+/// Spawns a new thread for the admin service
+pub fn start_admin_service(node_config: &NodeConfig) -> AdminService {
+    AdminService::new(node_config)
+}
+
 /// Spawns a new thread for the node inspection service
 pub fn start_node_inspection_service(
     node_config: &NodeConfig,
+    aptos_data_client: AptosDataClient,
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) {
-    aptos_inspection_service::start_inspection_service(node_config.clone(), peers_and_metadata)
+    aptos_inspection_service::start_inspection_service(
+        node_config.clone(),
+        aptos_data_client,
+        peers_and_metadata,
+    )
 }
 
 /// Starts the peer monitoring service and returns the runtime

@@ -1,5 +1,5 @@
 
-<a name="0x1_delegation_pool"></a>
+<a id="0x1_delegation_pool"></a>
 
 # Module `0x1::delegation_pool`
 
@@ -121,21 +121,28 @@ transferred to A
 -  [Struct `VoteDelegation`](#0x1_delegation_pool_VoteDelegation)
 -  [Struct `DelegatedVotes`](#0x1_delegation_pool_DelegatedVotes)
 -  [Resource `GovernanceRecords`](#0x1_delegation_pool_GovernanceRecords)
+-  [Resource `BeneficiaryForOperator`](#0x1_delegation_pool_BeneficiaryForOperator)
+-  [Resource `NextCommissionPercentage`](#0x1_delegation_pool_NextCommissionPercentage)
 -  [Struct `AddStakeEvent`](#0x1_delegation_pool_AddStakeEvent)
 -  [Struct `ReactivateStakeEvent`](#0x1_delegation_pool_ReactivateStakeEvent)
 -  [Struct `UnlockStakeEvent`](#0x1_delegation_pool_UnlockStakeEvent)
 -  [Struct `WithdrawStakeEvent`](#0x1_delegation_pool_WithdrawStakeEvent)
 -  [Struct `DistributeCommissionEvent`](#0x1_delegation_pool_DistributeCommissionEvent)
+-  [Struct `DistributeCommission`](#0x1_delegation_pool_DistributeCommission)
 -  [Struct `VoteEvent`](#0x1_delegation_pool_VoteEvent)
 -  [Struct `CreateProposalEvent`](#0x1_delegation_pool_CreateProposalEvent)
 -  [Struct `DelegateVotingPowerEvent`](#0x1_delegation_pool_DelegateVotingPowerEvent)
+-  [Struct `SetBeneficiaryForOperator`](#0x1_delegation_pool_SetBeneficiaryForOperator)
+-  [Struct `CommissionPercentageChange`](#0x1_delegation_pool_CommissionPercentageChange)
 -  [Constants](#@Constants_0)
 -  [Function `owner_cap_exists`](#0x1_delegation_pool_owner_cap_exists)
 -  [Function `get_owned_pool_address`](#0x1_delegation_pool_get_owned_pool_address)
 -  [Function `delegation_pool_exists`](#0x1_delegation_pool_delegation_pool_exists)
 -  [Function `partial_governance_voting_enabled`](#0x1_delegation_pool_partial_governance_voting_enabled)
 -  [Function `observed_lockup_cycle`](#0x1_delegation_pool_observed_lockup_cycle)
+-  [Function `is_next_commission_percentage_effective`](#0x1_delegation_pool_is_next_commission_percentage_effective)
 -  [Function `operator_commission_percentage`](#0x1_delegation_pool_operator_commission_percentage)
+-  [Function `operator_commission_percentage_next_lockup_cycle`](#0x1_delegation_pool_operator_commission_percentage_next_lockup_cycle)
 -  [Function `shareholders_count_active_pool`](#0x1_delegation_pool_shareholders_count_active_pool)
 -  [Function `get_delegation_pool_stake`](#0x1_delegation_pool_get_delegation_pool_stake)
 -  [Function `get_pending_withdrawal`](#0x1_delegation_pool_get_pending_withdrawal)
@@ -146,7 +153,9 @@ transferred to A
 -  [Function `calculate_and_update_remaining_voting_power`](#0x1_delegation_pool_calculate_and_update_remaining_voting_power)
 -  [Function `calculate_and_update_delegator_voter`](#0x1_delegation_pool_calculate_and_update_delegator_voter)
 -  [Function `get_expected_stake_pool_address`](#0x1_delegation_pool_get_expected_stake_pool_address)
+-  [Function `min_remaining_secs_for_commission_change`](#0x1_delegation_pool_min_remaining_secs_for_commission_change)
 -  [Function `initialize_delegation_pool`](#0x1_delegation_pool_initialize_delegation_pool)
+-  [Function `beneficiary_for_operator`](#0x1_delegation_pool_beneficiary_for_operator)
 -  [Function `enable_partial_governance_voting`](#0x1_delegation_pool_enable_partial_governance_voting)
 -  [Function `vote`](#0x1_delegation_pool_vote)
 -  [Function `create_proposal`](#0x1_delegation_pool_create_proposal)
@@ -171,6 +180,8 @@ transferred to A
 -  [Function `calculate_and_update_delegator_voter_internal`](#0x1_delegation_pool_calculate_and_update_delegator_voter_internal)
 -  [Function `calculate_and_update_delegated_votes`](#0x1_delegation_pool_calculate_and_update_delegated_votes)
 -  [Function `set_operator`](#0x1_delegation_pool_set_operator)
+-  [Function `set_beneficiary_for_operator`](#0x1_delegation_pool_set_beneficiary_for_operator)
+-  [Function `update_commission_percentage`](#0x1_delegation_pool_update_commission_percentage)
 -  [Function `set_delegated_voter`](#0x1_delegation_pool_set_delegated_voter)
 -  [Function `delegate_voting_power`](#0x1_delegation_pool_delegate_voting_power)
 -  [Function `add_stake`](#0x1_delegation_pool_add_stake)
@@ -199,6 +210,7 @@ transferred to A
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
+<b>use</b> <a href="aptos_account.md#0x1_aptos_account">0x1::aptos_account</a>;
 <b>use</b> <a href="aptos_coin.md#0x1_aptos_coin">0x1::aptos_coin</a>;
 <b>use</b> <a href="aptos_governance.md#0x1_aptos_governance">0x1::aptos_governance</a>;
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
@@ -217,7 +229,7 @@ transferred to A
 
 
 
-<a name="0x1_delegation_pool_DelegationPoolOwnership"></a>
+<a id="0x1_delegation_pool_DelegationPoolOwnership"></a>
 
 ## Resource `DelegationPoolOwnership`
 
@@ -245,7 +257,7 @@ Capability that represents ownership over privileged operations on the underlyin
 
 </details>
 
-<a name="0x1_delegation_pool_ObservedLockupCycle"></a>
+<a id="0x1_delegation_pool_ObservedLockupCycle"></a>
 
 ## Struct `ObservedLockupCycle`
 
@@ -272,7 +284,7 @@ Capability that represents ownership over privileged operations on the underlyin
 
 </details>
 
-<a name="0x1_delegation_pool_DelegationPool"></a>
+<a id="0x1_delegation_pool_DelegationPool"></a>
 
 ## Resource `DelegationPool`
 
@@ -365,7 +377,7 @@ Capability that represents ownership over privileged operations on the underlyin
 
 </details>
 
-<a name="0x1_delegation_pool_VotingRecordKey"></a>
+<a id="0x1_delegation_pool_VotingRecordKey"></a>
 
 ## Struct `VotingRecordKey`
 
@@ -398,7 +410,7 @@ Capability that represents ownership over privileged operations on the underlyin
 
 </details>
 
-<a name="0x1_delegation_pool_VoteDelegation"></a>
+<a id="0x1_delegation_pool_VoteDelegation"></a>
 
 ## Struct `VoteDelegation`
 
@@ -438,7 +450,7 @@ Track delgated voter of each delegator.
 
 </details>
 
-<a name="0x1_delegation_pool_DelegatedVotes"></a>
+<a id="0x1_delegation_pool_DelegatedVotes"></a>
 
 ## Struct `DelegatedVotes`
 
@@ -484,7 +496,7 @@ Track total voteing power of each voter.
 
 </details>
 
-<a name="0x1_delegation_pool_GovernanceRecords"></a>
+<a id="0x1_delegation_pool_GovernanceRecords"></a>
 
 ## Resource `GovernanceRecords`
 
@@ -549,7 +561,67 @@ This struct should be stored in the delegation pool resource account.
 
 </details>
 
-<a name="0x1_delegation_pool_AddStakeEvent"></a>
+<a id="0x1_delegation_pool_BeneficiaryForOperator"></a>
+
+## Resource `BeneficiaryForOperator`
+
+
+
+<pre><code><b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>beneficiary_for_operator: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_delegation_pool_NextCommissionPercentage"></a>
+
+## Resource `NextCommissionPercentage`
+
+
+
+<pre><code><b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>commission_percentage_next_lockup_cycle: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>effective_after_secs: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_delegation_pool_AddStakeEvent"></a>
 
 ## Struct `AddStakeEvent`
 
@@ -594,7 +666,7 @@ This struct should be stored in the delegation pool resource account.
 
 </details>
 
-<a name="0x1_delegation_pool_ReactivateStakeEvent"></a>
+<a id="0x1_delegation_pool_ReactivateStakeEvent"></a>
 
 ## Struct `ReactivateStakeEvent`
 
@@ -633,7 +705,7 @@ This struct should be stored in the delegation pool resource account.
 
 </details>
 
-<a name="0x1_delegation_pool_UnlockStakeEvent"></a>
+<a id="0x1_delegation_pool_UnlockStakeEvent"></a>
 
 ## Struct `UnlockStakeEvent`
 
@@ -672,7 +744,7 @@ This struct should be stored in the delegation pool resource account.
 
 </details>
 
-<a name="0x1_delegation_pool_WithdrawStakeEvent"></a>
+<a id="0x1_delegation_pool_WithdrawStakeEvent"></a>
 
 ## Struct `WithdrawStakeEvent`
 
@@ -711,7 +783,7 @@ This struct should be stored in the delegation pool resource account.
 
 </details>
 
-<a name="0x1_delegation_pool_DistributeCommissionEvent"></a>
+<a id="0x1_delegation_pool_DistributeCommissionEvent"></a>
 
 ## Struct `DistributeCommissionEvent`
 
@@ -756,7 +828,59 @@ This struct should be stored in the delegation pool resource account.
 
 </details>
 
-<a name="0x1_delegation_pool_VoteEvent"></a>
+<a id="0x1_delegation_pool_DistributeCommission"></a>
+
+## Struct `DistributeCommission`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_DistributeCommission">DistributeCommission</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>pool_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>operator: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>beneficiary: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>commission_active: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>commission_pending_inactive: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_delegation_pool_VoteEvent"></a>
 
 ## Struct `VoteEvent`
 
@@ -807,7 +931,7 @@ This struct should be stored in the delegation pool resource account.
 
 </details>
 
-<a name="0x1_delegation_pool_CreateProposalEvent"></a>
+<a id="0x1_delegation_pool_CreateProposalEvent"></a>
 
 ## Struct `CreateProposalEvent`
 
@@ -846,7 +970,7 @@ This struct should be stored in the delegation pool resource account.
 
 </details>
 
-<a name="0x1_delegation_pool_DelegateVotingPowerEvent"></a>
+<a id="0x1_delegation_pool_DelegateVotingPowerEvent"></a>
 
 ## Struct `DelegateVotingPowerEvent`
 
@@ -885,12 +1009,92 @@ This struct should be stored in the delegation pool resource account.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="0x1_delegation_pool_SetBeneficiaryForOperator"></a>
+
+## Struct `SetBeneficiaryForOperator`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_SetBeneficiaryForOperator">SetBeneficiaryForOperator</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>operator: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>old_beneficiary: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>new_beneficiary: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_delegation_pool_CommissionPercentageChange"></a>
+
+## Struct `CommissionPercentageChange`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_CommissionPercentageChange">CommissionPercentageChange</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>pool_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>owner: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>commission_percentage_next_lockup_cycle: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_delegation_pool_MAX_U64"></a>
+<a id="0x1_delegation_pool_MAX_U64"></a>
 
 
 
@@ -899,7 +1103,7 @@ This struct should be stored in the delegation pool resource account.
 
 
 
-<a name="0x1_delegation_pool_EDEPRECATED_FUNCTION"></a>
+<a id="0x1_delegation_pool_EDEPRECATED_FUNCTION"></a>
 
 Function is deprecated.
 
@@ -909,7 +1113,7 @@ Function is deprecated.
 
 
 
-<a name="0x1_delegation_pool_EDISABLED_FUNCTION"></a>
+<a id="0x1_delegation_pool_EDISABLED_FUNCTION"></a>
 
 The function is disabled or hasn't been enabled.
 
@@ -919,7 +1123,17 @@ The function is disabled or hasn't been enabled.
 
 
 
-<a name="0x1_delegation_pool_EOWNER_CAP_ALREADY_EXISTS"></a>
+<a id="0x1_delegation_pool_ENOT_OPERATOR"></a>
+
+The account is not the operator of the stake pool.
+
+
+<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_ENOT_OPERATOR">ENOT_OPERATOR</a>: u64 = 18;
+</code></pre>
+
+
+
+<a id="0x1_delegation_pool_EOWNER_CAP_ALREADY_EXISTS"></a>
 
 Account is already owning a delegation pool.
 
@@ -929,7 +1143,7 @@ Account is already owning a delegation pool.
 
 
 
-<a name="0x1_delegation_pool_EOWNER_CAP_NOT_FOUND"></a>
+<a id="0x1_delegation_pool_EOWNER_CAP_NOT_FOUND"></a>
 
 Delegation pool owner capability does not exist at the provided account.
 
@@ -939,7 +1153,7 @@ Delegation pool owner capability does not exist at the provided account.
 
 
 
-<a name="0x1_delegation_pool_VALIDATOR_STATUS_INACTIVE"></a>
+<a id="0x1_delegation_pool_VALIDATOR_STATUS_INACTIVE"></a>
 
 
 
@@ -948,7 +1162,7 @@ Delegation pool owner capability does not exist at the provided account.
 
 
 
-<a name="0x1_delegation_pool_EINSUFFICIENT_PROPOSER_STAKE"></a>
+<a id="0x1_delegation_pool_EINSUFFICIENT_PROPOSER_STAKE"></a>
 
 The voter does not have sufficient stake to create a proposal.
 
@@ -958,7 +1172,7 @@ The voter does not have sufficient stake to create a proposal.
 
 
 
-<a name="0x1_delegation_pool_ENO_VOTING_POWER"></a>
+<a id="0x1_delegation_pool_ENO_VOTING_POWER"></a>
 
 The voter does not have any voting power on this proposal.
 
@@ -968,7 +1182,7 @@ The voter does not have any voting power on this proposal.
 
 
 
-<a name="0x1_delegation_pool_EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING"></a>
+<a id="0x1_delegation_pool_EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING"></a>
 
 The stake pool has already voted on the proposal before enabling partial governance voting on this delegation pool.
 
@@ -978,7 +1192,17 @@ The stake pool has already voted on the proposal before enabling partial governa
 
 
 
-<a name="0x1_delegation_pool_EDELEGATION_POOLS_DISABLED"></a>
+<a id="0x1_delegation_pool_ECOMMISSION_RATE_CHANGE_NOT_SUPPORTED"></a>
+
+Changing operator commission rate in delegation pool is not supported.
+
+
+<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_ECOMMISSION_RATE_CHANGE_NOT_SUPPORTED">ECOMMISSION_RATE_CHANGE_NOT_SUPPORTED</a>: u64 = 22;
+</code></pre>
+
+
+
+<a id="0x1_delegation_pool_EDELEGATION_POOLS_DISABLED"></a>
 
 Creating delegation pools is not enabled yet.
 
@@ -988,7 +1212,7 @@ Creating delegation pools is not enabled yet.
 
 
 
-<a name="0x1_delegation_pool_EDELEGATION_POOL_DOES_NOT_EXIST"></a>
+<a id="0x1_delegation_pool_EDELEGATION_POOL_DOES_NOT_EXIST"></a>
 
 Delegation pool does not exist at the provided pool address.
 
@@ -998,7 +1222,7 @@ Delegation pool does not exist at the provided pool address.
 
 
 
-<a name="0x1_delegation_pool_EDELEGATOR_ACTIVE_BALANCE_TOO_LOW"></a>
+<a id="0x1_delegation_pool_EDELEGATOR_ACTIVE_BALANCE_TOO_LOW"></a>
 
 Delegator's active balance cannot be less than <code><a href="delegation_pool.md#0x1_delegation_pool_MIN_COINS_ON_SHARES_POOL">MIN_COINS_ON_SHARES_POOL</a></code>.
 
@@ -1008,7 +1232,7 @@ Delegator's active balance cannot be less than <code><a href="delegation_pool.md
 
 
 
-<a name="0x1_delegation_pool_EDELEGATOR_PENDING_INACTIVE_BALANCE_TOO_LOW"></a>
+<a id="0x1_delegation_pool_EDELEGATOR_PENDING_INACTIVE_BALANCE_TOO_LOW"></a>
 
 Delegator's pending_inactive balance cannot be less than <code><a href="delegation_pool.md#0x1_delegation_pool_MIN_COINS_ON_SHARES_POOL">MIN_COINS_ON_SHARES_POOL</a></code>.
 
@@ -1018,7 +1242,7 @@ Delegator's pending_inactive balance cannot be less than <code><a href="delegati
 
 
 
-<a name="0x1_delegation_pool_EINVALID_COMMISSION_PERCENTAGE"></a>
+<a id="0x1_delegation_pool_EINVALID_COMMISSION_PERCENTAGE"></a>
 
 Commission percentage has to be between 0 and <code><a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a></code> - 100%.
 
@@ -1028,7 +1252,7 @@ Commission percentage has to be between 0 and <code><a href="delegation_pool.md#
 
 
 
-<a name="0x1_delegation_pool_ENOT_ENOUGH_ACTIVE_STAKE_TO_UNLOCK"></a>
+<a id="0x1_delegation_pool_ENOT_ENOUGH_ACTIVE_STAKE_TO_UNLOCK"></a>
 
 There is not enough <code>active</code> stake on the stake pool to <code>unlock</code>.
 
@@ -1038,7 +1262,17 @@ There is not enough <code>active</code> stake on the stake pool to <code>unlock<
 
 
 
-<a name="0x1_delegation_pool_EPARTIAL_GOVERNANCE_VOTING_NOT_ENABLED"></a>
+<a id="0x1_delegation_pool_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED"></a>
+
+Chaning beneficiaries for operators is not supported.
+
+
+<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED">EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED</a>: u64 = 19;
+</code></pre>
+
+
+
+<a id="0x1_delegation_pool_EPARTIAL_GOVERNANCE_VOTING_NOT_ENABLED"></a>
 
 Partial governance voting hasn't been enabled on this delegation pool.
 
@@ -1048,7 +1282,7 @@ Partial governance voting hasn't been enabled on this delegation pool.
 
 
 
-<a name="0x1_delegation_pool_EPENDING_WITHDRAWAL_EXISTS"></a>
+<a id="0x1_delegation_pool_EPENDING_WITHDRAWAL_EXISTS"></a>
 
 There is a pending withdrawal to be executed before <code>unlock</code>ing any new stake.
 
@@ -1058,7 +1292,7 @@ There is a pending withdrawal to be executed before <code>unlock</code>ing any n
 
 
 
-<a name="0x1_delegation_pool_ESLASHED_INACTIVE_STAKE_ON_PAST_OLC"></a>
+<a id="0x1_delegation_pool_ESLASHED_INACTIVE_STAKE_ON_PAST_OLC"></a>
 
 Slashing (if implemented) should not be applied to already <code>inactive</code> stake.
 Not only it invalidates the accounting of past observed lockup cycles (OLC),
@@ -1071,7 +1305,27 @@ Additionally, the inactive stake does not count on the voting power of validator
 
 
 
-<a name="0x1_delegation_pool_EWITHDRAW_ZERO_STAKE"></a>
+<a id="0x1_delegation_pool_ETOO_LARGE_COMMISSION_INCREASE"></a>
+
+Commission percentage increase is too large.
+
+
+<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_ETOO_LARGE_COMMISSION_INCREASE">ETOO_LARGE_COMMISSION_INCREASE</a>: u64 = 20;
+</code></pre>
+
+
+
+<a id="0x1_delegation_pool_ETOO_LATE_COMMISSION_CHANGE"></a>
+
+Commission percentage change is too late in this lockup period, and should be done at least a quarter (1/4) of the lockup duration before the lockup cycle ends.
+
+
+<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_ETOO_LATE_COMMISSION_CHANGE">ETOO_LATE_COMMISSION_CHANGE</a>: u64 = 21;
+</code></pre>
+
+
+
+<a id="0x1_delegation_pool_EWITHDRAW_ZERO_STAKE"></a>
 
 Cannot request to withdraw zero stake.
 
@@ -1081,7 +1335,17 @@ Cannot request to withdraw zero stake.
 
 
 
-<a name="0x1_delegation_pool_MAX_FEE"></a>
+<a id="0x1_delegation_pool_MAX_COMMISSION_INCREASE"></a>
+
+Maximum commission percentage increase per lockup cycle. 10% is represented as 1000.
+
+
+<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_MAX_COMMISSION_INCREASE">MAX_COMMISSION_INCREASE</a>: u64 = 1000;
+</code></pre>
+
+
+
+<a id="0x1_delegation_pool_MAX_FEE"></a>
 
 Maximum operator percentage fee(of double digit precision): 22.85% is represented as 2285
 
@@ -1091,7 +1355,7 @@ Maximum operator percentage fee(of double digit precision): 22.85% is represente
 
 
 
-<a name="0x1_delegation_pool_MIN_COINS_ON_SHARES_POOL"></a>
+<a id="0x1_delegation_pool_MIN_COINS_ON_SHARES_POOL"></a>
 
 Minimum coins to exist on a shares pool at all times.
 Enforced per delegator for both active and pending_inactive pools.
@@ -1107,7 +1371,7 @@ This constraint is not enforced on inactive pools as they only allow redeems
 
 
 
-<a name="0x1_delegation_pool_MODULE_SALT"></a>
+<a id="0x1_delegation_pool_MODULE_SALT"></a>
 
 
 
@@ -1116,7 +1380,7 @@ This constraint is not enforced on inactive pools as they only allow redeems
 
 
 
-<a name="0x1_delegation_pool_NULL_SHAREHOLDER"></a>
+<a id="0x1_delegation_pool_NULL_SHAREHOLDER"></a>
 
 Special shareholder temporarily owning the <code>add_stake</code> fees charged during this epoch.
 On each <code>add_stake</code> operation any resulted fee is used to buy active shares for this shareholder.
@@ -1128,7 +1392,7 @@ First synchronization after this epoch ends will distribute accumulated fees to 
 
 
 
-<a name="0x1_delegation_pool_SHARES_SCALING_FACTOR"></a>
+<a id="0x1_delegation_pool_SHARES_SCALING_FACTOR"></a>
 
 Scaling factor of shares pools used within the delegation pool
 
@@ -1138,7 +1402,7 @@ Scaling factor of shares pools used within the delegation pool
 
 
 
-<a name="0x1_delegation_pool_owner_cap_exists"></a>
+<a id="0x1_delegation_pool_owner_cap_exists"></a>
 
 ## Function `owner_cap_exists`
 
@@ -1164,7 +1428,7 @@ Return whether supplied address <code>addr</code> is owner of a delegation pool.
 
 </details>
 
-<a name="0x1_delegation_pool_get_owned_pool_address"></a>
+<a id="0x1_delegation_pool_get_owned_pool_address"></a>
 
 ## Function `get_owned_pool_address`
 
@@ -1191,7 +1455,7 @@ Return address of the delegation pool owned by <code>owner</code> or fail if the
 
 </details>
 
-<a name="0x1_delegation_pool_delegation_pool_exists"></a>
+<a id="0x1_delegation_pool_delegation_pool_exists"></a>
 
 ## Function `delegation_pool_exists`
 
@@ -1217,7 +1481,7 @@ Return whether a delegation pool exists at supplied address <code>addr</code>.
 
 </details>
 
-<a name="0x1_delegation_pool_partial_governance_voting_enabled"></a>
+<a id="0x1_delegation_pool_partial_governance_voting_enabled"></a>
 
 ## Function `partial_governance_voting_enabled`
 
@@ -1243,7 +1507,7 @@ Return whether a delegation pool has already enabled partial govnernance voting.
 
 </details>
 
-<a name="0x1_delegation_pool_observed_lockup_cycle"></a>
+<a id="0x1_delegation_pool_observed_lockup_cycle"></a>
 
 ## Function `observed_lockup_cycle`
 
@@ -1270,7 +1534,34 @@ Return the index of current observed lockup cycle on delegation pool <code>pool_
 
 </details>
 
-<a name="0x1_delegation_pool_operator_commission_percentage"></a>
+<a id="0x1_delegation_pool_is_next_commission_percentage_effective"></a>
+
+## Function `is_next_commission_percentage_effective`
+
+Return whether the commission percentage for the next lockup cycle is effective.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_is_next_commission_percentage_effective">is_next_commission_percentage_effective</a>(pool_address: <b>address</b>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_is_next_commission_percentage_effective">is_next_commission_percentage_effective</a>(pool_address: <b>address</b>): bool <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
+    <b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a>&gt;(pool_address) &&
+        <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt;= <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a>&gt;(pool_address).effective_after_secs
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_operator_commission_percentage"></a>
 
 ## Function `operator_commission_percentage`
 
@@ -1287,9 +1578,13 @@ Return the operator commission percentage set on the delegation pool <code>pool_
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_operator_commission_percentage">operator_commission_percentage</a>(pool_address: <b>address</b>): u64 <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_operator_commission_percentage">operator_commission_percentage</a>(pool_address: <b>address</b>): u64 <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     <a href="delegation_pool.md#0x1_delegation_pool_assert_delegation_pool_exists">assert_delegation_pool_exists</a>(pool_address);
-    <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address).operator_commission_percentage
+    <b>if</b> (<a href="delegation_pool.md#0x1_delegation_pool_is_next_commission_percentage_effective">is_next_commission_percentage_effective</a>(pool_address)) {
+        <a href="delegation_pool.md#0x1_delegation_pool_operator_commission_percentage_next_lockup_cycle">operator_commission_percentage_next_lockup_cycle</a>(pool_address)
+    } <b>else</b> {
+        <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address).operator_commission_percentage
+    }
 }
 </code></pre>
 
@@ -1297,7 +1592,38 @@ Return the operator commission percentage set on the delegation pool <code>pool_
 
 </details>
 
-<a name="0x1_delegation_pool_shareholders_count_active_pool"></a>
+<a id="0x1_delegation_pool_operator_commission_percentage_next_lockup_cycle"></a>
+
+## Function `operator_commission_percentage_next_lockup_cycle`
+
+Return the operator commission percentage for the next lockup cycle.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_operator_commission_percentage_next_lockup_cycle">operator_commission_percentage_next_lockup_cycle</a>(pool_address: <b>address</b>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_operator_commission_percentage_next_lockup_cycle">operator_commission_percentage_next_lockup_cycle</a>(pool_address: <b>address</b>): u64 <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
+    <a href="delegation_pool.md#0x1_delegation_pool_assert_delegation_pool_exists">assert_delegation_pool_exists</a>(pool_address);
+    <b>if</b> (<b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a>&gt;(pool_address)) {
+        <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a>&gt;(pool_address).commission_percentage_next_lockup_cycle
+    } <b>else</b> {
+        <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address).operator_commission_percentage
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_shareholders_count_active_pool"></a>
 
 ## Function `shareholders_count_active_pool`
 
@@ -1324,7 +1650,7 @@ Return the number of delegators owning active stake within <code>pool_address</c
 
 </details>
 
-<a name="0x1_delegation_pool_get_delegation_pool_stake"></a>
+<a id="0x1_delegation_pool_get_delegation_pool_stake"></a>
 
 ## Function `get_delegation_pool_stake`
 
@@ -1352,7 +1678,7 @@ Return the stake amounts on <code>pool_address</code> in the different states:
 
 </details>
 
-<a name="0x1_delegation_pool_get_pending_withdrawal"></a>
+<a id="0x1_delegation_pool_get_pending_withdrawal"></a>
 
 ## Function `get_pending_withdrawal`
 
@@ -1412,7 +1738,7 @@ some stake and the stake pool's lockup cycle has not ended, their coins are not 
 
 </details>
 
-<a name="0x1_delegation_pool_get_stake"></a>
+<a id="0x1_delegation_pool_get_stake"></a>
 
 ## Function `get_stake`
 
@@ -1430,7 +1756,7 @@ in each of its individual states: (<code>active</code>,<code>inactive</code>,<co
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_stake">get_stake</a>(pool_address: <b>address</b>, delegator_address: <b>address</b>): (u64, u64, u64) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_stake">get_stake</a>(pool_address: <b>address</b>, delegator_address: <b>address</b>): (u64, u64, u64) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a> {
     <a href="delegation_pool.md#0x1_delegation_pool_assert_delegation_pool_exists">assert_delegation_pool_exists</a>(pool_address);
     <b>let</b> pool = <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
     <b>let</b> (
@@ -1470,7 +1796,7 @@ in each of its individual states: (<code>active</code>,<code>inactive</code>,<co
     // operator rewards are actually used <b>to</b> buy shares which is introducing
     // some imprecision (received <a href="stake.md#0x1_stake">stake</a> would be slightly less)
     // but adding rewards onto the existing <a href="stake.md#0x1_stake">stake</a> is still a good approximation
-    <b>if</b> (delegator_address == <a href="stake.md#0x1_stake_get_operator">stake::get_operator</a>(pool_address)) {
+    <b>if</b> (delegator_address == <a href="delegation_pool.md#0x1_delegation_pool_beneficiary_for_operator">beneficiary_for_operator</a>(get_operator(pool_address))) {
         active = active + commission_active;
         // in-flight pending_inactive commission can coexist <b>with</b> already inactive withdrawal
         <b>if</b> (lockup_cycle_ended) {
@@ -1488,7 +1814,7 @@ in each of its individual states: (<code>active</code>,<code>inactive</code>,<co
 
 </details>
 
-<a name="0x1_delegation_pool_get_add_stake_fee"></a>
+<a id="0x1_delegation_pool_get_add_stake_fee"></a>
 
 ## Function `get_add_stake_fee`
 
@@ -1531,7 +1857,7 @@ extracted-fee = (amount - extracted-fee) * reward-rate% * (100% - operator-commi
 
 </details>
 
-<a name="0x1_delegation_pool_can_withdraw_pending_inactive"></a>
+<a id="0x1_delegation_pool_can_withdraw_pending_inactive"></a>
 
 ## Function `can_withdraw_pending_inactive`
 
@@ -1560,7 +1886,7 @@ the validator had gone inactive before its lockup expired.
 
 </details>
 
-<a name="0x1_delegation_pool_calculate_and_update_voter_total_voting_power"></a>
+<a id="0x1_delegation_pool_calculate_and_update_voter_total_voting_power"></a>
 
 ## Function `calculate_and_update_voter_total_voting_power`
 
@@ -1578,7 +1904,7 @@ latest state.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_voter_total_voting_power">calculate_and_update_voter_total_voting_power</a>(pool_address: <b>address</b>, voter: <b>address</b>): u64 <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_voter_total_voting_power">calculate_and_update_voter_total_voting_power</a>(pool_address: <b>address</b>, voter: <b>address</b>): u64 <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     <a href="delegation_pool.md#0x1_delegation_pool_assert_partial_governance_voting_enabled">assert_partial_governance_voting_enabled</a>(pool_address);
     // Delegation pool need <b>to</b> be synced <b>to</b> explain rewards(which could change the <a href="coin.md#0x1_coin">coin</a> amount) and
     // commission(which could cause share transfer).
@@ -1594,7 +1920,7 @@ latest state.
 
 </details>
 
-<a name="0x1_delegation_pool_calculate_and_update_remaining_voting_power"></a>
+<a id="0x1_delegation_pool_calculate_and_update_remaining_voting_power"></a>
 
 ## Function `calculate_and_update_remaining_voting_power`
 
@@ -1612,7 +1938,7 @@ latest state.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_remaining_voting_power">calculate_and_update_remaining_voting_power</a>(pool_address: <b>address</b>, voter_address: <b>address</b>, proposal_id: u64): u64 <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_remaining_voting_power">calculate_and_update_remaining_voting_power</a>(pool_address: <b>address</b>, voter_address: <b>address</b>, proposal_id: u64): u64 <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     <a href="delegation_pool.md#0x1_delegation_pool_assert_partial_governance_voting_enabled">assert_partial_governance_voting_enabled</a>(pool_address);
     // If the whole <a href="stake.md#0x1_stake">stake</a> pool <b>has</b> no <a href="voting.md#0x1_voting">voting</a> power(e.g. it <b>has</b> already voted before partial
     // governance <a href="voting.md#0x1_voting">voting</a> flag is enabled), the delegator also <b>has</b> no <a href="voting.md#0x1_voting">voting</a> power.
@@ -1630,7 +1956,7 @@ latest state.
 
 </details>
 
-<a name="0x1_delegation_pool_calculate_and_update_delegator_voter"></a>
+<a id="0x1_delegation_pool_calculate_and_update_delegator_voter"></a>
 
 ## Function `calculate_and_update_delegator_voter`
 
@@ -1662,7 +1988,7 @@ latest state.
 
 </details>
 
-<a name="0x1_delegation_pool_get_expected_stake_pool_address"></a>
+<a id="0x1_delegation_pool_get_expected_stake_pool_address"></a>
 
 ## Function `get_expected_stake_pool_address`
 
@@ -1690,7 +2016,34 @@ Return the address of the stake pool to be created with the provided owner, and 
 
 </details>
 
-<a name="0x1_delegation_pool_initialize_delegation_pool"></a>
+<a id="0x1_delegation_pool_min_remaining_secs_for_commission_change"></a>
+
+## Function `min_remaining_secs_for_commission_change`
+
+Return the minimum remaining time in seconds for commission change, which is one fourth of the lockup duration.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_min_remaining_secs_for_commission_change">min_remaining_secs_for_commission_change</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_min_remaining_secs_for_commission_change">min_remaining_secs_for_commission_change</a>(): u64 {
+    <b>let</b> config = <a href="staking_config.md#0x1_staking_config_get">staking_config::get</a>();
+    <a href="staking_config.md#0x1_staking_config_get_recurring_lockup_duration">staking_config::get_recurring_lockup_duration</a>(&config) / 4
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_initialize_delegation_pool"></a>
 
 ## Function `initialize_delegation_pool`
 
@@ -1713,7 +2066,7 @@ Ownership over setting the operator/voter is granted to <code>owner</code> who h
     owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     operator_commission_percentage: u64,
     delegation_pool_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_delegation_pools_enabled">features::delegation_pools_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="delegation_pool.md#0x1_delegation_pool_EDELEGATION_POOLS_DISABLED">EDELEGATION_POOLS_DISABLED</a>));
     <b>let</b> owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
     <b>assert</b>!(!<a href="delegation_pool.md#0x1_delegation_pool_owner_cap_exists">owner_cap_exists</a>(owner_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="delegation_pool.md#0x1_delegation_pool_EOWNER_CAP_ALREADY_EXISTS">EOWNER_CAP_ALREADY_EXISTS</a>));
@@ -1765,7 +2118,37 @@ Ownership over setting the operator/voter is granted to <code>owner</code> who h
 
 </details>
 
-<a name="0x1_delegation_pool_enable_partial_governance_voting"></a>
+<a id="0x1_delegation_pool_beneficiary_for_operator"></a>
+
+## Function `beneficiary_for_operator`
+
+Return the beneficiary address of the operator.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_beneficiary_for_operator">beneficiary_for_operator</a>(operator: <b>address</b>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_beneficiary_for_operator">beneficiary_for_operator</a>(operator: <b>address</b>): <b>address</b> <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a> {
+    <b>if</b> (<b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>&gt;(operator)) {
+        <b>return</b> <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>&gt;(operator).beneficiary_for_operator
+    } <b>else</b> {
+        operator
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_enable_partial_governance_voting"></a>
 
 ## Function `enable_partial_governance_voting`
 
@@ -1784,7 +2167,7 @@ THe existing voter will be replaced. The function is permissionless.
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_enable_partial_governance_voting">enable_partial_governance_voting</a>(
     pool_address: <b>address</b>,
-) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_partial_governance_voting_enabled">features::partial_governance_voting_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="delegation_pool.md#0x1_delegation_pool_EDISABLED_FUNCTION">EDISABLED_FUNCTION</a>));
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_delegation_pool_partial_governance_voting_enabled">features::delegation_pool_partial_governance_voting_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="delegation_pool.md#0x1_delegation_pool_EDISABLED_FUNCTION">EDISABLED_FUNCTION</a>));
     <a href="delegation_pool.md#0x1_delegation_pool_assert_delegation_pool_exists">assert_delegation_pool_exists</a>(pool_address);
@@ -1813,7 +2196,7 @@ THe existing voter will be replaced. The function is permissionless.
 
 </details>
 
-<a name="0x1_delegation_pool_vote"></a>
+<a id="0x1_delegation_pool_vote"></a>
 
 ## Function `vote`
 
@@ -1833,7 +2216,7 @@ Vote on a proposal with a voter's voting power. To successfully vote, the follow
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_vote">vote</a>(voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, proposal_id: u64, voting_power: u64, should_pass: bool) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_vote">vote</a>(voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, proposal_id: u64, voting_power: u64, should_pass: bool) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     <a href="delegation_pool.md#0x1_delegation_pool_assert_partial_governance_voting_enabled">assert_partial_governance_voting_enabled</a>(pool_address);
     // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation.
     <a href="delegation_pool.md#0x1_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address);
@@ -1871,7 +2254,7 @@ Vote on a proposal with a voter's voting power. To successfully vote, the follow
 
 </details>
 
-<a name="0x1_delegation_pool_create_proposal"></a>
+<a id="0x1_delegation_pool_create_proposal"></a>
 
 ## Function `create_proposal`
 
@@ -1896,7 +2279,7 @@ voting power in THIS delegation pool must be not less than the minimum required 
     metadata_location: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     metadata_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     is_multi_step_proposal: bool,
-) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     <a href="delegation_pool.md#0x1_delegation_pool_assert_partial_governance_voting_enabled">assert_partial_governance_voting_enabled</a>(pool_address);
 
     // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation
@@ -1935,7 +2318,7 @@ voting power in THIS delegation pool must be not less than the minimum required 
 
 </details>
 
-<a name="0x1_delegation_pool_assert_owner_cap_exists"></a>
+<a id="0x1_delegation_pool_assert_owner_cap_exists"></a>
 
 ## Function `assert_owner_cap_exists`
 
@@ -1959,7 +2342,7 @@ voting power in THIS delegation pool must be not less than the minimum required 
 
 </details>
 
-<a name="0x1_delegation_pool_assert_delegation_pool_exists"></a>
+<a id="0x1_delegation_pool_assert_delegation_pool_exists"></a>
 
 ## Function `assert_delegation_pool_exists`
 
@@ -1983,7 +2366,7 @@ voting power in THIS delegation pool must be not less than the minimum required 
 
 </details>
 
-<a name="0x1_delegation_pool_assert_min_active_balance"></a>
+<a id="0x1_delegation_pool_assert_min_active_balance"></a>
 
 ## Function `assert_min_active_balance`
 
@@ -2008,7 +2391,7 @@ voting power in THIS delegation pool must be not less than the minimum required 
 
 </details>
 
-<a name="0x1_delegation_pool_assert_min_pending_inactive_balance"></a>
+<a id="0x1_delegation_pool_assert_min_pending_inactive_balance"></a>
 
 ## Function `assert_min_pending_inactive_balance`
 
@@ -2036,7 +2419,7 @@ voting power in THIS delegation pool must be not less than the minimum required 
 
 </details>
 
-<a name="0x1_delegation_pool_assert_partial_governance_voting_enabled"></a>
+<a id="0x1_delegation_pool_assert_partial_governance_voting_enabled"></a>
 
 ## Function `assert_partial_governance_voting_enabled`
 
@@ -2061,7 +2444,7 @@ voting power in THIS delegation pool must be not less than the minimum required 
 
 </details>
 
-<a name="0x1_delegation_pool_coins_to_redeem_to_ensure_min_stake"></a>
+<a id="0x1_delegation_pool_coins_to_redeem_to_ensure_min_stake"></a>
 
 ## Function `coins_to_redeem_to_ensure_min_stake`
 
@@ -2099,7 +2482,7 @@ voting power in THIS delegation pool must be not less than the minimum required 
 
 </details>
 
-<a name="0x1_delegation_pool_coins_to_transfer_to_ensure_min_stake"></a>
+<a id="0x1_delegation_pool_coins_to_transfer_to_ensure_min_stake"></a>
 
 ## Function `coins_to_transfer_to_ensure_min_stake`
 
@@ -2140,7 +2523,7 @@ voting power in THIS delegation pool must be not less than the minimum required 
 
 </details>
 
-<a name="0x1_delegation_pool_retrieve_stake_pool_owner"></a>
+<a id="0x1_delegation_pool_retrieve_stake_pool_owner"></a>
 
 ## Function `retrieve_stake_pool_owner`
 
@@ -2166,7 +2549,7 @@ to forward a stake-management operation to this underlying pool.
 
 </details>
 
-<a name="0x1_delegation_pool_get_pool_address"></a>
+<a id="0x1_delegation_pool_get_pool_address"></a>
 
 ## Function `get_pool_address`
 
@@ -2191,7 +2574,7 @@ Get the address of delegation pool reference <code>pool</code>.
 
 </details>
 
-<a name="0x1_delegation_pool_get_delegator_active_shares"></a>
+<a id="0x1_delegation_pool_get_delegator_active_shares"></a>
 
 ## Function `get_delegator_active_shares`
 
@@ -2216,7 +2599,7 @@ Get the active share amount of the delegator.
 
 </details>
 
-<a name="0x1_delegation_pool_get_delegator_pending_inactive_shares"></a>
+<a id="0x1_delegation_pool_get_delegator_pending_inactive_shares"></a>
 
 ## Function `get_delegator_pending_inactive_shares`
 
@@ -2241,7 +2624,7 @@ Get the pending inactive share amount of the delegator.
 
 </details>
 
-<a name="0x1_delegation_pool_get_used_voting_power"></a>
+<a id="0x1_delegation_pool_get_used_voting_power"></a>
 
 ## Function `get_used_voting_power`
 
@@ -2271,7 +2654,7 @@ Get the used voting power of a voter on a proposal.
 
 </details>
 
-<a name="0x1_delegation_pool_create_resource_account_seed"></a>
+<a id="0x1_delegation_pool_create_resource_account_seed"></a>
 
 ## Function `create_resource_account_seed`
 
@@ -2303,7 +2686,7 @@ Create the seed to derive the resource account address.
 
 </details>
 
-<a name="0x1_delegation_pool_borrow_mut_used_voting_power"></a>
+<a id="0x1_delegation_pool_borrow_mut_used_voting_power"></a>
 
 ## Function `borrow_mut_used_voting_power`
 
@@ -2333,7 +2716,7 @@ Borrow the mutable used voting power of a voter on a proposal.
 
 </details>
 
-<a name="0x1_delegation_pool_update_and_borrow_mut_delegator_vote_delegation"></a>
+<a id="0x1_delegation_pool_update_and_borrow_mut_delegator_vote_delegation"></a>
 
 ## Function `update_and_borrow_mut_delegator_vote_delegation`
 
@@ -2382,7 +2765,7 @@ Update VoteDelegation of a delegator to up-to-date then borrow_mut it.
 
 </details>
 
-<a name="0x1_delegation_pool_update_and_borrow_mut_delegated_votes"></a>
+<a id="0x1_delegation_pool_update_and_borrow_mut_delegated_votes"></a>
 
 ## Function `update_and_borrow_mut_delegated_votes`
 
@@ -2435,7 +2818,7 @@ Update DelegatedVotes of a voter to up-to-date then borrow_mut it.
 
 </details>
 
-<a name="0x1_delegation_pool_olc_with_index"></a>
+<a id="0x1_delegation_pool_olc_with_index"></a>
 
 ## Function `olc_with_index`
 
@@ -2459,7 +2842,7 @@ Update DelegatedVotes of a voter to up-to-date then borrow_mut it.
 
 </details>
 
-<a name="0x1_delegation_pool_calculate_total_voting_power"></a>
+<a id="0x1_delegation_pool_calculate_total_voting_power"></a>
 
 ## Function `calculate_total_voting_power`
 
@@ -2491,7 +2874,7 @@ power, which equals to the sum of the coin amounts.
 
 </details>
 
-<a name="0x1_delegation_pool_calculate_and_update_delegator_voter_internal"></a>
+<a id="0x1_delegation_pool_calculate_and_update_delegator_voter_internal"></a>
 
 ## Function `calculate_and_update_delegator_voter_internal`
 
@@ -2517,7 +2900,7 @@ Update VoteDelegation of a delegator to up-to-date then return the latest voter.
 
 </details>
 
-<a name="0x1_delegation_pool_calculate_and_update_delegated_votes"></a>
+<a id="0x1_delegation_pool_calculate_and_update_delegated_votes"></a>
 
 ## Function `calculate_and_update_delegated_votes`
 
@@ -2543,7 +2926,7 @@ Update DelegatedVotes of a voter to up-to-date then return the total voting powe
 
 </details>
 
-<a name="0x1_delegation_pool_set_operator"></a>
+<a id="0x1_delegation_pool_set_operator"></a>
 
 ## Function `set_operator`
 
@@ -2562,7 +2945,7 @@ Allows an owner to change the operator of the underlying stake pool.
 <pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_set_operator">set_operator</a>(
     owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     new_operator: <b>address</b>
-) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     <b>let</b> pool_address = <a href="delegation_pool.md#0x1_delegation_pool_get_owned_pool_address">get_owned_pool_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner));
     // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation
     // ensure the <b>old</b> operator is paid its uncommitted commission rewards
@@ -2575,7 +2958,117 @@ Allows an owner to change the operator of the underlying stake pool.
 
 </details>
 
-<a name="0x1_delegation_pool_set_delegated_voter"></a>
+<a id="0x1_delegation_pool_set_beneficiary_for_operator"></a>
+
+## Function `set_beneficiary_for_operator`
+
+Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
+beneficiary. To ensures payment to the current beneficiary, one should first call <code>synchronize_delegation_pool</code>
+before switching the beneficiary. An operator can set one beneficiary for delegation pools, not a separate
+one for each pool.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_set_beneficiary_for_operator">set_beneficiary_for_operator</a>(operator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_beneficiary: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_set_beneficiary_for_operator">set_beneficiary_for_operator</a>(operator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_beneficiary: <b>address</b>) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a> {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operator_beneficiary_change_enabled">features::operator_beneficiary_change_enabled</a>(), std::error::invalid_state(
+        <a href="delegation_pool.md#0x1_delegation_pool_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED">EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED</a>
+    ));
+    // The beneficiay <b>address</b> of an operator is stored under the operator's <b>address</b>.
+    // So, the operator does not need <b>to</b> be validated <b>with</b> respect <b>to</b> a staking pool.
+    <b>let</b> operator_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(operator);
+    <b>let</b> old_beneficiary = <a href="delegation_pool.md#0x1_delegation_pool_beneficiary_for_operator">beneficiary_for_operator</a>(operator_addr);
+    <b>if</b> (<b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>&gt;(operator_addr)) {
+        <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>&gt;(operator_addr).beneficiary_for_operator = new_beneficiary;
+    } <b>else</b> {
+        <b>move_to</b>(operator, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a> { beneficiary_for_operator: new_beneficiary });
+    };
+
+    emit(<a href="delegation_pool.md#0x1_delegation_pool_SetBeneficiaryForOperator">SetBeneficiaryForOperator</a> {
+        operator: operator_addr,
+        old_beneficiary,
+        new_beneficiary,
+    });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_update_commission_percentage"></a>
+
+## Function `update_commission_percentage`
+
+Allows an owner to update the commission percentage for the operator of the underlying stake pool.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_update_commission_percentage">update_commission_percentage</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_commission_percentage: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_update_commission_percentage">update_commission_percentage</a>(
+    owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    new_commission_percentage: u64
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_commission_change_delegation_pool_enabled">features::commission_change_delegation_pool_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(
+        <a href="delegation_pool.md#0x1_delegation_pool_ECOMMISSION_RATE_CHANGE_NOT_SUPPORTED">ECOMMISSION_RATE_CHANGE_NOT_SUPPORTED</a>
+    ));
+    <b>assert</b>!(new_commission_percentage &lt;= <a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="delegation_pool.md#0x1_delegation_pool_EINVALID_COMMISSION_PERCENTAGE">EINVALID_COMMISSION_PERCENTAGE</a>));
+    <b>let</b> owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
+    <b>let</b> pool_address = <a href="delegation_pool.md#0x1_delegation_pool_get_owned_pool_address">get_owned_pool_address</a>(owner_address);
+    <b>assert</b>!(
+        <a href="delegation_pool.md#0x1_delegation_pool_operator_commission_percentage">operator_commission_percentage</a>(pool_address) + <a href="delegation_pool.md#0x1_delegation_pool_MAX_COMMISSION_INCREASE">MAX_COMMISSION_INCREASE</a> &gt;= new_commission_percentage,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="delegation_pool.md#0x1_delegation_pool_ETOO_LARGE_COMMISSION_INCREASE">ETOO_LARGE_COMMISSION_INCREASE</a>)
+    );
+    <b>assert</b>!(
+        <a href="stake.md#0x1_stake_get_remaining_lockup_secs">stake::get_remaining_lockup_secs</a>(pool_address) &gt;= <a href="delegation_pool.md#0x1_delegation_pool_min_remaining_secs_for_commission_change">min_remaining_secs_for_commission_change</a>(),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="delegation_pool.md#0x1_delegation_pool_ETOO_LATE_COMMISSION_CHANGE">ETOO_LATE_COMMISSION_CHANGE</a>)
+    );
+
+    // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation. this <b>ensures</b>:
+    // (1) the operator is paid its uncommitted commission rewards <b>with</b> the <b>old</b> commission percentage, and
+    // (2) <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> pending commission percentage change is applied before the new commission percentage is set.
+    <a href="delegation_pool.md#0x1_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address);
+
+    <b>if</b> (<b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a>&gt;(pool_address)) {
+        <b>let</b> commission_percentage = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a>&gt;(pool_address);
+        commission_percentage.commission_percentage_next_lockup_cycle = new_commission_percentage;
+        commission_percentage.effective_after_secs = <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(pool_address);
+    } <b>else</b> {
+        <b>let</b> <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a> = <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+        <b>let</b> pool_signer = <a href="account.md#0x1_account_create_signer_with_capability">account::create_signer_with_capability</a>(&<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>.stake_pool_signer_cap);
+        <b>move_to</b>(&pool_signer, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
+            commission_percentage_next_lockup_cycle: new_commission_percentage,
+            effective_after_secs: <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(pool_address),
+        });
+    };
+
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="delegation_pool.md#0x1_delegation_pool_CommissionPercentageChange">CommissionPercentageChange</a> {
+        pool_address,
+        owner: owner_address,
+        commission_percentage_next_lockup_cycle: new_commission_percentage,
+    });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_set_delegated_voter"></a>
 
 ## Function `set_delegated_voter`
 
@@ -2594,7 +3087,7 @@ Allows an owner to change the delegated voter of the underlying stake pool.
 <pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_set_delegated_voter">set_delegated_voter</a>(
     owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     new_voter: <b>address</b>
-) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     // No one can change delegated_voter once the partial governance <a href="voting.md#0x1_voting">voting</a> feature is enabled.
     <b>assert</b>!(!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_delegation_pool_partial_governance_voting_enabled">features::delegation_pool_partial_governance_voting_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="delegation_pool.md#0x1_delegation_pool_EDEPRECATED_FUNCTION">EDEPRECATED_FUNCTION</a>));
     <b>let</b> pool_address = <a href="delegation_pool.md#0x1_delegation_pool_get_owned_pool_address">get_owned_pool_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner));
@@ -2608,7 +3101,7 @@ Allows an owner to change the delegated voter of the underlying stake pool.
 
 </details>
 
-<a name="0x1_delegation_pool_delegate_voting_power"></a>
+<a id="0x1_delegation_pool_delegate_voting_power"></a>
 
 ## Function `delegate_voting_power`
 
@@ -2629,7 +3122,7 @@ this change won't take effects until the next lockup period.
     delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     pool_address: <b>address</b>,
     new_voter: <b>address</b>
-) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     <a href="delegation_pool.md#0x1_delegation_pool_assert_partial_governance_voting_enabled">assert_partial_governance_voting_enabled</a>(pool_address);
 
     // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation
@@ -2680,7 +3173,7 @@ this change won't take effects until the next lockup period.
 
 </details>
 
-<a name="0x1_delegation_pool_add_stake"></a>
+<a id="0x1_delegation_pool_add_stake"></a>
 
 ## Function `add_stake`
 
@@ -2696,7 +3189,7 @@ Add <code>amount</code> of coins to the delegation pool <code>pool_address</code
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_add_stake">add_stake</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_add_stake">add_stake</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     // short-circuit <b>if</b> amount <b>to</b> add is 0 so no <a href="event.md#0x1_event">event</a> is emitted
     <b>if</b> (amount == 0) { <b>return</b> };
     // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation
@@ -2709,7 +3202,7 @@ Add <code>amount</code> of coins to the delegation pool <code>pool_address</code
     <b>let</b> delegator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegator);
 
     // <a href="stake.md#0x1_stake">stake</a> the entire amount <b>to</b> the <a href="stake.md#0x1_stake">stake</a> pool
-    <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;AptosCoin&gt;(delegator, pool_address, amount);
+    <a href="aptos_account.md#0x1_aptos_account_transfer">aptos_account::transfer</a>(delegator, pool_address, amount);
     <a href="stake.md#0x1_stake_add_stake">stake::add_stake</a>(&<a href="delegation_pool.md#0x1_delegation_pool_retrieve_stake_pool_owner">retrieve_stake_pool_owner</a>(pool), amount);
 
     // but buy shares for delegator just for the remaining amount after fee
@@ -2738,7 +3231,7 @@ Add <code>amount</code> of coins to the delegation pool <code>pool_address</code
 
 </details>
 
-<a name="0x1_delegation_pool_unlock"></a>
+<a id="0x1_delegation_pool_unlock"></a>
 
 ## Function `unlock`
 
@@ -2755,7 +3248,7 @@ at most how much active stake there is on the stake pool.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_unlock">unlock</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_unlock">unlock</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     // short-circuit <b>if</b> amount <b>to</b> unlock is 0 so no <a href="event.md#0x1_event">event</a> is emitted
     <b>if</b> (amount == 0) { <b>return</b> };
 
@@ -2797,7 +3290,7 @@ at most how much active stake there is on the stake pool.
 
 </details>
 
-<a name="0x1_delegation_pool_reactivate_stake"></a>
+<a id="0x1_delegation_pool_reactivate_stake"></a>
 
 ## Function `reactivate_stake`
 
@@ -2813,7 +3306,7 @@ Move <code>amount</code> of coins from pending_inactive to active.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_reactivate_stake">reactivate_stake</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_reactivate_stake">reactivate_stake</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     // short-circuit <b>if</b> amount <b>to</b> reactivate is 0 so no <a href="event.md#0x1_event">event</a> is emitted
     <b>if</b> (amount == 0) { <b>return</b> };
     // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation
@@ -2851,7 +3344,7 @@ Move <code>amount</code> of coins from pending_inactive to active.
 
 </details>
 
-<a name="0x1_delegation_pool_withdraw"></a>
+<a id="0x1_delegation_pool_withdraw"></a>
 
 ## Function `withdraw`
 
@@ -2867,7 +3360,7 @@ Withdraw <code>amount</code> of owned inactive stake from the delegation pool at
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_withdraw">withdraw</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_withdraw">withdraw</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     <b>assert</b>!(amount &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="delegation_pool.md#0x1_delegation_pool_EWITHDRAW_ZERO_STAKE">EWITHDRAW_ZERO_STAKE</a>));
     // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation
     <a href="delegation_pool.md#0x1_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address);
@@ -2879,7 +3372,7 @@ Withdraw <code>amount</code> of owned inactive stake from the delegation pool at
 
 </details>
 
-<a name="0x1_delegation_pool_withdraw_internal"></a>
+<a id="0x1_delegation_pool_withdraw_internal"></a>
 
 ## Function `withdraw_internal`
 
@@ -2936,7 +3429,7 @@ Withdraw <code>amount</code> of owned inactive stake from the delegation pool at
         // no excess <a href="stake.md#0x1_stake">stake</a> <b>if</b> `<a href="stake.md#0x1_stake_withdraw">stake::withdraw</a>` does not inactivate at all
         <a href="stake.md#0x1_stake_withdraw">stake::withdraw</a>(stake_pool_owner, amount);
     };
-    <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;AptosCoin&gt;(stake_pool_owner, delegator_address, amount);
+    <a href="aptos_account.md#0x1_aptos_account_transfer">aptos_account::transfer</a>(stake_pool_owner, delegator_address, amount);
 
     // commit withdrawal of possibly inactive <a href="stake.md#0x1_stake">stake</a> <b>to</b> the `total_coins_inactive`
     // known by the delegation pool in order <b>to</b> not mistake it for slashing at next synchronization
@@ -2958,7 +3451,7 @@ Withdraw <code>amount</code> of owned inactive stake from the delegation pool at
 
 </details>
 
-<a name="0x1_delegation_pool_pending_withdrawal_exists"></a>
+<a id="0x1_delegation_pool_pending_withdrawal_exists"></a>
 
 ## Function `pending_withdrawal_exists`
 
@@ -2989,7 +3482,7 @@ A bool is returned to signal if a pending withdrawal exists at all.
 
 </details>
 
-<a name="0x1_delegation_pool_pending_inactive_shares_pool_mut"></a>
+<a id="0x1_delegation_pool_pending_inactive_shares_pool_mut"></a>
 
 ## Function `pending_inactive_shares_pool_mut`
 
@@ -3016,7 +3509,7 @@ delegation pool, always the last item in <code>inactive_shares</code>.
 
 </details>
 
-<a name="0x1_delegation_pool_pending_inactive_shares_pool"></a>
+<a id="0x1_delegation_pool_pending_inactive_shares_pool"></a>
 
 ## Function `pending_inactive_shares_pool`
 
@@ -3040,7 +3533,7 @@ delegation pool, always the last item in <code>inactive_shares</code>.
 
 </details>
 
-<a name="0x1_delegation_pool_execute_pending_withdrawal"></a>
+<a id="0x1_delegation_pool_execute_pending_withdrawal"></a>
 
 ## Function `execute_pending_withdrawal`
 
@@ -3071,7 +3564,7 @@ be explicitly withdrawn by delegator
 
 </details>
 
-<a name="0x1_delegation_pool_buy_in_active_shares"></a>
+<a id="0x1_delegation_pool_buy_in_active_shares"></a>
 
 ## Function `buy_in_active_shares`
 
@@ -3112,7 +3605,7 @@ deposited <code>coins_amount</code>. This function doesn't make any coin transfe
 
 </details>
 
-<a name="0x1_delegation_pool_buy_in_pending_inactive_shares"></a>
+<a id="0x1_delegation_pool_buy_in_pending_inactive_shares"></a>
 
 ## Function `buy_in_pending_inactive_shares`
 
@@ -3170,7 +3663,7 @@ to ensure there is always only one withdrawal request.
 
 </details>
 
-<a name="0x1_delegation_pool_amount_to_shares_to_redeem"></a>
+<a id="0x1_delegation_pool_amount_to_shares_to_redeem"></a>
 
 ## Function `amount_to_shares_to_redeem`
 
@@ -3205,7 +3698,7 @@ to the exact number of shares to redeem in order to achieve this.
 
 </details>
 
-<a name="0x1_delegation_pool_redeem_active_shares"></a>
+<a id="0x1_delegation_pool_redeem_active_shares"></a>
 
 ## Function `redeem_active_shares`
 
@@ -3247,7 +3740,7 @@ be available for withdrawal when current OLC ends.
 
 </details>
 
-<a name="0x1_delegation_pool_redeem_inactive_shares"></a>
+<a id="0x1_delegation_pool_redeem_inactive_shares"></a>
 
 ## Function `redeem_inactive_shares`
 
@@ -3312,7 +3805,7 @@ escape inactivation when current lockup ends.
 
 </details>
 
-<a name="0x1_delegation_pool_calculate_stake_pool_drift"></a>
+<a id="0x1_delegation_pool_calculate_stake_pool_drift"></a>
 
 ## Function `calculate_stake_pool_drift`
 
@@ -3357,18 +3850,18 @@ whether the lockup expired on the stake pool.
     // unsynced are rewards and slashes routed exclusively <b>to</b>/out the <a href="stake.md#0x1_stake">stake</a> pool
 
     // operator `active` rewards not persisted yet <b>to</b> the active shares pool
-    <b>let</b> commission_active = total_coins(&pool.active_shares);
-    commission_active = <b>if</b> (active &gt; commission_active) {
-        <a href="../../aptos-stdlib/doc/math64.md#0x1_math64_mul_div">math64::mul_div</a>(active - commission_active, pool.operator_commission_percentage, <a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a>)
+    <b>let</b> pool_active = total_coins(&pool.active_shares);
+    <b>let</b> commission_active = <b>if</b> (active &gt; pool_active) {
+        <a href="../../aptos-stdlib/doc/math64.md#0x1_math64_mul_div">math64::mul_div</a>(active - pool_active, pool.operator_commission_percentage, <a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a>)
     } <b>else</b> {
         // handle <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> slashing applied <b>to</b> `active` <a href="stake.md#0x1_stake">stake</a>
         0
     };
     // operator `pending_inactive` rewards not persisted yet <b>to</b> the pending_inactive shares pool
-    <b>let</b> commission_pending_inactive = total_coins(<a href="delegation_pool.md#0x1_delegation_pool_pending_inactive_shares_pool">pending_inactive_shares_pool</a>(pool));
-    commission_pending_inactive = <b>if</b> (pending_inactive &gt; commission_pending_inactive) {
+    <b>let</b> pool_pending_inactive = total_coins(<a href="delegation_pool.md#0x1_delegation_pool_pending_inactive_shares_pool">pending_inactive_shares_pool</a>(pool));
+    <b>let</b> commission_pending_inactive = <b>if</b> (pending_inactive &gt; pool_pending_inactive) {
         <a href="../../aptos-stdlib/doc/math64.md#0x1_math64_mul_div">math64::mul_div</a>(
-            pending_inactive - commission_pending_inactive,
+            pending_inactive - pool_pending_inactive,
             pool.operator_commission_percentage,
             <a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a>
         )
@@ -3385,7 +3878,7 @@ whether the lockup expired on the stake pool.
 
 </details>
 
-<a name="0x1_delegation_pool_synchronize_delegation_pool"></a>
+<a id="0x1_delegation_pool_synchronize_delegation_pool"></a>
 
 ## Function `synchronize_delegation_pool`
 
@@ -3402,7 +3895,7 @@ shares pools, assign commission to operator and eventually prepare delegation po
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address: <b>address</b>) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address: <b>address</b>) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     <a href="delegation_pool.md#0x1_delegation_pool_assert_delegation_pool_exists">assert_delegation_pool_exists</a>(pool_address);
     <b>let</b> pool = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
     <b>let</b> (
@@ -3436,9 +3929,9 @@ shares pools, assign commission to operator and eventually prepare delegation po
     );
 
     // reward operator its commission out of uncommitted active rewards (`add_stake` fees already excluded)
-    <a href="delegation_pool.md#0x1_delegation_pool_buy_in_active_shares">buy_in_active_shares</a>(pool, <a href="stake.md#0x1_stake_get_operator">stake::get_operator</a>(pool_address), commission_active);
+    <a href="delegation_pool.md#0x1_delegation_pool_buy_in_active_shares">buy_in_active_shares</a>(pool, <a href="delegation_pool.md#0x1_delegation_pool_beneficiary_for_operator">beneficiary_for_operator</a>(<a href="stake.md#0x1_stake_get_operator">stake::get_operator</a>(pool_address)), commission_active);
     // reward operator its commission out of uncommitted pending_inactive rewards
-    <a href="delegation_pool.md#0x1_delegation_pool_buy_in_pending_inactive_shares">buy_in_pending_inactive_shares</a>(pool, <a href="stake.md#0x1_stake_get_operator">stake::get_operator</a>(pool_address), commission_pending_inactive);
+    <a href="delegation_pool.md#0x1_delegation_pool_buy_in_pending_inactive_shares">buy_in_pending_inactive_shares</a>(pool, <a href="delegation_pool.md#0x1_delegation_pool_beneficiary_for_operator">beneficiary_for_operator</a>(<a href="stake.md#0x1_stake_get_operator">stake::get_operator</a>(pool_address)), commission_pending_inactive);
 
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
         &<b>mut</b> pool.distribute_commission_events,
@@ -3449,6 +3942,16 @@ shares pools, assign commission to operator and eventually prepare delegation po
             commission_pending_inactive,
         },
     );
+
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operator_beneficiary_change_enabled">features::operator_beneficiary_change_enabled</a>()) {
+        emit(<a href="delegation_pool.md#0x1_delegation_pool_DistributeCommission">DistributeCommission</a> {
+            pool_address,
+            operator: <a href="stake.md#0x1_stake_get_operator">stake::get_operator</a>(pool_address),
+            beneficiary: <a href="delegation_pool.md#0x1_delegation_pool_beneficiary_for_operator">beneficiary_for_operator</a>(<a href="stake.md#0x1_stake_get_operator">stake::get_operator</a>(pool_address)),
+            commission_active,
+            commission_pending_inactive,
+        })
+    };
 
     // advance lockup cycle on delegation pool <b>if</b> already ended on <a href="stake.md#0x1_stake">stake</a> pool (AND <a href="stake.md#0x1_stake">stake</a> explicitly inactivated)
     <b>if</b> (lockup_cycle_ended) {
@@ -3464,6 +3967,10 @@ shares pools, assign commission to operator and eventually prepare delegation po
             pool.observed_lockup_cycle,
             <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_create_with_scaling_factor">pool_u64::create_with_scaling_factor</a>(<a href="delegation_pool.md#0x1_delegation_pool_SHARES_SCALING_FACTOR">SHARES_SCALING_FACTOR</a>)
         );
+    };
+
+    <b>if</b> (<a href="delegation_pool.md#0x1_delegation_pool_is_next_commission_percentage_effective">is_next_commission_percentage_effective</a>(pool_address)) {
+        pool.operator_commission_percentage = <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a>&gt;(pool_address).commission_percentage_next_lockup_cycle;
     }
 }
 </code></pre>
@@ -3472,7 +3979,7 @@ shares pools, assign commission to operator and eventually prepare delegation po
 
 </details>
 
-<a name="0x1_delegation_pool_assert_and_update_proposal_used_voting_power"></a>
+<a id="0x1_delegation_pool_assert_and_update_proposal_used_voting_power"></a>
 
 ## Function `assert_and_update_proposal_used_voting_power`
 
@@ -3507,7 +4014,7 @@ shares pools, assign commission to operator and eventually prepare delegation po
 
 </details>
 
-<a name="0x1_delegation_pool_update_governance_records_for_buy_in_active_shares"></a>
+<a id="0x1_delegation_pool_update_governance_records_for_buy_in_active_shares"></a>
 
 ## Function `update_governance_records_for_buy_in_active_shares`
 
@@ -3551,7 +4058,7 @@ shares pools, assign commission to operator and eventually prepare delegation po
 
 </details>
 
-<a name="0x1_delegation_pool_update_governance_records_for_buy_in_pending_inactive_shares"></a>
+<a id="0x1_delegation_pool_update_governance_records_for_buy_in_pending_inactive_shares"></a>
 
 ## Function `update_governance_records_for_buy_in_pending_inactive_shares`
 
@@ -3583,7 +4090,7 @@ shares pools, assign commission to operator and eventually prepare delegation po
 
 </details>
 
-<a name="0x1_delegation_pool_update_governanace_records_for_redeem_active_shares"></a>
+<a id="0x1_delegation_pool_update_governanace_records_for_redeem_active_shares"></a>
 
 ## Function `update_governanace_records_for_redeem_active_shares`
 
@@ -3630,7 +4137,7 @@ shares pools, assign commission to operator and eventually prepare delegation po
 
 </details>
 
-<a name="0x1_delegation_pool_update_governanace_records_for_redeem_pending_inactive_shares"></a>
+<a id="0x1_delegation_pool_update_governanace_records_for_redeem_pending_inactive_shares"></a>
 
 ## Function `update_governanace_records_for_redeem_pending_inactive_shares`
 
@@ -3662,7 +4169,7 @@ shares pools, assign commission to operator and eventually prepare delegation po
 
 </details>
 
-<a name="0x1_delegation_pool_multiply_then_divide"></a>
+<a id="0x1_delegation_pool_multiply_then_divide"></a>
 
 ## Function `multiply_then_divide`
 
@@ -3688,7 +4195,7 @@ Deprecated, prefer math64::mul_div
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 

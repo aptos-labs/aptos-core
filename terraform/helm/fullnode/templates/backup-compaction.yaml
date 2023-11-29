@@ -31,7 +31,8 @@ spec:
             {{- end }}
             imagePullPolicy: {{ .Values.backup.image.pullPolicy }}
             command:
-            - /usr/local/bin/aptos-db-tool
+            - /usr/local/bin/aptos-debugger
+            - aptos-db
             - backup-maintenance
             - compact
             - --state-snapshot-file-compact-factor

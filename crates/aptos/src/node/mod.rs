@@ -100,7 +100,10 @@ impl NodeTool {
             ShowValidatorSet(tool) => tool.execute_serialized().await,
             ShowValidatorStake(tool) => tool.execute_serialized().await,
             ShowValidatorConfig(tool) => tool.execute_serialized().await,
-            RunLocalTestnet(tool) => tool.execute_serialized_without_logger().await,
+            RunLocalTestnet(tool) => tool
+                .execute_serialized_without_logger()
+                .await
+                .map(|_| "".to_string()),
             UpdateConsensusKey(tool) => tool.execute_serialized().await,
             UpdateValidatorNetworkAddresses(tool) => tool.execute_serialized().await,
         }
@@ -1432,6 +1435,7 @@ impl Time {
     pub fn new(time: Duration) -> Self {
         let date_time =
             NaiveDateTime::from_timestamp_opt(time.as_secs() as i64, time.subsec_nanos()).unwrap();
+        #[allow(deprecated)]
         let utc_time = DateTime::from_utc(date_time, Utc);
         // TODO: Allow configurable time zone
         Self {

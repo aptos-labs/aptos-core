@@ -7,7 +7,7 @@ use poem::{web::Accept, FromRequest, Request, RequestBody, Result};
 /// Accept types from input headers
 ///
 /// Determines the output type of each API
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum AcceptType {
     /// Convert and resolve types to JSON
     Json,

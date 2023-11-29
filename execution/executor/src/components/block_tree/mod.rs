@@ -7,25 +7,19 @@
 #[cfg(test)]
 mod test;
 
-use crate::{
-    logging::{LogEntry, LogSchema},
-    metrics::APTOS_EXECUTOR_OTHER_TIMERS_SECONDS,
-};
+use crate::logging::{LogEntry, LogSchema};
 use anyhow::{anyhow, ensure, Result};
 use aptos_consensus_types::block::Block as ConsensusBlock;
 use aptos_crypto::HashValue;
+use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_executor_types::{execution_output::ExecutionOutput, ExecutorError, LedgerUpdateOutput};
-use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
 use aptos_storage_interface::DbReader;
 use aptos_types::{ledger_info::LedgerInfo, proof::definition::LeafCount};
 use std::{
     collections::{hash_map::Entry, HashMap},
-    sync::{
-        mpsc::{channel, Receiver},
-        Arc, Weak,
-    },
+    sync::{mpsc::Receiver, Arc, Weak},
 };
 
 pub struct Block {
@@ -276,6 +270,10 @@ impl BlockTree {
             );
             last_committed_block
         };
+        root.output
+            .state()
+            .current
+            .log_generation("block_tree_base");
         let old_root = {
             let mut root_locked = self.root.lock();
             // send old root to async task to drop it
@@ -283,19 +281,8 @@ impl BlockTree {
             *root_locked = root;
             old_root
         };
-        // This should be the last reference to old root, spawning a drop to a different thread
-        // guarantees that the drop will not happen in the current thread
-        let (tx, rx) = channel::<()>();
-        THREAD_MANAGER.get_non_exe_cpu_pool().spawn(move || {
-            let _timeer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-                .with_label_values(&["drop_old_root"])
-                .start_timer();
-            drop(old_root);
-            // Error is ignored, since the caller might not care about dropping completion and
-            // has discarded the receiver already.
-            tx.send(()).ok();
-        });
-        Ok(rx)
+
+        Ok(DEFAULT_DROPPER.schedule_drop_with_waiter(old_root))
     }
 
     pub fn add_block(

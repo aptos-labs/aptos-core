@@ -22,6 +22,7 @@ use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, nibble::nibble_path::NibblePath,
     state_store::state_key::StateKeyTag,
 };
+use arr_macro::arr;
 use proptest::{collection::hash_map, prelude::*};
 use std::collections::HashMap;
 
@@ -58,6 +59,7 @@ fn put_value_set(
             &state_kv_metadata_batch,
             /*put_state_value_indices=*/ false,
             /*skip_usage=*/ false,
+            /*last_checkpoint_index=*/ None,
         )
         .unwrap();
     state_store

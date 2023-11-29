@@ -3,6 +3,39 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+
+## [2.3.2] - 2023/11/28
+- Services in the local testnet now bind to 127.0.0.1 by default (unless the CLI is running inside a container, which most users should not do) rather than 0.0.0.0. You can override this behavior with the `--bind-to` flag. This fixes an issue preventing the local testnet from working on Windows.
+
+## [2.3.1] - 2023/11/07
+### Updated
+- Updated processor code from https://github.com/aptos-labs/aptos-indexer-processors for the local testnet to 2d5cb211a89a8705674e9e1e741c841dd899c558. 
+- Improved reliability of inter-container networking with local testnet.
+
+## [2.3.0] - 2023/10/25
+### Added
+- Added `--node-api-key`. This lets you set an API key for the purpose of not being ratelimited.
+
+### Updated
+- Made the local testnet exit more quickly if a service fails to start.
+- Updated processor code from https://github.com/aptos-labs/aptos-indexer-processors for the local testnet to bcba94c26c8a6372056d2b69ce411c5719f98965.
+
+### Fixed
+- Fixed an infrequent bug that caused startup failures for the local testnet with `--force-restart` + `--with-indexer-api` by using a Docker volume rather than a bind mount for the postgres storage.
+- Fixed an issue where the CLI could not find the Docker socket with some Docker Desktop configurations.
+
+## [2.2.2] - 2023/10/16
+### Updated
+- Updated processor code from https://github.com/aptos-labs/aptos-indexer-processors for the local testnet to d6f55d4baba32960ea7be60878552e73ffbe8b7e.
+
+## [2.2.1] - 2023/10/13
+### Fixed
+- Fixed postgres data persistence between restarts when using `aptos node run-local-testnet --with-indexer-api`.
+
+## [2.2.0] - 2023/10/11
+### Added
+- Added `--with-indexer-api` to `aptos node run-local-testnet`. With this flag you can run a full processor + indexer API stack as part of your local testnet. You must have Docker installed to use this feature. For more information, see https://aptos.dev/nodes/local-testnet/local-testnet-index.
+### Updated
 - Updated CLI source compilation to use rust toolchain version 1.72.1 (from 1.71.1).
 
 ## [2.1.1] - 2023/09/27

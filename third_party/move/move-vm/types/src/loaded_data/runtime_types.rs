@@ -5,13 +5,17 @@
 use derivative::Derivative;
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
-    file_format::{AbilitySet, SignatureToken, StructTypeParameter, TypeParameterIndex},
+    file_format::{
+        AbilitySet, SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex,
+    },
 };
 use move_core_types::{
     gas_algebra::AbstractMemorySize, identifier::Identifier, language_storage::ModuleId,
     vm_status::StatusCode,
 };
-use std::{cmp::max, collections::BTreeMap, fmt::Debug, sync::Arc};
+use smallbitvec::SmallBitVec;
+use std::{cmp::max, collections::BTreeMap, fmt::Debug};
+use triomphe::Arc as TriompheArc;
 
 pub const TYPE_DEPTH_MAX: usize = 256;
 
@@ -108,24 +112,54 @@ impl DepthFormula {
     }
 }
 
-#[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct StructType {
+    pub idx: StructNameIndex,
     pub fields: Vec<Type>,
     pub field_names: Vec<Identifier>,
-    pub phantom_ty_args_mask: Vec<bool>,
+    pub phantom_ty_args_mask: SmallBitVec,
     pub abilities: AbilitySet,
     pub type_parameters: Vec<StructTypeParameter>,
-    pub name: Arc<StructIdentifier>,
+    pub name: Identifier,
+    pub module: ModuleId,
 }
 
 impl StructType {
     pub fn type_param_constraints(&self) -> impl ExactSizeIterator<Item = &AbilitySet> {
         self.type_parameters.iter().map(|param| &param.constraints)
     }
+
+    // Check if the local struct handle is compatible with the defined struct type.
+    pub fn check_compatibility(&self, struct_handle: &StructHandle) -> PartialVMResult<()> {
+        if !struct_handle.abilities.is_subset(self.abilities) {
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Ability definition of module mismatch".to_string()),
+            );
+        }
+
+        if self.phantom_ty_args_mask.len() != struct_handle.type_parameters.len()
+            || !self
+                .phantom_ty_args_mask
+                .iter()
+                .zip(struct_handle.type_parameters.iter())
+                .all(|(defined_is_phantom, local_type_parameter)| {
+                    !local_type_parameter.is_phantom || defined_is_phantom
+                })
+        {
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                    "Phantom type parameter definition of module mismatch".to_string(),
+                ),
+            );
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct CachedStructIndex(pub usize);
+pub struct StructNameIndex(pub usize);
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StructIdentifier {
@@ -133,8 +167,7 @@ pub struct StructIdentifier {
     pub name: Identifier,
 }
 
-#[derive(Derivative, Ord, PartialOrd)]
-#[derivative(Debug, Clone, Eq, Hash, PartialEq)]
+#[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Type {
     Bool,
     U8,
@@ -142,19 +175,15 @@ pub enum Type {
     U128,
     Address,
     Signer,
-    Vector(Box<Type>),
+    Vector(TriompheArc<Type>),
     Struct {
-        name: Arc<StructIdentifier>,
-        #[derivative(PartialEq = "ignore", Hash = "ignore")]
-        ability: AbilitySet,
+        idx: StructNameIndex,
+        ability: AbilityInfo,
     },
     StructInstantiation {
-        name: Arc<StructIdentifier>,
-        ty_args: Arc<Vec<Type>>,
-        #[derivative(PartialEq = "ignore", Hash = "ignore")]
-        base_ability_set: AbilitySet,
-        #[derivative(PartialEq = "ignore", Hash = "ignore")]
-        phantom_ty_args_mask: Vec<bool>,
+        idx: StructNameIndex,
+        ty_args: TriompheArc<Vec<Type>>,
+        ability: AbilityInfo,
     },
     Reference(Box<Type>),
     MutableReference(Box<Type>),
@@ -162,6 +191,43 @@ pub enum Type {
     U16,
     U32,
     U256,
+}
+
+// Cache for the ability of struct. They will be ignored when comparing equality or Ord as they are just used for caching purpose.
+#[derive(Derivative)]
+#[derivative(Debug, Clone, Eq, Hash, PartialEq, Ord, PartialOrd)]
+pub struct AbilityInfo {
+    #[derivative(
+        PartialEq = "ignore",
+        Hash = "ignore",
+        Ord = "ignore",
+        PartialOrd = "ignore"
+    )]
+    base_ability_set: AbilitySet,
+
+    #[derivative(
+        PartialEq = "ignore",
+        Hash = "ignore",
+        Ord = "ignore",
+        PartialOrd = "ignore"
+    )]
+    phantom_ty_args_mask: SmallBitVec,
+}
+
+impl AbilityInfo {
+    pub fn struct_(ability: AbilitySet) -> Self {
+        Self {
+            base_ability_set: ability,
+            phantom_ty_args_mask: SmallBitVec::new(),
+        }
+    }
+
+    pub fn generic_struct(base_ability_set: AbilitySet, phantom_ty_args_mask: SmallBitVec) -> Self {
+        Self {
+            base_ability_set,
+            phantom_ty_args_mask,
+        }
+    }
 }
 
 impl Type {
@@ -190,30 +256,28 @@ impl Type {
             Type::U256 => Type::U256,
             Type::Address => Type::Address,
             Type::Signer => Type::Signer,
-            Type::Vector(ty) => Type::Vector(Box::new(ty.apply_subst(subst, depth + 1)?)),
+            Type::Vector(ty) => Type::Vector(TriompheArc::new(ty.apply_subst(subst, depth + 1)?)),
             Type::Reference(ty) => Type::Reference(Box::new(ty.apply_subst(subst, depth + 1)?)),
             Type::MutableReference(ty) => {
                 Type::MutableReference(Box::new(ty.apply_subst(subst, depth + 1)?))
             },
-            Type::Struct { name, ability } => Type::Struct {
-                name: name.clone(),
-                ability: *ability,
+            Type::Struct { idx, ability } => Type::Struct {
+                idx: *idx,
+                ability: ability.clone(),
             },
             Type::StructInstantiation {
-                name,
+                idx,
                 ty_args: instantiation,
-                base_ability_set: base_ability,
-                phantom_ty_args_mask: is_phantom_params,
+                ability,
             } => {
                 let mut inst = vec![];
                 for ty in instantiation.iter() {
                     inst.push(ty.apply_subst(subst, depth + 1)?)
                 }
                 Type::StructInstantiation {
-                    name: name.clone(),
-                    ty_args: Arc::new(inst),
-                    base_ability_set: *base_ability,
-                    phantom_ty_args_mask: is_phantom_params.clone(),
+                    idx: *idx,
+                    ty_args: TriompheArc::new(inst),
+                    ability: ability.clone(),
                 }
             },
         };
@@ -248,9 +312,8 @@ impl Type {
             TyParam(_) | Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer => {
                 Self::LEGACY_BASE_MEMORY_SIZE
             },
-            Vector(ty) | Reference(ty) | MutableReference(ty) => {
-                Self::LEGACY_BASE_MEMORY_SIZE + ty.size()
-            },
+            Reference(ty) | MutableReference(ty) => Self::LEGACY_BASE_MEMORY_SIZE + ty.size(),
+            Vector(ty) => Self::LEGACY_BASE_MEMORY_SIZE + ty.size(),
             Struct { .. } => Self::LEGACY_BASE_MEMORY_SIZE,
             StructInstantiation { ty_args: tys, .. } => tys
                 .iter()
@@ -271,7 +334,7 @@ impl Type {
             S::U128 => L::U128,
             S::U256 => L::U256,
             S::Address => L::Address,
-            S::Vector(inner) => L::Vector(Box::new(Self::from_const_signature(inner)?)),
+            S::Vector(inner) => L::Vector(TriompheArc::new(Self::from_const_signature(inner)?)),
             // Not yet supported
             S::Struct(_) | S::StructInstantiation(_, _) => {
                 return Err(
@@ -371,11 +434,14 @@ impl Type {
                     ty.abilities()?
                 ])
             },
-            Type::Struct { ability, .. } => Ok(*ability),
+            Type::Struct { ability, .. } => Ok(ability.base_ability_set),
             Type::StructInstantiation {
                 ty_args,
-                base_ability_set: base_ability,
-                phantom_ty_args_mask: is_phantom_params,
+                ability:
+                    AbilityInfo {
+                        base_ability_set,
+                        phantom_ty_args_mask,
+                    },
                 ..
             } => {
                 let type_argument_abilities = ty_args
@@ -383,8 +449,8 @@ impl Type {
                     .map(|arg| arg.abilities())
                     .collect::<PartialVMResult<Vec<_>>>()?;
                 AbilitySet::polymorphic_abilities(
-                    *base_ability,
-                    is_phantom_params.iter().copied(),
+                    *base_ability_set,
+                    phantom_ty_args_mask.iter(),
                     type_argument_abilities,
                 )
             },

@@ -1,5 +1,5 @@
 
-<a name="0x1_hash"></a>
+<a id="0x1_hash"></a>
 
 # Module `0x1::hash`
 
@@ -17,7 +17,7 @@ as in the Move prover's prelude.
 
 
 
-<a name="0x1_hash_sha2_256"></a>
+<a id="0x1_hash_sha2_256"></a>
 
 ## Function `sha2_256`
 
@@ -39,7 +39,7 @@ as in the Move prover's prelude.
 
 </details>
 
-<a name="0x1_hash_sha3_256"></a>
+<a id="0x1_hash_sha3_256"></a>
 
 ## Function `sha3_256`
 

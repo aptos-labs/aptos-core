@@ -26,6 +26,7 @@ aptos-enum-conversion-derive = { workspace = true }
 aptos-event-notifications = { workspace = true }
 aptos-executor = { workspace = true }
 aptos-executor-types = { workspace = true }
+aptos-experimental-runtimes = { workspace = true }
 aptos-fallible = { workspace = true }
 aptos-global-constants = { workspace = true }
 aptos-infallible = { workspace = true }
@@ -51,7 +52,9 @@ byteorder = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true }
 claims = { workspace = true }
+clap = { workspace = true }
 dashmap = { workspace = true }
+enum_dispatch = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 futures-channel = { workspace = true }
@@ -69,6 +72,7 @@ scopeguard = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

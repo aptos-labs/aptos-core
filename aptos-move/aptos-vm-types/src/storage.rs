@@ -179,9 +179,9 @@ impl StoragePricingV3 {
         STORAGE_IO_PER_STATE_SLOT_READ * NumArgs::from(1) + STORAGE_IO_PER_STATE_BYTE_READ * loaded
     }
 
-    fn write_op_size(&self, key: &StateKey, value: &[u8]) -> NumBytes {
-        let value_size = NumBytes::new(value.len() as u64);
+    fn write_op_size(&self, key: &StateKey, value_size: u64) -> NumBytes {
         let key_size = NumBytes::new(key.size() as u64);
+        let value_size = NumBytes::new(value_size);
 
         (key_size + value_size)
             .checked_sub(self.free_write_bytes_quota)
@@ -201,9 +201,24 @@ impl StoragePricingV3 {
             | Modification(data)
             | ModificationWithMetadata { data, .. } => Either::Left(
                 STORAGE_IO_PER_STATE_SLOT_WRITE * NumArgs::new(1)
-                    + STORAGE_IO_PER_STATE_BYTE_WRITE * self.write_op_size(key, data),
+                    + STORAGE_IO_PER_STATE_BYTE_WRITE * self.write_op_size(key, data.len() as u64),
             ),
             Deletion | DeletionWithMetadata { .. } => Either::Right(InternalGas::zero()),
+        }
+    }
+
+    fn io_gas_per_group_write(
+        &self,
+        key: &StateKey,
+        maybe_group_size: Option<u64>,
+    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
+        match maybe_group_size {
+            Some(group_op_size) => Either::Left(
+                STORAGE_IO_PER_STATE_SLOT_WRITE * NumArgs::new(1)
+                    + STORAGE_IO_PER_STATE_BYTE_WRITE * self.write_op_size(key, group_op_size),
+            ),
+            // Deletion.
+            None => Either::Right(InternalGas::zero()),
         }
     }
 }
@@ -260,6 +275,8 @@ impl StoragePricing {
         }
     }
 
+    /// If group write size is provided, then the StateKey is for a resource group and the
+    /// WriteOp does not contain the raw data, and the provided size should be used instead.
     pub fn io_gas_per_write(
         &self,
         key: &StateKey,
@@ -271,6 +288,24 @@ impl StoragePricing {
             V1(v1) => Either::Left(v1.io_gas_per_write(key, op)),
             V2(v2) => Either::Left(v2.io_gas_per_write(key, op)),
             V3(v3) => Either::Right(v3.io_gas_per_write(key, op)),
+        }
+    }
+
+    /// If group write size is provided, then the StateKey is for a resource group and the
+    /// WriteOp does not contain the raw data, and the provided size should be used instead.
+    pub fn io_gas_per_group_write(
+        &self,
+        key: &StateKey,
+        maybe_group_size: Option<u64>,
+    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
+        use StoragePricing::*;
+
+        match self {
+            V3(v3) => {
+                Either::<InternalGas, _>::Right(v3.io_gas_per_group_write(key, maybe_group_size))
+            },
+            V2(_) => unreachable!("Group write handling unreachable for StoragePricing V2"),
+            V1(_) => unreachable!("Group write handling unreachable for StoragePricing V1"),
         }
     }
 }
@@ -378,7 +413,7 @@ impl CheckChangeSet for ChangeSetConfigs {
         }
 
         let mut total_event_size = 0;
-        for event in change_set.events() {
+        for (event, _) in change_set.events() {
             let size = event.event_data().len() as u64;
             if size > self.max_bytes_per_event {
                 return Err(VMStatus::error(ERR, None));

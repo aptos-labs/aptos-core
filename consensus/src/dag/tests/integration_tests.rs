@@ -2,7 +2,7 @@
 
 use super::dag_test;
 use crate::{
-    dag::{bootstrap::bootstrap_dag_for_test, dag_state_sync::StateSyncStatus},
+    dag::{bootstrap::bootstrap_dag_for_test, dag_state_sync::SyncOutcome},
     experimental::buffer_manager::OrderedBlocks,
     network::{IncomingDAGRequest, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
@@ -42,7 +42,7 @@ use std::sync::Arc;
 use tokio::task::JoinHandle;
 
 struct DagBootstrapUnit {
-    nh_task_handle: JoinHandle<StateSyncStatus>,
+    nh_task_handle: JoinHandle<SyncOutcome>,
     df_task_handle: JoinHandle<()>,
     dag_rpc_tx: aptos_channel::Sender<Author, IncomingDAGRequest>,
     network_events:
@@ -81,7 +81,6 @@ impl DagBootstrapUnit {
                 self_peer,
                 signer,
                 Arc::new(epoch_state),
-                storage.get_ledger_info(),
                 Arc::new(dag_storage),
                 network.clone(),
                 network.clone(),

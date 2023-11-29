@@ -3,7 +3,9 @@ module 0x8675309::M {
     struct R {
         dummy_field: bool,
     }
-    private fun t0(a: &signer) {
+    private fun t0(a: &signer)
+        acquires M::R(*)
+     {
         {
           let _ = exists<M::R>(0x0);
           {
@@ -21,7 +23,9 @@ module 0x8675309::M {
           }
         }
     }
-    private fun t1(a: &signer) {
+    private fun t1(a: &signer)
+        acquires M::R(*)
+     {
         {
           let _ = exists<M::R>(0x0);
           {

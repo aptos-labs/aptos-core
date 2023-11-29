@@ -49,9 +49,10 @@ async fn test_apply_transaction_outputs() {
     // Setup the mock executor
     let mut chunk_executor = create_mock_executor();
     chunk_executor
-        .expect_apply_chunk()
+        .expect_enqueue_chunk_by_transaction_outputs()
         .with(always(), always(), always())
         .returning(|_, _, _| Ok(()));
+    chunk_executor.expect_update_ledger().returning(|| Ok(()));
     let expected_commit_return = Ok(ChunkCommitNotification {
         committed_events: vec![event_to_commit.clone()],
         committed_transactions: vec![transaction_to_commit.clone()],
@@ -76,12 +77,13 @@ async fn test_apply_transaction_outputs() {
         mut storage_synchronizer,
         _,
         _,
+        _,
     ) = create_storage_synchronizer(chunk_executor, mock_reader_writer);
 
     // Subscribe to the expected event
     let mut event_listener = event_subscription_service
         .lock()
-        .subscribe_to_events(vec![*event_to_commit.v1().unwrap().key()])
+        .subscribe_to_events(vec![*event_to_commit.v1().unwrap().key()], vec![])
         .unwrap();
 
     // Attempt to apply a chunk of outputs
@@ -115,12 +117,12 @@ async fn test_apply_transaction_outputs_error() {
     // Setup the mock executor
     let mut chunk_executor = create_mock_executor();
     chunk_executor
-        .expect_apply_chunk()
+        .expect_enqueue_chunk_by_transaction_outputs()
         .with(always(), always(), always())
         .returning(|_, _, _| Err(format_err!("Failed to apply chunk!")));
 
     // Create the storage synchronizer
-    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _, _) =
+    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _, _, _) =
         create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
 
     // Attempt to apply a chunk of outputs
@@ -141,20 +143,189 @@ async fn test_apply_transaction_outputs_error() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_commit_chunk_error() {
+async fn test_apply_transaction_outputs_send_error() {
     // Setup the mock executor
     let mut chunk_executor = create_mock_executor();
     chunk_executor
-        .expect_execute_chunk()
+        .expect_enqueue_chunk_by_transaction_outputs()
         .with(always(), always(), always())
         .returning(|_, _, _| Ok(()));
+
+    // Create the storage synchronizer
+    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _, ledger_updater, _) =
+        create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
+
+    // Explicitly drop the ledger updater to cause a send error for the executor
+    ledger_updater.abort();
+
+    // Attempt to apply a chunk of outputs
+    let notification_id = 101;
+    storage_synchronizer
+        .apply_transaction_outputs(
+            notification_id,
+            create_output_list_with_proof(),
+            create_epoch_ending_ledger_info(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    // Verify we get an error notification and that there's no pending data
+    verify_error_notification(&mut error_listener, notification_id).await;
+    verify_no_pending_data(&storage_synchronizer);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_apply_transaction_outputs_update_error() {
+    // Setup the mock executor
+    let mut chunk_executor = create_mock_executor();
+    chunk_executor
+        .expect_enqueue_chunk_by_transaction_outputs()
+        .with(always(), always(), always())
+        .returning(|_, _, _| Ok(()));
+    chunk_executor
+        .expect_update_ledger()
+        .returning(|| Err(format_err!("Failed to update the ledger!")));
+
+    // Create the storage synchronizer
+    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _, _, _) =
+        create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
+
+    // Attempt to apply a chunk of outputs
+    let notification_id = 101;
+    storage_synchronizer
+        .apply_transaction_outputs(
+            notification_id,
+            create_output_list_with_proof(),
+            create_epoch_ending_ledger_info(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    // Verify we get an error notification and that there's no pending data
+    verify_error_notification(&mut error_listener, notification_id).await;
+    verify_no_pending_data(&storage_synchronizer);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_commit_chunk_error_execution() {
+    // Setup the mock executor
+    let mut chunk_executor = create_mock_executor();
+    chunk_executor
+        .expect_enqueue_chunk_by_execution()
+        .with(always(), always(), always())
+        .returning(|_, _, _| Ok(()));
+    chunk_executor.expect_update_ledger().returning(|| Ok(()));
     chunk_executor
         .expect_commit_chunk()
         .return_once(|| Err(format_err!("Failed to commit chunk!")));
 
     // Create the storage synchronizer
-    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _, _) =
+    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _, _, _) =
         create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
+
+    // Attempt to execute a chunk of transactions
+    let notification_id = 100;
+    storage_synchronizer
+        .execute_transactions(
+            notification_id,
+            create_transaction_list_with_proof(),
+            create_epoch_ending_ledger_info(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    // Verify we get an error notification and that there's no pending data
+    verify_error_notification(&mut error_listener, notification_id).await;
+    verify_no_pending_data(&storage_synchronizer);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_commit_chunk_error_output_application() {
+    // Setup the mock executor
+    let mut chunk_executor = create_mock_executor();
+    chunk_executor
+        .expect_enqueue_chunk_by_transaction_outputs()
+        .with(always(), always(), always())
+        .returning(|_, _, _| Ok(()));
+    chunk_executor.expect_update_ledger().returning(|| Ok(()));
+    chunk_executor
+        .expect_commit_chunk()
+        .return_once(|| Err(format_err!("Failed to commit chunk!")));
+
+    // Create the storage synchronizer
+    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _, _, _) =
+        create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
+
+    // Attempt to apply a chunk of outputs
+    let notification_id = 101;
+    storage_synchronizer
+        .apply_transaction_outputs(
+            notification_id,
+            create_output_list_with_proof(),
+            create_epoch_ending_ledger_info(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    // Verify we get an error notification and that there's no pending data
+    verify_error_notification(&mut error_listener, notification_id).await;
+    verify_no_pending_data(&storage_synchronizer);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_commit_chunk_apply_send_error() {
+    // Setup the mock executor
+    let mut chunk_executor = create_mock_executor();
+    chunk_executor
+        .expect_enqueue_chunk_by_transaction_outputs()
+        .with(always(), always(), always())
+        .returning(|_, _, _| Ok(()));
+    chunk_executor.expect_update_ledger().returning(|| Ok(()));
+
+    // Create the storage synchronizer
+    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _, _, committer) =
+        create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
+
+    // Explicitly drop the committer to cause a send error for the ledger updater
+    committer.abort();
+
+    // Attempt to apply a chunk of outputs
+    let notification_id = 101;
+    storage_synchronizer
+        .apply_transaction_outputs(
+            notification_id,
+            create_output_list_with_proof(),
+            create_epoch_ending_ledger_info(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    // Verify we get an error notification and that there's no pending data
+    verify_error_notification(&mut error_listener, notification_id).await;
+    verify_no_pending_data(&storage_synchronizer);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_commit_chunk_execute_send_error() {
+    // Setup the mock executor
+    let mut chunk_executor = create_mock_executor();
+    chunk_executor
+        .expect_enqueue_chunk_by_execution()
+        .with(always(), always(), always())
+        .returning(|_, _, _| Ok(()));
+    chunk_executor.expect_update_ledger().returning(|| Ok(()));
+
+    // Create the storage synchronizer
+    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _, _, committer) =
+        create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
+
+    // Explicitly drop the committer to cause a send error for the ledger updater
+    committer.abort();
 
     // Attempt to execute a chunk of transactions
     let notification_id = 100;
@@ -182,7 +353,7 @@ async fn test_execute_transactions() {
     // Setup the mock executor
     let mut chunk_executor = create_mock_executor();
     chunk_executor
-        .expect_execute_chunk()
+        .expect_enqueue_chunk_by_execution()
         .with(always(), always(), always())
         .returning(|_, _, _| Ok(()));
     let expected_commit_return = Ok(ChunkCommitNotification {
@@ -190,6 +361,7 @@ async fn test_execute_transactions() {
         committed_transactions: vec![transaction_to_commit.clone()],
         reconfiguration_occurred: false,
     });
+    chunk_executor.expect_update_ledger().returning(|| Ok(()));
     chunk_executor
         .expect_commit_chunk()
         .return_once(move || expected_commit_return);
@@ -209,12 +381,13 @@ async fn test_execute_transactions() {
         mut storage_synchronizer,
         _,
         _,
+        _,
     ) = create_storage_synchronizer(chunk_executor, mock_reader_writer);
 
     // Subscribe to the expected event
     let mut event_listener = event_subscription_service
         .lock()
-        .subscribe_to_events(vec![*event_to_commit.v1().unwrap().key()])
+        .subscribe_to_events(vec![*event_to_commit.v1().unwrap().key()], vec![])
         .unwrap();
 
     // Attempt to execute a chunk of transactions
@@ -248,12 +421,78 @@ async fn test_execute_transactions_error() {
     // Setup the mock executor
     let mut chunk_executor = create_mock_executor();
     chunk_executor
-        .expect_execute_chunk()
+        .expect_enqueue_chunk_by_execution()
         .with(always(), always(), always())
         .returning(|_, _, _| Err(format_err!("Failed to execute chunk!")));
 
     // Create the storage synchronizer
-    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _, _) =
+    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _, _, _) =
+        create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
+
+    // Attempt to execute a chunk of transactions
+    let notification_id = 100;
+    storage_synchronizer
+        .execute_transactions(
+            notification_id,
+            create_transaction_list_with_proof(),
+            create_epoch_ending_ledger_info(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    // Verify we get an error notification and that there's no pending data
+    verify_error_notification(&mut error_listener, notification_id).await;
+    verify_no_pending_data(&storage_synchronizer);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_execute_transactions_send_error() {
+    // Setup the mock executor
+    let mut chunk_executor = create_mock_executor();
+    chunk_executor
+        .expect_enqueue_chunk_by_execution()
+        .with(always(), always(), always())
+        .returning(|_, _, _| Ok(()));
+
+    // Create the storage synchronizer
+    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _, ledger_updater, _) =
+        create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
+
+    // Explicitly drop the ledger updater to cause a send error for the executor
+    ledger_updater.abort();
+
+    // Attempt to execute a chunk of transactions
+    let notification_id = 101;
+    storage_synchronizer
+        .execute_transactions(
+            notification_id,
+            create_transaction_list_with_proof(),
+            create_epoch_ending_ledger_info(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    // Verify we get an error notification and that there's no pending data
+    verify_error_notification(&mut error_listener, notification_id).await;
+    verify_no_pending_data(&storage_synchronizer);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_execute_transactions_update_error() {
+    // Setup the mock executor
+    let mut chunk_executor = create_mock_executor();
+    chunk_executor
+        .expect_enqueue_chunk_by_execution()
+        .with(always(), always(), always())
+        .returning(|_, _, _| Ok(()));
+    chunk_executor
+        .expect_update_ledger()
+        .returning(|| Err(format_err!("Failed to update the ledger!")));
+
+    // Create the storage synchronizer
+    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _, _, _) =
         create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
 
     // Attempt to execute a chunk of transactions
@@ -281,7 +520,7 @@ async fn test_initialize_state_synchronizer_missing_info() {
     output_list_with_proof.proof.transaction_infos = vec![]; // This is invalid!
 
     // Create the storage synchronizer
-    let (_, _, _, _, _, mut storage_synchronizer, _, _) = create_storage_synchronizer(
+    let (_, _, _, _, _, mut storage_synchronizer, _, _, _) = create_storage_synchronizer(
         create_mock_executor(),
         create_mock_reader_writer(None, None),
     );
@@ -309,7 +548,7 @@ async fn test_initialize_state_synchronizer_receiver_error() {
         .returning(|_, _| Err(format_err!("Failed to get snapshot receiver!")));
 
     // Create the storage synchronizer
-    let (_, _, _, _, _, mut storage_synchronizer, _, _) = create_storage_synchronizer(
+    let (_, _, _, _, _, mut storage_synchronizer, _, _, _) = create_storage_synchronizer(
         create_mock_executor(),
         create_mock_reader_writer(None, Some(db_writer)),
     );
@@ -373,7 +612,7 @@ async fn test_save_states_completion() {
         .returning(|_, _, _| Ok(()));
 
     // Create the storage synchronizer
-    let (mut commit_listener, _, _, _, _, mut storage_synchronizer, _, _) =
+    let (mut commit_listener, _, _, _, _, mut storage_synchronizer, _, _, _) =
         create_storage_synchronizer(
             chunk_executor,
             create_mock_reader_writer(None, Some(db_writer)),
@@ -437,7 +676,7 @@ async fn test_save_states_dropped_error_listener() {
         .return_once(move |_, _| Ok(Box::new(snapshot_receiver)));
 
     // Create the storage synchronizer (drop all listeners)
-    let (_, _, _, _, _, mut storage_synchronizer, _, _) = create_storage_synchronizer(
+    let (_, _, _, _, _, mut storage_synchronizer, _, _, _) = create_storage_synchronizer(
         create_mock_executor(),
         create_mock_reader_writer(None, Some(db_writer)),
     );
@@ -478,7 +717,7 @@ async fn test_save_states_invalid_chunk() {
         .return_once(move |_, _| Ok(Box::new(snapshot_receiver)));
 
     // Create the storage synchronizer
-    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _, _) =
+    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _, _, _) =
         create_storage_synchronizer(
             create_mock_executor(),
             create_mock_reader_writer(None, Some(db_writer)),
@@ -505,7 +744,7 @@ async fn test_save_states_invalid_chunk() {
 #[should_panic]
 fn test_save_states_without_initialize() {
     // Create the storage synchronizer
-    let (_, _, _, _, _, mut storage_synchronizer, _, _) = create_storage_synchronizer(
+    let (_, _, _, _, _, mut storage_synchronizer, _, _, _) = create_storage_synchronizer(
         create_mock_executor(),
         create_mock_reader_writer(None, None),
     );
@@ -526,6 +765,7 @@ fn create_storage_synchronizer(
     MempoolNotificationListener,
     StorageServiceNotificationListener,
     StorageSynchronizer<MockChunkExecutor, PersistentMetadataStorage>,
+    JoinHandle<()>,
     JoinHandle<()>,
     JoinHandle<()>,
 ) {
@@ -560,18 +800,19 @@ fn create_storage_synchronizer(
     let metadata_storage = PersistentMetadataStorage::new(db_path.path());
 
     // Create the storage synchronizer
-    let (storage_synchronizer, executor_handle, committer_handle) = StorageSynchronizer::new(
-        StateSyncDriverConfig::default(),
-        Arc::new(mock_chunk_executor),
-        commit_notification_sender,
-        error_notification_sender,
-        event_subscription_service.clone(),
-        mempool_notification_handler,
-        storage_service_notification_handler,
-        metadata_storage,
-        mock_reader_writer,
-        None,
-    );
+    let (storage_synchronizer, executor_handle, ledger_updater_handle, committer_handle) =
+        StorageSynchronizer::new(
+            StateSyncDriverConfig::default(),
+            Arc::new(mock_chunk_executor),
+            commit_notification_sender,
+            error_notification_sender,
+            event_subscription_service.clone(),
+            mempool_notification_handler,
+            storage_service_notification_handler,
+            metadata_storage,
+            mock_reader_writer,
+            None,
+        );
 
     (
         commit_notification_listener,
@@ -581,6 +822,7 @@ fn create_storage_synchronizer(
         storage_service_listener,
         storage_synchronizer,
         executor_handle,
+        ledger_updater_handle,
         committer_handle,
     )
 }

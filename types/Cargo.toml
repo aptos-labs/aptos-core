@@ -17,6 +17,7 @@ anyhow = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
+aptos-experimental-runtimes = { workspace = true }
 arr_macro = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
@@ -24,8 +25,10 @@ chrono = { workspace = true }
 derivative = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
+move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-table-extension = { workspace = true }
+move-vm-types = { workspace = true }
 num-derive = { workspace = true }
 num-traits = { workspace = true }
 once_cell = { workspace = true }

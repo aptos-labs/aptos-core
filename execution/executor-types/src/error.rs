@@ -5,6 +5,7 @@
 use aptos_crypto::HashValue;
 use aptos_types::transaction::Version;
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 use thiserror::Error;
 
 #[derive(Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
@@ -59,6 +60,14 @@ impl From<aptos_secure_net::Error> for ExecutorError {
     fn from(error: aptos_secure_net::Error) -> Self {
         Self::InternalError {
             error: format!("{}", error),
+        }
+    }
+}
+
+impl ExecutorError {
+    pub fn internal_err<E: Display>(e: E) -> Self {
+        Self::InternalError {
+            error: format!("{}", e),
         }
     }
 }

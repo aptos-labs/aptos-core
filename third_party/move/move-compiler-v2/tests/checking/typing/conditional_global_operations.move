@@ -11,7 +11,7 @@ module M {
     }
 
     // types that can have key/store but the specific instantiation does not
-    fun ex<T>(s: &signer, a1: address) acquires Box, Pair {
+    fun ex<T>(s: &signer, a1: address) acquires Box<R>, Box<T>, Pair<S, R> {
         move_to(s, Box<R> { f: R {} });
         borrow_global<Box<T>>(a1);
         borrow_global_mut<Box<Box<T>>>(a1);

@@ -1,0 +1,43 @@
+
+Diagnostics:
+error: invalid access specifier
+  ┌─ tests/checking/access_specifiers/access_err.move:6:23
+  │
+6 │     fun f1() acquires undef {
+  │                       ^^^^^^
+
+error: undeclared module `undef`
+  ┌─ tests/checking/access_specifiers/access_err.move:9:23
+  │
+9 │     fun f2() acquires 0x42::undef::* {
+  │                       ^^^^^^^^^^^^^^^
+
+error: invalid access specifier: a wildcard cannot be followed by a non-wildcard name component
+   ┌─ tests/checking/access_specifiers/access_err.move:12:23
+   │
+12 │     fun f3() acquires 0x42::*::S {
+   │                       ^^^^^^^^^^^
+
+error: undeclared `m::y`
+   ┌─ tests/checking/access_specifiers/access_err.move:18:35
+   │
+18 │     fun f5(x: address) acquires *(y) {
+   │                                   ^
+
+error: undeclared `m::y`
+   ┌─ tests/checking/access_specifiers/access_err.move:21:51
+   │
+21 │     fun f6(x: address) acquires *(make_up_address(y)) {
+   │                                                   ^
+
+error: expected `address` but found `u64`
+   ┌─ tests/checking/access_specifiers/access_err.move:24:30
+   │
+24 │     fun f7(x: u64) acquires *(make_up_address_wrong(x)) {
+   │                              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: no function named `undefined` found
+   ┌─ tests/checking/access_specifiers/access_err.move:27:30
+   │
+27 │     fun f8(x: u64) acquires *(undefined(x)) {
+   │                              ^^^^^^^^^^^^^^

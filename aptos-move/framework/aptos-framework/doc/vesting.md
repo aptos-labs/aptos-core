@@ -1,5 +1,5 @@
 
-<a name="0x1_vesting"></a>
+<a id="0x1_vesting"></a>
 
 # Module `0x1::vesting`
 
@@ -89,6 +89,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 -  [Function `reset_beneficiary`](#0x1_vesting_reset_beneficiary)
 -  [Function `set_management_role`](#0x1_vesting_set_management_role)
 -  [Function `set_beneficiary_resetter`](#0x1_vesting_set_beneficiary_resetter)
+-  [Function `set_beneficiary_for_operator`](#0x1_vesting_set_beneficiary_for_operator)
 -  [Function `get_role_holder`](#0x1_vesting_get_role_holder)
 -  [Function `get_vesting_account_signer`](#0x1_vesting_get_vesting_account_signer)
 -  [Function `get_vesting_account_signer_internal`](#0x1_vesting_get_vesting_account_signer_internal)
@@ -133,6 +134,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
     -  [Function `reset_beneficiary`](#@Specification_1_reset_beneficiary)
     -  [Function `set_management_role`](#@Specification_1_set_management_role)
     -  [Function `set_beneficiary_resetter`](#@Specification_1_set_beneficiary_resetter)
+    -  [Function `set_beneficiary_for_operator`](#@Specification_1_set_beneficiary_for_operator)
     -  [Function `get_role_holder`](#@Specification_1_get_role_holder)
     -  [Function `get_vesting_account_signer`](#@Specification_1_get_vesting_account_signer)
     -  [Function `get_vesting_account_signer_internal`](#@Specification_1_get_vesting_account_signer_internal)
@@ -167,7 +169,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 
 
 
-<a name="0x1_vesting_VestingSchedule"></a>
+<a id="0x1_vesting_VestingSchedule"></a>
 
 ## Struct `VestingSchedule`
 
@@ -212,7 +214,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 
 </details>
 
-<a name="0x1_vesting_StakingInfo"></a>
+<a id="0x1_vesting_StakingInfo"></a>
 
 ## Struct `StakingInfo`
 
@@ -257,7 +259,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 
 </details>
 
-<a name="0x1_vesting_VestingContract"></a>
+<a id="0x1_vesting_VestingContract"></a>
 
 ## Resource `VestingContract`
 
@@ -386,7 +388,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 
 </details>
 
-<a name="0x1_vesting_VestingAccountManagement"></a>
+<a id="0x1_vesting_VestingAccountManagement"></a>
 
 ## Resource `VestingAccountManagement`
 
@@ -413,7 +415,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 
 </details>
 
-<a name="0x1_vesting_AdminStore"></a>
+<a id="0x1_vesting_AdminStore"></a>
 
 ## Resource `AdminStore`
 
@@ -452,7 +454,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 
 </details>
 
-<a name="0x1_vesting_CreateVestingContractEvent"></a>
+<a id="0x1_vesting_CreateVestingContractEvent"></a>
 
 ## Struct `CreateVestingContractEvent`
 
@@ -515,7 +517,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 
 </details>
 
-<a name="0x1_vesting_UpdateOperatorEvent"></a>
+<a id="0x1_vesting_UpdateOperatorEvent"></a>
 
 ## Struct `UpdateOperatorEvent`
 
@@ -572,7 +574,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 
 </details>
 
-<a name="0x1_vesting_UpdateVoterEvent"></a>
+<a id="0x1_vesting_UpdateVoterEvent"></a>
 
 ## Struct `UpdateVoterEvent`
 
@@ -623,7 +625,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 
 </details>
 
-<a name="0x1_vesting_ResetLockupEvent"></a>
+<a id="0x1_vesting_ResetLockupEvent"></a>
 
 ## Struct `ResetLockupEvent`
 
@@ -668,7 +670,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 
 </details>
 
-<a name="0x1_vesting_SetBeneficiaryEvent"></a>
+<a id="0x1_vesting_SetBeneficiaryEvent"></a>
 
 ## Struct `SetBeneficiaryEvent`
 
@@ -719,7 +721,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 
 </details>
 
-<a name="0x1_vesting_UnlockRewardsEvent"></a>
+<a id="0x1_vesting_UnlockRewardsEvent"></a>
 
 ## Struct `UnlockRewardsEvent`
 
@@ -764,7 +766,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 
 </details>
 
-<a name="0x1_vesting_VestEvent"></a>
+<a id="0x1_vesting_VestEvent"></a>
 
 ## Struct `VestEvent`
 
@@ -815,7 +817,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 
 </details>
 
-<a name="0x1_vesting_DistributeEvent"></a>
+<a id="0x1_vesting_DistributeEvent"></a>
 
 ## Struct `DistributeEvent`
 
@@ -854,7 +856,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 
 </details>
 
-<a name="0x1_vesting_TerminateEvent"></a>
+<a id="0x1_vesting_TerminateEvent"></a>
 
 ## Struct `TerminateEvent`
 
@@ -887,7 +889,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 
 </details>
 
-<a name="0x1_vesting_AdminWithdrawEvent"></a>
+<a id="0x1_vesting_AdminWithdrawEvent"></a>
 
 ## Struct `AdminWithdrawEvent`
 
@@ -926,12 +928,12 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_vesting_EEMPTY_VESTING_SCHEDULE"></a>
+<a id="0x1_vesting_EEMPTY_VESTING_SCHEDULE"></a>
 
 Vesting schedule cannot be empty.
 
@@ -941,7 +943,7 @@ Vesting schedule cannot be empty.
 
 
 
-<a name="0x1_vesting_EINVALID_WITHDRAWAL_ADDRESS"></a>
+<a id="0x1_vesting_EINVALID_WITHDRAWAL_ADDRESS"></a>
 
 Withdrawal address is invalid.
 
@@ -951,7 +953,7 @@ Withdrawal address is invalid.
 
 
 
-<a name="0x1_vesting_ENOT_ADMIN"></a>
+<a id="0x1_vesting_ENOT_ADMIN"></a>
 
 The signer is not the admin of the vesting contract.
 
@@ -961,7 +963,7 @@ The signer is not the admin of the vesting contract.
 
 
 
-<a name="0x1_vesting_ENO_SHAREHOLDERS"></a>
+<a id="0x1_vesting_ENO_SHAREHOLDERS"></a>
 
 Shareholders list cannot be empty.
 
@@ -971,7 +973,7 @@ Shareholders list cannot be empty.
 
 
 
-<a name="0x1_vesting_EPENDING_STAKE_FOUND"></a>
+<a id="0x1_vesting_EPENDING_STAKE_FOUND"></a>
 
 Cannot terminate the vesting contract with pending active stake. Need to wait until next epoch.
 
@@ -981,7 +983,7 @@ Cannot terminate the vesting contract with pending active stake. Need to wait un
 
 
 
-<a name="0x1_vesting_EPERMISSION_DENIED"></a>
+<a id="0x1_vesting_EPERMISSION_DENIED"></a>
 
 Account is not admin or does not have the required role to take this action.
 
@@ -991,7 +993,7 @@ Account is not admin or does not have the required role to take this action.
 
 
 
-<a name="0x1_vesting_EROLE_NOT_FOUND"></a>
+<a id="0x1_vesting_EROLE_NOT_FOUND"></a>
 
 The vesting account has no such management role.
 
@@ -1001,7 +1003,7 @@ The vesting account has no such management role.
 
 
 
-<a name="0x1_vesting_ESHARES_LENGTH_MISMATCH"></a>
+<a id="0x1_vesting_ESHARES_LENGTH_MISMATCH"></a>
 
 The length of shareholders and shares lists don't match.
 
@@ -1011,7 +1013,7 @@ The length of shareholders and shares lists don't match.
 
 
 
-<a name="0x1_vesting_EVEC_EMPTY_FOR_MANY_FUNCTION"></a>
+<a id="0x1_vesting_EVEC_EMPTY_FOR_MANY_FUNCTION"></a>
 
 Zero items were provided to a *_many function.
 
@@ -1021,7 +1023,7 @@ Zero items were provided to a *_many function.
 
 
 
-<a name="0x1_vesting_EVESTING_ACCOUNT_HAS_NO_ROLES"></a>
+<a id="0x1_vesting_EVESTING_ACCOUNT_HAS_NO_ROLES"></a>
 
 Vesting account has no other management roles beside admin.
 
@@ -1031,7 +1033,7 @@ Vesting account has no other management roles beside admin.
 
 
 
-<a name="0x1_vesting_EVESTING_CONTRACT_NOT_ACTIVE"></a>
+<a id="0x1_vesting_EVESTING_CONTRACT_NOT_ACTIVE"></a>
 
 Vesting contract needs to be in active state.
 
@@ -1041,7 +1043,7 @@ Vesting contract needs to be in active state.
 
 
 
-<a name="0x1_vesting_EVESTING_CONTRACT_NOT_FOUND"></a>
+<a id="0x1_vesting_EVESTING_CONTRACT_NOT_FOUND"></a>
 
 No vesting contract found at provided address.
 
@@ -1051,7 +1053,7 @@ No vesting contract found at provided address.
 
 
 
-<a name="0x1_vesting_EVESTING_CONTRACT_STILL_ACTIVE"></a>
+<a id="0x1_vesting_EVESTING_CONTRACT_STILL_ACTIVE"></a>
 
 Admin can only withdraw from an inactive (paused or terminated) vesting contract.
 
@@ -1061,7 +1063,7 @@ Admin can only withdraw from an inactive (paused or terminated) vesting contract
 
 
 
-<a name="0x1_vesting_EVESTING_START_TOO_SOON"></a>
+<a id="0x1_vesting_EVESTING_START_TOO_SOON"></a>
 
 Vesting cannot start before or at the current block timestamp. Has to be in the future.
 
@@ -1071,7 +1073,7 @@ Vesting cannot start before or at the current block timestamp. Has to be in the 
 
 
 
-<a name="0x1_vesting_EZERO_GRANT"></a>
+<a id="0x1_vesting_EZERO_GRANT"></a>
 
 Grant amount cannot be 0.
 
@@ -1081,7 +1083,7 @@ Grant amount cannot be 0.
 
 
 
-<a name="0x1_vesting_EZERO_VESTING_SCHEDULE_PERIOD"></a>
+<a id="0x1_vesting_EZERO_VESTING_SCHEDULE_PERIOD"></a>
 
 Vesting period cannot be 0.
 
@@ -1091,7 +1093,7 @@ Vesting period cannot be 0.
 
 
 
-<a name="0x1_vesting_MAXIMUM_SHAREHOLDERS"></a>
+<a id="0x1_vesting_MAXIMUM_SHAREHOLDERS"></a>
 
 Maximum number of shareholders a vesting pool can support.
 
@@ -1101,7 +1103,7 @@ Maximum number of shareholders a vesting pool can support.
 
 
 
-<a name="0x1_vesting_ROLE_BENEFICIARY_RESETTER"></a>
+<a id="0x1_vesting_ROLE_BENEFICIARY_RESETTER"></a>
 
 Roles that can manage certain aspects of the vesting account beyond the main admin.
 
@@ -1111,7 +1113,7 @@ Roles that can manage certain aspects of the vesting account beyond the main adm
 
 
 
-<a name="0x1_vesting_VESTING_POOL_ACTIVE"></a>
+<a id="0x1_vesting_VESTING_POOL_ACTIVE"></a>
 
 Vesting contract states.
 Vesting contract is active and distributions can be made.
@@ -1122,7 +1124,7 @@ Vesting contract is active and distributions can be made.
 
 
 
-<a name="0x1_vesting_VESTING_POOL_SALT"></a>
+<a id="0x1_vesting_VESTING_POOL_SALT"></a>
 
 
 
@@ -1131,7 +1133,7 @@ Vesting contract is active and distributions can be made.
 
 
 
-<a name="0x1_vesting_VESTING_POOL_TERMINATED"></a>
+<a id="0x1_vesting_VESTING_POOL_TERMINATED"></a>
 
 Vesting contract has been terminated and all funds have been released back to the withdrawal address.
 
@@ -1141,7 +1143,7 @@ Vesting contract has been terminated and all funds have been released back to th
 
 
 
-<a name="0x1_vesting_stake_pool_address"></a>
+<a id="0x1_vesting_stake_pool_address"></a>
 
 ## Function `stake_pool_address`
 
@@ -1170,7 +1172,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 </details>
 
-<a name="0x1_vesting_vesting_start_secs"></a>
+<a id="0x1_vesting_vesting_start_secs"></a>
 
 ## Function `vesting_start_secs`
 
@@ -1200,7 +1202,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 </details>
 
-<a name="0x1_vesting_period_duration_secs"></a>
+<a id="0x1_vesting_period_duration_secs"></a>
 
 ## Function `period_duration_secs`
 
@@ -1230,7 +1232,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 </details>
 
-<a name="0x1_vesting_remaining_grant"></a>
+<a id="0x1_vesting_remaining_grant"></a>
 
 ## Function `remaining_grant`
 
@@ -1262,7 +1264,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 </details>
 
-<a name="0x1_vesting_beneficiary"></a>
+<a id="0x1_vesting_beneficiary"></a>
 
 ## Function `beneficiary`
 
@@ -1292,7 +1294,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 </details>
 
-<a name="0x1_vesting_operator_commission_percentage"></a>
+<a id="0x1_vesting_operator_commission_percentage"></a>
 
 ## Function `operator_commission_percentage`
 
@@ -1321,7 +1323,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 </details>
 
-<a name="0x1_vesting_vesting_contracts"></a>
+<a id="0x1_vesting_vesting_contracts"></a>
 
 ## Function `vesting_contracts`
 
@@ -1351,7 +1353,7 @@ Return all the vesting contracts a given address is an admin of.
 
 </details>
 
-<a name="0x1_vesting_operator"></a>
+<a id="0x1_vesting_operator"></a>
 
 ## Function `operator`
 
@@ -1380,7 +1382,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 </details>
 
-<a name="0x1_vesting_voter"></a>
+<a id="0x1_vesting_voter"></a>
 
 ## Function `voter`
 
@@ -1410,7 +1412,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 </details>
 
-<a name="0x1_vesting_vesting_schedule"></a>
+<a id="0x1_vesting_vesting_schedule"></a>
 
 ## Function `vesting_schedule`
 
@@ -1445,7 +1447,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 </details>
 
-<a name="0x1_vesting_total_accumulated_rewards"></a>
+<a id="0x1_vesting_total_accumulated_rewards"></a>
 
 ## Function `total_accumulated_rewards`
 
@@ -1479,7 +1481,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 </details>
 
-<a name="0x1_vesting_accumulated_rewards"></a>
+<a id="0x1_vesting_accumulated_rewards"></a>
 
 ## Function `accumulated_rewards`
 
@@ -1515,7 +1517,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 </details>
 
-<a name="0x1_vesting_shareholders"></a>
+<a id="0x1_vesting_shareholders"></a>
 
 ## Function `shareholders`
 
@@ -1544,7 +1546,7 @@ Return the list of all shareholders in the vesting contract.
 
 </details>
 
-<a name="0x1_vesting_shareholder"></a>
+<a id="0x1_vesting_shareholder"></a>
 
 ## Function `shareholder`
 
@@ -1591,7 +1593,7 @@ This returns 0x0 if no shareholder is found for the given beneficiary / the addr
 
 </details>
 
-<a name="0x1_vesting_create_vesting_schedule"></a>
+<a id="0x1_vesting_create_vesting_schedule"></a>
 
 ## Function `create_vesting_schedule`
 
@@ -1632,7 +1634,7 @@ Create a vesting schedule with the given schedule of distributions, a vesting st
 
 </details>
 
-<a name="0x1_vesting_create_vesting_contract"></a>
+<a id="0x1_vesting_create_vesting_contract"></a>
 
 ## Function `create_vesting_contract`
 
@@ -1752,7 +1754,7 @@ Create a vesting contract with a given configurations.
 
 </details>
 
-<a name="0x1_vesting_unlock_rewards"></a>
+<a id="0x1_vesting_unlock_rewards"></a>
 
 ## Function `unlock_rewards`
 
@@ -1779,7 +1781,7 @@ Unlock any accumulated rewards.
 
 </details>
 
-<a name="0x1_vesting_unlock_rewards_many"></a>
+<a id="0x1_vesting_unlock_rewards_many"></a>
 
 ## Function `unlock_rewards_many`
 
@@ -1811,7 +1813,7 @@ Call <code>unlock_rewards</code> for many vesting contracts.
 
 </details>
 
-<a name="0x1_vesting_vest"></a>
+<a id="0x1_vesting_vest"></a>
 
 ## Function `vest`
 
@@ -1884,7 +1886,7 @@ Unlock any vested portion of the grant.
 
 </details>
 
-<a name="0x1_vesting_vest_many"></a>
+<a id="0x1_vesting_vest_many"></a>
 
 ## Function `vest_many`
 
@@ -1916,7 +1918,7 @@ Call <code>vest</code> for many vesting contracts.
 
 </details>
 
-<a name="0x1_vesting_distribute"></a>
+<a id="0x1_vesting_distribute"></a>
 
 ## Function `distribute`
 
@@ -1977,7 +1979,7 @@ Distribute any withdrawable stake from the stake pool.
 
 </details>
 
-<a name="0x1_vesting_distribute_many"></a>
+<a id="0x1_vesting_distribute_many"></a>
 
 ## Function `distribute_many`
 
@@ -2009,7 +2011,7 @@ Call <code>distribute</code> for many vesting contracts.
 
 </details>
 
-<a name="0x1_vesting_terminate_vesting_contract"></a>
+<a id="0x1_vesting_terminate_vesting_contract"></a>
 
 ## Function `terminate_vesting_contract`
 
@@ -2055,7 +2057,7 @@ Terminate the vesting contract and send all funds back to the withdrawal address
 
 </details>
 
-<a name="0x1_vesting_admin_withdraw"></a>
+<a id="0x1_vesting_admin_withdraw"></a>
 
 ## Function `admin_withdraw`
 
@@ -2101,7 +2103,7 @@ has already been terminated.
 
 </details>
 
-<a name="0x1_vesting_update_operator"></a>
+<a id="0x1_vesting_update_operator"></a>
 
 ## Function `update_operator`
 
@@ -2148,7 +2150,7 @@ has already been terminated.
 
 </details>
 
-<a name="0x1_vesting_update_operator_with_same_commission"></a>
+<a id="0x1_vesting_update_operator_with_same_commission"></a>
 
 ## Function `update_operator_with_same_commission`
 
@@ -2177,7 +2179,7 @@ has already been terminated.
 
 </details>
 
-<a name="0x1_vesting_update_commission_percentage"></a>
+<a id="0x1_vesting_update_commission_percentage"></a>
 
 ## Function `update_commission_percentage`
 
@@ -2212,7 +2214,7 @@ has already been terminated.
 
 </details>
 
-<a name="0x1_vesting_update_voter"></a>
+<a id="0x1_vesting_update_voter"></a>
 
 ## Function `update_voter`
 
@@ -2256,7 +2258,7 @@ has already been terminated.
 
 </details>
 
-<a name="0x1_vesting_reset_lockup"></a>
+<a id="0x1_vesting_reset_lockup"></a>
 
 ## Function `reset_lockup`
 
@@ -2296,7 +2298,7 @@ has already been terminated.
 
 </details>
 
-<a name="0x1_vesting_set_beneficiary"></a>
+<a id="0x1_vesting_set_beneficiary"></a>
 
 ## Function `set_beneficiary`
 
@@ -2350,7 +2352,7 @@ has already been terminated.
 
 </details>
 
-<a name="0x1_vesting_reset_beneficiary"></a>
+<a id="0x1_vesting_reset_beneficiary"></a>
 
 ## Function `reset_beneficiary`
 
@@ -2391,7 +2393,7 @@ account.
 
 </details>
 
-<a name="0x1_vesting_set_management_role"></a>
+<a id="0x1_vesting_set_management_role"></a>
 
 ## Function `set_management_role`
 
@@ -2434,7 +2436,7 @@ account.
 
 </details>
 
-<a name="0x1_vesting_set_beneficiary_resetter"></a>
+<a id="0x1_vesting_set_beneficiary_resetter"></a>
 
 ## Function `set_beneficiary_resetter`
 
@@ -2462,7 +2464,35 @@ account.
 
 </details>
 
-<a name="0x1_vesting_get_role_holder"></a>
+<a id="0x1_vesting_set_beneficiary_for_operator"></a>
+
+## Function `set_beneficiary_for_operator`
+
+Set the beneficiary for the operator.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_set_beneficiary_for_operator">set_beneficiary_for_operator</a>(operator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_beneficiary: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_set_beneficiary_for_operator">set_beneficiary_for_operator</a>(
+    operator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    new_beneficiary: <b>address</b>,
+) {
+    <a href="staking_contract.md#0x1_staking_contract_set_beneficiary_for_operator">staking_contract::set_beneficiary_for_operator</a>(operator, new_beneficiary);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_vesting_get_role_holder"></a>
 
 ## Function `get_role_holder`
 
@@ -2489,7 +2519,7 @@ account.
 
 </details>
 
-<a name="0x1_vesting_get_vesting_account_signer"></a>
+<a id="0x1_vesting_get_vesting_account_signer"></a>
 
 ## Function `get_vesting_account_signer`
 
@@ -2518,7 +2548,7 @@ staking_contract and stake modules.
 
 </details>
 
-<a name="0x1_vesting_get_vesting_account_signer_internal"></a>
+<a id="0x1_vesting_get_vesting_account_signer_internal"></a>
 
 ## Function `get_vesting_account_signer_internal`
 
@@ -2542,7 +2572,7 @@ staking_contract and stake modules.
 
 </details>
 
-<a name="0x1_vesting_create_vesting_contract_account"></a>
+<a id="0x1_vesting_create_vesting_contract_account"></a>
 
 ## Function `create_vesting_contract_account`
 
@@ -2586,7 +2616,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 </details>
 
-<a name="0x1_vesting_verify_admin"></a>
+<a id="0x1_vesting_verify_admin"></a>
 
 ## Function `verify_admin`
 
@@ -2610,7 +2640,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 </details>
 
-<a name="0x1_vesting_assert_vesting_contract_exists"></a>
+<a id="0x1_vesting_assert_vesting_contract_exists"></a>
 
 ## Function `assert_vesting_contract_exists`
 
@@ -2634,7 +2664,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 </details>
 
-<a name="0x1_vesting_assert_active_vesting_contract"></a>
+<a id="0x1_vesting_assert_active_vesting_contract"></a>
 
 ## Function `assert_active_vesting_contract`
 
@@ -2660,7 +2690,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 </details>
 
-<a name="0x1_vesting_unlock_stake"></a>
+<a id="0x1_vesting_unlock_stake"></a>
 
 ## Function `unlock_stake`
 
@@ -2685,7 +2715,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 </details>
 
-<a name="0x1_vesting_withdraw_stake"></a>
+<a id="0x1_vesting_withdraw_stake"></a>
 
 ## Function `withdraw_stake`
 
@@ -2714,7 +2744,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 </details>
 
-<a name="0x1_vesting_get_beneficiary"></a>
+<a id="0x1_vesting_get_beneficiary"></a>
 
 ## Function `get_beneficiary`
 
@@ -2742,7 +2772,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -2754,7 +2784,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_stake_pool_address"></a>
+<a id="@Specification_1_stake_pool_address"></a>
 
 ### Function `stake_pool_address`
 
@@ -2771,7 +2801,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_vesting_start_secs"></a>
+<a id="@Specification_1_vesting_start_secs"></a>
 
 ### Function `vesting_start_secs`
 
@@ -2788,7 +2818,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_period_duration_secs"></a>
+<a id="@Specification_1_period_duration_secs"></a>
 
 ### Function `period_duration_secs`
 
@@ -2805,7 +2835,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_remaining_grant"></a>
+<a id="@Specification_1_remaining_grant"></a>
 
 ### Function `remaining_grant`
 
@@ -2822,7 +2852,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_beneficiary"></a>
+<a id="@Specification_1_beneficiary"></a>
 
 ### Function `beneficiary`
 
@@ -2839,7 +2869,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_operator_commission_percentage"></a>
+<a id="@Specification_1_operator_commission_percentage"></a>
 
 ### Function `operator_commission_percentage`
 
@@ -2856,7 +2886,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_vesting_contracts"></a>
+<a id="@Specification_1_vesting_contracts"></a>
 
 ### Function `vesting_contracts`
 
@@ -2873,7 +2903,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_operator"></a>
+<a id="@Specification_1_operator"></a>
 
 ### Function `operator`
 
@@ -2890,7 +2920,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_voter"></a>
+<a id="@Specification_1_voter"></a>
 
 ### Function `voter`
 
@@ -2907,7 +2937,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_vesting_schedule"></a>
+<a id="@Specification_1_vesting_schedule"></a>
 
 ### Function `vesting_schedule`
 
@@ -2924,7 +2954,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_total_accumulated_rewards"></a>
+<a id="@Specification_1_total_accumulated_rewards"></a>
 
 ### Function `total_accumulated_rewards`
 
@@ -2936,14 +2966,14 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 300;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 <b>include</b> <a href="vesting.md#0x1_vesting_TotalAccumulatedRewardsAbortsIf">TotalAccumulatedRewardsAbortsIf</a>;
 </code></pre>
 
 
 
 
-<a name="0x1_vesting_TotalAccumulatedRewardsAbortsIf"></a>
+<a id="0x1_vesting_TotalAccumulatedRewardsAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_TotalAccumulatedRewardsAbortsIf">TotalAccumulatedRewardsAbortsIf</a> {
@@ -2975,7 +3005,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_accumulated_rewards"></a>
+<a id="@Specification_1_accumulated_rewards"></a>
 
 ### Function `accumulated_rewards`
 
@@ -2988,7 +3018,6 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
-<b>pragma</b> verify_duration_estimate = 1000;
 <b>include</b> <a href="vesting.md#0x1_vesting_TotalAccumulatedRewardsAbortsIf">TotalAccumulatedRewardsAbortsIf</a>;
 <b>let</b> vesting_contract = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
 <b>let</b> operator = vesting_contract.staking.operator;
@@ -3012,7 +3041,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_shareholders"></a>
+<a id="@Specification_1_shareholders"></a>
 
 ### Function `shareholders`
 
@@ -3030,7 +3059,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="0x1_vesting_spec_shareholder"></a>
+<a id="0x1_vesting_spec_shareholder"></a>
 
 
 <pre><code><b>fun</b> <a href="vesting.md#0x1_vesting_spec_shareholder">spec_shareholder</a>(vesting_contract_address: <b>address</b>, shareholder_or_beneficiary: <b>address</b>): <b>address</b>;
@@ -3038,7 +3067,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_shareholder"></a>
+<a id="@Specification_1_shareholder"></a>
 
 ### Function `shareholder`
 
@@ -3057,7 +3086,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_create_vesting_schedule"></a>
+<a id="@Specification_1_create_vesting_schedule"></a>
 
 ### Function `create_vesting_schedule`
 
@@ -3076,7 +3105,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_create_vesting_contract"></a>
+<a id="@Specification_1_create_vesting_contract"></a>
 
 ### Function `create_vesting_contract`
 
@@ -3097,7 +3126,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_unlock_rewards"></a>
+<a id="@Specification_1_unlock_rewards"></a>
 
 ### Function `unlock_rewards`
 
@@ -3115,7 +3144,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="0x1_vesting_UnlockRewardsAbortsIf"></a>
+<a id="0x1_vesting_UnlockRewardsAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_UnlockRewardsAbortsIf">UnlockRewardsAbortsIf</a> {
@@ -3139,7 +3168,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_unlock_rewards_many"></a>
+<a id="@Specification_1_unlock_rewards_many"></a>
 
 ### Function `unlock_rewards_many`
 
@@ -3157,7 +3186,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_vest"></a>
+<a id="@Specification_1_vest"></a>
 
 ### Function `vest`
 
@@ -3174,7 +3203,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_vest_many"></a>
+<a id="@Specification_1_vest_many"></a>
 
 ### Function `vest_many`
 
@@ -3193,7 +3222,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="0x1_vesting_PreconditionAbortsIf"></a>
+<a id="0x1_vesting_PreconditionAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_PreconditionAbortsIf">PreconditionAbortsIf</a> {
@@ -3205,7 +3234,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_distribute"></a>
+<a id="@Specification_1_distribute"></a>
 
 ### Function `distribute`
 
@@ -3224,7 +3253,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_distribute_many"></a>
+<a id="@Specification_1_distribute_many"></a>
 
 ### Function `distribute_many`
 
@@ -3241,7 +3270,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_terminate_vesting_contract"></a>
+<a id="@Specification_1_terminate_vesting_contract"></a>
 
 ### Function `terminate_vesting_contract`
 
@@ -3260,7 +3289,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_admin_withdraw"></a>
+<a id="@Specification_1_admin_withdraw"></a>
 
 ### Function `admin_withdraw`
 
@@ -3280,7 +3309,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_update_operator"></a>
+<a id="@Specification_1_update_operator"></a>
 
 ### Function `update_operator`
 
@@ -3306,7 +3335,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_update_operator_with_same_commission"></a>
+<a id="@Specification_1_update_operator_with_same_commission"></a>
 
 ### Function `update_operator_with_same_commission`
 
@@ -3322,7 +3351,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_update_commission_percentage"></a>
+<a id="@Specification_1_update_commission_percentage"></a>
 
 ### Function `update_commission_percentage`
 
@@ -3338,7 +3367,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_update_voter"></a>
+<a id="@Specification_1_update_voter"></a>
 
 ### Function `update_voter`
 
@@ -3358,7 +3387,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_reset_lockup"></a>
+<a id="@Specification_1_reset_lockup"></a>
 
 ### Function `reset_lockup`
 
@@ -3384,7 +3413,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_set_beneficiary"></a>
+<a id="@Specification_1_set_beneficiary"></a>
 
 ### Function `set_beneficiary`
 
@@ -3404,7 +3433,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_reset_beneficiary"></a>
+<a id="@Specification_1_reset_beneficiary"></a>
 
 ### Function `reset_beneficiary`
 
@@ -3430,7 +3459,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_set_management_role"></a>
+<a id="@Specification_1_set_management_role"></a>
 
 ### Function `set_management_role`
 
@@ -3447,7 +3476,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_set_beneficiary_resetter"></a>
+<a id="@Specification_1_set_beneficiary_resetter"></a>
 
 ### Function `set_beneficiary_resetter`
 
@@ -3465,7 +3494,23 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_get_role_holder"></a>
+<a id="@Specification_1_set_beneficiary_for_operator"></a>
+
+### Function `set_beneficiary_for_operator`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_set_beneficiary_for_operator">set_beneficiary_for_operator</a>(operator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_beneficiary: <b>address</b>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_get_role_holder"></a>
 
 ### Function `get_role_holder`
 
@@ -3483,7 +3528,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_get_vesting_account_signer"></a>
+<a id="@Specification_1_get_vesting_account_signer"></a>
 
 ### Function `get_vesting_account_signer`
 
@@ -3499,7 +3544,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_get_vesting_account_signer_internal"></a>
+<a id="@Specification_1_get_vesting_account_signer_internal"></a>
 
 ### Function `get_vesting_account_signer_internal`
 
@@ -3516,7 +3561,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="0x1_vesting_spec_get_vesting_account_signer"></a>
+<a id="0x1_vesting_spec_get_vesting_account_signer"></a>
 
 
 <pre><code><b>fun</b> <a href="vesting.md#0x1_vesting_spec_get_vesting_account_signer">spec_get_vesting_account_signer</a>(vesting_contract: <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
@@ -3524,7 +3569,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_create_vesting_contract_account"></a>
+<a id="@Specification_1_create_vesting_contract_account"></a>
 
 ### Function `create_vesting_contract_account`
 
@@ -3562,7 +3607,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_verify_admin"></a>
+<a id="@Specification_1_verify_admin"></a>
 
 ### Function `verify_admin`
 
@@ -3578,7 +3623,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_assert_vesting_contract_exists"></a>
+<a id="@Specification_1_assert_vesting_contract_exists"></a>
 
 ### Function `assert_vesting_contract_exists`
 
@@ -3594,7 +3639,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_assert_active_vesting_contract"></a>
+<a id="@Specification_1_assert_active_vesting_contract"></a>
 
 ### Function `assert_active_vesting_contract`
 
@@ -3610,7 +3655,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_unlock_stake"></a>
+<a id="@Specification_1_unlock_stake"></a>
 
 ### Function `unlock_stake`
 
@@ -3628,7 +3673,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="0x1_vesting_UnlockStakeAbortsIf"></a>
+<a id="0x1_vesting_UnlockStakeAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_UnlockStakeAbortsIf">UnlockStakeAbortsIf</a> {
@@ -3645,7 +3690,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_withdraw_stake"></a>
+<a id="@Specification_1_withdraw_stake"></a>
 
 ### Function `withdraw_stake`
 
@@ -3663,7 +3708,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="0x1_vesting_WithdrawStakeAbortsIf"></a>
+<a id="0x1_vesting_WithdrawStakeAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_WithdrawStakeAbortsIf">WithdrawStakeAbortsIf</a> {
@@ -3680,7 +3725,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="0x1_vesting_DistributeInternalAbortsIf"></a>
+<a id="0x1_vesting_DistributeInternalAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_DistributeInternalAbortsIf">DistributeInternalAbortsIf</a> {
@@ -3713,7 +3758,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="@Specification_1_get_beneficiary"></a>
+<a id="@Specification_1_get_beneficiary"></a>
 
 ### Function `get_beneficiary`
 
@@ -3730,7 +3775,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="0x1_vesting_SetManagementRoleAbortsIf"></a>
+<a id="0x1_vesting_SetManagementRoleAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_SetManagementRoleAbortsIf">SetManagementRoleAbortsIf</a> {
@@ -3745,7 +3790,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="0x1_vesting_VerifyAdminAbortsIf"></a>
+<a id="0x1_vesting_VerifyAdminAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_VerifyAdminAbortsIf">VerifyAdminAbortsIf</a> {
@@ -3760,7 +3805,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<a name="0x1_vesting_ActiveVestingContractAbortsIf"></a>
+<a id="0x1_vesting_ActiveVestingContractAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt; {

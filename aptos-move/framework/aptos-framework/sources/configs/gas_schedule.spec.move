@@ -7,10 +7,11 @@ spec aptos_framework::gas_schedule {
     spec initialize(aptos_framework: &signer, gas_schedule_blob: vector<u8>) {
         use std::signer;
 
+        let addr = signer::address_of(aptos_framework);
         include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
         aborts_if len(gas_schedule_blob) == 0;
-        aborts_if exists<GasScheduleV2>(signer::address_of(aptos_framework));
-        ensures exists<GasScheduleV2>(signer::address_of(aptos_framework));
+        aborts_if exists<GasScheduleV2>(addr);
+        ensures exists<GasScheduleV2>(addr);
     }
 
     spec set_gas_schedule(aptos_framework: &signer, gas_schedule_blob: vector<u8>) {
@@ -21,8 +22,9 @@ spec aptos_framework::gas_schedule {
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::transaction_fee;
         use aptos_framework::staking_config;
-        pragma verify_duration_estimate = 120;
 
+        // TODO: set because of timeout (property proved)
+        pragma verify_duration_estimate = 120;
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
@@ -34,6 +36,7 @@ spec aptos_framework::gas_schedule {
         let gas_schedule = global<GasScheduleV2>(@aptos_framework);
         aborts_if exists<GasScheduleV2>(@aptos_framework) && new_gas_schedule.feature_version < gas_schedule.feature_version;
         ensures exists<GasScheduleV2>(signer::address_of(aptos_framework));
+        ensures global<GasScheduleV2>(@aptos_framework) == new_gas_schedule;
     }
 
     spec set_storage_gas_config(aptos_framework: &signer, config: StorageGasConfig) {
@@ -43,13 +46,14 @@ spec aptos_framework::gas_schedule {
         use aptos_framework::transaction_fee;
         use aptos_framework::staking_config;
 
-        pragma verify_duration_estimate = 200;
-
+        // TODO: set because of timeout (property proved).
+        pragma verify_duration_estimate = 120;
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         include staking_config::StakingRewardsConfigRequirement;
         aborts_if !exists<StorageGasConfig>(@aptos_framework);
+        ensures global<StorageGasConfig>(@aptos_framework) == config;
     }
 }

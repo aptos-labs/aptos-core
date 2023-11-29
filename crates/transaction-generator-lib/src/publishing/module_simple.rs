@@ -168,6 +168,18 @@ pub enum EntryPoints {
     TokenV1MintAndTransferFT,
 
     TokenV2AmbassadorMint,
+
+    InitializeVectorPicture {
+        length: u64,
+    },
+    VectorPicture {
+        length: u64,
+    },
+    InitializeSmartTablePicture,
+    SmartTablePicture {
+        length: u64,
+        num_points_per_txn: usize,
+    },
 }
 
 impl EntryPoints {
@@ -201,6 +213,10 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndStoreFT
             | EntryPoints::TokenV1MintAndTransferFT => "framework_usecases",
             EntryPoints::TokenV2AmbassadorMint => "ambassador_token",
+            EntryPoints::InitializeVectorPicture { .. }
+            | EntryPoints::VectorPicture { .. }
+            | EntryPoints::InitializeSmartTablePicture
+            | EntryPoints::SmartTablePicture { .. } => "complex",
         }
     }
 
@@ -234,6 +250,12 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndStoreFT
             | EntryPoints::TokenV1MintAndTransferFT => "token_v1",
             EntryPoints::TokenV2AmbassadorMint => "ambassador",
+            EntryPoints::InitializeVectorPicture { .. } | EntryPoints::VectorPicture { .. } => {
+                "vector_picture"
+            },
+            EntryPoints::InitializeSmartTablePicture | EntryPoints::SmartTablePicture { .. } => {
+                "smart_table_picture"
+            },
         }
     }
 
@@ -365,13 +387,52 @@ impl EntryPoints {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 get_payload(
                     module_id,
-                    ident_str!("mint_ambassador_token_by_user").to_owned(),
+                    ident_str!("mint_numbered_ambassador_token_by_user").to_owned(),
                     vec![
                         bcs::to_bytes(&rand_string(rng, 100)).unwrap(), // description
-                        bcs::to_bytes(&rand_string(rng, 20)).unwrap(),  // name
+                        bcs::to_bytes("superstar #").unwrap(),          // name
                         bcs::to_bytes(&rand_string(rng, 50)).unwrap(),  // uri
                     ],
                 )
+            },
+            EntryPoints::InitializeVectorPicture { length } => {
+                get_payload(module_id, ident_str!("create").to_owned(), vec![
+                    bcs::to_bytes(&length).unwrap(), // length
+                ])
+            },
+            EntryPoints::VectorPicture { length } => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                get_payload(module_id, ident_str!("update").to_owned(), vec![
+                    bcs::to_bytes(&other.expect("Must provide other")).unwrap(),
+                    bcs::to_bytes(&0u64).unwrap(), // palette_index
+                    bcs::to_bytes(&rng.gen_range(0u64, length)).unwrap(), // index
+                    bcs::to_bytes(&rng.gen_range(0u8, 255u8)).unwrap(), // color R
+                    bcs::to_bytes(&rng.gen_range(0u8, 255u8)).unwrap(), // color G
+                    bcs::to_bytes(&rng.gen_range(0u8, 255u8)).unwrap(), // color B
+                ])
+            },
+            EntryPoints::InitializeSmartTablePicture => {
+                get_payload(module_id, ident_str!("create").to_owned(), vec![])
+            },
+            EntryPoints::SmartTablePicture {
+                length,
+                num_points_per_txn,
+            } => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                u32::try_from(*length).unwrap();
+                let mut indices = (0..*num_points_per_txn)
+                    .map(|_| rng.gen_range(0u64, length))
+                    .collect::<Vec<_>>();
+                let mut colors = (0..*num_points_per_txn)
+                    .map(|_| rng.gen_range(0u8, 100u8))
+                    .collect::<Vec<_>>();
+                assert!(indices.len() == colors.len());
+                get_payload(module_id, ident_str!("update").to_owned(), vec![
+                    bcs::to_bytes(&other.expect("Must provide other")).unwrap(),
+                    bcs::to_bytes(&0u64).unwrap(),    // palette_index
+                    bcs::to_bytes(&indices).unwrap(), // indices
+                    bcs::to_bytes(&colors).unwrap(),  // colors
+                ])
             },
         }
     }
@@ -386,6 +447,10 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndTransferFT => {
                 Some(EntryPoints::TokenV1InitializeCollection)
             },
+            EntryPoints::VectorPicture { length } => {
+                Some(EntryPoints::InitializeVectorPicture { length: *length })
+            },
+            EntryPoints::SmartTablePicture { .. } => Some(EntryPoints::InitializeSmartTablePicture),
             _ => None,
         }
     }

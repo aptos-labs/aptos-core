@@ -11,6 +11,7 @@ use crate::{
     payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
+    transaction_filter::TransactionFilter,
     transaction_shuffler::TransactionShuffler,
     txn_notifier::TxnNotifier,
 };
@@ -22,8 +23,9 @@ use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResul
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    account_address::AccountAddress, contract_event::ContractEvent, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
+    account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
+    contract_event::ContractEvent, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
+    on_chain_config::OnChainExecutionConfig, transaction::Transaction,
 };
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
@@ -61,8 +63,9 @@ pub struct ExecutionProxy {
     write_mutex: AsyncMutex<LogicalTime>,
     payload_manager: Mutex<Option<Arc<PayloadManager>>>,
     transaction_shuffler: Mutex<Option<Arc<dyn TransactionShuffler>>>,
-    maybe_block_gas_limit: Mutex<Option<u64>>,
+    block_executor_onchain_config: Mutex<BlockExecutorConfigFromOnchain>,
     transaction_deduper: Mutex<Option<Arc<dyn TransactionDeduper>>>,
+    transaction_filter: TransactionFilter,
     execution_pipeline: ExecutionPipeline,
 }
 
@@ -72,6 +75,7 @@ impl ExecutionProxy {
         txn_notifier: Arc<dyn TxnNotifier>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         handle: &tokio::runtime::Handle,
+        txn_filter: TransactionFilter,
     ) -> Self {
         let (tx, mut rx) =
             aptos_channels::new::<NotificationType>(10, &counters::PENDING_STATE_SYNC_NOTIFICATION);
@@ -98,8 +102,11 @@ impl ExecutionProxy {
             write_mutex: AsyncMutex::new(LogicalTime::new(0, 0)),
             payload_manager: Mutex::new(None),
             transaction_shuffler: Mutex::new(None),
-            maybe_block_gas_limit: Mutex::new(None),
+            block_executor_onchain_config: Mutex::new(
+                OnChainExecutionConfig::default_if_missing().block_executor_onchain_config(),
+            ),
             transaction_deduper: Mutex::new(None),
+            transaction_filter: txn_filter,
             execution_pipeline,
         }
     }
@@ -126,22 +133,27 @@ impl StateComputer for ExecutionProxy {
         let txn_deduper = self.transaction_deduper.lock().as_ref().unwrap().clone();
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
         let txn_notifier = self.txn_notifier.clone();
-        let txns = match payload_manager.get_transactions(block).await {
+        let sys_txns = block.sys_txns().cloned().unwrap_or_default();
+        let user_txns = match payload_manager.get_transactions(block).await {
             Ok(txns) => txns,
             Err(err) => return Box::pin(async move { Err(err) }),
         };
 
-        let deduped_txns = txn_deduper.dedup(txns);
+        let filtered_txns =
+            self.transaction_filter
+                .filter(block_id, block.timestamp_usecs(), user_txns);
+        let deduped_txns = txn_deduper.dedup(filtered_txns);
         let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
-        let maybe_block_gas_limit = *self.maybe_block_gas_limit.lock();
+        let block_executor_onchain_config = self.block_executor_onchain_config.lock().clone();
 
         // TODO: figure out error handling for the prologue txn
         let timestamp = block.timestamp_usecs();
         let transactions_to_execute = block.transactions_to_execute(
             &self.validators.lock(),
+            sys_txns,
             shuffled_txns.clone(),
-            maybe_block_gas_limit,
+            block_executor_onchain_config.has_any_block_gas_limit(),
         );
 
         let fut = self
@@ -150,7 +162,7 @@ impl StateComputer for ExecutionProxy {
                 block_id,
                 parent_block_id,
                 transactions_to_execute,
-                maybe_block_gas_limit,
+                block_executor_onchain_config.clone(),
             )
             .await;
 
@@ -164,7 +176,11 @@ impl StateComputer for ExecutionProxy {
 
             // notify mempool about failed transaction
             if let Err(e) = txn_notifier
-                .notify_failed_txn(shuffled_txns, &compute_result)
+                .notify_failed_txn(
+                    shuffled_txns,
+                    &compute_result,
+                    block_executor_onchain_config.has_any_block_gas_limit(),
+                )
                 .await
             {
                 error!(
@@ -199,7 +215,7 @@ impl StateComputer for ExecutionProxy {
         let txn_deduper = self.transaction_deduper.lock().as_ref().unwrap().clone();
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
 
-        let block_gas_limit = *self.maybe_block_gas_limit.lock();
+        let block_executor_onchain_config = self.block_executor_onchain_config.lock().clone();
 
         for block in blocks {
             block_ids.push(block.id());
@@ -208,14 +224,19 @@ impl StateComputer for ExecutionProxy {
                 payloads.push(payload.clone());
             }
 
+            let sys_txns = block.sys_txns().map_or(vec![], Vec::clone);
             let signed_txns = payload_manager.get_transactions(block.block()).await?;
-            let deduped_txns = txn_deduper.dedup(signed_txns);
+            let filtered_txns =
+                self.transaction_filter
+                    .filter(block.id(), block.timestamp_usecs(), signed_txns);
+            let deduped_txns = txn_deduper.dedup(filtered_txns);
             let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
             txns.extend(block.transactions_to_commit(
                 &self.validators.lock(),
+                sys_txns,
                 shuffled_txns,
-                block_gas_limit,
+                block_executor_onchain_config.has_any_block_gas_limit(),
             ));
             reconfig_events.extend(block.reconfig_event());
         }
@@ -309,7 +330,7 @@ impl StateComputer for ExecutionProxy {
         epoch_state: &EpochState,
         payload_manager: Arc<PayloadManager>,
         transaction_shuffler: Arc<dyn TransactionShuffler>,
-        block_gas_limit: Option<u64>,
+        block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
     ) {
         *self.validators.lock() = epoch_state
@@ -320,7 +341,7 @@ impl StateComputer for ExecutionProxy {
         self.transaction_shuffler
             .lock()
             .replace(transaction_shuffler);
-        *self.maybe_block_gas_limit.lock() = block_gas_limit;
+        *self.block_executor_onchain_config.lock() = block_executor_onchain_config;
         self.transaction_deduper.lock().replace(transaction_deduper);
     }
 
@@ -338,6 +359,7 @@ async fn test_commit_sync_race() {
         error::MempoolError, transaction_deduper::create_transaction_deduper,
         transaction_shuffler::create_transaction_shuffler,
     };
+    use aptos_config::config::transaction_filter_type::Filter;
     use aptos_consensus_notifications::Error;
     use aptos_executor_types::state_checkpoint_output::StateCheckpointOutput;
     use aptos_types::{
@@ -366,7 +388,7 @@ async fn test_commit_sync_race() {
             &self,
             _block: ExecutableBlock,
             _parent_block_id: HashValue,
-            _maybe_block_gas_limit: Option<u64>,
+            _onchain_config: BlockExecutorConfigFromOnchain,
         ) -> ExecutorResult<StateComputeResult> {
             Ok(StateComputeResult::new_dummy())
         }
@@ -375,7 +397,7 @@ async fn test_commit_sync_race() {
             &self,
             _block: ExecutableBlock,
             _parent_block_id: HashValue,
-            _maybe_block_gas_limit: Option<u64>,
+            _onchain_config: BlockExecutorConfigFromOnchain,
         ) -> ExecutorResult<StateCheckpointOutput> {
             todo!()
         }
@@ -411,6 +433,7 @@ async fn test_commit_sync_race() {
             &self,
             _txns: Vec<SignedTransaction>,
             _compute_results: &StateComputeResult,
+            _block_gas_limit_enabled: bool,
         ) -> Result<(), MempoolError> {
             Ok(())
         }
@@ -460,12 +483,13 @@ async fn test_commit_sync_race() {
         recorded_commit.clone(),
         recorded_commit.clone(),
         &tokio::runtime::Handle::current(),
+        TransactionFilter::new(Filter::empty()),
     );
     executor.new_epoch(
         &EpochState::empty(),
         Arc::new(PayloadManager::DirectMempool),
         create_transaction_shuffler(TransactionShufflerType::NoShuffling),
-        None,
+        BlockExecutorConfigFromOnchain::new_no_block_limit(),
         create_transaction_deduper(TransactionDeduperType::NoDedup),
     );
     executor

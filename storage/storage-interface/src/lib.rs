@@ -49,6 +49,7 @@ pub mod state_delta;
 pub mod state_view;
 
 use crate::state_delta::StateDelta;
+use aptos_scratchpad::SparseMerkleTree;
 pub use executed_trees::ExecutedTrees;
 
 // This is last line of defense against large queries slipping through external facing interfaces,
@@ -238,6 +239,9 @@ pub trait DbReader: Send + Sync {
 
         fn get_next_block_event(&self, version: Version) -> Result<(Version, NewBlockEvent)>;
 
+        /// See [AptosDB::get_latest_block_events].
+        fn get_latest_block_events(&self, num_events: usize) -> Result<Vec<EventWithVersion>>;
+
         /// Returns the start_version, end_version and NewBlockEvent of the block containing the input
         /// transaction version.
         fn get_block_info_by_version(
@@ -370,6 +374,9 @@ pub trait DbReader: Send + Sync {
         /// Gets the latest ExecutedTrees no matter if db has been bootstrapped.
         /// Used by the Db-bootstrapper.
         fn get_latest_executed_trees(&self) -> Result<ExecutedTrees>;
+
+        /// Get the oldest in memory state tree.
+        fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>>;
 
         /// Get the ledger info of the epoch that `known_version` belongs to.
         fn get_epoch_ending_ledger_info(
@@ -546,25 +553,8 @@ pub trait DbWriter: Send + Sync {
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
         latest_in_memory_state: StateDelta,
-    ) -> Result<()> {
-        unimplemented!()
-    }
-
-    /// Persist transactions for block.
-    /// See [`AptosDB::save_transaction_block`].
-    ///
-    /// [`AptosDB::save_transaction_block`]:
-    /// ../aptosdb/struct.AptosDB.html#method.save_transaction_block
-    fn save_transaction_block(
-        &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-        base_state_version: Option<Version>,
-        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        sync_commit: bool,
-        latest_in_memory_state: StateDelta,
-        block_state_updates: ShardedStateUpdates,
-        sharded_state_cache: &ShardedStateCache,
+        state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
+        sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<()> {
         unimplemented!()
     }

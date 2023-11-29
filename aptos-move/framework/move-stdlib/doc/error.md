@@ -1,5 +1,5 @@
 
-<a name="0x1_error"></a>
+<a id="0x1_error"></a>
 
 # Module `0x1::error`
 
@@ -48,12 +48,12 @@ error codes here are a bit richer than HTTP codes.
 
 
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_error_ABORTED"></a>
+<a id="0x1_error_ABORTED"></a>
 
 Concurrency conflict, such as read-modify-write conflict (http: 409)
 
@@ -63,7 +63,7 @@ Concurrency conflict, such as read-modify-write conflict (http: 409)
 
 
 
-<a name="0x1_error_ALREADY_EXISTS"></a>
+<a id="0x1_error_ALREADY_EXISTS"></a>
 
 The resource that a client tried to create already exists (http: 409)
 
@@ -73,7 +73,7 @@ The resource that a client tried to create already exists (http: 409)
 
 
 
-<a name="0x1_error_CANCELLED"></a>
+<a id="0x1_error_CANCELLED"></a>
 
 Request cancelled by the client (http: 499)
 
@@ -83,7 +83,7 @@ Request cancelled by the client (http: 499)
 
 
 
-<a name="0x1_error_INTERNAL"></a>
+<a id="0x1_error_INTERNAL"></a>
 
 Internal error (http: 500)
 
@@ -93,7 +93,7 @@ Internal error (http: 500)
 
 
 
-<a name="0x1_error_INVALID_ARGUMENT"></a>
+<a id="0x1_error_INVALID_ARGUMENT"></a>
 
 Caller specified an invalid argument (http: 400)
 
@@ -103,7 +103,7 @@ Caller specified an invalid argument (http: 400)
 
 
 
-<a name="0x1_error_INVALID_STATE"></a>
+<a id="0x1_error_INVALID_STATE"></a>
 
 The system is not in a state where the operation can be performed (http: 400)
 
@@ -113,7 +113,7 @@ The system is not in a state where the operation can be performed (http: 400)
 
 
 
-<a name="0x1_error_NOT_FOUND"></a>
+<a id="0x1_error_NOT_FOUND"></a>
 
 A specified resource is not found (http: 404)
 
@@ -123,7 +123,7 @@ A specified resource is not found (http: 404)
 
 
 
-<a name="0x1_error_NOT_IMPLEMENTED"></a>
+<a id="0x1_error_NOT_IMPLEMENTED"></a>
 
 Feature not implemented (http: 501)
 
@@ -133,7 +133,7 @@ Feature not implemented (http: 501)
 
 
 
-<a name="0x1_error_OUT_OF_RANGE"></a>
+<a id="0x1_error_OUT_OF_RANGE"></a>
 
 An input or result of a computation is out of range (http: 400)
 
@@ -143,7 +143,7 @@ An input or result of a computation is out of range (http: 400)
 
 
 
-<a name="0x1_error_PERMISSION_DENIED"></a>
+<a id="0x1_error_PERMISSION_DENIED"></a>
 
 client does not have sufficient permission (http: 403)
 
@@ -153,7 +153,7 @@ client does not have sufficient permission (http: 403)
 
 
 
-<a name="0x1_error_RESOURCE_EXHAUSTED"></a>
+<a id="0x1_error_RESOURCE_EXHAUSTED"></a>
 
 Out of gas or other forms of quota (http: 429)
 
@@ -163,7 +163,7 @@ Out of gas or other forms of quota (http: 429)
 
 
 
-<a name="0x1_error_UNAUTHENTICATED"></a>
+<a id="0x1_error_UNAUTHENTICATED"></a>
 
 Request not authenticated due to missing, invalid, or expired auth token (http: 401)
 
@@ -173,7 +173,7 @@ Request not authenticated due to missing, invalid, or expired auth token (http: 
 
 
 
-<a name="0x1_error_UNAVAILABLE"></a>
+<a id="0x1_error_UNAVAILABLE"></a>
 
 The service is currently unavailable. Indicates that a retry could solve the issue (http: 503)
 
@@ -183,7 +183,7 @@ The service is currently unavailable. Indicates that a retry could solve the iss
 
 
 
-<a name="0x1_error_canonical"></a>
+<a id="0x1_error_canonical"></a>
 
 ## Function `canonical`
 
@@ -208,7 +208,7 @@ Construct a canonical error code from a category and a reason.
 
 </details>
 
-<a name="0x1_error_invalid_argument"></a>
+<a id="0x1_error_invalid_argument"></a>
 
 ## Function `invalid_argument`
 
@@ -231,7 +231,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a name="0x1_error_out_of_range"></a>
+<a id="0x1_error_out_of_range"></a>
 
 ## Function `out_of_range`
 
@@ -253,7 +253,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a name="0x1_error_invalid_state"></a>
+<a id="0x1_error_invalid_state"></a>
 
 ## Function `invalid_state`
 
@@ -275,7 +275,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a name="0x1_error_unauthenticated"></a>
+<a id="0x1_error_unauthenticated"></a>
 
 ## Function `unauthenticated`
 
@@ -297,7 +297,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a name="0x1_error_permission_denied"></a>
+<a id="0x1_error_permission_denied"></a>
 
 ## Function `permission_denied`
 
@@ -319,7 +319,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a name="0x1_error_not_found"></a>
+<a id="0x1_error_not_found"></a>
 
 ## Function `not_found`
 
@@ -341,7 +341,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a name="0x1_error_aborted"></a>
+<a id="0x1_error_aborted"></a>
 
 ## Function `aborted`
 
@@ -363,7 +363,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a name="0x1_error_already_exists"></a>
+<a id="0x1_error_already_exists"></a>
 
 ## Function `already_exists`
 
@@ -385,7 +385,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a name="0x1_error_resource_exhausted"></a>
+<a id="0x1_error_resource_exhausted"></a>
 
 ## Function `resource_exhausted`
 
@@ -407,7 +407,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a name="0x1_error_internal"></a>
+<a id="0x1_error_internal"></a>
 
 ## Function `internal`
 
@@ -429,7 +429,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a name="0x1_error_not_implemented"></a>
+<a id="0x1_error_not_implemented"></a>
 
 ## Function `not_implemented`
 
@@ -451,7 +451,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a name="0x1_error_unavailable"></a>
+<a id="0x1_error_unavailable"></a>
 
 ## Function `unavailable`
 
@@ -473,12 +473,12 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
 
-<a name="@Specification_1_canonical"></a>
+<a id="@Specification_1_canonical"></a>
 
 ### Function `canonical`
 

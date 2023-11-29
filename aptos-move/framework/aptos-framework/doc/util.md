@@ -1,5 +1,5 @@
 
-<a name="0x1_util"></a>
+<a id="0x1_util"></a>
 
 # Module `0x1::util`
 
@@ -10,13 +10,14 @@ Utility functions used by the framework modules.
 -  [Function `address_from_bytes`](#0x1_util_address_from_bytes)
 -  [Specification](#@Specification_0)
     -  [Function `from_bytes`](#@Specification_0_from_bytes)
+    -  [Function `address_from_bytes`](#@Specification_0_address_from_bytes)
 
 
 <pre><code></code></pre>
 
 
 
-<a name="0x1_util_from_bytes"></a>
+<a id="0x1_util_from_bytes"></a>
 
 ## Function `from_bytes`
 
@@ -43,7 +44,7 @@ owned.
 
 </details>
 
-<a name="0x1_util_address_from_bytes"></a>
+<a id="0x1_util_address_from_bytes"></a>
 
 ## Function `address_from_bytes`
 
@@ -67,12 +68,12 @@ owned.
 
 </details>
 
-<a name="@Specification_0"></a>
+<a id="@Specification_0"></a>
 
 ## Specification
 
 
-<a name="@Specification_0_from_bytes"></a>
+<a id="@Specification_0_from_bytes"></a>
 
 ### Function `from_bytes`
 
@@ -91,10 +92,26 @@ owned.
 
 
 
-<a name="0x1_util_spec_from_bytes"></a>
+<a id="0x1_util_spec_from_bytes"></a>
 
 
 <pre><code><b>fun</b> <a href="util.md#0x1_util_spec_from_bytes">spec_from_bytes</a>&lt;T&gt;(bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T;
+</code></pre>
+
+
+
+<a id="@Specification_0_address_from_bytes"></a>
+
+### Function `address_from_bytes`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="util.md#0x1_util_address_from_bytes">address_from_bytes</a>(bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> [abstract] len(bytes) != 32;
 </code></pre>
 
 
