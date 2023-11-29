@@ -1,0 +1,42 @@
+// ---- Model Dump
+module 0x42::M {
+    struct S {
+        dummy_field: bool,
+    }
+    public fun empty_generic_vec<T>(): vector<#0> {
+        Vector<T>()
+    }
+    public fun empty_generic_vec_vec<T>(): vector<vector<#0>> {
+        Vector<vector<T>>()
+    }
+    public fun empty_signer_vec(): vector<signer> {
+        Vector<signer>()
+    }
+    public fun empty_signer_vec_vec(): vector<vector<signer>> {
+        Vector<vector<signer>>()
+    }
+    public fun empty_struct_vec(): vector<M::S> {
+        Vector<M::S>()
+    }
+    public fun empty_struct_vec_vec(): vector<vector<M::S>> {
+        Vector<vector<M::S>>()
+    }
+    spec fun $empty_generic_vec<T>(): vector<#0> {
+        Vector<#0>()
+    }
+    spec fun $empty_generic_vec_vec<T>(): vector<vector<#0>> {
+        Vector<vector<#0>>()
+    }
+    spec fun $empty_signer_vec(): vector<signer> {
+        Vector<signer>()
+    }
+    spec fun $empty_signer_vec_vec(): vector<vector<signer>> {
+        Vector<vector<signer>>()
+    }
+    spec fun $empty_struct_vec(): vector<M::S> {
+        Vector<M::S>()
+    }
+    spec fun $empty_struct_vec_vec(): vector<vector<M::S>> {
+        Vector<vector<M::S>>()
+    }
+} // end 0x42::M
