@@ -347,8 +347,9 @@ module std::features {
         });
     }
 
+    #[view]
     /// Check whether the feature is enabled.
-    fun is_enabled(feature: u64): bool acquires Features {
+    public fun is_enabled(feature: u64): bool acquires Features {
         exists<Features>(@std) &&
             contains(&borrow_global<Features>(@std).features, feature)
     }

@@ -346,7 +346,6 @@ ZKRP
 Zxing
 accessors
 accountHasList
-acount
 addr
 ait
 allowfullscreen
@@ -390,6 +389,7 @@ cli
 clippy
 cn
 codebase
+composability
 composable
 config
 configs
@@ -401,6 +401,7 @@ cryptographically
 cryptosystem
 cryptosystems
 crytographic
+customizability
 customizable
 dApp
 dApps
@@ -666,3 +667,8 @@ yamls
 zkSNARK
 zksnark
 observability
+Profiler
+profiler
+html
+Flamegraphs
+flamegraphs

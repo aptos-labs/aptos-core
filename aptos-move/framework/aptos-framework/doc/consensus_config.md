@@ -1,5 +1,5 @@
 
-<a name="0x1_consensus_config"></a>
+<a id="0x1_consensus_config"></a>
 
 # Module `0x1::consensus_config`
 
@@ -23,7 +23,7 @@ Reconfiguration, and may be updated by root.
 
 
 
-<a name="0x1_consensus_config_ConsensusConfig"></a>
+<a id="0x1_consensus_config_ConsensusConfig"></a>
 
 ## Resource `ConsensusConfig`
 
@@ -50,12 +50,12 @@ Reconfiguration, and may be updated by root.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_consensus_config_EINVALID_CONFIG"></a>
+<a id="0x1_consensus_config_EINVALID_CONFIG"></a>
 
 The provided on chain config bytes are empty or invalid
 
@@ -65,7 +65,7 @@ The provided on chain config bytes are empty or invalid
 
 
 
-<a name="0x1_consensus_config_initialize"></a>
+<a id="0x1_consensus_config_initialize"></a>
 
 ## Function `initialize`
 
@@ -92,7 +92,7 @@ Publishes the ConsensusConfig config.
 
 </details>
 
-<a name="0x1_consensus_config_set"></a>
+<a id="0x1_consensus_config_set"></a>
 
 ## Function `set`
 
@@ -124,7 +124,7 @@ This can be called by on-chain governance to update on-chain consensus configs.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -136,7 +136,7 @@ This can be called by on-chain governance to update on-chain consensus configs.
 
 
 
-<a name="@Specification_1_initialize"></a>
+<a id="@Specification_1_initialize"></a>
 
 ### Function `initialize`
 
@@ -153,12 +153,12 @@ Aborts if StateStorageUsage already exists.
 <b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(addr);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@aptos_framework);
 <b>aborts_if</b> !(len(config) &gt; 0);
-<b>ensures</b>  <b>exists</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@aptos_framework);
+<b>ensures</b> <b>global</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(addr) == <a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a> { config };
 </code></pre>
 
 
 
-<a name="@Specification_1_set"></a>
+<a id="@Specification_1_set"></a>
 
 ### Function `set`
 

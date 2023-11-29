@@ -1,0 +1,223 @@
+// ---- Model Dump
+module 0x42::m_nonfriend {
+    friend fun bar(): u64 {
+        42
+    }
+    spec fun $bar(): u64 {
+        42
+    }
+    spec fun $foo(): u64 {
+        m_nonfriend::$bar()
+    }
+    spec fun $friend_accessible(): u64 {
+        m_nonfriend::$bar()
+    }
+    spec fun $inaccessible(): u64 {
+        m_nonfriend::$bar()
+    }
+} // end 0x42::m_nonfriend
+module 0x42::m {
+    friend fun bar(): u64 {
+        42
+    }
+    spec fun $bar(): u64 {
+        42
+    }
+    spec fun $foo(): u64 {
+        m::$bar()
+    }
+    spec fun $friend_accessible(): u64 {
+        m::$bar()
+    }
+    spec fun $inaccessible(): u64 {
+        m::$bar()
+    }
+} // end 0x42::m
+module 0x42::o_nonfriend {
+    use 0x42::m; // resolved as: 0x42::m
+    use 0x42::m_nonfriend; // resolved as: 0x42::m_nonfriend
+    private fun bar(): u64 {
+        42
+    }
+    spec fun $bar(): u64 {
+        42
+    }
+    spec fun $foo(): u64;
+    spec fun $friend_accessible(): u64;
+    spec fun $inaccessible(): u64;
+} // end 0x42::o_nonfriend
+module 0x42::o {
+    use 0x42::m; // resolved as: 0x42::m
+    use 0x42::m_nonfriend; // resolved as: 0x42::m_nonfriend
+    private fun bar(): u64 {
+        42
+    }
+    spec fun $bar(): u64 {
+        42
+    }
+    spec fun $foo(): u64;
+    spec fun $friend_accessible(): u64;
+    spec fun $inaccessible(): u64;
+} // end 0x42::o
+module 0x42::n {
+    use 0x42::o; // resolved as: 0x42::o
+    use 0x42::o_nonfriend; // resolved as: 0x42::o_nonfriend
+    public fun test() {
+        if Eq<u64>({
+          let ();
+          {
+            let ();
+            m::bar()
+          };
+          {
+            let ();
+            m_nonfriend::bar()
+          };
+          o::bar()
+        }, 42) {
+          Tuple()
+        } else {
+          Abort(1)
+        };
+        if Eq<u64>({
+          let ();
+          {
+            let ();
+            m::bar()
+          };
+          {
+            let ();
+            m_nonfriend::bar()
+          };
+          o::bar()
+        }, 42) {
+          Tuple()
+        } else {
+          Abort(1)
+        };
+        if Eq<u64>({
+          let ();
+          {
+            let ();
+            m::bar()
+          };
+          {
+            let ();
+            m_nonfriend::bar()
+          };
+          o::bar()
+        }, 42) {
+          Tuple()
+        } else {
+          Abort(1)
+        };
+        Tuple()
+    }
+    public fun test2() {
+        if Eq<u64>({
+          let ();
+          {
+            let ();
+            m::bar()
+          };
+          {
+            let ();
+            m_nonfriend::bar()
+          };
+          o_nonfriend::bar()
+        }, 42) {
+          Tuple()
+        } else {
+          Abort(1)
+        };
+        if Eq<u64>({
+          let ();
+          {
+            let ();
+            m::bar()
+          };
+          {
+            let ();
+            m_nonfriend::bar()
+          };
+          o_nonfriend::bar()
+        }, 42) {
+          Tuple()
+        } else {
+          Abort(1)
+        };
+        if Eq<u64>({
+          let ();
+          {
+            let ();
+            m::bar()
+          };
+          {
+            let ();
+            m_nonfriend::bar()
+          };
+          o_nonfriend::bar()
+        }, 42) {
+          Tuple()
+        } else {
+          Abort(1)
+        };
+        Tuple()
+    }
+    spec fun $test() {
+        Tuple()
+    }
+    spec fun $test2() {
+        Tuple()
+    }
+} // end 0x42::n
+
+
+Diagnostics:
+error: friend function `0x42::m::bar` cannot be called here because `0x42::n` is not a friend of `0x42::m`
+  ┌─ tests/checking/inlining/private_call_3.move:5:9
+  │
+5 │         bar()
+  │         ^^^^^
+
+error: friend function `0x42::m_nonfriend::bar` cannot be called here because `0x42::n` is not a friend of `0x42::m_nonfriend`
+   ┌─ tests/checking/inlining/private_call_3.move:21:9
+   │
+21 │         bar()
+   │         ^^^^^
+
+error: function `0x42::o_nonfriend::bar` cannot be called here because it is private to module `0x42::o_nonfriend`
+   ┌─ tests/checking/inlining/private_call_3.move:69:2
+   │
+69 │     bar()
+   │     ^^^^^
+
+error: function `0x42::o_nonfriend::bar` cannot be called here because it is private to module `0x42::o_nonfriend`
+   ┌─ tests/checking/inlining/private_call_3.move:75:2
+   │
+75 │     bar()
+   │     ^^^^^
+
+error: function `0x42::o_nonfriend::bar` cannot be called here because it is private to module `0x42::o_nonfriend`
+   ┌─ tests/checking/inlining/private_call_3.move:81:2
+   │
+81 │     bar()
+   │     ^^^^^
+
+error: function `0x42::o::bar` cannot be called here because it is private to module `0x42::o`
+   ┌─ tests/checking/inlining/private_call_3.move:43:2
+   │
+43 │     bar()
+   │     ^^^^^
+
+error: function `0x42::o::bar` cannot be called here because it is private to module `0x42::o`
+   ┌─ tests/checking/inlining/private_call_3.move:49:2
+   │
+49 │     bar()
+   │     ^^^^^
+
+error: function `0x42::o::bar` cannot be called here because it is private to module `0x42::o`
+   ┌─ tests/checking/inlining/private_call_3.move:55:2
+   │
+55 │     bar()
+   │     ^^^^^

@@ -1,0 +1,12 @@
+comparison between v1 and v2 failed:
+= processed 3 tasks
+= 
++ task 2 'run'. lines 103-115:
++ Error: Script execution failed with VMError: {
++     major_status: UNSAFE_RET_UNUSED_VALUES_WITHOUT_DROP,
++     sub_status: None,
++     location: script,
++     indices: redacted,
++     offsets: redacted,
++ }
++ 
