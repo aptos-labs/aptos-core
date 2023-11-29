@@ -32,6 +32,7 @@ jobs:
       only_docs_changed: ${{ steps.determine_file_changes.outputs.only_docs_changed }}
     steps:
       - uses: actions/checkout@v3
+      - run: echo "${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) || github.sha }}"
       - name: Run the file change determinator
         id: determine_file_changes
         uses: ./.github/actions/file-change-determinator
