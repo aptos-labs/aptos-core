@@ -16,6 +16,7 @@ use move_core_types::{
     u256::U256,
 };
 use num::BigInt;
+use num_traits::identities::Zero;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     fmt,
@@ -282,6 +283,34 @@ impl PrimitiveType {
             PrimitiveType::U64 => Some(BigInt::from(u64::MAX)),
             PrimitiveType::U128 => Some(BigInt::from(u128::MAX)),
             PrimitiveType::U256 => Some(BigInt::from(&U256::max_value())),
+            PrimitiveType::Num => None,
+            _ => unreachable!("no num type"),
+        }
+    }
+
+    /// Gets the manimal value allowed for a numeric type, or none if it is unbounded.
+    pub fn get_min_value(self: &PrimitiveType) -> Option<BigInt> {
+        match self {
+            PrimitiveType::U8 => Some(BigInt::zero()),
+            PrimitiveType::U16 => Some(BigInt::zero()),
+            PrimitiveType::U32 => Some(BigInt::zero()),
+            PrimitiveType::U64 => Some(BigInt::zero()),
+            PrimitiveType::U128 => Some(BigInt::zero()),
+            PrimitiveType::U256 => Some(BigInt::zero()),
+            PrimitiveType::Num => None,
+            _ => unreachable!("no num type"),
+        }
+    }
+
+    /// Gets the number of bits in the type, or None if unbounded..
+    pub fn get_num_bits(self: &PrimitiveType) -> Option<usize> {
+        match self {
+            PrimitiveType::U8 => Some(8),
+            PrimitiveType::U16 => Some(16),
+            PrimitiveType::U32 => Some(32),
+            PrimitiveType::U64 => Some(64),
+            PrimitiveType::U128 => Some(128),
+            PrimitiveType::U256 => Some(256),
             PrimitiveType::Num => None,
             _ => unreachable!("no num type"),
         }
