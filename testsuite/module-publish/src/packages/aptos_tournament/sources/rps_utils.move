@@ -15,12 +15,12 @@ module tournament::rps_unit_tests {
     use tournament::tournament_manager;
 
     struct TournamentConfig has key {
-        // signer_cap: account::SignerCapability,
         tournament_address: address,
-        game_addresses: vector<address>,
         round_address: Option<address>,
     }
 
+    // Stores a map of player address to the game address.
+    // Admin of the tournament stores this resource.
     struct PlayerToGameMapping has key {
         mapping: Table<address, MyAddress>
     }
@@ -28,20 +28,11 @@ module tournament::rps_unit_tests {
     struct PlayerConfig has key {
         // Configuration of the player for each tournament.
         player_tokens: Table<address, Object<Token>>,
-        // game_addresses: Table<address, address>
     }
-
-    // fun get_signer(account_address: address): signer acquires PlayerConfig {
-    //     account::create_signer_with_capability(&borrow_global<PlayerConfig>(account_address).signer_cap)
-    // }
 
     public entry fun setup_tournament(
         admin: &signer
     ) {
-        // Create a resource account owned by admin.
-        // TODO: Not sure if the signer capability is required
-        // let (resource_signer, signer_cap) = account::create_resource_account(admin, vector::empty());
-
         token_manager::init_module_for_test(admin);
         aptos_tournament::init_module_for_test(admin);
         admin::set_admin_signer(admin, signer::address_of(admin));
@@ -50,9 +41,7 @@ module tournament::rps_unit_tests {
         tournament_manager::set_tournament_joinable(&admin2, tournament_address);
         
         move_to(admin, TournamentConfig {
-            // signer_cap, 
             tournament_address,
-            game_addresses: vector[],
             round_address: option::none(),
         });
     }
@@ -73,7 +62,6 @@ module tournament::rps_unit_tests {
         if (exists<PlayerConfig>(user_address)) {
             move_to(user, PlayerConfig {
                 player_tokens: table::new(),
-                // game_addresses: table::new()
             })
         };
         // TODO: Can a resource be inserted and modified in the same transaction?
@@ -101,37 +89,9 @@ module tournament::rps_unit_tests {
             mapping: player_to_game_mapping
         });
 
-        // let len = length(&player_to_game_mapping);
-        // while (len > 0) {
-        //     let (player_addr, game_addr) = pop_back(&mut player_to_game_mapping);
-        //     table::upsert(borrow_global_mut<PlayerConfig>(player_addr).game_addresses, admin_address, player_addr);
-        //     // f(pop_back(&mut v));
-        //     len = len - 1;
-        // };
-        // vector::destroy_empty(player_to_game_mapping);
-
-        // vector::for_each(&player_to_game_mapping, |player_addr, game_addr| {
-        //     table::upsert(borrow_global_mut<PlayerConfig>(player_addr).game_addresses, admin_address, player_addr);
-        // });
-
-        // move_to<PlayerToGameMapping>(admin, PlayerToGameMapping {
-        //     mapping: player_to_game_mapping
-        // });
-        // let (player_addrs, game_addrs) = simple_map::to_vec_pair(player_to_game_mapping);
-        // let i = 0;
-        // let len = vector::length(&player_addrs);
-        // while (i < len) {
-        //     move_tovector::borrow(&player_addrs, i), 
-        //     let player1_address = rock_paper_scissor::get_game_players(borrow_global<RockPaperScissor>(*vector::borrow(&game_addresses, i)));
-        //     i = i + 1;
-        // };
-        // vector::for_each_ref(&game_addresses, |game_address| {
-        //     let player1_address = rock_paper_scissor::get_game_players(&borrow_global<RockPaperScissor>(game_address));
-        // });
         let round_address = tournament_manager::get_round_address(tournament_address);
         let tournament_config = borrow_global_mut<TournamentConfig>(admin_address);
         tournament_config.round_address = option::some(round_address);
-        tournament_config.game_addresses = game_addresses;
     }
 
     fun player_commit(player: &signer, game_address: address, action: vector<u8>, hash_addition: vector<u8>) {
@@ -144,60 +104,11 @@ module tournament::rps_unit_tests {
         player: &signer,
         admin_address: address,
         action: vector<u8>,
-        game_index: u64,
-    ) acquires TournamentConfig {
-        let game_address = *vector::borrow(&borrow_global<TournamentConfig>(admin_address).game_addresses, game_index);
-        // let RockPaperScissor {player1, player2} =  borrow_global<RockPaperScissor>(game_address);
+    ) acquires PlayerToGameMapping {
+        let player_address = signer::address_of(player);
+        let player_to_game_mapping = borrow_global<PlayerToGameMapping>(admin_address);
+        let game_address = rock_paper_scissor::get_address(*table::borrow(&player_to_game_mapping.mapping, player_address));
         let hash_addition = b"random uuid";
         player_commit(player, game_address, action, hash_addition);
-
     }
-
-    // fun full_play(
-    //     admin: address,
-    //     game_index: u64,
-    //     // TODO: We need to get player1 and player 2 details from game_index instead of supplying them as input here.
-    //     player1: address,
-    //     player2: address,
-    //     action1: vector<u8>,
-    //     action2: vector<u8>,
-    //     // 0: no one goes. 1: first goes. 2: second goes. 3: all go
-    //     move_players: u8,
-    // ): (vector<address>, vector<address>, address) acquires PlayerConfig, TournamentConfig {
-    //     let game_address = *vector::borrow(&borrow_global<TournamentConfig>(admin).game_addresses, game_index);
-    //     // let RockPaperScissor {player1, player2} =  borrow_global<RockPaperScissor>(game_address);
-
-    //     let player1_signer = get_signer(player1);
-    //     let player2_signer = get_signer(player2);
-
-    //     let hash_addition1 = b"random uuid 1";
-    //     let hash_addition2 = b"random uuid 2";
-
-    //     player_commit(&player1_signer, game_address, action1, hash_addition1);
-    //     player_commit(&player2_signer, game_address, action2, hash_addition2);
-    //     if (move_players == 1 || move_players == 3) {
-    //         let (is_game_over, _winners, _losers) = rock_paper_scissor::verify_action_returning(
-    //             &player1_signer,
-    //             game_address,
-    //             action1,
-    //             hash_addition1
-    //         );
-    //         assert!(!is_game_over, 0);
-    //     };
-
-    //     let winners = vector[];
-    //     let losers = vector[];
-    //     if (move_players == 2 || move_players == 3) {
-    //         let (_is_game_over, winnersi, losersi) = rock_paper_scissor::verify_action_returning(
-    //             &player2_signer,
-    //             game_address,
-    //             action2,
-    //             hash_addition2
-    //         );
-    //         winners = winnersi;
-    //         losers = losersi;
-    //     };
-
-    //     (winners, losers, game_address)
-    // }
 }

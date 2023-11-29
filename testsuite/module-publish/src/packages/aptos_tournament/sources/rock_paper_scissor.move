@@ -61,7 +61,7 @@ module tournament::rock_paper_scissor {
         opponent_action: Option<vector<u8>>,
     }
 
-    struct MyAddress has store, drop {
+    struct MyAddress has copy, drop, store {
         inner: address
     }
 
