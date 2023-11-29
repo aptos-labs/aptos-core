@@ -678,3 +678,4 @@ MoveVector
 MoveString
 MoveOption
 autocomplete
+keypair
