@@ -30,10 +30,7 @@ export class ArgumentABI {
    * @param name
    * @param type_tag
    */
-  constructor(
-    public readonly name: string,
-    public readonly type_tag: TypeTag,
-  ) {}
+  constructor(public readonly name: string, public readonly type_tag: TypeTag) {}
 
   serialize(serializer: Serializer): void {
     serializer.serializeStr(this.name);
