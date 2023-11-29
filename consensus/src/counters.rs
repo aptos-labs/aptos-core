@@ -815,6 +815,15 @@ pub static BUFFER_MANAGER_PHASE_PROCESS_SECONDS: Lazy<HistogramVec> = Lazy::new(
     .unwrap()
 });
 
+/// Count of the number of `ProposalExt` blocks received while the feature is disabled.
+pub static UNEXPECTED_PROPOSAL_EXT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_unexpected_proposal_ext_count",
+        "Count of the number of `ProposalExt` blocks received while the feature is disabled."
+    )
+    .unwrap()
+});
+
 /// Update various counters for committed blocks
 pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBlock>]) {
     for block in blocks_to_commit {

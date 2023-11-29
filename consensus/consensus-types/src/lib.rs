@@ -13,6 +13,7 @@ pub mod epoch_retrieval;
 pub mod executed_block;
 pub mod experimental;
 pub mod proof_of_store;
+pub mod proposal_ext;
 pub mod proposal_msg;
 pub mod quorum_cert;
 pub mod request_response;

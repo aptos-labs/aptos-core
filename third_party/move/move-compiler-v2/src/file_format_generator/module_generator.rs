@@ -155,6 +155,9 @@ impl ModuleGenerator {
 
     /// Generate information for a struct.
     fn gen_struct(&mut self, ctx: &ModuleContext, struct_env: &StructEnv<'_>) {
+        if struct_env.is_ghost_memory() {
+            return;
+        }
         let loc = &struct_env.get_loc();
         let struct_handle = self.struct_index(ctx, loc, struct_env);
         let field_information = FF::StructFieldInformation::Declared(
@@ -227,12 +230,12 @@ impl ModuleGenerator {
                 Address => FF::SignatureToken::Address,
                 Signer => FF::SignatureToken::Signer,
                 Num | Range | EventStore => {
-                    ctx.internal_error(loc, "unexpected specification type");
+                    ctx.internal_error(loc, format!("unexpected specification type {:#?}", ty));
                     FF::SignatureToken::Bool
                 },
             },
             Tuple(_) => {
-                ctx.internal_error(loc, "unexpected tuple type");
+                ctx.internal_error(loc, format!("unexpected tuple type {:#?}", ty));
                 FF::SignatureToken::Bool
             },
             Vector(ty) => FF::SignatureToken::Vector(Box::new(self.signature_token(ctx, loc, ty))),

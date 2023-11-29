@@ -37,8 +37,8 @@ pub use self::{
         Version, APTOS_MAX_KNOWN_VERSION, APTOS_VERSION_2, APTOS_VERSION_3, APTOS_VERSION_4,
     },
     consensus_config::{
-        ConsensusConfigV1, DagConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig,
-        ProposerAndVoterConfig, ProposerElectionType,
+        ConsensusConfigV1, ConsensusConfigV1Ext, ConsensusExtraFeature, DagConsensusConfigV1,
+        LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig, ProposerElectionType,
     },
     execution_config::{
         BlockGasLimitType, ExecutionConfigV1, ExecutionConfigV2, OnChainExecutionConfig,

@@ -183,6 +183,7 @@ const sidebars = {
             "move/move-on-aptos/move-scripts",
             "move/move-on-aptos/cli",
             "move/move-on-aptos/cryptography",
+            "move/move-on-aptos/gas-profiling",
           ],
         },
         {
@@ -277,7 +278,7 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
-        "integration/wallet-adapter-concept",
+        "guides/nfts/aptos-token-overview",
         {
           type: "category",
           label: "Integrate with Wallets",
@@ -287,6 +288,7 @@ const sidebars = {
           collapsed: true,
         },
         "integration/aptos-names-service-package",
+        "reference/error-codes",
       ],
     },
     {
@@ -377,20 +379,6 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Create NFTs",
-      collapsible: true,
-      collapsed: true,
-      link: {
-        type: "generated-index",
-        title: "Create Tokens on Aptos",
-        description: "Learn the various ways to mint and exchange tokens.",
-        slug: "/category/nft",
-        keywords: ["nft"],
-      },
-      items: ["guides/nfts/aptos-token-comparison", "guides/nfts/mint-nft-cli", "guides/nfts/mint-onchain-data"],
-    },
-    {
-      type: "category",
       label: "Build E2E Dapp with Aptos",
       link: { type: "doc", id: "tutorials/build-e2e-dapp/index" },
       collapsible: true,
@@ -423,11 +411,13 @@ const sidebars = {
           collapsible: true,
           collapsed: true,
           items: [
+            "guides/sponsored-transactions",
             "guides/local-development-network",
             "nodes/local-testnet/run-a-local-testnet",
             "guides/running-a-local-multi-node-network",
           ],
         },
+        "guides/sponsored-transactions",
         "guides/transaction-management",
         "guides/account-management/key-rotation",
       ],
