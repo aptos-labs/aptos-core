@@ -1,8 +1,13 @@
 ---
 title: "Indexer API"
+beta: true
 ---
 
-# Indexer API
+See https://github.com/facebook/docusaurus/issues/9588.
+
+import DocsBadge from "@site/src/components/DocsBadge";
+
+<DocsBadge text="BETA" />
 
 This section contains documentation for the Aptos Indexer API, the API built upon the standard set of processors provided in the [aptos-labs/aptos-indexer-processors](https://github.com/aptos-labs/aptos-indexer-processors) repo.
 
