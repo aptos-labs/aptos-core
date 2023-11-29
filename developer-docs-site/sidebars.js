@@ -183,6 +183,7 @@ const sidebars = {
             "move/move-on-aptos/move-scripts",
             "move/move-on-aptos/cli",
             "move/move-on-aptos/cryptography",
+            "move/move-on-aptos/gas-profiling",
           ],
         },
         {
@@ -410,11 +411,13 @@ const sidebars = {
           collapsible: true,
           collapsed: true,
           items: [
+            "guides/sponsored-transactions",
             "guides/local-development-network",
             "nodes/local-testnet/run-a-local-testnet",
             "guides/running-a-local-multi-node-network",
           ],
         },
+        "guides/sponsored-transactions",
         "guides/transaction-management",
         "guides/account-management/key-rotation",
       ],

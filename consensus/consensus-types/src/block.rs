@@ -411,26 +411,25 @@ impl Block {
     pub fn transactions_to_execute(
         &self,
         validators: &[AccountAddress],
+        sys_txns: Vec<SystemTransaction>,
         txns: Vec<SignedTransaction>,
         is_block_gas_limit: bool,
     ) -> Vec<Transaction> {
+        let txns = once(Transaction::BlockMetadata(
+            self.new_block_metadata(validators),
+        ))
+        .chain(sys_txns.into_iter().map(Transaction::SystemTransaction))
+        .chain(txns.into_iter().map(Transaction::UserTransaction));
+
         if is_block_gas_limit {
             // After the per-block gas limit change, StateCheckpoint txn
             // is inserted after block execution
-            once(Transaction::BlockMetadata(
-                self.new_block_metadata(validators),
-            ))
-            .chain(txns.into_iter().map(Transaction::UserTransaction))
-            .collect()
+            txns.collect()
         } else {
             // Before the per-block gas limit change, StateCheckpoint txn
             // is inserted here for compatibility.
-            once(Transaction::BlockMetadata(
-                self.new_block_metadata(validators),
-            ))
-            .chain(txns.into_iter().map(Transaction::UserTransaction))
-            .chain(once(Transaction::StateCheckpoint(self.id)))
-            .collect()
+            txns.chain(once(Transaction::StateCheckpoint(self.id)))
+                .collect()
         }
     }
 

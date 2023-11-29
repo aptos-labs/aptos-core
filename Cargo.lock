@@ -227,7 +227,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "2.3.1"
+version = "2.3.2"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -9815,6 +9815,7 @@ dependencies = [
  "codespan-reporting",
  "datatest-stable",
  "ethnum",
+ "im",
  "itertools 0.10.5",
  "move-binary-format",
  "move-bytecode-source-map",

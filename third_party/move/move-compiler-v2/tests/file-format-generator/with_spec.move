@@ -1,5 +1,8 @@
 module 0x42::m {
     use std::vector;
+    spec module {
+        global var: num;
+    }
     struct S {
         data: vector<E>,
     }
@@ -14,7 +17,7 @@ module 0x42::m {
 
     fun bar() {
         spec {
-            assert true;
+            update var = 1;
         };
     }
 }

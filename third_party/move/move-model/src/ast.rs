@@ -1096,6 +1096,16 @@ impl ExpData {
             }
         });
     }
+
+    /// Returns the node id of the inner expression which delivers the result. For blocks,
+    /// this traverses into the body.
+    pub fn result_node_id(&self) -> NodeId {
+        if let ExpData::Block(_, _, _, body) = self {
+            body.result_node_id()
+        } else {
+            self.node_id()
+        }
+    }
 }
 
 struct ExpRewriter<'a> {
@@ -1153,6 +1163,10 @@ pub enum Operation {
     Gt,
     Le,
     Ge,
+
+    // Copy and Move
+    Copy,
+    Move,
 
     // Unary operators
     Not,
@@ -1270,7 +1284,7 @@ impl Pattern {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum TraceKind {
     /// A user level TRACE(..) in the source.
     User,

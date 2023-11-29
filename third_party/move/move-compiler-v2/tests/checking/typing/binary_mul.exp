@@ -12,7 +12,7 @@ module 0x8675309::M {
         Mul<u128>(0, 1);
         Mul<u128>(0, 1);
         Mul<u64>(0, 1);
-        Mul<u64>(x, x);
+        Mul<u64>(Copy(x), Move(x));
         Mul<u64>(select M::R.f(r), select M::R.f(r));
         Mul<u64>(Mul<u64>(Mul<u64>(1, select M::R.f(r)), select M::R.f(r)), 0);
         {
