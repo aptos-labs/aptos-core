@@ -1,5 +1,5 @@
 
-<a name="0x1_create_signer"></a>
+<a id="0x1_create_signer"></a>
 
 # Module `0x1::create_signer`
 
@@ -24,7 +24,7 @@ on account to have access to this.
 
 
 
-<a name="0x1_create_signer_create_signer"></a>
+<a id="0x1_create_signer_create_signer"></a>
 
 ## Function `create_signer`
 
@@ -46,7 +46,7 @@ on account to have access to this.
 
 </details>
 
-<a name="@Specification_0"></a>
+<a id="@Specification_0"></a>
 
 ## Specification
 
@@ -58,7 +58,7 @@ on account to have access to this.
 
 
 
-<a name="@Specification_0_create_signer"></a>
+<a id="@Specification_0_create_signer"></a>
 
 ### Function `create_signer`
 

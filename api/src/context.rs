@@ -29,6 +29,7 @@ use aptos_types::{
     access_path::{AccessPath, Path},
     account_address::AccountAddress,
     account_config::{AccountResource, NewBlockEvent},
+    block_executor::config::BlockExecutorConfigFromOnchain,
     chain_id::ChainId,
     contract_event::EventWithVersion,
     event::EventKey,
@@ -98,7 +99,8 @@ impl Context {
             })),
             gas_limit_cache: Arc::new(RwLock::new(GasLimitCache {
                 last_updated_epoch: None,
-                block_gas_limit: None,
+                block_executor_onchain_config: OnChainExecutionConfig::default_if_missing()
+                    .block_executor_onchain_config(),
             })),
         }
     }
@@ -935,7 +937,7 @@ impl Context {
     ) -> Result<GasEstimation, E> {
         let config = &self.node_config.api.gas_estimation;
         let min_gas_unit_price = self.min_gas_unit_price(ledger_info)?;
-        let block_gas_limit = self.block_gas_limit(ledger_info)?;
+        let block_config = self.block_executor_onchain_config(ledger_info)?;
         if !config.enabled {
             return Ok(self.default_gas_estimation(min_gas_unit_price));
         }
@@ -1024,7 +1026,9 @@ impl Context {
                 Ok(prices_and_used) => {
                     let is_full_block = if prices_and_used.len() >= config.full_block_txns {
                         true
-                    } else if let Some(full_block_gas_used) = block_gas_limit {
+                    } else if let Some(full_block_gas_used) =
+                        block_config.block_gas_limit_type.block_gas_limit()
+                    {
                         prices_and_used.iter().map(|(_, used)| *used).sum::<u64>()
                             >= full_block_gas_used
                     } else {
@@ -1207,16 +1211,16 @@ impl Context {
         }
     }
 
-    pub fn block_gas_limit<E: InternalError>(
+    pub fn block_executor_onchain_config<E: InternalError>(
         &self,
         ledger_info: &LedgerInfo,
-    ) -> Result<Option<u64>, E> {
+    ) -> Result<BlockExecutorConfigFromOnchain, E> {
         // If it's the same epoch, use the cached results
         {
             let cache = self.gas_limit_cache.read().unwrap();
             if let Some(ref last_updated_epoch) = cache.last_updated_epoch {
                 if *last_updated_epoch == ledger_info.epoch.0 {
-                    return Ok(cache.block_gas_limit);
+                    return Ok(cache.block_executor_onchain_config.clone());
                 }
             }
         }
@@ -1227,7 +1231,7 @@ impl Context {
             // If a different thread updated the cache, we can exit early
             if let Some(ref last_updated_epoch) = cache.last_updated_epoch {
                 if *last_updated_epoch == ledger_info.epoch.0 {
-                    return Ok(cache.block_gas_limit);
+                    return Ok(cache.block_executor_onchain_config.clone());
                 }
             }
 
@@ -1240,13 +1244,14 @@ impl Context {
                 })?;
             let resolver = state_view.as_move_resolver();
 
-            let block_gas_limit = OnChainExecutionConfig::fetch_config(&resolver)
-                .and_then(|config| config.block_gas_limit());
+            let block_executor_onchain_config = OnChainExecutionConfig::fetch_config(&resolver)
+                .unwrap_or_else(OnChainExecutionConfig::default_if_missing)
+                .block_executor_onchain_config();
 
             // Update the cache
-            cache.block_gas_limit = block_gas_limit;
+            cache.block_executor_onchain_config = block_executor_onchain_config.clone();
             cache.last_updated_epoch = Some(ledger_info.epoch.0);
-            Ok(block_gas_limit)
+            Ok(block_executor_onchain_config)
         }
     }
 
@@ -1298,7 +1303,7 @@ pub struct GasEstimationCache {
 
 pub struct GasLimitCache {
     last_updated_epoch: Option<u64>,
-    block_gas_limit: Option<u64>,
+    block_executor_onchain_config: BlockExecutorConfigFromOnchain,
 }
 
 /// This function just calls tokio::task::spawn_blocking with the given closure and in

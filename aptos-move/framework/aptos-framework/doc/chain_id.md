@@ -1,5 +1,5 @@
 
-<a name="0x1_chain_id"></a>
+<a id="0x1_chain_id"></a>
 
 # Module `0x1::chain_id`
 
@@ -21,7 +21,7 @@ This code provides a container for storing a chain id and functions to initializ
 
 
 
-<a name="0x1_chain_id_ChainId"></a>
+<a id="0x1_chain_id_ChainId"></a>
 
 ## Resource `ChainId`
 
@@ -48,7 +48,7 @@ This code provides a container for storing a chain id and functions to initializ
 
 </details>
 
-<a name="0x1_chain_id_initialize"></a>
+<a id="0x1_chain_id_initialize"></a>
 
 ## Function `initialize`
 
@@ -75,7 +75,7 @@ Publish the chain ID <code>id</code> of this instance under the SystemAddresses 
 
 </details>
 
-<a name="0x1_chain_id_get"></a>
+<a id="0x1_chain_id_get"></a>
 
 ## Function `get`
 
@@ -101,7 +101,7 @@ Return the chain ID of this instance.
 
 </details>
 
-<a name="@Specification_0"></a>
+<a id="@Specification_0"></a>
 
 ## Specification
 
@@ -113,7 +113,7 @@ Return the chain ID of this instance.
 
 
 
-<a name="@Specification_0_initialize"></a>
+<a id="@Specification_0_initialize"></a>
 
 ### Function `initialize`
 
@@ -132,7 +132,7 @@ Return the chain ID of this instance.
 
 
 
-<a name="@Specification_0_get"></a>
+<a id="@Specification_0_get"></a>
 
 ### Function `get`
 

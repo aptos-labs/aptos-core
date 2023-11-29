@@ -192,7 +192,7 @@ pub fn run_benchmark<V>(
 
     let mut start_time = Instant::now();
     let start_gas_measurement = GasMeasuring::start();
-    let start_output_size = APTOS_PROCESSED_TXNS_OUTPUT_SIZE.get();
+    let start_output_size = APTOS_PROCESSED_TXNS_OUTPUT_SIZE.get_sample_sum();
     let start_partitioning_total = BLOCK_PARTITIONING_SECONDS.get_sample_sum();
     let start_execution_total = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum();
     let start_vm_only = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
@@ -249,7 +249,7 @@ pub fn run_benchmark<V>(
     let elapsed = start_time.elapsed().as_secs_f64();
     let delta_v = (db.reader.get_latest_version().unwrap() - version) as f64;
     let delta_gas = start_gas_measurement.end();
-    let delta_output_size = APTOS_PROCESSED_TXNS_OUTPUT_SIZE.get() - start_output_size;
+    let delta_output_size = APTOS_PROCESSED_TXNS_OUTPUT_SIZE.get_sample_sum() - start_output_size;
 
     let delta_vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum() - start_vm_time;
     info!(
@@ -277,10 +277,7 @@ pub fn run_benchmark<V>(
         "Overall GPT: {} gas/txn",
         delta_gas.gas / (delta_gas.gas_count as f64).max(1.0)
     );
-    info!(
-        "Overall output: {} bytes/s",
-        delta_output_size as f64 / elapsed
-    );
+    info!("Overall output: {} bytes/s", delta_output_size / elapsed);
 
     let time_in_partitioning =
         BLOCK_PARTITIONING_SECONDS.get_sample_sum() - start_partitioning_total;
@@ -623,7 +620,7 @@ mod tests {
     }
 
     #[test]
-    fn test_benchmark() {
+    fn test_benchmark_default() {
         test_generic_benchmark::<AptosVM>(None, true);
     }
 
