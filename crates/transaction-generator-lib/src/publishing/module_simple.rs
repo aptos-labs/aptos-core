@@ -175,6 +175,9 @@ pub enum EntryPoints {
     VectorPicture {
         length: u64,
     },
+    VectorPictureRead {
+        length: u64,
+    },
     InitializeSmartTablePicture,
     SmartTablePicture {
         length: u64,
@@ -215,6 +218,7 @@ impl EntryPoints {
             EntryPoints::TokenV2AmbassadorMint => "ambassador_token",
             EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
+            | EntryPoints::VectorPictureRead { .. }
             | EntryPoints::InitializeSmartTablePicture
             | EntryPoints::SmartTablePicture { .. } => "complex",
         }
@@ -250,7 +254,7 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndStoreFT
             | EntryPoints::TokenV1MintAndTransferFT => "token_v1",
             EntryPoints::TokenV2AmbassadorMint => "ambassador",
-            EntryPoints::InitializeVectorPicture { .. } | EntryPoints::VectorPicture { .. } => {
+            EntryPoints::InitializeVectorPicture { .. } | EntryPoints::VectorPicture { .. } | EntryPoints::VectorPictureRead { .. } => {
                 "vector_picture"
             },
             EntryPoints::InitializeSmartTablePicture | EntryPoints::SmartTablePicture { .. } => {
@@ -411,6 +415,14 @@ impl EntryPoints {
                     bcs::to_bytes(&rng.gen_range(0u8, 255u8)).unwrap(), // color B
                 ])
             },
+            EntryPoints::VectorPictureRead { length } => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                get_payload(module_id, ident_str!("check").to_owned(), vec![
+                    bcs::to_bytes(&other.expect("Must provide other")).unwrap(),
+                    bcs::to_bytes(&0u64).unwrap(), // palette_index
+                    bcs::to_bytes(&rng.gen_range(0u64, length)).unwrap(), // index
+                ])
+            },
             EntryPoints::InitializeSmartTablePicture => {
                 get_payload(module_id, ident_str!("create").to_owned(), vec![])
             },
@@ -447,7 +459,7 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndTransferFT => {
                 Some(EntryPoints::TokenV1InitializeCollection)
             },
-            EntryPoints::VectorPicture { length } => {
+            EntryPoints::VectorPicture { length } | EntryPoints::VectorPictureRead { length } => {
                 Some(EntryPoints::InitializeVectorPicture { length: *length })
             },
             EntryPoints::SmartTablePicture { .. } => Some(EntryPoints::InitializeSmartTablePicture),

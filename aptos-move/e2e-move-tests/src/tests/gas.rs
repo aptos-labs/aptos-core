@@ -5,8 +5,10 @@ use crate::{tests::common::test_dir_path, MoveHarness};
 use aptos_cached_packages::{aptos_stdlib, aptos_token_sdk_builder};
 use aptos_crypto::{bls12381, PrivateKey, Uniform};
 use aptos_gas_profiling::TransactionGasLog;
-use aptos_types::account_address::{default_stake_pool_address, AccountAddress};
+use aptos_transaction_generator_lib::{EntryPoints, publishing::publish_util::PackageHandler};
+use aptos_types::{account_address::{default_stake_pool_address, AccountAddress}, fee_statement::{self, FeeStatement}};
 use aptos_vm::AptosVM;
+use rand::{rngs::StdRng, SeedableRng};
 use std::path::Path;
 
 fn save_profiling_results(name: &str, log: &TransactionGasLog) {
@@ -42,9 +44,9 @@ fn test_gas() {
         if !profile_gas {
             print_gas_cost(function, harness.evaluate_gas(account, payload));
         } else {
-            let (log, gas_used) = harness.evaluate_gas_with_profiler(account, payload);
+            let (log, gas_used, fee_statement) = harness.evaluate_gas_with_profiler(account, payload);
             save_profiling_results(function, &log);
-            print_gas_cost(function, gas_used);
+            print_gas_cost_with_statement(function, gas_used, fee_statement);
         }
     };
 
@@ -52,13 +54,45 @@ fn test_gas() {
         if !profile_gas {
             print_gas_cost(name, harness.evaluate_publish_gas(account, path));
         } else {
-            let (log, gas_used) = harness.evaluate_publish_gas_with_profiler(account, path);
+            let (log, gas_used, fee_statement) = harness.evaluate_publish_gas_with_profiler(account, path);
             save_profiling_results(name, &log);
-            print_gas_cost(name, gas_used);
+            print_gas_cost_with_statement(name, gas_used, fee_statement);
         }
     };
 
     AptosVM::set_paranoid_type_checks(true);
+
+    let entry_points = vec![
+        EntryPoints::VectorPicture { length: 30 * 1024 },
+        EntryPoints::VectorPictureRead { length: 30 * 1024 },
+        EntryPoints::VectorPicture { length: 40 },
+        EntryPoints::VectorPictureRead { length: 40 },
+        EntryPoints::SmartTablePicture {
+            length: 1024 * 1024,
+            num_points_per_txn: 1024,
+        },
+        EntryPoints::Nop,
+        EntryPoints::TokenV2AmbassadorMint,
+        EntryPoints::TokenV1MintAndStoreNFTSequential,
+        EntryPoints::StepDst,
+    ].into_iter().map(|e| (e, format!("entry_point_{e:?}"))).collect::<Vec<_>>();
+
+    for (entry_point, entry_point_name) in &entry_points {
+        let mut package_handler = PackageHandler::new(entry_point.package_name());
+        let mut rng = StdRng::seed_from_u64(14);
+        let package = package_handler.pick_package(&mut rng, account_1.address().clone());
+        harness.run_transaction_payload(account_1, package.publish_transaction_payload());
+        if let Some(init_entry_point) = entry_point.initialize_entry_point() {
+            harness.run_transaction_payload(account_1, init_entry_point.create_payload(package.get_module_id(init_entry_point.module_name()), Some(&mut rng), Some(account_1.address())));
+        }
+
+        run(
+            &mut harness,
+            &entry_point_name,
+            account_2,
+            entry_point.create_payload(package.get_module_id(entry_point.module_name()), Some(&mut rng), Some(account_1.address())),
+        );
+    }
 
     run(
         &mut harness,
@@ -291,11 +325,25 @@ fn dollar_cost(gas_units: u64, price: u64) -> f64 {
 
 pub fn print_gas_cost(function: &str, gas_units: u64) {
     println!(
-        "{:20} | {:8} | {:.6} | {:.6} | {:.6}",
-        function,
+        "{:8} | {:.6} | {:.6} | {:.6} | {}",
         gas_units,
         dollar_cost(gas_units, 5),
         dollar_cost(gas_units, 15),
-        dollar_cost(gas_units, 30)
+        dollar_cost(gas_units, 30),
+        function,
+    );
+}
+
+pub fn print_gas_cost_with_statement(function: &str, gas_units: u64, fee_statement: Option<FeeStatement>) {
+    println!(
+        "{:8} | {:.6} | {:.6} | {:.6} | {:8} | {:8} | {:8} | {}",
+        gas_units,
+        dollar_cost(gas_units, 5),
+        dollar_cost(gas_units, 15),
+        dollar_cost(gas_units, 30),
+        fee_statement.unwrap().execution_gas_used() + fee_statement.unwrap().io_gas_used(),
+        fee_statement.unwrap().execution_gas_used(),
+        fee_statement.unwrap().io_gas_used(),
+        function,
     );
 }

@@ -13,6 +13,9 @@ module 0xABCD::vector_picture {
     /// The caller tried to create palette for non-initialized account.
     const E_ALL_PALETTES_NOT_INIT: u64 = 2;
 
+    /// Color checked is max.
+    const E_MAX_COLOR: u64 = 3;
+
     struct AllPalettes has key {
         all: vector<address>,
     }
@@ -94,5 +97,23 @@ module 0xABCD::vector_picture {
         // Write the pixel.
         let color = Color { r, g, b };
         *vector::borrow_mut(&mut palette_.vec, index) = color;
+    }
+
+    public entry fun check(
+        palette_addr: address,
+        palette_index: u64,
+        index: u64,
+    ) acquires Palette, AllPalettes {
+        let all_palettes = borrow_global<AllPalettes>(palette_addr);
+        let palette_addr = vector::borrow(&all_palettes.all, palette_index);
+
+        let palette_ = borrow_global_mut<Palette>(*palette_addr);
+
+        // Confirm the index is not out of bounds.
+        assert!(index < vector::length(&palette_.vec), error::invalid_argument(E_INDEX_OUT_OF_BOUNDS));
+
+        // Write the pixel.
+        let color = vector::borrow(&mut palette_.vec, index);
+        assert!(color.r != 255 || color.g != 255 || color.b != 255, error::invalid_argument(E_MAX_COLOR));
     }
 }
