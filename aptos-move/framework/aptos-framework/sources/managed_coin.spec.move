@@ -36,13 +36,6 @@
 /// function ensures the precise return of the initially specified coin amount.
 /// [Enforcement] Enforced via: burn_from
 ///
-/// [No.] 6
-/// [Property] Minted coins are deposited to the provided destination address.
-/// [Criticality] High
-/// [Implementation] After the coins are minted via coin::mint they are deposited into the coinstore of the destination
-/// address.
-/// [Enforcement] _This should be formally verified via a post condition to ensure that coins are deposited to the
-/// destination address._
 
 spec aptos_framework::managed_coin {
     spec module {

@@ -38,7 +38,6 @@ By utilizing this current module, a developer can create his own coin and care l
         <td>Criticality</td>
         <td>Implementation</td>
         <td>Enforcement</td>
-        <td></td>
     </tr>
     <tr>
         <td>1</td>
@@ -46,7 +45,6 @@ By utilizing this current module, a developer can create his own coin and care l
         <td>Critical</td>
         <td>The capabilities are stored under the initializing account under the Capabilities resource, which is distinct for a distinct type of coin.</td>
         <td>Enforced via: <a href="https://github.com/aptos-labs/aptos-core/blob/cdb1f27868890a49075356d626e91d73f8ee3170/aptos-move/framework/aptos-framework/sources/managed_coin.spec.move#L60">initialize</a></td>
-        <td></td>
     </tr>
     <tr>
         <td>2</td>
@@ -54,7 +52,6 @@ By utilizing this current module, a developer can create his own coin and care l
         <td>High</td>
         <td>In the initialize function, a new coin is initialized via the coin module with the specified properties.</td>
         <td>Enforced via: <a href="https://github.com/aptos-labs/aptos-core/blob/37d7a428eaadf6ff99eb9fd302a689405b20c2c5/aptos-move/framework/aptos-framework/sources/coin.spec.move#L305">initialize_internal</a>.</td>
-        <td></td>
     </tr>
     <tr>
         <td>3</td>
@@ -62,7 +59,6 @@ By utilizing this current module, a developer can create his own coin and care l
         <td>High</td>
         <td>The mint and burn capabilities are moved under the initializing account and retrieved, while minting/burning</td>
         <td>Enforced via: <a href="https://github.com/aptos-labs/aptos-core/blob/cdb1f27868890a49075356d626e91d73f8ee3170/aptos-move/framework/aptos-framework/sources/managed_coin.spec.move#L60">initialize</a>, <a href="https://github.com/aptos-labs/aptos-core/blob/cdb1f27868890a49075356d626e91d73f8ee3170/aptos-move/framework/aptos-framework/sources/managed_coin.spec.move#L24">burn</a>, <a href="https://github.com/aptos-labs/aptos-core/blob/cdb1f27868890a49075356d626e91d73f8ee3170/aptos-move/framework/aptos-framework/sources/managed_coin.spec.move#L71">mint</a>.</td>
-        <td></td>
     </tr>
     <tr>
         <td>4</td>
@@ -70,7 +66,6 @@ By utilizing this current module, a developer can create his own coin and care l
         <td>High</td>
         <td>The coin::burn and coin::mint functions, when tracking the supply, adjusts the total coin supply accordingly.</td>
         <td>Formally Verified: <a href="https://github.com/aptos-labs/aptos-core/blob/005aca2ae22a1200871c4679b606c84210fdfb94/aptos-move/framework/aptos-framework/sources/coin.spec.move#L8">TotalSupplyNoChange</a>.</td>
-        <td></td>
     </tr>
     <tr>
         <td>5</td>
@@ -78,7 +73,6 @@ By utilizing this current module, a developer can create his own coin and care l
         <td>High</td>
         <td>After utilizing the coin::withdraw function to withdraw coins, they are then burned, and the function ensures the precise return of the initially specified coin amount.</td>
         <td>Enforced via: <a href="https://github.com/aptos-labs/aptos-core/blob/37d7a428eaadf6ff99eb9fd302a689405b20c2c5/aptos-move/framework/aptos-framework/sources/coin.spec.move#L179">burn_from</a>.</td>
-        <td></td>
     </tr>
 </table>
 
