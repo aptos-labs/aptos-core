@@ -14,7 +14,7 @@ This tutorial introduces how you can compile, deploy, and mint your own coin, na
 
 Install your preferred SDK from the below list:
 
-* [TypeScript SDK](../sdks/ts-sdk/v1/index.md)
+* [TypeScript SDK](../sdks/ts-sdk-v2/index.md)
 * [Python SDK](../sdks/python-sdk.md)
 * [Rust SDK](../sdks/rust-sdk.md)
 
@@ -28,19 +28,20 @@ Install your preferred SDK from the below list:
 
 ## Step 3: Run the example
 
-Clone the `aptos-core` repo:
-
-```bash
-git clone https://github.com/aptos-labs/aptos-core.git
-```
-
 <Tabs groupId="examples">
   <TabItem value="typescript" label="Typescript">
+
+Clone the `aptos-ts-sdk` repo:
+
+
+```bash
+git clone https://github.com/aptos-labs/aptos-ts-sdk.git
+```
 
 Navigate to the TypeScript SDK directory:
 
 ```bash
-cd ~/aptos-core/ecosystem/typescript/sdk
+cd ~/examples/typescript/
 ```
 
 Install the necessary dependencies:
@@ -49,16 +50,30 @@ Install the necessary dependencies:
 pnpm install
 ```
 
-Run the TypeScript [`your_coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/your_coin.ts) example:
+Run the TypeScript [`your_coin`](https://github.com/aptos-labs/aptos-ts-sdk/blob/main/examples/typescript/your_coin.ts) example:
 
 ```bash
-cd examples/typescript
-pnpm your_coin ~/aptos-core/aptos-move/move-examples/moon_coin
+pnpm run your_coin
+```
+
+The application will complete, printing:
+
+```ts
+Bob's initial MoonCoin balance: 0.
+Alice mints herself 100 MoonCoin.
+Alice transfers 100 MoonCoin to Bob.
+Bob's updated MoonCoin balance: 100.
 ```
 
   </TabItem>
   <TabItem value="python" label="Python">
 
+Clone the `aptos-core` repo:
+
+
+```bash
+git clone https://github.com/aptos-labs/aptos-core
+```
 Navigate to the Python SDK directory:
 
 ```bash
@@ -77,16 +92,6 @@ Run the Python [`your_coin`](https://github.com/aptos-labs/aptos-core/blob/main/
 ```bash
 poetry run python -m examples.your_coin ~/aptos-core/aptos-move/move-examples/moon_coin
 ```
-
-  </TabItem>
-  <TabItem value="rust" label="Rust">
-
-    Coming soon.
-
-  </TabItem>
-</Tabs>
-
----
 
 ### Step 3.1: Build the package
 
@@ -131,7 +136,13 @@ Bob's initial MoonCoin balance: 0.
 Alice mints Bob some of the new coin.
 Bob's updated MoonCoin balance: 100.
 ```
+
+  </TabItem>
+</Tabs>
+
 ---
+
+
 
 ## Step 4: MoonCoin in depth
 
@@ -147,8 +158,56 @@ These are read by the example and published to the Aptos blockchain:
 <Tabs groupId="examples">
   <TabItem value="typescript" label="Typescript">
 
-```typescript
-:!: static/sdks/typescript/examples/typescript/your_coin.ts publish
+In the TypeScript example, we use `aptos move build-publish-payload` command to compile and build the module. 
+That command builds the `build` folder that contains the `package-metadata.bcs` and the bytecode for the `moon_coin.mv` module. The command also builds a publication transaction payload and stores it in a JSON output file that we can later read from to get the `metadataBytes` and `byteCode` to publish the contract to chain with.
+
+Compile the package:
+```ts
+export function compilePackage(
+  packageDir: string,
+  outputFile: string,
+  namedAddresses: Array<{ name: string; address: AccountAddress }>,
+) {
+  const addressArg = namedAddresses.map(({ name, address }) => `${name}=${address}`).join(" ");
+  // Assume-yes automatically overwrites the previous compiled version, only do this if you are sure you want to overwrite the previous version.
+  const compileCommand = `aptos move build-publish-payload --json-output-file ${outputFile} --package-dir ${packageDir} --named-addresses ${addressArg} --assume-yes`;
+  execSync(compileCommand);
+}
+
+compilePackage("move/moonCoin", "move/moonCoin/moonCoin.json", [{ name: "MoonCoin", address: alice.accountAddress }]);
+```
+
+Publish the package to chain:
+```ts
+export function getPackageBytesToPublish(filePath: string) {
+  // current working directory - the root folder of this repo
+  const cwd = process.cwd();
+  // target directory - current working directory + filePath (filePath json file is generated with the prevoius, compilePackage, cli command)
+  const modulePath = path.join(cwd, filePath);
+
+  const jsonData = JSON.parse(fs.readFileSync(modulePath, "utf8"));
+
+  const metadataBytes = jsonData.args[0].value;
+  const byteCode = jsonData.args[1].value;
+
+  return { metadataBytes, byteCode };
+}
+
+const { metadataBytes, byteCode } = getPackageBytesToPublish("move/moonCoin/moonCoin.json");
+
+// Publish MoonCoin package to chain
+const transaction = await aptos.publishPackageTransaction({
+  account: alice.accountAddress,
+  metadataBytes,
+  moduleBytecode: byteCode,
+});
+
+const pendingTransaction = await aptos.signAndSubmitTransaction({
+  signer: alice,
+  transaction,
+});
+
+await aptos.waitForTransaction({ transactionHash: pendingTransaction.hash });
 ```
 
   </TabItem>
@@ -300,7 +359,7 @@ There are two separate withdraw and deposit events instead of a single transfer 
 
 ## Supporting documentation
 * [Aptos CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md)
-* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [TypeScript SDK](../sdks/ts-sdk-v2/index.md)
 * [Python SDK](../sdks/python-sdk.md)
 * [Rust SDK](../sdks/rust-sdk.md)
 * [REST API specification](https://aptos.dev/nodes/aptos-api-spec#/)
