@@ -1,12 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// Do a few checks of functions and function calls:
-// - check that calls to or from inline functions are accessible;
-//   - non-inline functions are handled in the VisibilityChecker pass, but
-//     inline functions will be either gone or inlined by then.
-// - check that non-inline function parameters do not have function type
-// - check that all private functions in target modules have uses (if -Wunused flag is set)
+//! Do a few checks of functions and function calls.
 
 use crate::Options;
 use codespan_reporting::diagnostic::Severity;
@@ -15,53 +10,74 @@ use move_model::{
     model::{FunId, GlobalEnv, QualifiedId},
     ty::Type,
 };
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    iter::Iterator,
-    ops::Deref,
-    vec::Vec,
-};
+use std::{collections::BTreeSet, iter::Iterator, ops::Deref, vec::Vec};
 
 type QualifiedFunId = QualifiedId<FunId>;
 
-// Run checks for all functions in all target modules.
-pub fn check_functions(env: &mut GlobalEnv) {
+/// check that non-inline function parameters do not have function type
+pub fn check_functions_for_function_typed_parameters(env: &mut GlobalEnv) {
+    for caller_module in env.get_modules() {
+        if caller_module.is_target() {
+            for caller_func in caller_module.get_functions() {
+                // Check that non-inline function parameters don't have function type
+                if !caller_func.is_inline() {
+                    let parameters = caller_func.get_parameters();
+                    let bad_params: Vec<_> = parameters
+                        .iter()
+                        .filter(|param| matches!(param.1, Type::Fun(_, _)))
+                        .collect();
+                    if !bad_params.is_empty() {
+                        let type_ctx = caller_func.get_type_display_ctx();
+                        let caller_name = caller_func.get_full_name_str();
+                        let notes: Vec<String> = bad_params
+                            .iter()
+                            .map(|param| {
+                                format!(
+                                    "Parameter `{}` has a function type `{}`.",
+                                    param.0.display(env.symbol_pool()),
+                                    param.1.display(&type_ctx)
+                                )
+                            })
+                            .collect();
+                        env.error_with_notes(
+                            &caller_func.get_loc(),
+                            &format!("Only inline functions may have function-typed parameters, but non-inline function `{}` has some:",
+                                     caller_name),
+                            notes,
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// For all function in target modules:
+/// - check that non-inline function parameters do not have function type
+/// - check that calls to or from inline functions are accessible;
+///   - non-inline functions are handled in the VisibilityChecker pass, but
+///     inline functions will be either gone or inlined by then.
+pub fn check_functions_access_and_use(env: &mut GlobalEnv) {
     let options = env
         .get_extension::<Options>()
         .expect("Options is available");
-    //let debug = options.debug;
     let warn_about_unused = options.warn_unused;
 
-    let mut callees_seen: BTreeMap<QualifiedFunId, BTreeSet<QualifiedFunId>> = BTreeMap::new();
+    // For each function seen, we record whether it has an accessible caller.
+    let mut functions_with_callers: BTreeSet<QualifiedFunId> = BTreeSet::new();
+    // Record all private and friendless public(friend) functions to check for uses.
     let mut private_funcs: BTreeSet<QualifiedFunId> = BTreeSet::new();
+
     for caller_module in env.get_modules() {
         if caller_module.is_target() {
             let caller_module_id = caller_module.get_id();
             let caller_module_name = caller_module.get_name();
-            let caller_module_has_friends = !caller_module.get_friend_modules().is_empty();
+            let caller_module_has_friends = !caller_module.has_no_friends();
             let caller_module_is_script = caller_module.get_name().is_script();
             for caller_func in caller_module.get_functions() {
                 let caller_name_str = caller_func.get_full_name_with_address();
                 let caller_qfid = caller_func.get_qualified_id();
                 let caller_is_inline = caller_func.is_inline();
-
-                // Check that non-inline function parameters don't have function type
-                if !caller_is_inline {
-                    let parameters = caller_func.get_parameters();
-                    for param in parameters
-                        .iter()
-                        .filter(|param| matches!(param.1, Type::Fun(_, _)))
-                    {
-                        let type_ctx = caller_func.get_type_display_ctx();
-                        let msg = format!(
-                            "Non-inlined function `{}` parameter `{}` has a function type `{}`",
-                            caller_module_name.display_full(env),
-                            param.0.display(env.symbol_pool()),
-                            param.1.display(&type_ctx)
-                        );
-                        env.error(&caller_func.get_loc(), &msg);
-                    }
-                }
 
                 match caller_func.visibility() {
                     Visibility::Public => {},
@@ -75,8 +91,6 @@ pub fn check_functions(env: &mut GlobalEnv) {
                         private_funcs.insert(caller_qfid);
                     },
                 };
-
-                callees_seen.entry(caller_qfid).or_insert(BTreeSet::new());
 
                 // Check that inline functions being called are accessible
                 if let Some(def) = caller_func.get_def().deref() {
@@ -181,25 +195,17 @@ pub fn check_functions(env: &mut GlobalEnv) {
                             }
                         };
                         if callee_is_accessible {
-                            callees_seen
-                                .entry(callee)
-                                .and_modify(|curr| {
-                                    curr.insert(caller_qfid);
-                                })
-                                .or_insert(BTreeSet::from([caller_qfid]));
+                            functions_with_callers.insert(callee);
                         }
                     }
                 }
             }
         }
     }
+
     // Check for Unused functions: private (or friendless public(friend)) funs with no callers.
     for callee in private_funcs {
-        if callees_seen
-            .get(&callee)
-            .map(|s| s.is_empty())
-            .unwrap_or(true)
-        {
+        if !functions_with_callers.contains(&callee) {
             // We saw no uses of private/friendless function `callee`.
             let callee_env = env.get_function(callee);
             let callee_loc = callee_env.get_loc();

@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: Non-inlined function `0x42::sort` parameter `a_less_b` has a function type `|(T, T)|bool`
+error: Only inline functions may have function-typed parameters, but non-inline function `sort::incorrect_sort` has some:
   ┌─ tests/checking/inlining/non_lambda_arg.move:4:5
   │
 4 │ ╭     public fun incorrect_sort<T: copy>(arr: &mut vector<T>, a_less_b: |T, T| bool) {
@@ -8,8 +8,10 @@ error: Non-inlined function `0x42::sort` parameter `a_less_b` has a function typ
 6 │ │         incorrect_sort_recursive<T>(arr, 0, n - 1, a_less_b)
 7 │ │     }
   │ ╰─────^
+  │
+  = Parameter `a_less_b` has a function type `|(T, T)|bool`.
 
-error: Non-inlined function `0x42::sort` parameter `a_less_b` has a function type `|(T, T)|bool`
+error: Only inline functions may have function-typed parameters, but non-inline function `sort::incorrect_sort_recursive` has some:
    ┌─ tests/checking/inlining/non_lambda_arg.move:9:5
    │
  9 │ ╭     public fun incorrect_sort_recursive<T: copy>(arr: &mut vector<T>, low: u64, high: u64, a_less_b: |T, T| bool) {
@@ -20,3 +22,5 @@ error: Non-inlined function `0x42::sort` parameter `a_less_b` has a function typ
 14 │ │         };
 15 │ │     }
    │ ╰─────^
+   │
+   = Parameter `a_less_b` has a function type `|(T, T)|bool`.

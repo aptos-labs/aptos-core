@@ -233,7 +233,8 @@ impl TestConfig {
         let mut ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
 
         if ok {
-            function_checker::check_functions(&mut env);
+            function_checker::check_functions_for_function_typed_parameters(&mut env);
+            function_checker::check_functions_access_and_use(&mut env);
             ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
         }
 
