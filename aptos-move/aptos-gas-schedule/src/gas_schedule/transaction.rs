@@ -28,7 +28,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             min_transaction_gas_units: InternalGas,
             "min_transaction_gas_units",
-            1_500_000
+            5_500_000
         ],
         // Any transaction over this size will be charged an additional amount per byte.
         [
@@ -79,19 +79,19 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             storage_io_per_state_slot_read: InternalGasPerArg,
             { 0..=9 => "load_data.base", 10.. => "storage_io_per_state_slot_read"},
-            300_000,
+            400_000,
         ],
         [
             storage_io_per_state_byte_read: InternalGasPerByte,
             { 0..=9 => "load_data.per_byte", 10.. => "storage_io_per_state_byte_read"},
-            300,
+            600,
         ],
         [load_data_failure: InternalGas, "load_data.failure", 0],
         // Gas parameters for writing data to storage.
         [
             storage_io_per_state_slot_write: InternalGasPerArg,
             { 0..=9 => "write_data.per_op", 10.. => "storage_io_per_state_slot_write"},
-            300_000,
+            500_000,
         ],
         [
             write_data_per_new_item: InternalGasPerArg,
@@ -101,7 +101,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             storage_io_per_state_byte_write: InternalGasPerByte,
             { 0..=9 => "write_data.per_byte_in_key", 10.. => "storage_io_per_state_byte_write"},
-            5_000
+            1000
         ],
         [
             write_data_per_byte_in_val: InternalGasPerByte,
@@ -112,7 +112,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             free_write_bytes_quota: NumBytes,
             { 5.. => "free_write_bytes_quota" },
-            1024, // 1KB free per state write
+            0, // 1KB free per state write
         ],
         [
             free_event_bytes_quota: NumBytes,
