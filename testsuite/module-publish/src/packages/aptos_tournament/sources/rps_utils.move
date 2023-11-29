@@ -103,11 +103,11 @@ module tournament::rps_unit_tests {
     fun game_play(
         player: &signer,
         admin_address: address,
-        action: vector<u8>,
     ) acquires PlayerToGameMapping {
         let player_address = signer::address_of(player);
         let player_to_game_mapping = borrow_global<PlayerToGameMapping>(admin_address);
         let game_address = rock_paper_scissor::get_address(*table::borrow(&player_to_game_mapping.mapping, player_address));
+        let action = b"Rock";
         let hash_addition = b"random uuid";
         player_commit(player, game_address, action, hash_addition);
     }

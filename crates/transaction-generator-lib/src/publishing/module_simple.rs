@@ -180,6 +180,9 @@ pub enum EntryPoints {
         length: u64,
         num_points_per_txn: usize,
     },
+    TournamentSetup,
+    TournamentSetupPlayer,
+    TournamentGamePlay,
 }
 
 impl EntryPoints {
@@ -217,6 +220,9 @@ impl EntryPoints {
             | EntryPoints::VectorPicture { .. }
             | EntryPoints::InitializeSmartTablePicture
             | EntryPoints::SmartTablePicture { .. } => "complex",
+            EntryPoints::TournamentSetup
+            | EntryPoints::TournamentSetupPlayer
+            | EntryPoints::TournamentGamePlay => "aptos_tournament",
         }
     }
 
@@ -256,6 +262,9 @@ impl EntryPoints {
             EntryPoints::InitializeSmartTablePicture | EntryPoints::SmartTablePicture { .. } => {
                 "smart_table_picture"
             },
+            EntryPoints::TournamentSetup
+            | EntryPoints::TournamentSetupPlayer
+            | EntryPoints::TournamentGamePlay => "aptos_tournament",
         }
     }
 
@@ -434,6 +443,23 @@ impl EntryPoints {
                     bcs::to_bytes(&colors).unwrap(),  // colors
                 ])
             },
+            EntryPoints::TournamentSetup => {
+                get_payload_void(module_id,ident_str!("setup_tournament").to_owned())
+            }
+            EntryPoints::TournamentSetupPlayer => {
+                get_payload(
+                    module_id,
+                    ident_str!("setup_player").to_owned(),
+                    vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
+                )
+            }
+            EntryPoints::TournamentGamePlay => {
+                get_payload(
+                    module_id,
+                    ident_str!("game_play").to_owned(),
+                    vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
+                )
+            }
         }
     }
 
@@ -451,6 +477,7 @@ impl EntryPoints {
                 Some(EntryPoints::InitializeVectorPicture { length: *length })
             },
             EntryPoints::SmartTablePicture { .. } => Some(EntryPoints::InitializeSmartTablePicture),
+            EntryPoints::TournamentSetupPlayer => Some(EntryPoints::TournamentSetup),
             _ => None,
         }
     }
