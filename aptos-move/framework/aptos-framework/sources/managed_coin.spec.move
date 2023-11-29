@@ -1,3 +1,49 @@
+/// ### High-level Properties
+///
+/// [No.] 1
+/// [Property] The initializing account should hold the capabilities to operate the coin.
+/// [Criticality] Critical
+/// [Implementation] The capabilities are stored under the initializing account under the Capabilities resource, which
+/// is distinct for a distinct type of coin.
+/// [Enforcement] Enforced via: initialize
+///
+/// [No.] 2
+/// [Property] A new coin should be properly initialized.
+/// [Criticality] High
+/// [Implementation] In the initialize function, a new coin is initialized via the coin module with the specified
+/// properties.
+/// [Enforcement] Enforced via: initialize_internal
+///
+/// [No.] 3
+/// [Property] Minting/Burning should only be done by the account who hold the valid capabilities.
+/// [Criticality] High
+/// [Implementation] The mint and burn capabilities are moved under the initializing account and retrieved, while
+/// minting/burning
+/// [Enforcement] Enforced via: initialize, burn, mint
+///
+/// [No.] 4
+/// [Property] If the total supply of coins is being monitored, burn and mint operations will appropriately adjust the
+/// total supply.
+/// [Criticality] High
+/// [Implementation] The coin::burn and coin::mint functions, when tracking the supply, adjusts the total coin supply
+/// accordingly.
+/// [Enforcement] Formally Verified: TotalSupplyNoChange
+///
+/// [No.] 5
+/// [Property] Before burning coins, exact amount of coins are withdrawn.
+/// [Criticality] High
+/// [Implementation] After utilizing the coin::withdraw function to withdraw coins, they are then burned, and the
+/// function ensures the precise return of the initially specified coin amount.
+/// [Enforcement] Enforced via: burn_from
+///
+/// [No.] 6
+/// [Property] Minted coins are deposited to the provided destination address.
+/// [Criticality] High
+/// [Implementation] After the coins are minted via coin::mint they are deposited into the coinstore of the destination
+/// address.
+/// [Enforcement] _This should be formally verified via a post condition to ensure that coins are deposited to the
+/// destination address._
+
 spec aptos_framework::managed_coin {
     spec module {
         pragma verify = true;

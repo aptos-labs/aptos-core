@@ -31,14 +31,57 @@ By utilizing this current module, a developer can create his own coin and care l
 
 ## High-Level Properties
 
-| No. | Property                                                                                                              | Criticality | Implementation                                                                                                                                                           | Enforcement                                                                                                            |
-|-----|-----------------------------------------------------------------------------------------------------------------------|-------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
-| 1   | The initializing account should hold the capabilities to operate the coin.                                            | Critical    | The capabilities are stored under the initializing account under the Capabilities resource, which is distinct for a distinct type of coin.                               | Enforced via: [initialize](#HL1)                                                                                       |
-| 2   | A new coin should be properly initialized.                                                                            | High        | In the initialize function, a new coin is initialized via the coin module with the specified properties.                                                                 | Enforced via: [initialize\_internal](#HL2).                                                                            |
-| 3   | Minting/Burning should only be done by the account who hold the valid capabilities.                                   | High        | The mint and burn capabilities are moved under the initializing account and retrieved, while minting/burning                                                             | Enforced via: [initialize](#HL31), [burn](#HL32), [mint](#HL33).                                                       |
-| 4   | If the total supply of coins is being monitored, burn and mint operations will appropriately adjust the total supply. | High        | The coin::burn and coin::mint functions, when tracking the supply, adjusts the total coin supply accordingly.                                                            | Formally Verified: [TotalSupplyNoChange](#HL4).                                                                        |
-| 5   | Before burning coins, exact amount of coins are withdrawn.                                                            | High        | After utilizing the coin::withdraw function to withdraw coins, they are then burned, and the function ensures the precise return of the initially specified coin amount. | Enforced via: [burn\_from](#HL5).                                                                                      |
-| 6   | Minted coins are deposited to the provided destination address.                                                       | High        | After the coins are minted via coin::mint they are deposited into the coinstore of the destination address.                                                              | _This should be formally verified via a post condition to ensure that coins are deposited to the destination address._ |
+<table>
+    <tr>
+        <td>No.</td>
+        <td>Property</td>
+        <td>Criticality</td>
+        <td>Implementation</td>
+        <td>Enforcement</td>
+        <td></td>
+    </tr>
+    <tr>
+        <td>1</td>
+        <td>The initializing account should hold the capabilities to operate the coin.</td>
+        <td>Critical</td>
+        <td>The capabilities are stored under the initializing account under the Capabilities resource, which is distinct for a distinct type of coin.</td>
+        <td>Enforced via: <a href="https://github.com/aptos-labs/aptos-core/blob/cdb1f27868890a49075356d626e91d73f8ee3170/aptos-move/framework/aptos-framework/sources/managed_coin.spec.move#L60">initialize</a></td>
+        <td></td>
+    </tr>
+    <tr>
+        <td>2</td>
+        <td>A new coin should be properly initialized.</td>
+        <td>High</td>
+        <td>In the initialize function, a new coin is initialized via the coin module with the specified properties.</td>
+        <td>Enforced via: <a href="https://github.com/aptos-labs/aptos-core/blob/37d7a428eaadf6ff99eb9fd302a689405b20c2c5/aptos-move/framework/aptos-framework/sources/coin.spec.move#L305">initialize_internal</a>.</td>
+        <td></td>
+    </tr>
+    <tr>
+        <td>3</td>
+        <td>Minting/Burning should only be done by the account who hold the valid capabilities.</td>
+        <td>High</td>
+        <td>The mint and burn capabilities are moved under the initializing account and retrieved, while minting/burning</td>
+        <td>Enforced via: <a href="https://github.com/aptos-labs/aptos-core/blob/cdb1f27868890a49075356d626e91d73f8ee3170/aptos-move/framework/aptos-framework/sources/managed_coin.spec.move#L60">initialize</a>, <a href="https://github.com/aptos-labs/aptos-core/blob/cdb1f27868890a49075356d626e91d73f8ee3170/aptos-move/framework/aptos-framework/sources/managed_coin.spec.move#L24">burn</a>, <a href="https://github.com/aptos-labs/aptos-core/blob/cdb1f27868890a49075356d626e91d73f8ee3170/aptos-move/framework/aptos-framework/sources/managed_coin.spec.move#L71">mint</a>.</td>
+        <td></td>
+    </tr>
+    <tr>
+        <td>4</td>
+        <td>If the total supply of coins is being monitored, burn and mint operations will appropriately adjust the total supply.</td>
+        <td>High</td>
+        <td>The coin::burn and coin::mint functions, when tracking the supply, adjusts the total coin supply accordingly.</td>
+        <td>Formally Verified: <a href="https://github.com/aptos-labs/aptos-core/blob/005aca2ae22a1200871c4679b606c84210fdfb94/aptos-move/framework/aptos-framework/sources/coin.spec.move#L8">TotalSupplyNoChange</a>.</td>
+        <td></td>
+    </tr>
+    <tr>
+        <td>5</td>
+        <td>Before burning coins, exact amount of coins are withdrawn.</td>
+        <td>High</td>
+        <td>After utilizing the coin::withdraw function to withdraw coins, they are then burned, and the function ensures the precise return of the initially specified coin amount.</td>
+        <td>Enforced via: <a href="https://github.com/aptos-labs/aptos-core/blob/37d7a428eaadf6ff99eb9fd302a689405b20c2c5/aptos-move/framework/aptos-framework/sources/coin.spec.move#L179">burn_from</a>.</td>
+        <td></td>
+    </tr>
+</table>
+
 
 <a name="0x1_managed_coin_Capabilities"></a>
 
