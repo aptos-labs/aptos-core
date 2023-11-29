@@ -89,6 +89,7 @@ impl DataCollection {
             txns.into_iter().map(|x| x.into()).collect::<Vec<_>>();
         // check whether total supply can be retrieved
         // used for debugging the aggregator panic issue, will be removed later
+        // FIXME(#10412): remove the assert
         let val = debugger_stateview.get_state_value(TOTAL_SUPPLY_STATE_KEY.deref());
         assert!(val.is_ok() && val.unwrap().is_some());
         AptosVM::execute_block(

@@ -229,7 +229,7 @@ impl DebuggerStateView {
             .send((state_key.clone(), version, tx))
             .unwrap();
         let ret = rx.recv()?;
-        if let Some(reads) = &self.data_read_stake_keys {
+        if let Some(reads) = &self.data_read_state_keys {
             if !reads.lock().unwrap().contains_key(state_key) && ret.is_ok() {
                 let val = ret?.clone();
                 if val.is_some() {

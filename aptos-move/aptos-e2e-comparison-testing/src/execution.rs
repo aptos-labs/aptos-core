@@ -67,6 +67,14 @@ impl ExecutionMode {
     pub fn is_compare(&self) -> bool {
         *self == Self::Compare
     }
+
+    pub fn is_v1_or_compare(&self) -> bool {
+        self.is_v1() || self.is_compare()
+    }
+
+    pub fn is_v2_or_compare(&self) -> bool {
+        self.is_v2() || self.is_compare()
+    }
 }
 
 impl Default for ExecutionMode {
@@ -90,15 +98,6 @@ impl Execution {
         }
     }
 
-    fn set_enable(features: &mut Features, flag: FeatureFlag) {
-        let val = flag as u64;
-        let byte_index = (val / 8) as usize;
-        let bit_mask = 1 << (val % 8);
-        if byte_index < features.features.len() {
-            features.features[byte_index] |= bit_mask;
-        }
-    }
-
     pub async fn execute_txns(&self, begin: Version, limit: u64) -> Result<()> {
         let aptos_commons_path = self.input_path.join(APTOS_COMMONS);
         if !check_aptos_packages_availability(aptos_commons_path.clone()) {
@@ -109,10 +108,10 @@ impl Execution {
             HashMap::new();
         let mut compiled_package_cache_v2: HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>> =
             HashMap::new();
-        if self.execution_mode.is_v1() || self.execution_mode.is_compare() {
+        if self.execution_mode.is_v1_or_compare() {
             compile_aptos_packages(&aptos_commons_path, &mut compiled_package_cache, false)?;
         }
-        if self.execution_mode.is_v2() || self.execution_mode.is_compare() {
+        if self.execution_mode.is_v2_or_compare() {
             compile_aptos_packages(&aptos_commons_path, &mut compiled_package_cache_v2, true)?;
         }
 
@@ -164,13 +163,13 @@ impl Execution {
         if !package_dir.exists() {
             return Err(anyhow::Error::msg("source code is not available"));
         }
-        if (self.execution_mode.is_compare() || self.execution_mode.is_v1())
+        if self.execution_mode.is_v1_or_compare()
             && !compiled_package_cache.contains_key(&package_info)
         {
             let compiled_res = compile_package(package_dir.clone(), &package_info, None)?;
             generate_compiled_blob(&package_info, &compiled_res, compiled_package_cache);
         }
-        if (self.execution_mode.is_compare() || self.execution_mode.is_v2())
+        if self.execution_mode.is_v2_or_compare()
             && !compiled_package_cache_v2.contains_key(&package_info)
         {
             let compiled_res =
@@ -199,7 +198,7 @@ impl Execution {
             let state_view = state.as_move_resolver();
             let mut features = Features::fetch_config(&state_view).unwrap_or_default();
             if self.bytecode_version == 6 {
-                Self::set_enable(&mut features, FeatureFlag::VM_BINARY_FORMAT_V6);
+                features.enable(FeatureFlag::VM_BINARY_FORMAT_V6);
             }
             // execute and compare
             self.execute_and_compare(

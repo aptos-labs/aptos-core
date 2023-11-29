@@ -3,7 +3,7 @@
 
 use crate::{AptosValidatorInterface, FilterCondition};
 use anyhow::{anyhow, Result};
-use aptos_api_types::{AptosError, AptosErrorCode, TransactionOnChainData};
+use aptos_api_types::{AptosError, AptosErrorCode};
 use aptos_framework::{
     natives::code::{PackageMetadata, PackageRegistry},
     APTOS_PACKAGES,
@@ -115,7 +115,8 @@ async fn check_and_obtain_source_code(
     client: &Client,
     m: &ModuleId,
     addr: &AccountAddress,
-    txn: &TransactionOnChainData,
+    version: Version,
+    transaction: &Transaction,
     txns: &mut Vec<(
         u64,
         Transaction,
@@ -143,15 +144,14 @@ async fn check_and_obtain_source_code(
         };
     let mut package_registry_cache: HashMap<AccountAddress, PackageRegistry> = HashMap::new();
     let package_registry =
-        get_or_update_package_registry(client, txn.version, addr, &mut package_registry_cache)
-            .await?;
+        get_or_update_package_registry(client, version, addr, &mut package_registry_cache).await?;
     let target_package_opt = locate_package_with_src(m, &package_registry.packages);
     if let Some(target_package) = target_package_opt {
         let mut map = HashMap::new();
         if APTOS_PACKAGES.contains(&target_package.name.as_str()) {
             txns.push((
-                txn.version,
-                txn.transaction.clone(),
+                version,
+                transaction.clone(),
                 Some((
                     AccountAddress::ONE,
                     target_package.name, // all aptos packages are stored under 0x1
@@ -160,7 +160,7 @@ async fn check_and_obtain_source_code(
             ));
         } else if let Ok(()) = retrieve_dep_packages_with_src(
             client,
-            txn.version,
+            version,
             &target_package,
             &mut map,
             &mut package_registry_cache,
@@ -169,8 +169,8 @@ async fn check_and_obtain_source_code(
         {
             map.insert((*addr, target_package.clone().name), target_package.clone());
             txns.push((
-                txn.version,
-                txn.transaction.clone(),
+                version,
+                transaction.clone(),
                 Some((*addr, target_package.name, map)),
             ));
         }
@@ -264,11 +264,15 @@ impl AptosValidatorInterface for RestDebuggerInterface {
         )>,
     > {
         let mut txns = Vec::with_capacity(limit as usize);
-        let temp_txns = self
-            .0
-            .get_transactions_bcs(Some(start), Some(limit as u16))
-            .await?
-            .into_inner();
+        let (tns, infos) = self.get_committed_transactions(start, limit).await?;
+        let temp_txns = tns
+            .iter()
+            .zip(infos)
+            .enumerate()
+            .map(|(idx, (txn, txn_info))| {
+                let version = start + idx as u64;
+                (version, txn, txn_info)
+            });
         let extract_entry_fun = |payload: &TransactionPayload| -> Option<EntryFunction> {
             match payload {
                 TransactionPayload::Multisig(multi_sig)
@@ -282,14 +286,14 @@ impl AptosValidatorInterface for RestDebuggerInterface {
                 _ => None,
             }
         };
-        for txn in temp_txns {
-            if filter_condition.skip_failed_txns && !txn.info.status().is_success() {
+        for (version, txn, txn_info) in temp_txns {
+            if filter_condition.skip_failed_txns && !txn_info.status().is_success() {
                 continue;
             }
-            if let MiscellaneousError(_) = txn.info.status() {
+            if let MiscellaneousError(_) = txn_info.status() {
                 continue;
             }
-            if let Transaction::UserTransaction(signed_trans) = txn.transaction.clone() {
+            if let Transaction::UserTransaction(signed_trans) = txn.clone() {
                 let payload = signed_trans.payload();
                 if let Some(entry_function) = extract_entry_fun(payload) {
                     let m = entry_function.module();
@@ -300,9 +304,10 @@ impl AptosValidatorInterface for RestDebuggerInterface {
                         continue;
                     }
                     if !filter_condition.check_source_code {
-                        txns.push((txn.version, txn.transaction, None));
+                        txns.push((version, txn.clone(), None));
                     } else {
-                        check_and_obtain_source_code(&self.0, m, addr, &txn, &mut txns).await?;
+                        check_and_obtain_source_code(&self.0, m, addr, version, txn, &mut txns)
+                            .await?;
                     }
                 }
             }
