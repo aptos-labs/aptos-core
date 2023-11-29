@@ -7,9 +7,10 @@ use move_model::{ast::TempIndex, model::FunctionEnv};
 use move_stackless_bytecode::{
     function_target::FunctionData,
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{AttrId, Bytecode, Operation},
+    stackless_bytecode::{AttrId, Bytecode, Label, Operation},
+    stackless_control_flow_graph::StacklessControlFlowGraph,
 };
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub struct ExplicateDrop {}
 
@@ -39,6 +40,8 @@ struct ExplicateDropTransformer<'a> {
     codes: Vec<Bytecode>,
     live_var_annot: &'a LiveVarAnnotation,
     lifetime_annot: &'a LifetimeAnnotation,
+    label_offsets: BTreeMap<Label, CodeOffset>,
+    cfg: StacklessControlFlowGraph,
 }
 
 impl<'a> ExplicateDropTransformer<'a> {
@@ -51,10 +54,14 @@ impl<'a> ExplicateDropTransformer<'a> {
             .annotations
             .get::<LifetimeAnnotation>()
             .expect("lifetime annotation");
+        let label_offsets = Bytecode::label_offsets(&codes);
+        let cfg = StacklessControlFlowGraph::new_backward(&codes, true);
         ExplicateDropTransformer {
             codes,
             live_var_annot,
             lifetime_annot,
+            label_offsets,
+            cfg,
         }
     }
 
@@ -63,19 +70,44 @@ impl<'a> ExplicateDropTransformer<'a> {
     pub fn transform(&mut self) {
         let bytecodes = std::mem::take(&mut self.codes);
         for (code_offset, bytecode) in bytecodes.into_iter().enumerate() {
-            let attr_id = bytecode.get_attr_id();
-            self.emit_bytecode(bytecode);
-            self.explicate_drops_at(code_offset as CodeOffset, attr_id);
+            self.emit_bytecode(bytecode.clone());
+            self.explicate_drops_at(code_offset as CodeOffset, &bytecode);
         }
     }
 
     // add drops at given code offset
-    fn explicate_drops_at(&mut self, code_offset: CodeOffset, attr_id: AttrId) {
-        let released_temps = self.released_temps_at(code_offset);
-        for t in released_temps {
-            let drop_t = Bytecode::Call(attr_id, Vec::new(), Operation::Destroy, vec![t], None);
-            self.emit_bytecode(drop_t)
+    fn explicate_drops_at(&mut self, code_offset: CodeOffset, bytecode: &Bytecode) {
+        match bytecode {
+            Bytecode::Ret(..) | Bytecode::Jump(..) | Bytecode::Abort(..) | Bytecode::Branch(..) => {
+                ()
+            },
+            Bytecode::Label(_, label) => {
+                // all locals released by (immediate) predec instructions
+                let released_temps_join: BTreeSet<_> = self
+                    .pred_instr_offsets(label)
+                    .flat_map(|pred_instr_offset| self.released_temps_at(pred_instr_offset))
+                    .collect();
+                self.drop_temps(&released_temps_join, bytecode.get_attr_id())
+            },
+            _ => {
+                let released_temps = self.released_temps_at(code_offset);
+                self.drop_temps(&released_temps, bytecode.get_attr_id())
+            },
         }
+    }
+
+    // return the offsets of the instructions which jump to the given label
+    fn pred_instr_offsets(&self, label: &Label) -> impl Iterator<Item = CodeOffset> + '_ {
+        let offset = self.label_offsets.get(label).expect("label offset");
+        let block_id = self.cfg.offset_to_key().get(offset).expect("block id");
+        self.cfg.successors(*block_id).iter().map(|pred_block| {
+            // last instr of the pred block
+            self.cfg
+                .instr_indexes(*pred_block)
+                .expect("basic block")
+                .last()
+                .expect("code offset")
+        })
     }
 
     // Returns a set of locals that can be dropped at given code offset
@@ -86,6 +118,19 @@ impl<'a> ExplicateDropTransformer<'a> {
             .expect("live var info");
         let lifetime_info = self.lifetime_annot.get_info_at(code_offset);
         released_temps(live_var_info, lifetime_info)
+    }
+
+    fn drop_temps(&mut self, temps_to_drop: &BTreeSet<TempIndex>, attr_id: AttrId) {
+        for t in temps_to_drop {
+            let drop_t = Bytecode::Call(
+                attr_id,
+                Vec::new(),
+                Operation::Destroy,
+                vec![*t],
+                None,
+            );
+            self.emit_bytecode(drop_t)
+        }
     }
 
     fn emit_bytecode(&mut self, bytecode: Bytecode) {
