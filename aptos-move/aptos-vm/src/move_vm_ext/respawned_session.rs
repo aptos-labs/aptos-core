@@ -144,11 +144,21 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
 }
 
 // Sporadically checks if the given two input type layouts match
-pub fn assert_layout_matches(
+pub fn randomly_check_layout_matches(
     layout_1: Option<&MoveTypeLayout>,
     layout_2: Option<&MoveTypeLayout>,
 ) -> Result<(), PanicError> {
-    if layout_1.is_some() || layout_2.is_some() {
+    if layout_1.is_some() != layout_2.is_some() {
+        return Err(code_invariant_error(format!(
+            "Layouts don't match when they are expected to: {:?} and {:?}",
+            layout_1, layout_2
+        )));
+    }
+    if layout_1.is_some() {
+        // Checking if 2 layouts are equal is a recursive operation and is expensive.
+        // We generally call this `randomly_check_layout_matches` function when we know
+        // that the layouts are supposed to match. As an optimization, we only randomly
+        // check if the layouts are matching.
         let mut rng = rand::thread_rng();
         let random_number: u32 = rng.gen_range(0, 100);
         if random_number == 1 && layout_1 != layout_2 {
@@ -349,7 +359,7 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
             .get(group_key)
             .and_then(|g| g.inner_ops().get(resource_tag))
         {
-            assert_layout_matches(maybe_layout, layout.as_deref())
+            randomly_check_layout_matches(maybe_layout, layout.as_deref())
                 .map_err(|e| anyhow::anyhow!("get_resource_from_group layout check: {:?}", e))?;
 
             Ok(write_op.extract_raw_bytes())
