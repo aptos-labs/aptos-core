@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-//! Logic for account universes. This is not in the parent module to enforce privacy.
+//! Logic for loader module universes.
 
 use move_core_types::language_storage::ModuleId;
 use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
