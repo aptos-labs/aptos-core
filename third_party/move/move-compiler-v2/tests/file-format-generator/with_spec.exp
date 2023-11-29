@@ -2,7 +2,7 @@
 
 [variant baseline]
 fun m::bar() {
-  0: assert true
+  0: assume 1
   1: return ()
 }
 
@@ -28,7 +28,7 @@ public fun m::foo($t0: &m::S): u8 {
 [variant baseline]
 fun m::bar() {
      # live vars:
-  0: assert true
+  0: assume 1
      # live vars:
   1: return ()
 }
