@@ -31,6 +31,7 @@ aptos-vm-genesis = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
+claims = { workspace = true }
 fail = { workspace = true, features = ['failpoints'] }
 itertools = { workspace = true }
 move-binary-format = { workspace = true }

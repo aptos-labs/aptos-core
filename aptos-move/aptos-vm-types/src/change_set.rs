@@ -48,7 +48,7 @@ pub enum AbstractResourceWriteOp {
 }
 
 impl AbstractResourceWriteOp {
-    pub fn try_to_concrete_write(&self) -> Option<&WriteOp> {
+    pub fn try_as_concrete_write(&self) -> Option<&WriteOp> {
         if let AbstractResourceWriteOp::Write(write_op) = self {
             Some(write_op)
         } else {
@@ -268,12 +268,7 @@ impl VMChangeSet {
         resource_write_set: BTreeMap<StateKey, AbstractResourceWriteOp>,
         module_write_set: BTreeMap<StateKey, WriteOp>,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
-
-        // Changes separated out from the writes, for better concurrency,
-        // materialized back into resources when transaction output is computed.
         delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
-
-        // TODO[agg_v1](cleanup) deprecate aggregator_v1 fields.
         aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
         aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
         checker: &dyn CheckChangeSet,
@@ -292,6 +287,7 @@ impl VMChangeSet {
         Ok(change_set)
     }
 
+    // TODO[agg_v2](cleanup) see if we can remove in favor of `new`.
     pub fn new_expanded(
         resource_write_set: BTreeMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
         resource_group_write_set: BTreeMap<StateKey, GroupWrite>,
@@ -308,7 +304,7 @@ impl VMChangeSet {
             resource_write_set
                 .into_iter()
                 .map(|(k, (w, l))| {
-                    (
+                    Ok((
                         k,
                         if let Some(layout) = l {
                             let materialized_size = WriteOpSize::from(&w).write_len();
@@ -322,34 +318,40 @@ impl VMChangeSet {
                         } else {
                             AbstractResourceWriteOp::Write(w)
                         },
-                    )
+                    ))
                 })
                 .chain(
                     resource_group_write_set
                         .into_iter()
-                        .map(|(k, w)| (k, AbstractResourceWriteOp::WriteResourceGroup(w))),
+                        .map(|(k, w)| Ok((k, AbstractResourceWriteOp::WriteResourceGroup(w)))),
                 )
                 .chain(
                     reads_needing_delayed_field_exchange
                         .into_iter()
                         .map(|(k, (w, layout))| {
-                            (
+                            Ok((
                                 k,
                                 AbstractResourceWriteOp::InPlaceDelayedFieldChange(
                                     InPlaceDelayedFieldChangeOp {
                                         layout,
-                                        materialized_size: w
-                                            .bytes()
-                                            .map(|b| b.len() as u64)
-                                            .unwrap(),
+                                        materialized_size: WriteOpSize::from(&w)
+                                            .write_len()
+                                            .ok_or_else(|| {
+                                                VMStatus::error(
+                                                    StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+                                                    err_msg(
+                                                        "Read with exchange cannot be a delete.",
+                                                    ),
+                                                )
+                                            })?,
                                     },
                                 ),
-                            )
+                            ))
                         }),
                 )
                 .chain(group_reads_needing_delayed_field_exchange.into_iter().map(
                     |(k, (metadata_op, materialized_size))| {
-                        (
+                        Ok((
                             k,
                             AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(
                                 ResourceGroupInPlaceDelayedFieldChangeOp {
@@ -357,10 +359,10 @@ impl VMChangeSet {
                                     materialized_size,
                                 },
                             ),
-                        )
+                        ))
                     },
                 ))
-                .collect(),
+                .collect::<Result<BTreeMap<_, _>, VMStatus>>()?,
             module_write_set,
             events,
             delayed_field_change_set,
@@ -425,11 +427,6 @@ impl VMChangeSet {
         Ok(change_set)
     }
 
-    pub(crate) fn into_storage_change_set_forced(self) -> StorageChangeSet {
-        self.try_into_storage_change_set()
-            .expect("Expected VMChangeSet to be valid and materialized")
-    }
-
     /// Converts VM-native change set into its storage representation with fully
     /// serialized changes. The conversion fails if:
     /// - deltas are not materialized.
@@ -490,7 +487,7 @@ impl VMChangeSet {
     pub fn concrete_write_set_iter(&self) -> impl Iterator<Item = (&StateKey, Option<&WriteOp>)> {
         self.resource_write_set()
             .iter()
-            .map(|(k, v)| (k, v.try_to_concrete_write()))
+            .map(|(k, v)| (k, v.try_as_concrete_write()))
             .chain(
                 self.module_write_set()
                     .iter()
@@ -560,6 +557,12 @@ impl VMChangeSet {
     ) -> Result<(), PanicError> {
         for (k, new_write) in patched_resource_writes {
             match self.resource_write_set.entry(k) {
+                Vacant(v) => {
+                    return Err(code_invariant_error(format!(
+                        "Cannot patch a resource which does not exist, for: {:?}.",
+                        v.key()
+                    )));
+                },
                 Occupied(mut o) => {
                     if let AbstractResourceWriteOp::Write(w) = o.get() {
                         return Err(code_invariant_error(format!(
@@ -567,7 +570,7 @@ impl VMChangeSet {
                         )));
                     }
 
-                    let new_length = new_write.bytes().map(|b| b.len() as u64);
+                    let new_length = WriteOpSize::from(&new_write).write_len();
                     let old_length = o.get().materialized_size().write_len();
                     if new_length != old_length {
                         return Err(code_invariant_error(format!(
@@ -576,12 +579,6 @@ impl VMChangeSet {
                     }
 
                     o.insert(AbstractResourceWriteOp::Write(new_write));
-                },
-                Vacant(v) => {
-                    return Err(code_invariant_error(format!(
-                        "Cannot patch a resource which does not exist, for: {:?}.",
-                        v.key()
-                    )));
                 },
             }
         }
@@ -850,6 +847,9 @@ impl VMChangeSet {
         use AbstractResourceWriteOp::*;
         for (key, additional_entry) in additional_write_set.into_iter() {
             match write_set.entry(key.clone()) {
+                Vacant(entry) => {
+                    entry.insert(additional_entry);
+                },
                 Occupied(mut entry) => {
                     let (to_delete, to_overwite) = match (entry.get_mut(), &additional_entry) {
                         (Write(write_op), Write(additional_write_op)) => {
@@ -999,9 +999,6 @@ impl VMChangeSet {
                     } else if to_delete {
                         entry.remove();
                     }
-                },
-                Vacant(entry) => {
-                    entry.insert(additional_entry);
                 },
             }
         }

@@ -665,15 +665,23 @@ where
                 // layout is Some(_) if it contains a delayed field
                 if let Some(layout) = layout {
                     if !write_op.is_deletion() {
-                        let patched_bytes = match latest_view
-                            .replace_identifiers_with_values(write_op.bytes().unwrap(), &layout)
-                        {
-                            Ok((bytes, _)) => bytes,
-                            Err(_) => unreachable!("Failed to replace identifiers with values"),
-                        };
-                        let mut patched_write_op = write_op;
-                        patched_write_op.set_bytes(patched_bytes);
-                        patched_resource_write_set.insert(key, patched_write_op);
+                        match write_op.bytes() {
+                            // TODO[agg_v2](fix): propagate error
+                            None => unreachable!(),
+                            Some(write_op_bytes) => {
+                                let patched_bytes = match latest_view
+                                    .replace_identifiers_with_values(write_op_bytes, &layout)
+                                {
+                                    Ok((bytes, _)) => bytes,
+                                    Err(_) => {
+                                        unreachable!("Failed to replace identifiers with values")
+                                    },
+                                };
+                                let mut patched_write_op = write_op;
+                                patched_write_op.set_bytes(patched_bytes);
+                                patched_resource_write_set.insert(key, patched_write_op);
+                            },
+                        }
                     }
                 }
             }

@@ -8989,6 +8989,7 @@ dependencies = [
  "aptos-vm-logging",
  "aptos-vm-types",
  "bcs 0.1.4",
+ "claims",
  "fail 0.5.0",
  "itertools 0.10.5",
  "move-binary-format",

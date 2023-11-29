@@ -21,7 +21,7 @@ use aptos_types::{
     transaction::ChangeSet as StorageChangeSet,
     write_set::{WriteOp, WriteSetMut},
 };
-use claims::{assert_matches, assert_ok, assert_some_eq};
+use claims::{assert_err, assert_matches, assert_ok, assert_some_eq};
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -398,8 +398,7 @@ fn test_failed_conversion_to_change_set() {
 }
 
 #[test]
-#[should_panic]
-fn test_forced_conversion_to_change_set_panics() {
+fn test_conversion_to_change_set_fails() {
     let resource_write_set = vec![mock_delete_with_layout("a")];
     let aggregator_delta_set = vec![mock_add("b", 100)];
     let change_set = build_change_set(
@@ -410,9 +409,7 @@ fn test_forced_conversion_to_change_set_panics() {
         aggregator_delta_set,
     );
 
-    // forced call panics
-    let storage_change_set = change_set.clone().into_storage_change_set_forced();
-    assert_eq!(storage_change_set.write_set().clone().into_mut().len(), 1);
+    assert_err!(change_set.clone().try_into_storage_change_set());
 }
 
 #[test]

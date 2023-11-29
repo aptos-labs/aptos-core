@@ -69,7 +69,7 @@ impl AptosTransactionOutput {
                 .take()
                 .expect("Output must be set")
                 .into_transaction_output_with_materialized_write_set(vec![], vec![], vec![])
-                .unwrap(),
+                .expect("Transaction output is not alerady materialized"),
         }
     }
 }
@@ -148,17 +148,15 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .change_set()
             .resource_write_set()
             .iter()
-            .flat_map(|(key, write)| {
-                if let AbstractResourceWriteOp::Write(write_op) = write {
+            .flat_map(|(key, write)| match write {
+                AbstractResourceWriteOp::Write(write_op) => {
                     Some((key.clone(), (write_op.clone(), None)))
-                } else if let AbstractResourceWriteOp::WriteWithDelayedFields(write) = write {
-                    Some((
-                        key.clone(),
-                        (write.write_op.clone(), Some(write.layout.clone())),
-                    ))
-                } else {
-                    None
-                }
+                },
+                AbstractResourceWriteOp::WriteWithDelayedFields(write) => Some((
+                    key.clone(),
+                    (write.write_op.clone(), Some(write.layout.clone())),
+                )),
+                _ => None,
             })
             .collect()
     }
@@ -282,7 +280,8 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                             patched_resource_write_set,
                             patched_events,
                         )
-                        .unwrap(),
+                        // TODO[agg_v2](fix) - propagate issued to block executor.
+                        .expect("Materialization must not fail"),
                 )
                 .is_ok(),
             "Could not combine VMOutput with the patched resource and event data"

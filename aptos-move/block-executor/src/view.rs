@@ -43,7 +43,7 @@ use aptos_types::{
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{
-    ResourceGroupSizeInfo, StateStorageView, TModuleView, TResourceGroupView, TResourceView,
+    ResourceGroupSize, StateStorageView, TModuleView, TResourceGroupView, TResourceView,
 };
 use bytes::Bytes;
 use claims::assert_ok;
@@ -1230,7 +1230,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         let metadata_op: T::Value =
                             TransactionWrite::from_state_value(maybe_metadata);
                         if let Some(metadata_op) = metadata_op.convert_read_to_modification() {
-                            return Some(Ok((key.clone(), (metadata_op, group_size.group_size()))));
+                            return Some(Ok((key.clone(), (metadata_op, group_size.get()))));
                         }
                     } else {
                         return Some(Err(code_invariant_error(format!(
@@ -1285,10 +1285,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                                 .clone()
                                 .convert_read_to_modification()
                             {
-                                return Some(Ok((
-                                    key.clone(),
-                                    (metadata_op, group_size.group_size()),
-                                )));
+                                return Some(Ok((key.clone(), (metadata_op, group_size.get()))));
                             }
                         } else {
                             return Some(Err(code_invariant_error(format!(
@@ -1453,10 +1450,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
     type Layout = MoveTypeLayout;
     type ResourceTag = T::Tag;
 
-    fn resource_group_size(
-        &self,
-        group_key: &Self::GroupKey,
-    ) -> anyhow::Result<ResourceGroupSizeInfo> {
+    fn resource_group_size(&self, group_key: &Self::GroupKey) -> anyhow::Result<ResourceGroupSize> {
         let mut group_read = match &self.latest_view {
             ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx)?,
             ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key)?,

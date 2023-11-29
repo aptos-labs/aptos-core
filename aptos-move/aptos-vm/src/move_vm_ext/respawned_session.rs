@@ -28,7 +28,7 @@ use aptos_types::{
 use aptos_vm_types::{
     change_set::{AbstractResourceWriteOp, VMChangeSet, WriteWithDelayedFieldsOp},
     resolver::{
-        ExecutorView, ResourceGroupSizeInfo, ResourceGroupView, StateStorageView, TModuleView,
+        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TModuleView,
         TResourceGroupView, TResourceView,
     },
     storage::ChangeSetConfigs,
@@ -336,7 +336,15 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
                     ..
                 }),
             ) => Ok(write_op.as_state_value()),
-            Some(_) | None => self
+            // TODO[agg_v2](fix): Is this really unreachable, or is this called for metadata,
+            // and metadata should be returned here?
+            Some(&AbstractResourceWriteOp::WriteResourceGroup(_)) => {
+                unreachable!();
+            },
+            // We could either return from the read, or do the base read again.
+            Some(&AbstractResourceWriteOp::InPlaceDelayedFieldChange(_))
+            | Some(&AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(_))
+            | None => self
                 .base_executor_view
                 .get_resource_state_value(state_key, maybe_layout),
         }
@@ -351,9 +359,9 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
     fn resource_group_size(
         &self,
         _group_key: &Self::GroupKey,
-    ) -> anyhow::Result<ResourceGroupSizeInfo> {
+    ) -> anyhow::Result<ResourceGroupSize> {
         // In respawned session, gas is irrelevant, so we return 0 (GroupSizeKind::None).
-        Ok(ResourceGroupSizeInfo::zero_concrete())
+        Ok(ResourceGroupSize::zero_concrete())
     }
 
     fn get_resource_from_group(
@@ -366,13 +374,14 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
             .change_set
             .resource_write_set()
             .get(group_key)
-            .and_then(|write| {
-                if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
-                    Some(group_write)
-                } else {
-                    None
-                }
+            .and_then(|write| match write {
+                AbstractResourceWriteOp::WriteResourceGroup(group_write) => Some(Ok(group_write)),
+                AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(_) => None,
+                _ => Some(Err(anyhow::anyhow!(
+                    "Non-ResourceGroup write found for key in get_resource_from_group call"
+                ))),
             })
+            .transpose()?
             .and_then(|g| g.inner_ops().get(resource_tag))
         {
             randomly_check_layout_matches(maybe_layout, layout.as_deref())

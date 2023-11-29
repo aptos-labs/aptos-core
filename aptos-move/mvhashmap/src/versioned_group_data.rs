@@ -6,7 +6,7 @@ use crate::types::{
 };
 use anyhow::bail;
 use aptos_types::write_set::{TransactionWrite, WriteOpKind};
-use aptos_vm_types::{resolver::ResourceGroupSizeInfo, resource_group_adapter::group_size_as_sum};
+use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
 use claims::{assert_matches, assert_none, assert_some};
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
@@ -327,10 +327,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
             })
     }
 
-    fn get_latest_group_size(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> Result<ResourceGroupSizeInfo, MVGroupError> {
+    fn get_latest_group_size(&self, txn_idx: TxnIndex) -> Result<ResourceGroupSize, MVGroupError> {
         if !self
             .idx_to_update
             .contains_key(&ShiftedTxnIndex::zero_idx())
@@ -459,7 +456,7 @@ impl<
         &self,
         key: &K,
         txn_idx: TxnIndex,
-    ) -> Result<ResourceGroupSizeInfo, MVGroupError> {
+    ) -> Result<ResourceGroupSize, MVGroupError> {
         match self.group_values.get(key) {
             Some(g) => g.get_latest_group_size(txn_idx),
             None => Err(MVGroupError::Uninitialized),

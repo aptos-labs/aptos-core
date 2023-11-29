@@ -488,24 +488,29 @@ where
         self.algebra.charge_storage_fee(amount, gas_unit_price)
     }
 
-    fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOpSize) -> VMResult<()> {
-        let cost = self.storage_gas_params().pricing.io_gas_per_write(key, op);
+    fn charge_io_gas_for_write(&mut self, key: &StateKey, op_size: &WriteOpSize) -> VMResult<()> {
+        let cost = self
+            .storage_gas_params()
+            .pricing
+            .io_gas_per_write(key, op_size);
 
         self.algebra
             .charge_io(cost)
             .map_err(|e| e.finish(Location::Undefined))
     }
 
-    fn storage_fee_for_state_slot(&self, op: &WriteOpSize) -> Fee {
-        self.vm_gas_params().txn.storage_fee_for_slot(op)
+    fn storage_fee_for_state_slot(&self, op_size: &WriteOpSize) -> Fee {
+        self.vm_gas_params().txn.storage_fee_for_slot(op_size)
     }
 
-    fn storage_fee_refund_for_state_slot(&self, op: &WriteOpSize) -> Fee {
-        self.vm_gas_params().txn.storage_fee_refund_for_slot(op)
+    fn storage_fee_refund_for_state_slot(&self, op_size: &WriteOpSize) -> Fee {
+        self.vm_gas_params()
+            .txn
+            .storage_fee_refund_for_slot(op_size)
     }
 
-    fn storage_fee_for_state_bytes(&self, key: &StateKey, op: &WriteOpSize) -> Fee {
-        self.vm_gas_params().txn.storage_fee_for_bytes(key, op)
+    fn storage_fee_for_state_bytes(&self, key: &StateKey, op_size: &WriteOpSize) -> Fee {
+        self.vm_gas_params().txn.storage_fee_for_bytes(key, op_size)
     }
 
     fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee {

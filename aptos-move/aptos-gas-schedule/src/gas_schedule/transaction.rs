@@ -194,22 +194,22 @@ impl TransactionGasParameters {
         }
     }
 
-    pub fn storage_fee_for_slot(&self, op: &WriteOpSize) -> Fee {
+    pub fn storage_fee_for_slot(&self, op_size: &WriteOpSize) -> Fee {
         use WriteOpSize::*;
 
-        match op {
+        match op_size {
             Creation { .. } => self.storage_fee_per_state_slot_create * NumSlots::new(1),
             Modification { .. } | Deletion | DeletionWithDeposit { .. } => 0.into(),
         }
     }
 
-    pub fn storage_fee_refund_for_slot(&self, op: &WriteOpSize) -> Fee {
-        op.deletion_deposit().map_or(0.into(), Fee::new)
+    pub fn storage_fee_refund_for_slot(&self, op_size: &WriteOpSize) -> Fee {
+        op_size.deletion_deposit().map_or(0.into(), Fee::new)
     }
 
     /// Maybe value size is None for deletion Ops.
-    pub fn storage_fee_for_bytes(&self, key: &StateKey, op: &WriteOpSize) -> Fee {
-        if let Some(value_size) = op.write_len() {
+    pub fn storage_fee_for_bytes(&self, key: &StateKey, op_size: &WriteOpSize) -> Fee {
+        if let Some(value_size) = op_size.write_len() {
             let size = NumBytes::new(key.size() as u64) + NumBytes::new(value_size);
             if let Some(excess) = size.checked_sub(self.free_write_bytes_quota) {
                 return excess * self.storage_fee_per_excess_state_byte;

@@ -85,10 +85,7 @@ pub trait TResourceGroupView {
     /// the parallel execution setting, as a wrong value will be (later) caught by validation.
     /// Thus, R/W conflicts are avoided, as long as the estimates are correct (e.g. updating
     /// struct members of a fixed size).
-    fn resource_group_size(
-        &self,
-        group_key: &Self::GroupKey,
-    ) -> anyhow::Result<ResourceGroupSizeInfo>;
+    fn resource_group_size(&self, group_key: &Self::GroupKey) -> anyhow::Result<ResourceGroupSize>;
 
     fn get_resource_from_group(
         &self,
@@ -288,7 +285,7 @@ pub trait StateValueMetadataResolver {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ResourceGroupSizeInfo {
+pub enum ResourceGroupSize {
     Concrete(u64),
     Combined {
         num_tagged_resources: usize,
@@ -299,14 +296,14 @@ pub enum ResourceGroupSizeInfo {
 pub fn size_u32_as_uleb128(mut value: usize) -> usize {
     let mut len = 1;
     while value >= 0x80 {
-        // Write 7 (lowest) bits of data and set the 8th bit to 1.
+        // 7 (lowest) bits of data get written in a single byte.
         len += 1;
         value >>= 7;
     }
     len
 }
 
-impl ResourceGroupSizeInfo {
+impl ResourceGroupSize {
     pub fn zero_combined() -> Self {
         Self::Combined {
             num_tagged_resources: 0,
@@ -318,7 +315,7 @@ impl ResourceGroupSizeInfo {
         Self::Concrete(0)
     }
 
-    pub fn group_size(&self) -> u64 {
+    pub fn get(&self) -> u64 {
         match self {
             Self::Concrete(size) => *size,
             Self::Combined {

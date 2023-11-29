@@ -5,7 +5,7 @@ use aptos_aggregator::resolver::{AggregatorV1Resolver, DelayedFieldResolver};
 use aptos_table_natives::TableResolver;
 use aptos_types::{on_chain_config::ConfigStorage, state_store::state_key::StateKey};
 use aptos_vm_types::resolver::{
-    ExecutorView, ResourceGroupSizeInfo, ResourceGroupView, StateStorageView,
+    ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView,
     StateValueMetadataResolver,
 };
 use bytes::Bytes;
@@ -33,7 +33,7 @@ pub trait ResourceGroupResolver {
     fn release_resource_group_cache(&self)
         -> Option<HashMap<StateKey, BTreeMap<StructTag, Bytes>>>;
 
-    fn resource_group_size(&self, group_key: &StateKey) -> anyhow::Result<ResourceGroupSizeInfo>;
+    fn resource_group_size(&self, group_key: &StateKey) -> anyhow::Result<ResourceGroupSize>;
 
     fn resource_size_in_group(
         &self,

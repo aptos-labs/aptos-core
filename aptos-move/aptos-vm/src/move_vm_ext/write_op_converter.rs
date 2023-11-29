@@ -12,7 +12,7 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use aptos_vm_types::{
-    change_set::GroupWrite, resolver::ResourceGroupSizeInfo,
+    change_set::GroupWrite, resolver::ResourceGroupSize,
     resource_group_adapter::group_tagged_resource_size,
 };
 use bytes::Bytes;
@@ -111,11 +111,17 @@ impl<'r> WriteOpConverter<'r> {
         })?;
 
         let (pre_group_tag_count, pre_group_tags_size) = match pre_group_size_info {
-            ResourceGroupSizeInfo::Concrete ( _ ) => return Err(VMStatus::error(
+            ResourceGroupSize::Concrete(_) => return Err(VMStatus::error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                err_msg(format!("Unexpected ResourceGroupSizeInfo::Concrete in convert_resource_group_v1 for {:?}", state_key)),
+                err_msg(format!(
+                    "Unexpected ResourceGroupSize::Concrete in convert_resource_group_v1 for {:?}",
+                    state_key
+                )),
             )),
-            ResourceGroupSizeInfo::Combined { num_tagged_resources, all_tagged_resources_size } => (num_tagged_resources, all_tagged_resources_size)
+            ResourceGroupSize::Combined {
+                num_tagged_resources,
+                all_tagged_resources_size,
+            } => (num_tagged_resources, all_tagged_resources_size),
         };
 
         if let Ok(None) = state_value_metadata_result {
@@ -233,11 +239,11 @@ impl<'r> WriteOpConverter<'r> {
             // TODO[agg_v2](fix): Converting the inner ops from Vec to BTreeMap. Try to have
             // uniform datastructure to represent the inner ops.
             inner_ops.into_iter().collect(),
-            ResourceGroupSizeInfo::Combined {
+            ResourceGroupSize::Combined {
                 num_tagged_resources: post_group_tag_count,
                 all_tagged_resources_size: post_group_tags_size,
             }
-            .group_size(),
+            .get(),
         ))
     }
 
@@ -312,8 +318,10 @@ impl<'r> WriteOpConverter<'r> {
             .remote
             .get_aggregator_v1_state_value_metadata(state_key)
             .map_err(|e| {
-                println!("SPECULATIVE_EXECUTION_ABORT_ERROR: convert_aggregator_modification failed {:?}", e);
-                VMStatus::error(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR, Some(format!("convert_aggregator_modification failed {:?}", e).to_string()))
+                VMStatus::error(
+                    StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                    Some(format!("convert_aggregator_modification failed {:?}", e).to_string()),
+                )
             })?;
         let data = serialize(&value).into();
 

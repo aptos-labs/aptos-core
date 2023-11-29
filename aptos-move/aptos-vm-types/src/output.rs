@@ -120,8 +120,8 @@ impl VMOutput {
     /// Constructs `TransactionOutput`, without doing `try_materialize`
     pub fn into_transaction_output(self) -> anyhow::Result<TransactionOutput, VMStatus> {
         let (change_set, fee_statement, status) = self.unpack_with_fee_statement();
-        let materialized_output = VMOutput::new(change_set, fee_statement, status);
-        Self::convert_to_transaction_output(materialized_output).map_err(|e| {
+        let output = VMOutput::new(change_set, fee_statement, status);
+        Self::convert_to_transaction_output(output).map_err(|e| {
             VMStatus::error(
                 StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
                 Some(e.to_string()),
@@ -186,7 +186,7 @@ impl VMOutput {
         let _ = self.change_set.drain_aggregator_v1_delta_set();
 
         let (vm_change_set, gas_used, status) = self.unpack();
-        let (write_set, events) = vm_change_set.into_storage_change_set_forced().into_inner();
+        let (write_set, events) = vm_change_set.try_into_storage_change_set()?.into_inner();
         Ok(TransactionOutput::new(write_set, events, gas_used, status))
     }
 }

@@ -150,7 +150,7 @@ impl StoragePricingV2 {
     fn io_gas_per_write(&self, key: &StateKey, op: &WriteOpSize) -> InternalGas {
         use aptos_types::write_set::WriteOpSize::*;
 
-        match &op {
+        match op {
             Creation { write_len } => {
                 self.per_item_create * NumArgs::new(1)
                     + self.write_op_size(key, *write_len) * self.per_byte_create

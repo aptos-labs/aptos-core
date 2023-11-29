@@ -68,8 +68,8 @@ fn with_layout_to_abstract(
     write_op: WriteOp,
     layout: Option<Arc<MoveTypeLayout>>,
 ) -> AbstractResourceWriteOp {
-    let materialized_size = WriteOpSize::from(&write_op).write_len();
     if let Some(layout) = layout {
+        let materialized_size = WriteOpSize::from(&write_op).write_len();
         AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFieldsOp {
             write_op,
             layout,
@@ -159,30 +159,6 @@ pub(crate) fn build_change_set(
     )
     .unwrap()
 }
-
-// pub(crate) fn build_change_set_expanded(
-//     resource_write_set: impl IntoIterator<Item = (StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>))>,
-//     resource_group_write_set: impl IntoIterator<Item = (StateKey, GroupWrite)>,
-//     module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
-//     aggregator_v1_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
-//     aggregator_v1_delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
-//     delayed_field_change_set: impl IntoIterator<Item = (DelayedFieldID, DelayedChange<DelayedFieldID>)>,
-// ) -> VMChangeSet {
-//     VMChangeSet::new_expanded(
-//         BTreeMap::from_iter(resource_write_set),
-//         BTreeMap::from_iter(resource_group_write_set),
-//         BTreeMap::from_iter(module_write_set),
-//         BTreeMap::from_iter(aggregator_v1_write_set),
-//         BTreeMap::from_iter(aggregator_v1_delta_set),
-//         BTreeMap::from_iter(delayed_field_change_set),
-//         // TODO[agg_v2](fix) add to the caller.
-//         BTreeMap::new(),
-//         BTreeMap::new(),
-//         vec![],
-//         &MockChangeSetChecker,
-//     )
-//     .unwrap()
-// }
 
 // For testing, output has always a success execution status and uses 100 gas units.
 pub(crate) fn build_vm_output(

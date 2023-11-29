@@ -887,8 +887,8 @@ where
                         (
                             group_key.clone(),
                             view.resource_group_size(group_key)
-                                .expect("Group must exist and size computation should must succeed")
-                                .group_size(),
+                                .expect("Group must exist and size computation must succeed")
+                                .get(),
                         )
                     })
                     .collect();

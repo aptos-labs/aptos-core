@@ -10,7 +10,7 @@ use aptos_types::{
     executable::ExecutableDescriptor,
     write_set::{TransactionWrite, WriteOpKind},
 };
-use aptos_vm_types::resolver::ResourceGroupSizeInfo;
+use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use move_core_types::value::MoveTypeLayout;
 use std::sync::{atomic::AtomicU32, Arc};
@@ -70,7 +70,7 @@ pub enum MVModulesError {
 #[derive(Debug, Eq, PartialEq)]
 pub enum GroupReadResult {
     Value(Option<Bytes>, Option<Arc<MoveTypeLayout>>),
-    Size(ResourceGroupSizeInfo),
+    Size(ResourceGroupSize),
     Uninitialized,
 }
 
@@ -82,7 +82,7 @@ impl GroupReadResult {
         }
     }
 
-    pub fn into_size(self) -> ResourceGroupSizeInfo {
+    pub fn into_size(self) -> ResourceGroupSize {
         match self {
             GroupReadResult::Size(size) => size,
             _ => unreachable!("Expected size"),

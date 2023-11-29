@@ -273,7 +273,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                         assert_eq!(
                             group_size_as_sum(group_map.iter().map(|(t, v)| (t, v.len())))
                                 .unwrap()
-                                .group_size(),
+                                .get(),
                             *size
                         );
                     }
