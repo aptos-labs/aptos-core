@@ -2725,7 +2725,7 @@ mod test {
             identifiers2.len() == 3,
             "Three identifiers should have been replaced in this case"
         );
-        assert_eq!(identifiers, identifiers2);
+        assert_eq!(identifiers, identifiers2);        
     }
 
     fn create_aggregator_layout() -> MoveTypeLayout {

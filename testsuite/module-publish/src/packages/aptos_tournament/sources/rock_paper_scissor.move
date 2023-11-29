@@ -5,7 +5,6 @@ module tournament::rock_paper_scissor {
     use std::signer;
     use std::string::{String, utf8};
     use std::vector;
-    use std::simple_map::{Self, SimpleMap};
     use std::table::{Self, Table};
     use aptos_framework::object::Self;
 
@@ -62,16 +61,26 @@ module tournament::rock_paper_scissor {
         opponent_action: Option<vector<u8>>,
     }
 
+    struct MyAddress has store, drop {
+        inner: address
+    }
+
+    public fun get_address(my_address: MyAddress): address {
+        my_address.inner
+    }
+
     public fun get_player_to_game_mapping(
         game_addresses: &vector<address>
-    ): vector<(address, address)> {
+    ): Table<address, MyAddress> acquires RockPaperScissor {
         let player_to_game_mapping = table::new();
-        // let player_to_game_mapping = vector::new();
+        // let player_to_game_mapping = vector::empty<(address, address)>();
         vector::for_each_ref(game_addresses, |game_address| {
             let game = borrow_global<RockPaperScissor>(*game_address);
-            vector::push(&mut player_to_game_mapping, (game.player1.address, game_address));
-            vector::push(&mut player_to_game_mapping, (game.player2.address, game_address));
-            // table::upsert(&mut player_to_game_mapping, game.player2.address, game_address);
+            // vector::push_back(&mut player_to_game_mapping, (game.player1.address, *game_address));
+            // vector::push_back(&mut player_to_game_mapping, (game.player2.address, *game_address));
+            table::upsert(&mut player_to_game_mapping, game.player2.address, MyAddress {
+                inner: *game_address
+            });
         });
         player_to_game_mapping
     }

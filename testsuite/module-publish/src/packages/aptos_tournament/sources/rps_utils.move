@@ -1,19 +1,16 @@
 module tournament::rps_unit_tests {
-    use aptos_framework::account;
     use std::hash;
     use std::signer;
-    use std::string;
     use std::vector;
     use std::table::{Self, Table};
     use std::option::{Self, Option};
     use std::string_utils::{to_string};
-    use std::simple_map::{Self, SimpleMap};
-    use aptos_framework::object::{Self, Object};
+    use aptos_framework::object::Object;
     use aptos_token_objects::token::Token;
 
     use tournament::admin;
     use tournament::aptos_tournament;
-    use tournament::rock_paper_scissor::{Self, RockPaperScissor, RockPaperScissorsGame};
+    use tournament::rock_paper_scissor::{Self, MyAddress, RockPaperScissorsGame};
     use tournament::token_manager;
     use tournament::tournament_manager;
 
@@ -25,13 +22,13 @@ module tournament::rps_unit_tests {
     }
 
     struct PlayerToGameMapping has key {
-        mapping: Table<address, address>
+        mapping: Table<address, MyAddress>
     }
 
     struct PlayerConfig has key {
         // Configuration of the player for each tournament.
         player_tokens: Table<address, Object<Token>>,
-        game_addresses: Table<address, address>
+        // game_addresses: Table<address, address>
     }
 
     // fun get_signer(account_address: address): signer acquires PlayerConfig {
@@ -63,7 +60,7 @@ module tournament::rps_unit_tests {
     public entry fun setup_player(
         user: &signer,
         admin_address: address
-    ) acquires TournamentConfig {
+    ) acquires TournamentConfig, PlayerConfig {
         let user_address = signer::address_of(user);
         // TODO: Does this create a new resource account for each tournament? Should we just use one resource account for all tournaments?
         let player_name = to_string<address>(&user_address);
@@ -76,7 +73,7 @@ module tournament::rps_unit_tests {
         if (exists<PlayerConfig>(user_address)) {
             move_to(user, PlayerConfig {
                 player_tokens: table::new(),
-                game_addresses: table::new()
+                // game_addresses: table::new()
             })
         };
         // TODO: Can a resource be inserted and modified in the same transaction?
@@ -84,7 +81,7 @@ module tournament::rps_unit_tests {
         table::upsert(&mut player_config.player_tokens, tournament_address, player_token);
     }
 
-    public entry fun start_new_round(admin: &signer, player_addresses: vector<address>) acquires PlayerConfig, TournamentConfig, PlayerToGameMapping {
+    public entry fun start_new_round(admin: &signer, player_addresses: vector<address>) acquires PlayerConfig, TournamentConfig {
         let admin_address = signer::address_of(admin);
         let tournament_address = borrow_global<TournamentConfig>(admin_address).tournament_address;
         aptos_tournament::start_new_round<RockPaperScissorsGame>(admin, tournament_address);
@@ -100,9 +97,23 @@ module tournament::rps_unit_tests {
             player_tokens
         );
         let player_to_game_mapping = rock_paper_scissor::get_player_to_game_mapping(&game_addresses);
-        vector::for_each(&player_to_game_mapping, |(player_addr, game_addr)| {
-            table::upsert(borrow_global_mut<PlayerConfig>(player_addr).game_addresses, admin_address, player_addr);
+        move_to<PlayerToGameMapping>(admin, PlayerToGameMapping {
+            mapping: player_to_game_mapping
         });
+
+        // let len = length(&player_to_game_mapping);
+        // while (len > 0) {
+        //     let (player_addr, game_addr) = pop_back(&mut player_to_game_mapping);
+        //     table::upsert(borrow_global_mut<PlayerConfig>(player_addr).game_addresses, admin_address, player_addr);
+        //     // f(pop_back(&mut v));
+        //     len = len - 1;
+        // };
+        // vector::destroy_empty(player_to_game_mapping);
+
+        // vector::for_each(&player_to_game_mapping, |player_addr, game_addr| {
+        //     table::upsert(borrow_global_mut<PlayerConfig>(player_addr).game_addresses, admin_address, player_addr);
+        // });
+
         // move_to<PlayerToGameMapping>(admin, PlayerToGameMapping {
         //     mapping: player_to_game_mapping
         // });
@@ -134,7 +145,7 @@ module tournament::rps_unit_tests {
         admin_address: address,
         action: vector<u8>,
         game_index: u64,
-    ) {
+    ) acquires TournamentConfig {
         let game_address = *vector::borrow(&borrow_global<TournamentConfig>(admin_address).game_addresses, game_index);
         // let RockPaperScissor {player1, player2} =  borrow_global<RockPaperScissor>(game_address);
         let hash_addition = b"random uuid";
