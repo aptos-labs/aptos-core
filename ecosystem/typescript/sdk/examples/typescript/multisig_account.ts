@@ -158,7 +158,7 @@ const { AccountAddress, EntryFunction, MultiSig, MultiSigTransactionPayload, Tra
   // The multisig account should now have 4 owners.
   assert((await getNumberOfOwners(client, multisigAddress)) == 4);
   console.log("Number of Owners after addition:", await getNumberOfOwners(client, multisigAddress));
-  
+
   const removeOwnerPayload = new MultiSigTransactionPayload(
     EntryFunction.natural(
       "0x1::multisig_account",
@@ -182,7 +182,7 @@ const { AccountAddress, EntryFunction, MultiSig, MultiSigTransactionPayload, Tra
   assert((await getNumberOfOwners(client, multisigAddress)) == 3);
   console.log("Number of Owners after removal:", await getNumberOfOwners(client, multisigAddress));
   console.log();
-  
+
   console.log("Changing the signature threshold to 3-of-3...");
   // Step 5: Create a multisig transactions to change the signature threshold to 3-of-3.
   // ===========================================================================================
