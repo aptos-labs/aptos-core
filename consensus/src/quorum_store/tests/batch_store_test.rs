@@ -1,14 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    quorum_store::{
-        batch_requester::BatchRequester,
-        batch_store::{BatchStore, QuotaManager},
-        quorum_store_db::QuorumStoreDB,
-        types::{PersistedValue, StorageMode},
-    },
-    test_utils::mock_quorum_store_sender::MockQuorumStoreSender,
+use crate::quorum_store::{
+    batch_store::{BatchStore, QuotaManager},
+    quorum_store_db::QuorumStoreDB,
+    types::{PersistedValue, StorageMode},
 };
 use aptos_consensus_types::proof_of_store::{BatchId, BatchInfo};
 use aptos_crypto::HashValue;
@@ -18,30 +14,19 @@ use aptos_types::{
     validator_verifier::random_validator_verifier,
 };
 use claims::{assert_err, assert_ok, assert_ok_eq};
-use futures::executor::block_on;
 use once_cell::sync::Lazy;
 use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
     Arc,
 };
-use tokio::{sync::mpsc::channel, task::spawn_blocking};
+use tokio::task::spawn_blocking;
 
 static TEST_REQUEST_ACCOUNT: Lazy<AccountAddress> = Lazy::new(AccountAddress::random);
 
-fn batch_store_for_test(memory_quota: usize) -> Arc<BatchStore<MockQuorumStoreSender>> {
+fn batch_store_for_test(memory_quota: usize) -> Arc<BatchStore> {
     let tmp_dir = TempPath::new();
     let db = Arc::new(QuorumStoreDB::new(&tmp_dir));
-    let (tx, _rx) = channel(10);
-    let requester = BatchRequester::new(
-        10,
-        AccountAddress::random(),
-        1,
-        1,
-        1,
-        1,
-        MockQuorumStoreSender::new(tx),
-    );
-    let (signers, validator_verifier) = random_validator_verifier(4, None, false);
+    let (signers, _validator_verifier) = random_validator_verifier(4, None, false);
 
     Arc::new(BatchStore::new(
         10, // epoch
@@ -50,9 +35,7 @@ fn batch_store_for_test(memory_quota: usize) -> Arc<BatchStore<MockQuorumStoreSe
         memory_quota, // memory_quota
         2001,         // db quota
         2001,         // batch quota
-        requester,
         signers[0].clone(),
-        validator_verifier,
     ))
 }
 
@@ -165,7 +148,7 @@ async fn test_extend_expiration_vs_save() {
                 }
             }
 
-            block_on(batch_store_clone2.update_certified_timestamp(i as u64 + 30));
+            batch_store_clone2.update_certified_timestamp(i as u64 + 30);
             start_clone2.fetch_add(1, Ordering::Relaxed);
         }
     });
@@ -188,9 +171,7 @@ async fn test_extend_expiration_vs_save() {
 
     // Expire everything, call for higher times as well.
     for i in 35..50 {
-        batch_store
-            .update_certified_timestamp((i + num_experiments) as u64)
-            .await;
+        batch_store.update_certified_timestamp((i + num_experiments) as u64);
     }
 }
 
@@ -248,7 +229,7 @@ fn test_get_local_batch() {
     // Should be stored in memory and DB.
     assert!(!store.persist(vec![request_1]).is_empty());
 
-    block_on(store.update_certified_timestamp(40));
+    store.update_certified_timestamp(40);
 
     let digest_2 = HashValue::random();
     assert!(digest_2 != digest_1);
@@ -269,7 +250,7 @@ fn test_get_local_batch() {
 
     assert_ok!(store.get_batch_from_local(&digest_1));
     assert_ok!(store.get_batch_from_local(&digest_2));
-    block_on(store.update_certified_timestamp(51));
+    store.update_certified_timestamp(51);
     // Expired value w. digest_1.
     assert_err!(store.get_batch_from_local(&digest_1));
     assert_ok!(store.get_batch_from_local(&digest_2));
@@ -280,16 +261,16 @@ fn test_get_local_batch() {
     assert!(!store.persist(vec![request_3]).is_empty());
     assert_ok!(store.get_batch_from_local(&digest_3));
 
-    block_on(store.update_certified_timestamp(52));
+    store.update_certified_timestamp(52);
     assert_ok!(store.get_batch_from_local(&digest_2));
     assert_ok!(store.get_batch_from_local(&digest_3));
 
-    block_on(store.update_certified_timestamp(55));
+    store.update_certified_timestamp(55);
     // Expired value w. digest_2
     assert_err!(store.get_batch_from_local(&digest_2));
     assert_ok!(store.get_batch_from_local(&digest_3));
 
-    block_on(store.update_certified_timestamp(56));
+    store.update_certified_timestamp(56);
     // Expired value w. digest_3
     assert_err!(store.get_batch_from_local(&digest_1));
     assert_err!(store.get_batch_from_local(&digest_2));
