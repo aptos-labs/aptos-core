@@ -76,8 +76,8 @@ pub enum TransactionType {
     BatchTransfer {
         batch_size: usize,
     },
-    Tournament {
-        num_tournaments: usize
+    TournamentSetupRound {
+        num_tournaments: usize,
     }
 }
 
@@ -287,16 +287,18 @@ pub async fn create_txn_generator_creator(
                     *use_account_pool,
                     accounts_pool.clone(),
                 ),
-                TransactionType::Tournament {
+                TransactionType::TournamentSetupRound {
                     num_tournaments
-                } => Box::new(TournamentTransactionGeneratorCreator::new(
-                        txn_factory.clone(),
-                        *num_tournaments,
-                        accounts_pool.clone(),
-                        txn_executor,
+                } => {
+                    Box::new(TournamentTransactionGeneratorCreator::new(
+                            txn_factory.clone(),
+                            *num_tournaments,
+                            // TODO: Input admin account
+                            addresses_pool.clone()
+                        )
+                        .await
                     )
-                    .await
-                ),
+                },
                 TransactionType::BatchTransfer { batch_size } => {
                     Box::new(BatchTransferTransactionGeneratorCreator::new(
                         txn_factory.clone(),

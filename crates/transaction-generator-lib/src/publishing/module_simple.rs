@@ -264,7 +264,7 @@ impl EntryPoints {
             },
             EntryPoints::TournamentSetup
             | EntryPoints::TournamentSetupPlayer
-            | EntryPoints::TournamentGamePlay => "aptos_tournament",
+            | EntryPoints::TournamentGamePlay => "rps_utils",
         }
     }
 

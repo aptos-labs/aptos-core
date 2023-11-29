@@ -1,4 +1,4 @@
-module tournament::rps_unit_tests {
+module tournament::rps_utils {
     use std::hash;
     use std::signer;
     use std::vector;
