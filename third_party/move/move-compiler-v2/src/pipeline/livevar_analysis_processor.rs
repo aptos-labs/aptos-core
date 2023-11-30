@@ -177,12 +177,8 @@ impl<'a> TransferFunctions for LiveVarAnalysis<'a> {
         use Bytecode::*;
         match instr {
             Assign(id, dst, src, _) => {
-                // Only if dst is used afterwards account for usage. Otherwise this is dead
-                // code.
-                if state.livevars.contains_key(dst) {
-                    state.livevars.remove(dst);
-                    state.livevars.insert(*src, self.livevar_info(id));
-                }
+                state.livevars.remove(dst);
+                state.livevars.insert(*src, self.livevar_info(id));
             },
             Load(_, dst, _) => {
                 state.livevars.remove(dst);

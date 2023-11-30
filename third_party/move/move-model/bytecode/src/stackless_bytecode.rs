@@ -484,6 +484,21 @@ impl Bytecode {
         self.is_conditional_branch() || self.is_unconditional_branch()
     }
 
+    pub fn dests(&self) -> Vec<TempIndex> {
+        match self {
+            Bytecode::Assign(_, dst, _, _) => {
+                vec![*dst]
+            }
+            Bytecode::Load(_, dst, _) => {
+                vec![*dst]
+            }
+            Bytecode::Call(_, dsts, _, _, _) => {
+                dsts.clone()
+            }
+            _ => Vec::new(),
+        }
+    }
+
     /// Return the destination(s) if self is a branch/jump instruction
     pub fn branch_dests(&self) -> Vec<Label> {
         match self {

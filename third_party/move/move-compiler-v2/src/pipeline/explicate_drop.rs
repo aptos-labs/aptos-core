@@ -5,7 +5,7 @@ use super::{
 use move_binary_format::file_format::CodeOffset;
 use move_model::{ast::TempIndex, model::FunctionEnv};
 use move_stackless_bytecode::{
-    function_target::FunctionData,
+    function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
     stackless_bytecode::{AttrId, Bytecode, Label, Operation},
     stackless_control_flow_graph::StacklessControlFlowGraph,
@@ -25,9 +25,10 @@ impl FunctionTargetProcessor for ExplicateDrop {
         if fun_env.is_native() {
             return data;
         }
-        let mut transformer = ExplicateDropTransformer::new(std::mem::take(&mut data.code), &data);
+        let target = FunctionTarget::new(fun_env, &data);
+        let mut transformer = ExplicateDropTransformer::new(target);
         transformer.transform();
-        data.code = transformer.codes;
+        data.code = transformer.transformed;
         data
     }
 
@@ -37,7 +38,9 @@ impl FunctionTargetProcessor for ExplicateDrop {
 }
 
 struct ExplicateDropTransformer<'a> {
-    codes: Vec<Bytecode>,
+    target: FunctionTarget<'a>,
+    // result of the transformation
+    transformed: Vec<Bytecode>,
     live_var_annot: &'a LiveVarAnnotation,
     lifetime_annot: &'a LifetimeAnnotation,
     label_offsets: BTreeMap<Label, CodeOffset>,
@@ -45,19 +48,20 @@ struct ExplicateDropTransformer<'a> {
 }
 
 impl<'a> ExplicateDropTransformer<'a> {
-    pub fn new(codes: Vec<Bytecode>, fun_data: &'a FunctionData) -> Self {
-        let live_var_annot = fun_data
-            .annotations
+    pub fn new(target: FunctionTarget<'a>) -> Self {
+        let live_var_annot = target
+            .get_annotations()
             .get::<LiveVarAnnotation>()
             .expect("livevar annotation");
-        let lifetime_annot = fun_data
-            .annotations
+        let lifetime_annot = target
+            .get_annotations()
             .get::<LifetimeAnnotation>()
             .expect("lifetime annotation");
-        let label_offsets = Bytecode::label_offsets(&codes);
-        let cfg = StacklessControlFlowGraph::new_backward(&codes, true);
+        let label_offsets = Bytecode::label_offsets(target.get_bytecode());
+        let cfg = StacklessControlFlowGraph::new_backward(target.get_bytecode(), true);
         ExplicateDropTransformer {
-            codes,
+            target,
+            transformed: Vec::new(),
             live_var_annot,
             lifetime_annot,
             label_offsets,
@@ -68,10 +72,10 @@ impl<'a> ExplicateDropTransformer<'a> {
     /// Add explicit drop instructions
     /// note that this will invalidate existing analyses
     pub fn transform(&mut self) {
-        let bytecodes = std::mem::take(&mut self.codes);
-        for (code_offset, bytecode) in bytecodes.into_iter().enumerate() {
+        self.drop_unused_args();
+        for (code_offset, bytecode) in self.target.get_bytecode().to_vec().iter().enumerate() {
             self.emit_bytecode(bytecode.clone());
-            self.explicate_drops_at(code_offset as CodeOffset, &bytecode);
+            self.explicate_drops_at(code_offset as CodeOffset, bytecode);
         }
     }
 
@@ -82,7 +86,7 @@ impl<'a> ExplicateDropTransformer<'a> {
                 ()
             },
             Bytecode::Label(_, label) => {
-                // all locals released by (immediate) predec instructions
+                // all locals released by (immediate) preceding instructions
                 let released_temps_join: BTreeSet<_> = self
                     .pred_instr_offsets(label)
                     .flat_map(|pred_instr_offset| self.released_temps_at(pred_instr_offset))
@@ -110,6 +114,22 @@ impl<'a> ExplicateDropTransformer<'a> {
         })
     }
 
+    fn drop_unused_args(&mut self) {
+        let code_offset = 0;
+        let live_var_info = self
+            .live_var_annot
+            .get_live_var_info_at(code_offset)
+            .expect("live var info");
+        let lifetime_info = self.lifetime_annot.get_info_at(code_offset);
+        for arg in self.target.get_parameters() {
+            if !live_var_info.before.contains_key(&arg) && !lifetime_info.before.is_borrowed(arg) {
+                // todo
+                let attr_id = self.target.get_bytecode()[0].get_attr_id();
+                self.drop_temp(arg, attr_id)
+            }
+        }
+    }
+
     // Returns a set of locals that can be dropped at given code offset
     fn released_temps_at(&self, code_offset: CodeOffset) -> BTreeSet<TempIndex> {
         let live_var_info = self
@@ -117,24 +137,23 @@ impl<'a> ExplicateDropTransformer<'a> {
             .get_live_var_info_at(code_offset)
             .expect("live var info");
         let lifetime_info = self.lifetime_annot.get_info_at(code_offset);
-        released_temps(live_var_info, lifetime_info)
+        let bytecode = &self.target.get_bytecode()[code_offset as usize];
+        released_temps(live_var_info, lifetime_info, bytecode)
+    }
+
+    fn drop_temp(&mut self, tmp: TempIndex, attr_id: AttrId) {
+        let drop_t = Bytecode::Call(attr_id, Vec::new(), Operation::Destroy, vec![tmp], None);
+        self.emit_bytecode(drop_t)
     }
 
     fn drop_temps(&mut self, temps_to_drop: &BTreeSet<TempIndex>, attr_id: AttrId) {
         for t in temps_to_drop {
-            let drop_t = Bytecode::Call(
-                attr_id,
-                Vec::new(),
-                Operation::Destroy,
-                vec![*t],
-                None,
-            );
-            self.emit_bytecode(drop_t)
+            self.drop_temp(*t, attr_id)
         }
     }
 
     fn emit_bytecode(&mut self, bytecode: Bytecode) {
-        self.codes.push(bytecode)
+        self.transformed.push(bytecode)
     }
 }
 
@@ -143,6 +162,7 @@ impl<'a> ExplicateDropTransformer<'a> {
 fn released_temps(
     live_var_info: &LiveVarInfoAtCodeOffset,
     life_time_info: &LifetimeInfoAtCodeOffset,
+    bytecode: &Bytecode,
 ) -> BTreeSet<TempIndex> {
     // use set to avoid duplicate dropping
     let mut released_temps = BTreeSet::new();
@@ -154,6 +174,17 @@ fn released_temps(
     for t in life_time_info.released_temps() {
         if !live_var_info.after.contains_key(&t) {
             released_temps.insert(t);
+        }
+    }
+    // this is needed because dead vars are not ever used
+    // and thus never released by live var info
+    for dst in bytecode.dests() {
+        if !live_var_info.after.contains_key(&dst) {
+            debug_assert!(
+                !life_time_info.after.is_borrowed(dst),
+                "dead assignment borrowed later"
+            );
+            released_temps.insert(dst);
         }
     }
     released_temps
