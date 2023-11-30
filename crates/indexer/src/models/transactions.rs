@@ -219,7 +219,20 @@ impl Transaction {
             APITransaction::PendingTransaction(..) => {
                 unreachable!()
             },
-            APITransaction::SystemTransaction(_) => todo!(),
+            APITransaction::SystemTransaction(system_txn) => (
+                Self::from_transaction_info(
+                    &system_txn.info,
+                    None,
+                    transaction.type_str().to_string(),
+                    0,
+                    block_height,
+                    epoch,
+                ),
+                None,
+                vec![],
+                vec![],
+                vec![],
+            ),
         }
     }
 
