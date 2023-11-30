@@ -114,8 +114,13 @@ pub trait AptosValidatorInterface: Sync {
 }
 
 pub struct DebuggerStateView {
-    query_sender:
-        Mutex<UnboundedSender<(StateKey, Version, std::sync::mpsc::Sender<Option<Vec<u8>>>)>>,
+    query_sender: Mutex<
+        UnboundedSender<(
+            StateKey,
+            Version,
+            std::sync::mpsc::Sender<Result<Option<StateValue>>>,
+        )>,
+    >,
     version: Version,
 }
 
@@ -124,13 +129,14 @@ async fn handler_thread<'a>(
     mut thread_receiver: UnboundedReceiver<(
         StateKey,
         Version,
-        std::sync::mpsc::Sender<Option<Vec<u8>>>,
+        std::sync::mpsc::Sender<Result<Option<StateValue>>>,
     )>,
 ) {
     const M: usize = 1024 * 1024;
-    let cache = Arc::new(Mutex::new(
-        LruCache::<(StateKey, Version), Option<Vec<u8>>>::new(M),
-    ));
+    let cache = Arc::new(Mutex::new(LruCache::<
+        (StateKey, Version),
+        Option<StateValue>,
+    >::new(M)));
 
     loop {
         let (key, version, sender) =
@@ -141,19 +147,20 @@ async fn handler_thread<'a>(
             };
 
         if let Some(val) = cache.lock().unwrap().get(&(key.clone(), version)) {
-            sender.send(val.clone()).unwrap();
+            sender.send(Ok(val.clone())).unwrap();
         } else {
             assert!(version > 0, "Expecting a non-genesis version");
             let db = db.clone();
             let cache = cache.clone();
             tokio::spawn(async move {
-                let val = db
-                    .get_state_value_by_version(&key, version - 1)
-                    .await
-                    .ok()
-                    .and_then(|v| v.map(|s| s.bytes().to_vec()));
-                cache.lock().unwrap().put((key, version), val.clone());
-                sender.send(val)
+                let res = db.get_state_value_by_version(&key, version - 1).await;
+                match res {
+                    Ok(val) => {
+                        cache.lock().unwrap().put((key, version), val.clone());
+                        sender.send(Ok(val))
+                    },
+                    Err(err) => sender.send(Err(err)),
+                }
             });
         }
     }
@@ -180,8 +187,7 @@ impl DebuggerStateView {
         query_handler_locked
             .send((state_key.clone(), version, tx))
             .unwrap();
-        let bytes_opt = rx.recv()?;
-        Ok(bytes_opt.map(|bytes| StateValue::new_legacy(bytes.into())))
+        rx.recv()?
     }
 }
 
