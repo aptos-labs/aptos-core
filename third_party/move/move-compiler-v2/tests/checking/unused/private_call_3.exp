@@ -8,7 +8,7 @@ warning: Function `0x42::m_nonfriend::friend_accessible` is unused: it has no cu
 30 │ │     }
    │ ╰─────^
 
-warning: Function `0x42::m_nonfriend::inaccessible` is unused: it has no current uses and is `private` so it can have no future uses.
+warning: Function `0x42::m_nonfriend::inaccessible` is unused: it has no current callers and is private to its module.
    ┌─ tests/checking/unused/private_call_3.move:24:5
    │
 24 │ ╭     inline fun inaccessible(): u64 {
@@ -16,7 +16,7 @@ warning: Function `0x42::m_nonfriend::inaccessible` is unused: it has no current
 26 │ │     }
    │ ╰─────^
 
-warning: Function `0x42::m::inaccessible` is unused: it has no current uses and is `private` so it can have no future uses.
+warning: Function `0x42::m::inaccessible` is unused: it has no current callers and is private to its module.
    ┌─ tests/checking/unused/private_call_3.move:8:5
    │
  8 │ ╭     inline fun inaccessible(): u64 {
@@ -24,7 +24,7 @@ warning: Function `0x42::m::inaccessible` is unused: it has no current uses and 
 10 │ │     }
    │ ╰─────^
 
-warning: Function `0x42::o_nonfriend::inaccessible` is unused: it has no current uses and is `private` so it can have no future uses.
+warning: Function `0x42::o_nonfriend::inaccessible` may be unused: it has callers, but none with access.
    ┌─ tests/checking/unused/private_call_3.move:72:5
    │
 72 │ ╭     inline fun inaccessible(): u64 {
@@ -34,7 +34,7 @@ warning: Function `0x42::o_nonfriend::inaccessible` is unused: it has no current
 76 │ │     }
    │ ╰─────^
 
-warning: Function `0x42::o::inaccessible` is unused: it has no current uses and is `private` so it can have no future uses.
+warning: Function `0x42::o::inaccessible` may be unused: it has callers, but none with access.
    ┌─ tests/checking/unused/private_call_3.move:46:5
    │
 46 │ ╭     inline fun inaccessible(): u64 {

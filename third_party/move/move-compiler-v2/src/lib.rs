@@ -50,8 +50,8 @@ pub fn run_move_compiler(
     let mut env = run_checker(options.clone())?;
     check_errors(&env, error_writer, "checking errors")?;
 
-    function_checker::check_functions_for_function_typed_parameters(&mut env);
-    function_checker::check_functions_access_and_use(&mut env);
+    function_checker::check_for_function_typed_parameters(&mut env);
+    function_checker::check_access_and_use(&mut env);
     check_errors(&env, error_writer, "checking errors")?;
 
     if options.debug {

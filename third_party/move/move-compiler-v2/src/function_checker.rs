@@ -15,7 +15,7 @@ use std::{collections::BTreeSet, iter::Iterator, ops::Deref, vec::Vec};
 type QualifiedFunId = QualifiedId<FunId>;
 
 /// check that non-inline function parameters do not have function type
-pub fn check_functions_for_function_typed_parameters(env: &mut GlobalEnv) {
+pub fn check_for_function_typed_parameters(env: &mut GlobalEnv) {
     for caller_module in env.get_modules() {
         if caller_module.is_target() {
             for caller_func in caller_module.get_functions() {
@@ -57,7 +57,7 @@ pub fn check_functions_for_function_typed_parameters(env: &mut GlobalEnv) {
 /// - check that calls to or from inline functions are accessible;
 ///   - non-inline functions are handled in the VisibilityChecker pass, but
 ///     inline functions will be either gone or inlined by then.
-pub fn check_functions_access_and_use(env: &mut GlobalEnv) {
+pub fn check_access_and_use(env: &mut GlobalEnv) {
     let options = env
         .get_extension::<Options>()
         .expect("Options is available");
@@ -65,6 +65,8 @@ pub fn check_functions_access_and_use(env: &mut GlobalEnv) {
 
     // For each function seen, we record whether it has an accessible caller.
     let mut functions_with_callers: BTreeSet<QualifiedFunId> = BTreeSet::new();
+    // For each function seen, we record whether it has an inaccessible caller.
+    let mut functions_with_inaccessible_callers: BTreeSet<QualifiedFunId> = BTreeSet::new();
     // Record all private and friendless public(friend) functions to check for uses.
     let mut private_funcs: BTreeSet<QualifiedFunId> = BTreeSet::new();
 
@@ -119,7 +121,7 @@ pub fn check_functions_access_and_use(env: &mut GlobalEnv) {
                                             })
                                             .collect();
                                         let msg = format!(
-                                            "inline function `{}` cannot be called from a script, \
+                                            "Inline function `{}` cannot be called from a script, \
                                              because it is not public",
                                             callee_env.get_full_name_with_address(),
                                         );
@@ -196,6 +198,8 @@ pub fn check_functions_access_and_use(env: &mut GlobalEnv) {
                         };
                         if callee_is_accessible {
                             functions_with_callers.insert(callee);
+                        } else {
+                            functions_with_inaccessible_callers.insert(callee);
                         }
                     }
                 }
@@ -216,16 +220,24 @@ pub fn check_functions_access_and_use(env: &mut GlobalEnv) {
             if !callee_is_script {
                 let is_private = matches!(callee_env.visibility(), Visibility::Private);
                 if warn_about_unused {
-                    let msg = format!(
-                        "Function `{}` is unused: it has no current uses and {} so it can have no future uses.",
-                        callee_env.get_full_name_with_address(),
-                        if is_private {
-                            "is `private`"
-                        } else {
-                            "is `public(friend)` but module has no friends"
-                        }
-                    );
-                    env.diag(Severity::Warning, &callee_loc, &msg);
+                    if functions_with_inaccessible_callers.contains(&callee) {
+                        let msg = format!(
+                            "Function `{}` may be unused: it has callers, but none with access.",
+                            callee_env.get_full_name_with_address(),
+                        );
+                        env.diag(Severity::Warning, &callee_loc, &msg);
+                    } else {
+                        let msg = format!(
+                            "Function `{}` is unused: it has no current callers and {}.",
+                            callee_env.get_full_name_with_address(),
+                            if is_private {
+                                "is private to its module"
+                            } else {
+                                "is `public(friend)` but its module has no friends"
+                            }
+                        );
+                        env.diag(Severity::Warning, &callee_loc, &msg);
+                    }
                 }
             }
         }
