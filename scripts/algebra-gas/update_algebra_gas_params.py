@@ -96,17 +96,19 @@ def get_algebra_lines(gas_per_ns):
     return lines
 
 def main(gas_per_ns):
-    path = Path('aptos-move/aptos-gas/src/aptos_framework.rs')
+    path = Path(PATH_STR)
     lines = path.read_text().split('\n')
-    line_id_begin = lines.index('    // Algebra gas parameters begin.')
-    line_id_end = lines.index('    // Algebra gas parameters end.')
+    striped_lines = [line.strip() for line in lines]
+    line_id_begin = striped_lines.index('// Algebra gas parameters begin.')
+    line_id_end = striped_lines.index('// Algebra gas parameters end.')
     generator_note_line = f'    // Generated at time {time()} by `scripts/algebra-gas/update_algebra_gas_params.py` with gas_per_ns={gas_per_ns}.'
     new_lines = lines[:line_id_begin+1] + [generator_note_line] + get_algebra_lines(gas_per_ns) + lines[line_id_end:]
     path.write_text('\n'.join(new_lines))
 
+PATH_STR = 'aptos-move/aptos-gas-schedule/src/gas_schedule/aptos_framework.rs'
 if __name__=='__main__':
     parser = argparse.ArgumentParser(
-        description='Generate gas parameters for algebra module in `aptos-move/aptos-gas/src/aptos_framework.rs`.')
+        description=f'Generate gas parameters for algebra module in `{PATH_STR}`.')
     parser.add_argument('--gas_per_ns', required=True, type=float)
     args = parser.parse_args()
     main(args.gas_per_ns)
