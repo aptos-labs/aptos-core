@@ -74,7 +74,7 @@ impl Default for Features {
         features.enable(APTOS_UNIQUE_IDENTIFIERS);
         features.enable(SIGNATURE_CHECKER_V2_SCRIPT_FIX);
         features.enable(AGGREGATOR_V2_API);
-
+        features.enable(BN254_STRUCTURES);
         features
     }
 }
