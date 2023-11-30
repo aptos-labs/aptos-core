@@ -4,7 +4,8 @@
 use crate::{
     common::{
         types::{
-            CliCommand, CliError, CliResult, CliTypedResult, TransactionOptions, TransactionSummary,
+            CliCommand, CliError, CliResult, CliTypedResult, ProfileOptions, TransactionOptions,
+            TransactionSummary,
         },
         utils::prompt_yes_with_override,
     },
@@ -26,6 +27,7 @@ use clap::Parser;
 pub enum StakeTool {
     AddStake(AddStake),
     CreateStakingContract(CreateStakingContract),
+    DeriveStakingContractAddress(DeriveStakingContractAddress),
     DistributeVestedCoins(DistributeVestedCoins),
     IncreaseLockup(IncreaseLockup),
     InitializeStakeOwner(InitializeStakeOwner),
@@ -43,6 +45,7 @@ impl StakeTool {
         match self {
             AddStake(tool) => tool.execute_serialized().await,
             CreateStakingContract(tool) => tool.execute_serialized().await,
+            DeriveStakingContractAddress(tool) => tool.execute_serialized().await,
             DistributeVestedCoins(tool) => tool.execute_serialized().await,
             IncreaseLockup(tool) => tool.execute_serialized().await,
             InitializeStakeOwner(tool) => tool.execute_serialized().await,
@@ -109,7 +112,7 @@ impl CliCommand<Vec<TransactionSummary>> for AddStake {
                 StakePoolType::Vesting => {
                     return Err(CliError::UnexpectedError(
                         "Adding stake is not supported for vesting contracts".into(),
-                    ))
+                    ));
                 },
             }
         }
@@ -170,7 +173,7 @@ impl CliCommand<Vec<TransactionSummary>> for UnlockStake {
                 StakePoolType::Vesting => {
                     return Err(CliError::UnexpectedError(
                         "Unlocking stake is not supported for vesting contracts".into(),
-                    ))
+                    ));
                 },
             }
         }
@@ -235,7 +238,7 @@ impl CliCommand<Vec<TransactionSummary>> for WithdrawStake {
                     return Err(CliError::UnexpectedError(
                         "Stake withdrawal from vesting contract should use distribute-vested-coins"
                             .into(),
-                    ))
+                    ));
                 },
             }
         }
@@ -546,6 +549,40 @@ impl CliCommand<TransactionSummary> for CreateStakingContract {
             ))
             .await
             .map(|inner| inner.into())
+    }
+}
+
+/// Derive the default staking contract stake pool address used by create-staking-contract
+///
+///
+#[derive(Parser)]
+pub struct DeriveStakingContractAddress {
+    /// Account Address of operator
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
+    pub operator: Option<AccountAddress>,
+
+    /// Account Address of owner, defaults to profile
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
+    pub owner: Option<AccountAddress>,
+
+    #[clap(flatten)]
+    pub profile_options: ProfileOptions,
+}
+
+#[async_trait]
+impl CliCommand<AccountAddress> for DeriveStakingContractAddress {
+    fn command_name(&self) -> &'static str {
+        "DeriveStakingContractAddress"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<AccountAddress> {
+        let owner = if let Some(owner) = self.owner {
+            owner
+        } else {
+            self.profile_options.account_address()?
+        };
+        let operator = self.operator.unwrap_or(owner);
+        Ok(default_stake_pool_address(owner, operator))
     }
 }
 
