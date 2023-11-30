@@ -98,7 +98,7 @@ impl Execution {
         }
     }
 
-    pub async fn execute_txns(&self, begin: Version, limit: u64) -> Result<()> {
+    pub async fn execute_txns(&self, begin: Version, num_txns_to_execute: u64) -> Result<()> {
         let aptos_commons_path = self.input_path.join(APTOS_COMMONS);
         if !check_aptos_packages_availability(aptos_commons_path.clone()) {
             return Err(anyhow::Error::msg("aptos packages are missing"));
@@ -133,18 +133,26 @@ impl Execution {
             ));
         }
         let mut cur_version = ver.unwrap();
-        while cur_version < begin + limit {
-            self.execute_one_txn(
+        let mut i = 0;
+        while i < num_txns_to_execute {
+            let res = self.execute_one_txn(
                 cur_version,
                 &data_manager,
                 &mut compiled_package_cache,
                 &mut compiled_package_cache_v2,
-            )?;
+            );
+            if res.is_err() {
+                println!(
+                    "execution at version:{} failed, skip to the next txn",
+                    cur_version
+                );
+            }
             if let Some(ver) = index_reader.get_next_version() {
                 cur_version = ver;
             } else {
                 break;
             }
+            i += 1;
         }
         Ok(())
     }
@@ -191,7 +199,15 @@ impl Execution {
             if txn_idx.package_info.is_compilable()
                 && !is_aptos_package(&txn_idx.package_info.package_name)
             {
-                self.compile_code(&txn_idx, compiled_package_cache, compiled_package_cache_v2)?;
+                let compiled_result =
+                    self.compile_code(&txn_idx, compiled_package_cache, compiled_package_cache_v2);
+                if compiled_result.is_err() {
+                    println!(
+                        "compilation failed for the package:{} at version:{}",
+                        txn_idx.package_info.package_name, cur_version
+                    );
+                    return compiled_result;
+                }
             }
             // read the state data;
             let state = data_manager.get_state(cur_version);

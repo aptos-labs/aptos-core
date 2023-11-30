@@ -362,8 +362,8 @@ impl PackageInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct TxnIndex {
     version: u64,
-    txn: Transaction,
     package_info: PackageInfo,
+    txn: Transaction,
 }
 
 fn generate_compiled_blob(
