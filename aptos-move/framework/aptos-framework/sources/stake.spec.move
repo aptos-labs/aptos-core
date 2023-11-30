@@ -17,6 +17,7 @@ spec aptos_framework::stake {
         // ghost variable
         global ghost_valid_perf: ValidatorPerformance;
         global ghost_proposer_idx: Option<u64>;
+        global ghost_withdraw_amount: u64;
     }
 
     // property 1: the validator set resource stores consensus information for each validator.
@@ -170,8 +171,40 @@ spec aptos_framework::stake {
         aborts_if !exists<coin::CoinStore<AptosCoin>>(addr);
         include coin::DepositAbortsIf<AptosCoin>{account_addr: addr};
 
-        let post p_addr = signer::address_of(owner);
-        //ensures global<coin::CoinStore<AptosCoin>>(addr).coin.value + new_withdraw_amount == global<coin::CoinStore<AptosCoin>>(p_addr).coin.value;
+        let coin_store = global<coin::CoinStore<AptosCoin>>(addr);
+        let post p_coin_store = global<coin::CoinStore<AptosCoin>>(addr);
+        ensures exists<account::Account>(addr) && exists<coin::CoinStore<AptosCoin>>(addr) ==>
+                    coin_store.coin.value + ghost_withdraw_amount == p_coin_store.coin.value;
+    }
+
+    spec leave_validator_set(
+        operator: &signer,
+        pool_address: address
+    ) {
+        requires chain_status::is_operating();
+
+        let config = staking_config::get();
+        aborts_if !staking_config::get_allow_validator_set_change(config);
+        aborts_if !exists<StakePool>(pool_address);
+        aborts_if !exists<ValidatorSet>(@aptos_framework);
+        aborts_if !exists<staking_config::StakingConfig>(@aptos_framework);
+        let stake_pool = global<StakePool>(pool_address);
+        aborts_if signer::address_of(operator) != stake_pool.operator_address;
+
+        let validator_set = global<ValidatorSet>(@aptos_framework);
+        let validator_find_bool = option::spec_is_some(spec_find_validator(validator_set.pending_active, pool_address));
+        let active_validators = validator_set.active_validators;
+        let pending_active = validator_set.pending_active;
+
+        aborts_if !validator_find_bool && !option::spec_is_some(spec_find_validator(active_validators, pool_address));
+        aborts_if !validator_find_bool && vector::length(validator_set.active_validators) <= option::spec_borrow(spec_find_validator(active_validators, pool_address));
+        aborts_if !validator_find_bool && vector::length(validator_set.active_validators) < 2;
+        aborts_if validator_find_bool && vector::length(validator_set.pending_active) <= option::spec_borrow(spec_find_validator(pending_active, pool_address));
+        let post p_validator_set = global<ValidatorSet>(@aptos_framework);
+        let validator_stake = (get_next_epoch_voting_power(stake_pool) as u128);
+        ensures validator_find_bool && validator_set.total_joining_power > validator_stake ==>
+                    p_validator_set.total_joining_power == validator_set.total_joining_power - validator_stake;
+        ensures !validator_find_bool ==> !option::spec_is_some(spec_find_validator(p_validator_set.pending_active, pool_address));
     }
 
     spec extract_owner_cap(owner: &signer): OwnerCapability {
@@ -270,12 +303,16 @@ spec aptos_framework::stake {
         new_consensus_pubkey: vector<u8>,
         proof_of_possession: vector<u8>,
     ) {
-        pragma aborts_if_is_partial;
         let pre_stake_pool = global<StakePool>(pool_address);
         let post validator_info = global<ValidatorConfig>(pool_address);
         aborts_if !exists<StakePool>(pool_address);
         aborts_if signer::address_of(operator) != pre_stake_pool.operator_address;
         aborts_if !exists<ValidatorConfig>(pool_address);
+        let pubkey_from_pop = bls12381::spec_public_key_from_bytes_with_pop(
+            new_consensus_pubkey,
+            proof_of_possession_from_bytes(proof_of_possession)
+        );
+        aborts_if !option::spec_is_some(pubkey_from_pop);
         modifies global<ValidatorConfig>(pool_address);
         include StakedValueNochange;
 
