@@ -2,7 +2,9 @@
 title: "Parsing Transactions"
 ---
 
-# Parsing Transactions
+import BetaNotice from '../../../src/components/_indexer_beta_notice.mdx';
+
+<BetaNotice />
 
 <!--
 Things to add:
