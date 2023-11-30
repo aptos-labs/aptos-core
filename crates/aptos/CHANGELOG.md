@@ -4,6 +4,9 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 
+## [2.3.2] - 2023/11/28
+- Services in the local testnet now bind to 127.0.0.1 by default (unless the CLI is running inside a container, which most users should not do) rather than 0.0.0.0. You can override this behavior with the `--bind-to` flag. This fixes an issue preventing the local testnet from working on Windows.
+
 ## [2.3.1] - 2023/11/07
 ### Updated
 - Updated processor code from https://github.com/aptos-labs/aptos-indexer-processors for the local testnet to 2d5cb211a89a8705674e9e1e741c841dd899c558. 
