@@ -116,11 +116,8 @@ impl<'a> ExplicateDropTransformer<'a> {
 
     fn drop_unused_args(&mut self) {
         let code_offset = 0;
-        let live_var_info = self
-            .live_var_annot
-            .get_live_var_info_at(code_offset)
-            .expect("live var info");
-        let lifetime_info = self.lifetime_annot.get_info_at(code_offset);
+        let live_var_info = self.get_live_var_info(code_offset);
+        let lifetime_info = self.get_lifetime_info(code_offset);
         for arg in self.target.get_parameters() {
             if !live_var_info.before.contains_key(&arg) && !lifetime_info.before.is_borrowed(arg) {
                 // todo
@@ -132,13 +129,21 @@ impl<'a> ExplicateDropTransformer<'a> {
 
     // Returns a set of locals that can be dropped at given code offset
     fn released_temps_at(&self, code_offset: CodeOffset) -> BTreeSet<TempIndex> {
-        let live_var_info = self
-            .live_var_annot
-            .get_live_var_info_at(code_offset)
-            .expect("live var info");
-        let lifetime_info = self.lifetime_annot.get_info_at(code_offset);
+        let live_var_info = self.get_live_var_info(code_offset);
+        let lifetime_info = self.get_lifetime_info(code_offset);
         let bytecode = &self.target.get_bytecode()[code_offset as usize];
         released_temps(live_var_info, lifetime_info, bytecode)
+    }
+
+    fn get_live_var_info(&self, code_offset: CodeOffset) -> &'a LiveVarInfoAtCodeOffset {
+        self
+            .live_var_annot
+            .get_live_var_info_at(code_offset)
+            .expect("live var info")
+    }
+
+    fn get_lifetime_info(&self, code_offset: CodeOffset) -> &'a LifetimeInfoAtCodeOffset {
+        self.lifetime_annot.get_info_at(code_offset)
     }
 
     fn drop_temp(&mut self, tmp: TempIndex, attr_id: AttrId) {
