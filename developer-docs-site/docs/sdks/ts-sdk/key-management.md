@@ -1,6 +1,5 @@
 ---
 title: "Key Management"
-slug: "typescript-sdk-key-management"
 ---
 
 The SDK provides an `Account` class for creating and managing [account](../../concepts/accounts.md) on Aptos network.

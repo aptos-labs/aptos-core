@@ -1,6 +1,5 @@
 ---
 title: "Move Types"
-slug: "typescript-sdk-move-types"
 ---
 
 When developing on Aptos, and specifically working with the SDK, developers often need to handle Move types serialization and deserialization. Whether is to construct a transaction payload, build a raw transaction or read BCS data.

@@ -1,6 +1,5 @@
 ---
 title: "Typescript"
-slug: "typescript-sdk-typescript"
 ---
 
 Aptos SDK is designed to be type-safe! Things to keep in mind:

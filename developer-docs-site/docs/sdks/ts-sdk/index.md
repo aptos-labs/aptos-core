@@ -13,7 +13,7 @@ import ThemedImage from '@theme/ThemedImage';
 :::note
 This documentation is for TypeScript SDK > ` v2.0.0`. You can find the documentation for SDK `v1.x.x` [here](./v1/index.md)
 
-Looking to migrate to `v2`? check out the [migration guide](./migration-guide.md)
+Looking to migrate to `TypeScript SDK v2`? check out the [migration guide](./migration-guide.md)
 :::
 
 ## Overview

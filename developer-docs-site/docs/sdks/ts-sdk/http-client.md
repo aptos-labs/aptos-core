@@ -1,6 +1,5 @@
 ---
 title: "HTTP Client"
-slug: "typescript-sdk-http-client"
 ---
 
 ### Default HTTP Client

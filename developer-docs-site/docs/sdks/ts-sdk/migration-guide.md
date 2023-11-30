@@ -1,6 +1,5 @@
 ---
 title: "Migration Guide"
-slug: "migration-guide"
 ---
 
 If you are coming from an earlier version `1.x.x` of `aptos`, you will need to make the following updates.

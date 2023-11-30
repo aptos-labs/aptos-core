@@ -1,6 +1,5 @@
 ---
 title: "SDK Configuration"
-slug: "typescript-sdk-sdk-configuration"
 ---
 
 ## `Aptos` class

@@ -1,6 +1,5 @@
 ---
 title: "Fetch data from chain"
-slug: "typescript-sdk-fetch-data-from-chain"
 ---
 
 Once we created a new [Aptos instance](./sdk-configuration.md), we get access to all the sdk functionality. We now can query the chain for data.

@@ -1,6 +1,5 @@
 ---
 title: "Transaction Builder"
-slug: "typescript-sdk-transaction-builder"
 ---
 
 The SDK provides a simplified and meaningful transaction builder flow to handles the transaction creation lifecycle.
