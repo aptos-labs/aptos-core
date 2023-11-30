@@ -29,9 +29,6 @@ const SKIP_ATTRIBUTE_CHECKS_PATH: &str = "/skip_attribute_checks/";
 /// Root of tests which require to set warn_of_deprecation_use flag
 const WARN_DEPRECATION_PATH: &str = "/deprecated/";
 
-/// Root of unused functions tests warn_unused flag
-const WARN_UNUSED_PATH: &str = "/warn_unused/";
-
 fn default_testing_addresses() -> BTreeMap<String, NumericalAddress> {
     let mapping = [
         ("aptos_std", "0x1"),
@@ -112,9 +109,6 @@ fn move_check_testsuite(path: &Path) -> datatest_stable::Result<()> {
         }
         if p.contains(WARN_DEPRECATION_PATH) {
             flags = flags.set_warn_of_deprecation_use(true);
-        }
-        if p.contains(WARN_UNUSED_PATH) {
-            flags = flags.set_warn_unused(true);
         }
     };
     run_test(path, &exp_path, &out_path, flags)?;
