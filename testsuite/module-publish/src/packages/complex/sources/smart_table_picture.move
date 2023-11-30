@@ -11,9 +11,6 @@ module 0xABCD::smart_table_picture {
     /// The caller tried to mutate an item outside the bounds of the vector.
     const E_INDEX_OUT_OF_BOUNDS: u64 = 1;
 
-    /// The caller tried to create palette for non-initialized account.
-    const E_ALL_PALETTES_NOT_INIT: u64 = 2;
-
     struct AllPalettes has key {
         all: vector<address>,
     }
@@ -47,10 +44,20 @@ module 0xABCD::smart_table_picture {
         let object_signer = object::generate_signer(&constructor_ref);
         move_to(&object_signer, palette);
 
-        assert!(exists<AllPalettes>(caller_addr), error::invalid_argument(E_ALL_PALETTES_NOT_INIT));
+        if (!exists<AllPalettes>(caller_addr)) {
+            let vec = vector::empty();
+            vector::push_back(&mut vec, object::address_from_constructor_ref(&constructor_ref));
 
-        let all_palettes = borrow_global_mut<AllPalettes>(caller_addr);
-        vector::push_back(&mut all_palettes.all, object::address_from_constructor_ref(&constructor_ref));
+            move_to<AllPalettes>(
+                caller,
+                AllPalettes {
+                    all: vec,
+                },
+            );
+        } else {
+            let all_palettes = borrow_global_mut<AllPalettes>(caller_addr);
+            vector::push_back(&mut all_palettes.all, object::address_from_constructor_ref(&constructor_ref));
+        }
     }
 
     /// Update an element in the vector.

@@ -30,8 +30,10 @@ pub enum TransactionTypeArg {
     TokenV1FTMintAndStore,
     TokenV1FTMintAndTransfer,
     TokenV2AmbassadorMint,
+    VectorPictureCreate30k,
     VectorPicture30k,
     VectorPictureRead30k,
+    VectorPictureCreate40,
     VectorPicture40,
     VectorPictureRead40,
     SmartTablePicture30KWith200Change,
@@ -164,6 +166,11 @@ impl TransactionTypeArg {
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
+            TransactionTypeArg::VectorPictureCreate30k => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::InitializeVectorPicture { length: 30 * 1024 },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
             TransactionTypeArg::VectorPicture30k => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::VectorPicture { length: 30 * 1024 },
                 num_modules: module_working_set_size,
@@ -171,6 +178,11 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::VectorPictureRead30k => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::VectorPictureRead { length: 30 * 1024 },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::VectorPictureCreate40 => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::InitializeVectorPicture { length: 40 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
