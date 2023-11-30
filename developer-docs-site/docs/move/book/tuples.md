@@ -107,8 +107,8 @@ For more details, see [Move Variables](./variables.md).
 
 ## Subtyping
 
-Along with references, tuples are the only types that have [subtyping](https://en.wikipedia.org/wiki/Subtyping) in Move. Tuples do have
-subtyping only in the sense that subtype with references (in a covariant way).
+Along with references, tuples are the only other type that have [subtyping](https://en.wikipedia.org/wiki/Subtyping) in Move. Tuples have
+subtyping only in the sense that they subtype with references (in a covariant way).
 
 For example:
 

@@ -115,7 +115,7 @@ script {
 
 ### `entry` modifier
 
-The `entry` modifier is designed to allow module functions to be safely and directly invoked much like scripts. This allows module writers to specify which functions can be to begin execution. The module writer then knows that any non-`entry` function will be called from a Move program already in execution.
+The `entry` modifier is designed to allow module functions to be safely and directly invoked much like scripts. This allows module writers to specify which functions can be invoked to begin execution. The module writer then knows that any non-`entry` function will be called from a Move program already in execution.
 
 Essentially, `entry` functions are the "main" functions of a module, and they specify where Move programs start executing.
 
@@ -189,9 +189,13 @@ must not have any return values.
 Function names can start with letters `a` to `z` or letters `A` to `Z`. After the first character, function names can contain underscores `_`, letters `a` to `z`, letters `A` to `Z`, or digits `0` to `9`.
 
 ```move
+// all valid
 fun FOO() {}
 fun bar_42() {}
-fun _bAZ19() {}
+fun bAZ19() {}
+
+// invalid
+fun _bAZ19() {} // Function names cannot start with '_'
 ```
 
 ### Type Parameters
@@ -463,7 +467,7 @@ fun add(x: u64, y: u64): u64 {
 }
 ```
 
-[As mentioned above](#function-body), the function's body is an [expression block](./variables.md). The expression block can sequence various statements, and the final expression in the block will be the value of that block
+[As mentioned above](#function-body), the function's body is an [expression block](./variables.md). The expression block can be a sequence of various statements, and the final expression in the block will be the value of that block.
 
 ```move=
 fun double_and_add(x: u64, y: u64): u64 {
@@ -495,7 +499,7 @@ fun safe_sub(x: u64, y: u64): u64 {
 
 Note that the body of this function could also have been written as `if (y > x) 0 else x - y`.
 
-However `return` really shines is in exiting deep within other control flow constructs. In this example, the function iterates through a vector to find the index of a given value:
+However where `return` really shines is in exiting deep within other control flow constructs. In this example, the function iterates through a vector to find the index of a given value:
 
 ```move=
 use std::vector;
