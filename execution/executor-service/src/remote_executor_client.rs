@@ -315,7 +315,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                 let num_txns = shard_txns.len();
 
                 let _ = shard_txns
-                    .par_chunks(batch_size)
+                    .chunks(batch_size)
                     .enumerate()
                     .for_each(|(chunk_idx, txns)| {
                         let analyzed_txns = txns.iter().map(|txn| {
