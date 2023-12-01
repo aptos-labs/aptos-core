@@ -24,8 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          # ref: ${{ github.event.inputs.git_ref }}
-          ref: aptos-node-v1.4.3
+          ref: ${{ github.event.inputs.git_ref }}
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - name: Build Aptos Node Binary ${{ matrix.os }}
         run: |

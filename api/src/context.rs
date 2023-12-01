@@ -10,7 +10,7 @@ use crate::{
         ForbiddenError, InternalError, NotFoundError, ServiceUnavailableError, StdApiError,
     },
 };
-use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
+use anyhow::{anyhow, bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{
     AptosErrorCode, AsConverter, BcsBlock, GasEstimation, LedgerInfo, ResourceGroup,
     TransactionOnChainData,
@@ -28,9 +28,8 @@ use aptos_storage_interface::{
 use aptos_types::{
     access_path::{AccessPath, Path},
     account_address::AccountAddress,
-    account_config::NewBlockEvent,
-    account_state::AccountState,
-    account_view::AccountView,
+    account_config::{AccountResource, NewBlockEvent},
+    block_executor::config::BlockExecutorConfigFromOnchain,
     chain_id::ChainId,
     contract_event::EventWithVersion,
     event::EventKey,
@@ -48,6 +47,7 @@ use aptos_vm::data_cache::AsMoveResolver;
 use futures::{channel::oneshot, SinkExt};
 use move_core_types::{
     language_storage::{ModuleId, StructTag},
+    move_resource::MoveResource,
     resolver::ModuleResolver,
 };
 use std::{
@@ -99,7 +99,8 @@ impl Context {
             })),
             gas_limit_cache: Arc::new(RwLock::new(GasLimitCache {
                 last_updated_epoch: None,
-                block_gas_limit: None,
+                block_executor_onchain_config: OnChainExecutionConfig::default_if_missing()
+                    .block_executor_onchain_config(),
             })),
         }
     }
@@ -292,6 +293,52 @@ impl Context {
             .map_err(|e| E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info))
     }
 
+    pub fn get_resource<T: MoveResource>(
+        &self,
+        address: AccountAddress,
+        version: Version,
+    ) -> Result<Option<T>> {
+        let access_path = AccessPath::resource_access_path(address, T::struct_tag())?;
+        let bytes_opt = self.get_state_value(&StateKey::access_path(access_path), version)?;
+        bytes_opt
+            .map(|bytes| bcs::from_bytes(&bytes))
+            .transpose()
+            .map_err(|err| anyhow!(format!("Failed to deserialize resource: {}", err)))
+    }
+
+    pub fn get_resource_poem<T: MoveResource, E: InternalError>(
+        &self,
+        address: AccountAddress,
+        version: Version,
+        latest_ledger_info: &LedgerInfo,
+    ) -> Result<Option<T>, E> {
+        self.get_resource(address, version)
+            .context("Failed to read account resource.")
+            .map_err(|err| {
+                E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
+            })
+    }
+
+    pub fn expect_resource_poem<T: MoveResource, E: InternalError + NotFoundError>(
+        &self,
+        address: AccountAddress,
+        version: Version,
+        latest_ledger_info: &LedgerInfo,
+    ) -> Result<T, E> {
+        self.get_resource_poem(address, version, latest_ledger_info)?
+            .ok_or_else(|| {
+                E::not_found_with_code(
+                    format!(
+                        "{} not found under address {}",
+                        T::struct_identifier(),
+                        address,
+                    ),
+                    AptosErrorCode::ResourceNotFound,
+                    latest_ledger_info,
+                )
+            })
+    }
+
     pub fn get_state_values(
         &self,
         address: AccountAddress,
@@ -451,26 +498,6 @@ impl Context {
             ))
         });
         Ok((kvs, next_key))
-    }
-
-    // This function should be deprecated. DO NOT USE it.
-    // Instead, call either `get_modules_by_pagination` or `get_modules_by_pagination`.
-    pub fn get_account_state<E: InternalError>(
-        &self,
-        address: AccountAddress,
-        version: u64,
-        latest_ledger_info: &LedgerInfo,
-    ) -> Result<Option<AccountState>, E> {
-        AccountState::from_access_paths_and_values(
-            address,
-            &self.get_state_values(address, version).map_err(|err| {
-                E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
-            })?,
-        )
-        .context("Failed to read account state at requested version")
-        .map_err(|err| {
-            E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
-        })
     }
 
     pub fn get_block_timestamp<E: InternalError>(
@@ -707,35 +734,13 @@ impl Context {
         let start_seq_number = if let Some(start_seq_number) = start_seq_number {
             start_seq_number
         } else {
-            // Get the current account state, and get the sequence number to get the limit most
-            // recent transactions
-            let account_state = self
-                .get_account_state(address, ledger_info.version(), ledger_info)?
-                .ok_or_else(|| {
-                    E::not_found_with_code(
-                        "Account not found",
-                        AptosErrorCode::AccountNotFound,
-                        ledger_info,
-                    )
-                })?;
-            let resource = account_state
-                .get_account_resource()
-                .map_err(|err| {
-                    E::internal_with_code(
-                        format!("Failed to get account resource {}", err),
-                        AptosErrorCode::InternalError,
-                        ledger_info,
-                    )
-                })?
-                .ok_or_else(|| {
-                    E::not_found_with_code(
-                        "Account not found",
-                        AptosErrorCode::AccountNotFound,
-                        ledger_info,
-                    )
-                })?;
-
-            resource.sequence_number().saturating_sub(limit as u64)
+            self.expect_resource_poem::<AccountResource, E>(
+                address,
+                ledger_info.version(),
+                ledger_info,
+            )?
+            .sequence_number()
+            .saturating_sub(limit as u64)
         };
 
         let txns = self
@@ -932,7 +937,7 @@ impl Context {
     ) -> Result<GasEstimation, E> {
         let config = &self.node_config.api.gas_estimation;
         let min_gas_unit_price = self.min_gas_unit_price(ledger_info)?;
-        let block_gas_limit = self.block_gas_limit(ledger_info)?;
+        let block_config = self.block_executor_onchain_config(ledger_info)?;
         if !config.enabled {
             return Ok(self.default_gas_estimation(min_gas_unit_price));
         }
@@ -1021,7 +1026,9 @@ impl Context {
                 Ok(prices_and_used) => {
                     let is_full_block = if prices_and_used.len() >= config.full_block_txns {
                         true
-                    } else if let Some(full_block_gas_used) = block_gas_limit {
+                    } else if let Some(full_block_gas_used) =
+                        block_config.block_gas_limit_type.block_gas_limit()
+                    {
                         prices_and_used.iter().map(|(_, used)| *used).sum::<u64>()
                             >= full_block_gas_used
                     } else {
@@ -1204,16 +1211,16 @@ impl Context {
         }
     }
 
-    pub fn block_gas_limit<E: InternalError>(
+    pub fn block_executor_onchain_config<E: InternalError>(
         &self,
         ledger_info: &LedgerInfo,
-    ) -> Result<Option<u64>, E> {
+    ) -> Result<BlockExecutorConfigFromOnchain, E> {
         // If it's the same epoch, use the cached results
         {
             let cache = self.gas_limit_cache.read().unwrap();
             if let Some(ref last_updated_epoch) = cache.last_updated_epoch {
                 if *last_updated_epoch == ledger_info.epoch.0 {
-                    return Ok(cache.block_gas_limit);
+                    return Ok(cache.block_executor_onchain_config.clone());
                 }
             }
         }
@@ -1224,7 +1231,7 @@ impl Context {
             // If a different thread updated the cache, we can exit early
             if let Some(ref last_updated_epoch) = cache.last_updated_epoch {
                 if *last_updated_epoch == ledger_info.epoch.0 {
-                    return Ok(cache.block_gas_limit);
+                    return Ok(cache.block_executor_onchain_config.clone());
                 }
             }
 
@@ -1237,13 +1244,14 @@ impl Context {
                 })?;
             let resolver = state_view.as_move_resolver();
 
-            let block_gas_limit = OnChainExecutionConfig::fetch_config(&resolver)
-                .and_then(|config| config.block_gas_limit());
+            let block_executor_onchain_config = OnChainExecutionConfig::fetch_config(&resolver)
+                .unwrap_or_else(OnChainExecutionConfig::default_if_missing)
+                .block_executor_onchain_config();
 
             // Update the cache
-            cache.block_gas_limit = block_gas_limit;
+            cache.block_executor_onchain_config = block_executor_onchain_config.clone();
             cache.last_updated_epoch = Some(ledger_info.epoch.0);
-            Ok(block_gas_limit)
+            Ok(block_executor_onchain_config)
         }
     }
 
@@ -1295,7 +1303,7 @@ pub struct GasEstimationCache {
 
 pub struct GasLimitCache {
     last_updated_epoch: Option<u64>,
-    block_gas_limit: Option<u64>,
+    block_executor_onchain_config: BlockExecutorConfigFromOnchain,
 }
 
 /// This function just calls tokio::task::spawn_blocking with the given closure and in

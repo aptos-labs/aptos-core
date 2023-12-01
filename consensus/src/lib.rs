@@ -36,13 +36,15 @@ pub mod quorum_store;
 mod recovery_manager;
 mod round_manager;
 mod state_computer;
+#[cfg(test)]
+mod state_computer_tests;
 mod state_replication;
 #[cfg(any(test, feature = "fuzzing"))]
 mod test_utils;
 #[cfg(test)]
 mod twins;
 mod txn_notifier;
-mod util;
+pub mod util;
 
 /// AptosBFT implementation
 pub mod consensus_provider;

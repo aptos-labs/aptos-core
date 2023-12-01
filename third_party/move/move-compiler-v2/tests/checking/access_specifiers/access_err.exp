@@ -18,12 +18,6 @@ error: invalid access specifier: a wildcard cannot be followed by a non-wildcard
 12 │     fun f3() acquires 0x42::*::S {
    │                       ^^^^^^^^^^^
 
-error: type argument count mismatch (expected 1 but got 0)
-   ┌─ tests/checking/access_specifiers/access_err.move:15:23
-   │
-15 │     fun f4() acquires G {
-   │                       ^^
-
 error: undeclared `m::y`
    ┌─ tests/checking/access_specifiers/access_err.move:18:35
    │

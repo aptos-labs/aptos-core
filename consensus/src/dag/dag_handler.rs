@@ -5,12 +5,16 @@ use crate::{
         dag_driver::DagDriver,
         dag_fetcher::{FetchRequestHandler, FetchWaiter},
         dag_network::RpcHandler,
-        dag_state_sync::{StateSyncStatus, StateSyncTrigger},
-        errors::{DAGError, DAGRpcError, DagDriverError, NodeBroadcastHandleError},
+        dag_state_sync::{StateSyncTrigger, SyncOutcome},
+        errors::{
+            DAGError, DAGRpcError, DagDriverError, FetchRequestHandleError,
+            NodeBroadcastHandleError,
+        },
         rb_handler::NodeBroadcastHandler,
         types::{DAGMessage, DAGRpcResult},
         CertifiedNode, Node,
     },
+    monitor,
     network::{IncomingDAGRequest, TConsensusMsg},
 };
 use aptos_channels::aptos_channel;
@@ -60,13 +64,15 @@ impl NetworkHandler {
     pub async fn run(
         mut self,
         dag_rpc_rx: &mut aptos_channel::Receiver<Author, IncomingDAGRequest>,
-    ) -> StateSyncStatus {
+        _buffer: Vec<DAGMessage>,
+    ) -> SyncOutcome {
+        // TODO: process buffer
         loop {
             select! {
                 msg = dag_rpc_rx.select_next_some() => {
                     match self.process_rpc(msg).await {
                         Ok(sync_status) => {
-                            if matches!(sync_status, StateSyncStatus::NeedsSync(_) | StateSyncStatus::EpochEnds) {
+                            if matches!(sync_status, SyncOutcome::NeedsSync(_) | SyncOutcome::EpochEnds) {
                                 return sync_status;
                             }
                         },
@@ -105,7 +111,7 @@ impl NetworkHandler {
     async fn process_rpc(
         &mut self,
         rpc_request: IncomingDAGRequest,
-    ) -> anyhow::Result<StateSyncStatus> {
+    ) -> anyhow::Result<SyncOutcome> {
         let dag_message: DAGMessage = rpc_request.req.try_into()?;
         let epoch = dag_message.epoch();
 
@@ -116,7 +122,10 @@ impl NetworkHandler {
         );
 
         let response: Result<DAGMessage, DAGError> = {
-            match dag_message.verify(rpc_request.sender, &self.epoch_state.verifier) {
+            match monitor!(
+                "dag_message_verify",
+                dag_message.verify(rpc_request.sender, &self.epoch_state.verifier)
+            ) {
                 Ok(_) => match dag_message {
                     DAGMessage::NodeMsg(node) => self
                         .node_receiver
@@ -131,7 +140,7 @@ impl NetworkHandler {
                         }),
                     DAGMessage::CertifiedNodeMsg(certified_node_msg) => {
                         match self.state_sync_trigger.check(certified_node_msg).await? {
-                            StateSyncStatus::Synced(Some(certified_node_msg)) => self
+                            SyncOutcome::Synced(Some(certified_node_msg)) => self
                                 .dag_driver
                                 .process(certified_node_msg.certified_node())
                                 .await
@@ -142,8 +151,9 @@ impl NetworkHandler {
                                             DAGError::DagDriverError(err)
                                         })
                                 }),
-                            status @ (StateSyncStatus::NeedsSync(_)
-                            | StateSyncStatus::EpochEnds) => return Ok(status),
+                            status @ (SyncOutcome::NeedsSync(_) | SyncOutcome::EpochEnds) => {
+                                return Ok(status)
+                            },
                             _ => unreachable!(),
                         }
                     },
@@ -153,8 +163,8 @@ impl NetworkHandler {
                         .await
                         .map(|r| r.into())
                         .map_err(|err| {
-                            err.downcast::<DagDriverError>()
-                                .map_or(DAGError::Unknown, DAGError::DagDriverError)
+                            err.downcast::<FetchRequestHandleError>()
+                                .map_or(DAGError::Unknown, DAGError::FetchRequestHandleError)
                         }),
                     _ => unreachable!("verification must catch this error"),
                 },
@@ -183,6 +193,6 @@ impl NetworkHandler {
             .send(rpc_response)
             .map_err(|_| anyhow::anyhow!("unable to respond to rpc"))?;
 
-        Ok(StateSyncStatus::Synced(None))
+        Ok(SyncOutcome::Synced(None))
     }
 }

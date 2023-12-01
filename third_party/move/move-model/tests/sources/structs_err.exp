@@ -2,7 +2,7 @@ error: field `xx` not declared in struct `M::S`
    ┌─ tests/sources/structs_err.move:26:7
    │
 26 │       s.xx
-   │       ^^^^
+   │       ^
 
 error: expected `bool` but found `u64`
    ┌─ tests/sources/structs_err.move:31:7

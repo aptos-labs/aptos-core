@@ -11,15 +11,15 @@ use aptos_crypto::{
 };
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
 use aptos_types::{
-    block_executor::partitioner::ExecutableBlock,
+    block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     proof::{AccumulatorExtensionProof, SparseMerkleProofExt},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        Transaction, TransactionInfo, TransactionListWithProof, TransactionOutputListWithProof,
-        TransactionStatus, Version,
+        ExecutionStatus, Transaction, TransactionInfo, TransactionListWithProof,
+        TransactionOutputListWithProof, TransactionStatus, Version,
     },
     write_set::WriteSet,
 };
@@ -41,7 +41,6 @@ use std::{
 mod error;
 mod executed_chunk;
 pub mod execution_output;
-pub mod in_memory_state_calculator;
 mod ledger_update_output;
 pub mod parsed_transaction_output;
 pub mod state_checkpoint_output;
@@ -139,11 +138,11 @@ pub trait BlockExecutorTrait: Send + Sync {
         &self,
         block: ExecutableBlock,
         parent_block_id: HashValue,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<StateComputeResult> {
         let block_id = block.block_id;
         let state_checkpoint_output =
-            self.execute_and_state_checkpoint(block, parent_block_id, maybe_block_gas_limit)?;
+            self.execute_and_state_checkpoint(block, parent_block_id, onchain_config)?;
         self.ledger_update(block_id, parent_block_id, state_checkpoint_output)
     }
 
@@ -152,7 +151,7 @@ pub trait BlockExecutorTrait: Send + Sync {
         &self,
         block: ExecutableBlock,
         parent_block_id: HashValue,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<StateCheckpointOutput>;
 
     fn ledger_update(
@@ -294,7 +293,7 @@ pub struct ChunkCommitNotification {
 /// of success / failure of the transactions.
 /// Note that the specific details of compute_status are opaque to StateMachineReplication,
 /// which is going to simply pass the results between StateComputer and PayloadClient.
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct StateComputeResult {
     /// transaction accumulator root hash is identified as `state_id` in Consensus.
     root_hash: HashValue,
@@ -367,12 +366,33 @@ impl StateComputeResult {
         }
     }
 
+    pub fn new_dummy_with_num_txns(num_txns: usize) -> Self {
+        Self {
+            root_hash: HashValue::zero(),
+            frozen_subtree_roots: vec![],
+            num_leaves: 0,
+            parent_frozen_subtree_roots: vec![],
+            parent_num_leaves: 0,
+            epoch_state: None,
+            compute_status: vec![TransactionStatus::Keep(ExecutionStatus::Success); num_txns],
+            transaction_info_hashes: vec![],
+            reconfig_events: vec![],
+        }
+    }
+
     /// generate a new dummy state compute result with ACCUMULATOR_PLACEHOLDER_HASH as the root hash.
     /// this function is used in ordering_state_computer as a dummy state compute result,
     /// where the real compute result is generated after ordering_state_computer.commit pushes
     /// the blocks and the finality proof to the execution phase.
     pub fn new_dummy() -> Self {
         StateComputeResult::new_dummy_with_root_hash(*ACCUMULATOR_PLACEHOLDER_HASH)
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn new_dummy_with_compute_status(compute_status: Vec<TransactionStatus>) -> Self {
+        let mut ret = Self::new_dummy();
+        ret.compute_status = compute_status;
+        ret
     }
 }
 

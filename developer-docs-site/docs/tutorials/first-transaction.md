@@ -32,7 +32,7 @@ git clone https://github.com/aptos-labs/aptos-core.git
 
   Navigate to the Typescript SDK examples directory:
   ```bash
-  cd ~/aptos-core/ecosystem/typescript/sdk/examples/typescript
+  cd aptos-core/ecosystem/typescript/sdk/examples/typescript
   ```
 
   Install the necessary dependencies:
@@ -50,7 +50,7 @@ git clone https://github.com/aptos-labs/aptos-core.git
 
   Navigate to the Python SDK directory:
   ```bash
-  cd ~/aptos-core/ecosystem/python/sdk
+  cd aptos-core/ecosystem/python/sdk
   ```
 
   Install the necessary dependencies:
@@ -61,14 +61,14 @@ git clone https://github.com/aptos-labs/aptos-core.git
 
   Run the [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/transfer_coin.py) example:
   ```bash
-  poetry run python -m examples.transfer-coin
+  poetry run python -m examples.transfer_coin
   ```
   </TabItem>
   <TabItem value="rust" label="Rust">
 
   Navigate to the Rust SDK directory:
   ```bash
-  cd ~/aptos-core/sdk
+  cd aptos-core/sdk
   ```
 
   Run the [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/sdk/examples/transfer-coin.rs) example:
@@ -131,7 +131,7 @@ See the TypeScript [`transfer-coin`](https://github.com/aptos-labs/aptos-core/bl
   <TabItem value="python" label="Python">
 
 :::tip See the full code
-See the Python [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/transfer_coin.py) for the complete code as you follow the below steps.
+See the Python [`transfer_coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/transfer_coin.py) for the complete code as you follow the below steps.
 :::
   </TabItem>
   <TabItem value="rust" label="Rust">

@@ -33,11 +33,15 @@ use aptos_types::{
         new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource, NewBlockEvent,
         CORE_CODE_ADDRESS,
     },
+    block_executor::config::{
+        BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
+    },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
     on_chain_config::{
-        Features, OnChainConfig, TimedFeatureOverride, TimedFeaturesBuilder, ValidatorSet, Version,
+        BlockGasLimitType, Features, OnChainConfig, TimedFeatureOverride, TimedFeaturesBuilder,
+        ValidatorSet, Version,
     },
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
@@ -81,6 +85,8 @@ static RNG_SEED: [u8; 32] = [9u8; 32];
 
 const ENV_TRACE_DIR: &str = "TRACE";
 
+// Enables running parallel, in addition to sequential, in a
+// BothComparison mode.
 const ENV_ENABLE_PARALLEL: &str = "E2E_PARALLEL_EXEC";
 
 /// Directory structure of the trace dir
@@ -463,13 +469,18 @@ impl FakeExecutor {
     pub fn execute_transaction_block_parallel(
         &self,
         txn_block: &[SignatureVerifiedTransaction],
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
             self.executor_thread_pool.clone(),
             txn_block,
             &self.data_store,
-            usize::min(4, num_cpus::get()),
-            None,
+            BlockExecutorConfig {
+                local: BlockExecutorLocalConfig {
+                    concurrency_level: usize::min(4, num_cpus::get()),
+                },
+                onchain: onchain_config,
+            },
             None,
         )
     }
@@ -501,18 +512,23 @@ impl FakeExecutor {
             }
         });
 
+        let onchain_config = BlockExecutorConfigFromOnchain {
+            // TODO fetch values from state?
+            block_gas_limit_type: BlockGasLimitType::Limit(30000),
+        };
+
         let sequential_output = if mode != ExecutorMode::ParallelOnly {
             Some(AptosVM::execute_block(
                 &sig_verified_block,
                 &self.data_store,
-                None,
+                onchain_config.clone(),
             ))
         } else {
             None
         };
 
         let parallel_output = if mode != ExecutorMode::SequentialOnly {
-            Some(self.execute_transaction_block_parallel(&sig_verified_block))
+            Some(self.execute_transaction_block_parallel(&sig_verified_block, onchain_config))
         } else {
             None
         };
@@ -592,9 +608,9 @@ impl FakeExecutor {
         let log_context = AdapterLogSchema::new(self.data_store.id(), 0);
 
         // TODO(Gas): revisit this.
-        let vm = AptosVM::new_from_state_view(&self.data_store);
-
         let resolver = self.data_store.as_move_resolver();
+        let vm = AptosVM::new(&resolver);
+
         let (_status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(
             &resolver,
             &txn,
@@ -664,7 +680,7 @@ impl FakeExecutor {
 
     /// Verifies the given transaction by running it through the VM verifier.
     pub fn verify_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
-        let vm = AptosVM::new_from_state_view(self.get_state_view());
+        let vm = AptosVM::new(&self.get_state_view().as_move_resolver());
         vm.validate_transaction(txn, &self.data_store)
     }
 
@@ -890,10 +906,9 @@ impl FakeExecutor {
                 }
             }
             let change_set = session
-                .finish(
-                    &mut (),
-                    &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-                )
+                .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
+                    LATEST_GAS_FEATURE_VERSION,
+                ))
                 .expect("Failed to generate txn effects");
             change_set
                 .try_into_storage_change_set()
@@ -954,10 +969,9 @@ impl FakeExecutor {
                     )
                 });
             let change_set = session
-                .finish(
-                    &mut (),
-                    &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-                )
+                .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
+                    LATEST_GAS_FEATURE_VERSION,
+                ))
                 .expect("Failed to generate txn effects");
             change_set
                 .try_into_storage_change_set()
@@ -1011,10 +1025,9 @@ impl FakeExecutor {
             .map_err(|e| e.into_vm_status())?;
 
         let change_set = session
-            .finish(
-                &mut (),
-                &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-            )
+            .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
+                LATEST_GAS_FEATURE_VERSION,
+            ))
             .expect("Failed to generate txn effects");
         // TODO: Support deltas in fake executor.
         let (write_set, events) = change_set

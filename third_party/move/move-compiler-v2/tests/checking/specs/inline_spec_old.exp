@@ -1,0 +1,13 @@
+// ---- Model Dump
+module 0x42::m {
+    public fun foo(vec: &mut vector<bool>) {
+        spec {
+          assert forall k: num: Range(0, Len<bool>($t0)): Eq<bool>(Index($t0, k), Index(Old<vector<bool>>($t0), k));
+        }
+        ;
+        Tuple()
+    }
+    spec fun $foo(vec: vector<bool>) {
+        Tuple()
+    }
+} // end 0x42::m

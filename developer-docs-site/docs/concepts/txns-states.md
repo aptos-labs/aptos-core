@@ -8,13 +8,14 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Transactions and States
 
-The two fundamental concepts at the heart of the Aptos blockchain are transactions and states:
+The Aptos blockchain stores three types of data:
 
-* **Transactions**: Transactions represent the exchange of data (e.g., Aptos Coins or NFTs) between accounts on the Aptos blockchain.
-* **States**: The state, i.e., the Aptos blockchain ledger state, represents the state of all the accounts in the Aptos blockchain. 
+* **Transactions**: Transactions represent an intended operation being performed by an account on the blockchain (e.g., transferring assets).
+* **States**: The (blockchain ledger) state represents the accumulation of the output of execution of transactions, the values stored within all [resources](./resources).
+* [**Events**](./events.md): Ancillary data published by the execution of a transaction.
 
 :::tip
-Only executing transactions can change the ledger state.
+Only transactions can change the ledger state.
 :::
 
 ## Transactions
@@ -44,33 +45,28 @@ See [Aptos Blockchain Deep Dive](./blockchain.md) for a comprehensive descriptio
 
 ### Contents of a Transaction
 
-A [signed transaction](../integration/sign-a-transaction.md) on the blockchain contains the following information:
+A signed transaction on the blockchain contains the following information:
 
 - **Signature**: The sender uses a digital signature to verify that they signed the transaction (i.e., authentication).
 - **Sender address**: The sender's [account address](./accounts.md#account-address).
 - **Sender public key**: The public authentication key that corresponds to the private authentication key used to sign the transaction.
-- **Program**: The program comprises:
-  - A Move module and function name or a move bytecode transaction script.
-  - An optional list of inputs to the script. For a peer-to-peer transaction, these inputs contain the recipient's information and the amount transferred to them.
-  - An optional list of Move bytecode modules to publish.
+- **Payload**: Indicates an action or set of actions Alice's behalf. In the case this is a Move function, it directly calls into Move bytecode on the chain. Alternatively, it may be Move bytecode peer-to-peer [transaction script](../reference/glossary.md#transaction-script). It also contains a list of inputs to the function or script. For this example, it is a function call to transfer an amount of Aptos Coins from Alice account to Bob's account, where Alice's account is implied by sending the transaction and Bob's account and the amount are specified as transaction inputs.
+- [**Gas unit price**](../reference/glossary.md#gas-unit-price): The amount the sender is willing to pay per unit of gas, to execute the transaction. This is represented as Octa or units of 10<sup>-8</sup> utility tokens.
+- [**Maximum gas amount**](../reference/glossary.md#maximum-gas-amount): The maximum gas amount in Aptos utility tokens the sender is willing to pay for this transaction. Gas charges are equal to the base gas cost covered by computation and IO multiplied by the gas price. Gas costs also include storage with an Apt-fixed priced storage model. This is represents as Octa or units of 10<sup>-8</sup> Aptos utility tokens.
 - **Gas price** (in specified gas units): This is the amount the sender is willing to pay per unit of [gas](./gas-txn-fee.md) to execute the transaction. [Gas](./gas-txn-fee.md) is a way to pay for computation and storage. A gas unit is an abstract measurement of computation with no inherent real-world value.
 - **Maximum gas amount**: The [maximum gas amount](./gas-txn-fee.md#gas-and-transaction-fee-on-the-aptos-blockchain) is the maximum gas units the transaction is allowed to consume.
 - **Sequence number**: This is an unsigned integer that must be equal to the sender's account [sequence number](./accounts.md#account-sequence-number) at the time of execution.
 - **Expiration time**: A timestamp after which the transaction ceases to be valid (i.e., expires).
 
-### Types of transactions
-Within a given transaction, the target of execution can be one of two types:
+### Types of transaction payloads
+Within a given transaction, the two most common types of payloads include:
 
 - An entry point
-- A script (payload)
+- [A script (payload)](../move/move-on-aptos/move-scripts)
 
-Currently the SDKs [Python](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L249) and [Typescript](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/typescript/sdk/src/aptos_client.test.ts#L98) support the generation of transactions that target entry points only. This guide points out many of those entry points, such as `coin::transfer` and `aptos_account::create_account`.
+Currently the SDKs [Python](https://aptos.dev/sdks/python-sdk) and [Typescript](https://aptos.dev/sdks/ts-sdk/index) support both. This guide points out many of those entry points, such as `coin::transfer` and `aptos_account::create_account`.
 
 All operations on the Aptos blockchain should be available via entry point calls. While one could submit multiple transactions calling entry points in series, many such operations may benefit from being called atomically from a single transaction. A script payload transaction can call any entry point or public function defined within any module.
-
-:::tip Move book
-Currently there are no tutorials in this guide on script payloads, but the [Move book](../move/book/modules-and-scripts.md) does go in some depth.
-:::
 
 :::tip Read more
 See the tutorial on [Your First Transaction](../tutorials/first-transaction.md) for generating valid transactions.

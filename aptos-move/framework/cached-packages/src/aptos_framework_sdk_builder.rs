@@ -328,6 +328,11 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    /// Allows an owner to update the commission percentage for the operator of the underlying stake pool.
+    DelegationPoolUpdateCommissionPercentage {
+        new_commission_percentage: u64,
+    },
+
     /// Vote on a proposal with a voter's voting power. To successfully vote, the following conditions must be met:
     /// 1. The voting period of the proposal hasn't ended.
     /// 2. The delegation pool's lockup period ends after the voting period of the proposal.
@@ -1074,6 +1079,9 @@ impl EntryFunctionCall {
                 pool_address,
                 amount,
             } => delegation_pool_unlock(pool_address, amount),
+            DelegationPoolUpdateCommissionPercentage {
+                new_commission_percentage,
+            } => delegation_pool_update_commission_percentage(new_commission_percentage),
             DelegationPoolVote {
                 pool_address,
                 proposal_id,
@@ -2246,6 +2254,24 @@ pub fn delegation_pool_unlock(pool_address: AccountAddress, amount: u64) -> Tran
             bcs::to_bytes(&pool_address).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
         ],
+    ))
+}
+
+/// Allows an owner to update the commission percentage for the operator of the underlying stake pool.
+pub fn delegation_pool_update_commission_percentage(
+    new_commission_percentage: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("update_commission_percentage").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&new_commission_percentage).unwrap()],
     ))
 }
 
@@ -4458,6 +4484,20 @@ mod decoder {
         }
     }
 
+    pub fn delegation_pool_update_commission_percentage(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::DelegationPoolUpdateCommissionPercentage {
+                    new_commission_percentage: bcs::from_bytes(script.args().get(0)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn delegation_pool_vote(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolVote {
@@ -5638,6 +5678,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "delegation_pool_unlock".to_string(),
             Box::new(decoder::delegation_pool_unlock),
+        );
+        map.insert(
+            "delegation_pool_update_commission_percentage".to_string(),
+            Box::new(decoder::delegation_pool_update_commission_percentage),
         );
         map.insert(
             "delegation_pool_vote".to_string(),

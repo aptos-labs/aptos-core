@@ -32,7 +32,11 @@ impl BatchReader for MockBatchReader {
     }
 
     fn get_batch(&self, _proof: ProofOfStore) -> Receiver<ExecutorResult<Vec<SignedTransaction>>> {
-        unimplemented!();
+        unimplemented!()
+    }
+
+    fn update_certified_timestamp(&self, _certified_time: u64) {
+        unimplemented!()
     }
 }
 
@@ -48,6 +52,7 @@ async fn test_proof_coordinator_basic() {
             peer: signers[0].author(),
         }),
         tx,
+        true,
     );
     let (proof_coordinator_tx, proof_coordinator_rx) = channel(100);
     let (tx, mut rx) = channel(100);

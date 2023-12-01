@@ -38,7 +38,10 @@ use claims::assert_matches;
 use futures::StreamExt;
 use mockall::predicate::always;
 use std::{sync::Arc, time::Duration};
-use tokio::task::JoinHandle;
+use tokio::{task::JoinHandle, time::timeout};
+
+// Useful test constants
+const TEST_TIMEOUT_SECS: u64 = 30;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_apply_transaction_outputs() {
@@ -83,7 +86,7 @@ async fn test_apply_transaction_outputs() {
     // Subscribe to the expected event
     let mut event_listener = event_subscription_service
         .lock()
-        .subscribe_to_events(vec![*event_to_commit.v1().unwrap().key()])
+        .subscribe_to_events(vec![*event_to_commit.v1().unwrap().key()], vec![])
         .unwrap();
 
     // Attempt to apply a chunk of outputs
@@ -387,7 +390,7 @@ async fn test_execute_transactions() {
     // Subscribe to the expected event
     let mut event_listener = event_subscription_service
         .lock()
-        .subscribe_to_events(vec![*event_to_commit.v1().unwrap().key()])
+        .subscribe_to_events(vec![*event_to_commit.v1().unwrap().key()], vec![])
         .unwrap();
 
     // Attempt to execute a chunk of transactions
@@ -832,8 +835,12 @@ async fn verify_snapshot_commit_notification(
     commit_listener: &mut CommitNotificationListener,
     expected_committed_transactions: CommittedTransactions,
 ) {
-    let CommitNotification::CommittedStateSnapshot(committed_snapshot) =
-        commit_listener.select_next_some().await;
+    let CommitNotification::CommittedStateSnapshot(committed_snapshot) = timeout(
+        Duration::from_secs(TEST_TIMEOUT_SECS),
+        commit_listener.select_next_some(),
+    )
+    .await
+    .unwrap();
     assert_eq!(
         committed_snapshot.committed_transaction,
         expected_committed_transactions
@@ -845,7 +852,12 @@ async fn verify_error_notification(
     error_listener: &mut ErrorNotificationListener,
     expected_notification_id: NotificationId,
 ) {
-    let error_notification = error_listener.select_next_some().await;
+    let error_notification = timeout(
+        Duration::from_secs(TEST_TIMEOUT_SECS),
+        error_listener.select_next_some(),
+    )
+    .await
+    .unwrap();
     assert_eq!(error_notification.notification_id, expected_notification_id);
     assert_matches!(error_notification.error, Error::UnexpectedError(_));
 }

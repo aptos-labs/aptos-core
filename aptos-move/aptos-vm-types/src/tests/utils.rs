@@ -52,23 +52,6 @@ pub(crate) fn raw_metadata(v: u64) -> StateValueMetadata {
     StateValueMetadata::new(v, &CurrentTimeMicroseconds { microseconds: v })
 }
 
-pub(crate) fn write_op_with_metadata(type_idx: u8, v: u128) -> WriteOp {
-    match type_idx {
-        0 => WriteOp::CreationWithMetadata {
-            data: as_bytes!(v).into(),
-            metadata: raw_metadata(v as u64),
-        },
-        1 => WriteOp::ModificationWithMetadata {
-            data: as_bytes!(v).into(),
-            metadata: raw_metadata(v as u64),
-        },
-        2 => WriteOp::DeletionWithMetadata {
-            metadata: raw_metadata(v as u64),
-        },
-        _ => unreachable!("Wrong type index for test"),
-    }
-}
-
 pub(crate) fn mock_create(k: impl ToString, v: u128) -> (StateKey, WriteOp) {
     (as_state_key!(k), WriteOp::Creation(as_bytes!(v).into()))
 }
@@ -157,6 +140,7 @@ pub(crate) fn build_change_set(
         BTreeMap::from_iter(aggregator_v1_delta_set),
         BTreeMap::from_iter(delayed_field_change_set),
         // TODO[agg_v2](fix) add to the caller.
+        BTreeMap::new(),
         BTreeMap::new(),
         vec![],
         &MockChangeSetChecker,

@@ -8,7 +8,7 @@ use crate::dag::{
     order_rule::OrderRule,
     tests::{
         dag_test::MockStorage,
-        helpers::{generate_dag_nodes, TEST_DAG_WINDOW},
+        helpers::{generate_dag_nodes, MockPayloadManager, TEST_DAG_WINDOW},
     },
     types::NodeMetadata,
     CertifiedNode,
@@ -95,7 +95,7 @@ fn create_order_rule(
     epoch_state: Arc<EpochState>,
     dag: Arc<RwLock<Dag>>,
 ) -> (OrderRule, UnboundedReceiver<Vec<Arc<CertifiedNode>>>) {
-    let anchor_election = Box::new(RoundRobinAnchorElection::new(
+    let anchor_election = Arc::new(RoundRobinAnchorElection::new(
         epoch_state.verifier.get_ordered_account_addresses(),
     ));
     let (tx, rx) = unbounded();
@@ -134,7 +134,7 @@ proptest! {
             epoch: 1,
             verifier: validator_verifier,
         });
-        let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), 0, TEST_DAG_WINDOW);
+        let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), Arc::new(MockPayloadManager{}), 0, TEST_DAG_WINDOW);
         for round_nodes in &nodes {
             for node in round_nodes.iter().flatten() {
                 dag.add_node(node.clone()).unwrap();
@@ -224,6 +224,7 @@ fn test_order_rule_basic() {
     let mut dag = Dag::new(
         epoch_state.clone(),
         Arc::new(MockStorage::new()),
+        Arc::new(MockPayloadManager {}),
         0,
         TEST_DAG_WINDOW,
     );

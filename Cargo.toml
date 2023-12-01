@@ -49,6 +49,7 @@ members = [
     "crates/aptos",
     "crates/aptos-admin-service",
     "crates/aptos-api-tester",
+    "crates/aptos-bcs-utils",
     "crates/aptos-bitvec",
     "crates/aptos-build-info",
     "crates/aptos-compression",
@@ -276,6 +277,7 @@ aptos-api-test-context = { path = "api/test-context" }
 aptos-api-types = { path = "api/types" }
 aptos-backup-cli = { path = "storage/backup/backup-cli" }
 aptos-backup-service = { path = "storage/backup/backup-service" }
+aptos-bcs-utils = { path = "crates/aptos-bcs-utils" }
 aptos-bounded-executor = { path = "crates/bounded-executor" }
 aptos-block-executor = { path = "aptos-move/block-executor" }
 aptos-bitvec = { path = "crates/aptos-bitvec" }
@@ -499,8 +501,8 @@ event-listener = "2.5.3"
 fail = "0.5.0"
 field_count = "0.1.1"
 flate2 = "1.0.24"
-futures = "= 0.3.24" # Previously futures v0.3.23 caused some consensus network_tests to fail. We now pin the dependency to v0.3.24.
-futures-channel = "= 0.3.24"
+futures = "0.3.24"
+futures-channel = "0.3.24"
 futures-core = "0.3.25"
 futures-util = "0.3.21"
 gcp-bigquery-client = "0.13.0"
@@ -567,7 +569,7 @@ paste = "1.0.7"
 pbjson = "0.5.1"
 percent-encoding = "2.1.0"
 pin-project = "1.0.10"
-poem = { version = "=1.3.55", features = ["anyhow", "rustls"] }
+poem = { version = "=1.3.59", features = ["anyhow", "rustls"] }
 poem-openapi = { version = "=2.0.11", features = ["swagger-ui", "url"] }
 poem-openapi-derive = "=2.0.11"
 pprof = { version = "0.11", features = ["flamegraph", "protobuf-codec"] }
@@ -608,6 +610,7 @@ rusty-fork = "0.3.0"
 scopeguard = "1.2.0"
 sha-1 = "0.10.0"
 sha2 = "0.9.3"
+sha256 = "1.4.0"
 sha2_0_10_6 = { package = "sha2", version = "0.10.6" }
 sha3 = "0.9.1"
 siphasher = "0.3.10"

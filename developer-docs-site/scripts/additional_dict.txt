@@ -30,6 +30,7 @@ AptosRelease
 AptosToken
 AptosWalletAdapterProvider
 BCS
+BetaNotice
 BFT
 BIP
 BLS
@@ -48,6 +49,7 @@ CDN
 Choco
 CLI
 CMake
+CoinFlipEvents
 CPU
 CPUs
 ChainID
@@ -126,6 +128,8 @@ EntryFunctionPayload
 Enums
 EpochChangeProof
 Ethereum
+EventHandle
+EventHandles
 ExtendRef
 ExternalMarkdown
 FA
@@ -241,6 +245,7 @@ Poelstra
 Pontem
 Postcondition
 Postgres
+postgresql
 PowerShell
 PropertyMap
 Prover
@@ -342,7 +347,6 @@ ZKRP
 Zxing
 accessors
 accountHasList
-acount
 addr
 ait
 allowfullscreen
@@ -386,6 +390,7 @@ cli
 clippy
 cn
 codebase
+composability
 composable
 config
 configs
@@ -397,6 +402,7 @@ cryptographically
 cryptosystem
 cryptosystems
 crytographic
+customizability
 customizable
 dApp
 dApps
@@ -474,6 +480,7 @@ illiquid
 img
 incrementing
 init
+inlining
 instantiation
 integrations
 integrators
@@ -661,3 +668,9 @@ yaml
 yamls
 zkSNARK
 zksnark
+observability
+Profiler
+profiler
+html
+Flamegraphs
+flamegraphs

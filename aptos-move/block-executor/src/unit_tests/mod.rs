@@ -23,7 +23,8 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    contract_event::ReadWriteEvent,
+    block_executor::config::BlockExecutorConfig,
+    contract_event::TransactionEvent,
     executable::{ExecutableTestType, ModulePath},
 };
 use claims::assert_matches;
@@ -36,7 +37,7 @@ use std::{
 fn run_and_assert<K, E>(transactions: Vec<MockTransaction<K, E>>)
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
-    E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
+    E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
     let data_view = DeltaDataView::<K> {
         phantom: PhantomData,
@@ -55,7 +56,11 @@ where
         DeltaDataView<K>,
         NoOpTransactionCommitHook<MockOutput<K, E>, usize>,
         ExecutableTestType,
-    >::new(num_cpus::get(), executor_thread_pool, None, None)
+    >::new(
+        BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+        executor_thread_pool,
+        None,
+    )
     .execute_transactions_parallel((), &transactions, &data_view);
 
     let baseline = BaselineOutput::generate(&transactions, None);

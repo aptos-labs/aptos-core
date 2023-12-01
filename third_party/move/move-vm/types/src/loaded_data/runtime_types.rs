@@ -14,7 +14,8 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use smallbitvec::SmallBitVec;
-use std::{cmp::max, collections::BTreeMap, fmt::Debug, sync::Arc};
+use std::{cmp::max, collections::BTreeMap, fmt::Debug};
+use triomphe::Arc as TriompheArc;
 
 pub const TYPE_DEPTH_MAX: usize = 256;
 
@@ -113,12 +114,14 @@ impl DepthFormula {
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct StructType {
+    pub idx: StructNameIndex,
     pub fields: Vec<Type>,
     pub field_names: Vec<Identifier>,
     pub phantom_ty_args_mask: SmallBitVec,
     pub abilities: AbilitySet,
     pub type_parameters: Vec<StructTypeParameter>,
-    pub name: Arc<StructIdentifier>,
+    pub name: Identifier,
+    pub module: ModuleId,
 }
 
 impl StructType {
@@ -156,7 +159,7 @@ impl StructType {
 }
 
 #[derive(Debug, Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct CachedStructIndex(pub usize);
+pub struct StructNameIndex(pub usize);
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StructIdentifier {
@@ -172,14 +175,14 @@ pub enum Type {
     U128,
     Address,
     Signer,
-    Vector(Box<Type>),
+    Vector(TriompheArc<Type>),
     Struct {
-        name: Arc<StructIdentifier>,
+        idx: StructNameIndex,
         ability: AbilityInfo,
     },
     StructInstantiation {
-        name: Arc<StructIdentifier>,
-        ty_args: Arc<Vec<Type>>,
+        idx: StructNameIndex,
+        ty_args: TriompheArc<Vec<Type>>,
         ability: AbilityInfo,
     },
     Reference(Box<Type>),
@@ -253,17 +256,17 @@ impl Type {
             Type::U256 => Type::U256,
             Type::Address => Type::Address,
             Type::Signer => Type::Signer,
-            Type::Vector(ty) => Type::Vector(Box::new(ty.apply_subst(subst, depth + 1)?)),
+            Type::Vector(ty) => Type::Vector(TriompheArc::new(ty.apply_subst(subst, depth + 1)?)),
             Type::Reference(ty) => Type::Reference(Box::new(ty.apply_subst(subst, depth + 1)?)),
             Type::MutableReference(ty) => {
                 Type::MutableReference(Box::new(ty.apply_subst(subst, depth + 1)?))
             },
-            Type::Struct { name, ability } => Type::Struct {
-                name: name.clone(),
+            Type::Struct { idx, ability } => Type::Struct {
+                idx: *idx,
                 ability: ability.clone(),
             },
             Type::StructInstantiation {
-                name,
+                idx,
                 ty_args: instantiation,
                 ability,
             } => {
@@ -272,8 +275,8 @@ impl Type {
                     inst.push(ty.apply_subst(subst, depth + 1)?)
                 }
                 Type::StructInstantiation {
-                    name: name.clone(),
-                    ty_args: Arc::new(inst),
+                    idx: *idx,
+                    ty_args: TriompheArc::new(inst),
                     ability: ability.clone(),
                 }
             },
@@ -309,9 +312,8 @@ impl Type {
             TyParam(_) | Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer => {
                 Self::LEGACY_BASE_MEMORY_SIZE
             },
-            Vector(ty) | Reference(ty) | MutableReference(ty) => {
-                Self::LEGACY_BASE_MEMORY_SIZE + ty.size()
-            },
+            Reference(ty) | MutableReference(ty) => Self::LEGACY_BASE_MEMORY_SIZE + ty.size(),
+            Vector(ty) => Self::LEGACY_BASE_MEMORY_SIZE + ty.size(),
             Struct { .. } => Self::LEGACY_BASE_MEMORY_SIZE,
             StructInstantiation { ty_args: tys, .. } => tys
                 .iter()
@@ -332,7 +334,7 @@ impl Type {
             S::U128 => L::U128,
             S::U256 => L::U256,
             S::Address => L::Address,
-            S::Vector(inner) => L::Vector(Box::new(Self::from_const_signature(inner)?)),
+            S::Vector(inner) => L::Vector(TriompheArc::new(Self::from_const_signature(inner)?)),
             // Not yet supported
             S::Struct(_) | S::StructInstantiation(_, _) => {
                 return Err(

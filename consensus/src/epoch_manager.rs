@@ -81,6 +81,7 @@ use aptos_types::{
         LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
         OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
     },
+    system_txn::pool::SystemTransactionPoolClient,
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
@@ -121,6 +122,7 @@ pub enum LivenessStorageData {
 pub struct EpochManager<P: OnChainConfigProvider> {
     author: Author,
     config: ConsensusConfig,
+    #[allow(unused)]
     execution_config: ExecutionConfig,
     time_service: Arc<dyn TimeService>,
     self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
@@ -131,6 +133,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     commit_state_computer: Arc<dyn StateComputer>,
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
+    sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
     reconfig_events: ReconfigNotificationListener<P>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingCommitRequest>>,
@@ -173,6 +176,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         reconfig_events: ReconfigNotificationListener<P>,
         bounded_executor: BoundedExecutor,
         aptos_time_service: aptos_time_service::TimeService,
+        sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -194,6 +198,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             commit_state_computer,
             storage,
             safety_rules_manager,
+            sys_txn_pool_client,
             reconfig_events,
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
@@ -676,10 +681,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         epoch_state: &EpochState,
         network_sender: NetworkSender,
+        consensus_config: &OnChainConsensusConfig,
     ) -> (Arc<PayloadManager>, QuorumStoreClient, QuorumStoreBuilder) {
         // Start QuorumStore
         let (consensus_to_quorum_store_tx, consensus_to_quorum_store_rx) =
             mpsc::channel(self.config.intra_consensus_channel_buffer_size);
+
+        let quorum_store_config = if consensus_config.is_dag_enabled() {
+            self.dag_config.quorum_store.clone()
+        } else {
+            self.config.quorum_store.clone()
+        };
 
         let mut quorum_store_builder = if self.quorum_store_enabled {
             info!("Building QuorumStore");
@@ -687,7 +699,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.epoch(),
                 self.author,
                 epoch_state.verifier.len() as u64,
-                self.config.quorum_store.clone(),
+                quorum_store_config,
                 consensus_to_quorum_store_rx,
                 self.quorum_store_to_mempool_sender.clone(),
                 self.config.mempool_txn_pull_timeout_ms,
@@ -696,6 +708,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 epoch_state.verifier.clone(),
                 self.config.safety_rules.backend.clone(),
                 self.quorum_store_storage.clone(),
+                !consensus_config.is_dag_enabled(),
             ))
         } else {
             info!("Building DirectMempool");
@@ -726,14 +739,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) {
         let transaction_shuffler =
             create_transaction_shuffler(onchain_execution_config.transaction_shuffler_type());
-        let block_gas_limit = onchain_execution_config.block_gas_limit();
+        let block_executor_onchain_config =
+            onchain_execution_config.block_executor_onchain_config();
         let transaction_deduper =
             create_transaction_deduper(onchain_execution_config.transaction_deduper_type());
         self.commit_state_computer.new_epoch(
             epoch_state,
             payload_manager,
             transaction_shuffler,
-            block_gas_limit,
+            block_executor_onchain_config,
             transaction_deduper,
         );
     }
@@ -862,6 +876,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
+            self.sys_txn_pool_client.clone(),
+            onchain_consensus_config.should_propose_system_txns(),
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::LIFO,
@@ -934,6 +950,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
+
         if let Err(error) = &onchain_consensus_config {
             error!("Failed to read on-chain consensus config {}", error);
         }
@@ -982,7 +999,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.quorum_store_enabled = self.enable_quorum_store(consensus_config);
         let network_sender = self.create_network_sender(epoch_state);
         let (payload_manager, payload_client, quorum_store_builder) = self
-            .init_payload_provider(epoch_state, network_sender.clone())
+            .init_payload_provider(epoch_state, network_sender.clone(), consensus_config)
             .await;
 
         self.init_commit_state_computer(epoch_state, payload_manager.clone(), execution_config);
@@ -1074,6 +1091,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             payload_manager,
             payload_client,
             state_computer,
+            block_tx,
+            onchain_consensus_config.quorum_store_enabled(),
         );
 
         let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);
@@ -1081,7 +1100,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let (dag_shutdown_tx, dag_shutdown_rx) = oneshot::channel();
         self.dag_shutdown_tx = Some(dag_shutdown_tx);
 
-        tokio::spawn(bootstrapper.start(dag_rpc_rx, block_tx, dag_shutdown_rx));
+        tokio::spawn(bootstrapper.start(dag_rpc_rx, dag_shutdown_rx));
     }
 
     fn enable_quorum_store(&mut self, onchain_config: &OnChainConsensusConfig) -> bool {

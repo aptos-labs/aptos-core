@@ -32,7 +32,7 @@ use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use aptos_executor_types::in_memory_state_calculator::InMemoryStateCalculator;
+use aptos_executor::components::in_memory_state_calculator_v2::InMemoryStateCalculatorV2;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
@@ -545,12 +545,13 @@ impl StateStore {
                 .map(|(idx, _)| idx);
             latest_snapshot_state_view.prime_cache_by_write_set(&write_sets)?;
 
-            let calculator = InMemoryStateCalculator::new(
-                buffered_state.current_state(),
-                latest_snapshot_state_view.into_state_cache(),
-            );
-            let (updates_until_last_checkpoint, state_after_last_checkpoint) = calculator
-                .calculate_for_write_sets_after_snapshot(last_checkpoint_index, &write_sets)?;
+            let (updates_until_last_checkpoint, state_after_last_checkpoint) =
+                InMemoryStateCalculatorV2::calculate_for_write_sets_after_snapshot(
+                    buffered_state.current_state(),
+                    latest_snapshot_state_view.into_state_cache(),
+                    last_checkpoint_index,
+                    &write_sets,
+                )?;
 
             // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
             buffered_state.update(
@@ -650,6 +651,7 @@ impl StateStore {
             batch,
             sharded_state_kv_batches,
             /*skip_usage=*/ false,
+            None,
         )?;
 
         self.put_state_values(
@@ -675,6 +677,7 @@ impl StateStore {
         state_kv_metadata_batch: &SchemaBatch,
         put_state_value_indices: bool,
         skip_usage: bool,
+        last_checkpoint_index: Option<usize>,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_value_sets"])
@@ -688,6 +691,7 @@ impl StateStore {
             ledger_batch,
             sharded_state_kv_batches,
             skip_usage,
+            last_checkpoint_index,
         )?;
 
         let _timer = OTHER_TIMERS_SECONDS
@@ -774,6 +778,7 @@ impl StateStore {
         batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
         skip_usage: bool,
+        last_checkpoint_index: Option<usize>,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_stats_and_indices"])
@@ -906,9 +911,11 @@ impl StateStore {
                 (usage.items() as i64 + items_delta) as usize,
                 (usage.bytes() as i64 + bytes_delta) as usize,
             );
-            if !skip_usage || i == num_versions - 1 {
+            let should_write_index_for_version =
+                (i == num_versions - 1) || Some(i) == last_checkpoint_index;
+            if !skip_usage || should_write_index_for_version {
                 let version = first_version + i as u64;
-                if i == num_versions - 1 {
+                if should_write_index_for_version {
                     info!("Write usage at version {version}, {usage:?}, skip_usage: {skip_usage}.");
                 }
                 batch

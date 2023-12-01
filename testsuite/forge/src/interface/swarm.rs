@@ -6,7 +6,10 @@ use crate::{
     AptosPublicInfo, ChainInfo, FullNode, NodeExt, Result, SwarmChaos, Validator, Version,
 };
 use anyhow::{anyhow, bail};
-use aptos_config::config::{NodeConfig, OverrideNodeConfig};
+use aptos_config::{
+    config::{NodeConfig, OverrideNodeConfig},
+    network_id::NetworkId,
+};
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
@@ -157,7 +160,7 @@ pub trait SwarmExt: Swarm {
         while !try_join_all(
             validators
                 .iter()
-                .map(|node| node.check_connectivity(validators.len() - 1))
+                .map(|node| node.check_connectivity(NetworkId::Validator, validators.len() - 1))
                 .chain(full_nodes.iter().map(|node| node.check_connectivity())),
         )
         .await
@@ -411,15 +414,14 @@ async fn wait_for_all_nodes_to_catchup_to_target_version_or_epoch(
                 ))
             }))
             .await;
-        let node_versions_and_epochs = version_and_epoch_results
-            .map(|results| results.into_iter().collect::<Vec<_>>())
-            .ok();
+        let node_versions_and_epochs =
+            version_and_epoch_results.map(|results| results.into_iter().collect::<Vec<_>>());
 
         // Check if all nodes are caught up to the target version
         let all_caught_up_to_version = target_version
             .map(|target_version| {
                 node_versions_and_epochs
-                    .clone()
+                    .as_ref()
                     .map(|responses| {
                         responses
                             .iter()
@@ -433,7 +435,7 @@ async fn wait_for_all_nodes_to_catchup_to_target_version_or_epoch(
         let all_caught_up_to_epoch = target_epoch
             .map(|target_epoch| {
                 node_versions_and_epochs
-                    .clone()
+                    .as_ref()
                     .map(|responses| responses.iter().all(|(_, _, epoch)| *epoch >= target_epoch))
                     .unwrap_or(false) // No epoch found
             })
@@ -457,7 +459,7 @@ async fn wait_for_all_nodes_to_catchup_to_target_version_or_epoch(
                 target_version,
                 target_epoch,
                 start_time.elapsed().as_secs(),
-                node_versions_and_epochs.unwrap_or_default()
+                node_versions_and_epochs
             ));
         }
 
@@ -493,7 +495,7 @@ pub async fn get_highest_synced_epoch(clients: &[(String, RestClient)]) -> Resul
 }
 
 /// Returns the highest synced version and epoch of the given clients
-async fn get_highest_synced_version_and_epoch(
+pub async fn get_highest_synced_version_and_epoch(
     clients: &[(String, RestClient)],
 ) -> Result<(u64, u64)> {
     let mut latest_version_and_epoch = (0, 0);

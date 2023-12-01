@@ -171,6 +171,9 @@ pub struct EmitArgs {
     #[clap(long)]
     pub max_transactions_per_account: Option<usize>,
 
+    #[clap(long)]
+    pub latency_polling_interval_s: Option<f32>,
+
     // In cases you want to run txn emitter from multiple machines,
     // and want to make sure that initialization succeeds
     // (account minting and txn-specific initialization), before the

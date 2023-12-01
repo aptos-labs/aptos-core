@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
 
-use super::{config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig};
+use super::{
+    config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, ChainHealthBackoffValues,
+    Error, NodeConfig, QuorumStoreConfig,
+};
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 
@@ -18,9 +21,9 @@ pub struct DagPayloadConfig {
 impl Default for DagPayloadConfig {
     fn default() -> Self {
         Self {
-            max_sending_txns_per_round: 1000,
+            max_sending_txns_per_round: 10000,
             max_sending_size_per_round_bytes: 10 * 1024 * 1024,
-            max_receiving_txns_per_round: 2000,
+            max_receiving_txns_per_round: 11000,
             max_receiving_size_per_round_bytes: 20 * 1024 * 1024,
 
             payload_pull_max_poll_time_ms: 1000,
@@ -111,7 +114,7 @@ impl Default for ReliableBroadcastConfig {
             backoff_policy_factor: 50,
             backoff_policy_max_delay_ms: 3000,
 
-            rpc_timeout_ms: 500,
+            rpc_timeout_ms: 1000,
         }
     }
 }
@@ -127,7 +130,7 @@ impl Default for DagRoundStateConfig {
     fn default() -> Self {
         Self {
             round_event_channel_size: 1024,
-            adaptive_responsive_minimum_wait_time_ms: 300,
+            adaptive_responsive_minimum_wait_time_ms: 500,
         }
     }
 }
@@ -139,6 +142,9 @@ pub struct DagConsensusConfig {
     pub rb_config: ReliableBroadcastConfig,
     pub fetcher_config: DagFetcherConfig,
     pub round_state_config: DagRoundStateConfig,
+    pub chain_backoff_config: Vec<ChainHealthBackoffValues>,
+    #[serde(default = "QuorumStoreConfig::default_for_dag")]
+    pub quorum_store: QuorumStoreConfig,
 }
 
 impl ConfigSanitizer for DagConsensusConfig {

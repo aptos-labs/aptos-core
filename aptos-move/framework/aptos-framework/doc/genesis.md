@@ -1,5 +1,5 @@
 
-<a name="0x1_genesis"></a>
+<a id="0x1_genesis"></a>
 
 # Module `0x1::genesis`
 
@@ -63,7 +63,7 @@
 
 
 
-<a name="0x1_genesis_AccountMap"></a>
+<a id="0x1_genesis_AccountMap"></a>
 
 ## Struct `AccountMap`
 
@@ -96,7 +96,7 @@
 
 </details>
 
-<a name="0x1_genesis_EmployeeAccountMap"></a>
+<a id="0x1_genesis_EmployeeAccountMap"></a>
 
 ## Struct `EmployeeAccountMap`
 
@@ -147,7 +147,7 @@
 
 </details>
 
-<a name="0x1_genesis_ValidatorConfiguration"></a>
+<a id="0x1_genesis_ValidatorConfiguration"></a>
 
 ## Struct `ValidatorConfiguration`
 
@@ -216,7 +216,7 @@
 
 </details>
 
-<a name="0x1_genesis_ValidatorConfigurationWithCommission"></a>
+<a id="0x1_genesis_ValidatorConfigurationWithCommission"></a>
 
 ## Struct `ValidatorConfigurationWithCommission`
 
@@ -255,12 +255,12 @@
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_genesis_EACCOUNT_DOES_NOT_EXIST"></a>
+<a id="0x1_genesis_EACCOUNT_DOES_NOT_EXIST"></a>
 
 
 
@@ -269,7 +269,7 @@
 
 
 
-<a name="0x1_genesis_EDUPLICATE_ACCOUNT"></a>
+<a id="0x1_genesis_EDUPLICATE_ACCOUNT"></a>
 
 
 
@@ -278,7 +278,7 @@
 
 
 
-<a name="0x1_genesis_initialize"></a>
+<a id="0x1_genesis_initialize"></a>
 
 ## Function `initialize`
 
@@ -368,7 +368,7 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
 
 </details>
 
-<a name="0x1_genesis_initialize_aptos_coin"></a>
+<a id="0x1_genesis_initialize_aptos_coin"></a>
 
 ## Function `initialize_aptos_coin`
 
@@ -399,7 +399,7 @@ Genesis step 2: Initialize Aptos coin.
 
 </details>
 
-<a name="0x1_genesis_initialize_core_resources_and_aptos_coin"></a>
+<a id="0x1_genesis_initialize_core_resources_and_aptos_coin"></a>
 
 ## Function `initialize_core_resources_and_aptos_coin`
 
@@ -437,7 +437,7 @@ Only called for testnets and e2e tests.
 
 </details>
 
-<a name="0x1_genesis_create_accounts"></a>
+<a id="0x1_genesis_create_accounts"></a>
 
 ## Function `create_accounts`
 
@@ -475,7 +475,7 @@ Only called for testnets and e2e tests.
 
 </details>
 
-<a name="0x1_genesis_create_account"></a>
+<a id="0x1_genesis_create_account"></a>
 
 ## Function `create_account`
 
@@ -508,7 +508,7 @@ If it exists, it just returns the signer.
 
 </details>
 
-<a name="0x1_genesis_create_employee_validators"></a>
+<a id="0x1_genesis_create_employee_validators"></a>
 
 ## Function `create_employee_validators`
 
@@ -614,7 +614,7 @@ If it exists, it just returns the signer.
 
 </details>
 
-<a name="0x1_genesis_create_initialize_validators_with_commission"></a>
+<a id="0x1_genesis_create_initialize_validators_with_commission"></a>
 
 ## Function `create_initialize_validators_with_commission`
 
@@ -651,7 +651,7 @@ If it exists, it just returns the signer.
 
 </details>
 
-<a name="0x1_genesis_create_initialize_validators"></a>
+<a id="0x1_genesis_create_initialize_validators"></a>
 
 ## Function `create_initialize_validators`
 
@@ -695,7 +695,7 @@ encoded in a single BCS byte array.
 
 </details>
 
-<a name="0x1_genesis_create_initialize_validator"></a>
+<a id="0x1_genesis_create_initialize_validator"></a>
 
 ## Function `create_initialize_validator`
 
@@ -752,7 +752,7 @@ encoded in a single BCS byte array.
 
 </details>
 
-<a name="0x1_genesis_initialize_validator"></a>
+<a id="0x1_genesis_initialize_validator"></a>
 
 ## Function `initialize_validator`
 
@@ -790,7 +790,7 @@ encoded in a single BCS byte array.
 
 </details>
 
-<a name="0x1_genesis_set_genesis_end"></a>
+<a id="0x1_genesis_set_genesis_end"></a>
 
 ## Function `set_genesis_end`
 
@@ -815,7 +815,7 @@ The last step of genesis.
 
 </details>
 
-<a name="0x1_genesis_initialize_for_verification"></a>
+<a id="0x1_genesis_initialize_for_verification"></a>
 
 ## Function `initialize_for_verification`
 
@@ -889,7 +889,7 @@ The last step of genesis.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -900,7 +900,7 @@ The last step of genesis.
 
 
 
-<a name="@Specification_1_initialize"></a>
+<a id="@Specification_1_initialize"></a>
 
 ### Function `initialize`
 
@@ -933,7 +933,7 @@ The last step of genesis.
 
 
 
-<a name="@Specification_1_initialize_aptos_coin"></a>
+<a id="@Specification_1_initialize_aptos_coin"></a>
 
 ### Function `initialize_aptos_coin`
 
@@ -952,7 +952,7 @@ The last step of genesis.
 
 
 
-<a name="@Specification_1_create_initialize_validators_with_commission"></a>
+<a id="@Specification_1_create_initialize_validators_with_commission"></a>
 
 ### Function `create_initialize_validators_with_commission`
 
@@ -970,7 +970,7 @@ The last step of genesis.
 
 
 
-<a name="@Specification_1_create_initialize_validators"></a>
+<a id="@Specification_1_create_initialize_validators"></a>
 
 ### Function `create_initialize_validators`
 
@@ -988,7 +988,7 @@ The last step of genesis.
 
 
 
-<a name="@Specification_1_create_initialize_validator"></a>
+<a id="@Specification_1_create_initialize_validator"></a>
 
 ### Function `create_initialize_validator`
 
@@ -1004,7 +1004,7 @@ The last step of genesis.
 
 
 
-<a name="@Specification_1_initialize_for_verification"></a>
+<a id="@Specification_1_initialize_for_verification"></a>
 
 ### Function `initialize_for_verification`
 
@@ -1022,7 +1022,7 @@ The last step of genesis.
 
 
 
-<a name="0x1_genesis_InitalizeRequires"></a>
+<a id="0x1_genesis_InitalizeRequires"></a>
 
 
 <pre><code><b>schema</b> <a href="genesis.md#0x1_genesis_InitalizeRequires">InitalizeRequires</a> {
@@ -1041,7 +1041,7 @@ The last step of genesis.
 
 
 
-<a name="0x1_genesis_CompareTimeRequires"></a>
+<a id="0x1_genesis_CompareTimeRequires"></a>
 
 
 <pre><code><b>schema</b> <a href="genesis.md#0x1_genesis_CompareTimeRequires">CompareTimeRequires</a> {
