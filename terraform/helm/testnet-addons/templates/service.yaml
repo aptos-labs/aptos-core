@@ -30,6 +30,10 @@ metadata:
   name: {{ include "testnet-addons.fullname" . }}-api
   namespace: default
 spec:
+  {{- if .Values.ingress.gce_security_policy }}
+  securityPolicy:
+    name: {{ .Values.ingress.gce_security_policy }}
+  {{- end }}
   healthCheck:
     checkIntervalSec: 30
     timeoutSec: 5

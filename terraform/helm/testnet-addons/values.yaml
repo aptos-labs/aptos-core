@@ -28,54 +28,6 @@ waypoint:
       cpu: 200m
       memory: 512Mi
 
-load_test:
-  # -- Whether to enable the load test CronJob
-  enabled: false
-  image:
-    # -- Image repo to use for tools image for running load tests
-    repo: aptoslabs/tools
-    # -- Image tag to use for tools image
-    tag:
-    # -- Image pull policy to use for tools image
-    pullPolicy: IfNotPresent
-  resources:
-    limits:
-      cpu: 1
-      memory: 512Mi
-    requests:
-      cpu: 1
-      memory: 512Mi
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
-  # -- How many minutes between load test runs
-  intervalMins: 15
-  # -- The fullnode groups to target
-  fullnode:
-    groups:
-      - name: fullnode
-  config:
-    # -- The number of fullnode groups to run traffic against
-    numFullnodeGroups:
-    # -- The private key used to mint to fund load test
-    mint_key:
-    # -- Number of transactions outstanding in mempool
-    mempool_backlog: 5000
-    # -- Whether to target a constant TPS, or 0 if not used. Cannot be used with mempool_backlog.
-    target_tps: 0
-    # -- How long to emit transactions for
-    duration: 300
-    # -- How long to wait for transactions to be expired
-    txn_expiration_time_secs: 30
-    # -- Whether to submit transactions through validator REST API
-    use_validators: false
-    # -- If true, run $numFullnodeGroups parallel load tests
-    use_pfns: true
-    # -- Default 20k * $duration
-    expected_max_txns: 6000000
-    max_transactions_per_account: 5
-    transaction_type: coin-transfer
-
 serviceAccount:
   # -- Specifies whether a service account should be created
   create: true
@@ -93,6 +45,8 @@ ingress:
   gce_static_ip:
   # -- The GCE certificate to install on the ingress
   gce_managed_certificate:
+  # -- Security policy to apply to the backend services behind the ingress
+  gce_security_policy:
   # -- The ARN of the WAF ACL to install on the ingress
   wafAclArn:
   # -- List of CIDRs to accept traffic from

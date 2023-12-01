@@ -227,7 +227,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "2.3.1"
+version = "2.3.2"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -3989,6 +3989,7 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "itertools 0.10.5",
+ "log",
  "lru 0.7.8",
  "move-binary-format",
  "tokio",
@@ -10980,11 +10981,11 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "openssl"
-version = "0.10.56"
+version = "0.10.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "729b745ad4a5575dd06a3e1af1414bd330ee561c01b3899eb584baeaa8def17e"
+checksum = "79a4c6c3a2b158f7f8f2a2fc5a969fa3a068df6fc9dbb4a43845436e3af7c800"
 dependencies = [
- "bitflags 1.3.2",
+ "bitflags 2.4.0",
  "cfg-if",
  "foreign-types 0.3.2",
  "libc",
@@ -11012,9 +11013,9 @@ checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.93"
+version = "0.9.96"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db4d56a4c0478783083cfafcc42493dd4a981d41669da64b4572a2a089b51b1d"
+checksum = "3812c071ba60da8b5677cc12bcb1d42989a65553772897a7e0355545a819838f"
 dependencies = [
  "cc",
  "libc",
