@@ -15,7 +15,7 @@ use aptos_indexer_grpc_utils::{
     },
     create_grpc_client,
     file_store_operator::{
-        FileStoreMetadata, FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator, self,
+        FileStoreMetadata, FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator,
     },
     time_diff_since_pb_timestamp_in_secs, timestamp_to_unixtime,
     types::RedisUrl,
@@ -150,10 +150,13 @@ impl Worker {
                 })?;
 
             // 3&4. Infinite streaming until error happens. Either stream ends or worker crashes.
-            process_streaming_response(conn,
-                file_store_metadata, 
+            process_streaming_response(
+                conn,
+                file_store_metadata,
                 file_store_operator,
-                response.into_inner()).await?;
+                response.into_inner(),
+            )
+            .await?;
         }
     }
 }
@@ -303,7 +306,6 @@ async fn process_streaming_response(
         }
     }
     let mut current_version = starting_version;
-    let mut starting_time = std::time::Instant::now();
     let mut last_file_update_check_timestamp = std::time::Instant::now();    let mut starting_time = std::time::Instant::now();
 
     // 4. Process the streaming response.
@@ -422,7 +424,7 @@ async fn process_streaming_response(
                 break;
             },
         }
-    
+
         // Check if the file store has been updated.
         if last_file_update_check_timestamp.elapsed().as_secs() >= GCS_LOOKUP_FREQUENCY_IN_SECS {
             let file_store_metadata = file_store_operator.get_file_store_metadata().await;
