@@ -167,9 +167,6 @@ impl RawData for RawDataServerWrapper {
                 let conn = match redis_client.get_tokio_connection_manager().await {
                     Ok(conn) => conn,
                     Err(e) => {
-                        ERROR_COUNT
-                            .with_label_values(&["redis_connection_failed"])
-                            .inc();
                         SHORT_CONNECTION_COUNT
                             .with_label_values(&[
                                 request_metadata.request_api_key_name.as_str(),
@@ -199,9 +196,6 @@ impl RawData for RawDataServerWrapper {
                 let chain_id = match cache_operator.get_chain_id().await {
                     Ok(chain_id) => chain_id,
                     Err(e) => {
-                        ERROR_COUNT
-                            .with_label_values(&["redis_get_chain_id_failed"])
-                            .inc();
                         SHORT_CONNECTION_COUNT
                             .with_label_values(&[
                                 request_metadata.request_api_key_name.as_str(),
