@@ -147,7 +147,7 @@ impl Processor {
                 let total_size = transactions_buffer.iter().map(|t| t.0.len()).sum::<usize>();
                 // If we haven't hit the head and transactions are small,
                 // we want to collect more transactions.
-                 if total_size < LARGE_FILE_BYTES_COUNT {
+                if total_size < LARGE_FILE_BYTES_COUNT {
                     // Skip only when current transactions are small.
                     continue;
                 }
@@ -156,7 +156,7 @@ impl Processor {
             if hit_head && transactions_buffer.len() < BLOB_STORAGE_SIZE {
                 continue;
             }
-            
+
             // Final check to make sure the transactions buffer contains enough transactions.
             if transactions_buffer.len() < BLOB_STORAGE_SIZE {
                 continue;
