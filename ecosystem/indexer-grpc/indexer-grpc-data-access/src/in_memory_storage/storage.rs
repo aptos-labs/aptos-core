@@ -105,14 +105,9 @@ where
 {
     let current_connection = redis_connection.clone();
     loop {
-        tokio::select! {
-            _ = cancellation_token.cancelled() => {
-                return Ok(());
-            },
-            _ = {
-                // Continue.
-                // Only wait when in memory storage hits the head.
-            },
+        if cancellation_token.is_cancelled() {
+            cancellation_token.cancelled().await;
+            return Ok(());
         }
         let start_time = std::time::Instant::now();
         let mut conn = current_connection.as_ref().clone();
@@ -206,9 +201,7 @@ where
         }
         if redis_fetch_size == 0 {
             tracing::info!("Redis is not ready for current fetch. Wait.");
-            tokio::time::sleep(Duration::from_millis(
-                REDIS_FETCH_TASK_INTERVAL_IN_MILLIS,
-            ));
+            tokio::time::sleep(Duration::from_millis(REDIS_FETCH_TASK_INTERVAL_IN_MILLIS)).await;
             continue;
         }
         // Garbage collection. Note, this is *not a thread safe* operation; readers should
