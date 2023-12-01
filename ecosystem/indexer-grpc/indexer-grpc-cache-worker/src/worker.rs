@@ -15,7 +15,7 @@ use aptos_indexer_grpc_utils::{
     },
     create_grpc_client,
     file_store_operator::{
-        FileStoreMetadata, FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator,
+        FileStoreMetadata, FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator, self,
     },
     time_diff_since_pb_timestamp_in_secs, timestamp_to_unixtime,
     types::RedisUrl,
@@ -32,6 +32,12 @@ use url::Url;
 
 type ChainID = u32;
 type StartingVersion = u64;
+
+const GCS_LOOKUP_FREQUENCY_IN_SECS: u64 = 60;
+const FILE_STORE_VERSIONS_RESERVED: u64 = 30_000;
+// Cache worker will wait if filestore is behind by
+// `FILE_STORE_VERSIONS_RESERVED` versions
+const CACHE_WORKER_WAIT_FOR_FILE_STORE_IN_SECS: u64 = 1;
 
 const SERVICE_TYPE: &str = "cache_worker";
 
@@ -144,7 +150,10 @@ impl Worker {
                 })?;
 
             // 3&4. Infinite streaming until error happens. Either stream ends or worker crashes.
-            process_streaming_response(conn, file_store_metadata, response.into_inner()).await?;
+            process_streaming_response(conn,
+                file_store_metadata, 
+                file_store_operator,
+                response.into_inner()).await?;
         }
     }
 }
@@ -267,6 +276,7 @@ async fn setup_cache_with_init_signal(
 async fn process_streaming_response(
     conn: redis::aio::ConnectionManager,
     file_store_metadata: Option<FileStoreMetadata>,
+    file_store_operator: Box<dyn FileStoreOperator>,
     mut resp_stream: impl futures_core::Stream<Item = Result<TransactionsFromNodeResponse, tonic::Status>>
         + std::marker::Unpin,
 ) -> Result<()> {
@@ -294,6 +304,7 @@ async fn process_streaming_response(
     }
     let mut current_version = starting_version;
     let mut starting_time = std::time::Instant::now();
+    let mut last_file_update_check_timestamp = std::time::Instant::now();    let mut starting_time = std::time::Instant::now();
 
     // 4. Process the streaming response.
     while let Some(received) = resp_stream.next().await {
@@ -410,6 +421,25 @@ async fn process_streaming_response(
                 ERROR_COUNT.with_label_values(&["response_error"]).inc();
                 break;
             },
+        }
+    
+        // Check if the file store has been updated.
+        if last_file_update_check_timestamp.elapsed().as_secs() >= GCS_LOOKUP_FREQUENCY_IN_SECS {
+            let file_store_metadata = file_store_operator.get_file_store_metadata().await;
+            if let Some(file_store_metadata) = file_store_metadata {
+                if file_store_metadata.version + FILE_STORE_VERSIONS_RESERVED < current_version {
+                    tokio::time::sleep(std::time::Duration::from_secs(
+                        CACHE_WORKER_WAIT_FOR_FILE_STORE_IN_SECS,
+                    ))
+                    .await;
+                    tracing::warn!(
+                        current_version = current_version,
+                        file_store_version = file_store_metadata.version,
+                        "[Indexer Cache] File store version is behind current version too much."
+                    );
+                }
+            }
+            last_file_update_check_timestamp = std::time::Instant::now();
         }
     }
 
