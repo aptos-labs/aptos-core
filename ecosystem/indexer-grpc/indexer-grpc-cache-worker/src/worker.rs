@@ -15,7 +15,7 @@ use aptos_indexer_grpc_utils::{
     },
     create_grpc_client,
     file_store_operator::{
-        self, FileStoreMetadata, FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator,
+        FileStoreMetadata, FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator,
     },
     time_diff_since_pb_timestamp_in_secs, timestamp_to_unixtime,
     types::RedisUrl,
@@ -306,7 +306,8 @@ async fn process_streaming_response(
         }
     }
     let mut current_version = starting_version;
-
+    let mut starting_time = std::time::Instant::now();
+    let mut last_file_update_check_timestamp = std::time::Instant::now();
     // 4. Process the streaming response.
     while let Some(received) = resp_stream.next().await {
         let received: TransactionsFromNodeResponse = match received {
