@@ -50,7 +50,7 @@ use move_binary_format::{
     file_format::{
         AccessKind, Bytecode, CodeOffset, Constant as VMConstant, ConstantPoolIndex,
         FunctionDefinitionIndex, FunctionHandleIndex, SignatureIndex, SignatureToken,
-        StructDefinitionIndex,
+        StructDefinitionIndex, Ability,
     },
     normalized::Type as MType,
     views::{FunctionDefinitionView, FunctionHandleView, StructHandleView},
@@ -1236,10 +1236,19 @@ impl GlobalEnv {
             Type::Vector(et) => AbilitySet::VECTOR.intersect(self.type_abilities(et, ty_params)),
             Type::Struct(mid, sid, inst) => {
                 let struct_env = self.get_struct(mid.qualified(*sid));
-                let mut abilities = struct_env.get_abilities();
-                for inst_ty in inst {
-                    abilities = abilities.intersect(self.type_abilities(inst_ty, ty_params))
-                }
+                let struct_abilities = struct_env.get_abilities();
+                let field_abilities = inst.iter().fold(AbilitySet::ALL, |acc, ty| {
+                    acc.intersect(self.type_abilities(ty, ty_params))
+                });
+                let abilities = if struct_abilities.has_ability(Ability::Key) {
+                    if field_abilities.has_store() {
+                        struct_abilities.intersect(field_abilities).add(Ability::Key)
+                    } else {
+                        struct_abilities.intersect(field_abilities).remove(Ability::Key)
+                    }
+                } else {
+                    struct_abilities.intersect(field_abilities)
+                };
                 abilities
             },
             Type::TypeParameter(i) => {
