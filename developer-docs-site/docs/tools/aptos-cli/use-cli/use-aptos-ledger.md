@@ -1,6 +1,6 @@
 ---
-title: "Use Aptos CLI with Ledger"
-id: "use-aptos-ledger"
+title: Use Aptos CLI with Ledger
+id: use-aptos-ledger
 ---
 
 # Use the Aptos CLI with Ledger
@@ -39,10 +39,11 @@ Aptos CLI is now set up for account 59836ba1dd0c845713bdab34346688d6f1dba290dbf6
   "Result": "Success"
 }
 ```
+
 In the above, we have created a new profile called `myprofile` and have chosen to use the first Ledger account (index 0) to sign transactions. If there is a certain index account you would like to use, you are welcome to use it.
 
-
 After the above command, a new profile will be created in `~/.aptos/config.yml` and will look like the following:
+
 ```yaml
   myprofile:
     public_key: "0x05a8ace09d1136181029be3e817de3619562b0da2eedbff210e2b2f92c71be70"
@@ -51,11 +52,14 @@ After the above command, a new profile will be created in `~/.aptos/config.yml` 
     faucet_url: "https://faucet.devnet.aptoslabs.com"
     derivation_path: "m/44'/637'/0'/0'/0'"
 ```
+
 Notice that the above stores the derivation path instead of private key. This is because the private key is stored on your Ledger device, and is never exposed to the `aptos` tool.
 
 ## Publish a package with Ledger
+
 Once you have created a profile, you can use it to publish a package. The `aptos` tool will prompt you to confirm the transaction on your Ledger device.
 Note: Make sure that you are on the same directory as where your move module is located:
+
 ```bash
 $ aptos move publish --profile myprofile --named-addresses hello_blockchain=myprofile
 Compiling, may take a little while to download git dependencies...
@@ -87,7 +91,9 @@ After the above command, you will be prompted to confirm the transaction on your
 ## Common Errors
 
 ### Error: Wrong raw transaction length
+
 Your raw transaction or package size is too big. Currently the Aptos ledger app can only support up to 20kb transaction. If you are using a `Ledger Nano S`, the supported transaction size will be even smaller.
+
 ```bash
 {
   "Error": "Unexpected error: Error - Wrong raw transaction length"
@@ -95,7 +101,9 @@ Your raw transaction or package size is too big. Currently the Aptos ledger app 
 ```
 
 ### Error: Ledger device is locked
+
 Make sure your Ledger device is unlocked and you have Aptos app opened
+
 ```bash
 {
   "Error": "Unexpected error: Error - Ledger device is locked"
