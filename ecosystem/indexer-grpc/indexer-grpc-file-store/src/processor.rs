@@ -156,6 +156,12 @@ impl Processor {
             if hit_head && transactions_buffer.len() < BLOB_STORAGE_SIZE {
                 continue;
             }
+            
+            // Final check to make sure the transactions buffer contains enough transactions.
+            if transactions_buffer.len() < BLOB_STORAGE_SIZE {
+                continue;
+            }
+
             // Drain the transactions buffer and upload to file store in size of multiple of BLOB_STORAGE_SIZE.
             let process_size = transactions_buffer.len() / BLOB_STORAGE_SIZE * BLOB_STORAGE_SIZE;
             let current_batch: Vec<EncodedTransactionWithVersion> =
