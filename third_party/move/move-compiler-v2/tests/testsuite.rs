@@ -11,7 +11,7 @@ use move_compiler_v2::{
     pipeline::{
         livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety_processor::ReferenceSafetyProcessor,
-        visibility_checker::VisibilityChecker, explicate_drop::ExplicateDrop,
+        visibility_checker::VisibilityChecker, explicate_drop::ExplicateDrop, ability_checker::AbilityChecker,
     },
     run_file_format_gen, Options,
 };
@@ -166,7 +166,19 @@ impl TestConfig {
                 generate_file_format: false,
                 dump_annotated_targets: true,
             }
-        }else {
+        } else if path.contains("/ability-checker/") {
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+            pipeline.add_processor(Box::new(ExplicateDrop {}));
+            pipeline.add_processor(Box::new(AbilityChecker {}));
+            Self {
+                type_check_only: false,
+                dump_ast: false,
+                pipeline,
+                generate_file_format: false,
+                dump_annotated_targets: true,
+            }
+        } else {
             panic!(
                 "unexpected test path `{}`, cannot derive configuration",
                 path
