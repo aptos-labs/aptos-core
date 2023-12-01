@@ -42,6 +42,12 @@ Aptos CLI is now set up for account 59836ba1dd0c845713bdab34346688d6f1dba290dbf6
 
 In the above, we have created a new profile called `myprofile` and have chosen to use the first Ledger account (index 0) to sign transactions. If there is a certain index account you would like to use, you are welcome to use it.
 
+:::tip
+
+For more info on the derivation path ("index") schema, see [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki) and [SLIP-44](https://github.com/satoshilabs/slips/blob/master/slip-0044.md).
+
+:::
+
 After the above command, a new profile will be created in `~/.aptos/config.yml` and will look like the following:
 
 ```yaml
