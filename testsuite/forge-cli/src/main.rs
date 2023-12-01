@@ -24,7 +24,6 @@ use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::aptos_stdlib,
     types::on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig},
-    crypto::_once_cell::sync::Lazy,
 };
 use aptos_testcases::{
     compatibility_test::SimpleValidatorUpgrade,
