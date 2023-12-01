@@ -154,6 +154,11 @@ impl ConnectionMetadata {
             application_protocols: ProtocolIdSet::empty(),
         }
     }
+
+    /// Returns true iff the connection origin is outbound
+    pub fn is_outbound_connection(&self) -> bool {
+        self.origin == ConnectionOrigin::Outbound
+    }
 }
 
 impl fmt::Debug for ConnectionMetadata {
