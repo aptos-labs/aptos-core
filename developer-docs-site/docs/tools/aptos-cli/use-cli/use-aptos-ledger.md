@@ -99,7 +99,6 @@ After the above command, you will be prompted to confirm the transaction on your
 If you would like to use the Aptos ledger app with an existing account address, like one with a vanity prefix, you can rotate the account's authentication key.
 You can also rotate the authentication key of an account secured by a ledger hardware wallet, for example if you need to publish a transaction that is too large for your ledger to sign.
 
-
 ```bash title="Generate a typical (not ledger) account with a vanity prefix"
 aptos key generate --vanity-prefix 0xaaa --output-file vanity-aaa
 ```
@@ -161,7 +160,6 @@ You'll need to approve on your ledger.
 ```
 
 </details>
-
 
 ## Common Errors
 
