@@ -820,7 +820,7 @@ impl<'env> Generator<'env> {
         }
     }
 
-    // Generate the code for a list of arguments.
+    /// Generate the code for a list of arguments.
     fn gen_arg_list(&mut self, exps: &[Exp]) -> Vec<TempIndex> {
         let len = exps.len();
         // Generate code with forced creation of temporaries for all except last arg.
@@ -836,9 +836,9 @@ impl<'env> Generator<'env> {
         args
     }
 
-    // Generate the code for an argument.
-    // If `with_forced_temp` is true, it will force generating a temporary for the argument,
-    // thereby forcing its evaluation right away in the generated code.
+    /// Generate the code for an argument.
+    /// If `with_forced_temp` is true, it will force generating a temporary for the argument,
+    /// thereby forcing its evaluation right away in the generated code.
     fn gen_arg(&mut self, exp: &Exp, with_forced_temp: bool) -> TempIndex {
         match exp.as_ref() {
             ExpData::Temporary(_, temp) => *temp,
