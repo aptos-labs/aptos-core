@@ -5,8 +5,9 @@ use crate::common::{
     types::{
         account_address_from_auth_key, account_address_from_public_key,
         AuthenticationKeyInputOptions, CliCommand, CliConfig, CliError, CliTypedResult,
-        ConfigSearchMode, EncodingOptions, ExtractPublicKey, ParsePrivateKey, ProfileConfig,
-        ProfileOptions, PublicKeyInputOptions, RestOptions, TransactionOptions, TransactionSummary,
+        ConfigSearchMode, EncodingOptions, ExtractPublicKey, HardwareWalletOptions,
+        ParsePrivateKey, ProfileConfig, ProfileOptions, PublicKeyInputOptions, RestOptions,
+        TransactionOptions, TransactionSummary,
     },
     utils::{prompt_yes, prompt_yes_with_override, read_line},
 };
@@ -44,12 +45,30 @@ pub struct RotateKey {
     pub(crate) txn_options: TransactionOptions,
 
     /// File name that contains the new private key encoded in the type from `--encoding`
-    #[clap(long, group = "new_private_key_inputs", value_parser)]
+    #[clap(
+        conflicts_with_all = &[
+            "derivation_index",
+            "derivation_path",
+            "new_private_key"
+        ],
+        long,
+        value_parser
+    )]
     pub(crate) new_private_key_file: Option<PathBuf>,
 
     /// New private key encoded in the type from `--encoding`
-    #[clap(long, group = "new_private_key_inputs")]
+    #[clap(
+        conflicts_with_all = &[
+            "derivation_index",
+            "derivation_path",
+            "new_private_key_file"
+        ],
+        long
+    )]
     pub(crate) new_private_key: Option<String>,
+
+    #[clap(flatten)]
+    pub(crate) hardware_wallet_options: HardwareWalletOptions,
 
     /// Name of the profile to save the new private key
     ///
