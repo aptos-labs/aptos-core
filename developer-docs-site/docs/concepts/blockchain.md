@@ -50,6 +50,12 @@ The lifecycle of a transaction has five stages:
 
 We've described what happens in each stage below, along with links to the corresponding Aptos node component interactions.
 
+:::warning
+
+Transactions are validated upon entering a mempool and prior to execution by consensus. The client only learns of validation results returned during the initial submission via the REST service. Transactions may silently fail to execute, especially in the case where the account has run out of utility token or changed its authentication key in the midst of many transactions. While this happens infrequently, there are ongoing efforts to improve the visibility in this space.
+
+:::
+
 ### Client submits a transaction
 
 An Aptos **client constructs a raw transaction** (let's call it Traw<sub>5</sub>) to transfer 10 Aptos Coins from Alice’s account to Bob’s account. The Aptos client signs the transaction with Alice's private key. The signed transaction T<sub>5</sub> includes the following:
@@ -63,9 +69,9 @@ The raw transaction includes the following fields:
 | Fields | Description |
 | ------ | ----------- |
 | [Account address](../reference/glossary.md#account-address) | Alice's account address |
-| Move module | A module (or program) that indicates the actions to be performed on Alice's behalf. In this case, it contains:  <br />- A Move bytecode peer-to-peer [transaction script](../reference/glossary.md#transaction-script) <br />- A list of inputs to the script (for this example the list would contain Bob's account address and the payment amount in Aptos Coins). |
-| [Maximum gas amount](../reference/glossary.md#maximum-gas-amount) | The maximum gas amount Alice is willing to pay for this transaction. Gas is a way to pay for computation and storage. A gas unit is an abstract measurement of computation. |
-| [Gas price](../reference/glossary.md#gas-price) | The amount (in Aptos Coins) Alice is willing to pay per unit of gas, to execute the transaction. |
+| Payload | Indicates an action or set of actions Alice's behalf. In the case this is a Move function, it directly calls into Move bytecode on the chain. Alternatively, it may be Move bytecode peer-to-peer [transaction script](../reference/glossary.md#transaction-script). It also contains a list of inputs to the function or script. For this example, it is a function call to transfer an amount of Aptos Coins from Alice account to Bob's account, where Alice's account is implied by sending the transaction and Bob's account and the amount are specified as transaction inputs. |
+| [Gas unit price](../reference/glossary.md#gas-unit-price) | The amount the sender is willing to pay per unit of gas, to execute the transaction. This is represented as Octa or units of 10<sup>-8</sup> Aptos utility tokens.
+| [Maximum gas amount](../reference/glossary.md#maximum-gas-amount) | The maximum gas amount in Aptos utility tokens Alice is willing to pay for this transaction. Gas charges are equal to the base gas cost covered by computation and IO multiplied by the gas price. Gas costs also include storage with an Apt-fixed priced storage model. This is represents as Octa or units of 10<sup>-8</sup> Aptos utility tokens.
 | [Expiration time](../reference/glossary.md#expiration-time) | Expiration time of the transaction. |
 | [Sequence number](../reference/glossary.md#sequence-number)  | The sequence number (5, in this example) for an account indicates the number of transactions that have been submitted and committed on-chain from that account. In this case, 5 transactions have been submitted from Alice’s account, including Traw<sub>5</sub>. Note: a transaction with sequence number 5 can only be committed on-chain if the account sequence number is 5. |
 | [Chain ID](https://github.com/aptos-labs/aptos-core/blob/main/types/src/chain_id.rs) | An identifier that distinguishes the Aptos networks (to prevent cross-network attacks). |
@@ -157,11 +163,11 @@ A client submits a transaction to the REST service of an Aptos fullnode.
 
 ### 2. REST Service → Mempool
 
-The REST service of the fullnode puts the transaction in its mempool. After mempool does some initial checks, REST Service will return a status to the client indicating whether the transaction was accepted or rejected. For example, out-of-date transactions will be rejected: mempool will accept the transaction T<sub>N</sub> only if the sequence number of T<sub>N</sub> is greater than or equal to the current sequence number of the sender's account.
+The REST service of the fullnode transfers the transaction to its mempool. After mempool does some initial checks, the REST Service will return a status to the client indicating whether the transaction was accepted or rejected. For example, out-of-date transactions will be rejected: mempool will accept the transaction T<sub>N</sub> only if the sequence number of T<sub>N</sub> is greater than or equal to the current sequence number of the sender's account.
 
 ### 3. Mempool -> Mempool
 
-The mempool on the fullnode sends the transaction to the mempool of a validator fullnode, which then sends the transaction to validator node V<sub>X</sub>'s mempool.  Note that the transaction will not be sent to the next mempool (or passed to consensus) until the sequence number matches the sequence number of the sender’s account.
+The mempool on the fullnode sends the transaction to the mempool of a validator fullnode, which then sends the transaction to validator node V<sub>X</sub>'s mempool.  Note that the transaction will not be sent to the next mempool (or passed to consensus) until the sequence number matches the sequence number of the sender’s account. Furthermore, each mempool performs the same initial checks upon receiving a transaction, this may result in a transaction being discarded on its way to consensus. The current implementation of mempool does not provide any feedback if a transaction is discarded during this process.
 
 ### 4. REST Service → Storage
 

@@ -32,7 +32,11 @@ impl BatchReader for MockBatchReader {
     }
 
     fn get_batch(&self, _proof: ProofOfStore) -> Receiver<ExecutorResult<Vec<SignedTransaction>>> {
-        unimplemented!();
+        unimplemented!()
+    }
+
+    fn update_certified_timestamp(&self, _certified_time: u64) {
+        unimplemented!()
     }
 }
 

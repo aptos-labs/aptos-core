@@ -1,5 +1,5 @@
 
-<a name="0x3_token_event_store"></a>
+<a id="0x3_token_event_store"></a>
 
 # Module `0x3::token_event_store`
 
@@ -50,7 +50,7 @@ This module provides utils to add and emit new token events that are not in toke
 
 
 
-<a name="0x3_token_event_store_CollectionDescriptionMutateEvent"></a>
+<a id="0x3_token_event_store_CollectionDescriptionMutateEvent"></a>
 
 ## Struct `CollectionDescriptionMutateEvent`
 
@@ -96,7 +96,7 @@ Event emitted when collection description is mutated
 
 </details>
 
-<a name="0x3_token_event_store_CollectionUriMutateEvent"></a>
+<a id="0x3_token_event_store_CollectionUriMutateEvent"></a>
 
 ## Struct `CollectionUriMutateEvent`
 
@@ -142,7 +142,7 @@ Event emitted when collection uri is mutated
 
 </details>
 
-<a name="0x3_token_event_store_CollectionMaxiumMutateEvent"></a>
+<a id="0x3_token_event_store_CollectionMaxiumMutateEvent"></a>
 
 ## Struct `CollectionMaxiumMutateEvent`
 
@@ -188,7 +188,7 @@ Event emitted when the collection maximum is mutated
 
 </details>
 
-<a name="0x3_token_event_store_OptInTransferEvent"></a>
+<a id="0x3_token_event_store_OptInTransferEvent"></a>
 
 ## Struct `OptInTransferEvent`
 
@@ -216,7 +216,7 @@ Event emitted when an user opt-in the direct transfer
 
 </details>
 
-<a name="0x3_token_event_store_UriMutationEvent"></a>
+<a id="0x3_token_event_store_UriMutationEvent"></a>
 
 ## Struct `UriMutationEvent`
 
@@ -268,7 +268,7 @@ Event emitted when the tokendata uri mutates
 
 </details>
 
-<a name="0x3_token_event_store_DefaultPropertyMutateEvent"></a>
+<a id="0x3_token_event_store_DefaultPropertyMutateEvent"></a>
 
 ## Struct `DefaultPropertyMutateEvent`
 
@@ -326,7 +326,7 @@ Event emitted when mutating the default the token properties stored at tokendata
 
 </details>
 
-<a name="0x3_token_event_store_DescriptionMutateEvent"></a>
+<a id="0x3_token_event_store_DescriptionMutateEvent"></a>
 
 ## Struct `DescriptionMutateEvent`
 
@@ -378,7 +378,7 @@ Event emitted when the tokendata description is mutated
 
 </details>
 
-<a name="0x3_token_event_store_RoyaltyMutateEvent"></a>
+<a id="0x3_token_event_store_RoyaltyMutateEvent"></a>
 
 ## Struct `RoyaltyMutateEvent`
 
@@ -454,7 +454,7 @@ Event emitted when the token royalty is mutated
 
 </details>
 
-<a name="0x3_token_event_store_MaxiumMutateEvent"></a>
+<a id="0x3_token_event_store_MaxiumMutateEvent"></a>
 
 ## Struct `MaxiumMutateEvent`
 
@@ -506,7 +506,7 @@ Event emitted when the token maximum is mutated
 
 </details>
 
-<a name="0x3_token_event_store_TokenEventStoreV1"></a>
+<a id="0x3_token_event_store_TokenEventStoreV1"></a>
 
 ## Resource `TokenEventStoreV1`
 
@@ -587,7 +587,7 @@ Event emitted when the token maximum is mutated
 
 </details>
 
-<a name="0x3_token_event_store_initialize_token_event_store"></a>
+<a id="0x3_token_event_store_initialize_token_event_store"></a>
 
 ## Function `initialize_token_event_store`
 
@@ -624,7 +624,7 @@ Event emitted when the token maximum is mutated
 
 </details>
 
-<a name="0x3_token_event_store_emit_collection_uri_mutate_event"></a>
+<a id="0x3_token_event_store_emit_collection_uri_mutate_event"></a>
 
 ## Function `emit_collection_uri_mutate_event`
 
@@ -660,7 +660,7 @@ Emit the collection uri mutation event
 
 </details>
 
-<a name="0x3_token_event_store_emit_collection_description_mutate_event"></a>
+<a id="0x3_token_event_store_emit_collection_description_mutate_event"></a>
 
 ## Function `emit_collection_description_mutate_event`
 
@@ -696,7 +696,7 @@ Emit the collection description mutation event
 
 </details>
 
-<a name="0x3_token_event_store_emit_collection_maximum_mutate_event"></a>
+<a id="0x3_token_event_store_emit_collection_maximum_mutate_event"></a>
 
 ## Function `emit_collection_maximum_mutate_event`
 
@@ -732,7 +732,7 @@ Emit the collection maximum mutation event
 
 </details>
 
-<a name="0x3_token_event_store_emit_token_opt_in_event"></a>
+<a id="0x3_token_event_store_emit_token_opt_in_event"></a>
 
 ## Function `emit_token_opt_in_event`
 
@@ -765,7 +765,7 @@ Emit the direct opt-in event
 
 </details>
 
-<a name="0x3_token_event_store_emit_token_uri_mutate_event"></a>
+<a id="0x3_token_event_store_emit_token_uri_mutate_event"></a>
 
 ## Function `emit_token_uri_mutate_event`
 
@@ -811,7 +811,7 @@ Emit URI mutation event
 
 </details>
 
-<a name="0x3_token_event_store_emit_default_property_mutate_event"></a>
+<a id="0x3_token_event_store_emit_default_property_mutate_event"></a>
 
 ## Function `emit_default_property_mutate_event`
 
@@ -859,7 +859,7 @@ Emit tokendata property map mutation event
 
 </details>
 
-<a name="0x3_token_event_store_emit_token_descrition_mutate_event"></a>
+<a id="0x3_token_event_store_emit_token_descrition_mutate_event"></a>
 
 ## Function `emit_token_descrition_mutate_event`
 
@@ -905,7 +905,7 @@ Emit description mutation event
 
 </details>
 
-<a name="0x3_token_event_store_emit_token_royalty_mutate_event"></a>
+<a id="0x3_token_event_store_emit_token_royalty_mutate_event"></a>
 
 ## Function `emit_token_royalty_mutate_event`
 
@@ -958,7 +958,7 @@ Emit royalty mutation event
 
 </details>
 
-<a name="0x3_token_event_store_emit_token_maximum_mutate_event"></a>
+<a id="0x3_token_event_store_emit_token_maximum_mutate_event"></a>
 
 ## Function `emit_token_maximum_mutate_event`
 
@@ -1004,7 +1004,7 @@ Emit maximum mutation event
 
 </details>
 
-<a name="@Specification_0"></a>
+<a id="@Specification_0"></a>
 
 ## Specification
 
@@ -1016,7 +1016,7 @@ Emit maximum mutation event
 
 
 
-<a name="@Specification_0_initialize_token_event_store"></a>
+<a id="@Specification_0_initialize_token_event_store"></a>
 
 ### Function `initialize_token_event_store`
 
@@ -1037,7 +1037,7 @@ Adjust the overflow value according to the
 number of registered events
 
 
-<a name="0x3_token_event_store_InitializeTokenEventStoreAbortsIf"></a>
+<a id="0x3_token_event_store_InitializeTokenEventStoreAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="token_event_store.md#0x3_token_event_store_InitializeTokenEventStoreAbortsIf">InitializeTokenEventStoreAbortsIf</a> {
@@ -1053,7 +1053,7 @@ number of registered events
 
 
 
-<a name="0x3_token_event_store_TokenEventStoreAbortsIf"></a>
+<a id="0x3_token_event_store_TokenEventStoreAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="token_event_store.md#0x3_token_event_store_TokenEventStoreAbortsIf">TokenEventStoreAbortsIf</a> {
@@ -1068,7 +1068,7 @@ number of registered events
 
 
 
-<a name="@Specification_0_emit_collection_uri_mutate_event"></a>
+<a id="@Specification_0_emit_collection_uri_mutate_event"></a>
 
 ### Function `emit_collection_uri_mutate_event`
 
@@ -1084,7 +1084,7 @@ number of registered events
 
 
 
-<a name="@Specification_0_emit_collection_description_mutate_event"></a>
+<a id="@Specification_0_emit_collection_description_mutate_event"></a>
 
 ### Function `emit_collection_description_mutate_event`
 
@@ -1100,7 +1100,7 @@ number of registered events
 
 
 
-<a name="@Specification_0_emit_collection_maximum_mutate_event"></a>
+<a id="@Specification_0_emit_collection_maximum_mutate_event"></a>
 
 ### Function `emit_collection_maximum_mutate_event`
 
@@ -1116,7 +1116,7 @@ number of registered events
 
 
 
-<a name="@Specification_0_emit_token_opt_in_event"></a>
+<a id="@Specification_0_emit_token_opt_in_event"></a>
 
 ### Function `emit_token_opt_in_event`
 
@@ -1132,7 +1132,7 @@ number of registered events
 
 
 
-<a name="@Specification_0_emit_token_uri_mutate_event"></a>
+<a id="@Specification_0_emit_token_uri_mutate_event"></a>
 
 ### Function `emit_token_uri_mutate_event`
 
@@ -1148,7 +1148,7 @@ number of registered events
 
 
 
-<a name="@Specification_0_emit_default_property_mutate_event"></a>
+<a id="@Specification_0_emit_default_property_mutate_event"></a>
 
 ### Function `emit_default_property_mutate_event`
 
@@ -1164,7 +1164,7 @@ number of registered events
 
 
 
-<a name="@Specification_0_emit_token_descrition_mutate_event"></a>
+<a id="@Specification_0_emit_token_descrition_mutate_event"></a>
 
 ### Function `emit_token_descrition_mutate_event`
 
@@ -1180,7 +1180,7 @@ number of registered events
 
 
 
-<a name="@Specification_0_emit_token_royalty_mutate_event"></a>
+<a id="@Specification_0_emit_token_royalty_mutate_event"></a>
 
 ### Function `emit_token_royalty_mutate_event`
 
@@ -1196,7 +1196,7 @@ number of registered events
 
 
 
-<a name="@Specification_0_emit_token_maximum_mutate_event"></a>
+<a id="@Specification_0_emit_token_maximum_mutate_event"></a>
 
 ### Function `emit_token_maximum_mutate_event`
 

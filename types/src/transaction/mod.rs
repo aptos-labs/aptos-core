@@ -1813,6 +1813,13 @@ impl Transaction {
         }
     }
 
+    pub fn try_as_system_txn(&self) -> Option<&SystemTransaction> {
+        match self {
+            Transaction::SystemTransaction(t) => Some(t),
+            _ => None,
+        }
+    }
+
     pub fn format_for_client(&self, get_transaction_name: impl Fn(&[u8]) -> String) -> String {
         match self {
             Transaction::UserTransaction(user_txn) => {

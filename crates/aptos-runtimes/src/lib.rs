@@ -24,6 +24,8 @@ pub fn spawn_named_runtime_with_start_hook<F>(
 where
     F: Fn() + Send + Sync + 'static,
 {
+    const MAX_BLOCKING_THREADS: usize = 64;
+
     // Verify the given name has an appropriate length
     if thread_name.len() > MAX_THREAD_NAME_LENGTH {
         panic!(
@@ -43,6 +45,9 @@ where
         })
         .on_thread_start(on_thread_start)
         .disable_lifo_slot()
+        // Limit concurrent blocking tasks from spawn_blocking(), in case, for example, too many
+        // Rest API calls overwhelm the node.
+        .max_blocking_threads(MAX_BLOCKING_THREADS)
         .enable_all();
     if let Some(num_worker_threads) = num_worker_threads {
         builder.worker_threads(num_worker_threads);

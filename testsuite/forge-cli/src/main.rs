@@ -56,8 +56,9 @@ use aptos_testcases::{
     validator_reboot_stress_test::ValidatorRebootStressTest,
     CompositeNetworkTest,
 };
-use clap::{Parser, Subcommand, __derive_refs::once_cell::sync::Lazy};
+use clap::{Parser, Subcommand};
 use futures::stream::{FuturesUnordered, StreamExt};
+use once_cell::sync::Lazy;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use std::{
     env,
@@ -787,7 +788,6 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
 
 fn optimize_for_maximum_throughput(config: &mut NodeConfig) {
     mempool_config_practically_non_expiring(&mut config.mempool);
-    state_sync_config_execute_transactions(&mut config.state_sync);
 
     config
         .consensus
@@ -1226,11 +1226,6 @@ fn graceful_overload() -> ForgeConfig {
 fn realistic_env_graceful_overload() -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        // if we have full nodes for subset of validators, TPS drops.
-        // Validators without VFN are not creating batches,
-        // as no useful transaction reach their mempool.
-        // something to potentially improve upon.
-        // So having VFNs for all validators
         .with_initial_fullnode_count(20)
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
@@ -1256,7 +1251,7 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
         .with_success_criteria(
             SuccessCriteria::new(900)
                 .add_no_restarts()
-                .add_wait_for_catchup_s(120)
+                .add_wait_for_catchup_s(180) // 3 minutes
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // overload test uses more CPUs than others, so increase the limit
                     // Check that we don't use more than 18 CPU cores for 30% of the time.
@@ -1871,6 +1866,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             // Experimental delayed QC aggregation
             config.consensus.qc_aggregator_type = QcAggregatorType::default_delayed();
 
+            // Increase the concurrency level
             if USE_CRAZY_MACHINES {
                 config.execution.concurrency_level = 48;
             }
@@ -1886,12 +1882,17 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         }));
 
     if ENABLE_VFNS {
-        // if we have full nodes for subset of validators, TPS drops.
-        // Validators without VFN are not creating batches,
-        // as no useful transaction reach their mempool.
-        // something to potentially improve upon.
-        // So having VFNs for all validators
-        forge_config = forge_config.with_initial_fullnode_count(VALIDATOR_COUNT);
+        forge_config = forge_config
+            .with_initial_fullnode_count(VALIDATOR_COUNT)
+            .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+                // Experimental storage optimizations
+                config.storage.rocksdb_configs.enable_storage_sharding = true;
+
+                // Increase the concurrency level
+                if USE_CRAZY_MACHINES {
+                    config.execution.concurrency_level = 48;
+                }
+            }));
     }
 
     if USE_CRAZY_MACHINES {
@@ -1908,7 +1909,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 SuccessCriteria::new(25000)
                     .add_no_restarts()
                     .add_wait_for_catchup_s(60),
-                /* Doesn't work with out event indices
+                /* Doesn't work without event indices
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
@@ -1928,7 +1929,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
                     MetricsThreshold::new_gb(10.0, 30),
                 )),
-            /* Doens't work without event indices
+            /* Doesn't work without event indices
             .add_chain_progress(StateProgressThreshold {
                 max_no_progress_secs: 10.0,
                 max_round_gap: 4,

@@ -1280,9 +1280,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 };
                 let mut result = et.translate_seq(&loc, seq, &result_type);
                 et.finalize_types();
-                if !as_spec_fun {
-                    result = et.post_process_spec_blocks(result.into_exp()).into();
-                }
+                result = et.post_process_placeholders(result.into_exp()).into();
                 (result, access_specifiers)
             };
 
@@ -1940,7 +1938,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             // Check whether the inclusion is correct regards usage of post state.
 
             // First check for lets.
-            for (name, _) in cond.exp.free_vars(self.parent.env) {
+            for (name, _) in cond.exp.free_vars_with_types(self.parent.env) {
                 if let Some((true, id)) = self.spec_block_lets.get(&name) {
                     let label_cond = (cond.loc.clone(), "not allowed to use post state".to_owned());
                     let label_let = (
@@ -3018,7 +3016,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             // that conflicts with variables defined in the condition, return an error
             for bound_expr in argument_map.values() {
                 let exp_loc = self.parent.env.get_node_loc(bound_expr.node_id());
-                for loc_sym in bound_expr.free_local_vars_with_node_id().keys() {
+                for loc_sym in bound_expr.bound_local_vars_with_node_id().keys() {
                     match kind {
                         ConditionKind::LetPost(name) | ConditionKind::LetPre(name) => {
                             if name == loc_sym {
@@ -3414,11 +3412,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 ExpData::Call(node_id, Operation::Global(_), _)
                 | ExpData::Call(node_id, Operation::Exists(_), _) => {
                     if !self.parent.env.has_errors() {
-                        // We would crash if the type is not valid, so only do this if no errors
-                        // have been reported so far.
                         let ty = &self.parent.env.get_node_instantiation(*node_id)[0];
-                        let (mid, sid, inst) = ty.require_struct();
-                        used_memory.insert(mid.qualified_inst(sid, inst.to_owned()));
+                        if let Type::Struct(mid, sid, inst) = ty {
+                            used_memory.insert(mid.qualified_inst(*sid, inst.to_owned()));
+                        }
                     }
                 },
                 _ => {},
@@ -3664,7 +3661,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 result_type: entry.result_type.clone(),
                 access_specifiers,
                 spec: spec.into(),
-                def,
+                def: def.into(),
                 called_funs: None,
                 calling_funs: RefCell::default(),
                 transitive_closure_of_called_funs: RefCell::default(),
