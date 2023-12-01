@@ -33,15 +33,18 @@ module 42.Test {
 public test(): u64 {
 L0:	loc0: u64
 L1:	loc1: u64
+L2:	loc2: u64
 B0:
 	0: LdU64(1)
 	1: StLoc[0](loc0: u64)
 	2: LdU64(2)
 	3: StLoc[1](loc1: u64)
 	4: MoveLoc[0](loc0: u64)
-	5: MoveLoc[1](loc1: u64)
-	6: Add
-	7: Ret
+	5: StLoc[2](loc2: u64)
+	6: MoveLoc[2](loc2: u64)
+	7: MoveLoc[1](loc1: u64)
+	8: Add
+	9: Ret
 }
 }
 == END Bytecode ==

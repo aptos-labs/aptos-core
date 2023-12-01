@@ -13,10 +13,12 @@ fun pack_unpack::pack2($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
      var $t3: pack_unpack::S
      var $t4: u8
      var $t5: u8
+     var $t6: u8
   0: $t4 := infer($t0)
   1: $t5 := infer($t1)
-  2: $t3 := pack pack_unpack::S($t4, $t2, $t5)
-  3: return $t3
+  2: $t6 := infer($t4)
+  3: $t3 := pack pack_unpack::S($t6, $t2, $t5)
+  4: return $t3
 }
 
 
@@ -24,9 +26,11 @@ fun pack_unpack::pack2($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
 fun pack_unpack::pack3($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
      var $t3: pack_unpack::S
      var $t4: u8
+     var $t5: u8
   0: $t4 := infer($t0)
-  1: $t3 := pack pack_unpack::S($t1, $t4, $t2)
-  2: return $t3
+  1: $t5 := infer($t4)
+  2: $t3 := pack pack_unpack::S($t1, $t5, $t2)
+  3: return $t3
 }
 
 
@@ -35,10 +39,12 @@ fun pack_unpack::pack4($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
      var $t3: pack_unpack::S
      var $t4: u8
      var $t5: u8
+     var $t6: u8
   0: $t4 := infer($t0)
   1: $t5 := infer($t1)
-  2: $t3 := pack pack_unpack::S($t2, $t4, $t5)
-  3: return $t3
+  2: $t6 := infer($t4)
+  3: $t3 := pack pack_unpack::S($t2, $t6, $t5)
+  4: return $t3
 }
 
 
@@ -57,10 +63,12 @@ fun pack_unpack::pack6($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
      var $t3: pack_unpack::S
      var $t4: u8
      var $t5: u8
+     var $t6: u8
   0: $t4 := infer($t0)
   1: $t5 := infer($t1)
-  2: $t3 := pack pack_unpack::S($t2, $t5, $t4)
-  3: return $t3
+  2: $t6 := infer($t5)
+  3: $t3 := pack pack_unpack::S($t2, $t6, $t4)
+  4: return $t3
 }
 
 ============ after LiveVarAnalysisProcessor: ================
@@ -80,14 +88,17 @@ fun pack_unpack::pack2($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
      var $t3: pack_unpack::S
      var $t4: u8
      var $t5: u8
+     var $t6: u8
      # live vars: $t0, $t1, $t2
   0: $t4 := move($t0)
      # live vars: $t1, $t2, $t4
   1: $t5 := move($t1)
      # live vars: $t2, $t4, $t5
-  2: $t3 := pack pack_unpack::S($t4, $t2, $t5)
+  2: $t6 := move($t4)
+     # live vars: $t2, $t5, $t6
+  3: $t3 := pack pack_unpack::S($t6, $t2, $t5)
      # live vars: $t3
-  3: return $t3
+  4: return $t3
 }
 
 
@@ -95,12 +106,15 @@ fun pack_unpack::pack2($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
 fun pack_unpack::pack3($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
      var $t3: pack_unpack::S
      var $t4: u8
+     var $t5: u8
      # live vars: $t0, $t1, $t2
   0: $t4 := move($t0)
      # live vars: $t1, $t2, $t4
-  1: $t3 := pack pack_unpack::S($t1, $t4, $t2)
+  1: $t5 := move($t4)
+     # live vars: $t1, $t2, $t5
+  2: $t3 := pack pack_unpack::S($t1, $t5, $t2)
      # live vars: $t3
-  2: return $t3
+  3: return $t3
 }
 
 
@@ -109,14 +123,17 @@ fun pack_unpack::pack4($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
      var $t3: pack_unpack::S
      var $t4: u8
      var $t5: u8
+     var $t6: u8
      # live vars: $t0, $t1, $t2
   0: $t4 := move($t0)
      # live vars: $t1, $t2, $t4
   1: $t5 := move($t1)
      # live vars: $t2, $t4, $t5
-  2: $t3 := pack pack_unpack::S($t2, $t4, $t5)
+  2: $t6 := move($t4)
+     # live vars: $t2, $t5, $t6
+  3: $t3 := pack pack_unpack::S($t2, $t6, $t5)
      # live vars: $t3
-  3: return $t3
+  4: return $t3
 }
 
 
@@ -138,14 +155,17 @@ fun pack_unpack::pack6($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
      var $t3: pack_unpack::S
      var $t4: u8
      var $t5: u8
+     var $t6: u8
      # live vars: $t0, $t1, $t2
   0: $t4 := move($t0)
      # live vars: $t1, $t2, $t4
   1: $t5 := move($t1)
      # live vars: $t2, $t4, $t5
-  2: $t3 := pack pack_unpack::S($t2, $t5, $t4)
+  2: $t6 := move($t5)
+     # live vars: $t2, $t4, $t6
+  3: $t3 := pack pack_unpack::S($t2, $t6, $t4)
      # live vars: $t3
-  3: return $t3
+  4: return $t3
 }
 
 
@@ -173,20 +193,24 @@ B0:
 	2: MoveLoc[1](Arg1: u8)
 	3: StLoc[4](loc1: u8)
 	4: MoveLoc[3](loc0: u8)
-	5: MoveLoc[2](Arg2: u8)
-	6: MoveLoc[4](loc1: u8)
-	7: Pack[0](S)
-	8: Ret
+	5: StLoc[5](loc2: u8)
+	6: MoveLoc[5](loc2: u8)
+	7: MoveLoc[2](Arg2: u8)
+	8: MoveLoc[4](loc1: u8)
+	9: Pack[0](S)
+	10: Ret
 }
 pack3(Arg0: u8, Arg1: u8, Arg2: u8): S {
 B0:
 	0: MoveLoc[0](Arg0: u8)
 	1: StLoc[3](loc0: u8)
-	2: MoveLoc[1](Arg1: u8)
-	3: MoveLoc[3](loc0: u8)
-	4: MoveLoc[2](Arg2: u8)
-	5: Pack[0](S)
-	6: Ret
+	2: MoveLoc[3](loc0: u8)
+	3: StLoc[4](loc1: u8)
+	4: MoveLoc[1](Arg1: u8)
+	5: MoveLoc[4](loc1: u8)
+	6: MoveLoc[2](Arg2: u8)
+	7: Pack[0](S)
+	8: Ret
 }
 pack4(Arg0: u8, Arg1: u8, Arg2: u8): S {
 B0:
@@ -194,11 +218,13 @@ B0:
 	1: StLoc[3](loc0: u8)
 	2: MoveLoc[1](Arg1: u8)
 	3: StLoc[4](loc1: u8)
-	4: MoveLoc[2](Arg2: u8)
-	5: MoveLoc[3](loc0: u8)
-	6: MoveLoc[4](loc1: u8)
-	7: Pack[0](S)
-	8: Ret
+	4: MoveLoc[3](loc0: u8)
+	5: StLoc[5](loc2: u8)
+	6: MoveLoc[2](Arg2: u8)
+	7: MoveLoc[5](loc2: u8)
+	8: MoveLoc[4](loc1: u8)
+	9: Pack[0](S)
+	10: Ret
 }
 pack5(Arg0: u8, Arg1: u8, Arg2: u8): S {
 B0:
@@ -216,10 +242,12 @@ B0:
 	1: StLoc[3](loc0: u8)
 	2: MoveLoc[1](Arg1: u8)
 	3: StLoc[4](loc1: u8)
-	4: MoveLoc[2](Arg2: u8)
-	5: MoveLoc[4](loc1: u8)
-	6: MoveLoc[3](loc0: u8)
-	7: Pack[0](S)
-	8: Ret
+	4: MoveLoc[4](loc1: u8)
+	5: StLoc[5](loc2: u8)
+	6: MoveLoc[2](Arg2: u8)
+	7: MoveLoc[5](loc2: u8)
+	8: MoveLoc[3](loc0: u8)
+	9: Pack[0](S)
+	10: Ret
 }
 }

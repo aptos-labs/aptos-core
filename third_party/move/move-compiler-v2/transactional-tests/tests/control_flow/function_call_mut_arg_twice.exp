@@ -1,0 +1,25 @@
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
++ task 0 'publish'. lines 1-16:
++ Error: compilation errors:
++  error: implicit copy of mutable reference in local `rx` which is used later
++    ┌─ TEMPFILE:9:12
++    │
++  9 │     update(rx, 3, 4);
++    │            ^^ implicitly copied here
++ 10 │     update(rx, 5, 6);
++    │            -- used here
++ 
++ 
++ 
+= task 1 'run'. lines 18-18:
+- return values: 11
++ Error: Function execution failed with VMError: {
++     major_status: LINKER_ERROR,
++     sub_status: None,
++     location: undefined,
++     indices: redacted,
++     offsets: redacted,
++ }
+= 
