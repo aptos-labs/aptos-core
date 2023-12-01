@@ -109,8 +109,9 @@ where
             _ = cancellation_token.cancelled() => {
                 return Ok(());
             },
-            _ = tokio::time::sleep(Duration::from_millis(REDIS_FETCH_TASK_INTERVAL_IN_MILLIS)) => {
+            _ = {
                 // Continue.
+                // Only wait when in memory storage hits the head.
             },
         }
         let start_time = std::time::Instant::now();
@@ -204,6 +205,10 @@ where
             *current_metadata = Some(new_metadata.clone());
         }
         if redis_fetch_size == 0 {
+            tracing::info!("Redis is not ready for current fetch. Wait.");
+            tokio::time::sleep(Duration::from_millis(
+                REDIS_FETCH_TASK_INTERVAL_IN_MILLIS,
+            ));
             continue;
         }
         // Garbage collection. Note, this is *not a thread safe* operation; readers should
