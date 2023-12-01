@@ -94,6 +94,75 @@ yes
 After the above command, you will be prompted to confirm the transaction on your Ledger device. Once you confirm, the transaction will be submitted to the network. Note: Make sure you have `Blind Signing` enabled on your Ledger device. Otherwise you will not be able to sign transactions.
 `Blind Signing` - confirming a smart contract interaction you can’t verify through a human readable language.
 
+## Key rotation
+
+If you would like to use the Aptos ledger app with an existing account address, like one with a vanity prefix, you can rotate the account's authentication key.
+You can also rotate the authentication key of an account secured by a ledger hardware wallet, for example if you need to publish a transaction that is too large for your ledger to sign.
+
+
+```bash title="Generate a typical (not ledger) account with a vanity prefix"
+aptos key generate --vanity-prefix 0xaaa --output-file vanity-aaa
+```
+
+<details><summary>Output</summary>
+
+```bash
+{
+  "Result": {
+    "Account Address:": "0xaaa...",
+    "PublicKey Path": "vanity-aaa.pub",
+    "PrivateKey Path": "vanity-aaa"
+  }
+}
+```
+
+</details>
+
+```bash title="Initialize profile on testnet"
+aptos init \
+    --assume-yes \
+    --network testnet \
+    --private-key $(cat vanity-aaa) \
+    --profile aaa
+```
+
+<details><summary>Output</summary>
+
+```bash
+Configuring for profile aaa
+Configuring for network Testnet
+Using command line argument for private key
+Account 0xaaa... doesn't exist, creating it and funding it with 100000000 Octas
+Account 0xaaa... funded successfully
+
+---
+Aptos CLI is now set up for account 0xaaa... as profile aaa!  Run `aptos --help` for more information about commands
+{
+  "Result": "Success"
+}
+```
+
+</details>
+
+```bash title="Rotate the key to hardware wallet, derivation index 0"
+aptos account rotate-key \
+    --derivation-index 0 \
+    --profile aaa \
+    --save-to-profile aaa-ledger
+```
+
+:::tip
+You'll need to approve on your ledger.
+:::
+
+<details><summary>Output</summary>
+
+```bash
+```
+
+</details>
+
+
 ## Common Errors
 
 ### Error: Wrong raw transaction length

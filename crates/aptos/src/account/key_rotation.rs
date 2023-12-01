@@ -40,6 +40,10 @@ use std::{collections::BTreeMap, path::PathBuf};
 /// rotated you will need to use the original account address, with the
 /// new private key.  There is an interactive prompt to help you add it
 /// to a new profile.
+///
+/// If you wish to rotate from a ledger wallet, it must have its own
+/// profile. If you wish to rotate to a ledger wallet, specify the new
+/// derivation path or index accordingly.
 #[derive(Debug, Parser)]
 pub struct RotateKey {
     #[clap(flatten)]
@@ -142,7 +146,7 @@ impl CliCommand<RotateSummary> for RotateKey {
         let (new_private_key, new_public_key) = if new_derivation_path.is_some() {
             (
                 None,
-                aptos_ledger::get_public_key(new_derivation_path.clone().unwrap().as_str(), true)?,
+                aptos_ledger::get_public_key(new_derivation_path.clone().unwrap().as_str(), false)?,
             )
         } else {
             let new_private_key = self
@@ -187,7 +191,7 @@ impl CliCommand<RotateSummary> for RotateKey {
                 .unwrap()
                 .sign_arbitrary_message(&rotation_msg.clone())
         };
-        let rotation_proof_signed_by_new_private_key = if current_derivation_path.is_some() {
+        let rotation_proof_signed_by_new_private_key = if new_derivation_path.is_some() {
             aptos_ledger::sign_message(
                 new_derivation_path.clone().unwrap().as_str(),
                 &rotation_msg.clone(),
