@@ -1016,7 +1016,8 @@ The last step of genesis.
 
 
 
-<pre><code><b>include</b> <a href="genesis.md#0x1_genesis_InitalizeRequires">InitalizeRequires</a>;
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>include</b> <a href="genesis.md#0x1_genesis_InitalizeRequires">InitalizeRequires</a>;
 </code></pre>
 
 
