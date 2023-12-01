@@ -23,11 +23,11 @@ pub fn all_groups(c: &mut Criterion) {
     group.finish();
 
     let mut group = c.benchmark_group("scrape-gjm21-naive-sk-in-g2");
-    wvuf_benches::<scrape::Transcript, gjm21_naive::g2::GjmNaiveWVUF, WallTime>(&mut group);
+    wvuf_benches::<scrape::Transcript, gjm21_naive::g2::GjmInsecureWVUF, WallTime>(&mut group);
     group.finish();
 
     let mut group = c.benchmark_group("das-gjm21-naive-sk-in-g1");
-    wvuf_benches::<das::Transcript, gjm21_naive::g1::GjmNaiveWVUF, WallTime>(&mut group);
+    wvuf_benches::<das::Transcript, gjm21_naive::g1::GjmInsecureWVUF, WallTime>(&mut group);
     group.finish();
 }
 

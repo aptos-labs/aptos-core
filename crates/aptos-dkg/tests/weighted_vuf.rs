@@ -15,8 +15,8 @@ use sha3::{Digest, Sha3_256};
 fn all_weighted_vuf_bvt() {
     weighted_wvuf_bvt::<pvss::das::Transcript, PinkasWUF>();
 
-    weighted_wvuf_bvt::<pvss::scrape::Transcript, gjm21_naive::g2::GjmNaiveWVUF>();
-    weighted_wvuf_bvt::<pvss::das::Transcript, gjm21_naive::g1::GjmNaiveWVUF>();
+    weighted_wvuf_bvt::<pvss::scrape::Transcript, gjm21_naive::g2::GjmInsecureWVUF>();
+    weighted_wvuf_bvt::<pvss::das::Transcript, gjm21_naive::g1::GjmInsecureWVUF>();
 }
 
 fn weighted_wvuf_bvt<

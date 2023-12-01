@@ -1,7 +1,9 @@
+//! An insecure variant of [GJM+21e] that reuses the ElGamal randomness.
+//!
 //! # References
 //! \[GJM+21\] Aggregatable Distributed Key Generation; by Kobi Gurkan and Philipp Jovanovic and Mary Maller and Sarah Meiklejohn and Gilad Stern and Alin Tomescu; in Cryptology ePrint Archive, Report 2021/005; 2021; https://eprint.iacr.org/2021/005
 
-macro_rules! gjm21_wvuf_impl {
+macro_rules! gjm21_wvuf_insecure_impl {
     (
         $g1:ident,
         $g1_multi_exp:ident,
@@ -28,7 +30,7 @@ macro_rules! gjm21_wvuf_impl {
         use serde::{Deserialize, Serialize};
         use std::ops::{Add, Mul, Neg};
 
-        pub struct GjmNaiveWVUF;
+        pub struct GjmInsecureWVUF;
 
         #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
         pub struct Randomizers {
@@ -66,7 +68,7 @@ macro_rules! gjm21_wvuf_impl {
 
         /// Implements a weighted variant of the \[GJM+21e\] VUF scheme, compatible with *any* PVSS scheme with the right kind
         /// of secret key and public key.
-        impl WeightedVUF for GjmNaiveWVUF {
+        impl WeightedVUF for GjmInsecureWVUF {
             type PublicParameters = PublicParameters;
             type PubKey = pvss::dealt_pub_key::$g1::DealtPubKey;
             type SecretKey = pvss::dealt_secret_key::$g2::DealtSecretKey;
@@ -349,7 +351,7 @@ macro_rules! gjm21_wvuf_impl {
             }
         }
 
-        impl GjmNaiveWVUF {
+        impl GjmInsecureWVUF {
             fn hash_to_curve(msg: &[u8]) -> $G1Projective {
                 // TODO: add DST and aug
                 let dst = b"none";
@@ -363,7 +365,7 @@ macro_rules! gjm21_wvuf_impl {
 
 // This means SK is in G1
 pub mod g1 {
-    gjm21_wvuf_impl!(
+    gjm21_wvuf_insecure_impl!(
         g2,
         g2_multi_exp,
         g1,
@@ -404,7 +406,7 @@ pub mod g1 {
 
 // This means SK is in G2
 pub mod g2 {
-    gjm21_wvuf_impl!(
+    gjm21_wvuf_insecure_impl!(
         g1,
         g1_multi_exp,
         g2,
