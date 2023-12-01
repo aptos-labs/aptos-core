@@ -12,7 +12,7 @@ use aptos_indexer_grpc_utils::{
     counters::{log_grpc_step, IndexerGrpcStep},
     create_grpc_client,
     file_store_operator::{
-        FileStoreMetadata, FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator,
+        FileStoreMetadata, FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator, self,
     },
     types::RedisUrl,
 };
@@ -28,6 +28,12 @@ use url::Url;
 
 type ChainID = u32;
 type StartingVersion = u64;
+
+const GCS_LOOKUP_FREQUENCY_IN_SECS: u64 = 60;
+const FILE_STORE_VERSIONS_RESERVED: u64 = 30_000;
+// Cache worker will wait if filestore is behind by
+// `FILE_STORE_VERSIONS_RESERVED` versions
+const CACHE_WORKER_WAIT_FOR_FILE_STORE_IN_SECS: u64 = 1;
 
 const GCS_LOOKUP_FREQUENCY_IN_SECS: u64 = 60;
 const FILE_STORE_VERSIONS_RESERVED: u64 = 30_000;
