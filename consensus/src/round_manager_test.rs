@@ -273,7 +273,7 @@ impl NodeSetup {
             ChainHealthBackoffConfig::new_no_backoff(),
             false,
             Arc::new(SystemTransactionPool::new()),
-            onchain_consensus_config.should_propose_system_txns(),
+            onchain_consensus_config.system_txn_enabled(),
         );
 
         let round_state = Self::create_round_state(time_service);
@@ -2052,7 +2052,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
 
     let mut onchain_config_inner = ConsensusConfigV1Ext::default_if_missing();
-    onchain_config_inner.update_extra_features(
+    onchain_config_inner.extra_features.update_extra_features(
         vec![ConsensusExtraFeature::ProposalWithSystemTransactions],
         vec![],
     );

@@ -33,7 +33,7 @@ use futures::future::BoxFuture;
 use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 #[cfg(test)]
@@ -302,32 +302,9 @@ impl ProposalGenerator {
 
             let voting_power_ratio = proposer_election.get_voting_power_participation_ratio(round);
 
-            let (mut max_block_txns, mut max_block_bytes, mut proposal_delay) = self
+            let (max_block_txns, max_block_bytes, proposal_delay) = self
                 .calculate_max_block_sizes(voting_power_ratio, timestamp)
                 .await;
-
-            let sys_txn_pull_timer = Instant::now();
-            let sys_txns = if self.should_propose_sys_txns {
-                let pending_sys_txn_hashes: HashSet<HashValue> = pending_blocks
-                    .iter()
-                    .filter_map(|block| block.sys_txns())
-                    .flatten()
-                    .map(SystemTransaction::hash)
-                    .collect();
-
-                self.sys_txn_pool_client.pull(
-                    max_block_txns as usize,
-                    max_block_bytes as usize,
-                    SystemTransactionFilter::PendingTxnHashSet(pending_sys_txn_hashes),
-                )
-            } else {
-                vec![]
-            };
-
-            let sys_txn_total_bytes = sys_txns.iter().map(|txn| txn.size_in_bytes() as u64).sum();
-            max_block_txns = max_block_txns.saturating_sub(sys_txns.len() as u64);
-            max_block_bytes = max_block_bytes.saturating_sub(sys_txn_total_bytes);
-            proposal_delay = proposal_delay.saturating_sub(sys_txn_pull_timer.elapsed());
 
             PROPOSER_DELAY_PROPOSAL.set(proposal_delay.as_secs_f64());
             if !proposal_delay.is_zero() {
@@ -349,12 +326,22 @@ impl ProposalGenerator {
                 .max(max_pending_block_bytes as f32 / self.max_block_bytes as f32);
             PROPOSER_PENDING_BLOCKS_COUNT.set(pending_blocks.len() as i64);
             PROPOSER_PENDING_BLOCKS_FILL_FRACTION.set(max_fill_fraction as f64);
-            let payload = self
+
+            let pending_sys_txn_hashes: HashSet<HashValue> = pending_blocks
+                .iter()
+                .filter_map(|block| block.sys_txns())
+                .flatten()
+                .map(SystemTransaction::hash)
+                .collect();
+            let sys_payload_filter =
+                SystemTransactionFilter::PendingTxnHashSet(pending_sys_txn_hashes);
+            let (sys_txns, payload) = self
                 .payload_client
                 .pull_payload(
                     self.quorum_store_poll_time.saturating_sub(proposal_delay),
                     max_block_txns,
                     max_block_bytes,
+                    sys_payload_filter,
                     payload_filter,
                     wait_callback,
                     pending_ordering,

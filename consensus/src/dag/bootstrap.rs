@@ -322,6 +322,7 @@ pub struct DagBootstrapper {
     state_computer: Arc<dyn StateComputer>,
     ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
     quorum_store_enabled: bool,
+    sys_txn_enabled: bool,
 }
 
 impl DagBootstrapper {
@@ -342,6 +343,7 @@ impl DagBootstrapper {
         state_computer: Arc<dyn StateComputer>,
         ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
         quorum_store_enabled: bool,
+        sys_txn_enabled: bool,
     ) -> Self {
         Self {
             self_peer,
@@ -359,6 +361,7 @@ impl DagBootstrapper {
             state_computer,
             ordered_nodes_tx,
             quorum_store_enabled,
+            sys_txn_enabled,
         }
     }
 
@@ -543,6 +546,7 @@ impl DagBootstrapper {
             self.storage.clone(),
             fetch_requester,
             self.config.node_payload_config.clone(),
+            self.sys_txn_enabled,
         );
         let fetch_handler = FetchRequestHandler::new(dag_store.clone(), self.epoch_state.clone());
 
@@ -648,6 +652,7 @@ pub(super) fn bootstrap_dag_for_test(
         payload_client,
         state_computer,
         ordered_nodes_tx,
+        false,
         false,
     );
 

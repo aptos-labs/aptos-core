@@ -31,6 +31,7 @@ pub(crate) struct NodeBroadcastHandler {
     storage: Arc<dyn DAGStorage>,
     fetch_requester: Arc<dyn TFetchRequester>,
     payload_config: DagPayloadConfig,
+    sys_txn_enabled: bool,
 }
 
 impl NodeBroadcastHandler {
@@ -41,6 +42,7 @@ impl NodeBroadcastHandler {
         storage: Arc<dyn DAGStorage>,
         fetch_requester: Arc<dyn TFetchRequester>,
         payload_config: DagPayloadConfig,
+        sys_txn_enabled: bool,
     ) -> Self {
         let epoch = epoch_state.epoch;
         let votes_by_round_peer = read_votes_from_storage(&storage, epoch);
@@ -53,6 +55,7 @@ impl NodeBroadcastHandler {
             storage,
             fetch_requester,
             payload_config,
+            sys_txn_enabled,
         }
     }
 
@@ -79,6 +82,10 @@ impl NodeBroadcastHandler {
     }
 
     fn validate(&self, node: Node) -> anyhow::Result<Node> {
+        if self.sys_txn_enabled {
+            ensure!(node.sys_txns().len() == 0);
+        }
+
         ensure!(node.payload().len() as u64 <= self.payload_config.max_receiving_txns_per_round);
         ensure!(
             node.payload().size() as u64 <= self.payload_config.max_receiving_size_per_round_bytes

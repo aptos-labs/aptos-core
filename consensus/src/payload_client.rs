@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    counters::WAIT_FOR_FULL_BLOCKS_TRIGGERED, error::QuorumStoreError, monitor,
+    counters::{SYSTEM_TXN_PULL_DURATION, WAIT_FOR_FULL_BLOCKS_TRIGGERED},
+    error::QuorumStoreError,
+    monitor,
     state_replication::PayloadClient,
 };
 use anyhow::Result;
@@ -11,15 +13,28 @@ use aptos_consensus_types::{
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
 use aptos_logger::prelude::*;
+use aptos_types::system_txn::{
+    pool::{SystemTransactionFilter, SystemTransactionPoolClient},
+    SystemTransaction,
+};
 use fail::fail_point;
 use futures::{
     channel::{mpsc, oneshot},
     future::BoxFuture,
 };
-use std::time::{Duration, Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::time::{sleep, timeout};
 
 const NO_TXN_DELAY: u64 = 30; // TODO: consider moving to a config
+
+pub struct MixedPayloadClient {
+    pub sys_txn_enabled: bool,
+    pub sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
+    pub quorum_store_client: QuorumStoreClient,
+}
 
 /// Client that pulls blocks from Quorum Store
 #[derive(Clone)]
@@ -82,21 +97,43 @@ impl QuorumStoreClient {
 }
 
 #[async_trait::async_trait]
-impl PayloadClient for QuorumStoreClient {
+impl PayloadClient for MixedPayloadClient {
     async fn pull_payload(
         &self,
-        max_poll_time: Duration,
-        max_items: u64,
-        max_bytes: u64,
+        mut max_poll_time: Duration,
+        mut max_items: u64,
+        mut max_bytes: u64,
+        exclude_sys_txns: SystemTransactionFilter,
         exclude_payloads: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,
         pending_uncommitted_blocks: usize,
         recent_max_fill_fraction: f32,
-    ) -> Result<Payload, QuorumStoreError> {
+    ) -> Result<(Vec<SystemTransaction>, Payload), QuorumStoreError> {
+        let sys_txn_pull_timer = SYSTEM_TXN_PULL_DURATION.start_timer();
+        let sys_txns = if self.sys_txn_enabled {
+            self.sys_txn_pool_client
+                .pull(max_items, max_bytes, exclude_sys_txns)
+        } else {
+            vec![]
+        };
+        max_items -= sys_txns.len() as u64;
+        max_bytes -= sys_txns
+            .iter()
+            .map(|txn| txn.size_in_bytes())
+            .sum::<usize>() as u64;
+        max_poll_time = max_poll_time.saturating_sub(Duration::from_secs_f64(
+            sys_txn_pull_timer.stop_and_record(),
+        ));
+
         let return_non_full = recent_max_fill_fraction
-            < self.wait_for_full_blocks_above_recent_fill_threshold
-            && pending_uncommitted_blocks < self.wait_for_full_blocks_above_pending_blocks;
+            < self
+                .quorum_store_client
+                .wait_for_full_blocks_above_recent_fill_threshold
+            && pending_uncommitted_blocks
+                < self
+                    .quorum_store_client
+                    .wait_for_full_blocks_above_pending_blocks;
         let return_empty = pending_ordering && return_non_full;
 
         WAIT_FOR_FULL_BLOCKS_TRIGGERED.observe(if !return_non_full { 1.0 } else { 0.0 });
@@ -108,10 +145,11 @@ impl PayloadClient for QuorumStoreClient {
         // keep polling QuorumStore until there's payloads available or there's still pending payloads
         let start_time = Instant::now();
 
-        let payload = loop {
+        let user_payload = loop {
             // Make sure we don't wait more than expected, due to thread scheduling delays/processing time consumed
             let done = start_time.elapsed() >= max_poll_time;
             let payload = self
+                .quorum_store_client
                 .pull_internal(
                     max_items,
                     max_bytes,
@@ -131,7 +169,7 @@ impl PayloadClient for QuorumStoreClient {
         info!(
             elapsed_time = start_time.elapsed(),
             max_poll_time = max_poll_time,
-            payload_len = payload.len(),
+            payload_len = user_payload.len(),
             max_items = max_items,
             max_bytes = max_bytes,
             pending_ordering = pending_ordering,
@@ -140,6 +178,6 @@ impl PayloadClient for QuorumStoreClient {
             duration = start_time.elapsed().as_secs_f32(),
             "Pull payloads from QuorumStore: proposal"
         );
-        Ok(payload)
+        Ok((sys_txns, user_payload))
     }
 }

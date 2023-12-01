@@ -55,6 +55,7 @@ pub enum BlockType {
     DAGBlock {
         author: Author,
         failed_authors: Vec<(Round, Author)>,
+        sys_txns: Vec<SystemTransaction>,
         payload: Payload,
         node_digests: Vec<HashValue>,
         parent_block_id: HashValue,
@@ -138,10 +139,8 @@ impl BlockData {
     pub fn sys_txns(&self) -> Option<&Vec<SystemTransaction>> {
         match &self.block_type {
             BlockType::ProposalExt(proposal_ext) => proposal_ext.sys_txns(),
-            BlockType::Proposal { .. }
-            | BlockType::NilBlock { .. }
-            | BlockType::Genesis
-            | BlockType::DAGBlock { .. } => None,
+            BlockType::Proposal { .. } | BlockType::NilBlock { .. } | BlockType::Genesis => None,
+            BlockType::DAGBlock { sys_txns, .. } => Some(sys_txns),
         }
     }
 
@@ -279,6 +278,7 @@ impl BlockData {
         epoch: u64,
         round: Round,
         timestamp_usecs: u64,
+        sys_txns: Vec<SystemTransaction>,
         payload: Payload,
         author: Author,
         failed_authors: Vec<(Round, Author)>,
@@ -299,6 +299,7 @@ impl BlockData {
             ),
             block_type: BlockType::DAGBlock {
                 author,
+                sys_txns,
                 payload,
                 failed_authors,
                 node_digests,

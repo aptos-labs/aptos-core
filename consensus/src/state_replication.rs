@@ -18,8 +18,10 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorResult, StateComputeResult};
 use aptos_types::{
-    block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
+    block_executor::config::BlockExecutorConfigFromOnchain,
+    epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
+    system_txn::{pool::SystemTransactionFilter, SystemTransaction},
 };
 use futures::future::BoxFuture;
 use std::{sync::Arc, time::Duration};
@@ -36,12 +38,13 @@ pub trait PayloadClient: Send + Sync {
         max_poll_time: Duration,
         max_items: u64,
         max_bytes: u64,
+        sys_exclude: SystemTransactionFilter,
         exclude: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,
         pending_uncommitted_blocks: usize,
         recent_max_fill_fraction: f32,
-    ) -> Result<Payload, QuorumStoreError>;
+    ) -> Result<(Vec<SystemTransaction>, Payload), QuorumStoreError>;
 
     fn trace_payloads(&self) {}
 }

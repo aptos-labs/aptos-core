@@ -11,6 +11,7 @@ use aptos_consensus_types::{
     request_response::GetPayloadCommand,
 };
 use aptos_types::{
+    system_txn::{pool::SystemTransactionFilter, SystemTransaction},
     transaction::{ExecutionStatus, TransactionStatus},
     vm_status::StatusCode,
 };
@@ -56,13 +57,14 @@ impl PayloadClient for MockPayloadManager {
         _max_poll_time: Duration,
         _max_size: u64,
         _max_bytes: u64,
+        _sys_exclude: SystemTransactionFilter,
         _exclude: PayloadFilter,
         _wait_callback: BoxFuture<'static, ()>,
         _pending_ordering: bool,
         _pending_uncommitted_blocks: usize,
         _recent_fill_fraction: f32,
-    ) -> Result<Payload, QuorumStoreError> {
+    ) -> Result<(Vec<SystemTransaction>, Payload), QuorumStoreError> {
         // generate 1k txn is too slow with coverage instrumentation
-        Ok(random_payload(10))
+        Ok((vec![], random_payload(10)))
     }
 }

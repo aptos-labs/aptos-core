@@ -6,13 +6,14 @@ use std::collections::HashSet;
 
 pub enum SystemTransactionFilter {
     PendingTxnHashSet(HashSet<HashValue>),
+    RejectAll,
 }
 
 pub trait SystemTransactionPoolClient: Send + Sync {
     fn pull(
         &self,
-        max_items: usize,
-        max_bytes: usize,
+        max_items: u64,
+        max_bytes: u64,
         exclude: SystemTransactionFilter,
     ) -> Vec<SystemTransaction>;
 }
@@ -33,8 +34,8 @@ impl Default for SystemTransactionPool {
 impl SystemTransactionPoolClient for SystemTransactionPool {
     fn pull(
         &self,
-        _max_items: usize,
-        _max_bytes: usize,
+        _max_items: u64,
+        _max_bytes: u64,
         _exclude: SystemTransactionFilter,
     ) -> Vec<SystemTransaction> {
         vec![]

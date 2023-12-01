@@ -25,6 +25,7 @@ use aptos_types::{
     aggregate_signature::{AggregateSignature, PartialSignatures},
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
+    system_txn::SystemTransaction,
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
@@ -55,6 +56,7 @@ struct NodeWithoutDigest<'a> {
     round: Round,
     author: Author,
     timestamp: u64,
+    sys_txns: &'a Vec<SystemTransaction>,
     payload: &'a Payload,
     parents: &'a Vec<NodeCertificate>,
     extensions: &'a Extensions,
@@ -78,6 +80,7 @@ impl<'a> From<&'a Node> for NodeWithoutDigest<'a> {
             round: node.metadata.round,
             author: node.metadata.author,
             timestamp: node.metadata.timestamp,
+            sys_txns: &node.sys_txns,
             payload: &node.payload,
             parents: &node.parents,
             extensions: &node.extensions,
@@ -146,6 +149,7 @@ impl Deref for NodeMetadata {
 #[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq)]
 pub struct Node {
     metadata: NodeMetadata,
+    sys_txns: Vec<SystemTransaction>,
     payload: Payload,
     parents: Vec<NodeCertificate>,
     extensions: Extensions,
@@ -157,6 +161,7 @@ impl Node {
         round: Round,
         author: Author,
         timestamp: u64,
+        sys_txns: Vec<SystemTransaction>,
         payload: Payload,
         parents: Vec<NodeCertificate>,
         extensions: Extensions,
@@ -166,6 +171,7 @@ impl Node {
             round,
             author,
             timestamp,
+            &sys_txns,
             &payload,
             &parents,
             &extensions,
@@ -181,6 +187,7 @@ impl Node {
                 timestamp,
                 digest,
             },
+            sys_txns,
             payload,
             parents,
             extensions,
@@ -196,6 +203,7 @@ impl Node {
     ) -> Self {
         Self {
             metadata,
+            sys_txns: vec![],
             payload,
             parents,
             extensions,
@@ -208,6 +216,7 @@ impl Node {
         round: Round,
         author: Author,
         timestamp: u64,
+        sys_txns: &Vec<SystemTransaction>,
         payload: &Payload,
         parents: &Vec<NodeCertificate>,
         extensions: &Extensions,
@@ -217,6 +226,7 @@ impl Node {
             round,
             author,
             timestamp,
+            sys_txns,
             payload,
             parents,
             extensions,
@@ -230,6 +240,7 @@ impl Node {
             self.metadata.round,
             self.metadata.author,
             self.metadata.timestamp,
+            &self.sys_txns,
             &self.payload,
             &self.parents,
             &self.extensions,
@@ -278,6 +289,10 @@ impl Node {
 
     pub fn payload(&self) -> &Payload {
         &self.payload
+    }
+
+    pub fn sys_txns(&self) -> &Vec<SystemTransaction> {
+        &self.sys_txns
     }
 
     pub fn verify(&self, sender: Author, verifier: &ValidatorVerifier) -> anyhow::Result<()> {

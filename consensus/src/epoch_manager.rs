@@ -38,7 +38,7 @@ use crate::{
         IncomingDAGRequest, IncomingRpcRequest, NetworkReceivers, NetworkSender,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
-    payload_client::QuorumStoreClient,
+    payload_client::{MixedPayloadClient, QuorumStoreClient},
     payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
     quorum_store::{
@@ -877,7 +877,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             chain_health_backoff_config,
             self.quorum_store_enabled,
             self.sys_txn_pool_client.clone(),
-            onchain_consensus_config.should_propose_system_txns(),
+            onchain_consensus_config.system_txn_enabled(),
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::LIFO,
@@ -998,13 +998,21 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.set_epoch_start_metrics(epoch_state);
         self.quorum_store_enabled = self.enable_quorum_store(consensus_config);
         let network_sender = self.create_network_sender(epoch_state);
-        let (payload_manager, payload_client, quorum_store_builder) = self
+        let (payload_manager, quorum_store_client, quorum_store_builder) = self
             .init_payload_provider(epoch_state, network_sender.clone(), consensus_config)
             .await;
-
+        let mixed_payload_client = MixedPayloadClient {
+            sys_txn_enabled: consensus_config.system_txn_enabled(),
+            sys_txn_pool_client: self.sys_txn_pool_client.clone(),
+            quorum_store_client,
+        };
         self.init_commit_state_computer(epoch_state, payload_manager.clone(), execution_config);
         self.start_quorum_store(quorum_store_builder);
-        (network_sender, Arc::new(payload_client), payload_manager)
+        (
+            network_sender,
+            Arc::new(mixed_payload_client),
+            payload_manager,
+        )
     }
 
     async fn start_new_epoch_with_joltean(
@@ -1093,6 +1101,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             state_computer,
             block_tx,
             onchain_consensus_config.quorum_store_enabled(),
+            onchain_consensus_config.system_txn_enabled(),
         );
 
         let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);
