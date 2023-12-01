@@ -242,7 +242,6 @@ fn serialize_internal_bn254(
             element
                 .serialize_uncompressed(&mut buf)
                 .map_err(|_e| abort_invariant_violated())?;
-            buf.reverse();
             Ok(smallvec![Value::vector_u8(buf)])
         },
         (BN254Structure::BN254Fq12, BN254SerializationFormat::BN254Fq12LscLsb) => {
@@ -253,7 +252,6 @@ fn serialize_internal_bn254(
             element
                 .serialize_uncompressed(&mut buf)
                 .map_err(|_e| abort_invariant_violated())?;
-            buf.reverse();
             Ok(smallvec![Value::vector_u8(buf)])
         },
         (BN254Structure::BN254G1, BN254SerializationFormat::BN254G1Uncompressed) => {
