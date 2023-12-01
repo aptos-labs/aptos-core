@@ -6,7 +6,7 @@ use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_executor_types::{parsed_transaction_output::TransactionsWithParsedOutput, ProofReader};
-use aptos_logger::{debug, info};
+use aptos_logger::info;
 use aptos_scratchpad::FrozenSparseMerkleTree;
 use aptos_storage_interface::{
     cached_state_view::{ShardedStateCache, StateCache},

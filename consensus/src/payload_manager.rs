@@ -21,7 +21,6 @@ use aptos_types::transaction::SignedTransaction;
 use futures::{channel::mpsc::Sender, SinkExt};
 use std::sync::Arc;
 use tokio::sync::oneshot;
-use aptos_types::system_txn::SystemTransaction;
 
 pub trait TPayloadManager: Send + Sync {
     fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64);
