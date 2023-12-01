@@ -3,6 +3,8 @@
 //! # References
 //! \[GJM+21\] Aggregatable Distributed Key Generation; by Kobi Gurkan and Philipp Jovanovic and Mary Maller and Sarah Meiklejohn and Gilad Stern and Alin Tomescu; in Cryptology ePrint Archive, Report 2021/005; 2021; https://eprint.iacr.org/2021/005
 
+pub const SCRAPE_PP_TO_GJM21_PP_DST: &[u8; 25] = b"ScrapeToGjm21WvufInsecure";
+
 macro_rules! gjm21_wvuf_insecure_impl {
     (
         $g1:ident,
@@ -365,6 +367,8 @@ macro_rules! gjm21_wvuf_insecure_impl {
 
 // This means SK is in G1
 pub mod g1 {
+    use crate::weighted_vuf::gjm21_insecure::SCRAPE_PP_TO_GJM21_PP_DST;
+
     gjm21_wvuf_insecure_impl!(
         g2,
         g2_multi_exp,
@@ -384,7 +388,7 @@ pub mod g1 {
             let seed = pp.to_bytes();
 
             // TODO(Security): domain separators / DSTs
-            let dst = b"ScrapeToGjm21WvufNaive";
+            let dst = SCRAPE_PP_TO_GJM21_PP_DST;
             let hat_h_2 = G1Projective::hash_to_curve(seed.as_slice(), dst, b"hat_h_2");
             let hat_h_3 = G1Projective::hash_to_curve(seed.as_slice(), dst, b"hat_h_3");
             let hat_h_4 = G1Projective::hash_to_curve(seed.as_slice(), dst, b"hat_h_4");
@@ -406,6 +410,8 @@ pub mod g1 {
 
 // This means SK is in G2
 pub mod g2 {
+    use crate::weighted_vuf::gjm21_insecure::SCRAPE_PP_TO_GJM21_PP_DST;
+
     gjm21_wvuf_insecure_impl!(
         g1,
         g1_multi_exp,
@@ -425,7 +431,7 @@ pub mod g2 {
             let seed = pp.to_bytes();
 
             // TODO(Security): domain separators / DSTs
-            let dst = b"ScrapeToGjm21WvufNaive";
+            let dst = SCRAPE_PP_TO_GJM21_PP_DST;
             let hat_h_2 = G2Projective::hash_to_curve(seed.as_slice(), dst, b"hat_h_2");
             let hat_h_3 = G2Projective::hash_to_curve(seed.as_slice(), dst, b"hat_h_3");
             let hat_h_4 = G2Projective::hash_to_curve(seed.as_slice(), dst, b"hat_h_4");

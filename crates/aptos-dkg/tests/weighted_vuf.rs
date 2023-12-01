@@ -3,7 +3,7 @@ use aptos_dkg::pvss::test_utils::NoAux;
 use aptos_dkg::pvss::traits::{Convert, SecretSharingConfig, Transcript};
 use aptos_dkg::pvss::{test_utils, Player, ThresholdConfig, WeightedConfig, WeightedTranscript};
 use aptos_dkg::utils::random::random_scalar;
-use aptos_dkg::weighted_vuf::gjm21_naive;
+use aptos_dkg::weighted_vuf::gjm21_insecure;
 use aptos_dkg::weighted_vuf::pinkas::PinkasWUF;
 use aptos_dkg::weighted_vuf::traits::WeightedVUF;
 use rand::rngs::StdRng;
@@ -15,8 +15,8 @@ use sha3::{Digest, Sha3_256};
 fn all_weighted_vuf_bvt() {
     weighted_wvuf_bvt::<pvss::das::Transcript, PinkasWUF>();
 
-    weighted_wvuf_bvt::<pvss::scrape::Transcript, gjm21_naive::g2::GjmInsecureWVUF>();
-    weighted_wvuf_bvt::<pvss::das::Transcript, gjm21_naive::g1::GjmInsecureWVUF>();
+    weighted_wvuf_bvt::<pvss::scrape::Transcript, gjm21_insecure::g2::GjmInsecureWVUF>();
+    weighted_wvuf_bvt::<pvss::das::Transcript, gjm21_insecure::g1::GjmInsecureWVUF>();
 }
 
 fn weighted_wvuf_bvt<

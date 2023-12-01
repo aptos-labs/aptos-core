@@ -11,7 +11,7 @@ use std::iter::zip;
 use aptos_dkg::pvss::test_utils::{get_weighted_configs_for_benchmarking, setup_dealing, NoAux};
 use aptos_dkg::pvss::traits::{SecretSharingConfig, Transcript};
 use aptos_dkg::pvss::{das, scrape, Player, ThresholdConfig, WeightedConfig, WeightedTranscript};
-use aptos_dkg::weighted_vuf::gjm21_naive;
+use aptos_dkg::weighted_vuf::gjm21_insecure;
 use aptos_dkg::weighted_vuf::pinkas::PinkasWUF;
 use aptos_dkg::weighted_vuf::traits::WeightedVUF;
 
@@ -22,12 +22,12 @@ pub fn all_groups(c: &mut Criterion) {
     wvuf_benches::<das::Transcript, PinkasWUF, WallTime>(&mut group);
     group.finish();
 
-    let mut group = c.benchmark_group("scrape-gjm21-naive-sk-in-g2");
-    wvuf_benches::<scrape::Transcript, gjm21_naive::g2::GjmInsecureWVUF, WallTime>(&mut group);
+    let mut group = c.benchmark_group("scrape-gjm21-insecure-sk-in-g2");
+    wvuf_benches::<scrape::Transcript, gjm21_insecure::g2::GjmInsecureWVUF, WallTime>(&mut group);
     group.finish();
 
-    let mut group = c.benchmark_group("das-gjm21-naive-sk-in-g1");
-    wvuf_benches::<das::Transcript, gjm21_naive::g1::GjmInsecureWVUF, WallTime>(&mut group);
+    let mut group = c.benchmark_group("das-gjm21-insecure-sk-in-g1");
+    wvuf_benches::<das::Transcript, gjm21_insecure::g1::GjmInsecureWVUF, WallTime>(&mut group);
     group.finish();
 }
 
