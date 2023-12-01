@@ -36,23 +36,13 @@ metadata:
     # Allow HTTP but always return 301 because we have redirectToHttps enabled
     kubernetes.io/ingress.allow-http: "true"
     kubernetes.io/ingress.global-static-ip-name: {{ .Values.ingress.gce_static_ip }}
+    {{- if .Values.ingress.gce_managed_certificate }}
     networking.gke.io/managed-certificates: {{ .Values.ingress.gce_managed_certificate }}
     networking.gke.io/v1beta1.FrontendConfig: {{ include "testnet-addons.fullname" . }}
+    {{- end }} # ingress.gce_managed_certificate
     {{- end }} # "GKE"
 spec:
   rules:
-  {{- if .Values.service.domain }}
-  - host: api.{{ .Values.service.domain }}
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: {{ include "testnet-addons.fullname" . }}-api
-            port:
-              number: 80
-  {{- end }}
   - host: {{ .Values.service.domain }}
     http:
       paths:
@@ -78,7 +68,7 @@ spec:
             port:
               number: 80
 ---
-{{- if eq .Values.cloud "GKE" }}
+{{- if .Values.ingress.gce_managed_certificate }}
 apiVersion: networking.gke.io/v1beta1
 kind: FrontendConfig
 metadata:
@@ -94,6 +84,5 @@ metadata:
 spec:
   domains:
     - {{ .Values.service.domain }}
-    - api.{{ .Values.service.domain }}
 ---
 {{- end }}
