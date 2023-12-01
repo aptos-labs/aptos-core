@@ -17,6 +17,7 @@ use aptos_crypto::{
     encoding_type::EncodingType,
     PrivateKey, SigningKey,
 };
+use aptos_ledger;
 use aptos_rest_client::{
     aptos_api_types::{AptosError, AptosErrorCode},
     error::{AptosErrorResponse, RestError},
@@ -68,7 +69,7 @@ pub struct RotateKey {
     pub(crate) new_private_key: Option<String>,
 
     #[clap(flatten)]
-    pub(crate) hardware_wallet_options: HardwareWalletOptions,
+    pub(crate) new_hardware_wallet_options: HardwareWalletOptions,
 
     /// Name of the profile to save the new private key
     ///
@@ -113,56 +114,99 @@ impl CliCommand<RotateSummary> for RotateKey {
     }
 
     async fn execute(self) -> CliTypedResult<RotateSummary> {
-        let new_private_key = self
-            .extract_private_key(self.txn_options.encoding_options.encoding)?
-            .ok_or_else(|| {
-                CliError::CommandArgumentError(
-                    "One of ['--new-private-key', '--new-private-key-file'] must be used"
-                        .to_string(),
-                )
-            })?;
+        // Get current signer options.
+        let current_derivation_path = if self.txn_options.profile_options.profile.is_some() {
+            self.txn_options.profile_options.derivation_path()?
+        } else {
+            None
+        };
+        let (current_private_key, current_address, current_public_key) = if current_derivation_path
+            .is_some()
+        {
+            (
+                None,
+                self.txn_options.profile_options.account_address()?,
+                self.txn_options.profile_options.public_key()?,
+            )
+        } else {
+            let (current_private_key, current_address) = self.txn_options.get_key_and_address()?;
+            (
+                Some(current_private_key),
+                current_address,
+                self.txn_options.get_public_key()?,
+            )
+        };
 
-        let (current_private_key, sender_address) = self.txn_options.get_key_and_address()?;
+        // Get new signer options.
+        let new_derivation_path = self.new_hardware_wallet_options.extract_derivation_path()?;
+        let (new_private_key, new_public_key) = if new_derivation_path.is_some() {
+            (
+                None,
+                aptos_ledger::get_public_key(new_derivation_path.clone().unwrap().as_str(), true)?,
+            )
+        } else {
+            let new_private_key = self
+                .extract_private_key(self.txn_options.encoding_options.encoding)?
+                .ok_or_else(|| {
+                    CliError::CommandArgumentError("Unable to parse new private key".to_string())
+                })?;
+            (Some(new_private_key.clone()), new_private_key.public_key())
+        };
 
-        if new_private_key == current_private_key {
+        // Check that public key is actually changing.
+        if new_public_key == current_public_key {
             return Err(CliError::CommandArgumentError(
-                "New private key cannot be the same as the current private key".to_string(),
+                "New public key cannot be the same as the current public key".to_string(),
             ));
         }
 
-        // Get sequence number for account
-        let sequence_number = self.txn_options.sequence_number(sender_address).await?;
-        let auth_key = self.txn_options.auth_key(sender_address).await?;
-
+        // Construct rotation proof challenge.
+        let sequence_number = self.txn_options.sequence_number(current_address).await?;
+        let auth_key = self.txn_options.auth_key(current_address).await?;
         let rotation_proof = RotationProofChallenge {
             account_address: CORE_CODE_ADDRESS,
             module_name: "account".to_string(),
             struct_name: "RotationProofChallenge".to_string(),
             sequence_number,
-            originator: sender_address,
+            originator: current_address,
             current_auth_key: AccountAddress::from_bytes(auth_key)
                 .map_err(|err| CliError::UnableToParse("auth_key", err.to_string()))?,
-            new_public_key: new_private_key.public_key().to_bytes().to_vec(),
+            new_public_key: new_public_key.to_bytes().to_vec(),
         };
-
         let rotation_msg =
             bcs::to_bytes(&rotation_proof).map_err(|err| CliError::BCS("rotation_proof", err))?;
 
-        // Signs the struct using both the current private key and the next private key
-        let rotation_proof_signed_by_current_private_key =
-            current_private_key.sign_arbitrary_message(&rotation_msg.clone());
-        let rotation_proof_signed_by_new_private_key =
-            new_private_key.sign_arbitrary_message(&rotation_msg);
+        // Sign the struct using both the current private key and the next private key.
+        let rotation_proof_signed_by_current_private_key = if current_derivation_path.is_some() {
+            aptos_ledger::sign_message(
+                current_derivation_path.clone().unwrap().as_str(),
+                &rotation_msg.clone(),
+            )?
+        } else {
+            current_private_key
+                .unwrap()
+                .sign_arbitrary_message(&rotation_msg.clone())
+        };
+        let rotation_proof_signed_by_new_private_key = if current_derivation_path.is_some() {
+            aptos_ledger::sign_message(
+                new_derivation_path.clone().unwrap().as_str(),
+                &rotation_msg.clone(),
+            )?
+        } else {
+            new_private_key
+                .clone()
+                .unwrap()
+                .sign_arbitrary_message(&rotation_msg.clone())
+        };
 
+        // Submit transaction.
         let txn_summary = self
             .txn_options
             .submit_transaction(aptos_stdlib::account_rotate_authentication_key(
                 0,
-                // Existing public key
-                current_private_key.public_key().to_bytes().to_vec(),
+                current_public_key.to_bytes().to_vec(),
                 0,
-                // New public key
-                new_private_key.public_key().to_bytes().to_vec(),
+                new_public_key.to_bytes().to_vec(),
                 rotation_proof_signed_by_current_private_key
                     .to_bytes()
                     .to_vec(),
@@ -243,9 +287,10 @@ impl CliCommand<RotateSummary> for RotateKey {
         }
 
         let mut profile_config = ProfileConfig {
-            private_key: Some(new_private_key.clone()),
-            public_key: Some(new_private_key.public_key()),
-            account: Some(sender_address),
+            public_key: Some(new_public_key),
+            account: Some(current_address),
+            private_key: new_private_key,
+            derivation_path: new_derivation_path,
             ..self.txn_options.profile_options.profile()?
         };
 
