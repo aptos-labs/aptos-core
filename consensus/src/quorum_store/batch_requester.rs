@@ -81,17 +81,15 @@ impl BatchRequesterState {
                     digest
                 )
             };
-        } else {
-            if self
-                .ret_tx
-                .send(Err(ExecutorError::CouldNotGetData))
-                .is_err()
-            {
-                debug!(
-                    "Receiver of requested batch not available for unavailable digest {}",
-                    digest
-                );
-            }
+        } else if self
+            .ret_tx
+            .send(Err(ExecutorError::CouldNotGetData))
+            .is_err()
+        {
+            debug!(
+                "Receiver of requested batch not available for unavailable digest {}",
+                digest
+            );
         }
     }
 }
@@ -177,7 +175,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
                             // Short-circuit if the chain has moved beyond expiration
                             Ok(BatchResponse::NotFound(ledger_info)) => {
                                 counters::RECEIVED_BATCH_NOT_FOUND_COUNT.inc();
-                                if ledger_info.commit_info().epoch() == self.epoch
+                                if ledger_info.commit_info().epoch() == epoch
                                     && ledger_info.commit_info().timestamp_usecs() > expiration
                                     && ledger_info.verify_signatures(&validator_verifier).is_ok()
                                 {
