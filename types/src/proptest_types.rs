@@ -20,7 +20,6 @@ use crate::{
     on_chain_config::ValidatorSet,
     proof::TransactionInfoListWithProof,
     state_store::{state_key::StateKey, state_value::StateValue},
-    validator_txn::{DummyValidatorTransaction, ValidatorTransaction},
     transaction::{
         ChangeSet, ExecutionStatus, Module, ModuleBundle, RawTransaction, Script,
         SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
@@ -29,6 +28,7 @@ use crate::{
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
+    validator_txn::{DummyValidatorTransaction, ValidatorTransaction},
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},

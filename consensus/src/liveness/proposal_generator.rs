@@ -324,7 +324,10 @@ impl ProposalGenerator {
                 vec![]
             };
 
-            let validator_txn_total_bytes = validator_txns.iter().map(|txn| txn.size_in_bytes() as u64).sum();
+            let validator_txn_total_bytes = validator_txns
+                .iter()
+                .map(|txn| txn.size_in_bytes() as u64)
+                .sum();
             max_block_txns = max_block_txns.saturating_sub(validator_txns.len() as u64);
             max_block_bytes = max_block_bytes.saturating_sub(validator_txn_total_bytes);
             proposal_delay = proposal_delay.saturating_sub(validator_txn_pull_timer.elapsed());

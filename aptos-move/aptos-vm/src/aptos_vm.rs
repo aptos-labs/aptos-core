@@ -36,7 +36,6 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     fee_statement::FeeStatement,
     on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
-    validator_txn::ValidatorTransaction,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction,
         EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
@@ -48,6 +47,7 @@ use aptos_types::{
         TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
         WriteSetPayload,
     },
+    validator_txn::ValidatorTransaction,
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use aptos_utils::{aptos_try, return_on_failure};

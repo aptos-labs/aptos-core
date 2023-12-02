@@ -21,8 +21,8 @@ use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    validator_txn::ValidatorTransaction,
     transaction::{ExecutionStatus, SignedTransaction, Transaction, TransactionStatus},
+    validator_txn::ValidatorTransaction,
 };
 use futures_channel::oneshot;
 use std::sync::Arc;
@@ -149,7 +149,10 @@ async fn schedule_compute_should_discover_validator_txns() {
 
     let block = Block::new_for_testing(
         HashValue::zero(),
-        BlockData::dummy_with_validator_txns(vec![validator_txn_0.clone(), validator_txn_1.clone()]),
+        BlockData::dummy_with_validator_txns(vec![
+            validator_txn_0.clone(),
+            validator_txn_1.clone(),
+        ]),
         None,
     );
 
@@ -198,7 +201,10 @@ async fn commit_should_discover_validator_txns() {
 
     let block = Block::new_for_testing(
         HashValue::zero(),
-        BlockData::dummy_with_validator_txns(vec![validator_txn_0.clone(), validator_txn_1.clone()]),
+        BlockData::dummy_with_validator_txns(vec![
+            validator_txn_0.clone(),
+            validator_txn_1.clone(),
+        ]),
         None,
     );
 

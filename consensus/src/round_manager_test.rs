@@ -64,9 +64,9 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
     on_chain_config::{ConsensusConfigV1Ext, ConsensusExtraFeature, OnChainConsensusConfig},
-    validator_txn::{pool::ValidatorTransactionPool, ValidatorTransaction},
     transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
+    validator_txn::{pool::ValidatorTransactionPool, ValidatorTransaction},
     validator_verifier::{generate_validator_verifier, random_validator_verifier},
     waypoint::Waypoint,
 };

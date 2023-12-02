@@ -43,9 +43,9 @@ use aptos_types::{
         ProposerElectionType::{self, RoundProposer},
         ValidatorSet,
     },
-    validator_txn::pool::{ValidatorTransactionPool, ValidatorTransactionPoolClient},
     transaction::SignedTransaction,
     validator_info::ValidatorInfo,
+    validator_txn::pool::{ValidatorTransactionPool, ValidatorTransactionPoolClient},
     waypoint::Waypoint,
 };
 use futures::{channel::mpsc, StreamExt};

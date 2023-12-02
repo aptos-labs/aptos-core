@@ -39,9 +39,9 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::{OnChainConsensusConfig, ValidatorSet},
-    validator_txn::pool::ValidatorTransactionPool,
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
+    validator_txn::pool::ValidatorTransactionPool,
     validator_verifier::ValidatorVerifier,
 };
 use futures::{channel::mpsc, executor::block_on};

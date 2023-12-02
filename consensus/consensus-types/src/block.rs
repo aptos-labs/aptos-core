@@ -17,9 +17,9 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
-    validator_txn::ValidatorTransaction,
     transaction::{SignedTransaction, Transaction, Version},
     validator_signer::ValidatorSigner,
+    validator_txn::ValidatorTransaction,
     validator_verifier::ValidatorVerifier,
 };
 use mirai_annotations::debug_checked_verify_eq;
@@ -418,7 +418,11 @@ impl Block {
         let txns = once(Transaction::BlockMetadata(
             self.new_block_metadata(validators),
         ))
-        .chain(validator_txns.into_iter().map(Transaction::ValidatorTransaction))
+        .chain(
+            validator_txns
+                .into_iter()
+                .map(Transaction::ValidatorTransaction),
+        )
         .chain(user_txns.into_iter().map(Transaction::UserTransaction));
 
         if is_block_gas_limit {

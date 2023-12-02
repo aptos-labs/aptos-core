@@ -81,8 +81,8 @@ use aptos_types::{
         LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
         OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
     },
-    validator_txn::pool::ValidatorTransactionPoolClient,
     validator_signer::ValidatorSigner,
+    validator_txn::pool::ValidatorTransactionPoolClient,
     validator_verifier::ValidatorVerifier,
 };
 use fail::fail_point;
