@@ -636,7 +636,7 @@ impl RoundManager {
             .author()
             .expect("Proposal should be verified having an author");
 
-        if !self.onchain_config.should_propose_system_txns()
+        if !self.onchain_config.should_propose_validator_txns()
             && matches!(
                 proposal.block_data().block_type(),
                 BlockType::ProposalExt(_)
@@ -646,8 +646,8 @@ impl RoundManager {
             bail!("ProposalExt unexpected while the feature is disabled.");
         }
 
-        let (num_sys_txns, sys_txns_total_bytes): (usize, usize) =
-            proposal.sys_txns().map_or((0, 0), |txns| {
+        let (num_validator_txns, validator_txns_total_bytes): (usize, usize) =
+            proposal.validator_txns().map_or((0, 0), |txns| {
                 txns.iter().fold((0, 0), |(count_acc, size_acc), txn| {
                     (count_acc + 1, size_acc + txn.size_in_bytes())
                 })
@@ -656,7 +656,7 @@ impl RoundManager {
         let payload_len = proposal.payload().map_or(0, |payload| payload.len());
         let payload_size = proposal.payload().map_or(0, |payload| payload.size());
         ensure!(
-            num_sys_txns as u64 + payload_len as u64
+            num_validator_txns as u64 + payload_len as u64
                 <= self
                     .local_config
                     .max_receiving_block_txns(self.onchain_config.quorum_store_enabled()),
@@ -667,7 +667,7 @@ impl RoundManager {
         );
 
         ensure!(
-            sys_txns_total_bytes as u64 + payload_size as u64
+            validator_txns_total_bytes as u64 + payload_size as u64
                 <= self
                     .local_config
                     .max_receiving_block_bytes(self.onchain_config.quorum_store_enabled()),

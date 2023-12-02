@@ -322,7 +322,7 @@ pub fn update_counters_for_processed_chunk<T, O>(
             Some(Transaction::GenesisTransaction(_)) => "genesis",
             Some(Transaction::BlockMetadata(_)) => "block_metadata",
             Some(Transaction::StateCheckpoint(_)) => "state_checkpoint",
-            Some(Transaction::SystemTransaction(_)) => "system_transaction",
+            Some(Transaction::ValidatorTransaction(_)) => "validator_transaction",
             None => "unknown",
         };
 

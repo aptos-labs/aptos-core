@@ -132,7 +132,7 @@ impl StateComputer for ExecutionProxy {
         let txn_deduper = self.transaction_deduper.lock().as_ref().unwrap().clone();
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
         let txn_notifier = self.txn_notifier.clone();
-        let sys_txns = block.sys_txns().cloned().unwrap_or_default();
+        let validator_txns = block.validator_txns().cloned().unwrap_or_default();
         let user_txns = match payload_manager.get_transactions(block).await {
             Ok(txns) => txns,
             Err(err) => return Box::pin(async move { Err(err) }),
@@ -150,7 +150,7 @@ impl StateComputer for ExecutionProxy {
         let timestamp = block.timestamp_usecs();
         let transactions_to_execute = block.transactions_to_execute(
             &self.validators.lock(),
-            sys_txns,
+            validator_txns,
             shuffled_txns.clone(),
             block_executor_onchain_config.has_any_block_gas_limit(),
         );
@@ -223,17 +223,17 @@ impl StateComputer for ExecutionProxy {
                 payloads.push(payload.clone());
             }
 
-            let sys_txns = block.sys_txns().map_or(vec![], Vec::clone);
-            let signed_txns = payload_manager.get_transactions(block.block()).await?;
+            let validator_txns = block.validator_txns().map_or(vec![], Vec::clone);
+            let user_txns = payload_manager.get_transactions(block.block()).await?;
             let filtered_txns =
                 self.transaction_filter
-                    .filter(block.id(), block.timestamp_usecs(), signed_txns);
+                    .filter(block.id(), block.timestamp_usecs(), user_txns);
             let deduped_txns = txn_deduper.dedup(filtered_txns);
             let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
             txns.extend(block.transactions_to_commit(
                 &self.validators.lock(),
-                sys_txns,
+                validator_txns,
                 shuffled_txns,
                 block_executor_onchain_config.has_any_block_gas_limit(),
             ));

@@ -6,29 +6,29 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
-pub enum SystemTransaction {
+pub enum ValidatorTransaction {
     #[cfg(any(test, feature = "fuzzing"))]
-    DummyTopic(DummySystemTransaction),
+    DummyTopic(DummyValidatorTransaction),
     // to be populated...
 }
 
 #[cfg(any(test, feature = "fuzzing"))]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
-pub struct DummySystemTransaction {
+pub struct DummyValidatorTransaction {
     #[serde(with = "serde_bytes")]
     pub payload: Vec<u8>,
 }
 
-impl SystemTransaction {
+impl ValidatorTransaction {
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy(payload: Vec<u8>) -> Self {
-        Self::DummyTopic(DummySystemTransaction { payload })
+        Self::DummyTopic(DummyValidatorTransaction { payload })
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn size_in_bytes(&self) -> usize {
         match self {
-            SystemTransaction::DummyTopic(txn) => txn.payload.len(),
+            ValidatorTransaction::DummyTopic(txn) => txn.payload.len(),
         }
     }
 

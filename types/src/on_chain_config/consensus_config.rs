@@ -84,10 +84,10 @@ impl OnChainConsensusConfig {
         }
     }
 
-    pub fn should_propose_system_txns(&self) -> bool {
+    pub fn should_propose_validator_txns(&self) -> bool {
         match self {
             OnChainConsensusConfig::V3(obj) => {
-                obj.is_enabled(ConsensusExtraFeature::ProposalWithSystemTransactions)
+                obj.is_enabled(ConsensusExtraFeature::ProposalWithValidatorTransactions)
             },
             _ => false,
         }
@@ -165,7 +165,7 @@ pub struct ConsensusConfigV1Ext {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[allow(non_camel_case_types)]
 pub enum ConsensusExtraFeature {
-    ProposalWithSystemTransactions = 0,
+    ProposalWithValidatorTransactions = 0,
 }
 
 impl ConsensusConfigV1Ext {

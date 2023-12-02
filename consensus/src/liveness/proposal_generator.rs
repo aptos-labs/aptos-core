@@ -25,9 +25,9 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::{error, sample, sample::SampleRate, warn};
-use aptos_types::system_txn::{
-    pool::{SystemTransactionFilter, SystemTransactionPoolClient},
-    SystemTransaction,
+use aptos_types::validator_txn::{
+    pool::{ValidatorTransactionFilter, ValidatorTransactionPoolClient},
+    ValidatorTransaction,
 };
 use futures::future::BoxFuture;
 use std::{
@@ -178,8 +178,8 @@ pub struct ProposalGenerator {
     last_round_generated: Round,
     quorum_store_enabled: bool,
 
-    sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
-    should_propose_sys_txns: bool,
+    validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
+    should_propose_validator_txns: bool,
 }
 
 impl ProposalGenerator {
@@ -195,8 +195,8 @@ impl ProposalGenerator {
         pipeline_backpressure_config: PipelineBackpressureConfig,
         chain_health_backoff_config: ChainHealthBackoffConfig,
         quorum_store_enabled: bool,
-        sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
-        should_propose_sys_txns: bool,
+        validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
+        should_propose_validator_txns: bool,
     ) -> Self {
         Self {
             author,
@@ -211,8 +211,8 @@ impl ProposalGenerator {
             chain_health_backoff_config,
             last_round_generated: 0,
             quorum_store_enabled,
-            sys_txn_pool_client,
-            should_propose_sys_txns,
+            validator_txn_pool_client,
+            should_propose_validator_txns,
         }
     }
 
@@ -261,7 +261,7 @@ impl ProposalGenerator {
 
         let hqc = self.ensure_highest_quorum_cert(round)?;
 
-        let (sys_txns, payload, timestamp) = if hqc.certified_block().has_reconfiguration() {
+        let (validator_txns, payload, timestamp) = if hqc.certified_block().has_reconfiguration() {
             // Reconfiguration rule - we propose empty blocks with parents' timestamp
             // after reconfiguration until it's committed
             (
@@ -306,28 +306,31 @@ impl ProposalGenerator {
                 .calculate_max_block_sizes(voting_power_ratio, timestamp)
                 .await;
 
-            let sys_txn_pull_timer = Instant::now();
-            let sys_txns = if self.should_propose_sys_txns {
-                let pending_sys_txn_hashes: HashSet<HashValue> = pending_blocks
+            let validator_txn_pull_timer = Instant::now();
+            let validator_txns = if self.should_propose_validator_txns {
+                let pending_validator_txn_hashes: HashSet<HashValue> = pending_blocks
                     .iter()
-                    .filter_map(|block| block.sys_txns())
+                    .filter_map(|block| block.validator_txns())
                     .flatten()
-                    .map(SystemTransaction::hash)
+                    .map(ValidatorTransaction::hash)
                     .collect();
 
-                self.sys_txn_pool_client.pull(
+                self.validator_txn_pool_client.pull(
                     max_block_txns as usize,
                     max_block_bytes as usize,
-                    SystemTransactionFilter::PendingTxnHashSet(pending_sys_txn_hashes),
+                    ValidatorTransactionFilter::PendingTxnHashSet(pending_validator_txn_hashes),
                 )
             } else {
                 vec![]
             };
 
-            let sys_txn_total_bytes = sys_txns.iter().map(|txn| txn.size_in_bytes() as u64).sum();
-            max_block_txns = max_block_txns.saturating_sub(sys_txns.len() as u64);
-            max_block_bytes = max_block_bytes.saturating_sub(sys_txn_total_bytes);
-            proposal_delay = proposal_delay.saturating_sub(sys_txn_pull_timer.elapsed());
+            let validator_txn_total_bytes = validator_txns
+                .iter()
+                .map(|txn| txn.size_in_bytes() as u64)
+                .sum();
+            max_block_txns = max_block_txns.saturating_sub(validator_txns.len() as u64);
+            max_block_bytes = max_block_bytes.saturating_sub(validator_txn_total_bytes);
+            proposal_delay = proposal_delay.saturating_sub(validator_txn_pull_timer.elapsed());
 
             PROPOSER_DELAY_PROPOSAL.set(proposal_delay.as_secs_f64());
             if !proposal_delay.is_zero() {
@@ -364,7 +367,7 @@ impl ProposalGenerator {
                 .await
                 .context("Fail to retrieve payload")?;
 
-            (sys_txns, payload, timestamp.as_micros() as u64)
+            (validator_txns, payload, timestamp.as_micros() as u64)
         };
 
         let quorum_cert = hqc.as_ref().clone();
@@ -375,9 +378,9 @@ impl ProposalGenerator {
             proposer_election,
         );
 
-        let block = if self.should_propose_sys_txns {
+        let block = if self.should_propose_validator_txns {
             BlockData::new_proposal_ext(
-                sys_txns,
+                validator_txns,
                 payload,
                 self.author,
                 failed_authors,
