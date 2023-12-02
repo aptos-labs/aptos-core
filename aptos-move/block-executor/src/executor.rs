@@ -32,6 +32,7 @@ use aptos_mvhashmap::{
 };
 use aptos_state_view::TStateView;
 use aptos_types::{
+    account_config::BlockLimitReachedEvent,
     aggregator::PanicError,
     block_executor::config::BlockExecutorConfig,
     contract_event::TransactionEvent,
@@ -63,6 +64,7 @@ pub struct BlockGasLimitProcessor<T: Transaction> {
     accumulated_fee_statement: FeeStatement,
     txn_fee_statements: Vec<FeeStatement>,
     txn_read_write_summaries: Vec<ReadWriteSummary<T>>,
+    block_limit_reached_event: Option<BlockLimitReachedEvent>,
 }
 
 impl<T: Transaction> BlockGasLimitProcessor<T> {
@@ -74,6 +76,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
             accumulated_fee_statement: FeeStatement::zero(),
             txn_fee_statements: Vec::with_capacity(init_size),
             txn_read_write_summaries: Vec::with_capacity(init_size),
+            block_limit_reached_event: None,
         }
     }
 
@@ -113,7 +116,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         self.accumulated_approx_output_size += approx_output_size.unwrap_or(0);
     }
 
-    fn should_end_block(&self, is_parallel: bool) -> bool {
+    fn should_end_block(&mut self, is_parallel: bool) -> bool {
         let mode = if is_parallel {
             counters::Mode::PARALLEL
         } else {
@@ -133,6 +136,10 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                     is_parallel, accumulated_block_gas, per_block_gas_limit,
                 );
 
+                self.block_limit_reached_event = Some(BlockLimitReachedEvent {
+                    block_gas_limit_reached: true,
+                    block_output_limit_reached: false,
+                });
                 return true;
             }
         }
@@ -149,6 +156,10 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                     is_parallel, accumulated_output, per_block_output_limit,
                 );
 
+                self.block_limit_reached_event = Some(BlockLimitReachedEvent {
+                    block_gas_limit_reached: false,
+                    block_output_limit_reached: true,
+                });
                 return true;
             }
         }
@@ -156,11 +167,11 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         false
     }
 
-    fn should_end_block_parallel(&self) -> bool {
+    fn should_end_block_parallel(&mut self) -> bool {
         self.should_end_block(true)
     }
 
-    fn should_end_block_sequential(&self) -> bool {
+    fn should_end_block_sequential(&mut self) -> bool {
         self.should_end_block(false)
     }
 
@@ -690,7 +701,7 @@ where
                     approx_output_size,
                 );
 
-                if accumulator.should_end_block_parallel() {
+                if txn_idx == scheduler.num_txns() - 1 && accumulator.should_end_block_parallel() {
                     // Set the execution output status to be SkipRest, to skip the rest of the txns.
                     last_input_output.update_to_skip_rest(txn_idx);
                 }
@@ -1303,7 +1314,16 @@ where
         drop(timer);
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
-        let (_, maybe_error) = shared_commit_state.into_inner();
+        let (accumulator, maybe_error) = shared_commit_state.into_inner();
+
+        Self::execute_checkpoint_on_block_limit_reached(
+            accumulator,
+            num_txns as usize,
+            signature_verified_block,
+            &mut final_results.acquire(),
+        )
+        .unwrap();
+
         match maybe_error {
             Some(err) => Err(err),
             None => Ok(final_results.into_inner()),
@@ -1599,7 +1619,7 @@ where
                 break;
             }
 
-            if accumulator.should_end_block_sequential() {
+            if idx < num_txns - 1 && accumulator.should_end_block_sequential() {
                 break;
             }
         }
@@ -1608,7 +1628,33 @@ where
             .finish_sequential_update_counters_and_log_info(ret.len() as u32, num_txns as u32);
 
         ret.resize_with(num_txns, E::Output::skip_output);
+
+        Self::execute_checkpoint_on_block_limit_reached(
+            accumulator,
+            num_txns,
+            signature_verified_block,
+            &mut ret,
+        )
+        .unwrap();
+
         Ok(ret)
+    }
+
+    fn execute_checkpoint_on_block_limit_reached(
+        accumulator: BlockGasLimitProcessor<T>,
+        num_txns: usize,
+        signature_verified_block: &[T],
+        ret: &mut [<E as ExecutorTask>::Output],
+    ) -> Result<(), PanicError> {
+        if let Some(block_limit_reached_event) = accumulator.block_limit_reached_event {
+            let idx = num_txns - 1;
+            let txn = &signature_verified_block[idx];
+            let txn_output = ret
+                .get_mut(idx)
+                .ok_or_else(|| code_invariant_error("Missing output for last transaction"))?;
+            E::execute_skipped_checkpoint(txn, txn_output, Some(block_limit_reached_event))?;
+        }
+        Ok(())
     }
 
     pub fn execute_block(

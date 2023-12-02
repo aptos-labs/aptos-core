@@ -9,6 +9,7 @@ This module defines a struct storing the metadata of the block and new block eve
 -  [Resource `BlockResource`](#0x1_block_BlockResource)
 -  [Struct `NewBlockEvent`](#0x1_block_NewBlockEvent)
 -  [Struct `UpdateEpochIntervalEvent`](#0x1_block_UpdateEpochIntervalEvent)
+-  [Struct `BlockLimitReachedEvent`](#0x1_block_BlockLimitReachedEvent)
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_block_initialize)
 -  [Function `update_epoch_interval_microsecs`](#0x1_block_update_epoch_interval_microsecs)
@@ -189,6 +190,43 @@ Event emitted when a proposal is created.
 </dt>
 <dd>
 
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_block_BlockLimitReachedEvent"></a>
+
+## Struct `BlockLimitReachedEvent`
+
+When the block limit is reached, this event is emitted.
+
+This is meant to emitted as a module event.
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="block.md#0x1_block_BlockLimitReachedEvent">BlockLimitReachedEvent</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>block_gas_limit_reached: bool</code>
+</dt>
+<dd>
+ Whether block gas limit was reached
+</dd>
+<dt>
+<code>block_output_limit_reached: bool</code>
+</dt>
+<dd>
+ Whether block output limit was reached
 </dd>
 </dl>
 

@@ -161,7 +161,6 @@ impl StateComputer for ExecutionProxy {
         );
 
         let block_executor_onchain_config = self.block_executor_onchain_config.lock().clone();
-        let block_gas_limit_enabled = block_executor_onchain_config.has_any_block_gas_limit();
 
         let timestamp = block.timestamp_usecs();
         let metadata = block.new_block_metadata(&self.validators.lock());
@@ -188,10 +187,7 @@ impl StateComputer for ExecutionProxy {
             observe_block(timestamp, BlockStage::EXECUTED);
 
             // notify mempool about failed transaction
-            if let Err(e) = txn_notifier
-                .notify_failed_txn(input_txns, result, block_gas_limit_enabled)
-                .await
-            {
+            if let Err(e) = txn_notifier.notify_failed_txn(input_txns, result).await {
                 error!(
                     error = ?e, "Failed to notify mempool of rejected txns",
                 );
@@ -219,8 +215,6 @@ impl StateComputer for ExecutionProxy {
         );
         let block_timestamp = finality_proof.commit_info().timestamp_usecs();
         let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
-        let block_executor_onchain_config = self.block_executor_onchain_config.lock().clone();
-        let is_block_gas_limit = block_executor_onchain_config.has_any_block_gas_limit();
 
         for block in blocks {
             block_ids.push(block.id());
@@ -234,7 +228,6 @@ impl StateComputer for ExecutionProxy {
                 &self.validators.lock(),
                 block.validator_txns().cloned().unwrap_or_default(),
                 input_txns,
-                is_block_gas_limit,
             ));
             reconfig_events.extend(block.reconfig_event());
         }
@@ -427,7 +420,6 @@ async fn test_commit_sync_race() {
             &self,
             _txns: Vec<SignedTransaction>,
             _compute_results: &StateComputeResult,
-            _block_gas_limit_enabled: bool,
         ) -> Result<(), MempoolError> {
             Ok(())
         }

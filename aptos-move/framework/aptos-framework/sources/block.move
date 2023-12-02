@@ -48,6 +48,17 @@ module aptos_framework::block {
         new_epoch_interval: u64,
     }
 
+    #[event]
+    /// When the block limit is reached, this event is emitted.
+    ///
+    /// This is meant to emitted as a module event.
+    struct BlockLimitReachedEvent has drop, store {
+        /// Whether block gas limit was reached
+        block_gas_limit_reached: bool,
+        /// Whether block output limit was reached
+        block_output_limit_reached: bool,
+    }
+
     /// The number of new block events does not equal the current block height.
     const ENUM_NEW_BLOCK_EVENTS_DOES_NOT_MATCH_BLOCK_HEIGHT: u64 = 1;
     /// An invalid proposer was provided. Expected the proposer to be the VM or an active validator.

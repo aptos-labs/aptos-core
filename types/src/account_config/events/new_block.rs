@@ -141,3 +141,12 @@ impl MoveStructType for BlockResource {
 }
 
 impl MoveResource for BlockResource {}
+
+/// (keep this doc in sync with the `struct BlockLimitReachedEvent` in Move.)
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BlockLimitReachedEvent {
+    pub block_gas_limit_reached: bool,
+    pub block_output_limit_reached: bool,
+}
+
+pub const BLOCK_LIMIT_REACHED_EVENT_TYPE_NAME: &str = "0x1::block::BlockLimitReachedEvent";

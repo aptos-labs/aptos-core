@@ -30,8 +30,18 @@ impl BlockExecutorConfigFromOnchain {
         }
     }
 
-    pub fn has_any_block_gas_limit(&self) -> bool {
-        self.block_gas_limit_type.block_gas_limit().is_some()
+    pub const fn on_but_large_for_test() -> Self {
+        Self {
+            block_gas_limit_type:
+                // present, so code is excercised, but large to not limit blocks
+                BlockGasLimitType::ComplexLimitV1 {
+                    effective_block_gas_limit: 1_000_000_000,
+                    execution_gas_effective_multiplier: 1,
+                    io_gas_effective_multiplier: 1,
+                    block_output_limit: Some(1_000_000_000_000),
+                    conflict_penalty_window: 8,
+                },
+        }
     }
 
     pub const fn on_but_large_for_test() -> Self {

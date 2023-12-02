@@ -5,16 +5,28 @@
 use crate::{
     aptos_vm::AptosVM, block_executor::AptosTransactionOutput, data_cache::AsMoveResolver,
 };
+use aptos_aggregator::types::code_invariant_error;
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
-use aptos_types::transaction::{
-    signature_verified_transaction::SignatureVerifiedTransaction, Transaction, WriteSetPayload,
+use aptos_types::{
+    account_config::{BlockLimitReachedEvent, BLOCK_LIMIT_REACHED_EVENT_TYPE_NAME},
+    aggregator::PanicError,
+    contract_event::ContractEvent,
+    transaction::{
+        signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
+        TransactionOutput, TransactionStatus, WriteSetPayload,
+    },
+    write_set::WriteSet,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{ExecutorView, ResourceGroupView};
-use move_core_types::vm_status::{StatusCode, VMStatus};
+use move_core_types::{
+    language_storage::TypeTag,
+    vm_status::{StatusCode, VMStatus},
+};
+use std::str::FromStr;
 
 pub(crate) struct AptosExecutorTask<'a, S> {
     vm: AptosVM,
@@ -113,6 +125,52 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
                     ExecutionStatus::Abort(err)
                 }
             },
+        }
+    }
+
+    fn execute_skipped_checkpoint(
+        txn: &Self::Txn,
+        output: &mut Self::Output,
+        block_limit_reached_event: Option<BlockLimitReachedEvent>,
+    ) -> Result<(), PanicError> {
+        if txn.is_valid() {
+            match txn.expect_valid() {
+                Transaction::StateCheckpoint(_) => {
+                    aptos_block_executor::task::TransactionOutput::set_txn_output_for_non_dynamic_change_set(output);
+                    let committed_output = output.committed_output();
+                    if !committed_output.status().is_retry() {
+                        return Err(code_invariant_error(format!(
+                            "Block limit cannot be reached on StateCheckpoint transaction, as it is free and empty. {:?}",
+                            committed_output,
+                        )));
+                    }
+
+                    let status = TransactionStatus::Keep(aptos_types::transaction::ExecutionStatus::Success);
+                    let events = block_limit_reached_event
+                        .map(|event| {
+                            Ok(vec![ContractEvent::new_v2(
+                                TypeTag::from_str(BLOCK_LIMIT_REACHED_EVENT_TYPE_NAME).map_err(|e| code_invariant_error(format!("Failed to parse type tag: {:?}", e)))?,
+                                bcs::to_bytes(&event).map_err(|e| code_invariant_error(format!("Failed to serialize event: {:?}", e)))?,
+                            )])
+                        })
+                        .transpose()?
+                        .unwrap_or_default();
+                    *output = AptosTransactionOutput::new_from_committed_output(TransactionOutput::new(WriteSet::default(), events, 0, status));
+                    Ok(())
+                },
+                Transaction::GenesisTransaction(_) => {
+                    // Genesis transaction is allowed to be last/only transaction in a block.
+                    Ok(())
+                },
+                valid_txn => {
+                    Err(code_invariant_error(format!(
+                        "Last transaction in a block where limit is reached is not StateCheckpoint, but: {}",
+                        valid_txn.type_name()
+                    )))
+                },
+            }
+        } else {
+            Err(code_invariant_error("When block limit is used, last transaction (should be StateCheckpoint or genesis) must not be invalid"))
         }
     }
 

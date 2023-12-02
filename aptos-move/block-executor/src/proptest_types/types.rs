@@ -17,6 +17,7 @@ use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
+    aggregator::PanicError,
     contract_event::TransactionEvent,
     executable::ModulePath,
     fee_statement::FeeStatement,
@@ -963,6 +964,15 @@ where
             MockTransaction::SkipRest => ExecutionStatus::SkipRest(MockOutput::skip_output()),
             MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
         }
+    }
+
+    fn execute_skipped_checkpoint(
+        _txn: &Self::Txn,
+        _output: &mut Self::Output,
+        _block_limit_reached_event: Option<aptos_types::account_config::BlockLimitReachedEvent>,
+    ) -> Result<(), PanicError> {
+        // no distinction of whether it is skip_output or not
+        Ok(())
     }
 
     fn is_transaction_dynamic_change_set_capable(_txn: &Self::Txn) -> bool {
