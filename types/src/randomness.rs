@@ -21,14 +21,6 @@ pub type Evaluation = <WVUF as WeightedVUF>::Evaluation;
 pub type Proof = <WVUF as WeightedVUF>::Proof;
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub enum Mode {
-    // randomness optimistic path
-    Optimistic,
-    // randomness fallback path
-    Fallback,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct RandMetadataToSign {
     pub epoch: u64,
     pub round: Round,
@@ -141,6 +133,8 @@ impl RandDecision {
     }
 
     pub fn verify(&self, rand_config: &RandConfig) -> anyhow::Result<()> {
+        // rand todo: if the caller locally does not have all the certified apks in Proof, the verification should fail.
+        // to fix after crypto API is fixed
         <WVUF as WeightedVUF>::verify_eval(&rand_config.vuf_pp, &rand_config.pk, self.randomness.metadata.to_bytes().as_slice(), &self.proof, &self.eval)?;
         Ok(())
     }
@@ -198,91 +192,62 @@ pub struct RandConfig {
     pub vuf_pp: WvufPP,
     // public key for the weighted VUF
     pub pk: PK,
-    // key shares for randomness fallback path
-    pub keys_f: RandKeys,
-    // key shares for randomness optimistic path
-    pub keys_o: RandKeys,
-    // weighted config for randomness fallback path
-    pub wc_f: WeightedConfig,
-    // weighted config for randomness optimistic path
-    pub wc_o: WeightedConfig,
+    // key shares for weighted VUF
+    pub keys: RandKeys,
+    // weighted config for weighted VUF
+    pub wconfig: WeightedConfig,
 }
 
 impl RandConfig {
-    pub fn new(author: AccountAddress, validator: ValidatorVerifier, vuf_pp: WvufPP, pk: PK, keys_f: RandKeys, keys_o: RandKeys, wc_f: WeightedConfig, wc_o: WeightedConfig) -> Self {
-        Self { author, validator, vuf_pp, pk, keys_f, keys_o, wc_f, wc_o }
+    pub fn new(author: AccountAddress, validator: ValidatorVerifier, vuf_pp: WvufPP, pk: PK, keys: RandKeys, wconfig: WeightedConfig) -> Self {
+        Self { author, validator, vuf_pp, pk, keys, wconfig}
     }
 
     pub fn get_id(&self, peer: &AccountAddress) -> usize {
         self.validator.address_to_validator_index().get(peer).unwrap().clone()
     }
 
-    pub fn get_signed_delta(&self, peer: &AccountAddress, mode: &Mode) -> Option<&Delta> {
+    pub fn get_signed_delta(&self, peer: &AccountAddress) -> Option<&Delta> {
         let index = self.get_id(peer);
-        match mode {
-            Mode::Optimistic => self.keys_o.signed_deltas[index].as_ref(),
-            Mode::Fallback => self.keys_f.signed_deltas[index].as_ref(),
-        }
+        self.keys.signed_deltas[index].as_ref()
     }
 
-    pub fn add_signed_delta(&mut self, peer: &AccountAddress, delta: Delta, mode: &Mode) -> anyhow::Result<()> {
+    pub fn add_signed_delta(&mut self, peer: &AccountAddress, delta: Delta) -> anyhow::Result<()> {
         let index = self.get_id(peer);
-        match mode {
-            Mode::Optimistic => self.keys_o.add_signed_delta(index, delta),
-            Mode::Fallback => self.keys_f.add_signed_delta(index, delta),
-        }
+        self.keys.add_signed_delta(index, delta)
     }
 
-    pub fn get_certified_apk(&self, peer: &AccountAddress, mode: &Mode) -> Option<&APK> {
+    pub fn get_certified_apk(&self, peer: &AccountAddress) -> Option<&APK> {
         let index = self.get_id(peer);
-        match mode {
-            Mode::Optimistic => self.keys_o.certified_apks[index].as_ref(),
-            Mode::Fallback => self.keys_f.certified_apks[index].as_ref(),
-        }
+        self.keys.certified_apks[index].as_ref()
     }
 
-    pub fn add_certified_apk(&mut self, peer: &AccountAddress, apk: APK, mode: &Mode) -> anyhow::Result<()> {
+    pub fn add_certified_apk(&mut self, peer: &AccountAddress, apk: APK) -> anyhow::Result<()> {
         let index = self.get_id(peer);
-        match mode {
-            Mode::Optimistic => self.keys_o.add_certified_apk(index, apk),
-            Mode::Fallback => self.keys_f.add_certified_apk(index, apk),
-        }
+        self.keys.add_certified_apk(index, apk)
     }
 
-    pub fn add_certified_delta(&mut self, peer: &AccountAddress, delta: Delta, mode: &Mode) -> anyhow::Result<()> {
-        let apk = <WVUF as WeightedVUF>::augment_pubkey(&self.vuf_pp, self.get_pk_share(peer, mode).clone(), delta)?;
-        self.add_certified_apk(peer, apk, mode)?;
+    pub fn add_certified_delta(&mut self, peer: &AccountAddress, delta: Delta) -> anyhow::Result<()> {
+        let apk = <WVUF as WeightedVUF>::augment_pubkey(&self.vuf_pp, self.get_pk_share(peer).clone(), delta)?;
+        self.add_certified_apk(peer, apk)?;
         Ok(())
     }
 
-    pub fn get_my_delta(&self, mode: &Mode) -> &Delta {
-        match mode {
-            Mode::Optimistic => <WVUF as WeightedVUF>::get_public_delta(&self.keys_o.apk),
-            Mode::Fallback => <WVUF as WeightedVUF>::get_public_delta(&self.keys_f.apk),
-        }
+    pub fn get_my_delta(&self) -> &Delta {
+        <WVUF as WeightedVUF>::get_public_delta(&self.keys.apk)
     }
 
-    pub fn get_pk_share(&self, peer: &AccountAddress, mode: &Mode) -> &PKShare {
+    pub fn get_pk_share(&self, peer: &AccountAddress) -> &PKShare {
         let index = self.get_id(peer);
-        match mode {
-            Mode::Optimistic => &self.keys_o.pk_shares[index],
-            Mode::Fallback => &self.keys_f.pk_shares[index],
-        }
+        &self.keys.pk_shares[index]
     }
 
-    pub fn get_peer_weight(&self, peer: &AccountAddress, mode: &Mode) -> usize {
+    pub fn get_peer_weight(&self, peer: &AccountAddress) -> usize {
         let player = Player{ id: self.get_id(peer) };
-        match mode {
-            Mode::Optimistic => self.wc_o.get_player_weight(&player),
-            Mode::Fallback => self.wc_f.get_player_weight(&player),
-        }
+        self.wconfig.get_player_weight(&player)
     }
 
-    pub fn th_f(&self) -> usize {
-        self.wc_f.get_threshold_weight()
-    }
-
-    pub fn th_o(&self) -> usize {
-        self.wc_o.get_threshold_weight()
+    pub fn threshold(&self) -> usize {
+        self.wconfig.get_threshold_weight()
     }
 }

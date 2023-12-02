@@ -25,7 +25,7 @@ use aptos_network::protocols::network::RpcError;
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_address::AccountAddress, validator_verifier::ValidatorVerifier, randomness::{RandDecision, RandConfig, Mode, RandMetadata, Delta, WVUF}, validator_signer::ValidatorSigner,
+    account_address::AccountAddress, validator_verifier::ValidatorVerifier, randomness::{RandDecision, RandConfig, RandMetadata, Delta, WVUF}, validator_signer::ValidatorSigner,
 };
 use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
@@ -121,7 +121,7 @@ impl RandManager {
         // reliable broadcast my delta
         let delta_rb_drop_guard = match &rand_config {
             Some(rand_config) => {
-                let apk_delta: Delta = rand_config.get_my_delta(&Mode::Fallback).clone();
+                let apk_delta: Delta = rand_config.get_my_delta().clone();
                 let delta_msg = DeltaMsg::new(epoch, author, apk_delta);
                 Some(Self::reliable_broadcast_delta(delta_msg, reliable_broadcast.clone(), verifier.clone()))
             },
@@ -214,7 +214,7 @@ impl RandManager {
         if let Some(rand_config) = self.rand_store.rand_config.as_mut() {
             delta_msg.verify()?;
             // only sign delta once to avoid equivocation
-            rand_config.add_signed_delta(delta_msg.author(), delta_msg.delta().clone(), &Mode::Fallback)?;
+            rand_config.add_signed_delta(delta_msg.author(), delta_msg.delta().clone())?;
             let signature = delta_msg.sign_vote(&self.signer)?;
             let ack = DeltaAck::new(delta_msg.metadata().clone(), signature);
             Ok(RandMessage::DeltaAck(ack))
@@ -225,9 +225,9 @@ impl RandManager {
 
     fn process_certified_delta(&mut self, certified_delta: CertifiedDelta) -> anyhow::Result<RandMessage> {
         if let Some(rand_config) = self.rand_store.rand_config.as_mut() {
-            if rand_config.get_certified_apk(certified_delta.author(), &Mode::Fallback).is_none() {
+            if rand_config.get_certified_apk(certified_delta.author()).is_none() {
                 certified_delta.verify(&self.verifier)?;
-                rand_config.add_certified_delta(certified_delta.author(), certified_delta.delta().clone(), &Mode::Fallback)?;
+                rand_config.add_certified_delta(certified_delta.author(), certified_delta.delta().clone())?;
             }
             Ok(RandMessage::CertifiedDeltaAck(()))
         } else {
@@ -334,10 +334,10 @@ impl RandManager {
                 num_undecided_blocks -= 1;
                 block.update_randomness(r);
             } else if let Some(rand_config) = self.rand_store.rand_config.as_ref() {
-                let ask = &rand_config.keys_f.ask;
+                let ask = &rand_config.keys.ask;
                 let metadata = RandMetadata::new(block.epoch(), block.round(), block.id(), block.timestamp_usecs());
                 let proof = <WVUF as WeightedVUF>::create_share(&ask, metadata.to_bytes().as_slice());
-                let share = RandShare::new(self.author, Mode::Fallback, metadata, proof);
+                let share = RandShare::new(self.author, metadata, proof);
 
                 observe_block(share.timestamp(), BlockStage::RAND_BC_SHARE);
                 log_rand_event(LogEvent::BroadcastRandShare, self.author, None, share.id(), share.round());

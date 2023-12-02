@@ -35,17 +35,15 @@ pub fn build_dkg_pvss_config(
         dkg_rounding::WEIGHT_PER_VALIDATOR_MIN,
         dkg_rounding::WEIGHT_PER_VALIDATOR_MAX,
         dkg_rounding::STEPS,
-        dkg_rounding::FALLBACK_RECONSTRUCT_THRESHOLD,
-        dkg_rounding::OPTIMISTIC_RECONSTRUCT_THRESHOLD,
+        dkg_rounding::RECONSTRUCT_THRESHOLD,
     );
 
     debug!(
-            "[DKG] Starting DKG with the following parameters: number of validators: {:?}, validator stakes: {:?}, validator weights: {:?}, fallback weights threshold: {:?}, optimistic weights threshold: {:?}",
+            "[DKG] Starting DKG with the following parameters: number of validators: {:?}, validator stakes: {:?}, validator weights: {:?}, reconstruct_threshold: {:?}",
             validator_stakes.len(),
             validator_stakes,
             dkg_rounding.profile.validator_weights,
-            dkg_rounding.profile.threshold_f,
-            dkg_rounding.profile.threshold_o,
+            dkg_rounding.profile.reconstruct_threshold_in_weights,
         );
 
 
@@ -60,13 +58,12 @@ pub fn build_dkg_pvss_config(
         .map(|k| k.to_bytes().as_slice().try_into().unwrap())
         .collect::<Vec<_>>();
     
-    let wc_f = dkg_rounding.config_f.clone();
-    let wc_o = dkg_rounding.config_o.clone();
+    let wconfig = dkg_rounding.wconfig.clone();
 
     let pp = DkgPP::new_from_seed_with_bls_base(SEED_PVSS_PUBLIC_PARAMS);
 
     let dkg_pvss_config =
-        DKGPvssConfig::new(cur_epoch,  wc_f.clone(), wc_o.clone(), pp, consensus_keys);
+        DKGPvssConfig::new(cur_epoch,  wconfig.clone(), pp, consensus_keys);
 
     dkg_pvss_config
 }

@@ -1103,32 +1103,23 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         let dealer_verifier: ValidatorVerifier = (&dkg_session.dealer_validator_set).into();
                         match trxs.verify(&dkg_pvss_config, &dealer_verifier) {
                             Ok(_) => {
-                                assert_eq!(trxs.trx_f.get_dealt_public_key(), trxs.trx_o.get_dealt_public_key());
-                                let pk = trxs.trx_f.get_dealt_public_key();
+                                let dealt_pk = trxs.trx.get_dealt_public_key();
 
                                 let mut rng = thread_rng();
                                 let seed = random_scalar(&mut rng);
                                 let mut rng = StdRng::from_seed(seed.to_bytes_le());
 
-                                // keys for randomness fallback path
-                                let (sk_f, pk_f) = trxs.trx_f.decrypt_own_share(&dkg_pvss_config.wc_f, &Player{id: my_index}, &dk);
-                                let (ask_f, apk_f) = <WVUF as WeightedVUF>::augment_key_pair(&vuf_pp, sk_f, pk_f.clone(), &mut rng);
-                                let pk_shares_f = (0..epoch_state.verifier.len())
-                                    .map(|id| trxs.trx_f.get_public_key_share(&dkg_pvss_config.wc_f, &Player { id }))
+                                // keys for randomness generation
+                                let (sk, pk) = trxs.trx.decrypt_own_share(&dkg_pvss_config.wconfig, &Player{id: my_index}, &dk);
+                                let (ask, apk) = <WVUF as WeightedVUF>::augment_key_pair(&vuf_pp, sk, pk.clone(), &mut rng);
+                                let pk_shares = (0..epoch_state.verifier.len())
+                                    .map(|id| trxs.trx.get_public_key_share(&dkg_pvss_config.wconfig, &Player { id }))
                                     .collect::<Vec<_>>();
-                                let keys_f = RandKeys::new(ask_f, apk_f, pk_shares_f, epoch_state.verifier.len());
+                                let keys = RandKeys::new(ask, apk, pk_shares, epoch_state.verifier.len());
 
-                                // keys for randomness optmistic path
-                                let (sk_o, pk_o) = trxs.trx_o.decrypt_own_share(&dkg_pvss_config.wc_o, &Player{id: my_index}, &dk);
-                                let (ask_o, apk_o) = <WVUF as WeightedVUF>::augment_key_pair(&vuf_pp, sk_o, pk_o.clone(), &mut rng);
-                                let pk_shares_o = (0..epoch_state.verifier.len())
-                                    .map(|id| trxs.trx_o.get_public_key_share(&dkg_pvss_config.wc_o, &Player { id }))
-                                    .collect::<Vec<_>>();
-                                let keys_o = RandKeys::new(ask_o, apk_o, pk_shares_o, epoch_state.verifier.len());
+                                debug!("[DKG] Successfully decrypted randomness keys! threshold = {}", dkg_pvss_config.wconfig.get_threshold_weight());
 
-                                debug!("[DKG] Successfully decrypted randomness keys! threshold_f = {}, threshold_o = {}", dkg_pvss_config.wc_f.get_threshold_weight(), dkg_pvss_config.wc_o.get_threshold_weight());
-
-                                rand_config = Some(RandConfig::new(self.author, epoch_state.verifier.clone(), vuf_pp, pk, keys_f, keys_o, dkg_pvss_config.wc_f.clone(), dkg_pvss_config.wc_o.clone()));
+                                rand_config = Some(RandConfig::new(self.author, epoch_state.verifier.clone(), vuf_pp, dealt_pk, keys, dkg_pvss_config.wconfig.clone()));
                             },
                             Err(error) => {
                                 // dkg todo: error handling and proceed epoch without randomness

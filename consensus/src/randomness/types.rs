@@ -8,7 +8,7 @@ use aptos_crypto::{HashValue, bls12381::Signature, CryptoMaterialError, hash::{C
 use aptos_dkg::weighted_vuf::traits::WeightedVUF;
 use aptos_enum_conversion_derive::EnumConversion;
 use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
-use aptos_types::{randomness::{RandConfig, RandDecision, Mode, ProofShare, Delta, RandMetadata, WVUF}, validator_verifier::ValidatorVerifier, validator_signer::ValidatorSigner, aggregate_signature::{PartialSignatures, AggregateSignature}};
+use aptos_types::{randomness::{RandConfig, RandDecision, ProofShare, Delta, RandMetadata, WVUF}, validator_verifier::ValidatorVerifier, validator_signer::ValidatorSigner, aggregate_signature::{PartialSignatures, AggregateSignature}};
 use futures_channel::mpsc::UnboundedSender;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, sync::Arc};
@@ -18,22 +18,17 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct RandShare {
     author: Author,
-    mode: Mode,
     metadata: RandMetadata,
     share: ProofShare,
 }
 
 impl RandShare {
-    pub fn new(author: Author, mode: Mode, metadata: RandMetadata, share: ProofShare) -> Self {
-        Self { author, mode, metadata, share }
+    pub fn new(author: Author, metadata: RandMetadata, share: ProofShare) -> Self {
+        Self { author, metadata, share }
     }
 
     pub fn author(&self) -> &Author {
         &self.author
-    }
-
-    pub fn mode(&self) -> &Mode {
-        &self.mode
     }
 
     pub fn metadata(&self) -> &RandMetadata {
@@ -62,13 +57,9 @@ impl RandShare {
 }
 
 impl RandShare {
-    pub fn verify(&self, mode: Mode, rand_config: &RandConfig) -> anyhow::Result<()> {
-        assert_eq!(self.mode, mode, "[RandShare] Invalid mode");
+    pub fn verify(&self, rand_config: &RandConfig) -> anyhow::Result<()> {
         let index = *rand_config.validator.address_to_validator_index().get(&self.author).unwrap();
-        let maybe_apk = match self.mode {
-            Mode::Optimistic => &rand_config.keys_o.certified_apks[index],
-            Mode::Fallback => &rand_config.keys_f.certified_apks[index],
-        };
+        let maybe_apk = &rand_config.keys.certified_apks[index];
         if let Some(apk) = maybe_apk {
             <WVUF as WeightedVUF>::verify_share(&rand_config.vuf_pp, apk, self.metadata.to_bytes().as_slice(), &self.share)?;
         } else {

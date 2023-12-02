@@ -88,42 +88,20 @@ fn verify_dkg_transcript(
     }
 
     println!("Double-verifying by reconstructing the dealt secret.");
-    let dealt_secret_2_from_shares = dealt_secret_from_shares(
+    let dealt_secret_from_shares = dealt_secret_from_shares(
         &dkg_session.target_validator_set,
         decrypt_key_map,
-        &pvss_config.wc_o,
-        &trxs.trx_o,
+        &pvss_config.wconfig,
+        &trxs.trx,
     );
-    let dealt_secret_1_from_shares = dealt_secret_from_shares(
-        &dkg_session.target_validator_set,
-        decrypt_key_map,
-        &pvss_config.wc_f,
-        &trxs.trx_f,
-    );
-    let dealt_secret_1_from_inputs = dealt_secret_from_input(
+    let dealt_secret_from_inputs = dealt_secret_from_input(
         &pvss_config.pp,
-        &trxs.trx_f,
-        &dkg_session.dealer_validator_set,
-        decrypt_key_map,
-    );
-    let dealt_secret_2_from_inputs = dealt_secret_from_input(
-        &pvss_config.pp,
-        &trxs.trx_o,
+        &trxs.trx,
         &dkg_session.dealer_validator_set,
         decrypt_key_map,
     );
 
-    // println!("dealt_secret_1_from_shares={}", hex::encode(dealt_secret_1_from_shares.sub_key().to_bytes()));
-    // println!("dealt_secret_2_from_shares={}", hex::encode(dealt_secret_2_from_shares.sub_key().to_bytes()));
-    // println!("dealt_secret_1_from_inputs={}", hex::encode(dealt_secret_1_from_inputs.to_bytes()));
-    // println!("dealt_secret_2_from_inputs={}", hex::encode(dealt_secret_2_from_inputs.to_bytes()));
-    if dealt_secret_1_from_shares != dealt_secret_1_from_inputs {
-        return false;
-    }
-    if dealt_secret_2_from_shares != dealt_secret_2_from_inputs {
-        return false;
-    }
-    if dealt_secret_1_from_shares != dealt_secret_2_from_shares {
+    if dealt_secret_from_shares != dealt_secret_from_inputs {
         return false;
     }
     true

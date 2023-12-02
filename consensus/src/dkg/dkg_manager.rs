@@ -164,11 +164,9 @@ impl DKGManager {
         let aux = (self.epoch_state.epoch, self.author);
 
 
-        // compute two transcripts of with two weighted configs
-        // trx_f is used for generating the keys of the randomness generation fallback path
-        // trx_o is used for generating the keys of the randomness generation optimistic path
-        let trx_f = WTrx::deal(
-            &dkg_pvss_config.wc_f,
+        // compute one transcript for generating the keys for the randomness generation
+        let trx = WTrx::deal(
+            &dkg_pvss_config.wconfig,
             &dkg_pvss_config.pp,
             &private_key,
             &dkg_pvss_config.eks,
@@ -178,18 +176,7 @@ impl DKGManager {
             &mut rng,
         );
 
-        let trx_o = WTrx::deal(
-            &dkg_pvss_config.wc_o,
-            &dkg_pvss_config.pp,
-            &private_key,
-            &dkg_pvss_config.eks,
-            &s,
-            &aux,
-            &Player{ id: my_index },
-            &mut rng,
-        );
-
-        let dkg_trx_wrapper = DKGTranscriptWrapper { trx_f, trx_o };
+        let dkg_trx_wrapper = DKGTranscriptWrapper { trx };
         let dkg_node = DKGNode::new(self.epoch_state.epoch, self.author, dkg_trx_wrapper);
 
         debug!("[DKG] Finish computing DKG Node of epoch {:?} at node {}", dkg_node.epoch(), self.author);

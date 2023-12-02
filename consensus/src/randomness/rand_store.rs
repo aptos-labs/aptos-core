@@ -7,7 +7,7 @@ use anyhow::bail;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_dkg::{pvss::Player, weighted_vuf::traits::WeightedVUF};
 use aptos_logger::debug;
-use aptos_types::randomness::{Randomness, RandConfig, RandDecision, Mode, RandMetadata, WVUF};
+use aptos_types::randomness::{Randomness, RandConfig, RandDecision, RandMetadata, WVUF};
 use serde::{Serialize, Deserialize};
 use sha3::{Digest, Sha3_256};
 
@@ -59,7 +59,7 @@ impl RandItem {
             }
         }
 
-        self.weight += rand_config.get_peer_weight(share.author(),  &Mode::Fallback);
+        self.weight += rand_config.get_peer_weight(share.author());
         self.shares.insert(*share.author(), share);
         Ok(())
     }
@@ -85,12 +85,12 @@ impl RandItem {
         // update weight
         self.weight = 0;
         for share in self.shares.values() {
-            self.weight += rand_config.get_peer_weight(share.author(), &Mode::Fallback);
+            self.weight += rand_config.get_peer_weight(share.author());
         }
     }
 
     pub fn ready_to_aggregate(&self, rand_config: &RandConfig) -> bool {
-        self.weight >= rand_config.th_f() && self.metadata.is_some()
+        self.weight >= rand_config.threshold() && self.metadata.is_some()
     }
 
     // call aggregate_shares only when all shares have correct metadata
@@ -99,7 +99,7 @@ impl RandItem {
             let mut apks_and_proofs = vec![];
             for share in self.shares.values() {
                 let id = *rand_config.validator.address_to_validator_index().get(share.author()).unwrap();
-                let maybe_apk = rand_config.get_certified_apk(share.author(), &Mode::Fallback);
+                let maybe_apk = rand_config.get_certified_apk(share.author());
                 if let Some(apk) = maybe_apk {
                     apks_and_proofs.push((Player{ id }, apk.clone(), share.share().clone()));
                 } else {
@@ -107,7 +107,7 @@ impl RandItem {
                 }
             }
 
-            let proof = <WVUF as WeightedVUF>::aggregate_shares(&rand_config.wc_f, &apks_and_proofs);
+            let proof = <WVUF as WeightedVUF>::aggregate_shares(&rand_config.wconfig, &apks_and_proofs);
             let eval = <WVUF as WeightedVUF>::derive_eval(&rand_config.vuf_pp, metadata.to_bytes().as_slice(), &proof);
             let eval_bytes = bcs::to_bytes(&eval).unwrap();
             let rand_bytes = Sha3_256::digest(eval_bytes.as_slice()).to_vec();
@@ -292,7 +292,7 @@ impl RandStore {
 
     pub fn add_share(&mut self, share: RandShare) -> anyhow::Result<(ShareAck, AddDecisionResult)> {
         let rand_config = self.rand_config.as_ref().unwrap();
-        let missing_apk = rand_config.get_certified_apk(share.author(), &Mode::Fallback).is_none();
+        let missing_apk = rand_config.get_certified_apk(share.author()).is_none();
 
         if missing_apk {
             bail!("[RandStore] missing apk for {:?}", share.author());
@@ -313,7 +313,7 @@ impl RandStore {
             bail!("[RandStore] duplicate share from the same author {:?}", share.author());
         }
 
-        share.verify(Mode::Fallback, rand_config)?;
+        share.verify(rand_config)?;
 
         rand_item.add_share(share.clone(), rand_config)?;
 

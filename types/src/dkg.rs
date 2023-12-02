@@ -33,10 +33,8 @@ impl MoveStructType for StartDKGEvent {
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct DKGPvssConfig {
     pub epoch: u64,
-    // weighted config for randomness fallback path
-    pub wc_f: SSConfig,
-    // weighted config for randomness optimistic path
-    pub wc_o: SSConfig,
+    // weighted config for randomness generation
+    pub wconfig: SSConfig,
     // DKG public parameters
     pub pp: DkgPP,
     // DKG encryption public keys
@@ -46,15 +44,13 @@ pub struct DKGPvssConfig {
 impl DKGPvssConfig {
     pub fn new(
         epoch: u64,
-        wc_f: SSConfig,
-        wc_o: SSConfig,
+        wconfig: SSConfig,
         pp: DkgPP,
         eks: Vec<EncPK>,
     ) -> Self {
         Self {
             epoch,
-            wc_f,
-            wc_o,
+            wconfig,
             pp,
             eks,
         }
@@ -68,10 +64,8 @@ impl DKGPvssConfig {
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct DKGTranscriptWrapper {
-    // DKG weighted transcript for randomness fallback path
-    pub trx_f: WTrx,
-    // DKG weighted transcript for randomness optimistic path
-    pub trx_o: WTrx,
+    // DKG weighted transcript for randomness generation
+    pub trx: WTrx,
 }
 
 impl DKGTranscriptWrapper {
@@ -87,15 +81,8 @@ impl DKGTranscriptWrapper {
 
         let aux = dealers_addresses.iter().map(|address| (dkg_pvss_config.epoch, address)).collect::<Vec<_>>();
 
-        self.trx_f.verify(
-            &dkg_pvss_config.wc_f,
-            &dkg_pvss_config.pp,
-            &spks,
-            &all_eks,
-            &aux,
-        )?;
-        self.trx_o.verify(
-            &dkg_pvss_config.wc_o,
+        self.trx.verify(
+            &dkg_pvss_config.wconfig,
             &dkg_pvss_config.pp,
             &spks,
             &all_eks,
@@ -106,25 +93,19 @@ impl DKGTranscriptWrapper {
     }
 
     pub fn verify_dealers(&self, n: usize) -> anyhow::Result<Vec<usize>> {
-        let dealers_f = self.trx_f.get_dealers().iter().map(|player| player.id).collect::<Vec<usize>>();
-        let dealers_o = self.trx_o.get_dealers().iter().map(|player| player.id).collect::<Vec<usize>>();
-        if dealers_f != dealers_o {
-            anyhow::bail!("[DKG] trx dealers mismatch!");
+        let dealers = self.trx.get_dealers().iter().map(|player| player.id).collect::<Vec<usize>>();
+        if dealers.iter().any(|id| *id >= n) {
+            anyhow::bail!("[DKG] transcript dealers out of range!");
         }
-        if dealers_f.iter().any(|id| *id >= n) {
-            anyhow::bail!("[DKG] trx dealers out of range!");
-        }
-        Ok(dealers_f)
+        Ok(dealers)
     }
 
     pub fn aggregate_with(&mut self, dkg_pvss_config: &DKGPvssConfig, other: &Self) {
-        self.trx_f
-            .aggregate_with(&dkg_pvss_config.wc_f, &other.trx_f);
-        self.trx_o
-            .aggregate_with(&dkg_pvss_config.wc_o, &other.trx_o);
+        self.trx
+            .aggregate_with(&dkg_pvss_config.wconfig, &other.trx);
     }
 
     pub fn num_bytes(&self) -> usize {
-        self.trx_f.to_bytes().len() + self.trx_o.to_bytes().len()
+        self.trx.to_bytes().len()
     }
 }
