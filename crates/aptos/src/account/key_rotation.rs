@@ -180,7 +180,7 @@ impl CliCommand<RotateSummary> for RotateKey {
         let rotation_msg =
             bcs::to_bytes(&rotation_proof).map_err(|err| CliError::BCS("rotation_proof", err))?;
 
-        // Sign the struct using both the current private key and the next private key.
+        // Sign the struct using both the current private key and the new private key.
         let rotation_proof_signed_by_current_private_key = if current_derivation_path.is_some() {
             aptos_ledger::sign_message(
                 current_derivation_path.clone().unwrap().as_str(),
