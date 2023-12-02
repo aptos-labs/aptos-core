@@ -11,7 +11,7 @@ use crate::{
     ProtocolId,
 };
 use aptos_config::{
-    config::PeerSet,
+    config::{Peer, PeerSet},
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_infallible::RwLock;
@@ -319,6 +319,19 @@ impl PeersAndMetadata {
                 network_id
             ))
         })
+    }
+
+    /// Returns the trusted peer state for the given peer (if one exists)
+    pub fn get_trusted_peer_state(
+        &self,
+        peer_network_id: &PeerNetworkId,
+    ) -> Result<Option<Peer>, Error> {
+        let trusted_peers = self.get_trusted_peer_set_for_network(&peer_network_id.network_id())?;
+        let trusted_peer_state = trusted_peers
+            .load()
+            .get(&peer_network_id.peer_id())
+            .cloned();
+        Ok(trusted_peer_state)
     }
 
     /// Updates the trusted peer set for the given network ID

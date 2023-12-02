@@ -15,7 +15,7 @@ use crate::{
     },
     peer_states::{ErrorType, PeerStates},
     poller::DataSummaryPoller,
-    utils,
+    priority, utils,
 };
 use aptos_config::{
     config::{AptosDataClientConfig, BaseConfig},
@@ -354,18 +354,19 @@ impl AptosDataClient {
         Ok(connected_peers)
     }
 
-    /// Returns all priority and regular peers
+    /// Returns all priority and regular peers. We define "priority peers" as
+    /// high-priority peers only, and "regular peers" as all other priority categories.
     pub fn get_priority_and_regular_peers(
         &self,
     ) -> crate::error::Result<(HashSet<PeerNetworkId>, HashSet<PeerNetworkId>), Error> {
         // Get all connected peers
         let all_connected_peers = self.get_all_connected_peers()?;
 
-        // Filter the peers based on priority
+        // Gather the peers based on priority
         let mut priority_peers = hashset![];
         let mut regular_peers = hashset![];
         for peer in all_connected_peers {
-            if utils::is_priority_peer(
+            if priority::is_high_priority_peer(
                 self.base_config.clone(),
                 self.get_peers_and_metadata(),
                 &peer,
