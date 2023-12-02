@@ -1,0 +1,201 @@
+Ok(
+    [
+        TransactionOutput {
+            write_set: V0(
+                WriteSetV0(
+                    WriteSetMut {
+                        write_set: {
+                            StateKey {
+                                inner: AccessPath { address: 0xbeef, path: "Code(000000000000000000000000000000000000000000000000000000000000beef::test)" },
+                                hash: OnceCell(Uninit),
+                            }: CreationWithMetadata(a11ceb0b060000000b01000602061003162e044406054a44078e018c01089a024006da02260a80030f0c8f03dd010dec04020000010101020003080000040800020a0402030100010005000100000602010000070101000008030100010b020500020c0708020300020d0a01020300020e010b02030405060606070604060c0202030001060c010c0602030302070b0202020a020a02010502020a0202060b02020900090109000101010203070b02020900090109000901010b0202090009010474657374067369676e6572057461626c6503466f6f0c5461626c654f6642797465730f6372656174655f6d756c7469706c6513696e69745f7461626c655f6f665f62797465730a72756e5f6578697374730b72756e5f6d6f76655f746f0b64756d6d795f6669656c64055461626c650a616464726573735f6f6608636f6e7461696e7303616464036e6577000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000010a020100052000000000000000000000000000000000000000000000000000000000000000010002010901010201020b0202020a020000040101044b0a0306000000000000000024040505090b0001060000000000000000270b03060100000000000000170c050b0011042a010f000c080a010c070a070a0223044805190a080a070c042e0b04380020042205290b080106e8030000000000000b0734162707000c090600000000000000000c060a060a050a070a0117341623043f05370d090a0744090b06060100000000000000160c06052d0a080a070b0938010b073101160c0705140b0801020100040001050b00380212012d01020200040001040701290001020300040001050e000912002d0002010000, metadata:V0 { deposit: 50000, creation_time_usecs: 0 }),
+                            StateKey {
+                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::code::PackageRegistry)" },
+                                hash: OnceCell(Uninit),
+                            }: CreationWithMetadata(010474657374010000000000000000403432384536444344423737363246364333463144443444453334423736413439324434353033394333444634433541373943384546314241443938364344323886011f8b08000000000002ff958c310e83301004fb7b85e53e261f489107a44a89282ef60559189fe5b3a040fc1d9b8a16ed56ab9de913da09471a20e24ceaa57421291a16cae239b6e1696a3440ef28517414ad2719e0c30b7d8b0bfe574f9b0a6c31b4bb31ddb5ff5cbd2be7a99b2bf09093d06a87772a2cb704d8888b010e77c4d528bd0000000104746573740000000200000000000000000000000000000000000000000000000000000000000000010b4170746f735374646c696200000000000000000000000000000000000000000000000000000000000000010a4d6f76655374646c696200, metadata:V0 { deposit: 50000, creation_time_usecs: 0 }),
+                            StateKey {
+                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>)" },
+                                hash: OnceCell(Uninit),
+                            }: Modification(bca7c4a47e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
+                            StateKey {
+                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::account::Account)" },
+                                hash: OnceCell(Uninit),
+                            }: Modification(201304972f9242cbc3528a1e286323471ab891baa37e0053b85651693a79854a000b00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000beef0000),
+                            StateKey {
+                                inner: TableItem { handle: 1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca, key: 0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935 },
+                                hash: OnceCell(Uninit),
+                            }: Modification(bb08f405000000000100000000000000),
+                        },
+                    },
+                ),
+            ),
+            events: [
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "b9040000000000000500000000000000650000000000000040af0100000000000000000000000000" },
+            ],
+            gas_used: 1209,
+            status: Keep(
+                Success,
+            ),
+        },
+    ],
+)
+Ok(
+    [
+        TransactionOutput {
+            write_set: V0(
+                WriteSetV0(
+                    WriteSetMut {
+                        write_set: {
+                            StateKey {
+                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>)" },
+                                hash: OnceCell(Uninit),
+                            }: Modification(40e3c3a47e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
+                            StateKey {
+                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::account::Account)" },
+                                hash: OnceCell(Uninit),
+                            }: Modification(201304972f9242cbc3528a1e286323471ab891baa37e0053b85651693a79854a000c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000beef0000),
+                            StateKey {
+                                inner: AccessPath { address: 0xbeef, path: "Resource(0xbeef::test::TableOfBytes)" },
+                                hash: OnceCell(Uninit),
+                            }: CreationWithMetadata(18c2d68313e9af7887d2b62a1d0f3b60b8e24511e45d370d3422851db20503f4, metadata:V0 { deposit: 50000, creation_time_usecs: 0 }),
+                            StateKey {
+                                inner: TableItem { handle: 1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca, key: 0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935 },
+                                hash: OnceCell(Uninit),
+                            }: Modification(3f44f305000000000100000000000000),
+                        },
+                    },
+                ),
+            ),
+            events: [
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "f7010000000000000200000000000000010000000000000050c30000000000000000000000000000" },
+            ],
+            gas_used: 503,
+            status: Keep(
+                Success,
+            ),
+        },
+    ],
+)
+Ok(
+    [
+        TransactionOutput {
+            write_set: V0(
+                WriteSetV0(
+                    WriteSetMut {
+                        write_set: {
+                            StateKey {
+                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>)" },
+                                hash: OnceCell(Uninit),
+                            }: Modification(283d28a47e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
+                            StateKey {
+                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::account::Account)" },
+                                hash: OnceCell(Uninit),
+                            }: Modification(201304972f9242cbc3528a1e286323471ab891baa37e0053b85651693a79854a000d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000beef0000),
+                            StateKey {
+                                inner: TableItem { handle: 18c2d68313e9af7887d2b62a1d0f3b60b8e24511e45d370d3422851db20503f4, key: 0a },
+                                hash: OnceCell(Uninit),
+                            }: CreationWithMetadata(00, metadata:V0 { deposit: 50000, creation_time_usecs: 0 }),
+                            StateKey {
+                                inner: TableItem { handle: 18c2d68313e9af7887d2b62a1d0f3b60b8e24511e45d370d3422851db20503f4, key: 0b },
+                                hash: OnceCell(Uninit),
+                            }: CreationWithMetadata(010b, metadata:V0 { deposit: 50000, creation_time_usecs: 0 }),
+                            StateKey {
+                                inner: TableItem { handle: 18c2d68313e9af7887d2b62a1d0f3b60b8e24511e45d370d3422851db20503f4, key: 0c },
+                                hash: OnceCell(Uninit),
+                            }: CreationWithMetadata(020c0c, metadata:V0 { deposit: 50000, creation_time_usecs: 0 }),
+                            StateKey {
+                                inner: TableItem { handle: 18c2d68313e9af7887d2b62a1d0f3b60b8e24511e45d370d3422851db20503f4, key: 0d },
+                                hash: OnceCell(Uninit),
+                            }: CreationWithMetadata(030d0d0d, metadata:V0 { deposit: 50000, creation_time_usecs: 0 }),
+                            StateKey {
+                                inner: TableItem { handle: 1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca, key: 0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935 },
+                                hash: OnceCell(Uninit),
+                            }: Modification(279e5705000000000100000000000000),
+                        },
+                    },
+                ),
+            ),
+            events: [
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "768e01000000000005000000000000000200000000000000c0a39b00000000000000000000000000" },
+            ],
+            gas_used: 102006,
+            status: Keep(
+                Success,
+            ),
+        },
+    ],
+)
+Ok(
+    [
+        TransactionOutput {
+            write_set: V0(
+                WriteSetV0(
+                    WriteSetMut {
+                        write_set: {
+                            StateKey {
+                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>)" },
+                                hash: OnceCell(Uninit),
+                            }: Modification(e0d56ea37e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
+                            StateKey {
+                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::account::Account)" },
+                                hash: OnceCell(Uninit),
+                            }: Modification(201304972f9242cbc3528a1e286323471ab891baa37e0053b85651693a79854a000e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000beef0000),
+                            StateKey {
+                                inner: TableItem { handle: 1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca, key: 0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935 },
+                                hash: OnceCell(Uninit),
+                            }: Modification(df369e04000000000100000000000000),
+                        },
+                    },
+                ),
+            ),
+            events: [
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "a2da01000000000005000000000000000200000000000000f064b900000000000000000000000000" },
+            ],
+            gas_used: 121506,
+            status: Keep(
+                MiscellaneousError(
+                    Some(
+                        STORAGE_LIMIT_REACHED,
+                    ),
+                ),
+            ),
+        },
+    ],
+)
+Ok(
+    [
+        TransactionOutput {
+            write_set: V0(
+                WriteSetV0(
+                    WriteSetMut {
+                        write_set: {
+                            StateKey {
+                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>)" },
+                                hash: OnceCell(Uninit),
+                            }: Modification(18e159a27e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
+                            StateKey {
+                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::account::Account)" },
+                                hash: OnceCell(Uninit),
+                            }: Modification(201304972f9242cbc3528a1e286323471ab891baa37e0053b85651693a79854a000f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000beef0000),
+                            StateKey {
+                                inner: TableItem { handle: 1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca, key: 0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935 },
+                                hash: OnceCell(Uninit),
+                            }: Modification(17428903000000000100000000000000),
+                        },
+                    },
+                ),
+            ),
+            events: [
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "02c50200000000000500000000000000020000000000000070f21401000000000000000000000000" },
+            ],
+            gas_used: 181506,
+            status: Keep(
+                MiscellaneousError(
+                    Some(
+                        STORAGE_LIMIT_REACHED,
+                    ),
+                ),
+            ),
+        },
+    ],
+)
