@@ -36,7 +36,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     fee_statement::FeeStatement,
     on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
-    system_txn::SystemTransaction,
+    validator_txn::ValidatorTransaction,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction,
         EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
@@ -1262,10 +1262,10 @@ impl AptosVM {
         }
     }
 
-    fn process_system_transaction(
+    fn process_validator_transaction(
         &self,
         _resolver: &impl AptosMoveResolver,
-        _txn: SystemTransaction,
+        _txn: ValidatorTransaction,
         _log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
         (
@@ -1853,11 +1853,11 @@ impl AptosVM {
                 let output = VMOutput::empty_with_status(status);
                 (VMStatus::Executed, output, Some("state_checkpoint".into()))
             },
-            Transaction::SystemTransaction(txn) => {
-                fail_point!("aptos_vm::execution::system_transaction");
+            Transaction::ValidatorTransaction(txn) => {
+                fail_point!("aptos_vm::execution::validator_transaction");
                 let (vm_status, output) =
-                    self.process_system_transaction(resolver, txn.clone(), log_context);
-                (vm_status, output, Some("system_transaction".to_string()))
+                    self.process_validator_transaction(resolver, txn.clone(), log_context);
+                (vm_status, output, Some("validator_transaction".to_string()))
             },
         })
     }

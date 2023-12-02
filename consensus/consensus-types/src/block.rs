@@ -17,7 +17,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
-    system_txn::SystemTransaction,
+    validator_txn::ValidatorTransaction,
     transaction::{SignedTransaction, Transaction, Version},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
@@ -255,7 +255,7 @@ impl Block {
     }
 
     pub fn new_proposal_ext(
-        sys_txns: Vec<SystemTransaction>,
+        validator_txns: Vec<ValidatorTransaction>,
         payload: Payload,
         round: Round,
         timestamp_usecs: u64,
@@ -264,7 +264,7 @@ impl Block {
         failed_authors: Vec<(Round, Author)>,
     ) -> anyhow::Result<Self> {
         let block_data = BlockData::new_proposal_ext(
-            sys_txns,
+            validator_txns,
             payload,
             validator_signer.author(),
             failed_authors,
@@ -297,8 +297,8 @@ impl Block {
         }
     }
 
-    pub fn sys_txns(&self) -> Option<&Vec<SystemTransaction>> {
-        self.block_data.sys_txns()
+    pub fn validator_txns(&self) -> Option<&Vec<ValidatorTransaction>> {
+        self.block_data.validator_txns()
     }
 
     /// Verifies that the proposal and the QC are correctly signed.
@@ -411,15 +411,15 @@ impl Block {
     pub fn transactions_to_execute(
         &self,
         validators: &[AccountAddress],
-        sys_txns: Vec<SystemTransaction>,
-        txns: Vec<SignedTransaction>,
+        validator_txns: Vec<ValidatorTransaction>,
+        user_txns: Vec<SignedTransaction>,
         is_block_gas_limit: bool,
     ) -> Vec<Transaction> {
         let txns = once(Transaction::BlockMetadata(
             self.new_block_metadata(validators),
         ))
-        .chain(sys_txns.into_iter().map(Transaction::SystemTransaction))
-        .chain(txns.into_iter().map(Transaction::UserTransaction));
+        .chain(validator_txns.into_iter().map(Transaction::ValidatorTransaction))
+        .chain(user_txns.into_iter().map(Transaction::UserTransaction));
 
         if is_block_gas_limit {
             // After the per-block gas limit change, StateCheckpoint txn
