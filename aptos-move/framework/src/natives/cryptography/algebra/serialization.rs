@@ -213,7 +213,7 @@ fn serialize_internal_bn254(
             buf.reverse();
             Ok(smallvec![Value::vector_u8(buf)])
         },
-        (BN254Structure::BN254Fq, BN254SerializationFormat::BN254FrLsb) => {
+        (BN254Structure::BN254Fq, BN254SerializationFormat::BN254FqLsb) => {
             let handle = safely_pop_arg!(args, u64) as usize;
             safe_borrow_element!(context, handle, ark_bn254::Fq, element_ptr, element);
             let mut buf = vec![];

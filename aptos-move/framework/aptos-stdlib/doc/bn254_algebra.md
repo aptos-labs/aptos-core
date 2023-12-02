@@ -23,6 +23,7 @@
 -  [Struct `FormatG2Compr`](#0x1_bn254_algebra_FormatG2Compr)
 -  [Struct `Gt`](#0x1_bn254_algebra_Gt)
 -  [Struct `FormatGt`](#0x1_bn254_algebra_FormatGt)
+-  [Constants](#@Constants_0)
 
 
 <pre><code></code></pre>
@@ -514,6 +515,18 @@
 
 
 </details>
+
+<a id="@Constants_0"></a>
+
+## Constants
+
+
+<a id="0x1_bn254_algebra_FQ_R_SERIALIZED"></a>
+
+
+
+<pre><code><b>const</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FQ_R_SERIALIZED">FQ_R_SERIALIZED</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [71, 253, 124, 216, 22, 140, 32, 60, 141, 202, 113, 104, 145, 106, 129, 151, 93, 88, 129, 129, 182, 69, 80, 184, 41, 160, 49, 225, 114, 78, 100, 48];
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

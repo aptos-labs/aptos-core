@@ -1,39 +1,247 @@
+/// This module defines marker types, constants and test cases for working with BN254 curves using the generic API defined in `algebra.move`.
+/// BN254 was sampled as part of the [\[BCTV14\]](https://eprint.iacr.org/2013/879.pdf) paper .
+/// The name denotes that it is a Barreto--Naehrig curve of embedding degree 12,
+/// defined over a 254-bit (prime) field. The scalar field is highly 2-adic.
+///
+/// This curve is also implemented in [libff](https://github.com/scipr-lab/libff/tree/master/libff/algebra/curves/alt_bn128) under the name `bn128`.
+/// It is the same as the `bn256` curve used in Ethereum (eg: [go-ethereum](https://github.com/ethereum/go-ethereum/tree/master/crypto/bn254/cloudflare)).
+///
+/// #CAUTION
+/// **This curve does not satisfy the 128-bit security level anymore.**
+///
+///
+/// Curve information:
+/// * Base field: q =
+///   21888242871839275222246405745257275088696311157297823662689037894645226208583
+/// * Scalar field: r =
+///   21888242871839275222246405745257275088548364400416034343698204186575808495617
+/// * valuation(q - 1, 2) = 1
+/// * valuation(r - 1, 2) = 28
+/// * G1 curve equation: y^2 = x^3 + 3
+/// * G2 curve equation: y^2 = x^3 + B, where
+///    * B = 3/(u+9) where Fq2 is represented as Fq\[u\]/(u^2+1) =
+///      Fq2(19485874751759354771024239261021720505790618469301721065564631296452457478373,
+///      266929791119991161246907387137283842545076965332900288569378510910307636690)
+///
+///
+/// Currently-supported BN254 structures include `Fq12`, `Fr`, `Fq`, `Fq2`, `G1`, `G2` and `Gt`,
+/// along with their widely-used serialization formats,
+/// the pairing between `G1`, `G2` and `Gt`.
+///
+/// Other unimplemented BN254 structures and serialization formats are also listed here,
+/// as they help define some of the currently supported structures.
+/// Their implementation may also be added in the future.
+///
+/// `Fq6`: the finite field $F_{q^6}$ used in BN254 curves,
+/// which is an extension field of `Fq2`, constructed as $F_{q^6}=F_{q^2}[v]/(v^3-u-9)$.
+///
+/// `FormatFq6LscLsb`: a serialization scheme for `Fq6` elements,
+/// where an element in the form $(c_0+c_1\cdot v+c_2\cdot v^2)$ is represented by a byte array `b[]` of size 192,
+/// which is a concatenation of its coefficients serialized, with the least significant coefficient (LSC) coming first:
+/// - `b[0..64]` is $c_0$ serialized using `FormatFq2LscLsb`.
+/// - `b[64..128]` is $c_1$ serialized using `FormatFq2LscLsb`.
+/// - `b[128..192]` is $c_2$ serialized using `FormatFq2LscLsb`.
+///
+/// `G1Full`: a group constructed by the points on the BN254 curve $E(F_q): y^2=x^3+3$ and the point at infinity,
+/// under the elliptic curve point addition.
+/// It contains the prime-order subgroup $G_1$ used in pairing.
+///
+/// `G2Full`: a group constructed by the points on a curve $E'(F_{q^2}): y^2=x^3+3/(u+9)$ and the point at infinity,
+/// under the elliptic curve point addition.
+/// It contains the prime-order subgroup $G_2$ used in pairing.
 module std::bn254_algebra {
+    //
+    // Marker types + serialization formats begin.
+    //
+
+    /// The finite field $F_r$ that can be used as the scalar fields
+    /// associated with the groups $G_1$, $G_2$, $G_t$ in BN254-based pairing.
     struct Fr {}
+
+    /// A serialization format for `Fr` elements,
+    /// where an element is represented by a byte array `b[]` of size 32 with the least significant byte (LSB) coming first.
+    ///
+    /// NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
     struct FormatFrLsb {}
+
+    /// A serialization scheme for `Fr` elements,
+    /// where an element is represented by a byte array `b[]` of size 32 with the most significant byte (MSB) coming first.
+    ///
+    /// NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
     struct FormatFrMsb {}
 
+    /// The finite field $F_q$ that can be used as the base field of $G_1$
     struct Fq {}
+
+    /// A serialization format for `Fq` elements,
+    /// where an element is represented by a byte array `b[]` of size 32 with the least significant byte (LSB) coming first.
+    ///
+    /// NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
     struct FormatFqLsb {}
+
+    /// A serialization scheme for `Fq` elements,
+    /// where an element is represented by a byte array `b[]` of size 32 with the most significant byte (MSB) coming first.
+    ///
+    /// NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
     struct FormatFqMsb {}
 
+    /// The finite field $F_q2$ that can be used as the base field of $G_2$
+    /// which is an extension field of `Fq`, constructed as $F_{q^2}=F_{q}[u]/(u^2+1)$.
     struct Fq2 {}
+
+    /// A serialization scheme for `Fq2` elements,
+    /// where an element $(c_0+c_1\cdot w)$ is represented by a byte array `b[]` of size N=64,
+    /// which is a concatenation of its coefficients serialized, with the least significant coefficient (LSC) coming first.
+    /// - `b[0..N]` is $c_0$ serialized using `FormatFqLscLsb`.
+    /// - `b[N..384]` is $c_1$ serialized using `FormatFqLscLsb`.
+    ///
+    /// NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
     struct FormatFq2LscLsb {}
 
+    /// The finite field $F_{q^12}$ used in BN254 curves,
+    /// which is an extension field of `Fq6` (defined in the module documentation), constructed as $F_{q^12}=F_{q^6}[w]/(w^2-v)$.
     struct Fq12 {}
+    /// A serialization scheme for `Fq12` elements,
+    /// where an element $(c_0+c_1\cdot w)$ is represented by a byte array `b[]` of size 384,
+    /// which is a concatenation of its coefficients serialized, with the least significant coefficient (LSC) coming first.
+    /// - `b[0..192]` is $c_0$ serialized using `FormatFq6LscLsb` (defined in the module documentation).
+    /// - `b[192..384]` is $c_1$ serialized using `FormatFq6LscLsb`.
+    ///
+    /// NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
     struct FormatFq12LscLsb {}
 
+    /// The group $G_1$ in BN254-based pairing $G_1 \times G_2 \rightarrow G_t$.
+    /// It is a subgroup of `G1Full` (defined in the module documentation) with a prime order $r$
+    /// equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+    /// (so `Fr` is the associated scalar field).
     struct G1 {}
+
+    /// A serialization scheme for `G1` elements derived from arkworks.rs.
+    ///
+    /// Below is the serialization procedure that takes a `G2` element `p` and outputs a byte array of size N=64.
+    /// 1. Let `(x,y)` be the coordinates of `p` if `p` is on the curve, or `(0,0)` otherwise.
+    /// 1. Serialize `x` and `y` into `b_x[]` and `b_y[]` respectively using `FormatFqLsb` (defined in the module documentation).
+    /// 1. Concatenate `b_x[]` and `b_y[]` into `b[]`.
+    /// 1. If `p` is the point at infinity, set the infinity bit: `b[N-1]: = b[N-1] | 0b0100_0000`.
+    /// 1. If `y`is negative, set the negative bit:  `b[N-1]: = b[N-1] | 0b1000_0000`.
+    /// 1. Return `b[]`.
+    ///
+    /// Below is the deserialization procedure that takes a byte array `b[]` and outputs either a `G1` element or none.
+    /// 1. If the size of `b[]` is not N, return none.
+    /// 1. Compute the infinity flag as `b[N-1] & 0b0100_0000 != 0`.
+    /// 1. If the infinity flag is set, return the point at infinity.
+    /// 1. Deserialize `[b[0], b[1], ..., b[N/2-1]]` to `x` using `FormatFqLsb`. If `x` is none, return none.
+    /// 1. Deserialize `[b[N/2], ..., b[N] & 0b0011_1111]` to `y` using `FormatFqLsb`. If `y` is none, return none.
+    /// 1. Check if `(x,y)` is on curve `E`. If not, return none.
+    /// 1. Check if `(x,y)` is in the subgroup of order `r`. If not, return none.
+    /// 1. Return `(x,y)`.
+    ///
+    /// NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
     struct FormatG1Uncompr {}
+
+    /// A serialization scheme for `G1` elements derived from arkworks.rs
+    ///
+    /// Below is the serialization procedure that takes a `G1` element `p` and outputs a byte array of size N=32.
+    /// 1. Let `(x,y)` be the coordinates of `p` if `p` is on the curve, or `(0,0)` otherwise.
+    /// 1. Serialize `x` into `b[]` using `FormatFqLsb` (defined in the module documentation).
+    /// 1. If `p` is the point at infinity, set the infinity bit: `b[N-1]: = b[N-1] | 0b0100_0000`.
+    /// 1. If `y > -y`, set the lexicographical flag: `b[N-1] := b[N-1] | 0x1000_0000`.
+    /// 1. Return `b[]`.
+    ///
+    /// Below is the deserialization procedure that takes a byte array `b[]` and outputs either a `G1` element or none.
+    /// 1. If the size of `b[]` is not N, return none.
+    /// 1. Compute the infinity flag as `b[N-1] & 0b0100_0000 != 0`.
+    /// 1. If the infinity flag is set, return the point at infinity.
+    /// 1. Compute the lexicographical flag as `b[N-1] & 0b1000_0000 != 0`.
+    /// 1. Deserialize `[b[0], b[1], ..., b[N/2-1] & 0b0011_1111]` to `x` using `FormatFqLsb`. If `x` is none, return none.
+    /// 1. Solve the curve equation with `x` for `y`. If no such `y` exists, return none.
+    /// 1. Let `y'` be `max(y,-y)` if the lexicographical flag is set, or `min(y,-y)` otherwise.
+    /// 1. Check if `(x,y')` is in the subgroup of order `r`. If not, return none.
+    /// 1. Return `(x,y')`.
+    ///
+    /// NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
     struct FormatG1Compr {}
+
+    /// The group $G_2$ in BN254-based pairing $G_1 \times G_2 \rightarrow G_t$.
+    /// It is a subgroup of `G2Full` (defined in the module documentation) with a prime order $r$ equal to
+    /// 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+    /// (so `Fr` is the scalar field).
     struct G2 {}
+
+    /// A serialization scheme for `G2` elements derived from arkworks.rs.
+    ///
+    /// Below is the serialization procedure that takes a `G2` element `p` and outputs a byte array of size N=128.
+    /// 1. Let `(x,y)` be the coordinates of `p` if `p` is on the curve, or `(0,0)` otherwise.
+    /// 1. Serialize `x` and `y` into `b_x[]` and `b_y[]` respectively using `FormatFq2Lsb` (defined in the module documentation).
+    /// 1. Concatenate `b_x[]` and `b_y[]` into `b[]`.
+    /// 1. If `p` is the point at infinity, set the infinity bit: `b[N-1]: = b[N-1] | 0b0100_0000`.
+    /// 1. If `y`is negative, set the negative bit:  `b[N-1]: = b[N-1] | 0b1000_0000`.
+    /// 1. Return `b[]`.
+    ///
+    /// Below is the deserialization procedure that takes a byte array `b[]` and outputs either a `G1` element or none.
+    /// 1. If the size of `b[]` is not N, return none.
+    /// 1. Compute the infinity flag as `b[N-1] & 0b0100_0000 != 0`.
+    /// 1. If the infinity flag is set, return the point at infinity.
+    /// 1. Deserialize `[b[0], b[1], ..., b[N/2-1]]` to `x` using `FormatFq2Lsb`. If `x` is none, return none.
+    /// 1. Deserialize `[b[N/2], ..., b[N] & 0b0011_1111]` to `y` using `FormatFq2Lsb`. If `y` is none, return none.
+    /// 1. Check if `(x,y)` is on curve `E`. If not, return none.
+    /// 1. Check if `(x,y)` is in the subgroup of order `r`. If not, return none.
+    /// 1. Return `(x,y)`.
+    ///
+    /// NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
     struct FormatG2Uncompr {}
+
+    /// A serialization scheme for `G1` elements derived from arkworks.rs
+    ///
+    /// Below is the serialization procedure that takes a `G1` element `p` and outputs a byte array of size N=64.
+    /// 1. Let `(x,y)` be the coordinates of `p` if `p` is on the curve, or `(0,0)` otherwise.
+    /// 1. Serialize `x` into `b[]` using `FormatFq2Lsb` (defined in the module documentation).
+    /// 1. If `p` is the point at infinity, set the infinity bit: `b[N-1]: = b[N-1] | 0b0100_0000`.
+    /// 1. If `y > -y`, set the lexicographical flag: `b[N-1] := b[N-1] | 0x1000_0000`.
+    /// 1. Return `b[]`.
+    ///
+    /// Below is the deserialization procedure that takes a byte array `b[]` and outputs either a `G1` element or none.
+    /// 1. If the size of `b[]` is not N, return none.
+    /// 1. Compute the infinity flag as `b[N-1] & 0b0100_0000 != 0`.
+    /// 1. If the infinity flag is set, return the point at infinity.
+    /// 1. Compute the lexicographical flag as `b[N-1] & 0b1000_0000 != 0`.
+    /// 1. Deserialize `[b[0], b[1], ..., b[N/2-1] & 0b0011_1111]` to `x` using `FormatFq2Lsb`. If `x` is none, return none.
+    /// 1. Solve the curve equation with `x` for `y`. If no such `y` exists, return none.
+    /// 1. Let `y'` be `max(y,-y)` if the lexicographical flag is set, or `min(y,-y)` otherwise.
+    /// 1. Check if `(x,y')` is in the subgroup of order `r`. If not, return none.
+    /// 1. Return `(x,y')`.
+    ///
+    /// NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
     struct FormatG2Compr {}
 
+    /// The group $G_t$ in BN254-based pairing $G_1 \times G_2 \rightarrow G_t$.
+    /// It is a multiplicative subgroup of `Fq12`,
+    /// with a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+    /// (so `Fr` is the scalar field).
+    /// The identity of `Gt` is 1.
     struct Gt {}
+
+    /// A serialization scheme for `Gt` elements.
+    ///
+    /// To serialize, it treats a `Gt` element `p` as an `Fq12` element and serialize it using `FormatFq12LscLsb`.
+    ///
+    /// To deserialize, it uses `FormatFq12LscLsb` to try deserializing to an `Fq12` element then test the membership in `Gt`.
+    ///
+    /// NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
     struct FormatGt {}
 
+    // Tests begin.
 
     #[test_only]
-    const FQ12_VAL_0_SERIALIZED: vector<u8> = x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    const FQ2_VAL_0_SERIALIZED: vector<u8> = x"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
     #[test_only]
-    const FQ12_VAL_1_SERIALIZED: vector<u8> = x"010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    const FQ2_VAL_1_SERIALIZED: vector<u8> = x"01000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
     #[test_only]
-    const FQ12_VAL_7_SERIALIZED: vector<u8> = x"070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    const FQ2_VAL_7_SERIALIZED: vector<u8> = x"07000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
     #[test_only]
-    const FQ12_VAL_7_NEG_SERIALIZED: vector<u8> = x"a4aafffffffffeb9ffff53b1feffab1e24f6b0f6a0d23067bf1285f3844b7764d7ac4b43b6a71b4b9ae67f39ea11011a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    const FQ2_VAL_7_NEG_SERIALIZED: vector<u8> = x"40fd7cd8168c203c8dca7168916a81975d588181b64550b829a031e1724e64300000000000000000000000000000000000000000000000000000000000000000";
     #[test_only]
-    const Q12_SERIALIZED: vector<u8> = x"21f186cad2e2d4c1dbaf8a066b0ebf41f734e3f859b1c523a6c1f4d457413fdbe3cd44add090135d3ae519acc30ee3bdb6bfac6573b767e975b18a77d53cdcddebf3672c74da9d1409d51b2b2db7ff000d59e3aa7cf09220159f925c86b65459ca6558c4eaa703bf45d85030ff85cc6a879c7e2c4034f7045faf20e4d3dcfffac5eb6634c3e7b939b69b2be70bdf6b9a4680297839b4e3a48cd746bd4d0ea82749ffb7e71bd9b3fb10aa684d71e6adab1250b1d8604d91b51c76c256a50b60ddba2f52b6cc853ac926c6ea86d09d400b2f2330e5c8e92e38905ba50a50c9e11cd979c284bf1327ccdc051a6da1a4a7eac5cec16757a27a1a2311bedd108a9b21ac0814269e7523a5dd3a1f5f4767ffe504a6cb3994fb0ec98d5cd5da00b9cb1188a85f2aa871ecb8a0f9d64141f1ccd2699c138e0ef9ac4d8d6a692b29db0f38b60eb08426ab46109fbab9a5221bb44dd338aafebcc4e6c10dd933597f3ff44ba41d04e82871447f3a759cfa9397c22c0c77f13618dfb65adc8aacf008";
+    const Q2_SERIALIZED: vector<u8> = x"b1695d27a258543b01c1ea092d0702a6dcca966d9c18504ac842127a959e68048db3c6345cfaed260656371651850bb01cd248037c6f9a599cbf3c76b8c42509";
 
     #[test_only]
     fun rand_vector<S>(num: u64): vector<Element<S>> {
@@ -44,6 +252,67 @@ module std::bn254_algebra {
         };
         elements
     }
+
+    #[test(fx = @std)]
+    fun test_fq2(fx: signer) {
+        enable_cryptography_algebra_natives(&fx);
+
+        // Constants.
+        assert!(Q2_SERIALIZED == order<Fq2>(), 1);
+
+        // Serialization/deserialization.
+        let val_0 = zero<Fq2>();
+        let val_1 = one<Fq2>();
+        assert!(FQ2_VAL_0_SERIALIZED == serialize<Fq2, FormatFq2LscLsb>(&val_0), 1);
+        assert!(FQ2_VAL_1_SERIALIZED == serialize<Fq2, FormatFq2LscLsb>(&val_1), 1);
+        let val_7 = from_u64<Fq2>(7);
+        let val_7_another = std::option::extract(&mut deserialize<Fq2, FormatFq2LscLsb>(&FQ2_VAL_7_SERIALIZED));
+        assert!(eq(&val_7, &val_7_another), 1);
+        assert!(FQ2_VAL_7_SERIALIZED == serialize<Fq2, FormatFq2LscLsb>(&val_7), 1);
+        assert!(std::option::is_none(&deserialize<Fq2, FormatFq2LscLsb>(&x"ffff")), 1);
+
+        // Negation.
+        let val_minus_7 = neg(&val_7);
+        assert!(FQ2_VAL_7_NEG_SERIALIZED == serialize<Fq2, FormatFq2LscLsb>(&val_minus_7), 1);
+
+        // Addition.
+        let val_9 = from_u64<Fq2>(9);
+        let val_2 = from_u64<Fq2>(2);
+        assert!(eq(&val_2, &add(&val_minus_7, &val_9)), 1);
+
+        // Subtraction.
+        assert!(eq(&val_9, &sub(&val_2, &val_minus_7)), 1);
+
+        // Multiplication.
+        let val_63 = from_u64<Fq2>(63);
+        assert!(eq(&val_63, &mul(&val_7, &val_9)), 1);
+
+        // division.
+        let val_0 = from_u64<Fq2>(0);
+        assert!(eq(&val_7, &std::option::extract(&mut div(&val_63, &val_9))), 1);
+        assert!(std::option::is_none(&div(&val_63, &val_0)), 1);
+
+        // Inversion.
+        assert!(eq(&val_minus_7, &neg(&val_7)), 1);
+        assert!(std::option::is_none(&inv(&val_0)), 1);
+
+        // Squaring.
+        let val_x = rand_insecure<Fq2>();
+        assert!(eq(&mul(&val_x, &val_x), &sqr(&val_x)), 1);
+    }
+
+
+    #[test_only]
+    const FQ12_VAL_0_SERIALIZED: vector<u8> = x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    #[test_only]
+    const FQ12_VAL_1_SERIALIZED: vector<u8> = x"010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    #[test_only]
+    const FQ12_VAL_7_SERIALIZED: vector<u8> = x"070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    #[test_only]
+    const FQ12_VAL_7_NEG_SERIALIZED: vector<u8> = x"40fd7cd8168c203c8dca7168916a81975d588181b64550b829a031e1724e643000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    #[test_only]
+    const Q12_SERIALIZED: vector<u8> = x"21f186cad2e2d4c1dbaf8a066b0ebf41f734e3f859b1c523a6c1f4d457413fdbe3cd44add090135d3ae519acc30ee3bdb6bfac6573b767e975b18a77d53cdcddebf3672c74da9d1409d51b2b2db7ff000d59e3aa7cf09220159f925c86b65459ca6558c4eaa703bf45d85030ff85cc6a879c7e2c4034f7045faf20e4d3dcfffac5eb6634c3e7b939b69b2be70bdf6b9a4680297839b4e3a48cd746bd4d0ea82749ffb7e71bd9b3fb10aa684d71e6adab1250b1d8604d91b51c76c256a50b60ddba2f52b6cc853ac926c6ea86d09d400b2f2330e5c8e92e38905ba50a50c9e11cd979c284bf1327ccdc051a6da1a4a7eac5cec16757a27a1a2311bedd108a9b21ac0814269e7523a5dd3a1f5f4767ffe504a6cb3994fb0ec98d5cd5da00b9cb1188a85f2aa871ecb8a0f9d64141f1ccd2699c138e0ef9ac4d8d6a692b29db0f38b60eb08426ab46109fbab9a5221bb44dd338aafebcc4e6c10dd933597f3ff44ba41d04e82871447f3a759cfa9397c22c0c77f13618dfb65adc8aacf008";
+
 
     #[test(fx = @std)]
     fun test_fq12(fx: signer) {
@@ -94,26 +363,28 @@ module std::bn254_algebra {
 
         // Downcasting.
         assert!(eq(&zero<Gt>(), &std::option::extract(&mut downcast<Fq12, Gt>(&val_1))), 1);
+        // upcasting
+        assert!(eq(&val_1, &upcast<Gt, Fq12>(&zero<Gt>())), 1);
     }
 
     #[test_only]
-    const R_SERIALIZED: vector<u8> = x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73";
+    const R_SERIALIZED: vector<u8> = x"010000f093f5e1439170b97948e833285d588181b64550b829a031e1724e6430";
     #[test_only]
-    const G1_INF_SERIALIZED_COMP: vector<u8> = x"c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    const G1_INF_SERIALIZED_COMP: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000040";
     #[test_only]
-    const G1_INF_SERIALIZED_UNCOMP: vector<u8> = x"400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    const G1_INF_SERIALIZED_UNCOMP: vector<u8> = x"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040";
     #[test_only]
-    const G1_GENERATOR_SERIALIZED_COMP: vector<u8> = x"97f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb";
+    const G1_GENERATOR_SERIALIZED_COMP: vector<u8> = x"0100000000000000000000000000000000000000000000000000000000000000";
     #[test_only]
-    const G1_GENERATOR_SERIALIZED_UNCOMP: vector<u8> = x"17f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb08b3f481e3aaa0f1a09e30ed741d8ae4fcf5e095d5d00af600db18cb2c04b3edd03cc744a2888ae40caa232946c5e7e1";
+    const G1_GENERATOR_SERIALIZED_UNCOMP: vector<u8> = x"01000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000";
     #[test_only]
-    const G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP: vector<u8> = x"b928f3beb93519eecf0145da903b40a4c97dca00b21f12ac0df3be9116ef2ef27b2ae6bcd4c5bc2d54ef5a70627efcb7";
+    const G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP: vector<u8> = x"78e0ffab866b3a9876bd01b8ecc66fcb86936277f425539a758dbbd32e2b0717";
     #[test_only]
-    const G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP: vector<u8> = x"1928f3beb93519eecf0145da903b40a4c97dca00b21f12ac0df3be9116ef2ef27b2ae6bcd4c5bc2d54ef5a70627efcb7108dadbaa4b636445639d5ae3089b3c43a8a1d47818edd1839d7383959a41c10fdc66849cfa1b08c5a11ec7e28981a1c";
+    const G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP: vector<u8> = x"78e0ffab866b3a9876bd01b8ecc66fcb86936277f425539a758dbbd32e2b07179eafd4607f9f80771bf4185df03bfead7a3719fa4bb57b0152dd30d16cda8a16";
     #[test_only]
-    const G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP: vector<u8> = x"9928f3beb93519eecf0145da903b40a4c97dca00b21f12ac0df3be9116ef2ef27b2ae6bcd4c5bc2d54ef5a70627efcb7";
+    const G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP: vector<u8> = x"78e0ffab866b3a9876bd01b8ecc66fcb86936277f425539a758dbbd32e2b0797";
     #[test_only]
-    const G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP: vector<u8> = x"1928f3beb93519eecf0145da903b40a4c97dca00b21f12ac0df3be9116ef2ef27b2ae6bcd4c5bc2d54ef5a70627efcb70973642f94c9b055f4e1d20812c1f91329ed2e3d71f635a72d599a679d0cda1320e597b4e1b24f735fed1381d767908f";
+    const G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP: vector<u8> = x"78e0ffab866b3a9876bd01b8ecc66fcb86936277f425539a758dbbd32e2b0717a94da87797ec9fc471d6580ba12e83e9e22068876a90d4b6d7c200100674d999";
 
     #[test(fx = @std)]
     fun test_g1affine(fx: signer) {
@@ -127,10 +398,8 @@ module std::bn254_algebra {
         // Serialization/deserialization.
         assert!(G1_GENERATOR_SERIALIZED_UNCOMP == serialize<G1, FormatG1Uncompr>(&generator), 1);
         assert!(G1_GENERATOR_SERIALIZED_COMP == serialize<G1, FormatG1Compr>(&generator), 1);
-        let generator_from_comp = std::option::extract(&mut deserialize<G1, FormatG1Compr>(&G1_GENERATOR_SERIALIZED_COMP
-        ));
-        let generator_from_uncomp = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&G1_GENERATOR_SERIALIZED_UNCOMP
-        ));
+        let generator_from_comp = std::option::extract(&mut deserialize<G1, FormatG1Compr>(&G1_GENERATOR_SERIALIZED_COMP));
+        let generator_from_uncomp = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&G1_GENERATOR_SERIALIZED_UNCOMP));
         assert!(eq(&generator, &generator_from_comp), 1);
         assert!(eq(&generator, &generator_from_uncomp), 1);
 
@@ -220,32 +489,32 @@ module std::bn254_algebra {
         // Subtraction.
         assert!(eq(&point_9g, &sub(&point_2g, &point_minus_7g_calc)), 1);
 
-        // Hash-to-group using suite `BLS12381G1_XMD:SHA-256_SSWU_RO_`.
-        // Test vectors source: https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-bls12381g1_xmdsha-256_sswu_
-        let actual = hash_to<G1, HashG1XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"");
-        let expected = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&x"052926add2207b76ca4fa57a8734416c8dc95e24501772c814278700eed6d1e4e8cf62d9c09db0fac349612b759e79a108ba738453bfed09cb546dbb0783dbb3a5f1f566ed67bb6be0e8c67e2e81a4cc68ee29813bb7994998f3eae0c9c6a265"));
-        assert!(eq(&expected, &actual), 1);
-        let actual = hash_to<G1, HashG1XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
-        let expected = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&x"11e0b079dea29a68f0383ee94fed1b940995272407e3bb916bbf268c263ddd57a6a27200a784cbc248e84f357ce82d9803a87ae2caf14e8ee52e51fa2ed8eefe80f02457004ba4d486d6aa1f517c0889501dc7413753f9599b099ebcbbd2d709"));
-        assert!(eq(&expected, &actual), 1);
+        // // Hash-to-group using suite `BLS12381G1_XMD:SHA-256_SSWU_RO_`.
+        // // Test vectors source: https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-bls12381g1_xmdsha-256_sswu_
+        // let actual = hash_to<G1, HashG1XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"");
+        // let expected = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&x"052926add2207b76ca4fa57a8734416c8dc95e24501772c814278700eed6d1e4e8cf62d9c09db0fac349612b759e79a108ba738453bfed09cb546dbb0783dbb3a5f1f566ed67bb6be0e8c67e2e81a4cc68ee29813bb7994998f3eae0c9c6a265"));
+        // assert!(eq(&expected, &actual), 1);
+        // let actual = hash_to<G1, HashG1XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
+        // let expected = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&x"11e0b079dea29a68f0383ee94fed1b940995272407e3bb916bbf268c263ddd57a6a27200a784cbc248e84f357ce82d9803a87ae2caf14e8ee52e51fa2ed8eefe80f02457004ba4d486d6aa1f517c0889501dc7413753f9599b099ebcbbd2d709"));
+        // assert!(eq(&expected, &actual), 1);
     }
 
     #[test_only]
-    const G2_INF_SERIALIZED_UNCOMP: vector<u8> = x"400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    const G2_INF_SERIALIZED_COMP: vector<u8> = x"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040";
     #[test_only]
-    const G2_INF_SERIALIZED_COMP: vector<u8> = x"c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    const G2_INF_SERIALIZED_UNCOMP: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040";
     #[test_only]
-    const G2_GENERATOR_SERIALIZED_UNCOMP: vector<u8> = x"13e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb80606c4a02ea734cc32acd2b02bc28b99cb3e287e85a763af267492ab572e99ab3f370d275cec1da1aaa9075ff05f79be0ce5d527727d6e118cc9cdc6da2e351aadfd9baa8cbdd3a76d429a695160d12c923ac9cc3baca289e193548608b82801";
+    const G2_GENERATOR_SERIALIZED_COMP: vector<u8> = x"edf692d95cbdde46ddda5ef7d422436779445c5e66006a42761e1f12efde0018c212f3aeb785e49712e7a9353349aaf1255dfb31b7bf60723a480d9293938e19";
     #[test_only]
-    const G2_GENERATOR_SERIALIZED_COMP: vector<u8> = x"93e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8";
+    const G2_GENERATOR_SERIALIZED_UNCOMP: vector<u8> = x"edf692d95cbdde46ddda5ef7d422436779445c5e66006a42761e1f12efde0018c212f3aeb785e49712e7a9353349aaf1255dfb31b7bf60723a480d9293938e19aa7dfa6601cce64c7bd3430c69e7d1e38f40cb8d8071ab4aeb6d8cdba55ec8125b9722d1dcdaac55f38eb37033314bbc95330c69ad999eec75f05f58d0890609";
     #[test_only]
-    const G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP: vector<u8> = x"0d0273f6bf31ed37c3b8d68083ec3d8e20b5f2cc170fa24b9b5be35b34ed013f9a921f1cad1644d4bdb14674247234c8049cd1dbb2d2c3581e54c088135fef36505a6823d61b859437bfc79b617030dc8b40e32bad1fa85b9c0f368af6d38d3c05ecf93654b7a1885695aaeeb7caf41b0239dc45e1022be55d37111af2aecef87799638bec572de86a7437898efa702008b7ae4dbf802c17a6648842922c9467e460a71c88d393ee7af356da123a2f3619e80c3bdcc8e2b1da52f8cd9913ccdd";
+    const G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP: vector<u8> = x"08b328aa2a1490c3892ae375ba53a257162f1cde012e70edf8fc27435ddc4b2255243646bade3e596dee466e51d40fbe631e55841e085d6ae2bd9a5a01ba03293f23144105e8212ed8df28ca0e8031d47b7a7de372b3ccee1750262af5ff921dd8e03503be1eedbaadf7e6c4a1be3670d14a46da5fafee7adbdeb2a6cdb7c803";
     #[test_only]
-    const G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP: vector<u8> = x"8d0273f6bf31ed37c3b8d68083ec3d8e20b5f2cc170fa24b9b5be35b34ed013f9a921f1cad1644d4bdb14674247234c8049cd1dbb2d2c3581e54c088135fef36505a6823d61b859437bfc79b617030dc8b40e32bad1fa85b9c0f368af6d38d3c";
+    const G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP: vector<u8> = x"08b328aa2a1490c3892ae375ba53a257162f1cde012e70edf8fc27435ddc4b2255243646bade3e596dee466e51d40fbe631e55841e085d6ae2bd9a5a01ba0329";
     #[test_only]
-    const G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP: vector<u8> = x"0d0273f6bf31ed37c3b8d68083ec3d8e20b5f2cc170fa24b9b5be35b34ed013f9a921f1cad1644d4bdb14674247234c8049cd1dbb2d2c3581e54c088135fef36505a6823d61b859437bfc79b617030dc8b40e32bad1fa85b9c0f368af6d38d3c141418b3e4c84511f485fcc78b80b8bc623d6f3f1282e6da09f9c1860402272ba7129c72c4fcd2174f8ac87671053a8b1149639c79ffba82a4b71f73b11f186f8016a4686ab17ed0ec3d7bc6e476c6ee04c3f3c2d48b1d4ddfac073266ebddce";
+    const G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP: vector<u8> = x"08b328aa2a1490c3892ae375ba53a257162f1cde012e70edf8fc27435ddc4b2255243646bade3e596dee466e51d40fbe631e55841e085d6ae2bd9a5a01ba032908da689711a4fe0db5ea489e82ea4fc3e1dd039e439283c911500bb77d4ed1126f1c47d5586d3381dfd28aa3efab4a278c0d3ba75696613d4ec17e3aa5969bac";
     #[test_only]
-    const G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP: vector<u8> = x"ad0273f6bf31ed37c3b8d68083ec3d8e20b5f2cc170fa24b9b5be35b34ed013f9a921f1cad1644d4bdb14674247234c8049cd1dbb2d2c3581e54c088135fef36505a6823d61b859437bfc79b617030dc8b40e32bad1fa85b9c0f368af6d38d3c";
+    const G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP: vector<u8> = x"08b328aa2a1490c3892ae375ba53a257162f1cde012e70edf8fc27435ddc4b2255243646bade3e596dee466e51d40fbe631e55841e085d6ae2bd9a5a01ba03a9";
 
     #[test(fx = @std)]
     fun test_g2affine(fx: signer) {
@@ -341,24 +610,25 @@ module std::bn254_algebra {
         // Subtraction.
         assert!(eq(&point_9g, &sub(&point_2g, &point_minus_7g_calc)), 1);
 
-        // Hash-to-group using suite `BLS12381G2_XMD:SHA-256_SSWU_RO_`.
-        // Test vectors source: https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-bls12381g2_xmdsha-256_sswu_
-        let actual = hash_to<G2, HashG2XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"");
-        let expected = std::option::extract(&mut deserialize<G2, FormatG2Uncompr>(&x"05cb8437535e20ecffaef7752baddf98034139c38452458baeefab379ba13dff5bf5dd71b72418717047f5b0f37da03d0141ebfbdca40eb85b87142e130ab689c673cf60f1a3e98d69335266f30d9b8d4ac44c1038e9dcdd5393faf5c41fb78a12424ac32561493f3fe3c260708a12b7c620e7be00099a974e259ddc7d1f6395c3c811cdd19f1e8dbf3e9ecfdcbab8d60503921d7f6a12805e72940b963c0cf3471c7b2a524950ca195d11062ee75ec076daf2d4bc358c4b190c0c98064fdd92"));
-        assert!(eq(&expected, &actual), 1);
-        let actual = hash_to<G2, HashG2XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
-        let expected = std::option::extract(&mut deserialize<G2, FormatG2Uncompr>(&x"190d119345b94fbd15497bcba94ecf7db2cbfd1e1fe7da034d26cbba169fb3968288b3fafb265f9ebd380512a71c3f2c121982811d2491fde9ba7ed31ef9ca474f0e1501297f68c298e9f4c0028add35aea8bb83d53c08cfc007c1e005723cd00bb5e7572275c567462d91807de765611490205a941a5a6af3b1691bfe596c31225d3aabdf15faff860cb4ef17c7c3be05571a0f8d3c08d094576981f4a3b8eda0a8e771fcdcc8ecceaf1356a6acf17574518acb506e435b639353c2e14827c8"));
-        assert!(eq(&expected, &actual), 1);
+        // // Hash-to-group using suite `BLS12381G2_XMD:SHA-256_SSWU_RO_`.
+        // // Test vectors source: https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-bls12381g2_xmdsha-256_sswu_
+        // let actual = hash_to<G2, HashG2XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"");
+        // let expected = std::option::extract(&mut deserialize<G2, FormatG2Uncompr>(&x"05cb8437535e20ecffaef7752baddf98034139c38452458baeefab379ba13dff5bf5dd71b72418717047f5b0f37da03d0141ebfbdca40eb85b87142e130ab689c673cf60f1a3e98d69335266f30d9b8d4ac44c1038e9dcdd5393faf5c41fb78a12424ac32561493f3fe3c260708a12b7c620e7be00099a974e259ddc7d1f6395c3c811cdd19f1e8dbf3e9ecfdcbab8d60503921d7f6a12805e72940b963c0cf3471c7b2a524950ca195d11062ee75ec076daf2d4bc358c4b190c0c98064fdd92"));
+        // assert!(eq(&expected, &actual), 1);
+        // let actual = hash_to<G2, HashG2XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
+        // let expected = std::option::extract(&mut deserialize<G2, FormatG2Uncompr>(&x"190d119345b94fbd15497bcba94ecf7db2cbfd1e1fe7da034d26cbba169fb3968288b3fafb265f9ebd380512a71c3f2c121982811d2491fde9ba7ed31ef9ca474f0e1501297f68c298e9f4c0028add35aea8bb83d53c08cfc007c1e005723cd00bb5e7572275c567462d91807de765611490205a941a5a6af3b1691bfe596c31225d3aabdf15faff860cb4ef17c7c3be05571a0f8d3c08d094576981f4a3b8eda0a8e771fcdcc8ecceaf1356a6acf17574518acb506e435b639353c2e14827c8"));
+        // assert!(eq(&expected, &actual), 1);
     }
 
     #[test_only]
-    const FQ12_ONE_SERIALIZED: vector<u8> = x"010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    const FQ12_ONE_SERIALIZED: vector<u8> = x"010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
     #[test_only]
-    const GT_GENERATOR_SERIALIZED: vector<u8> = x"b68917caaa0543a808c53908f694d1b6e7b38de90ce9d83d505ca1ef1b442d2727d7d06831d8b2a7920afc71d8eb50120f17a0ea982a88591d9f43503e94a8f1abaf2e4589f65aafb7923c484540a868883432a5c60e75860b11e5465b1c9a08873ec29e844c1c888cb396933057ffdd541b03a5220eda16b2b3a6728ea678034ce39c6839f20397202d7c5c44bb68134f93193cec215031b17399577a1de5ff1f5b0666bdd8907c61a7651e4e79e0372951505a07fa73c25788db6eb8023519a5aa97b51f1cad1d43d8aabbff4dc319c79a58cafc035218747c2f75daf8f2fb7c00c44da85b129113173d4722f5b201b6b4454062e9ea8ba78c5ca3cadaf7238b47bace5ce561804ae16b8f4b63da4645b8457a93793cbd64a7254f150781019de87ee42682940f3e70a88683d512bb2c3fb7b2434da5dedbb2d0b3fb8487c84da0d5c315bdd69c46fb05d23763f2191aabd5d5c2e12a10b8f002ff681bfd1b2ee0bf619d80d2a795eb22f2aa7b85d5ffb671a70c94809f0dafc5b73ea2fb0657bae23373b4931bc9fa321e8848ef78894e987bff150d7d671aee30b3931ac8c50e0b3b0868effc38bf48cd24b4b811a2995ac2a09122bed9fd9fa0c510a87b10290836ad06c8203397b56a78e9a0c61c77e56ccb4f1bc3d3fcaea7550f3503efe30f2d24f00891cb45620605fcfaa4292687b3a7db7c1c0554a93579e889a121fd8f72649b2402996a084d2381c5043166673b3849e4fd1e7ee4af24aa8ed443f56dfd6b68ffde4435a92cd7a4ac3bc77e1ad0cb728606cf08bf6386e5410f";
+    const GT_GENERATOR_SERIALIZED: vector<u8> = x"950e879d73631f5eb5788589eb5f7ef8d63e0a28de1ba00dfe4ca9ed3f252b264a8afb8eb4349db466ed1809ea4d7c39bdab7938821f1b0a00a295c72c2de002e01dbdfd0254134efcb1ec877395d25f937719b344adb1a58d129be2d6f2a9132b16a16e8ab030b130e69c69bd20b4c45986e6744a98314b5c1a0f50faa90b04dbaf9ef8aeeee3f50be31c210b598f4752f073987f9d35be8f6770d83f2ffc0af0d18dd9d2dbcdf943825acc12a7a9ddca45e629d962c6bd64908c3930a5541cfe2924dcc5580d5cef7a4bfdec90a91b59926f850d4a7923c01a5a5dbf0f5c094a2b9fb9d415820fa6b40c59bb9eade9c953407b0fc11da350a9d872cad6d3142974ca385854afdf5f583c04231adc5957c8914b6b20dc89660ed7c3bbe7c01d972be2d53ecdb27a1bcc16ac610db95aa7d237c8ff55a898cb88645a0e32530b23d7ebf5dafdd79b0f9c2ac4ba07ce18d3d16cf36e47916c4cae5d08d3afa813972c769e8514533e380c9443b3e1ee5c96fa3a0a73f301b626454721527bf900";
     #[test_only]
-    const GT_GENERATOR_MUL_BY_7_SERIALIZED: vector<u8> = x"2041ea7b66c19680e2c0bb23245a71918753220b31f88a925aa9b1e192e7c188a0b365cb994b3ec5e809206117c6411242b940b10caa37ce734496b3b7c63578a0e3c076f9b31a7ca13a716262e0e4cda4ac994efb9e19893cbfe4d464b9210d099d808a08b3c4c3846e7529984899478639c4e6c46152ef49a04af9c8e6ff442d286c4613a3dac6a4bee4b40e1f6b030f2871dabe4223b250c3181ecd3bc6819004745aeb6bac567407f2b9c7d1978c45ee6712ae46930bc00638383f6696158bad488cbe7663d681c96c035481dbcf78e7a7fbaec3799163aa6914cef3365156bdc3e533a7c883d5974e3462ac6f19e3f9ce26800ae248a45c5f0dd3a48a185969224e6cd6af9a048241bdcac9800d94aeee970e08488fb961e36a769b6c185d185b4605dc9808517196bba9d00a3e37bca466c19187486db104ee03962d39fe473e276355618e44c965f05082bb027a7baa4bcc6d8c0775c1e8a481e77df36ddad91e75a982302937f543a11fe71922dcd4f46fe8f951f91cde412b359507f2b3b6df0374bfe55c9a126ad31ce254e67d64194d32d7955ec791c9555ea5a917fc47aba319e909de82da946eb36e12aff936708402228295db2712f2fc807c95092a86afd71220699df13e2d2fdf2857976cb1e605f72f1b2edabadba3ff05501221fe81333c13917c85d725ce92791e115eb0289a5d0b3330901bb8b0ed146abeb81381b7331f1c508fb14e057b05d8b0190a9e74a3d046dcd24e7ab747049945b3d8a120c4f6d88e67661b55573aa9b361367488a1ef7dffd967d64a1518";
+    const GT_GENERATOR_MUL_BY_7_SERIALIZED: vector<u8> = x"533a587534641b568125fb273eac723c789a347eba9fcfd58d93742b3a0b782fd61bbf6202e04b8a33b6c60150fc62a071cb9ac9749a79031fd0dbb6dd8a1f2bcf1eb450bdf58fd3d124b2e0aaf878d11e96af3051631145a4bf0530b5d19d08bfe2d515530b9059525b2826587f7bf1f146bfd0e91e84411c7722abb7a8c418b20b1660b41e6949beff93b2b36303e74804df3335ab5bd85bfd7959d6fd3101d0bf6f681eb809c9a6c3544db7f81444e5c4fbdd0a31e920616ae08a2ab5f51ebf064c4906c7b29521e8fda3d704830a9a6ef5d455a85ae09216f55fd0e74d0aaf83ad81ba50218f08024910184c9ddab42a28f51912c779556c41c61aba2d075cfc020b61a18a9366c9f71658f00b44369bd86929725cf867a0b8fda694a7134a2790ebf19cbea1f972eedfd51787683f98d80895f630ff0bd513edebd5a217c00e231869178bd41cf47a7c0125379a3926353e5310a578066dfbb974424802b942a8b4f6338d7f9d8b9c4031dc46163a59c58ff503eca69b642398b5a1212b";
     #[test_only]
-    const GT_GENERATOR_MUL_BY_7_NEG_SERIALIZED: vector<u8> = x"2041ea7b66c19680e2c0bb23245a71918753220b31f88a925aa9b1e192e7c188a0b365cb994b3ec5e809206117c6411242b940b10caa37ce734496b3b7c63578a0e3c076f9b31a7ca13a716262e0e4cda4ac994efb9e19893cbfe4d464b9210d099d808a08b3c4c3846e7529984899478639c4e6c46152ef49a04af9c8e6ff442d286c4613a3dac6a4bee4b40e1f6b030f2871dabe4223b250c3181ecd3bc6819004745aeb6bac567407f2b9c7d1978c45ee6712ae46930bc00638383f6696158bad488cbe7663d681c96c035481dbcf78e7a7fbaec3799163aa6914cef3365156bdc3e533a7c883d5974e3462ac6f19e3f9ce26800ae248a45c5f0dd3a48a185969224e6cd6af9a048241bdcac9800d94aeee970e08488fb961e36a769b6c184e92a4b9fa2366b1ae8ebdf5542fa1e0ec390c90df40a91e5261800581b5492bd9640d1c5352babc551d1a49998f4517312f55b4339272b28a3e6b0c7d182e2bb61bd7d72b29ae3696db8fafe32b904ab5d0764e46bf21f9a0c9a1f7bedc6b12b9f64820fc8b3fd4a26541472be3c9c93d784cdd53a059d1604bf3292fedd1babfb00398128e3241bc63a5a47b5e9207fcb0c88f7bfddc376a242c9f0c032ba28eec8670f1fa1d47567593b4571c983b8015df91cfa1241b7fb8a57e0e6e01145b98de017eccc2a66e83ced9d83119a505e552467838d35b8ce2f4d7cc9a894f6dee922f35f0e72b7e96f0879b0c8614d3f9e5f5618b5be9b82381628448641a8bb0fd1dffb16c70e6831d8d69f61f2a2ef9e90c421f7a5b1ce7a5d113c7eb01";
+    const GT_GENERATOR_MUL_BY_7_NEG_SERIALIZED: vector<u8> = x"533a587534641b568125fb273eac723c789a347eba9fcfd58d93742b3a0b782fd61bbf6202e04b8a33b6c60150fc62a071cb9ac9749a79031fd0dbb6dd8a1f2bcf1eb450bdf58fd3d124b2e0aaf878d11e96af3051631145a4bf0530b5d19d08bfe2d515530b9059525b2826587f7bf1f146bfd0e91e84411c7722abb7a8c418b20b1660b41e6949beff93b2b36303e74804df3335ab5bd85bfd7959d6fd3101d0bf6f681eb809c9a6c3544db7f81444e5c4fbdd0a31e920616ae08a2ab5f51e88f6308f10c56da66be273c4b965fe8cc3e98bac609df5d796893c81a26616269879cf565c3bffac84c82858791ee4bca82d598c9c33893ed433f01a58943629eb007acdb5ea95a826017a51397a755327bda8178dd3f3bfc1ff78e3cbb9bc1cfdd5ecec24ef619a93578388bb52fa2e1ec0a878214f1fb91dcb1df48678c11887ee59c0ad74956770d6f6eb8f454afd23324c436335ab3f23333627fe0b1c2e8ebad423205893bcef3ed527608e3a8123ffbbf1c04164118e3b0e49bdac4205";
+
 
     #[test(fx = @std)]
     fun test_gt(fx: signer) {
@@ -412,7 +682,7 @@ module std::bn254_algebra {
     }
 
     #[test_only]
-    use aptos_std::crypto_algebra::{zero, one, from_u64, eq, deserialize, serialize, neg, add, sub, mul, div, inv, rand_insecure, sqr, order, scalar_mul, multi_scalar_mul, double, hash_to, upcast, enable_cryptography_algebra_natives, pairing, multi_pairing, downcast, Element};
+    use aptos_std::crypto_algebra::{zero, one, from_u64, eq, deserialize, serialize, neg, add, sub, mul, div, inv, rand_insecure, sqr, order, scalar_mul, multi_scalar_mul, double, upcast, enable_cryptography_algebra_natives, pairing, multi_pairing, downcast, Element};
 
     #[test_only]
     const FR_VAL_0_SERIALIZED_LSB: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
@@ -423,7 +693,7 @@ module std::bn254_algebra {
     #[test_only]
     const FR_VAL_7_SERIALIZED_MSB: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000007";
     #[test_only]
-    const FR_VAL_7_NEG_SERIALIZED_LSB: vector<u8> = x"fafffffffefffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73";
+    const FR_VAL_7_NEG_SERIALIZED_LSB: vector<u8> = x"faffffef93f5e1439170b97948e833285d588181b64550b829a031e1724e6430";
 
     #[test(fx = @std)]
     fun test_fr(fx: signer) {
@@ -482,6 +752,78 @@ module std::bn254_algebra {
 
         // Squaring.
         let val_x = rand_insecure<Fr>();
+        assert!(eq(&mul(&val_x, &val_x), &sqr(&val_x)), 1);
+    }
+
+    const FQ_R_SERIALIZED: vector<u8> = x"47fd7cd8168c203c8dca7168916a81975d588181b64550b829a031e1724e6430";
+    #[test_only]
+    const FQ_VAL_0_SERIALIZED_LSB: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
+    #[test_only]
+    const FQ_VAL_1_SERIALIZED_LSB: vector<u8> = x"0100000000000000000000000000000000000000000000000000000000000000";
+    #[test_only]
+    const FQ_VAL_7_SERIALIZED_LSB: vector<u8> = x"0700000000000000000000000000000000000000000000000000000000000000";
+    #[test_only]
+    const FQ_VAL_7_SERIALIZED_MSB: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000007";
+    #[test_only]
+    const FQ_VAL_7_NEG_SERIALIZED_LSB: vector<u8> = x"40fd7cd8168c203c8dca7168916a81975d588181b64550b829a031e1724e6430";
+
+    #[test(fx = @std)]
+    fun test_fq(fx: signer) {
+        enable_cryptography_algebra_natives(&fx);
+
+        // Constants.
+        assert!(FQ_R_SERIALIZED == order<Fq>(), 1);
+
+        // Serialization/deserialization.
+        let val_0 = zero<Fq>();
+        let val_1 = one<Fq>();
+        assert!(FQ_VAL_0_SERIALIZED_LSB == serialize<Fq, FormatFqLsb>(&val_0), 1);
+        assert!(FQ_VAL_1_SERIALIZED_LSB == serialize<Fq, FormatFqLsb>(&val_1), 1);
+        let val_7 = from_u64<Fq>(7);
+        let val_7_2nd = std::option::extract(&mut deserialize<Fq, FormatFqLsb>(&FQ_VAL_7_SERIALIZED_LSB));
+        let val_7_3rd = std::option::extract(&mut deserialize<Fq, FormatFqMsb>(&FQ_VAL_7_SERIALIZED_MSB));
+        assert!(eq(&val_7, &val_7_2nd), 1);
+        assert!(eq(&val_7, &val_7_3rd), 1);
+        assert!(FQ_VAL_7_SERIALIZED_LSB == serialize<Fq, FormatFqLsb>(&val_7), 1);
+        assert!(FQ_VAL_7_SERIALIZED_MSB == serialize<Fq, FormatFqMsb>(&val_7), 1);
+
+        // Deserialization should fail if given a byte array of right size but the value is not a member.
+        assert!(std::option::is_none(&deserialize<Fq, FormatFqLsb>(&x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73")), 1);
+        assert!(std::option::is_none(&deserialize<Fq, FormatFqMsb>(&x"73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")), 1);
+
+        // Deserialization should fail if given a byte array of wrong size.
+        assert!(std::option::is_none(&deserialize<Fq, FormatFqLsb>(&x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed7300")), 1);
+        assert!(std::option::is_none(&deserialize<Fq, FormatFqMsb>(&x"0073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")), 1);
+        assert!(std::option::is_none(&deserialize<Fq, FormatFqLsb>(&x"ffff")), 1);
+        assert!(std::option::is_none(&deserialize<Fq, FormatFqMsb>(&x"ffff")), 1);
+
+        // Negation.
+        let val_minus_7 = neg(&val_7);
+        assert!(FQ_VAL_7_NEG_SERIALIZED_LSB == serialize<Fq, FormatFqLsb>(&val_minus_7), 1);
+
+        // Addition.
+        let val_9 = from_u64<Fq>(9);
+        let val_2 = from_u64<Fq>(2);
+        assert!(eq(&val_2, &add(&val_minus_7, &val_9)), 1);
+
+        // Subtraction.
+        assert!(eq(&val_9, &sub(&val_2, &val_minus_7)), 1);
+
+        // Multiplication.
+        let val_63 = from_u64<Fq>(63);
+        assert!(eq(&val_63, &mul(&val_7, &val_9)), 1);
+
+        // division.
+        let val_0 = from_u64<Fq>(0);
+        assert!(eq(&val_7, &std::option::extract(&mut div(&val_63, &val_9))), 1);
+        assert!(std::option::is_none(&div(&val_63, &val_0)), 1);
+
+        // Inversion.
+        assert!(eq(&val_minus_7, &neg(&val_7)), 1);
+        assert!(std::option::is_none(&inv(&val_0)), 1);
+
+        // Squaring.
+        let val_x = rand_insecure<Fq>();
         assert!(eq(&mul(&val_x, &val_x), &sqr(&val_x)), 1);
     }
 
@@ -557,11 +899,11 @@ module std::bn254_algebra {
 
     #[test_only]
     /// The maximum number of `G1` elements that can be created in a transaction,
-    /// calculated by the current memory limit (1MB) and the in-mem G1 representation size (144 bytes per element).
+    /// calculated by the current memory limit (1MB) and the in-mem G1 representation size (32*3 bytes per element).
     const G1_NUM_MAX_NUMERATOR: u64 = 1048576; // TODO(#9330)
 
     #[test_only]
-    const G1_NUM_MAX_DENOMINATOR: u64 = 144; // TODO(#9330)
+    const G1_NUM_MAX_DENOMINATOR: u64 = 96; // TODO(#9330)
 
     #[test(fx = @std)]
     fun test_memory_limit(fx: signer) {
