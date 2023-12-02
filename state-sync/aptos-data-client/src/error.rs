@@ -17,6 +17,8 @@ pub enum Error {
     InvalidRequest(String),
     #[error("Invalid response: {0}")]
     InvalidResponse(String),
+    #[error("No connected peers: {0}")]
+    NoConnectedPeers(String),
     #[error("The subscription stream is lagging behind the data advertisements: {0}")]
     SubscriptionStreamIsLagging(String),
     #[error("Timed out waiting for a response: {0}")]
@@ -33,6 +35,7 @@ impl Error {
             Self::DataIsTooLarge(_) => "data_is_too_large",
             Self::InvalidRequest(_) => "invalid_request",
             Self::InvalidResponse(_) => "invalid_response",
+            Self::NoConnectedPeers(_) => "no_connected_peers",
             Self::SubscriptionStreamIsLagging(_) => "subscription_stream_is_lagging",
             Self::TimeoutWaitingForResponse(_) => "timeout_waiting_for_response",
             Self::UnexpectedErrorEncountered(_) => "unexpected_error_encountered",
