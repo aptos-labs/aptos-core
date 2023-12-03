@@ -101,8 +101,8 @@ impl PayloadClient for MixedPayloadClient {
         mut max_poll_time: Duration,
         mut max_items: u64,
         mut max_bytes: u64,
-        exclude_validator_txns: ValidatorTransactionFilter,
-        exclude_payloads: PayloadFilter,
+        validator_txn_filter: ValidatorTransactionFilter,
+        user_txn_filter: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,
         pending_uncommitted_blocks: usize,
@@ -111,7 +111,7 @@ impl PayloadClient for MixedPayloadClient {
         let validator_txn_pull_timer = Instant::now();
         let validator_txns = if self.validator_txn_enabled {
             self.validator_txn_pool_client
-                .pull(max_items, max_bytes, exclude_validator_txns)
+                .pull(max_items, max_bytes, validator_txn_filter)
         } else {
             vec![]
         };
@@ -150,7 +150,7 @@ impl PayloadClient for MixedPayloadClient {
                     max_items,
                     max_bytes,
                     return_non_full || return_empty || done,
-                    exclude_payloads.clone(),
+                    user_txn_filter.clone(),
                 )
                 .await?;
             if payload.is_empty() && !return_empty && !done {
