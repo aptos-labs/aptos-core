@@ -120,11 +120,11 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         let round = anchor.round();
         let timestamp = anchor.metadata().timestamp();
         let author = *anchor.author();
-        let mut sys_txns = vec![];
+        let mut validator_txns = vec![];
         let mut payload = Payload::empty(!anchor.payload().is_direct());
         let mut node_digests = vec![];
         for node in &ordered_nodes {
-            sys_txns.extend(node.sys_txns().clone());
+            validator_txns.extend(node.validator_txns().clone());
             payload.extend(node.payload().clone());
             node_digests.push(node.digest());
         }
@@ -157,7 +157,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                 epoch,
                 round,
                 block_timestamp,
-                sys_txns,
+                validator_txns,
                 payload,
                 author,
                 failed_author,

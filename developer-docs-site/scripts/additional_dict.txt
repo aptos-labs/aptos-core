@@ -30,6 +30,7 @@ AptosRelease
 AptosToken
 AptosWalletAdapterProvider
 BCS
+BetaNotice
 BFT
 BIP
 BLS
@@ -479,6 +480,7 @@ illiquid
 img
 incrementing
 init
+inlining
 instantiation
 integrations
 integrators

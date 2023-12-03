@@ -81,8 +81,8 @@ use aptos_types::{
         LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
         OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
     },
-    system_txn::pool::SystemTransactionPoolClient,
     validator_signer::ValidatorSigner,
+    validator_txn::pool::ValidatorTransactionPoolClient,
     validator_verifier::ValidatorVerifier,
 };
 use fail::fail_point;
@@ -133,7 +133,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     commit_state_computer: Arc<dyn StateComputer>,
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
-    sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
+    validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
     reconfig_events: ReconfigNotificationListener<P>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingCommitRequest>>,
@@ -176,7 +176,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         reconfig_events: ReconfigNotificationListener<P>,
         bounded_executor: BoundedExecutor,
         aptos_time_service: aptos_time_service::TimeService,
-        sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
+        validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -198,7 +198,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             commit_state_computer,
             storage,
             safety_rules_manager,
-            sys_txn_pool_client,
+            validator_txn_pool_client,
             reconfig_events,
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
@@ -518,8 +518,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         Ok(())
     }
 
-    fn spawn_block_retrieval_task(&mut self, epoch: u64, block_store: Arc<BlockStore>) {
-        let (request_tx, mut request_rx) = aptos_channel::new(
+    fn spawn_block_retrieval_task(
+        &mut self,
+        epoch: u64,
+        block_store: Arc<BlockStore>,
+        max_blocks_allowed: u64,
+    ) {
+        let (request_tx, mut request_rx) = aptos_channel::new::<_, IncomingBlockRetrievalRequest>(
             QueueStyle::LIFO,
             1,
             Some(&counters::BLOCK_RETRIEVAL_TASK_MSGS),
@@ -527,6 +532,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let task = async move {
             info!(epoch = epoch, "Block retrieval task starts");
             while let Some(request) = request_rx.next().await {
+                if request.req.num_blocks() > max_blocks_allowed {
+                    warn!(
+                        "Ignore block retrieval with too many blocks: {}",
+                        request.req.num_blocks()
+                    );
+                    continue;
+                }
                 if let Err(e) = monitor!(
                     "process_block_retrieval",
                     block_store.process_block_retrieval(request).await
@@ -656,6 +668,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     async fn start_recovery_manager(
         &mut self,
         ledger_data: LedgerRecoveryData,
+        onchain_consensus_config: OnChainConsensusConfig,
         epoch_state: EpochState,
         network_sender: NetworkSender,
     ) {
@@ -673,6 +686,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.storage.clone(),
             self.commit_state_computer.clone(),
             ledger_data.committed_round(),
+            self.config
+                .max_blocks_per_sending_request(onchain_consensus_config.quorum_store_enabled()),
         );
         tokio::spawn(recovery_manager.start(recovery_manager_rx, close_rx));
     }
@@ -876,8 +891,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
-            self.sys_txn_pool_client.clone(),
-            onchain_consensus_config.system_txn_enabled(),
+            onchain_consensus_config.validator_txn_enabled(),
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::LIFO,
@@ -892,6 +906,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         );
         self.round_manager_tx = Some(round_manager_tx.clone());
         self.buffered_proposal_tx = Some(buffered_proposal_tx.clone());
+        let max_blocks_allowed = self
+            .config
+            .max_blocks_per_receiving_request(onchain_consensus_config.quorum_store_enabled());
 
         let mut round_manager = RoundManager::new(
             epoch_state,
@@ -918,7 +935,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             close_rx,
         ));
 
-        self.spawn_block_retrieval_task(epoch, block_store);
+        self.spawn_block_retrieval_task(epoch, block_store, max_blocks_allowed);
     }
 
     fn start_quorum_store(&mut self, quorum_store_builder: QuorumStoreBuilder) {
@@ -1002,8 +1019,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .init_payload_provider(epoch_state, network_sender.clone(), consensus_config)
             .await;
         let mixed_payload_client = MixedPayloadClient {
-            sys_txn_enabled: consensus_config.system_txn_enabled(),
-            sys_txn_pool_client: self.sys_txn_pool_client.clone(),
+            validator_txn_enabled: consensus_config.validator_txn_enabled(),
+            validator_txn_pool_client: self.validator_txn_pool_client.clone(),
             quorum_store_client,
         };
         self.init_commit_state_computer(epoch_state, payload_manager.clone(), execution_config);
@@ -1038,8 +1055,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             },
             LivenessStorageData::PartialRecoveryData(ledger_data) => {
                 self.recovery_mode = true;
-                self.start_recovery_manager(ledger_data, epoch_state, network_sender)
-                    .await
+                self.start_recovery_manager(
+                    ledger_data,
+                    consensus_config,
+                    epoch_state,
+                    network_sender,
+                )
+                .await
             },
         }
     }
@@ -1101,7 +1123,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             state_computer,
             block_tx,
             onchain_consensus_config.quorum_store_enabled(),
-            onchain_consensus_config.system_txn_enabled(),
+            onchain_consensus_config.validator_txn_enabled(),
         );
 
         let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);

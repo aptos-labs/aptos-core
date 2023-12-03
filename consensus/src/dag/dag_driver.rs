@@ -33,7 +33,7 @@ use aptos_logger::{debug, error};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{
-    block_info::Round, epoch_state::EpochState, system_txn::pool::SystemTransactionFilter,
+    block_info::Round, epoch_state::EpochState, validator_txn::pool::ValidatorTransactionFilter,
 };
 use async_trait::async_trait;
 use futures::{
@@ -191,19 +191,20 @@ impl DagDriver {
 
             let payload_filter =
                 PayloadFilter::from(&nodes.iter().map(|node| node.payload()).collect());
-            let sys_txn_hashes = nodes
+            let validator_txn_hashes = nodes
                 .iter()
-                .flat_map(|node| node.sys_txns())
-                .map(|sys_txn| sys_txn.hash());
-            let sys_payload_filter =
-                SystemTransactionFilter::PendingTxnHashSet(HashSet::from_iter(sys_txn_hashes));
+                .flat_map(|node| node.validator_txns())
+                .map(|txn| txn.hash());
+            let validator_payload_filter = ValidatorTransactionFilter::PendingTxnHashSet(
+                HashSet::from_iter(validator_txn_hashes),
+            );
 
-            (sys_payload_filter, payload_filter)
+            (validator_payload_filter, payload_filter)
         };
 
         let (max_txns, max_size_bytes) = self.calculate_payload_limits(new_round);
 
-        let (sys_txns, payload) = match self
+        let (validator_txns, payload) = match self
             .payload_client
             .pull_payload(
                 Duration::from_millis(self.payload_config.payload_pull_max_poll_time_ms),
@@ -240,7 +241,7 @@ impl DagDriver {
             new_round,
             self.author,
             timestamp,
-            sys_txns,
+            validator_txns,
             payload,
             strong_links,
             Extensions::empty(),

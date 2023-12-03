@@ -21,7 +21,7 @@ use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    system_txn::{pool::SystemTransactionFilter, SystemTransaction},
+    validator_txn::{pool::ValidatorTransactionFilter, ValidatorTransaction},
 };
 use futures::future::BoxFuture;
 use std::{sync::Arc, time::Duration};
@@ -38,13 +38,13 @@ pub trait PayloadClient: Send + Sync {
         max_poll_time: Duration,
         max_items: u64,
         max_bytes: u64,
-        sys_exclude: SystemTransactionFilter,
+        sys_exclude: ValidatorTransactionFilter,
         exclude: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,
         pending_uncommitted_blocks: usize,
         recent_max_fill_fraction: f32,
-    ) -> Result<(Vec<SystemTransaction>, Payload), QuorumStoreError>;
+    ) -> Result<(Vec<ValidatorTransaction>, Payload), QuorumStoreError>;
 
     fn trace_payloads(&self) {}
 }

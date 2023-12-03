@@ -25,6 +25,7 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     validator_signer::ValidatorSigner,
 };
+use std::sync::{atomic::AtomicBool, Arc};
 
 pub fn prepare_signing_pipeline(
     signing_phase: SigningPhase,
@@ -36,9 +37,14 @@ pub fn prepare_signing_pipeline(
     // e2e tests
     let (in_channel_tx, in_channel_rx) = create_channel::<CountedRequest<SigningRequest>>();
     let (out_channel_tx, out_channel_rx) = create_channel::<SigningResponse>();
+    let reset_flag = Arc::new(AtomicBool::new(false));
 
-    let signing_phase_pipeline =
-        PipelinePhase::new(in_channel_rx, Some(out_channel_tx), Box::new(signing_phase));
+    let signing_phase_pipeline = PipelinePhase::new(
+        in_channel_rx,
+        Some(out_channel_tx),
+        Box::new(signing_phase),
+        reset_flag,
+    );
 
     (in_channel_tx, out_channel_rx, signing_phase_pipeline)
 }

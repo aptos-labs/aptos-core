@@ -25,10 +25,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::{error, sample, sample::SampleRate, warn};
-use aptos_types::system_txn::{
-    pool::{SystemTransactionFilter, SystemTransactionPoolClient},
-    SystemTransaction,
-};
+use aptos_types::validator_txn::{pool::ValidatorTransactionFilter, ValidatorTransaction};
 use futures::future::BoxFuture;
 use std::{
     collections::{BTreeMap, HashSet},
@@ -177,9 +174,7 @@ pub struct ProposalGenerator {
     // Last round that a proposal was generated
     last_round_generated: Round,
     quorum_store_enabled: bool,
-
-    sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
-    should_propose_sys_txns: bool,
+    validator_txn_enabled: bool,
 }
 
 impl ProposalGenerator {
@@ -195,8 +190,7 @@ impl ProposalGenerator {
         pipeline_backpressure_config: PipelineBackpressureConfig,
         chain_health_backoff_config: ChainHealthBackoffConfig,
         quorum_store_enabled: bool,
-        sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
-        should_propose_sys_txns: bool,
+        validator_txn_enabled: bool,
     ) -> Self {
         Self {
             author,
@@ -211,8 +205,7 @@ impl ProposalGenerator {
             chain_health_backoff_config,
             last_round_generated: 0,
             quorum_store_enabled,
-            sys_txn_pool_client,
-            should_propose_sys_txns,
+            validator_txn_enabled,
         }
     }
 
@@ -261,7 +254,7 @@ impl ProposalGenerator {
 
         let hqc = self.ensure_highest_quorum_cert(round)?;
 
-        let (sys_txns, payload, timestamp) = if hqc.certified_block().has_reconfiguration() {
+        let (validator_txns, payload, timestamp) = if hqc.certified_block().has_reconfiguration() {
             // Reconfiguration rule - we propose empty blocks with parents' timestamp
             // after reconfiguration until it's committed
             (
@@ -327,21 +320,21 @@ impl ProposalGenerator {
             PROPOSER_PENDING_BLOCKS_COUNT.set(pending_blocks.len() as i64);
             PROPOSER_PENDING_BLOCKS_FILL_FRACTION.set(max_fill_fraction as f64);
 
-            let pending_sys_txn_hashes: HashSet<HashValue> = pending_blocks
+            let pending_validator_txn_hashes: HashSet<HashValue> = pending_blocks
                 .iter()
-                .filter_map(|block| block.sys_txns())
+                .filter_map(|block| block.validator_txns())
                 .flatten()
-                .map(SystemTransaction::hash)
+                .map(ValidatorTransaction::hash)
                 .collect();
-            let sys_payload_filter =
-                SystemTransactionFilter::PendingTxnHashSet(pending_sys_txn_hashes);
-            let (sys_txns, payload) = self
+            let validator_txn_filter =
+                ValidatorTransactionFilter::PendingTxnHashSet(pending_validator_txn_hashes);
+            let (validator_txns, payload) = self
                 .payload_client
                 .pull_payload(
                     self.quorum_store_poll_time.saturating_sub(proposal_delay),
                     max_block_txns,
                     max_block_bytes,
-                    sys_payload_filter,
+                    validator_txn_filter,
                     payload_filter,
                     wait_callback,
                     pending_ordering,
@@ -351,7 +344,7 @@ impl ProposalGenerator {
                 .await
                 .context("Fail to retrieve payload")?;
 
-            (sys_txns, payload, timestamp.as_micros() as u64)
+            (validator_txns, payload, timestamp.as_micros() as u64)
         };
 
         let quorum_cert = hqc.as_ref().clone();
@@ -362,9 +355,9 @@ impl ProposalGenerator {
             proposer_election,
         );
 
-        let block = if self.should_propose_sys_txns {
+        let block = if self.validator_txn_enabled {
             BlockData::new_proposal_ext(
-                sys_txns,
+                validator_txns,
                 payload,
                 self.author,
                 failed_authors,

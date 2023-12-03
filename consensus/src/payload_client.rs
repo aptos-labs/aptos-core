@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    counters::{SYSTEM_TXN_PULL_DURATION, WAIT_FOR_FULL_BLOCKS_TRIGGERED},
-    error::QuorumStoreError,
-    monitor,
+    counters::WAIT_FOR_FULL_BLOCKS_TRIGGERED, error::QuorumStoreError, monitor,
     state_replication::PayloadClient,
 };
 use anyhow::Result;
@@ -13,9 +11,9 @@ use aptos_consensus_types::{
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
 use aptos_logger::prelude::*;
-use aptos_types::system_txn::{
-    pool::{SystemTransactionFilter, SystemTransactionPoolClient},
-    SystemTransaction,
+use aptos_types::validator_txn::{
+    pool::{ValidatorTransactionFilter, ValidatorTransactionPoolClient},
+    ValidatorTransaction,
 };
 use fail::fail_point;
 use futures::{
@@ -31,8 +29,8 @@ use tokio::time::{sleep, timeout};
 const NO_TXN_DELAY: u64 = 30; // TODO: consider moving to a config
 
 pub struct MixedPayloadClient {
-    pub sys_txn_enabled: bool,
-    pub sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
+    pub validator_txn_enabled: bool,
+    pub validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
     pub quorum_store_client: QuorumStoreClient,
 }
 
@@ -103,28 +101,26 @@ impl PayloadClient for MixedPayloadClient {
         mut max_poll_time: Duration,
         mut max_items: u64,
         mut max_bytes: u64,
-        exclude_sys_txns: SystemTransactionFilter,
+        exclude_validator_txns: ValidatorTransactionFilter,
         exclude_payloads: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,
         pending_uncommitted_blocks: usize,
         recent_max_fill_fraction: f32,
-    ) -> Result<(Vec<SystemTransaction>, Payload), QuorumStoreError> {
-        let sys_txn_pull_timer = SYSTEM_TXN_PULL_DURATION.start_timer();
-        let sys_txns = if self.sys_txn_enabled {
-            self.sys_txn_pool_client
-                .pull(max_items, max_bytes, exclude_sys_txns)
+    ) -> Result<(Vec<ValidatorTransaction>, Payload), QuorumStoreError> {
+        let validator_txn_pull_timer = Instant::now();
+        let validator_txns = if self.validator_txn_enabled {
+            self.validator_txn_pool_client
+                .pull(max_items, max_bytes, exclude_validator_txns)
         } else {
             vec![]
         };
-        max_items -= sys_txns.len() as u64;
-        max_bytes -= sys_txns
+        max_items -= validator_txns.len() as u64;
+        max_bytes -= validator_txns
             .iter()
             .map(|txn| txn.size_in_bytes())
             .sum::<usize>() as u64;
-        max_poll_time = max_poll_time.saturating_sub(Duration::from_secs_f64(
-            sys_txn_pull_timer.stop_and_record(),
-        ));
+        max_poll_time = max_poll_time.saturating_sub(validator_txn_pull_timer.elapsed());
 
         let return_non_full = recent_max_fill_fraction
             < self
@@ -178,6 +174,6 @@ impl PayloadClient for MixedPayloadClient {
             duration = start_time.elapsed().as_secs_f32(),
             "Pull payloads from QuorumStore: proposal"
         );
-        Ok((sys_txns, user_payload))
+        Ok((validator_txns, user_payload))
     }
 }

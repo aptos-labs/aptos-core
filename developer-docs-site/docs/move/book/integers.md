@@ -137,7 +137,7 @@ Casts *do not* truncate. Casting will abort if the result is too large for the s
 |------------|---------------------------------------------------------------------------------|---------------------------------------
 | `(e as T)`| Cast integer expression `e` into an integer type `T` | `e` is too large to represent as a `T`
 
-Here, the type of `e` must be `8`, `16`, `32`, `64`, `128` or `256` and `T` must be `u8`, `u16`, `u32`, `u64`, `u128` oe `u256`.
+Here, the type of `e` must be `8`, `16`, `32`, `64`, `128` or `256` and `T` must be `u8`, `u16`, `u32`, `u64`, `u128` or `u256`.
 
 For example:
 
