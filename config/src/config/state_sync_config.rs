@@ -298,11 +298,32 @@ impl Default for AptosDataPollerConfig {
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
+pub struct AptosLatencyFilteringConfig {
+    /// The reduction factor for latency filtering when selecting peers
+    pub latency_filtering_reduction_factor: u64,
+    /// Minimum peer ratio for latency filtering
+    pub min_peer_ratio_for_latency_filtering: u64,
+    /// Minimum number of peers before latency filtering can occur
+    pub min_peers_for_latency_filtering: u64,
+}
+
+impl Default for AptosLatencyFilteringConfig {
+    fn default() -> Self {
+        Self {
+            latency_filtering_reduction_factor: 2, // Only consider the best 50% of peers
+            min_peer_ratio_for_latency_filtering: 5, // Only filter if we have at least 5 potential peers per request
+            min_peers_for_latency_filtering: 10, // Only filter if we have at least 10 total peers
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct AptosDataClientConfig {
     /// The aptos data poller config for the data client
     pub data_poller_config: AptosDataPollerConfig,
-    /// The reduction factor for latency filtering when selecting peers
-    pub latency_filtering_reduction_factor: u64,
+    /// The aptos latency filtering config for the data client
+    pub latency_filtering_config: AptosLatencyFilteringConfig,
     /// The interval (milliseconds) at which to refresh the latency monitor
     pub latency_monitor_loop_interval_ms: u64,
     /// Maximum number of epoch ending ledger infos per chunk
@@ -321,10 +342,6 @@ pub struct AptosDataClientConfig {
     pub max_transaction_chunk_size: u64,
     /// Maximum number of transaction outputs per chunk
     pub max_transaction_output_chunk_size: u64,
-    /// Minimum peer ratio for latency filtering
-    pub min_peer_ratio_for_latency_filtering: u64,
-    /// Minimum number of peers before latency filtering can occur
-    pub min_peers_for_latency_filtering: u64,
     /// Timeout (in ms) when waiting for an optimistic fetch response
     pub optimistic_fetch_timeout_ms: u64,
     /// First timeout (in ms) when waiting for a response
@@ -339,7 +356,7 @@ impl Default for AptosDataClientConfig {
     fn default() -> Self {
         Self {
             data_poller_config: AptosDataPollerConfig::default(),
-            latency_filtering_reduction_factor: 2, // Only consider the best 50% of peers
+            latency_filtering_config: AptosLatencyFilteringConfig::default(),
             latency_monitor_loop_interval_ms: 100,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_num_output_reductions: 0,
@@ -349,10 +366,8 @@ impl Default for AptosDataClientConfig {
             max_subscription_lag_secs: 30, // 30 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
-            min_peer_ratio_for_latency_filtering: 5, // Only filter if we have at least 5 potential peers per request
-            min_peers_for_latency_filtering: 10, // Only filter if we have at least 10 total peers
-            optimistic_fetch_timeout_ms: 5000,   // 5 seconds
-            response_timeout_ms: 10_000,         // 10 seconds
+            optimistic_fetch_timeout_ms: 5000,        // 5 seconds
+            response_timeout_ms: 10_000,              // 10 seconds
             subscription_response_timeout_ms: 20_000, // 20 seconds (must be longer than a regular timeout because of pre-fetching)
             use_compression: true,
         }
