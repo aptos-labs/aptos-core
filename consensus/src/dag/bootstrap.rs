@@ -30,8 +30,9 @@ use crate::{
     },
     monitor,
     network::IncomingDAGRequest,
+    payload_client::PayloadClient,
     payload_manager::PayloadManager,
-    state_replication::{PayloadClient, StateComputer},
+    state_replication::StateComputer,
 };
 use aptos_channels::{
     aptos_channel::{self, Receiver},

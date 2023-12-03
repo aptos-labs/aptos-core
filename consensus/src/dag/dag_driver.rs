@@ -22,7 +22,7 @@ use crate::{
         },
         DAGRpcResult, RpcHandler,
     },
-    state_replication::PayloadClient,
+    payload_client::PayloadClient,
 };
 use anyhow::bail;
 use aptos_config::config::DagPayloadConfig;

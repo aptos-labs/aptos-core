@@ -3,51 +3,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    error::{QuorumStoreError, StateSyncError},
-    payload_manager::PayloadManager,
-    state_computer::StateComputeResultFut,
-    transaction_deduper::TransactionDeduper,
-    transaction_shuffler::TransactionShuffler,
+    error::StateSyncError, payload_manager::PayloadManager, state_computer::StateComputeResultFut,
+    transaction_deduper::TransactionDeduper, transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
-use aptos_consensus_types::{
-    block::Block,
-    common::{Payload, PayloadFilter},
-    executed_block::ExecutedBlock,
-};
+use aptos_consensus_types::{block::Block, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorResult, StateComputeResult};
 use aptos_types::{
-    block_executor::config::BlockExecutorConfigFromOnchain,
-    epoch_state::EpochState,
+    block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    validator_txn::{pool::ValidatorTransactionFilter, ValidatorTransaction},
 };
-use futures::future::BoxFuture;
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 pub type StateComputerCommitCallBackType =
     Box<dyn FnOnce(&[Arc<ExecutedBlock>], LedgerInfoWithSignatures) + Send + Sync>;
-
-/// Clients can pull information about transactions from the mempool and return
-/// the retrieved information as a `Payload`.
-#[async_trait::async_trait]
-pub trait PayloadClient: Send + Sync {
-    async fn pull_payload(
-        &self,
-        max_poll_time: Duration,
-        max_items: u64,
-        max_bytes: u64,
-        validator_txn_filter: ValidatorTransactionFilter,
-        user_txn_filter: PayloadFilter,
-        wait_callback: BoxFuture<'static, ()>,
-        pending_ordering: bool,
-        pending_uncommitted_blocks: usize,
-        recent_max_fill_fraction: f32,
-    ) -> Result<(Vec<ValidatorTransaction>, Payload), QuorumStoreError>;
-
-    fn trace_payloads(&self) {}
-}
 
 /// While Consensus is managing proposed blocks, `StateComputer` is managing the results of the
 /// (speculative) execution of their payload.

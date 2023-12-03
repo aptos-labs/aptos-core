@@ -38,7 +38,9 @@ use crate::{
         IncomingDAGRequest, IncomingRpcRequest, NetworkReceivers, NetworkSender,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
-    payload_client::{MixedPayloadClient, QuorumStoreClient},
+    payload_client::{
+        mixed::MixedPayloadClient, user::quorum_store_client::QuorumStoreClient, PayloadClient,
+    },
     payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
     quorum_store::{
@@ -48,7 +50,7 @@ use crate::{
     },
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
-    state_replication::{PayloadClient, StateComputer},
+    state_replication::StateComputer,
     transaction_deduper::create_transaction_deduper,
     transaction_shuffler::create_transaction_shuffler,
     util::time_service::TimeService,
@@ -1021,7 +1023,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let mixed_payload_client = MixedPayloadClient {
             validator_txn_enabled: consensus_config.validator_txn_enabled(),
             validator_txn_pool_client: self.validator_txn_pool_client.clone(),
-            quorum_store_client,
+            user_payload_client: Arc::new(quorum_store_client),
         };
         self.init_commit_state_computer(epoch_state, payload_manager.clone(), execution_config);
         self.start_quorum_store(quorum_store_builder);

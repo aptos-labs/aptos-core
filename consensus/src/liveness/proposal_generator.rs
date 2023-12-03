@@ -12,7 +12,7 @@ use crate::{
         PROPOSER_DELAY_PROPOSAL, PROPOSER_PENDING_BLOCKS_COUNT,
         PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
     },
-    state_replication::PayloadClient,
+    payload_client::PayloadClient,
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};

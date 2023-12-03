@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    error::QuorumStoreError, payload_client::QuorumStoreClient, state_replication::PayloadClient,
+    error::QuorumStoreError,
+    payload_client::{user::quorum_store_client::QuorumStoreClient, PayloadClient},
 };
 use anyhow::Result;
 use aptos_consensus_types::{
