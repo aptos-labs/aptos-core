@@ -22,9 +22,23 @@ use std::{
 };
 
 pub struct MixedPayloadClient {
-    pub validator_txn_enabled: bool,
-    pub validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
-    pub user_payload_client: Arc<dyn UserPayloadClient>,
+    validator_txn_enabled: bool,
+    validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
+    user_payload_client: Arc<dyn UserPayloadClient>,
+}
+
+impl MixedPayloadClient {
+    pub fn new(
+        validator_txn_enabled: bool,
+        validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
+        user_payload_client: Arc<dyn UserPayloadClient>,
+    ) -> Self {
+        Self {
+            validator_txn_enabled,
+            validator_txn_pool_client,
+            user_payload_client,
+        }
+    }
 }
 
 #[async_trait::async_trait]

@@ -1020,11 +1020,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let (payload_manager, quorum_store_client, quorum_store_builder) = self
             .init_payload_provider(epoch_state, network_sender.clone(), consensus_config)
             .await;
-        let mixed_payload_client = MixedPayloadClient {
-            validator_txn_enabled: consensus_config.validator_txn_enabled(),
-            validator_txn_pool_client: self.validator_txn_pool_client.clone(),
-            user_payload_client: Arc::new(quorum_store_client),
-        };
+        let mixed_payload_client = MixedPayloadClient::new(
+            consensus_config.validator_txn_enabled(),
+            self.validator_txn_pool_client.clone(),
+            Arc::new(quorum_store_client),
+        );
         self.init_commit_state_computer(epoch_state, payload_manager.clone(), execution_config);
         self.start_quorum_store(quorum_store_builder);
         (
