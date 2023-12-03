@@ -19,7 +19,9 @@ use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
-use aptos_types::{epoch_state::EpochState, validator_signer::ValidatorSigner};
+use aptos_types::{
+    epoch_state::EpochState, validator_signer::ValidatorSigner, validator_txn::ValidatorTransaction,
+};
 use async_trait::async_trait;
 use std::{collections::BTreeMap, mem, sync::Arc};
 
@@ -82,14 +84,18 @@ impl NodeBroadcastHandler {
     }
 
     fn validate(&self, node: Node) -> anyhow::Result<Node> {
-        if self.validator_txn_enabled {
+        if !self.validator_txn_enabled {
             ensure!(node.validator_txns().len() == 0);
         }
-
-        ensure!(node.payload().len() as u64 <= self.payload_config.max_receiving_txns_per_round);
-        ensure!(
-            node.payload().size() as u64 <= self.payload_config.max_receiving_size_per_round_bytes
-        );
+        let num_txns = node.validator_txns().len() + node.payload().len();
+        let txn_bytes = node
+            .validator_txns()
+            .iter()
+            .map(ValidatorTransaction::size_in_bytes)
+            .sum::<usize>()
+            + node.payload().size();
+        ensure!(num_txns as u64 <= self.payload_config.max_receiving_txns_per_round);
+        ensure!(txn_bytes as u64 <= self.payload_config.max_receiving_size_per_round_bytes);
 
         let current_round = node.metadata().round();
 
