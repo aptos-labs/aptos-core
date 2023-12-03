@@ -7,7 +7,7 @@ use crate::{
     tests::{mock::MockNetwork, utils},
 };
 use aptos_config::{
-    config::{AptosDataClientConfig, BaseConfig, RoleType},
+    config::{AptosDataClientConfig, AptosLatencyFilteringConfig, BaseConfig, RoleType},
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_storage_service_types::{
@@ -127,9 +127,11 @@ async fn prioritized_peer_request_latency_filtering() {
     let min_peers_for_latency_filtering = 100;
     let latency_filtering_reduction_factor = 2;
     let data_client_config = AptosDataClientConfig {
-        min_peers_for_latency_filtering,
-        min_peer_ratio_for_latency_filtering: 2,
-        latency_filtering_reduction_factor,
+        latency_filtering_config: AptosLatencyFilteringConfig {
+            min_peers_for_latency_filtering,
+            latency_filtering_reduction_factor,
+            ..Default::default()
+        },
         ..Default::default()
     };
 
@@ -204,9 +206,11 @@ async fn prioritized_peer_request_latency_filtering_ratio() {
     let min_peer_ratio_for_latency_filtering = 10_000; // Set to a very high value
     let latency_filtering_reduction_factor = 2;
     let data_client_config = AptosDataClientConfig {
-        min_peers_for_latency_filtering,
-        min_peer_ratio_for_latency_filtering,
-        latency_filtering_reduction_factor,
+        latency_filtering_config: AptosLatencyFilteringConfig {
+            min_peers_for_latency_filtering,
+            min_peer_ratio_for_latency_filtering,
+            latency_filtering_reduction_factor,
+        },
         ..Default::default()
     };
 
@@ -257,8 +261,11 @@ async fn prioritized_peer_request_latency_selection() {
     let min_peers_for_latency_filtering = 50;
     let latency_filtering_reduction_factor = 2;
     let data_client_config = AptosDataClientConfig {
-        min_peers_for_latency_filtering,
-        latency_filtering_reduction_factor,
+        latency_filtering_config: AptosLatencyFilteringConfig {
+            min_peers_for_latency_filtering,
+            latency_filtering_reduction_factor,
+            ..Default::default()
+        },
         ..Default::default()
     };
 
@@ -308,7 +315,10 @@ async fn prioritized_peer_request_missing_latencies() {
     // Create the data client config with latency filtering configurations
     let min_peers_for_latency_filtering = 50;
     let data_client_config = AptosDataClientConfig {
-        min_peers_for_latency_filtering,
+        latency_filtering_config: AptosLatencyFilteringConfig {
+            min_peers_for_latency_filtering,
+            ..Default::default()
+        },
         ..Default::default()
     };
 
@@ -371,7 +381,10 @@ async fn prioritized_peer_request_no_latencies() {
     // Create the data client config with latency filtering configurations
     let min_peers_for_latency_filtering = 50;
     let data_client_config = AptosDataClientConfig {
-        min_peers_for_latency_filtering,
+        latency_filtering_config: AptosLatencyFilteringConfig {
+            min_peers_for_latency_filtering,
+            ..Default::default()
+        },
         ..Default::default()
     };
 

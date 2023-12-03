@@ -90,12 +90,14 @@ pub fn choose_peers_by_latency(
     // number of peers, and there are enough potential peers for each request.
     let mut num_peers_to_consider = potential_peers_and_latency_weights.len() as u64;
     if ignore_high_latency_peers {
+        let latency_filtering_config = &data_client_config.latency_filtering_config;
         let peer_ratio_per_request = num_peers_to_consider / num_peers_to_choose;
-        if num_peers_to_consider >= data_client_config.min_peers_for_latency_filtering
-            && peer_ratio_per_request >= data_client_config.min_peer_ratio_for_latency_filtering
+        if num_peers_to_consider >= latency_filtering_config.min_peers_for_latency_filtering
+            && peer_ratio_per_request
+                >= latency_filtering_config.min_peer_ratio_for_latency_filtering
         {
             // Consider a subset of peers with the lowest latencies
-            num_peers_to_consider /= data_client_config.latency_filtering_reduction_factor
+            num_peers_to_consider /= latency_filtering_config.latency_filtering_reduction_factor
         }
     }
 
