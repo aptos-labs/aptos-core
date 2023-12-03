@@ -948,6 +948,7 @@ dependencies = [
  "futures",
  "itertools 0.10.5",
  "mirai-annotations",
+ "once_cell",
  "proptest",
  "rand 0.7.3",
  "rayon",

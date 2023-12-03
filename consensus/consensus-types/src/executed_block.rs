@@ -6,6 +6,7 @@ use crate::{
     block::Block,
     common::{Payload, Round},
     quorum_cert::QuorumCert,
+    randomness::Randomness,
     vote_proposal::VoteProposal,
 };
 use aptos_crypto::hash::HashValue;
@@ -17,6 +18,7 @@ use aptos_types::{
     transaction::{SignedTransaction, Transaction, TransactionStatus},
     validator_txn::ValidatorTransaction,
 };
+use once_cell::sync::OnceCell;
 use std::fmt::{Debug, Display, Formatter};
 
 /// ExecutedBlocks are managed in a speculative tree, the committed blocks form a chain. Besides
@@ -30,12 +32,17 @@ pub struct ExecutedBlock {
     /// the tree. The execution results are not persisted: they're recalculated again for the
     /// pending blocks upon restart.
     state_compute_result: StateComputeResult,
+    randomness: OnceCell<Randomness>,
 }
 
 impl ExecutedBlock {
     pub fn replace_result(mut self, result: StateComputeResult) -> Self {
         self.state_compute_result = result;
         self
+    }
+
+    pub fn set_randomness(&mut self, randomness: Randomness) {
+        assert!(self.randomness.set(randomness).is_ok());
     }
 }
 
@@ -56,6 +63,7 @@ impl ExecutedBlock {
         Self {
             block,
             state_compute_result,
+            randomness: OnceCell::new(),
         }
     }
 
@@ -97,6 +105,14 @@ impl ExecutedBlock {
 
     pub fn compute_result(&self) -> &StateComputeResult {
         &self.state_compute_result
+    }
+
+    pub fn randomness(&self) -> Option<&Randomness> {
+        self.randomness.get()
+    }
+
+    pub fn has_randomness(&self) -> bool {
+        self.randomness.get().is_some()
     }
 
     pub fn block_info(&self) -> BlockInfo {

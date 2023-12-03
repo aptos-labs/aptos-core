@@ -16,6 +16,7 @@ pub mod proof_of_store;
 pub mod proposal_ext;
 pub mod proposal_msg;
 pub mod quorum_cert;
+pub mod randomness;
 pub mod request_response;
 pub mod safety_data;
 pub mod sync_info;
