@@ -4,6 +4,10 @@ title: "Example Queries"
 
 # Example Indexer API Queries
 
+import BetaNotice from '../../../src/components/_indexer_beta_notice.mdx';
+
+<BetaNotice />
+
 ## Running example queries
 
 1. Open the Hasura Explorer for the network you want to query. You can find the URLs [here](/indexer/api/labs-hosted#hasura-explorer).

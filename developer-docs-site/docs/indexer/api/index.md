@@ -2,7 +2,9 @@
 title: "Indexer API"
 ---
 
-# Indexer API
+import BetaNotice from '../../../src/components/_indexer_beta_notice.mdx';
+
+<BetaNotice />
 
 This section contains documentation for the Aptos Indexer API, the API built upon the standard set of processors provided in the [aptos-labs/aptos-indexer-processors](https://github.com/aptos-labs/aptos-indexer-processors) repo.
 

@@ -4,6 +4,10 @@ title: "Running Locally"
 
 # Running the Transaction Stream Service Locally
 
+import BetaNotice from '../../../src/components/_indexer_beta_notice.mdx';
+
+<BetaNotice />
+
 :::info
 This has been tested on MacOS 13 on ARM and Debian 11 on x86_64.
 :::

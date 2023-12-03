@@ -1908,7 +1908,8 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             .with_success_criteria(
                 SuccessCriteria::new(25000)
                     .add_no_restarts()
-                    .add_wait_for_catchup_s(60),
+                    /* This test runs at high load, so we need more catchup time */
+                    .add_wait_for_catchup_s(120),
                 /* Doesn't work without event indices
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
@@ -1920,7 +1921,8 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         forge_config = forge_config.with_success_criteria(
             SuccessCriteria::new(12000)
                 .add_no_restarts()
-                .add_wait_for_catchup_s(60)
+                /* This test runs at high load, so we need more catchup time */
+                .add_wait_for_catchup_s(120)
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // Tuned for throughput uses more cores than regular tests,
                     // as it achieves higher throughput.
