@@ -559,6 +559,12 @@ impl From<Exp> for ExpData {
     }
 }
 
+/// Rewrite result
+pub enum RewriteResult {
+    Rewritten(Exp), // was OK
+    Unchanged(Exp), // was Error
+}
+
 impl ExpData {
     /// Version of `into` which does not require type annotations.
     pub fn into_exp(self) -> Exp {
@@ -963,13 +969,14 @@ impl ExpData {
         }
     }
 
-    /// Rewrites this expression and sub-expression based on the rewriter function. The
-    /// function returns `Ok(e)` if the expression is rewritten, and passes back ownership
-    /// using `Err(e)` if the expression stays unchanged. This function stops traversing
-    /// on `Ok(e)` and descents into sub-expressions on `Err(e)`.
+    /// Rewrites this expression and sub-expression based on the rewriter function. The function
+    /// returns `RewriteResult:Rewritten(e)` if the expression is rewritten, and passes back
+    /// ownership using `RewriteResult:Unchanged(e)` if the expression stays unchanged. This
+    /// function stops traversing on `RewriteResult::Rewritten(e)` and descents into sub-expressions
+    /// on `RewriteResult::Unchanged(e)`.
     pub fn rewrite<F>(exp: Exp, exp_rewriter: &mut F) -> Exp
     where
-        F: FnMut(Exp) -> Result<Exp, Exp>,
+        F: FnMut(Exp) -> RewriteResult,
     {
         ExpRewriter {
             exp_rewriter,
@@ -1003,7 +1010,7 @@ impl ExpData {
         F: FnMut(NodeId) -> Option<NodeId>,
     {
         ExpRewriter {
-            exp_rewriter: &mut Err,
+            exp_rewriter: &mut RewriteResult::Unchanged,
             node_rewriter,
             pattern_rewriter: &mut |_, _| None,
         }
@@ -1017,7 +1024,7 @@ impl ExpData {
         node_rewriter: &mut G,
     ) -> Exp
     where
-        F: FnMut(Exp) -> Result<Exp, Exp>,
+        F: FnMut(Exp) -> RewriteResult,
         G: FnMut(NodeId) -> Option<NodeId>,
     {
         ExpRewriter {
@@ -1178,7 +1185,7 @@ impl ExpData {
 }
 
 struct ExpRewriter<'a> {
-    exp_rewriter: &'a mut dyn FnMut(Exp) -> Result<Exp, Exp>,
+    exp_rewriter: &'a mut dyn FnMut(Exp) -> RewriteResult,
     node_rewriter: &'a mut dyn FnMut(NodeId) -> Option<NodeId>,
     pattern_rewriter: &'a mut dyn FnMut(&Pattern, bool) -> Option<Pattern>,
 }
@@ -1186,8 +1193,8 @@ struct ExpRewriter<'a> {
 impl<'a> ExpRewriterFunctions for ExpRewriter<'a> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         match (*self.exp_rewriter)(exp) {
-            Ok(new_exp) => new_exp,
-            Err(old_exp) => self.rewrite_exp_descent(old_exp),
+            RewriteResult::Rewritten(new_exp) => new_exp,
+            RewriteResult::Unchanged(old_exp) => self.rewrite_exp_descent(old_exp),
         }
     }
 

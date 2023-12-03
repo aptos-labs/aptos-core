@@ -7,8 +7,8 @@
 
 use crate::{
     ast::{
-        Condition, ConditionKind, Exp, ExpData, GlobalInvariant, MemoryLabel, Operation, Spec,
-        TempIndex, TraceKind,
+        Condition, ConditionKind, Exp, ExpData, GlobalInvariant, MemoryLabel, Operation,
+        RewriteResult, Spec, TempIndex, TraceKind,
     },
     exp_generator::ExpGenerator,
     exp_rewriter::ExpRewriterFunctions,
@@ -524,10 +524,10 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             if trace_this {
                 let l = self.builder.global_env().get_node_loc(e.node_id());
                 let traced = self.auto_trace_exp(&l, e, TraceKind::SubAuto);
-                Ok(traced)
+                RewriteResult::Rewritten(traced)
             } else {
                 // descent
-                Err(e)
+                RewriteResult::Unchanged(e)
             }
         })
     }
