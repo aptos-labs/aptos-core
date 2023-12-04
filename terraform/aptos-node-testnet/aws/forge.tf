@@ -17,7 +17,7 @@ resource "helm_release" "forge" {
       }
       serviceAccount = {
         annotations = {
-          "eks.amazonaws.com/role-arn" = aws_iam_role.forge.arn
+          "eks.amazonaws.com/role-arn" = aws_iam_role.forge[0].arn
         }
       }
     }),
@@ -32,6 +32,7 @@ resource "helm_release" "forge" {
 }
 
 data "aws_iam_policy_document" "forge-assume-role" {
+  count = var.enable_forge ? 1 : 0
   statement {
     actions = ["sts:AssumeRoleWithWebIdentity"]
 
@@ -58,6 +59,7 @@ data "aws_iam_policy_document" "forge-assume-role" {
 }
 
 data "aws_iam_policy_document" "forge" {
+  count = var.enable_forge ? 1 : 0
   statement {
     sid = "AllowS3"
     actions = [
@@ -71,15 +73,16 @@ data "aws_iam_policy_document" "forge" {
 }
 
 resource "aws_iam_role" "forge" {
+  count                = var.enable_forge ? 1 : 0
   name                 = "aptos-node-testnet-${local.workspace_name}-forge"
   path                 = var.iam_path
   permissions_boundary = var.permissions_boundary_policy
-  assume_role_policy   = data.aws_iam_policy_document.forge-assume-role.json
+  assume_role_policy   = data.aws_iam_policy_document.forge-assume-role[0].json
 }
 
 resource "aws_iam_role_policy" "forge" {
+  count  = var.enable_forge ? 1 : 0
   name   = "Helm"
-  role   = aws_iam_role.forge.name
-  policy = data.aws_iam_policy_document.forge.json
+  role   = aws_iam_role.forge[0].name
+  policy = data.aws_iam_policy_document.forge[0].json
 }
-
