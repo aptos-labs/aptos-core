@@ -131,56 +131,13 @@ impl BlockQueue {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        experimental::buffer_manager::OrderedBlocks,
-        rand::rand_gen::block_queue::{BlockQueue, QueueItem},
+    use crate::rand::rand_gen::{
+        block_queue::{BlockQueue, QueueItem},
+        test_utils::create_ordered_blocks,
     };
-    use aptos_consensus_types::{
-        block::Block,
-        block_data::{BlockData, BlockType},
-        common::Round,
-        executed_block::ExecutedBlock,
-        quorum_cert::QuorumCert,
-        randomness::Randomness,
-    };
-    use aptos_crypto::HashValue;
-    use aptos_executor_types::StateComputeResult;
-    use aptos_types::{
-        aggregate_signature::AggregateSignature,
-        ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    };
+    use aptos_consensus_types::randomness::Randomness;
     use std::collections::HashSet;
 
-    fn create_ordered_blocks(rounds: Vec<Round>) -> OrderedBlocks {
-        let blocks = rounds
-            .into_iter()
-            .map(|round| {
-                ExecutedBlock::new(
-                    Block::new_for_testing(
-                        HashValue::random(),
-                        BlockData::new_for_testing(
-                            1,
-                            round,
-                            1,
-                            QuorumCert::dummy(),
-                            BlockType::Genesis,
-                        ),
-                        None,
-                    ),
-                    vec![],
-                    StateComputeResult::new_dummy(),
-                )
-            })
-            .collect();
-        OrderedBlocks {
-            ordered_blocks: blocks,
-            ordered_proof: LedgerInfoWithSignatures::new(
-                LedgerInfo::mock_genesis(None),
-                AggregateSignature::empty(),
-            ),
-            callback: Box::new(move |_, _| {}),
-        }
-    }
     #[test]
     fn test_queue_item() {
         let single_round = vec![1];

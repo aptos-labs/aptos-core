@@ -52,6 +52,11 @@ impl RandMetadata {
     pub fn epoch(&self) -> u64 {
         self.metadata_to_sign.epoch
     }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn new_for_testing(round: Round) -> Self {
+        Self::new(1, round, HashValue::zero(), 1)
+    }
 }
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct Randomness {
