@@ -85,7 +85,6 @@ use aptos_types::{
     },
     validator_signer::ValidatorSigner,
     validator_txn::pool::ValidatorTransactionPoolClient,
-    validator_verifier::ValidatorVerifier,
 };
 use fail::fail_point;
 use futures::{
@@ -559,7 +558,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     fn spawn_decoupled_execution(
         &mut self,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
-        verifier: ValidatorVerifier,
+        epoch_state: Arc<EpochState>,
     ) -> (
         UnboundedSender<OrderedBlocks>,
         UnboundedSender<ResetRequest>,
@@ -568,7 +567,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.author,
             self.network_sender.clone(),
             self.self_sender.clone(),
-            verifier.clone(),
+            epoch_state.verifier.clone(),
         );
 
         let (block_tx, block_rx) = unbounded::<OrderedBlocks>();
@@ -599,14 +598,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.commit_state_computer.clone(),
             block_rx,
             reset_rx,
-            verifier,
+            epoch_state,
         );
+        let bounded_executor = self.bounded_executor.clone();
 
         tokio::spawn(execution_schedule_phase.start());
         tokio::spawn(execution_wait_phase.start());
         tokio::spawn(signing_phase.start());
         tokio::spawn(persisting_phase.start());
-        tokio::spawn(buffer_manager.start());
+        tokio::spawn(buffer_manager.start(bounded_executor));
 
         (block_tx, reset_tx)
     }
@@ -671,7 +671,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         ledger_data: LedgerRecoveryData,
         onchain_consensus_config: OnChainConsensusConfig,
-        epoch_state: EpochState,
+        epoch_state: Arc<EpochState>,
         network_sender: NetworkSender,
     ) {
         let (recovery_manager_tx, recovery_manager_rx) = aptos_channel::new(
@@ -771,13 +771,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
     fn init_ordering_state_computer(
         &mut self,
-        epoch_state: &EpochState,
+        epoch_state: Arc<EpochState>,
         onchain_consensus_config: &OnChainConsensusConfig,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
     ) -> Arc<dyn StateComputer> {
         if onchain_consensus_config.decoupled_execution() {
-            let (block_tx, reset_tx) = self
-                .spawn_decoupled_execution(commit_signer_provider, epoch_state.verifier.clone());
+            let (block_tx, reset_tx) =
+                self.spawn_decoupled_execution(commit_signer_provider, epoch_state);
             Arc::new(OrderingStateComputer::new(
                 block_tx,
                 self.commit_state_computer.clone(),
@@ -812,7 +812,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     async fn start_round_manager(
         &mut self,
         recovery_data: RecoveryData,
-        epoch_state: EpochState,
+        epoch_state: Arc<EpochState>,
         onchain_consensus_config: OnChainConsensusConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
@@ -858,7 +858,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
         let state_computer = self.init_ordering_state_computer(
-            &epoch_state,
+            epoch_state.clone(),
             &onchain_consensus_config,
             safety_rules_container.clone(),
         );
@@ -962,10 +962,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");
-        let epoch_state = EpochState {
+        let epoch_state = Arc::new(EpochState {
             epoch: payload.epoch(),
             verifier: (&validator_set).into(),
-        };
+        });
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
@@ -978,7 +978,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             error!("Failed to read on-chain execution config {}", error);
         }
 
-        self.epoch_state = Some(Arc::new(epoch_state.clone()));
+        self.epoch_state = Some(epoch_state.clone());
 
         let consensus_config = onchain_consensus_config.unwrap_or_default();
         let execution_config = onchain_execution_config
@@ -1036,7 +1036,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
     async fn start_new_epoch_with_joltean(
         &mut self,
-        epoch_state: EpochState,
+        epoch_state: Arc<EpochState>,
         consensus_config: OnChainConsensusConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
@@ -1070,7 +1070,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
     async fn start_new_epoch_with_dag(
         &mut self,
-        epoch_state: EpochState,
+        epoch_state: Arc<EpochState>,
         onchain_consensus_config: OnChainConsensusConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
@@ -1086,7 +1086,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             "decoupled execution must be enabled"
         );
         let (block_tx, reset_tx) =
-            self.spawn_decoupled_execution(commit_signer, epoch_state.verifier.clone());
+            self.spawn_decoupled_execution(commit_signer, epoch_state.clone());
         let state_computer = Arc::new(DagStateSyncComputer::new(
             self.commit_state_computer.clone(),
             reset_tx,
@@ -1114,7 +1114,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.dag_config.clone(),
             onchain_dag_consensus_config.clone(),
             signer,
-            Arc::new(epoch_state),
+            epoch_state.clone(),
             dag_storage,
             network_sender_arc.clone(),
             network_sender_arc.clone(),

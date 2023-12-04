@@ -98,7 +98,7 @@ pub(crate) fn get_allowed_structs(
 /// 3. check arg types are allowed after signers
 ///
 /// after validation, add senders and non-signer arguments to generate the final args
-pub(crate) fn validate_combine_signer_and_txn_args(
+pub fn validate_combine_signer_and_txn_args(
     session: &mut SessionExt,
     senders: Vec<AccountAddress>,
     args: Vec<Vec<u8>>,

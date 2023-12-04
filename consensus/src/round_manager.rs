@@ -173,7 +173,7 @@ pub mod round_manager_fuzzing;
 /// The caller is responsible for running the event loops and driving the execution via some
 /// executors.
 pub struct RoundManager {
-    epoch_state: EpochState,
+    epoch_state: Arc<EpochState>,
     block_store: Arc<BlockStore>,
     round_state: RoundState,
     proposer_election: UnequivocalProposerElection,
@@ -188,7 +188,7 @@ pub struct RoundManager {
 
 impl RoundManager {
     pub fn new(
-        epoch_state: EpochState,
+        epoch_state: Arc<EpochState>,
         block_store: Arc<BlockStore>,
         round_state: RoundState,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
