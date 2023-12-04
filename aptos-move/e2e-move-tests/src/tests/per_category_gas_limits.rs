@@ -12,7 +12,7 @@ use aptos_types::{
     transaction::TransactionStatus,
     vm_status::StatusCode,
 };
-use move_core_types::gas_algebra::InternalGas;
+use move_core_types::gas_algebra::{InternalGas, NumBytes};
 use serde::{Deserialize, Serialize};
 
 /// Mimics `0xcafe::test::ModuleData`
@@ -62,14 +62,7 @@ fn bounded_execution_time() {
 
 #[test]
 fn io_limit_reached_by_load_resource() {
-    let mut h = MoveHarness::new();
-
-    // Publish the test module.
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
-    assert_success!(h.publish_package_cache_building(
-        &acc,
-        &common::test_dir_path("per_category_gas_limits.data/test"),
-    ));
+    let (mut h, acc) = setup();
 
     // Lower the max io gas to lower than a single load_resource
     h.modify_gas_schedule(|gas_params| {
@@ -88,25 +81,9 @@ fn io_limit_reached_by_load_resource() {
 
 #[test]
 fn io_limit_reached_by_new_bytes() {
-    let mut h = MoveHarness::new();
+    let (mut h, acc) = setup();
     enable_golden!(h);
 
-    // Publish the test module.
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
-    assert_success!(h.publish_package_cache_building(
-        &acc,
-        &common::test_dir_path("per_category_gas_limits.data/test"),
-    ));
-
-    // Initialize.
-    assert_success!(h.run_entry_function(
-        &acc,
-        str::parse("0xbeef::test::init_table_of_bytes").unwrap(),
-        vec![],
-        vec![],
-    ));
-
-    let key_size = StateKey::table_item(TableHandle(AccountAddress::ONE), vec![0u8]).size();
     // Modify the gas schedule.
     h.modify_gas_schedule(|gas_params| {
         // Make other aspects of the gas schedule irrelevant by setting per state byte write gas super high.
@@ -114,46 +91,19 @@ fn io_limit_reached_by_new_bytes() {
         // Allow 10 value bytes charged at most.
         gas_params.vm.txn.max_io_gas = 110_000_000.into();
         // Make the key bytes free, only play around value sizes.
-        gas_params.vm.txn.free_write_bytes_quota = (key_size as u64).into();
+        gas_params.vm.txn.free_write_bytes_quota = state_key_size();
     });
 
-    // Create 1 + 2 + 3 + 4 = 10 bytes, should pass.
-    assert_success!(create_multiple_items(&mut h, &acc, 10, 14, 1));
-    // Try to create 3 + 4 + 5 = 12 bytes, should fail
-    assert_vm_status!(
-        create_multiple_items(&mut h, &acc, 0, 3, 3),
-        StatusCode::IO_LIMIT_REACHED,
-    );
-    // Try to create 5 + 6 + 7 = 18 bytes, should fail, actually any two of these would exceed the
-    // limit already, so it'll expose any problem wrt different orders of the write ops being fed to
-    // the charging logic.
-    assert_vm_status!(
-        create_multiple_items(&mut h, &acc, 4, 7, 5),
-        StatusCode::IO_LIMIT_REACHED,
-    );
+    test_create_multiple_items(&mut h, &acc, |status| {
+        assert_vm_status!(status, StatusCode::IO_LIMIT_REACHED);
+    });
 }
 
 #[test]
 fn storage_limit_reached_by_new_bytes() {
-    let mut h = MoveHarness::new();
+    let (mut h, acc) = setup();
     enable_golden!(h);
 
-    // Publish the test module.
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
-    assert_success!(h.publish_package_cache_building(
-        &acc,
-        &common::test_dir_path("per_category_gas_limits.data/test"),
-    ));
-
-    // Initialize.
-    assert_success!(h.run_entry_function(
-        &acc,
-        str::parse("0xbeef::test::init_table_of_bytes").unwrap(),
-        vec![],
-        vec![],
-    ));
-
-    let key_size = StateKey::table_item(TableHandle(AccountAddress::ONE), vec![0u8]).size();
     // Modify the gas schedule.
     h.modify_gas_schedule(|gas_params| {
         // Make other aspects of the gas schedule irrelevant by setting byte fee super high.
@@ -162,46 +112,19 @@ fn storage_limit_reached_by_new_bytes() {
         // Allow 10 value bytes charged at most.
         gas_params.vm.txn.max_storage_fee = 11_000_000.into();
         // Make the key bytes free, only play around value sizes.
-        gas_params.vm.txn.free_write_bytes_quota = (key_size as u64).into();
+        gas_params.vm.txn.free_write_bytes_quota = state_key_size();
     });
 
-    // Create 1 + 2 + 3 + 4 = 10 bytes, should pass.
-    assert_success!(create_multiple_items(&mut h, &acc, 10, 14, 1));
-    // Try to create 3 + 4 + 5 = 12 bytes, should fail
-    assert_vm_status!(
-        create_multiple_items(&mut h, &acc, 0, 3, 3),
-        StatusCode::STORAGE_LIMIT_REACHED,
-    );
-    // Try to create 5 + 6 + 7 = 18 bytes, should fail, actually any two of these would exceed the
-    // limit already, so it'll expose any problem wrt different orders of the write ops being fed to
-    // the charging logic.
-    assert_vm_status!(
-        create_multiple_items(&mut h, &acc, 4, 7, 5),
-        StatusCode::STORAGE_LIMIT_REACHED,
-    );
+    test_create_multiple_items(&mut h, &acc, |status| {
+        assert_vm_status!(status, StatusCode::STORAGE_LIMIT_REACHED);
+    });
 }
 
 #[test]
 fn out_of_gas_while_charging_write_gas() {
-    let mut h = MoveHarness::new();
+    let (mut h, acc) = setup();
     enable_golden!(h);
 
-    // Publish the test module.
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
-    assert_success!(h.publish_package_cache_building(
-        &acc,
-        &common::test_dir_path("per_category_gas_limits.data/test"),
-    ));
-
-    // Initialize.
-    assert_success!(h.run_entry_function(
-        &acc,
-        str::parse("0xbeef::test::init_table_of_bytes").unwrap(),
-        vec![],
-        vec![],
-    ));
-
-    let key_size = StateKey::table_item(TableHandle(AccountAddress::ONE), vec![0u8]).size();
     // Modify the gas schedule.
     h.modify_gas_schedule(|gas_params| {
         // Make other aspects of the gas schedule irrelevant by setting per state byte write gas super high.
@@ -211,26 +134,44 @@ fn out_of_gas_while_charging_write_gas() {
         // Bump max gas allowed
         gas_params.vm.txn.maximum_number_of_gas_units = 1_000_000_000.into();
         // Make the key bytes free, only play around value sizes.
-        gas_params.vm.txn.free_write_bytes_quota = (key_size as u64).into();
+        gas_params.vm.txn.free_write_bytes_quota = state_key_size();
     });
     // Allow 10 value bytes charged at most. Notice this is in external units.
     h.set_max_gas_per_txn(110_000);
 
-    // Create 1 + 2 + 3 + 4 = 10 bytes, should pass.
-    assert_success!(create_multiple_items(&mut h, &acc, 10, 14, 1));
-    // Try to create 3 + 4 + 5 = 12 bytes, should fail
-    assert_out_of_gas!(create_multiple_items(&mut h, &acc, 0, 3, 3));
-    // Try to create 5 + 6 + 7 = 18 bytes, should fail, actually any two of these would exceed the
-    // limit already, so it'll expose any problem wrt different orders of the write ops being fed to
-    // the charging logic.
-    assert_out_of_gas!(create_multiple_items(&mut h, &acc, 4, 7, 5));
+    test_create_multiple_items(&mut h, &acc, |status| assert_out_of_gas!(status));
 }
 
 #[test]
 fn out_of_gas_while_charging_storage_fee() {
-    let mut h = MoveHarness::new();
+    let (mut h, acc) = setup();
     enable_golden!(h);
 
+    // Modify the gas schedule.
+    h.modify_gas_schedule(|gas_params| {
+        // Make other aspects of the gas schedule irrelevant by setting per state byte storage fee super high.
+        gas_params.vm.txn.storage_fee_per_excess_state_byte = 1_000_000.into();
+        // Make sure we don't hit storage fee limit
+        gas_params.vm.txn.max_storage_fee = 100_000_000.into();
+        // Bump max gas allowed
+        gas_params.vm.txn.maximum_number_of_gas_units = 1_000_000_000.into();
+        // Make the key bytes free, only play around value sizes.
+        gas_params.vm.txn.free_write_bytes_quota = state_key_size();
+    });
+    // Allow 10 value bytes charged at most. Notice this is in external units,
+    //   which is 1/100x octas or 1Mx internal units.
+    h.set_max_gas_per_txn(110_000);
+
+    test_create_multiple_items(&mut h, &acc, |status| assert_out_of_gas!(status));
+}
+
+fn state_key_size() -> NumBytes {
+    let key_size = StateKey::table_item(TableHandle(AccountAddress::ONE), vec![0u8]).size();
+    (key_size as u64).into()
+}
+
+fn setup() -> (MoveHarness, Account) {
+    let mut h = MoveHarness::new();
     // Publish the test module.
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
     assert_success!(h.publish_package_cache_building(
@@ -245,31 +186,7 @@ fn out_of_gas_while_charging_storage_fee() {
         vec![],
         vec![],
     ));
-
-    let key_size = StateKey::table_item(TableHandle(AccountAddress::ONE), vec![0u8]).size();
-    // Modify the gas schedule.
-    h.modify_gas_schedule(|gas_params| {
-        // Make other aspects of the gas schedule irrelevant by setting per state byte storage fee super high.
-        gas_params.vm.txn.storage_fee_per_excess_state_byte = 1_000_000.into();
-        // Make sure we don't hit storage fee limit
-        gas_params.vm.txn.max_storage_fee = 100_000_000.into();
-        // Bump max gas allowed
-        gas_params.vm.txn.maximum_number_of_gas_units = 1_000_000_000.into();
-        // Make the key bytes free, only play around value sizes.
-        gas_params.vm.txn.free_write_bytes_quota = (key_size as u64).into();
-    });
-    // Allow 10 value bytes charged at most. Notice this is in external units,
-    //   which is 1/100x octas or 1Mx internal units.
-    h.set_max_gas_per_txn(110_000);
-
-    // Create 1 + 2 + 3 + 4 = 10 bytes, should pass.
-    assert_success!(create_multiple_items(&mut h, &acc, 10, 14, 1));
-    // Try to create 3 + 4 + 5 = 12 bytes, should fail
-    assert_out_of_gas!(create_multiple_items(&mut h, &acc, 0, 3, 3));
-    // Try to create 5 + 6 + 7 = 18 bytes, should fail, actually any two of these would exceed the
-    // limit already, so it'll expose any problem wrt different orders of the write ops being fed to
-    // the charging logic.
-    assert_out_of_gas!(create_multiple_items(&mut h, &acc, 4, 7, 5));
+    (h, acc)
 }
 
 fn ser<T: Serialize>(t: &T) -> Vec<u8> {
@@ -289,4 +206,18 @@ fn create_multiple_items(
         vec![],
         vec![ser(&begin), ser(&end), ser(&base_size)],
     )
+}
+
+fn test_create_multiple_items<P>(h: &mut MoveHarness, acc: &Account, assert_failure: P)
+where
+    P: Fn(TransactionStatus),
+{
+    // Create 1 + 2 + 3 + 4 = 10 bytes, should pass.
+    assert_success!(create_multiple_items(h, acc, 10, 14, 1));
+    // Try to create 3 + 4 + 5 = 12 bytes, should fail
+    assert_failure(create_multiple_items(h, acc, 0, 3, 3));
+    // Try to create 5 + 6 + 7 = 18 bytes, should fail, actually any two of these would exceed the
+    // limit already, so it'll expose any problem wrt different orders of the write ops being fed to
+    // the charging logic.
+    assert_failure(create_multiple_items(h, acc, 4, 7, 5))
 }
