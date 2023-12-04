@@ -22,6 +22,7 @@ use aptos_types::{
 };
 use lru::LruCache;
 use move_binary_format::file_format::CompiledModule;
+use move_core_types::language_storage::ModuleId;
 use std::{
     collections::HashMap,
     ops::DerefMut,
@@ -34,6 +35,7 @@ pub struct FilterCondition {
     pub skip_failed_txns: bool,
     pub skip_publish_txns: bool,
     pub check_source_code: bool,
+    pub target_account: Option<AccountAddress>,
 }
 
 // TODO(skedia) Clean up this interfact to remove account specific logic and move to state store
@@ -63,6 +65,14 @@ pub trait AptosValidatorInterface: Sync {
         start: Version,
         limit: u64,
         filter_condition: FilterCondition,
+        package_cache: &mut HashMap<
+            ModuleId,
+            (
+                AccountAddress,
+                String,
+                HashMap<(AccountAddress, String), PackageMetadata>,
+            ),
+        >,
     ) -> Result<
         Vec<(
             u64,
@@ -229,6 +239,9 @@ impl DebuggerStateView {
             .send((state_key.clone(), version, tx))
             .unwrap();
         let ret = rx.recv()?;
+        if state_key.is_aptos_path() {
+            return ret;
+        }
         if let Some(reads) = &self.data_read_state_keys {
             if !reads.lock().unwrap().contains_key(state_key) && ret.is_ok() {
                 let val = ret?.clone();

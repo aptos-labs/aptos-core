@@ -139,6 +139,11 @@ impl MoveVM {
         self.runtime.loader().flush_if_invalidated()
     }
 
+    pub fn flush_loader_cache(&self) {
+        self.runtime.loader().mark_as_invalid();
+        self.flush_loader_cache_if_invalidated();
+    }
+
     /// Attempts to discover metadata in a given module with given key. Availability
     /// of this data may depend on multiple aspects. In general, no hard assumptions of
     /// availability should be made, but typically, one can expect that

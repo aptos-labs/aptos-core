@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_framework::{
-    natives::code::PackageMetadata, unzip_metadata_str, BuildOptions, BuiltPackage, APTOS_PACKAGES,
+    natives::code::PackageMetadata, unzip_metadata_str, BuiltPackage, APTOS_PACKAGES,
 };
 use aptos_language_e2e_tests::data_store::FakeDataStore;
 use aptos_types::{
@@ -24,7 +24,9 @@ use std::{
 use tempfile::TempDir;
 
 mod data_collection;
+mod data_stateview;
 mod execution;
+mod online_execution;
 
 pub use data_collection::*;
 pub use execution::*;
@@ -38,6 +40,7 @@ use move_package::{
     },
     CompilerVersion,
 };
+pub use online_execution::*;
 
 const APTOS_PACKAGES_DIR_NAMES: [&str; 5] = [
     "aptos-framework",
@@ -110,7 +113,7 @@ impl IndexWriter {
     }
 
     pub fn write_err(&mut self, err_msg: &str) {
-        self.index_writer
+        self.err_logger
             .write_fmt(format_args!("{}\n", err_msg))
             .unwrap();
         self.err_logger.flush().unwrap();
@@ -325,10 +328,12 @@ pub async fn prepare_aptos_packages(path: PathBuf) {
 struct CompilationCache {
     compiled_package_map: HashMap<PackageInfo, CompiledPackage>,
     failed_packages: HashSet<PackageInfo>,
+    compiled_package_cache_v1: HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
+    compiled_package_cache_v2: HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
-struct PackageInfo {
+pub(crate) struct PackageInfo {
     address: AccountAddress,
     package_name: String,
     upgrade_number: Option<u64>,
@@ -360,7 +365,7 @@ impl PackageInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct TxnIndex {
+pub(crate) struct TxnIndex {
     version: u64,
     package_info: PackageInfo,
     txn: Transaction,
@@ -374,7 +379,7 @@ fn generate_compiled_blob(
     if compiled_blobs.contains_key(package_info) {
         return;
     }
-    let root_modules = compiled_package.all_modules();
+    let root_modules = &compiled_package.root_compiled_units;
     let mut blob_map = HashMap::new();
     for compiled_module in root_modules {
         if let CompiledUnitEnum::Module(module) = &compiled_module.unit {
@@ -432,7 +437,10 @@ fn compile_package(
     if let Ok(built_package) = compiled_package {
         Ok(built_package.package)
     } else {
-        Err(anyhow::Error::msg("compilation failed"))
+        Err(anyhow::Error::msg(format!(
+            "compilation failed for compiler:{:?}",
+            compiler_verion
+        )))
     }
 }
 
@@ -441,7 +449,7 @@ fn dump_and_compile_from_package_metadata(
     root_dir: PathBuf,
     dep_map: &HashMap<(AccountAddress, String), PackageMetadata>,
     compilation_cache: &mut CompilationCache,
-    compiler_verion: Option<CompilerVersion>,
+    execution_mode: Option<ExecutionMode>,
 ) -> anyhow::Result<()> {
     let root_package_dir = root_dir.join(format!("{}", package_info,));
     if compilation_cache.failed_packages.contains(&package_info) {
@@ -515,7 +523,7 @@ fn dump_and_compile_from_package_metadata(
                         root_dir.clone(),
                         dep_map,
                         compilation_cache,
-                        compiler_verion,
+                        execution_mode,
                     )?;
                 }
                 break;
@@ -528,23 +536,43 @@ fn dump_and_compile_from_package_metadata(
     std::fs::write(toml_path, manifest.to_string()).unwrap();
 
     // step 5: test whether the code can be compiled
-    if let std::collections::hash_map::Entry::Vacant(e) = compilation_cache
+    if !compilation_cache
         .compiled_package_map
-        .entry(package_info.clone())
+        .contains_key(&package_info)
     {
-        let mut build_options = BuildOptions::default();
-        build_options
-            .named_addresses
-            .insert(package_info.package_name.clone(), package_info.address);
-        build_options.compiler_version = compiler_verion;
-        let compiled_package = BuiltPackage::build(root_package_dir, build_options);
-        if let Ok(built_package) = compiled_package {
-            e.insert(built_package.package);
+        let package_v1 = compile_package(root_package_dir.clone(), &package_info, None);
+        if let Ok(built_package) = package_v1 {
+            if execution_mode.is_some() && execution_mode.unwrap().is_v1_or_compare() {
+                generate_compiled_blob(
+                    &package_info,
+                    &built_package,
+                    &mut compilation_cache.compiled_package_cache_v1,
+                );
+            }
+            compilation_cache
+                .compiled_package_map
+                .insert(package_info.clone(), built_package);
         } else {
             if !compilation_cache.failed_packages.contains(&package_info) {
                 compilation_cache.failed_packages.insert(package_info);
             }
-            return Err(anyhow::Error::msg("compilation failed"));
+            return Err(anyhow::Error::msg("compilation failed at v1"));
+        }
+        if execution_mode.is_some() && execution_mode.unwrap().is_v2_or_compare() {
+            let package_v2 =
+                compile_package(root_package_dir, &package_info, Some(CompilerVersion::V2));
+            if let Ok(built_package) = package_v2 {
+                generate_compiled_blob(
+                    &package_info,
+                    &built_package,
+                    &mut compilation_cache.compiled_package_cache_v2,
+                );
+            } else {
+                if !compilation_cache.failed_packages.contains(&package_info) {
+                    compilation_cache.failed_packages.insert(package_info);
+                }
+                return Err(anyhow::Error::msg("compilation failed at v2"));
+            }
         }
     }
     Ok(())
