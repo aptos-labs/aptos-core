@@ -421,6 +421,7 @@ impl<'env> ModelBuilder<'env> {
                 let fields_abilities_meet = if let Some(fields) = &struct_entry.fields {
                    fields.iter().map(
                     |(field_name, (_loc, field_idx, field_ty))| {
+                        let field_ty = &field_ty.instantiate(insts);
                         self.type_abilities_certainly_have(field_ty, ty_params, loc)
                     }
                    ).fold(AbilitySet::ALL, |acc, abilities| acc.intersect(abilities))
@@ -475,6 +476,7 @@ impl<'env> ModelBuilder<'env> {
                 let fields_abilities_meet = if let Some(fields) = &struct_entry.fields {
                    fields.iter().map(
                     |(field_name, (_loc, field_idx, field_ty))| {
+                        let field_ty = &field_ty.instantiate(insts);
                         self.type_abilities_certainly_have(field_ty, ty_params, loc)
                     }
                    ).fold(AbilitySet::ALL, |acc, abilities| acc.intersect(abilities))
