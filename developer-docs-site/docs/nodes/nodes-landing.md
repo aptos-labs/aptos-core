@@ -157,7 +157,7 @@ Also learn how to run a public fullnode on a local network and connect to either
               >Create a static network identity for your fullnode.</small
             >
           </a>
-          <a href="./full-node/update-fullnode-with-new-devnet-releases" class="list-group-item">
+          <a href="./full-node/update-fullnode-with-new-releases" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Update fullnode</h4>
             </div>
