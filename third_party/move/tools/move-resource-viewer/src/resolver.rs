@@ -21,7 +21,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::MoveResolver,
+    resolver::ModuleResolver,
 };
 use std::rc::Rc;
 
@@ -30,7 +30,7 @@ pub(crate) struct Resolver<'a, T: ?Sized> {
     cache: ModuleCache,
 }
 
-impl<'a, T: MoveResolver + ?Sized> GetModule for Resolver<'a, T> {
+impl<'a, T: ModuleResolver + ?Sized> GetModule for Resolver<'a, T> {
     type Error = Error;
     type Item = Rc<CompiledModule>;
 
@@ -54,7 +54,7 @@ impl<'a, T: MoveResolver + ?Sized> GetModule for Resolver<'a, T> {
     }
 }
 
-impl<'a, T: MoveResolver + ?Sized> Resolver<'a, T> {
+impl<'a, T: ModuleResolver + ?Sized> Resolver<'a, T> {
     pub fn new(state: &'a T) -> Self {
         Resolver {
             state,

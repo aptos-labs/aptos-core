@@ -7,7 +7,7 @@ use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, account_state::AccountState,
     contract_event::ContractEvent,
 };
-use move_core_types::{language_storage::StructTag, resolver::MoveResolver};
+use move_core_types::{language_storage::StructTag, resolver::ModuleResolver};
 use move_resource_viewer::MoveValueAnnotator;
 pub use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 use std::{
@@ -17,11 +17,11 @@ use std::{
 
 pub struct AptosValueAnnotator<'a, T>(MoveValueAnnotator<'a, T>);
 
-/// A wrapper around `MoveValueAnnotator` that adds a few aptos-specific funtionalities.
+/// A wrapper around `MoveValueAnnotator` that adds a few aptos-specific functionalities.
 #[derive(Debug)]
 pub struct AnnotatedAccountStateBlob(BTreeMap<StructTag, AnnotatedMoveStruct>);
 
-impl<'a, T: MoveResolver> AptosValueAnnotator<'a, T> {
+impl<'a, T: ModuleResolver> AptosValueAnnotator<'a, T> {
     pub fn new(storage: &'a T) -> Self {
         Self(MoveValueAnnotator::new(storage))
     }
