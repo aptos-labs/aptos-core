@@ -127,19 +127,19 @@ Until the delegation pool has received 1 million APT and the validator has been 
 
 In the [Aptos TypeScript SDK](../../../sdks/ts-sdk/index.md), a View function request would resemble:
 
-```bash
-import {AptosClient, ViewRequest} from "aptos";
+```ts
+import {Aptos, AptosConfig} from "@aptos-labs/ts-sdk";
 
 const NODE_URL = "https://aptos-testnet.public.blastapi.io";
 
 (async () => {
-    const client = new AptosClient(NODE_URL);
-    const payload: ViewRequest = {
+    const aptosConfig = new AptosConfig({fullnode:NODE_URL})
+    const aptos = new Aptos(aptosConfig);
+    const payload: InputViewRequestData = {
         function: "0x1::delagation_pool::get_stake",
-        type_arguments: [],
-        arguments: ["pool_address", "delegator_address"],
+        functionArguments: ["pool_address", "delegator_address"],
     };
-    console.log(await client.view(payload));
+    console.log(await aptos.view({payload}));
 })();
 
 ```
