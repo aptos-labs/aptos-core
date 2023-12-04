@@ -5,11 +5,12 @@ use aptos_consensus_types::{
     common::{Author, Round},
     randomness::{RandMetadata, Randomness},
 };
-use aptos_types::epoch_state::EpochState;
-use std::sync::Arc;
+use std::collections::HashMap;
 
+#[derive(Clone, Debug)]
 pub(super) struct MockShare;
 
+#[derive(Clone, Debug)]
 pub(super) struct MockProof;
 
 impl Share for MockShare {
@@ -59,6 +60,7 @@ pub trait Proof {
         Self: Sized;
 }
 
+#[derive(Clone, Debug)]
 pub struct RandShare<S> {
     author: Author,
     metadata: RandMetadata,
@@ -66,6 +68,14 @@ pub struct RandShare<S> {
 }
 
 impl<S: Share> RandShare<S> {
+    pub fn new(author: Author, metadata: RandMetadata, share: S) -> Self {
+        Self {
+            author,
+            metadata,
+            share,
+        }
+    }
+
     pub fn author(&self) -> &Author {
         &self.author
     }
@@ -112,25 +122,28 @@ impl<P: Proof> RandDecision<P> {
 
 pub struct RandConfig {
     author: Author,
-    epoch_state: Arc<EpochState>,
+    threshold: u64,
+    weights: HashMap<Author, u64>,
 }
 
 impl RandConfig {
-    pub fn new(author: Author, epoch_state: Arc<EpochState>) -> Self {
+    pub fn new(author: Author, weights: HashMap<Author, u64>) -> Self {
+        let sum = weights.values().sum::<u64>();
         Self {
             author,
-            epoch_state,
+            weights,
+            threshold: sum * 2 / 3 + 1,
         }
     }
 
     pub fn get_peer_weight(&self, author: &Author) -> u64 {
-        self.epoch_state
-            .verifier
-            .get_voting_power(author)
+        *self
+            .weights
+            .get(author)
             .expect("Author should exist after verify")
     }
 
     pub fn threshold_weight(&self) -> u64 {
-        self.epoch_state.verifier.quorum_voting_power() as u64
+        self.threshold
     }
 }
