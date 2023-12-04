@@ -66,12 +66,24 @@ module aptos_framework::aggregator_v2 {
     /// EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
     public native fun create_aggregator<IntElement: copy + drop>(max_value: IntElement): Aggregator<IntElement>;
 
+    public fun create_aggregator_with_value<IntElement: copy + drop>(start_value: IntElement, max_value: IntElement): Aggregator<IntElement> {
+        let aggregator = create_aggregator(max_value);
+        add(&mut aggregator, start_value);
+        aggregator
+    }
+
     /// Creates new aggregator, without any 'max_value' on top of the implicit bound restriction
     /// due to the width of the type (i.e. MAX_U64 for u64, MAX_U128 for u128).
     ///
     /// Currently supported types for IntElement are u64 and u128.
     /// EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
     public native fun create_unbounded_aggregator<IntElement: copy + drop>(): Aggregator<IntElement>;
+
+    public fun create_unbounded_aggregator_with_value<IntElement: copy + drop>(start_value: IntElement): Aggregator<IntElement> {
+        let aggregator = create_unbounded_aggregator();
+        add(&mut aggregator, start_value);
+        aggregator
+    }
 
     /// Adds `value` to aggregator.
     /// If addition would exceed the max_value, `false` is returned, and aggregator value is left unchanged.
@@ -91,6 +103,14 @@ module aptos_framework::aggregator_v2 {
     // If subtraction would result in a negative value, EAGGREGATOR_UNDERFLOW exception will be thrown.
     public fun sub<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement) {
         assert!(try_sub(aggregator, value), error::out_of_range(EAGGREGATOR_UNDERFLOW));
+    }
+
+    public fun is_at_least<IntElement: copy + drop>(aggregator: &mut Aggregator<IntElement>, min_amount: IntElement): bool {
+        let result = try_sub(aggregator, min_amount);
+        if (result) {
+            add(aggregator, min_amount);
+        };
+        result
     }
 
     /// Returns a value stored in this aggregator.
