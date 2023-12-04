@@ -49,9 +49,11 @@ impl QueueItem {
         self.num_undecided_blocks
     }
 
-    pub fn rand_metadata(&self, round: Round) -> RandMetadata {
-        let block = self.blocks()[self.offset(round)].block();
-        block.into()
+    pub fn all_rand_metadata(&self) -> Vec<RandMetadata> {
+        self.blocks()
+            .iter()
+            .map(|block| RandMetadata::from(block.block()))
+            .collect()
     }
 
     pub fn set_randomness(&mut self, round: Round, rand: Randomness) -> bool {
