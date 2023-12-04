@@ -7,7 +7,7 @@ A plugin is a component that can be added to the TypeScript SDK to extend or enh
 
 ## AptosToken class
 
-The [AptosToken](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/plugins/aptos_token.ts) class is compatible with the [Aptos Digital Asset Standard](../../../standards/digital-asset.md) and provides methods for creating and querying NFT collections and tokens.
+The [AptosToken](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/plugins/aptos_token.ts) class is compatible with the [Aptos Digital Asset Standard](../../standards/digital-asset.md) and provides methods for creating and querying NFT collections and tokens.
 It covers write methods that support creating, transferring, mutating, and burning tokens on-chain.
 
 The main write methods supported by the AptosToken class are:
@@ -30,7 +30,7 @@ The main write methods supported by the AptosToken class are:
 
 ## TokenClient class
 
-The [TokenClient](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/plugins/token_client.ts) class is compatible with the [token V1 standard](../../../standards/aptos-token.md) and provides methods for creating and querying the NFT collections and tokens.
+The [TokenClient](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/plugins/token_client.ts) class is compatible with the [token V1 standard](../../standards/aptos-token.md) and provides methods for creating and querying the NFT collections and tokens.
 It covers (1) write methods that support creating, transferring, mutating, and burning tokens on-chain and (2) read methods performing deserialization and returning data in TypeScript objects.
 
 The main write methods supported by the TokenClient class are:
@@ -52,7 +52,7 @@ The main read methods deserializing on-chain data to TypeScript objects are:
 
 ## FungibleAssetsClient class
 
-The [FungibleAssetsClient](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/plugins/fungible_asset_client.ts) class is compatible with the [fungible asset component](../../../standards/fungible-asset.md) and provides methods to transfer fungible assets between accounts and to check an account balance.
+The [FungibleAssetsClient](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/plugins/fungible_asset_client.ts) class is compatible with the [fungible asset component](../../standards/fungible-asset.md) and provides methods to transfer fungible assets between accounts and to check an account balance.
 
 The main write methods are:
 

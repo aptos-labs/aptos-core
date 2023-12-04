@@ -16,7 +16,7 @@ For a more comprehensive view of this process, see [Build an End-to-End Dapp on 
 
 We will use the:
 
-* [TypeScript SDK](../sdks/ts-sdk/v1/index.md)
+* [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Petra Wallet](https://petra.app)
 * [Aptos CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md)
 

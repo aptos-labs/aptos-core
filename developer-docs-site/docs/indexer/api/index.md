@@ -16,4 +16,4 @@ When making a query where one of the query params is an account address (e.g. ow
 
 ### TypeScript Client
 
-The Aptos TypeScript SDK provides an API functions for making queries to the Aptos Indexer API. Learn more [here](../../sdks/ts-sdk/fetch-data-from-chain.md).
+The Aptos TypeScript SDK provides an API functions for making queries to the Aptos Indexer API. Learn more [here](../../sdks/ts-sdk-v2/fetch-data-from-chain.md).

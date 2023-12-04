@@ -26,7 +26,7 @@ import { Provider, Network } from "aptos";
 The TypeScript SDK provides us with a `Provider` class where we can initialize and query the Aptos chain and Indexer. `Provider` expects `Network` type as an argument, which is the [network name](../../guides/system-integrators-guide.md#choose-a-network) we want to interact with.
 
 :::tip
-Read more about the [`Provider`](../../sdks/ts-sdk/v1/typescript-sdk-overview.md#provider-class) class in the Aptos TypeScript SDK overview.
+Read more about the [`Provider`](../../sdks/ts-sdk/typescript-sdk-overview.md#provider-class) class in the Aptos TypeScript SDK overview.
 :::
 
 1. In the `App.tsx` file, add:

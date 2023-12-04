@@ -17,7 +17,7 @@ This tutorial describes how to create and transfer non-fungible assets on the Ap
 
 Install your preferred SDK from the below list:
 
-* [TypeScript SDK](../sdks/ts-sdk/v1/index.md)
+* [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
 
 ---
@@ -392,7 +392,7 @@ To read a token's metadata:
 :!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_8
 ```
 
-Here's how `getTokenData` queries the token metadata using the [indexer client](../sdks/ts-sdk/v1/typescript-sdk-indexer-client-class):
+Here's how `getTokenData` queries the token metadata using the [indexer client](../sdks/ts-sdk/typescript-sdk-indexer-client-class):
 ```ts
 :!: static/sdks/typescript/src/providers/indexer.ts getTokenData
 ```
@@ -509,6 +509,6 @@ Each object created from the `aptos_token.move` contract is a distinct asset. Th
 ## Supporting documentation
 
 * [Account basics](../concepts/accounts.md)
-* [TypeScript SDK](../sdks/ts-sdk/v1/index.md)
+* [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
 * [REST API specification](https://aptos.dev/nodes/aptos-api-spec#/)
