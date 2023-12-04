@@ -114,6 +114,18 @@ BatchRequest:
         TYPENAME: AccountAddress
     - digest:
         TYPENAME: HashValue
+BatchResponse:
+  ENUM:
+    0:
+      Batch:
+        NEWTYPE:
+          TYPENAME: Batch
+    1:
+      NotFound:
+        NEWTYPE:
+          TYPENAME: LedgerInfoWithSignatures
+    2:
+      Uninitialized: UNIT
 BitVec:
   STRUCT:
     - inner: BYTES
@@ -315,6 +327,10 @@ ConsensusMsg:
       RandGenMessage:
         NEWTYPE:
           TYPENAME: RandGenMessage
+    17:
+      BatchResponseV2:
+        NEWTYPE:
+          TYPENAME: BatchResponse
 ContractEvent:
   ENUM:
     0:
