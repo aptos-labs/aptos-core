@@ -7,7 +7,7 @@
 use crate::{
     tasks::{
         taskify, InitCommand, PrintBytecodeCommand, PrintBytecodeInputChoice, PublishCommand,
-        RunCommand, SyntaxChoice, TaskCommand, TaskInput, ViewCommand,
+        RunCommand, SyntaxChoice, TaskCommand, TaskInput,
     },
     vm_test_harness::TestRunConfig,
 };
@@ -38,7 +38,7 @@ use move_compiler::{
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, StructTag, TypeTag},
+    language_storage::{ModuleId, TypeTag},
 };
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
@@ -161,13 +161,6 @@ pub trait MoveTestAdapter<'a>: Sized {
         gas_budget: Option<u64>,
         extra: Self::ExtraRunArgs,
     ) -> Result<(Option<String>, SerializedReturnValues)>;
-    fn view_data(
-        &mut self,
-        address: AccountAddress,
-        module: &ModuleId,
-        resource: &IdentStr,
-        type_args: Vec<TypeTag>,
-    ) -> Result<String>;
 
     fn handle_subcommand(
         &mut self,
@@ -450,25 +443,6 @@ pub trait MoveTestAdapter<'a>: Sized {
                 )?;
                 let rendered_return_value = display_return_values(return_values);
                 Ok(merge_output(output, rendered_return_value))
-            },
-            TaskCommand::View(ViewCommand { address, resource }) => {
-                let state: &CompiledState = self.compiled_state();
-                let StructTag {
-                    address: module_addr,
-                    module,
-                    name,
-                    type_params: type_arguments,
-                } = resource
-                    .into_struct_tag(&|s| Some(state.resolve_named_address(s)))
-                    .unwrap();
-                let module_id = ModuleId::new(module_addr, module);
-                let address = self.compiled_state().resolve_address(&address);
-                Ok(Some(self.view_data(
-                    address,
-                    &module_id,
-                    name.as_ident_str(),
-                    type_arguments,
-                )?))
             },
             TaskCommand::Subcommand(c) => self.handle_subcommand(TaskInput {
                 command: c,

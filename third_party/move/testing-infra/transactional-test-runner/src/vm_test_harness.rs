@@ -22,11 +22,9 @@ use move_compiler::{
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::MoveResolver,
+    language_storage::{ModuleId, TypeTag},
     value::MoveValue,
 };
-use move_resource_viewer::MoveValueAnnotator;
 use move_stdlib::move_stdlib_named_addresses;
 use move_symbol_pool::Symbol;
 use move_vm_runtime::{
@@ -49,29 +47,6 @@ struct SimpleVMTestAdapter<'a> {
     default_syntax: SyntaxChoice,
     comparison_mode: bool,
     run_config: TestRunConfig,
-}
-
-pub fn view_resource_in_move_storage(
-    storage: &impl MoveResolver,
-    address: AccountAddress,
-    module: &ModuleId,
-    resource: &IdentStr,
-    type_args: Vec<TypeTag>,
-) -> Result<String> {
-    let tag = StructTag {
-        address: *module.address(),
-        module: module.name().to_owned(),
-        name: resource.to_owned(),
-        type_params: type_args,
-    };
-    // TODO
-    match storage.get_resource(&address, &tag).unwrap() {
-        None => Ok("[No Resource Exists]".to_owned()),
-        Some(data) => {
-            let annotated = MoveValueAnnotator::new(storage).view_resource(&tag, &data)?;
-            Ok(format!("{}", annotated))
-        },
-    }
 }
 
 #[derive(Debug, Parser)]
@@ -323,16 +298,6 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 )
             })?;
         Ok((None, serialized_return_values))
-    }
-
-    fn view_data(
-        &mut self,
-        address: AccountAddress,
-        module: &ModuleId,
-        resource: &IdentStr,
-        type_args: Vec<TypeTag>,
-    ) -> Result<String> {
-        view_resource_in_move_storage(&self.storage, address, module, resource, type_args)
     }
 
     fn handle_subcommand(&mut self, _: TaskInput<Self::Subcommand>) -> Result<Option<String>> {
