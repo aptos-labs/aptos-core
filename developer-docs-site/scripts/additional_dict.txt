@@ -30,6 +30,7 @@ AptosRelease
 AptosToken
 AptosWalletAdapterProvider
 BCS
+BetaNotice
 BFT
 BIP
 BLS

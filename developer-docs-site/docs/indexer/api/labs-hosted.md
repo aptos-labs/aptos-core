@@ -2,7 +2,9 @@
 title: "Labs-Hosted Indexer API"
 ---
 
-# Labs-Hosted Indexer API
+import BetaNotice from '../../../src/components/_indexer_beta_notice.mdx';
+
+<BetaNotice />
 
 ## GraphQL API Endpoints
 

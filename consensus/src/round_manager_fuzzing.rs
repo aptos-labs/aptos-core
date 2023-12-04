@@ -39,9 +39,9 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::{OnChainConsensusConfig, ValidatorSet},
-    system_txn::pool::SystemTransactionPool,
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
+    validator_txn::pool::ValidatorTransactionPool,
     validator_verifier::ValidatorVerifier,
 };
 use futures::{channel::mpsc, executor::block_on};
@@ -152,10 +152,10 @@ fn create_node_for_fuzzing() -> RoundManager {
 
     let (self_sender, _self_receiver) = aptos_channels::new_test(8);
 
-    let epoch_state = EpochState {
+    let epoch_state = Arc::new(EpochState {
         epoch: 1,
         verifier: storage.get_validator_set().into(),
-    };
+    });
     let network = NetworkSender::new(
         signer.author(),
         consensus_network_client,
@@ -183,7 +183,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
-        Arc::new(SystemTransactionPool::new()),
+        Arc::new(ValidatorTransactionPool::new()),
         false,
     );
 

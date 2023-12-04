@@ -14,8 +14,8 @@ use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     contract_event::ContractEvent,
-    system_txn::SystemTransaction,
     transaction::{SignedTransaction, Transaction, TransactionStatus},
+    validator_txn::ValidatorTransaction,
 };
 use std::fmt::{Debug, Display, Formatter};
 
@@ -87,8 +87,8 @@ impl ExecutedBlock {
         self.block().round()
     }
 
-    pub fn sys_txns(&self) -> Option<&Vec<SystemTransaction>> {
-        self.block().sys_txns()
+    pub fn validator_txns(&self) -> Option<&Vec<ValidatorTransaction>> {
+        self.block().validator_txns()
     }
 
     pub fn timestamp_usecs(&self) -> u64 {
@@ -119,7 +119,7 @@ impl ExecutedBlock {
     pub fn transactions_to_commit(
         &self,
         validators: &[AccountAddress],
-        sys_txns: Vec<SystemTransaction>,
+        validator_txns: Vec<ValidatorTransaction>,
         txns: Vec<SignedTransaction>,
         is_block_gas_limit: bool,
     ) -> Vec<Transaction> {
@@ -129,9 +129,12 @@ impl ExecutedBlock {
             return vec![];
         }
 
-        let mut txns_with_state_checkpoint =
-            self.block
-                .transactions_to_execute(validators, sys_txns, txns, is_block_gas_limit);
+        let mut txns_with_state_checkpoint = self.block.transactions_to_execute(
+            validators,
+            validator_txns,
+            txns,
+            is_block_gas_limit,
+        );
         if is_block_gas_limit && !self.state_compute_result.has_reconfiguration() {
             // After the per-block gas limit change,
             // insert state checkpoint at the position
