@@ -3,8 +3,8 @@
 
 use crate::{
     check_aptos_packages_availability, compile_aptos_packages, compile_package,
-    generate_compiled_blob, is_aptos_package, DataManager, IndexReader, PackageInfo, TxnIndex,
-    APTOS_COMMONS,
+    data_stateview::DataStateView, generate_compiled_blob, is_aptos_package, DataManager,
+    IndexReader, PackageInfo, TxnIndex, APTOS_COMMONS,
 };
 use anyhow::Result;
 use aptos_framework::APTOS_PACKAGES;
@@ -16,18 +16,22 @@ use aptos_types::{
     vm_status::VMStatus,
     write_set::WriteSet,
 };
+use aptos_validator_interface::AptosValidatorInterface;
 use aptos_vm::{data_cache::AsMoveResolver, transaction_metadata::TransactionMetadata};
 use clap::ValueEnum;
 use itertools::Itertools;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
 use move_package::CompilerVersion;
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 fn load_packages_to_executor(
     executor: &mut FakeExecutor,
     package_info: &PackageInfo,
     compiled_package_cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
 ) {
+    if !compiled_package_cache.contains_key(package_info) {
+        return;
+    }
     let compiled_package = compiled_package_cache.get(package_info).unwrap();
     for (module_id, module_blob) in compiled_package {
         executor.add_module(module_id, module_blob.clone());
@@ -85,11 +89,15 @@ impl Default for ExecutionMode {
 
 pub struct Execution {
     input_path: PathBuf,
-    execution_mode: ExecutionMode,
-    bytecode_version: u32,
+    pub execution_mode: ExecutionMode,
+    pub bytecode_version: u32,
 }
 
 impl Execution {
+    pub fn output_result_str(&self, msg: String) {
+        eprintln!("{}", msg);
+    }
+
     pub fn new(input_path: PathBuf, execution_mode: ExecutionMode) -> Self {
         Self {
             input_path,
@@ -142,10 +150,10 @@ impl Execution {
                 &mut compiled_package_cache_v2,
             );
             if res.is_err() {
-                println!(
+                self.output_result_str(format!(
                     "execution at version:{} failed, skip to the next txn",
                     cur_version
-                );
+                ));
             }
             if let Some(ver) = index_reader.get_next_version() {
                 cur_version = ver;
@@ -171,18 +179,38 @@ impl Execution {
         if !package_dir.exists() {
             return Err(anyhow::Error::msg("source code is not available"));
         }
+        let mut v1_failed = false;
+        let mut v2_failed = false;
         if self.execution_mode.is_v1_or_compare()
             && !compiled_package_cache.contains_key(&package_info)
         {
-            let compiled_res = compile_package(package_dir.clone(), &package_info, None)?;
-            generate_compiled_blob(&package_info, &compiled_res, compiled_package_cache);
+            let compiled_res_v1 = compile_package(package_dir.clone(), &package_info, None);
+            if let Ok(compiled_res) = compiled_res_v1 {
+                generate_compiled_blob(&package_info, &compiled_res, compiled_package_cache);
+            } else {
+                v1_failed = true;
+            }
         }
         if self.execution_mode.is_v2_or_compare()
             && !compiled_package_cache_v2.contains_key(&package_info)
         {
-            let compiled_res =
-                compile_package(package_dir, &package_info, Some(CompilerVersion::V2))?;
-            generate_compiled_blob(&package_info, &compiled_res, compiled_package_cache_v2);
+            let compiled_res_v2 =
+                compile_package(package_dir, &package_info, Some(CompilerVersion::V2));
+            if let Ok(compiled_res) = compiled_res_v2 {
+                generate_compiled_blob(&package_info, &compiled_res, compiled_package_cache_v2);
+            } else {
+                v2_failed = true;
+            }
+        }
+        if v1_failed || v2_failed {
+            let mut err_msg = "compilation failed at ".to_string();
+            if v1_failed {
+                err_msg = format!("{} v1 ", err_msg);
+            }
+            if v2_failed {
+                err_msg = format!("{} v2", err_msg);
+            }
+            return Err(anyhow::Error::msg(err_msg));
         }
         Ok(())
     }
@@ -202,10 +230,10 @@ impl Execution {
                 let compiled_result =
                     self.compile_code(&txn_idx, compiled_package_cache, compiled_package_cache_v2);
                 if compiled_result.is_err() {
-                    println!(
+                    self.output_result_str(format!(
                         "compilation failed for the package:{} at version:{}",
                         txn_idx.package_info.package_name, cur_version
-                    );
+                    ));
                     return compiled_result;
                 }
             }
@@ -224,12 +252,13 @@ impl Execution {
                 &txn_idx,
                 compiled_package_cache,
                 compiled_package_cache_v2,
+                None,
             );
         }
         Ok(())
     }
 
-    fn execute_and_compare(
+    pub(crate) fn execute_and_compare(
         &self,
         cur_version: Version,
         state: &FakeDataStore,
@@ -237,6 +266,7 @@ impl Execution {
         txn_idx: &TxnIndex,
         compiled_package_cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
         compiled_package_cache_v2: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
+        debugger: Option<Arc<dyn AptosValidatorInterface + Send>>,
     ) {
         let mut package_cache_main = compiled_package_cache;
         let package_cache_other = compiled_package_cache_v2;
@@ -244,45 +274,51 @@ impl Execution {
             package_cache_main = compiled_package_cache_v2;
         }
         let res_main_opt = self.execute_code(
+            cur_version,
             state,
             features,
             &txn_idx.package_info,
             &txn_idx.txn,
             package_cache_main,
+            debugger.clone(),
         );
         if self.execution_mode.is_compare() {
             let res_other_opt = self.execute_code(
+                cur_version,
                 state,
                 features,
                 &txn_idx.package_info,
                 &txn_idx.txn,
                 package_cache_other,
+                debugger.clone(),
             );
-            Self::print_mismatches(cur_version, &res_main_opt.unwrap(), &res_other_opt.unwrap());
+            self.print_mismatches(cur_version, &res_main_opt.unwrap(), &res_other_opt.unwrap());
         } else {
             let res = res_main_opt.unwrap();
             if let Ok(res_ok) = res {
-                println!(
+                self.output_result_str(format!(
                     "version:{}\nwrite set:{:?}\n events:{:?}\n",
                     cur_version, res_ok.0, res_ok.1
-                );
+                ));
             } else {
-                println!(
+                self.output_result_str(format!(
                     "execution error {} at version: {}, error",
                     res.unwrap_err(),
                     cur_version
-                );
+                ));
             }
         }
     }
 
     fn execute_code(
         &self,
+        version: Version,
         state: &FakeDataStore,
         features: &Features,
         package_info: &PackageInfo,
         txn: &Transaction,
         compiled_package_cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
+        debugger_opt: Option<Arc<dyn AptosValidatorInterface + Send>>,
     ) -> Option<Result<(WriteSet, Vec<ContractEvent>), VMStatus>> {
         let executor = FakeExecutor::no_genesis();
         let mut executor = executor.set_not_parallel();
@@ -291,28 +327,49 @@ impl Execution {
             let sender = signed_trans.sender();
             let payload = signed_trans.payload();
             if let TransactionPayload::EntryFunction(entry_function) = payload {
-                // always load 0x1 modules
+                // Always load 0x1 modules
                 load_aptos_packages_to_executor(&mut executor, compiled_package_cache);
-                // Load other modules
+                // Load modules
                 if package_info.is_compilable() {
                     load_packages_to_executor(&mut executor, package_info, compiled_package_cache);
                 }
                 let mut senders = vec![sender];
                 senders.extend(TransactionMetadata::new(signed_trans).secondary_signers);
-                return Some(executor.try_exec_entry_with_features(
-                    senders,
-                    entry_function,
-                    features,
-                ));
-            } else if let TransactionPayload::Multisig(multi_sig) = payload {
-                assert!(multi_sig.transaction_payload.is_some());
-                println!("Multisig transaction is not supported yet");
+                if let Some(debugger) = debugger_opt {
+                    let data_view =
+                        DataStateView::new(debugger, version, executor.data_store().clone());
+                    return Some(executor.try_exec_entry_with_resolver(
+                        senders,
+                        entry_function,
+                        &data_view.as_move_resolver(),
+                    ));
+                } else {
+                    return Some(executor.try_exec_entry_with_features(
+                        senders,
+                        entry_function,
+                        features,
+                    ));
+                }
             }
         }
-        None
+        if let Some(debugger) = debugger_opt {
+            let data_view = DataStateView::new(debugger, version, executor.data_store().clone());
+            Some(
+                executor
+                    .execute_transaction_block_with_resolver(&[txn.clone()], &data_view)
+                    .map(|res| res[0].clone().into()),
+            )
+        } else {
+            Some(
+                executor
+                    .execute_transaction_block(vec![txn.clone()])
+                    .map(|res| res[0].clone().into()),
+            )
+        }
     }
 
     fn print_mismatches(
+        &self,
         cur_version: u64,
         res_1: &Result<(WriteSet, Vec<ContractEvent>), VMStatus>,
         res_2: &Result<(WriteSet, Vec<ContractEvent>), VMStatus>,
@@ -320,24 +377,24 @@ impl Execution {
         match (res_1, res_2) {
             (Err(e1), Err(e2)) => {
                 if e1 != e2 {
-                    println!("error is different at {}", cur_version);
-                    println!("error {} is raised from V1", e1);
-                    println!("error {} is raised from V2", e2);
+                    self.output_result_str(format!("error is different at {}", cur_version));
+                    self.output_result_str(format!("error {} is raised from V1", e1));
+                    self.output_result_str(format!("error {} is raised from V2", e2));
                 }
             },
             (Err(e), Ok(res)) => {
-                println!("error {} is raised from V1 at {}", e, cur_version);
-                println!(
+                self.output_result_str(format!("error {} is raised from V1 at {}", e, cur_version));
+                self.output_result_str(format!(
                     "output from V2 at version:{}\nwrite set:{:?}\n events:{:?}\n",
                     cur_version, res.0, res.1
-                );
+                ));
             },
             (Ok(res), Err(e)) => {
-                println!("error {} is raised from V2 at {}", e, cur_version);
-                println!(
+                self.output_result_str(format!("error {} is raised from V2 at {}", e, cur_version));
+                self.output_result_str(format!(
                     "output from V1 at version:{}\nwrite set:{:?}\n events:{:?}\n",
                     cur_version, res.0, res.1
-                );
+                ));
             },
             (Ok(res_1), Ok(res_2)) => {
                 // compare events
@@ -345,9 +402,18 @@ impl Execution {
                     let event_1 = &res_1.1[idx];
                     let event_2 = &res_2.1[idx];
                     if event_1 != event_2 {
-                        println!("event is different at version {}", cur_version);
-                        println!("event raised from V1: {} at index:{}", event_1, idx);
-                        println!("event raised from V2: {} at index:{}", event_2, idx);
+                        self.output_result_str(format!(
+                            "event is different at version {}",
+                            cur_version
+                        ));
+                        self.output_result_str(format!(
+                            "event raised from V1: {} at index:{}",
+                            event_1, idx
+                        ));
+                        self.output_result_str(format!(
+                            "event raised from V2: {} at index:{}",
+                            event_2, idx
+                        ));
                     }
                 }
                 // compare write set
@@ -357,14 +423,32 @@ impl Execution {
                     let write_set_1 = res_1_write_set_vec[0];
                     let write_set_2 = res_2_write_set_vec[0];
                     if write_set_1.0 != write_set_2.0 {
-                        println!("write set key is different at version {}", cur_version);
-                        println!("state key at V1: {:?} at index:{}", write_set_1.0, idx);
-                        println!("state key at V2: {:?} at index:{}", write_set_2.0, idx);
+                        self.output_result_str(format!(
+                            "write set key is different at version {}",
+                            cur_version
+                        ));
+                        self.output_result_str(format!(
+                            "state key at V1: {:?} at index:{}",
+                            write_set_1.0, idx
+                        ));
+                        self.output_result_str(format!(
+                            "state key at V2: {:?} at index:{}",
+                            write_set_2.0, idx
+                        ));
                     }
                     if write_set_1.1 != write_set_2.1 {
-                        println!("write set value is different at version {}", cur_version);
-                        println!("state value at V1: {:?} at index {}", write_set_1.1, idx);
-                        println!("state value at V2: {:?} at index {}", write_set_2.1, idx);
+                        self.output_result_str(format!(
+                            "write set value is different at version {}",
+                            cur_version
+                        ));
+                        self.output_result_str(format!(
+                            "state value at V1: {:?} at index {}",
+                            write_set_1.1, idx
+                        ));
+                        self.output_result_str(format!(
+                            "state value at V2: {:?} at index {}",
+                            write_set_2.1, idx
+                        ));
                     }
                 }
             },
