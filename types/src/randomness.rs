@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::{block_info::Round, validator_verifier::ValidatorVerifier};
 
 // pub type WVUF = weighted_vuf::pinkas::PinkasWUF;
-pub type WVUF = weighted_vuf::gjm21_naive::g1::GjmNaiveWVUF;
+pub type WVUF = weighted_vuf::gjm21_insecure::g1::GjmInsecureWVUF;
 pub type WvufPP = <WVUF as WeightedVUF>::PublicParameters;
 pub type PK = <WVUF as WeightedVUF>::PubKey;
 pub type PKShare = <WVUF as WeightedVUF>::PubKeyShare;
