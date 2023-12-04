@@ -295,6 +295,7 @@ impl StateApi {
 
         let (ledger_info, ledger_version, state_view) = self.context.state_view(ledger_version)?;
         let bytes = state_view
+            // TODO: Change to view resource?
             .as_move_resolver()
             .get_resource(&address.into(), &resource_type)
             .context(format!(
@@ -315,7 +316,6 @@ impl StateApi {
         match accept_type {
             AcceptType::Json => {
                 let resource = state_view
-                    .as_move_resolver()
                     .as_converter(self.context.db.clone())
                     .try_into_resource(&resource_type, &bytes)
                     .context("Failed to deserialize resource data retrieved from DB")
@@ -420,9 +420,7 @@ impl StateApi {
         let (ledger_info, ledger_version, state_view) = self
             .context
             .state_view(ledger_version.map(|inner| inner.0))?;
-
-        let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(self.context.db.clone());
+        let converter = state_view.as_converter(self.context.db.clone());
 
         // Convert key to lookup version for DB
         let vm_key = converter

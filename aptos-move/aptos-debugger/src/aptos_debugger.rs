@@ -185,8 +185,7 @@ impl AptosDebugger {
         version: Version,
     ) -> Result<Option<AnnotatedAccountStateBlob>> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let remote_storage = state_view.as_move_resolver();
-        let annotator = AptosValueAnnotator::new(&remote_storage);
+        let annotator = AptosValueAnnotator::new(&state_view);
         Ok(
             match self
                 .debugger
@@ -205,8 +204,7 @@ impl AptosDebugger {
     ) -> Result<Vec<(AccountAddress, AnnotatedAccountStateBlob)>> {
         let accounts = self.debugger.get_admin_accounts(version).await?;
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let remote_storage = state_view.as_move_resolver();
-        let annotator = AptosValueAnnotator::new(&remote_storage);
+        let annotator = AptosValueAnnotator::new(&state_view);
 
         let mut result = vec![];
         for (addr, state) in accounts.into_iter() {

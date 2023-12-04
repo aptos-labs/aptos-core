@@ -2,8 +2,10 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{bail, Error, Result};
+use anyhow::{anyhow, bail, Error, Result};
 use bytes::Bytes;
+use move_binary_format::CompiledModule;
+use move_bytecode_utils::viewer::ModuleViewer;
 use move_core_types::{
     account_address::AccountAddress,
     effects::{AccountChangeSet, ChangeSet, Op},
@@ -332,5 +334,21 @@ impl TableResolver for InMemoryStorage {
         _maybe_layout: Option<&MoveTypeLayout>,
     ) -> Result<Option<Bytes>, Error> {
         Ok(self.tables.get(handle).and_then(|t| t.get(key).cloned()))
+    }
+}
+
+// Used in testing to print resources.
+impl ModuleViewer for InMemoryStorage {
+    type Error = anyhow::Error;
+    type Item = CompiledModule;
+
+    fn view_module(&self, module_id: &ModuleId) -> Result<Self::Item, Self::Error> {
+        let bytes = self
+            .accounts
+            .get(module_id.address())
+            .and_then(|account_storage| account_storage.modules.get(module_id.name()))
+            .ok_or_else(|| anyhow!("Module {:?} not found", module_id))?;
+        CompiledModule::deserialize(bytes)
+            .map_err(|e| anyhow!("Failed to deserialize module {:?}: {:?}", module_id, e))
     }
 }

@@ -4,7 +4,7 @@
 
 pub mod dependency_graph;
 pub mod layout;
-pub mod module_cache;
+pub mod viewer;
 
 use crate::dependency_graph::DependencyGraph;
 use anyhow::{anyhow, Result};

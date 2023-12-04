@@ -6,7 +6,7 @@ use crate::{
     fat_type::{FatStructType, FatType, WrappedAbilitySet},
     module_cache::ModuleCache,
 };
-use anyhow::{anyhow, Error, Result};
+use anyhow::{anyhow, Result};
 use move_binary_format::{
     access::ModuleAccess,
     errors::PartialVMError,
@@ -16,12 +16,11 @@ use move_binary_format::{
     views::FunctionHandleView,
     CompiledModule,
 };
-use move_bytecode_utils::module_cache::GetModule;
+use move_bytecode_utils::viewer::{CompiledModuleViewer, ModuleViewer};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::ModuleResolver,
 };
 use std::rc::Rc;
 
@@ -30,31 +29,20 @@ pub(crate) struct Resolver<'a, T: ?Sized> {
     cache: ModuleCache,
 }
 
-impl<'a, T: ModuleResolver + ?Sized> GetModule for Resolver<'a, T> {
-    type Error = Error;
+impl<'a, T: CompiledModuleViewer + ?Sized> ModuleViewer for Resolver<'a, T> {
+    type Error = T::Error;
     type Item = Rc<CompiledModule>;
 
-    fn get_module_by_id(&self, module_id: &ModuleId) -> Result<Option<Self::Item>, Self::Error> {
+    fn view_module(&self, module_id: &ModuleId) -> Result<Self::Item, Self::Error> {
         if let Some(module) = self.cache.get(module_id) {
-            return Ok(Some(module));
+            return Ok(module);
         }
-        let blob = self
-            .state
-            .get_module(module_id)
-            .map_err(|e| anyhow!("Error retrieving module {:?}: {:?}", module_id, e))?
-            .ok_or_else(|| anyhow!("Module {:?} can't be found", module_id))?;
-        let compiled_module = CompiledModule::deserialize(&blob).map_err(|status| {
-            anyhow!(
-                "Module {:?} deserialize with error code {:?}",
-                module_id,
-                status
-            )
-        })?;
-        Ok(Some(self.cache.insert(module_id.clone(), compiled_module)))
+        let compiled_module = self.state.view_module(module_id)?;
+        Ok(self.cache.insert(module_id.clone(), compiled_module))
     }
 }
 
-impl<'a, T: ModuleResolver + ?Sized> Resolver<'a, T> {
+impl<'a, T: CompiledModuleViewer + ?Sized> Resolver<'a, T> {
     pub fn new(state: &'a T) -> Self {
         Resolver {
             state,
@@ -64,12 +52,7 @@ impl<'a, T: ModuleResolver + ?Sized> Resolver<'a, T> {
 
     fn get_module(&self, address: &AccountAddress, name: &IdentStr) -> Result<Rc<CompiledModule>> {
         let module_id = ModuleId::new(*address, name.to_owned());
-        self.get_module_by_id_or_err(&module_id)
-    }
-
-    pub fn get_module_by_id_or_err(&self, module_id: &ModuleId) -> Result<Rc<CompiledModule>> {
-        self.get_module_by_id(module_id)
-            .map(|opt| opt.expect("My GetModule impl always returns Some."))
+        self.view_module(&module_id)
     }
 
     pub fn resolve_function_arguments(
@@ -77,7 +60,7 @@ impl<'a, T: ModuleResolver + ?Sized> Resolver<'a, T> {
         module: &ModuleId,
         function: &IdentStr,
     ) -> Result<Vec<FatType>> {
-        let m = self.get_module_by_id_or_err(module)?;
+        let m = self.view_module(module)?;
         for def in m.function_defs.iter() {
             let fhandle = m.function_handle_at(def.function);
             let fhandle_view = FunctionHandleView::new(m.as_ref(), fhandle);

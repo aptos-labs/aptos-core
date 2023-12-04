@@ -4,10 +4,10 @@
 use super::new_test_context;
 use aptos_api_test_context::current_function_name;
 use aptos_api_types::{new_vm_utf8_string, AsConverter, HexEncodedBytes, MoveConverter, MoveType};
-use aptos_vm::data_cache::AsMoveResolver;
+use move_binary_format::CompiledModule;
+use move_bytecode_utils::viewer::ModuleViewer;
 use move_core_types::{
     account_address::AccountAddress,
-    resolver::MoveResolver,
     value::{MoveStruct, MoveValue as VmMoveValue},
 };
 use serde::Serialize;
@@ -20,8 +20,7 @@ async fn test_value_conversion() {
     let address = AccountAddress::from_hex_literal("0x1").unwrap();
 
     let state_view = context.latest_state_view();
-    let resolver = state_view.as_move_resolver();
-    let converter = resolver.as_converter(context.db);
+    let converter = state_view.as_converter(context.db);
 
     assert_value_conversion(&converter, "u8", 1i32, VmMoveValue::U8(1));
     assert_value_conversion(&converter, "u64", "1", VmMoveValue::U64(1));
@@ -58,7 +57,10 @@ async fn test_value_conversion() {
     );
 }
 
-fn assert_value_conversion<R: MoveResolver, V: Serialize>(
+fn assert_value_conversion<
+    R: ModuleViewer<Error = anyhow::Error, Item = CompiledModule>,
+    V: Serialize,
+>(
     converter: &MoveConverter<'_, R>,
     json_move_type: &str,
     json_value: V,
@@ -77,7 +79,7 @@ fn assert_value_conversion<R: MoveResolver, V: Serialize>(
     assert_eq!(json_value_back, json!(json_value));
 }
 
-fn assert_value_conversion_bytes<R: MoveResolver>(
+fn assert_value_conversion_bytes<R: ModuleViewer<Error = anyhow::Error, Item = CompiledModule>>(
     converter: &MoveConverter<'_, R>,
     json_move_type: &str,
     vm_bytes: &[u8],

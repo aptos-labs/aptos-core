@@ -10,7 +10,7 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     file_format::{CompiledModule, CompiledScript, FunctionDefinitionIndex},
 };
-use move_bytecode_utils::module_cache::GetModule;
+use move_bytecode_utils::viewer::ModuleViewer;
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_core_types::{
     account_address::AccountAddress,
@@ -150,18 +150,13 @@ impl OnDiskStateView {
     }
 
     /// Return the name of the function at `idx` in `module_id`
-    pub fn resolve_function(&self, module_id: &ModuleId, idx: u16) -> Result<Option<Identifier>> {
-        if let Some(m) = self.get_module_by_id(module_id)? {
-            Ok(Some(
-                m.identifier_at(
-                    m.function_handle_at(m.function_def_at(FunctionDefinitionIndex(idx)).function)
-                        .name,
-                )
-                .to_owned(),
-            ))
-        } else {
-            Ok(None)
-        }
+    pub fn resolve_function(&self, module_id: &ModuleId, idx: u16) -> Result<Identifier> {
+        let m = self.view_module(module_id)?;
+        Ok(m.identifier_at(
+            m.function_handle_at(m.function_def_at(FunctionDefinitionIndex(idx)).function)
+                .name,
+        )
+        .to_owned())
     }
 
     fn get_bytes(path: &Path) -> Result<Option<Bytes>> {
@@ -359,18 +354,16 @@ impl ResourceResolver for OnDiskStateView {
     }
 }
 
-impl GetModule for &OnDiskStateView {
+impl ModuleViewer for OnDiskStateView {
     type Error = anyhow::Error;
     type Item = CompiledModule;
 
-    fn get_module_by_id(&self, id: &ModuleId) -> Result<Option<CompiledModule>, Self::Error> {
-        if let Some(bytes) = self.get_module_bytes(id)? {
-            let module = CompiledModule::deserialize(&bytes)
-                .map_err(|e| anyhow!("Failure deserializing module {:?}: {:?}", id, e))?;
-            Ok(Some(module))
-        } else {
-            Ok(None)
-        }
+    fn view_module(&self, id: &ModuleId) -> Result<CompiledModule, Self::Error> {
+        let bytes = self
+            .get_module_bytes(id)?
+            .ok_or_else(|| anyhow!("Module {:?} not found", id))?;
+        CompiledModule::deserialize(&bytes)
+            .map_err(|e| anyhow!("Failure deserializing module {:?}: {:?}", id, e))
     }
 }
 

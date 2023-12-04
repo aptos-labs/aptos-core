@@ -37,7 +37,7 @@ use aptos_types::{
     },
     vm_status::StatusCode,
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosSimulationVM};
+use aptos_vm::AptosSimulationVM;
 use move_core_types::vm_status::VMStatus;
 use poem_openapi::{
     param::{Path, Query},
@@ -724,12 +724,11 @@ impl TransactionsApi {
         match accept_type {
             AcceptType::Json => {
                 let state_view = self.context.latest_state_view_poem(ledger_info)?;
-                let resolver = state_view.as_move_resolver();
                 let transaction = match transaction_data {
                     TransactionData::OnChain(txn) => {
                         let timestamp =
                             self.context.get_block_timestamp(ledger_info, txn.version)?;
-                        resolver
+                        state_view
                             .as_converter(self.context.db.clone())
                             .try_into_onchain_transaction(timestamp, txn)
                             .context("Failed to convert on chain transaction to Transaction")
@@ -741,7 +740,7 @@ impl TransactionsApi {
                                 )
                             })?
                     },
-                    TransactionData::Pending(txn) => resolver
+                    TransactionData::Pending(txn) => state_view
                         .as_converter(self.context.db.clone())
                         .try_into_pending_transaction(*txn)
                         .context("Failed to convert on pending transaction to Transaction")
@@ -913,7 +912,6 @@ impl TransactionsApi {
             SubmitTransactionPost::Json(data) => self
                 .context
                 .latest_state_view_poem(ledger_info)?
-                .as_move_resolver()
                 .as_converter(self.context.db.clone())
                 .try_into_signed_transaction_poem(data.0, self.context.chain_id())
                 .context("Failed to create SignedTransaction from SubmitTransactionRequest")
@@ -992,7 +990,7 @@ impl TransactionsApi {
                 .enumerate()
                 .map(|(index, txn)| {
                     self.context
-                        .latest_state_view_poem(ledger_info)?.as_move_resolver()
+                        .latest_state_view_poem(ledger_info)?
                         .as_converter(self.context.db.clone())
                         .try_into_signed_transaction_poem(txn, self.context.chain_id())
                         .context(format!("Failed to create SignedTransaction from SubmitTransactionRequest at position {}", index))
@@ -1081,10 +1079,8 @@ impl TransactionsApi {
                                 ledger_info,
                             )
                         })?;
-                    let resolver = state_view.as_move_resolver();
-
                     // We provide the pending transaction so that users have the hash associated
-                    let pending_txn = resolver
+                    let pending_txn = state_view
                             .as_converter(self.context.db.clone())
                             .try_into_pending_transaction_poem(txn)
                             .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
@@ -1288,8 +1284,7 @@ impl TransactionsApi {
 
         let ledger_info = self.context.get_latest_ledger_info()?;
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
-        let resolver = state_view.as_move_resolver();
-        let raw_txn: RawTransaction = resolver
+        let raw_txn: RawTransaction = state_view
             .as_converter(self.context.db.clone())
             .try_into_raw_transaction_poem(request.transaction, self.context.chain_id())
             .context("The given transaction is invalid")

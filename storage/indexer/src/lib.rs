@@ -28,12 +28,12 @@ use aptos_types::{
     transaction::{AtomicVersion, Version},
     write_set::{WriteOp, WriteSet},
 };
-use aptos_vm::data_cache::AsMoveResolver;
 use bytes::Bytes;
+use move_binary_format::CompiledModule;
+use move_bytecode_utils::viewer::ModuleViewer;
 use move_core_types::{
     ident_str,
     language_storage::{StructTag, TypeTag},
-    resolver::MoveResolver,
 };
 use move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
 use std::{
@@ -41,6 +41,7 @@ use std::{
     convert::TryInto,
     sync::{atomic::Ordering, Arc},
 };
+
 #[derive(Debug)]
 pub struct Indexer {
     db: DB,
@@ -82,12 +83,11 @@ impl Indexer {
             db: db_reader,
             version: Some(last_version),
         };
-        let resolver = state_view.as_move_resolver();
-        let annotator = MoveValueAnnotator::new(&resolver);
+        let annotator = MoveValueAnnotator::new(&state_view);
         self.index_with_annotator(&annotator, first_version, write_sets)
     }
 
-    pub fn index_with_annotator<R: MoveResolver>(
+    pub fn index_with_annotator<R: ModuleViewer<Error = anyhow::Error, Item = CompiledModule>>(
         &self,
         annotator: &MoveValueAnnotator<R>,
         first_version: Version,
@@ -158,7 +158,7 @@ struct TableInfoParser<'a, R> {
     pending_on: HashMap<TableHandle, Vec<Bytes>>,
 }
 
-impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
+impl<'a, R: ModuleViewer<Error = anyhow::Error, Item = CompiledModule>> TableInfoParser<'a, R> {
     pub fn new(indexer: &'a Indexer, annotator: &'a MoveValueAnnotator<R>) -> Self {
         Self {
             indexer,

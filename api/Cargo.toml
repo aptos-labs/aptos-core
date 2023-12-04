@@ -59,6 +59,8 @@ aptos-gas-meter = { workspace = true }
 aptos-gas-schedule = { workspace = true, features = ["testing"] }
 aptos-proptest-helpers = { workspace = true }
 aptos-sdk = { workspace = true }
+move-binary-format = { workspace = true }
+move-bytecode-utils = { workspace = true }
 move-package = { workspace = true }
 percent-encoding = { workspace = true }
 proptest = { workspace = true }

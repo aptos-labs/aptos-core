@@ -350,7 +350,6 @@ impl Account {
                     .context
                     .latest_state_view_poem(&self.latest_ledger_info)?;
                 let converted_resources = state_view
-                    .as_move_resolver()
                     .as_converter(self.context.db.clone())
                     .try_into_resources(resources.iter().map(|(k, v)| (k.clone(), v.as_slice())))
                     .context("Failed to build move resource response from data in DB")
@@ -528,6 +527,7 @@ impl Account {
         let resolver = state_view.as_move_resolver();
 
         let bytes = resolver
+            // TODO: change to viewer?
             .get_resource(&self.address.into(), resource_type)
             .context(format!(
                 "Failed to query DB to check for {} at {}",
@@ -544,7 +544,7 @@ impl Account {
                 resource_not_found(self.address, resource_type, ledger_version, &ledger_info)
             })?;
 
-        resolver
+        state_view
             .as_converter(self.context.db.clone())
             .move_struct_fields(resource_type, &bytes)
             .context("Failed to convert move structs from storage")

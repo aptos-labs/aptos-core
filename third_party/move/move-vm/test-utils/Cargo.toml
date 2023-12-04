@@ -17,6 +17,7 @@ once_cell = "1.7.2"
 serde = { version = "1.0.124", features = ["derive", "rc"] }
 
 move-binary-format = { path = "../../move-binary-format" }
+move-bytecode-utils = { path = "../../tools/move-bytecode-utils" }
 move-core-types = { path = "../../move-core/types" }
 move-table-extension = { path = "../../extensions/move-table-extension", optional = true }
 move-vm-types = { path = "../types" }

@@ -12,12 +12,14 @@ use move_binary_format::{
     file_format::{Ability, AbilitySet},
     CompiledModule,
 };
-use move_bytecode_utils::layout::TypeLayoutBuilder;
+use move_bytecode_utils::{
+    layout::TypeLayoutBuilder,
+    viewer::{CompiledModuleViewer, ModuleViewer},
+};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::ModuleResolver,
     u256,
     value::{MoveStruct, MoveTypeLayout, MoveValue},
     vm_status::VMStatus,
@@ -83,15 +85,15 @@ pub struct MoveValueAnnotator<'a, T: ?Sized> {
     cache: Resolver<'a, T>,
 }
 
-impl<'a, T: ModuleResolver + ?Sized> MoveValueAnnotator<'a, T> {
-    pub fn new(view: &'a T) -> Self {
+impl<'a, T: CompiledModuleViewer + ?Sized> MoveValueAnnotator<'a, T> {
+    pub fn new(viewer: &'a T) -> Self {
         Self {
-            cache: Resolver::new(view),
+            cache: Resolver::new(viewer),
         }
     }
 
-    pub fn get_module(&self, module: &ModuleId) -> Result<Rc<CompiledModule>> {
-        self.cache.get_module_by_id_or_err(module)
+    pub fn get_module(&self, module_id: &ModuleId) -> Result<Rc<CompiledModule>> {
+        self.cache.view_module(module_id)
     }
 
     pub fn get_type_layout_runtime(&self, type_tag: &TypeTag) -> Result<MoveTypeLayout> {

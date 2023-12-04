@@ -631,8 +631,7 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(self.db.clone());
+        let converter = state_view.as_converter(self.db.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
@@ -662,8 +661,7 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(self.db.clone());
+        let converter = state_view.as_converter(self.db.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
@@ -1177,6 +1175,7 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
+            // TODO: change to config adapter or simply implement config for DB?
             let resolver = state_view.as_move_resolver();
 
             let gas_schedule_params =
