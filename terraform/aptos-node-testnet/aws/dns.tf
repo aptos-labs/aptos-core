@@ -26,7 +26,7 @@ resource "aws_acm_certificate" "ingress" {
 }
 
 resource "aws_route53_record" "ingress-acm-validation" {
-  for_each = var.zone_id == "" ? {} : { for dvo in aws_acm_certificate.ingress[0].domain_validation_options : dvo.domain_name => dvo }
+  for_each = length(aws_acm_certificate.ingress) == 0 ? {} : { for dvo in aws_acm_certificate.ingress[0].domain_validation_options : dvo.domain_name => dvo }
 
   zone_id         = var.zone_id
   allow_overwrite = true
@@ -37,7 +37,7 @@ resource "aws_route53_record" "ingress-acm-validation" {
 }
 
 resource "aws_acm_certificate_validation" "ingress" {
-  count = var.zone_id != "" ? 1 : 0
+  count = length(aws_acm_certificate.ingress) > 0 ? 1 : 0
 
   certificate_arn         = aws_acm_certificate.ingress[0].arn
   validation_record_fqdns = [for dvo in aws_acm_certificate.ingress[0].domain_validation_options : dvo.resource_record_name]
