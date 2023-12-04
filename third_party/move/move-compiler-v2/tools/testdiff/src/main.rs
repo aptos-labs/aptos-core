@@ -28,6 +28,10 @@ struct Options {
     /// Print new tests.
     #[clap(short = 'n')]
     print_new: bool,
+
+    /// Diff against e2e (transactional) tests instead of unit tests.
+    #[clap(short = 'e')]
+    e2e_tests: bool,
 }
 
 fn main() {
@@ -41,11 +45,13 @@ fn main() {
     }
 }
 
-const V1_ROOT: &str = "move-compiler/tests/move_check";
-const V2_ROOT: &str = "move-compiler-v2/tests";
+const V1_UNIT_ROOT: &str = "move-compiler/tests/move_check";
+const V2_UNIT_ROOT: &str = "move-compiler-v2/tests";
+const V1_E2E_ROOT: &str = "move-compiler/transactional-tests/tests";
+const V2_E2E_ROOT: &str = "move-compiler-v2/transactional-tests/tests";
 
 /// Ignored directories in the move_check tree.
-static IGNORED_PATHS: Lazy<BTreeSet<String>> = Lazy::new(|| {
+static IGNORED_UNIT_PATHS: Lazy<BTreeSet<String>> = Lazy::new(|| {
     let mut set = BTreeSet::new();
     set.insert("parser".to_string());
     set.insert("expansion".to_string());
@@ -59,7 +65,7 @@ static IGNORED_PATHS: Lazy<BTreeSet<String>> = Lazy::new(|| {
 
 /// Remapping of test directories between v2 and v1 tree. This are paths
 /// relative to the according roots.
-static PATH_REMAP: Lazy<BTreeMap<String, String>> = Lazy::new(|| {
+static UNIT_PATH_REMAP: Lazy<BTreeMap<String, String>> = Lazy::new(|| {
     let mut map = BTreeMap::new();
     map.insert(
         "reference-safety/v1-tests".to_string(),
@@ -93,8 +99,13 @@ impl Display for TestKey {
 }
 
 fn run(opts: Options) -> anyhow::Result<()> {
-    let v1 = classify_tests(collect_tests(V1_ROOT)?, false);
-    let mut v2 = classify_tests(collect_tests(V2_ROOT)?, true);
+    let (v1_root, v2_root) = if opts.e2e_tests {
+        (V1_E2E_ROOT, V2_E2E_ROOT)
+    } else {
+        (V1_UNIT_ROOT, V2_UNIT_ROOT)
+    };
+    let v1 = classify_tests(&opts, collect_tests(v1_root)?, false);
+    let mut v2 = classify_tests(&opts, collect_tests(v2_root)?, true);
     let mut matched = vec![];
     let mut missed = BTreeMap::new();
     for (key, mut v1_path) in v1 {
@@ -115,7 +126,7 @@ fn run(opts: Options) -> anyhow::Result<()> {
                 .insert(key.file_name.clone(), path.clone());
         }
         for (parent, files) in missed_by_parent {
-            println!("{}/{}/{{", V1_ROOT, parent);
+            println!("{}/{}/{{", v1_root, parent);
             for (file, _) in files {
                 println!("  {},", file);
             }
@@ -153,13 +164,19 @@ fn collect_tests(root: &str) -> anyhow::Result<BTreeSet<PathBuf>> {
     Ok(result)
 }
 
-fn classify_tests(tests: BTreeSet<PathBuf>, for_v2: bool) -> BTreeMap<TestKey, PathBuf> {
+fn classify_tests(
+    opts: &Options,
+    tests: BTreeSet<PathBuf>,
+    for_v2: bool,
+) -> BTreeMap<TestKey, PathBuf> {
     let mut result = BTreeMap::new();
     for test in tests {
-        let Some(mut parent) = test.parent().map(|p| p.to_owned()) else { continue };
+        let Some(mut parent) = test.parent().map(|p| p.to_owned()) else {
+            continue;
+        };
         let mut parent_str = parent.display().to_string();
-        if for_v2 {
-            for (a, b) in &*PATH_REMAP {
+        if !opts.e2e_tests && for_v2 {
+            for (a, b) in &*UNIT_PATH_REMAP {
                 if parent_str.contains(a) {
                     parent_str = parent_str.replace(a, b);
                     parent = PathBuf::from(parent_str.clone());
@@ -167,7 +184,7 @@ fn classify_tests(tests: BTreeSet<PathBuf>, for_v2: bool) -> BTreeMap<TestKey, P
                 }
             }
         }
-        if IGNORED_PATHS.iter().any(|p| parent_str.contains(p)) {
+        if !opts.e2e_tests && IGNORED_UNIT_PATHS.iter().any(|p| parent_str.contains(p)) {
             continue;
         }
         if let (Some(file_name), Some(parent_name)) = (test.file_name(), parent.file_name()) {

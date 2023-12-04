@@ -1,0 +1,23 @@
+move-compiler/transactional-tests/tests/constants/{
+  by_reference.move,
+  default_int_size.move,
+  folding_boolean.move,
+  folding_complex.move,
+  folding_equality.move,
+  folding_numeric.move,
+  folding_values.move,
+  folding_vector.move,
+  folding_vector_large.move,
+  non_constant_empty_vec.move,
+}
+move-compiler/transactional-tests/tests/parser/{
+  byte_string.move,
+  control_exp_associativity.move,
+  expr_binary_operators.move,
+  hex_and_decimal_address.move,
+  hex_and_decimal_numbers.move,
+  hexstring.move,
+  num_literal_underscore.move,
+  precedence.move,
+  return_not_binary.move,
+}
