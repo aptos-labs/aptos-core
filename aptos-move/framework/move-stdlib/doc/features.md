@@ -118,6 +118,8 @@ return true.
 -  [Function `object_native_derived_address_enabled`](#0x1_features_object_native_derived_address_enabled)
 -  [Function `get_dispatchable_fungible_asset_feature`](#0x1_features_get_dispatchable_fungible_asset_feature)
 -  [Function `dispatchable_fungible_asset_enabled`](#0x1_features_dispatchable_fungible_asset_enabled)
+-  [Function `get_migrate_to_concurrent_fungible_balance_feature`](#0x1_features_get_migrate_to_concurrent_fungible_balance_feature)
+-  [Function `migrate_to_concurrent_fungible_balance_enabled`](#0x1_features_migrate_to_concurrent_fungible_balance_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -565,6 +567,18 @@ Whether checking the maximum object nesting is enabled.
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_MAX_OBJECT_NESTING_CHECK">MAX_OBJECT_NESTING_CHECK</a>: u64 = 53;
+</code></pre>
+
+
+
+<a id="0x1_features_MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE"></a>
+
+Whether enable Fungible Asset creation
+to create higher throughput concurrent variants.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE">MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE</a>: u64 = 64;
 </code></pre>
 
 
@@ -2834,6 +2848,53 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_dispatchable_fungible_asset_enabled">dispatchable_fungible_asset_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DISPATCHABLE_FUNGIBLE_ASSET">DISPATCHABLE_FUNGIBLE_ASSET</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_migrate_to_concurrent_fungible_balance_feature"></a>
+
+## Function `get_migrate_to_concurrent_fungible_balance_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_migrate_to_concurrent_fungible_balance_feature">get_migrate_to_concurrent_fungible_balance_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_migrate_to_concurrent_fungible_balance_feature">get_migrate_to_concurrent_fungible_balance_feature</a>(): u64 { <a href="features.md#0x1_features_MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE">MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_migrate_to_concurrent_fungible_balance_enabled"></a>
+
+## Function `migrate_to_concurrent_fungible_balance_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_migrate_to_concurrent_fungible_balance_enabled">migrate_to_concurrent_fungible_balance_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_migrate_to_concurrent_fungible_balance_enabled">migrate_to_concurrent_fungible_balance_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    // concurrent fungible assets cannot be used <b>if</b> aggregator v2 api is not enabled.
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE">MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE</a>) && <a href="features.md#0x1_features_aggregator_v2_api_enabled">aggregator_v2_api_enabled</a>()
 }
 </code></pre>
 
