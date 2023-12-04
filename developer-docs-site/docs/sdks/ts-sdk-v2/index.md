@@ -8,11 +8,14 @@ import ThemedImage from '@theme/ThemedImage';
 
 # Aptos TypeScript SDK
 
-// TODO remove soon - after 12/18/2023
-:::note
-This documentation is for TypeScript SDK > `v2.0.0`. You can find the documentation for SDK `v1.x.x` [here](../ts-sdk/index.md)
+<!---
+TODO remove soon - after 12/18/2023
+-->
 
-Looking to migrate to `TypeScript SDK v2`? check out the [migration guide](./migration-guide.md)
+:::note
+This documentation is for the new TypeScript SDK [@aptos-labs/ts-sdk](https://github.com/aptos-labs/aptos-ts-sdk). You can find the documentation for the old SDK (aka `aptos`) [here](../ts-sdk/index.md)
+
+Looking to migrate to the new `TypeScript SDK`? check out the [migration guide](./migration-guide.md)
 :::
 
 ## Overview
