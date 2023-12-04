@@ -680,3 +680,4 @@ MoveVector
 MoveString
 MoveOption
 autocomplete
+AccountAddress

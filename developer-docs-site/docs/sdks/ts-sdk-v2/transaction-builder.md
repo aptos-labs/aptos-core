@@ -2,6 +2,8 @@
 title: "Transaction Builder"
 ---
 
+# TS SDK Transaction Builder
+
 The SDK provides a simplified and meaningful transaction builder flow to handles the transaction creation lifecycle.
 
 The transaction builder is separated to different namespaces for each transaction step in the transaction submission flow.

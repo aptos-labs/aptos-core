@@ -2,6 +2,8 @@
 title: "SDK Configuration"
 ---
 
+# TS SDK Configuration
+
 ## `Aptos` class
 
 The first step to interact with the Aptos chain using the SDK it to intansiate an `Aptos` class. This class is the main entry point into Aptos's APIs.
@@ -18,7 +20,7 @@ Sometimes you might want to use custom configurations when interacting with the 
 const aptosConfig = new AptosConfig({...})
 ```
 
-### Available configuration
+## Available configuration
 
 ```ts
 /** The Network that this SDK is associated with. Defaults to DEVNET */

@@ -2,15 +2,55 @@
 title: "Migration Guide"
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# TS SDK Migration Guide
+
 If you are coming from an earlier version `1.x.x` of `aptos`, you will need to make the following updates.
 
 :::note
 In this guide we only mention the API differences and updates you would need to do and excluding new features implementation
 :::
 
-### SDK usage and query the Aptos chain
+## Install the SDK
 
-Removed all `<*>Client` modules (i.e `AptosClient`, `FaucetClient`, `CoinClient`, etc) and replaced with a `Aptos` entry point class
+The TypeScript SDK V2 is under a new [github repo](https://github.com/aptos-labs/aptos-ts-sdk) and with a new package name - `@aptos-labs/ts-sdk`
+
+<Tabs groupId="install-sdk">
+  <TabItem value="pnpm" label="pnpm">
+
+```bash
+ pnpm i @aptos-labs/ts-sdk
+```
+
+  </TabItem>
+  <TabItem value="npm" label="npm">
+
+```bash
+ npm i @aptos-labs/ts-sdk
+```
+
+  </TabItem>
+  <TabItem value="yarn" label="yarn">
+
+```bash
+ yarn add @aptos-labs/ts-sdk
+```
+
+  </TabItem>
+    <TabItem value="bun" label="bun">
+
+```bash
+ bun i @aptos-labs/ts-sdk
+```
+
+  </TabItem>
+</Tabs>
+
+## SDK usage and query the Aptos chain
+
+Remove all `<*>Client` modules (i.e `AptosClient`, `FaucetClient`, `CoinClient`, etc) and replace with an `Aptos` entry point class
 
 **V1**
 
@@ -35,7 +75,7 @@ const modules = await aptos.getAccountModules({ accountAddress: "0x123" });
 const tokens = await aptos.getAccountOwnedTokens({ accountAddress: "0x123" });
 ```
 
-### Configuration class
+## Configuration class
 
 Introduce `AptosConfig` class that holds the config information for the SDK. Once define it we can pass and use it with the `Aptos` class
 
@@ -44,7 +84,7 @@ const aptosConfig = new AptosConfig({ network: Network.TESTNET }); // default to
 const aptos = new Aptos(config);
 ```
 
-### Transaction Builder Flow
+## Transaction Builder Flow
 
 Removed all separate transaction functions in favor of a more simplified and friendlier transaction builder flow
 
@@ -114,7 +154,7 @@ const senderAuthenticator = aptos.sign.transaction({ signer: alice, transaction 
 const committedTransaction = await aptos.submit.transaction({ transaction, senderAuthenticator });
 ```
 
-### Key Management
+## Account
 
 Rename `AptosAccount` to `Account` and use static methods to generate / derive an account
 
@@ -131,7 +171,7 @@ const account = AptosAccount.fromDerivePath(..)
 **V2**
 
 :::tip
-Read more about it [here](./key-management.md)
+Read more about it [here](./account.md)
 :::
 
 ```ts

@@ -356,7 +356,7 @@ const sidebars = {
               collapsed: true,
               items: [
                 "sdks/ts-sdk-v2/migration-guide",
-                "sdks/ts-sdk-v2/key-management",
+                "sdks/ts-sdk-v2/account",
                 "sdks/ts-sdk-v2/sdk-configuration",
                 "sdks/ts-sdk-v2/fetch-data-from-chain",
                 "sdks/ts-sdk-v2/transaction-builder",

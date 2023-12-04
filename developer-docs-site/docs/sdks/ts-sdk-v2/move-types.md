@@ -2,6 +2,8 @@
 title: "Move Types"
 ---
 
+# TS SDK Move Types
+
 When developing on Aptos, and specifically working with the SDK, developers often need to handle Move types serialization and deserialization. Whether is to construct a transaction payload, build a raw transaction or read BCS data.
 
 The SDK provides a convenient Move sub-classes to easily interact with move types to perform serialization or deserialization operations.
@@ -9,7 +11,7 @@ Each class has a `serialize`, `serializeForEntryFunction` and `serializeForScrip
 
 In addition, for complex types like `Vector` the SDK supports nested serialization and deserialization.
 
-### Move primitive types
+## Move primitive types
 
 Classes to handle Move primitive types:
 
@@ -20,6 +22,7 @@ Classes to handle Move primitive types:
 - U128
 - U256
 - Bool
+- AccountAddress
 
 ```ts
 const serializer = new Serializer();
@@ -33,7 +36,7 @@ const deserializer = new Deserializer();
 U8.deserialize(deserializer);
 ```
 
-### Move struct types
+## Move struct types
 
 - MoveVector
 - MoveString

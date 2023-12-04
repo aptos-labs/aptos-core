@@ -1,8 +1,10 @@
 ---
-title: "Key Management"
+title: "Account"
 ---
 
-The SDK provides an `Account` class for creating and managing [account](../../concepts/accounts.md) on Aptos network.
+# Account
+
+The SDK provides an `Account` class for creating and managing [accounts](../../concepts/accounts.md) on Aptos network.
 
 Following [AIP-55](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-55.md) the SDK supports `Legacy` and `Unified` authentications. `Legacy` includes `ED25519` and `MultiED25519` and `Unified` includes `SingleSender` and `MultiSender` authenticators.
 
@@ -16,7 +18,7 @@ The `Account` class supports different static methods to generate and/or derive 
 - `Account.fromPrivateKeyAndAddress()`
 - `Account.fromDerivationPath()`
 
-### Generate a new account
+## Generate a new account
 
 To generate a new account (or a new key pair), the SDK provides a `generate()` static method on the `Account` class.
 
@@ -37,7 +39,7 @@ const transaction = await aptos.fundAccount({ accountAddress: account.accountAdd
 
 :::
 
-### Derive an account from private key
+## Derive an account from private key
 
 The SDK supports deriving an account from a private key with `fromPrivateKey()` static method.
 This method uses a local calculation and therefore is used to derive an `Account` that has not had its authentication key rotated.
@@ -56,7 +58,7 @@ const privateKey = new Secp256k1PrivateKey(privateKeyBytes);
 const account = Account.fromPrivateKey({ privateKey });
 ```
 
-### Derive an account from private key and address
+## Derive an account from private key and address
 
 The SDK supports deriving an account from a private key and address with `fromPrivateKeyAndAddress()` static method.
 
@@ -77,7 +79,7 @@ const accountAddress = AccountAddress.from(address);
 const account = Account.fromPrivateKeyAndAddress({ privateKey, address: accountAddress });
 ```
 
-### Derive an account from derivation path
+## Derive an account from derivation path
 
 The SDK supports deriving an account from derivation path with `fromDerivationPath()` static method.
 
