@@ -9,6 +9,7 @@ use std::time::Duration;
 
 pub mod mixed;
 pub mod user;
+#[cfg(test)]
 pub mod validator;
 
 #[async_trait::async_trait]
