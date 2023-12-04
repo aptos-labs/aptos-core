@@ -451,10 +451,6 @@ impl InMemoryStateCalculatorV2 {
             "Base state is corrupted, updates_since_base is not empty at a checkpoint."
         );
 
-        for (idx, (txn, _txn_output)) in to_keep.iter().enumerate() {
-            println!("idx={}, txn={:?}", idx, txn);
-        }
-
         for (i, (txn, txn_output)) in to_keep.iter().enumerate() {
             ensure!(
                 TransactionsWithParsedOutput::need_checkpoint(txn, txn_output) ^ (i != num_txns - 1),
