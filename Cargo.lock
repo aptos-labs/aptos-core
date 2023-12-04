@@ -926,6 +926,7 @@ dependencies = [
  "anyhow",
  "aptos-crypto-derive",
  "ark-bls12-381",
+ "ark-bn254",
  "ark-ec",
  "ark-ff",
  "ark-serialize",
