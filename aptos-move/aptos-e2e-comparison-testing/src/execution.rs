@@ -7,7 +7,6 @@ use crate::{
     APTOS_COMMONS,
 };
 use anyhow::Result;
-use aptos_framework::APTOS_PACKAGES;
 use aptos_language_e2e_tests::{data_store::FakeDataStore, executor::FakeExecutor};
 use aptos_types::{
     contract_event::ContractEvent,
@@ -19,7 +18,7 @@ use aptos_types::{
 use aptos_vm::{data_cache::AsMoveResolver, transaction_metadata::TransactionMetadata};
 use clap::ValueEnum;
 use itertools::Itertools;
-use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
+use move_core_types::language_storage::ModuleId;
 use move_package::CompilerVersion;
 use std::{collections::HashMap, path::PathBuf};
 
@@ -31,20 +30,6 @@ fn load_packages_to_executor(
     let compiled_package = compiled_package_cache.get(package_info).unwrap();
     for (module_id, module_blob) in compiled_package {
         executor.add_module(module_id, module_blob.clone());
-    }
-}
-
-fn load_aptos_packages_to_executor(
-    executor: &mut FakeExecutor,
-    compiled_package_map: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
-) {
-    for package in APTOS_PACKAGES {
-        let package_info = PackageInfo {
-            address: AccountAddress::ONE,
-            package_name: package.to_string(),
-            upgrade_number: None,
-        };
-        load_packages_to_executor(executor, &package_info, compiled_package_map);
     }
 }
 
@@ -291,9 +276,7 @@ impl Execution {
             let sender = signed_trans.sender();
             let payload = signed_trans.payload();
             if let TransactionPayload::EntryFunction(entry_function) = payload {
-                // always load 0x1 modules
-                load_aptos_packages_to_executor(&mut executor, compiled_package_cache);
-                // Load other modules
+                // Load modules
                 if package_info.is_compilable() {
                     load_packages_to_executor(&mut executor, package_info, compiled_package_cache);
                 }
