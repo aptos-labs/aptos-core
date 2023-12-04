@@ -888,6 +888,64 @@ module std::vector_tests {
         vector::insert(&mut v,6, 6);
     }
 
+    #[test]
+    fun test_range() {
+        let result = vector::range(5, 10);
+        assert!(result == vector[5, 6, 7, 8, 9], 1);
+    }
+
+    #[test]
+    fun test_range_with_step() {
+        let result = vector::range_with_step(0, 10, 2);
+        assert!(result == vector[0, 2, 4, 6, 8], 1);
+
+        let empty_result = vector::range_with_step(10, 10, 2);
+        assert!(empty_result == vector[], 1);
+
+        // Test with `start` greater than `end`
+        let reverse_result = vector::range_with_step(10, 0, 2);
+        assert!(reverse_result == vector[], 1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = V::EINVALID_STEP)]
+    fun test_range_with_invalid_step() {
+        vector::range_with_step(0, 10, 0);
+    }
+
+    #[test]
+    fun test_slice() {
+        let v = &vector[0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+        let slice_beginning = vector::slice(v, 0, 3);
+        assert!(slice_beginning == vector[0, 1, 2], 1);
+
+        let slice_end = vector::slice(v, 7, 10);
+        assert!(slice_end == vector[7, 8, 9], 1);
+
+        let empty_slice = vector::slice(v, 5, 5);
+        assert!(empty_slice == vector[], 1);
+        let empty_slice = vector::slice(v, 0, 0);
+        assert!(empty_slice == vector[], 1);
+
+        let full_slice = &vector::slice(v, 0, 10);
+        assert!(full_slice == v, 1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = V::EINVALID_SLICE_RANGE)]
+    fun test_slice_invalid_range() {
+        let v = &vector[0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+        vector::slice(v, 7, 6); // start is greater than end
+    }
+
+    #[test]
+    #[expected_failure(abort_code = V::EINVALID_SLICE_RANGE)]
+    fun test_slice_out_of_bounds() {
+        let v = &vector[0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+        vector::slice(v, 0, 11); // end is out of bounds
+    }
+
     #[test_only]
     struct MoveOnly {}
 
