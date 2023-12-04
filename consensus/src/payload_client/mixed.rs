@@ -135,9 +135,9 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
 
     let (pulled_validator_txns, Payload::DirectMempool(pulled_user_txns)) = client
         .pull_payload(
-            Duration::from_nanos(1), // max_poll_time
-            99,                      // max_items
-            1048576,                 // size limit: 1MB
+            Duration::from_micros(500), // max_poll_time
+            99,                         // max_items
+            1048576,                    // size limit: 1MB
             ValidatorTransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),

@@ -174,7 +174,12 @@ impl DagDriver {
                 vec![]
             });
 
-        let (sys_payload_filter, payload_filter) = {
+        let (sys_payload_filter, payload_filter) = if strong_links.is_empty() {
+            (
+                ValidatorTransactionFilter::PendingTxnHashSet(HashSet::new()),
+                PayloadFilter::Empty,
+            )
+        } else {
             let dag_reader = self.dag.read();
             let highest_commit_round = self
                 .ledger_info_provider

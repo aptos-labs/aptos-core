@@ -654,7 +654,7 @@ pub(super) fn bootstrap_dag_for_test(
         state_computer,
         ordered_nodes_tx,
         false,
-        false,
+        true,
     );
 
     let (_base_state, handler, fetch_service) = bootstraper.full_bootstrap();
