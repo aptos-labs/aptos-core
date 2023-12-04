@@ -156,6 +156,7 @@ impl Default for ConsensusConfigV1 {
     }
 }
 
+/// An extensible feature flag vector indexed by `ConsensusExtraFeature`.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct ConsensusExtraFeatures {
     features: Vec<bool>,

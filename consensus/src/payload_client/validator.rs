@@ -9,16 +9,19 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[cfg(test)]
 pub struct DummyValidatorTxnClient {
     txns: Vec<ValidatorTransaction>,
 }
 
+#[cfg(test)]
 impl DummyValidatorTxnClient {
     pub fn new(txns: Vec<ValidatorTransaction>) -> Self {
         Self { txns }
     }
 }
 
+#[cfg(test)]
 impl ValidatorTransactionPoolClient for DummyValidatorTxnClient {
     fn pull(
         &self,

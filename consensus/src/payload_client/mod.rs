@@ -7,7 +7,6 @@ use aptos_types::validator_txn::{pool::ValidatorTransactionFilter, ValidatorTran
 use futures::future::BoxFuture;
 use std::time::Duration;
 
-// TODO: consider moving to a config
 pub mod mixed;
 pub mod user;
 pub mod validator;
