@@ -314,7 +314,7 @@ impl<'env> ConstantFolder<'env> {
 
     /// Try constant folding of a tuple of arguments represented as a slice of `Exp`.
     ///
-    /// If every operand is already a constant literal, then return `Soem(exp)` where `exp`
+    /// If every operand is already a constant literal, then return `Some(exp)` where `exp`
     /// is an `ExpData::Value(id, ..)` expression representing a `Vector` of values.
     ///
     /// Returns `None` and emitting diagnostic messages (referencing code corresponding to`id`)
@@ -362,7 +362,7 @@ impl<'env> ExpRewriterFunctions for ConstantFolder<'env> {
             // unary op
             self.fold_unary_exp(id, oper, &args[0])
         } else if args.len() == 2 {
-            // unary op
+            // binary op
             self.fold_binary_exp(id, oper, &args[0], &args[1])
         } else {
             None
