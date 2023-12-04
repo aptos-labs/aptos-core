@@ -1240,22 +1240,17 @@ impl GlobalEnv {
                 let field_abilities = inst.iter().fold(AbilitySet::ALL, |acc, ty| {
                     acc.intersect(self.type_abilities(ty, ty_params))
                 });
-                let abilities = if struct_abilities.has_ability(Ability::Key) {
-                    if field_abilities.has_store() {
-                        struct_abilities.intersect(field_abilities).add(Ability::Key)
-                    } else {
-                        struct_abilities.intersect(field_abilities).remove(Ability::Key)
-                    }
+                if struct_abilities.has_ability(Ability::Key) && field_abilities.has_ability(Ability::Store) {
+                    struct_abilities.intersect(field_abilities).add(Ability::Key)
                 } else {
-                    struct_abilities.intersect(field_abilities)
-                };
-                abilities
+                    struct_abilities.intersect(field_abilities).remove(Ability::Key)
+                }
             },
             Type::TypeParameter(i) => {
                 if let Some(tp) = ty_params.get(*i as usize) {
                     tp.1.abilities
                 } else {
-                    AbilitySet::EMPTY
+                    panic!("ICE unbound type parameter")
                 }
             },
             Type::Reference(_, _) => AbilitySet::REFERENCES,
