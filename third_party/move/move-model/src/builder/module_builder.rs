@@ -1241,10 +1241,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             EA::StructFields::Native(_) => None,
         };
         self.parent
-            .struct_table
-            .get_mut(&qsym)
-            .expect("struct invalid")
-            .fields = fields;
+        .struct_table
+        .get_mut(&qsym)
+        .expect("struct invalid")
+        .fields = fields;
+        self.parent.ability_check_struct_def(self.parent.struct_table.get(&qsym).expect("struct invalid"));
     }
 
     /// The name of a dummy field the legacy Move compilers adds to zero-arity structs.

@@ -105,12 +105,15 @@ fn check_key_for_temp_with_msg(func_target: &FunctionTarget, t: TempIndex, loc: 
 	check_key(func_target, ty, loc, err_msg)
 }
 
+// checks that the given type is instantiated with types satisfying their ability constraints
+// on the type parameter
 fn check_struct_inst(target: &FunctionTarget, mid: ModuleId, sid: StructId, inst: &[Type], loc: &Loc) {
     let qid = QualifiedId{ module_id: mid, id: sid };
     let struct_env = target.global_env().get_struct(qid);
     for (param, ty) in struct_env.get_type_parameters().iter().zip(inst.iter()) {
         let required_abilities = param.1.abilities;
         let given_abilities = type_abilities(target, ty);
+        // todo: which field, why
         if !required_abilities.is_subset(given_abilities) {
             target.global_env().error(loc, "invalid instantiation")
         }
@@ -123,6 +126,7 @@ fn check_fun_inst(target: &FunctionTarget, mid: ModuleId, fid: FunId, inst: &[Ty
     for (param, ty) in fun_env.get_type_parameters().iter().zip(inst.iter()) {
         let required_abilities = param.1.abilities;
         let given_abilities = type_abilities(target, ty);
+        // todo: which field, why
         if !required_abilities.is_subset(given_abilities) {
             target.global_env().error(loc, "invalid instantiation")
         }
