@@ -14431,6 +14431,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "testdiff"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap 4.3.21",
+ "itertools 0.10.5",
+ "once_cell",
+ "walkdir",
+]
+
+[[package]]
 name = "textwrap"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
