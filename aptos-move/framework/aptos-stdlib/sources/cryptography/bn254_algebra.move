@@ -4,7 +4,7 @@
 /// defined over a 254-bit (prime) field. The scalar field is highly 2-adic.
 ///
 /// This curve is also implemented in [libff](https://github.com/scipr-lab/libff/tree/master/libff/algebra/curves/alt_bn128) under the name `bn128`.
-/// It is the same as the `bn256` curve used in Ethereum (eg: [go-ethereum](https://github.com/ethereum/go-ethereum/tree/master/crypto/bn254/cloudflare)).
+/// It is the same as the `bn254` curve used in Ethereum (eg: [go-ethereum](https://github.com/ethereum/go-ethereum/tree/master/crypto/bn254/cloudflare)).
 ///
 /// #CAUTION
 /// **This curve does not satisfy the 128-bit security level anymore.**
@@ -488,15 +488,6 @@ module std::bn254_algebra {
 
         // Subtraction.
         assert!(eq(&point_9g, &sub(&point_2g, &point_minus_7g_calc)), 1);
-
-        // // Hash-to-group using suite `BLS12381G1_XMD:SHA-256_SSWU_RO_`.
-        // // Test vectors source: https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-bls12381g1_xmdsha-256_sswu_
-        // let actual = hash_to<G1, HashG1XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"");
-        // let expected = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&x"052926add2207b76ca4fa57a8734416c8dc95e24501772c814278700eed6d1e4e8cf62d9c09db0fac349612b759e79a108ba738453bfed09cb546dbb0783dbb3a5f1f566ed67bb6be0e8c67e2e81a4cc68ee29813bb7994998f3eae0c9c6a265"));
-        // assert!(eq(&expected, &actual), 1);
-        // let actual = hash_to<G1, HashG1XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
-        // let expected = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&x"11e0b079dea29a68f0383ee94fed1b940995272407e3bb916bbf268c263ddd57a6a27200a784cbc248e84f357ce82d9803a87ae2caf14e8ee52e51fa2ed8eefe80f02457004ba4d486d6aa1f517c0889501dc7413753f9599b099ebcbbd2d709"));
-        // assert!(eq(&expected, &actual), 1);
     }
 
     #[test_only]
@@ -609,15 +600,6 @@ module std::bn254_algebra {
 
         // Subtraction.
         assert!(eq(&point_9g, &sub(&point_2g, &point_minus_7g_calc)), 1);
-
-        // // Hash-to-group using suite `BLS12381G2_XMD:SHA-256_SSWU_RO_`.
-        // // Test vectors source: https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-bls12381g2_xmdsha-256_sswu_
-        // let actual = hash_to<G2, HashG2XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"");
-        // let expected = std::option::extract(&mut deserialize<G2, FormatG2Uncompr>(&x"05cb8437535e20ecffaef7752baddf98034139c38452458baeefab379ba13dff5bf5dd71b72418717047f5b0f37da03d0141ebfbdca40eb85b87142e130ab689c673cf60f1a3e98d69335266f30d9b8d4ac44c1038e9dcdd5393faf5c41fb78a12424ac32561493f3fe3c260708a12b7c620e7be00099a974e259ddc7d1f6395c3c811cdd19f1e8dbf3e9ecfdcbab8d60503921d7f6a12805e72940b963c0cf3471c7b2a524950ca195d11062ee75ec076daf2d4bc358c4b190c0c98064fdd92"));
-        // assert!(eq(&expected, &actual), 1);
-        // let actual = hash_to<G2, HashG2XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
-        // let expected = std::option::extract(&mut deserialize<G2, FormatG2Uncompr>(&x"190d119345b94fbd15497bcba94ecf7db2cbfd1e1fe7da034d26cbba169fb3968288b3fafb265f9ebd380512a71c3f2c121982811d2491fde9ba7ed31ef9ca474f0e1501297f68c298e9f4c0028add35aea8bb83d53c08cfc007c1e005723cd00bb5e7572275c567462d91807de765611490205a941a5a6af3b1691bfe596c31225d3aabdf15faff860cb4ef17c7c3be05571a0f8d3c08d094576981f4a3b8eda0a8e771fcdcc8ecceaf1356a6acf17574518acb506e435b639353c2e14827c8"));
-        // assert!(eq(&expected, &actual), 1);
     }
 
     #[test_only]
