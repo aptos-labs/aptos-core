@@ -35,11 +35,11 @@ failing `assert!` macro).
 Instead of an `abort_code`, an `expected_failure` may specify program
 execution errors, such as `arithmetic_error`, `major_status`,
 `vector_error`, and `out_of_gas`.  For more specifity, a
-'minor_status' may optionally be specified.
+`minor_status` may optionally be specified.
 
 If the error is expected from a specific location, that may also be specified:
 `#[expected_failure(abort_code = <code>, location = <loc>)]`.
-If the test then fails with a different abort code, in a different module or with a non-abort error the test will fail.
+If the test then fails with the right error but in a different module, the test will also fail.
 Note that `<loc>` can be `Self`(in the current module) or a qualified name, e.g. `vector::std`.
 
 Only functions that have the `#[test]` annotation can also be annotated as an #`[expected_failure]`.
@@ -71,9 +71,9 @@ fun test_destroy_fails() { ... }
 
 ### Test parameters
 
-With arguments, a test annotation takes the form `#[test(<param_name_1> = <address>, ..., <param_name_n> = <address>)]`. If a function is annotated in such a manner, the function's parameters must be a permutation of the parameters <`param_name_1>, ..., <param_name_n>`, i.e., the order of these parameters as they occur in the function and their order in the test annotation do not have to be the same, but they must be able to be matched up with each other by name.
+With arguments, a test annotation takes the form `#[test(<param_name_1> = <address>, ..., <param_name_n> = <address>)]`. If a function is annotated in such a manner, the function's parameters must be a permutation of the parameters `<param_name_1>, ..., <param_name_n>`, i.e., the order of these parameters as they occur in the function and their order in the test annotation do not have to be the same, but they must be able to be matched up with each other by name.
 
-Only parameters with a type of `signer` are supported as test parameters. If a non-`signer` parameter is supplied, the test will result in an error when run.
+Only parameters with a type of `signer` are supported as test parameters. If a parameter other than `signer` is supplied, the test will result in an error when run.
 
 ```
 #[test(arg = @0xC0FFEE)] // OK
