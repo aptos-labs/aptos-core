@@ -16,14 +16,17 @@ use crate::{
         SpecFunId, SpecVarId, StructId, TypeParameter,
     },
     symbol::Symbol,
-    ty::{Constraint, Type, PrimitiveType},
+    ty::{Constraint, PrimitiveType, Type},
 };
 use codespan_reporting::diagnostic::Severity;
-use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
-use move_binary_format::file_format::{AbilitySet, Visibility, Ability};
-use move_compiler::{expansion::ast::{self as EA, Fields}, parser::ast as PA, shared::NumericalAddress};
+use move_binary_format::file_format::{Ability, AbilitySet, Visibility};
+use move_compiler::{
+    expansion::ast::{self as EA},
+    parser::ast as PA,
+    shared::NumericalAddress,
+};
 use move_core_types::account_address::AccountAddress;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -388,9 +391,18 @@ impl<'env> ModelBuilder<'env> {
             .expect("invalid Type::Struct")
     }
 
-    // infers the abilities that the given type certainly have
-    // meanwhile, checks that all type instantiations satisfy the ability constraint
-    pub fn type_abilities_certainly_have(&self, ty: &Type, ty_params: &[TypeParameter], loc: &Loc) -> AbilitySet {
+    // assuming all structs are well defined
+    // checks whether the type is instantiated properly, i.e.,
+    // - the type arguments given to the struct are instantiated properly
+    // - the type arguments satisfy the ability constraints defined on the struct generics
+    // and returns the abilities of the given type
+    // `ty_params` specify the abilities held by type params
+    pub fn check_instantiation(
+        &self,
+        ty: &Type,
+        ty_params: &[TypeParameter],
+        loc: &Loc,
+    ) -> AbilitySet {
         match ty {
             Type::Primitive(p) => match p {
                 PrimitiveType::Bool
@@ -406,32 +418,35 @@ impl<'env> ModelBuilder<'env> {
                 | PrimitiveType::Address => AbilitySet::PRIMITIVES,
                 PrimitiveType::Signer => AbilitySet::SIGNER,
             },
-            Type::Vector(et) => AbilitySet::VECTOR.intersect(self.type_abilities_certainly_have(et, ty_params, loc)),
+            Type::Vector(et) => {
+                AbilitySet::VECTOR.intersect(self.check_instantiation(et, ty_params, loc))
+            },
             Type::Struct(mid, sid, insts) => {
                 let struct_entry = self.lookup_struct_entry(mid.qualified(*sid));
                 let struct_abilities = &struct_entry.abilities;
-                let params_ability_constraints = struct_entry.type_params.iter().map(|tp| tp.1.abilities);
-                // validates type instantiations
-                for (inst_ty, param_ability_constraints) in insts.iter().zip(params_ability_constraints) {
-                    let inst_abilities = self.type_abilities_certainly_have(inst_ty, ty_params, loc);
-                        if !param_ability_constraints.is_subset(inst_abilities) {
-                            self.error(loc, "invalid instantiation")
+                let params_ability_constraints =
+                    struct_entry.type_params.iter().map(|tp| tp.1.abilities);
+                let fields_abilities_meet = insts
+                    .iter()
+                    .zip(params_ability_constraints)
+                    .map(|(inst_ty, constraints)| {
+                        let inst_abilities = self.check_instantiation(inst_ty, ty_params, loc);
+                        if !constraints.is_subset(inst_abilities) {
+                            self.error(loc, &format!("Invalid instantiation"))
                         }
-                }
-                let fields_abilities_meet = if let Some(fields) = &struct_entry.fields {
-                   fields.iter().map(
-                    |(field_name, (_loc, field_idx, field_ty))| {
-                        let field_ty = &field_ty.instantiate(insts);
-                        self.type_abilities_certainly_have(field_ty, ty_params, loc)
-                    }
-                   ).fold(AbilitySet::ALL, |acc, abilities| acc.intersect(abilities))
+                        inst_abilities
+                    })
+                    .fold(AbilitySet::ALL, |acc, abilities| acc.intersect(abilities));
+                if struct_abilities.has_ability(Ability::Key)
+                    && fields_abilities_meet.has_ability(Ability::Store)
+                {
+                    struct_abilities
+                        .intersect(fields_abilities_meet)
+                        .add(Ability::Key)
                 } else {
-                    AbilitySet::ALL
-                };
-                if struct_abilities.has_ability(Ability::Key) && fields_abilities_meet.has_ability(Ability::Store) {
-                    struct_abilities.intersect(fields_abilities_meet).add(Ability::Key)
-                } else {
-                    struct_abilities.intersect(fields_abilities_meet).remove(Ability::Key)
+                    struct_abilities
+                        .intersect(fields_abilities_meet)
+                        .remove(Ability::Key)
                 }
             },
             Type::TypeParameter(i) => {
@@ -452,7 +467,11 @@ impl<'env> ModelBuilder<'env> {
     }
 
     // infers the abilities that the given type may have
-    pub fn type_abilities_may_have(&self, ty: &Type, ty_params: &[TypeParameter], loc: &Loc) -> AbilitySet {
+    // assuming that type params have all abilities
+    pub fn type_abilities_may_have(
+        &self,
+        ty: &Type,
+    ) -> AbilitySet {
         match ty {
             Type::Primitive(p) => match p {
                 PrimitiveType::Bool
@@ -468,32 +487,37 @@ impl<'env> ModelBuilder<'env> {
                 | PrimitiveType::Address => AbilitySet::PRIMITIVES,
                 PrimitiveType::Signer => AbilitySet::SIGNER,
             },
-            Type::Vector(et) => AbilitySet::VECTOR.intersect(self.type_abilities_certainly_have(et, ty_params, loc)),
+            Type::Vector(et) => {
+                AbilitySet::VECTOR.intersect(self.type_abilities_may_have(et))
+            },
             Type::Struct(mid, sid, insts) => {
                 let struct_entry = self.lookup_struct_entry(mid.qualified(*sid));
                 let struct_abilities = &struct_entry.abilities;
                 let fields_abilities_meet = if let Some(fields) = &struct_entry.fields {
-                   fields.iter().map(
-                    |(field_name, (_loc, field_idx, field_ty))| {
-                        let field_ty = &field_ty.instantiate(insts);
-                        self.type_abilities_certainly_have(field_ty, ty_params, loc)
-                    }
-                   ).fold(AbilitySet::ALL, |acc, abilities| acc.intersect(abilities))
+                    fields
+                        .iter()
+                        .map(|(_field_name, (_loc, _field_idx, field_ty))| {
+                            let field_ty = &field_ty.instantiate(insts);
+                            self.type_abilities_may_have(field_ty)
+                        })
+                        .fold(AbilitySet::ALL, |acc, abilities| acc.intersect(abilities))
                 } else {
                     AbilitySet::ALL
                 };
-                if struct_abilities.has_ability(Ability::Key) && fields_abilities_meet.has_ability(Ability::Store) {
-                    struct_abilities.intersect(fields_abilities_meet).add(Ability::Key)
+                if struct_abilities.has_ability(Ability::Key)
+                    && fields_abilities_meet.has_ability(Ability::Store)
+                {
+                    struct_abilities
+                        .intersect(fields_abilities_meet)
+                        .add(Ability::Key)
                 } else {
-                    struct_abilities.intersect(fields_abilities_meet).remove(Ability::Key)
+                    struct_abilities
+                        .intersect(fields_abilities_meet)
+                        .remove(Ability::Key)
                 }
             },
-            Type::TypeParameter(i) => {
-                if let Some(_) = ty_params.get(*i as usize) {
-                    AbilitySet::ALL
-                } else {
-                    panic!("ICE unbound type parameter")
-                }
+            Type::TypeParameter(_) => {
+                AbilitySet::ALL
             },
             Type::Reference(_, _) => AbilitySet::REFERENCES,
             Type::Fun(_, _)
@@ -506,14 +530,32 @@ impl<'env> ModelBuilder<'env> {
     }
 
     pub fn ability_check_struct_def(&self, struct_entry: &StructEntry) {
-        if let Some(_) = &struct_entry.fields {
-            let ty_insts = (0..struct_entry.type_params.len()).map(|i| Type::TypeParameter(i as u16)).collect_vec();
-            let ty = Type::Struct(struct_entry.module_id.clone(), struct_entry.struct_id.clone(), ty_insts);
-            // check all type constraints are satisfied on fields
-            self.type_abilities_certainly_have(&ty, &struct_entry.type_params, &struct_entry.loc);
-            // check all fields may have the declared abilities
-            if !struct_entry.abilities.is_subset(self.type_abilities_may_have(&ty, &struct_entry.type_params, &struct_entry.loc)) {
-                self.error(&struct_entry.loc, "invalid struct definition")
+        if let Some(fields) = &struct_entry.fields {
+            let struct_abilities = struct_entry.abilities;
+            let ty_params = &struct_entry.type_params;
+            for (_field_name, (loc, _field_idx, field_ty)) in fields.iter() {
+                // check fields are properly instantiated
+                self.check_instantiation(field_ty, ty_params, loc);
+                // check fields may have the declared abilities on the struct
+                let may_have_abilities = self.type_abilities_may_have(field_ty);
+                if struct_abilities.has_copy() && !may_have_abilities.has_copy() {
+                    self.error(
+                        loc,
+                        "must have copy ability"
+                    )
+                }
+                if struct_abilities.has_drop() && !may_have_abilities.has_drop() {
+                    self.error(
+                        loc,
+                        "must have drop ability"
+                    )
+                }
+                if (struct_abilities.has_store() | struct_abilities.has_key()) && !may_have_abilities.has_store() {
+                    self.error(
+                        loc,
+                        "must have store ability"
+                    )
+                }
             }
         }
     }
