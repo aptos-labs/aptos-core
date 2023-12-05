@@ -2,22 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    abstract_write_op::{AbstractResourceWriteOp, GroupWrite},
     change_set::VMChangeSet,
     check_change_set::CheckChangeSet,
-    output::VMOutput, abstract_write_op::{AbstractResourceWriteOp, WriteWithDelayedFieldsOp},
+    output::VMOutput,
 };
 use aptos_aggregator::{
     delayed_change::DelayedChange,
-    delta_change_set::{delta_add, serialize, DeltaOp},
+    delta_change_set::{delta_add, DeltaOp},
     types::DelayedFieldID,
 };
 use aptos_types::{
     account_address::AccountAddress,
+    contract_event::ContractEvent,
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
     transaction::{ExecutionStatus, TransactionStatus},
-    write_set::{WriteOp, WriteOpSize},
+    write_set::WriteOp,
 };
 use move_core_types::{
     identifier::Identifier,
@@ -39,14 +41,22 @@ macro_rules! as_state_key {
     ($k:ident) => {
         StateKey::raw($k.to_string().into_bytes())
     };
+    ($k:expr) => {
+        StateKey::raw($k.to_string().into_bytes())
+    };
 }
 pub(crate) use as_state_key;
 
 macro_rules! as_bytes {
     ($v:ident) => {
-        serialize(&$v)
+        bcs::to_bytes(&$v).expect("unexpected serialization")
+    };
+    ($v:expr) => {
+        bcs::to_bytes(&$v).expect("unexpected serialization")
     };
 }
+
+pub(crate) use as_bytes;
 
 pub(crate) fn raw_metadata(v: u64) -> StateValueMetadata {
     StateValueMetadata::new(v, &CurrentTimeMicroseconds { microseconds: v })
@@ -64,22 +74,6 @@ pub(crate) fn mock_delete(k: impl ToString) -> (StateKey, WriteOp) {
     (as_state_key!(k), WriteOp::Deletion)
 }
 
-fn with_layout_to_abstract(
-    write_op: WriteOp,
-    layout: Option<Arc<MoveTypeLayout>>,
-) -> AbstractResourceWriteOp {
-    if let Some(layout) = layout {
-        let materialized_size = WriteOpSize::from(&write_op).write_len();
-        AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFieldsOp {
-            write_op,
-            layout,
-            materialized_size,
-        })
-    } else {
-        AbstractResourceWriteOp::Write(write_op)
-    }
-}
-
 pub(crate) fn mock_create_with_layout(
     k: impl ToString,
     v: u128,
@@ -87,7 +81,10 @@ pub(crate) fn mock_create_with_layout(
 ) -> (StateKey, AbstractResourceWriteOp) {
     (
         as_state_key!(k),
-        with_layout_to_abstract(WriteOp::Creation(as_bytes!(v).into()), layout),
+        AbstractResourceWriteOp::from_resource_write_with_maybe_layout(
+            WriteOp::Creation(as_bytes!(v).into()),
+            layout,
+        ),
     )
 }
 
@@ -98,14 +95,17 @@ pub(crate) fn mock_modify_with_layout(
 ) -> (StateKey, AbstractResourceWriteOp) {
     (
         as_state_key!(k),
-        with_layout_to_abstract(WriteOp::Modification(as_bytes!(v).into()), layout),
+        AbstractResourceWriteOp::from_resource_write_with_maybe_layout(
+            WriteOp::Modification(as_bytes!(v).into()),
+            layout,
+        ),
     )
 }
 
 pub(crate) fn mock_delete_with_layout(k: impl ToString) -> (StateKey, AbstractResourceWriteOp) {
     (
         as_state_key!(k),
-        with_layout_to_abstract(WriteOp::Deletion, None),
+        AbstractResourceWriteOp::from_resource_write_with_maybe_layout(WriteOp::Deletion, None),
     )
 }
 
@@ -180,6 +180,7 @@ impl VMChangeSetBuilder {
         self
     }
 
+    #[allow(dead_code)]
     pub(crate) fn with_events(
         mut self,
         events: impl IntoIterator<Item = (ContractEvent, Option<MoveTypeLayout>)>,
@@ -191,10 +192,13 @@ impl VMChangeSetBuilder {
 
     pub(crate) fn with_delayed_field_change_set(
         mut self,
-        delayed_field_change_set: impl IntoIterator<Item = (DelayedFieldID, DelayedChange<DelayedFieldID>)>,
+        delayed_field_change_set: impl IntoIterator<
+            Item = (DelayedFieldID, DelayedChange<DelayedFieldID>),
+        >,
     ) -> Self {
         assert!(self.delayed_field_change_set.is_empty());
-        self.delayed_field_change_set.extend(delayed_field_change_set);
+        self.delayed_field_change_set
+            .extend(delayed_field_change_set);
         self
     }
 
@@ -265,6 +269,7 @@ pub(crate) struct ExpandedVMChangeSetBuilder {
     events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
 }
 
+#[allow(dead_code)]
 impl ExpandedVMChangeSetBuilder {
     pub(crate) fn new() -> Self {
         Self {
@@ -294,7 +299,8 @@ impl ExpandedVMChangeSetBuilder {
         resource_group_write_set: impl IntoIterator<Item = (StateKey, GroupWrite)>,
     ) -> Self {
         assert!(self.resource_group_write_set.is_empty());
-        self.resource_group_write_set.extend(resource_group_write_set);
+        self.resource_group_write_set
+            .extend(resource_group_write_set);
         self
     }
 
@@ -327,16 +333,21 @@ impl ExpandedVMChangeSetBuilder {
 
     pub(crate) fn with_delayed_field_change_set(
         mut self,
-        delayed_field_change_set: impl IntoIterator<Item = (DelayedFieldID, DelayedChange<DelayedFieldID>)>,
+        delayed_field_change_set: impl IntoIterator<
+            Item = (DelayedFieldID, DelayedChange<DelayedFieldID>),
+        >,
     ) -> Self {
         assert!(self.delayed_field_change_set.is_empty());
-        self.delayed_field_change_set.extend(delayed_field_change_set);
+        self.delayed_field_change_set
+            .extend(delayed_field_change_set);
         self
     }
 
     pub(crate) fn with_reads_needing_delayed_field_exchange(
         mut self,
-        reads_needing_delayed_field_exchange: impl IntoIterator<Item = (StateKey, (WriteOp, Arc<MoveTypeLayout>))>,
+        reads_needing_delayed_field_exchange: impl IntoIterator<
+            Item = (StateKey, (WriteOp, Arc<MoveTypeLayout>)),
+        >,
     ) -> Self {
         assert!(self.reads_needing_delayed_field_exchange.is_empty());
         self.reads_needing_delayed_field_exchange
@@ -363,8 +374,8 @@ impl ExpandedVMChangeSetBuilder {
         self
     }
 
-    pub(crate) fn build(self) -> ExpandedVMChangeSet {
-        ExpandedVMChangeSet::new_expanded(
+    pub(crate) fn try_build(self) -> Result<VMChangeSet, VMStatus> {
+        VMChangeSet::new_expanded(
             self.resource_write_set,
             self.resource_group_write_set,
             self.module_write_set,
@@ -376,6 +387,9 @@ impl ExpandedVMChangeSetBuilder {
             self.events,
             &MockChangeSetChecker,
         )
-        .unwrap()
+    }
+
+    pub(crate) fn build(self) -> VMChangeSet {
+        self.try_build().unwrap()
     }
 }
