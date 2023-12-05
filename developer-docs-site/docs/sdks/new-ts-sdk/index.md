@@ -13,7 +13,7 @@ TODO remove soon - after 12/18/2023
 -->
 
 :::note
-This documentation is for the new TypeScript SDK [@aptos-labs/ts-sdk](https://github.com/aptos-labs/aptos-ts-sdk). You can find the documentation for the old SDK (aka `aptos`) [here](../ts-sdk/index.md)
+This documentation is for the new TypeScript SDK [@aptos-labs/ts-sdk](https://github.com/aptos-labs/aptos-ts-sdk). You can find the documentation for the legacy SDK (aka `aptos`) [here](../ts-sdk/index.md)
 
 Looking to migrate to the **new TypeScript SDK**? check out the [migration guide](./migration-guide.md)
 :::
