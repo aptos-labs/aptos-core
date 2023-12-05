@@ -428,7 +428,6 @@ impl<'env> ModelBuilder<'env> {
                 } else {
                     AbilitySet::ALL
                 };
-                // let fields_abilities_meet = fields_abilities.fold(AbilitySet::ALL, |acc, abilities| acc.intersect(abilities));
                 if struct_abilities.has_ability(Ability::Key) && fields_abilities_meet.has_ability(Ability::Store) {
                     struct_abilities.intersect(fields_abilities_meet).add(Ability::Key)
                 } else {
