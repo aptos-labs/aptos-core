@@ -436,11 +436,56 @@ pub trait ExpRewriterFunctions {
         }
     }
 
+    fn rewrite_pattern_vector(
+        &mut self,
+        pat_vec: &[Pattern],
+        entering_scope: bool,
+    ) -> Option<Vec<Pattern>> {
+        let rewritten_part: Vec<_> = pat_vec
+            .iter()
+            .map(|pat| self.rewrite_pattern(pat, entering_scope))
+            .collect();
+        if rewritten_part.iter().any(|opt_pat| opt_pat.is_some()) {
+            // if any subpattern was simplified, then rebuild the vector
+            // with a combination of original and new patterns.
+            let rewritten_vec: Vec<_> = pat_vec
+                .iter()
+                .zip(rewritten_part)
+                .map(|(org_pat, opt_new_pat)| opt_new_pat.unwrap_or(org_pat.clone()))
+                .collect();
+            Some(rewritten_vec)
+        } else {
+            None
+        }
+    }
+
     fn internal_rewrite_pattern(&mut self, pat: &Pattern, entering_scope: bool) -> (bool, Pattern) {
-        if let Some(new_pat) = self.rewrite_pattern(pat, entering_scope) {
+        let mut changed = false;
+        let new_pat = match pat {
+            Pattern::Tuple(id, pattern_vec) => {
+                let res_opt = self.rewrite_pattern_vector(pattern_vec, entering_scope);
+                if let Some(result) = res_opt {
+                    changed = true;
+                    Pattern::Tuple(*id, result)
+                } else {
+                    Pattern::Tuple(*id, pattern_vec.clone())
+                }
+            },
+            Pattern::Struct(id, struct_id, pattern_vec) => {
+                let res_opt = self.rewrite_pattern_vector(pattern_vec, entering_scope);
+                if let Some(result) = res_opt {
+                    changed = true;
+                    Pattern::Struct(*id, struct_id.clone(), result)
+                } else {
+                    Pattern::Struct(*id, struct_id.clone(), pattern_vec.clone())
+                }
+            },
+            _ => pat.clone(),
+        };
+        if let Some(new_pat) = self.rewrite_pattern(&new_pat, entering_scope) {
             (true, new_pat)
         } else {
-            (false, pat.clone())
+            (changed, new_pat.clone())
         }
     }
 
