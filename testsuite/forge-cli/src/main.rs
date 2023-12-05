@@ -1757,9 +1757,6 @@ fn realistic_env_max_load_test(
     let duration_secs = duration.as_secs();
     let long_running = duration_secs >= 2400;
 
-    // Calculate the max CPU threshold
-    let max_cpu_threshold = if num_validators >= 10 { 30 } else { 70 };
-
     // Create the test
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
