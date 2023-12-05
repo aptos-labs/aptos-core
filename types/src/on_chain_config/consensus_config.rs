@@ -13,8 +13,8 @@ use std::collections::HashMap;
 pub enum OnChainConsensusConfig {
     V1(ConsensusConfigV1),
     V2(ConsensusConfigV1),
-    DagV1(DagConsensusConfigV1),
     V3(ConsensusConfigV1Ext),
+    DagV1(DagConsensusConfigV1),
 }
 
 /// The public interface that exposes all values with safe fallback.
