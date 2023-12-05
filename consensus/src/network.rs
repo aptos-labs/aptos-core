@@ -552,7 +552,7 @@ impl RBNetworkSender<RandMessage, RandMessage> for NetworkSender {
     ) -> anyhow::Result<RandMessage> {
         let msg = ConsensusMsg::RandMessage(message.into());
         let response = match self.send_rpc(receiver, msg, timeout_duration).await? {
-            ConsensusMsg::RandMessage(resp) if matches!(*resp, RandMessage::ShareAck(_) | RandMessage::DeltaAck(_)) => *resp,
+            ConsensusMsg::RandMessage(resp) if matches!(*resp, RandMessage::ShareAck(_) | RandMessage::DeltaAck(_) | RandMessage::CertifiedDeltaAck(_)) => *resp,
             _ => bail!("[RandMessage] Invalid response to request"),
         };
 

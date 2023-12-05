@@ -18,15 +18,15 @@ use aptos_dkg::weighted_vuf::traits::WeightedVUF;
 const BENCH_MSG: &[u8; 36] = b"some dummy message for the benchmark";
 
 pub fn all_groups(c: &mut Criterion) {
-    let mut group = c.benchmark_group("das-pinkas-sk-in-g1");
+    let mut group = c.benchmark_group("wvuf/das-pinkas-sk-in-g1");
     wvuf_benches::<das::Transcript, PinkasWUF, WallTime>(&mut group);
     group.finish();
 
-    let mut group = c.benchmark_group("scrape-gjm21-insecure-sk-in-g2");
+    let mut group = c.benchmark_group("wvuf/scrape-gjm21-insecure-sk-in-g2");
     wvuf_benches::<scrape::Transcript, gjm21_insecure::g2::GjmInsecureWVUF, WallTime>(&mut group);
     group.finish();
 
-    let mut group = c.benchmark_group("das-gjm21-insecure-sk-in-g1");
+    let mut group = c.benchmark_group("wvuf/das-gjm21-insecure-sk-in-g1");
     wvuf_benches::<das::Transcript, gjm21_insecure::g1::GjmInsecureWVUF, WallTime>(&mut group);
     group.finish();
 }
@@ -152,9 +152,9 @@ pub fn wvuf_benches<
 
         wvuf_eval::<WeightedTranscript<T>, WVUF, M>(&wc, &sk, group);
 
-        // TODO: derive_eval (needs create_proof)
+        // TODO: verify_proof (needs efficient create_proof)
 
-        // TODO: verify_eval (needs create_proof)
+        // TODO: derive_eval (needs efficient create_proof)
     }
 }
 

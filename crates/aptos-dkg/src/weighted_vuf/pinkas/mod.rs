@@ -6,7 +6,7 @@ use crate::pvss::{Player, WeightedConfig};
 use crate::utils::random::random_scalar;
 use crate::utils::{g1_multi_exp, g2_multi_exp, multi_pairing};
 use crate::weighted_vuf::traits::WeightedVUF;
-use anyhow::bail;
+use anyhow::{anyhow, bail};
 use blstrs::{pairing, G1Projective, G2Projective, Gt, Scalar};
 use ff::Field;
 use group::{Curve, Group};
@@ -56,9 +56,10 @@ impl WeightedVUF for PinkasWUF {
     type AugmentedSecretKeyShare = (Scalar, Self::SecretKeyShare);
 
     type ProofShare = G2Projective;
-    type Proof = Self::Evaluation;
 
-    /// Note: The aggregated VUF proof is not verifiable.
+    /// Naive aggregation by concatenation. It is an open problem to get constant-sized aggregation.
+    type Proof = Vec<(Player, Self::ProofShare)>;
+
     type Evaluation = Gt;
 
     fn augment_key_pair<R: rand_core::RngCore + rand_core::CryptoRng>(
@@ -159,41 +160,16 @@ impl WeightedVUF for PinkasWUF {
     }
 
     fn aggregate_shares(
-        wc: &WeightedConfig,
+        _wc: &WeightedConfig,
         apks_and_proofs: &[(Player, Self::AugmentedPubKeyShare, Self::ProofShare)],
     ) -> Self::Proof {
-        // Collect all the evaluation points associated with each player's augmented pubkey sub shares.
-        let mut sub_player_ids = Vec::with_capacity(wc.get_total_weight());
+        let mut players_and_shares = Vec::with_capacity(apks_and_proofs.len());
 
-        for (i, apk_share, _) in apks_and_proofs {
-            for j in 0..apk_share.1.len() {
-                sub_player_ids.push(wc.get_virtual_player(i, j).id);
-            }
+        for (p, _, share) in apks_and_proofs {
+            players_and_shares.push((p.clone(), share.clone()));
         }
 
-        // Compute the Lagrange coefficients associated with those evaluation points
-        let batch_dom = wc.get_batch_evaluation_domain();
-        let lagr = lagrange_coefficients(batch_dom, &sub_player_ids[..], &Scalar::ZERO);
-
-        // Interpolate the WVUF Proof
-        let mut k = 0;
-        let mut lhs = Vec::with_capacity(apks_and_proofs.len());
-        let mut rhs = Vec::with_capacity(apks_and_proofs.len());
-        for (_, apk_share, proof) in apks_and_proofs {
-            // println!(
-            //     "Flattening {} share(s) for player {player}",
-            //     sub_shares.len()
-            // );
-            let rks = &apk_share.0.rks;
-            let num_shares = rks.len();
-
-            rhs.push(proof);
-            lhs.push(g1_multi_exp(&rks[..], &lagr[k..k + num_shares]));
-
-            k += num_shares;
-        }
-
-        multi_pairing(lhs.iter().map(|r| r), rhs.into_iter())
+        players_and_shares
     }
 
     fn eval(sk: &Self::SecretKey, msg: &[u8]) -> Self::Evaluation {
@@ -204,26 +180,64 @@ impl WeightedVUF for PinkasWUF {
 
     // NOTE: This VUF has the same evaluation as its proof.
     fn derive_eval(
+        wc: &WeightedConfig,
         _pp: &Self::PublicParameters,
         _msg: &[u8],
+        apks: &[Option<Self::AugmentedPubKeyShare>],
         proof: &Self::Proof,
-    ) -> Self::Evaluation {
-        *proof
+    ) -> anyhow::Result<Self::Evaluation> {
+        // Collect all the evaluation points associated with each player's augmented pubkey sub shares.
+        let mut sub_player_ids = Vec::with_capacity(wc.get_total_weight());
+
+        for (player, _) in proof {
+            for j in 0..wc.get_player_weight(player) {
+                sub_player_ids.push(wc.get_virtual_player(player, j).id);
+            }
+        }
+
+        // Compute the Lagrange coefficients associated with those evaluation points
+        let batch_dom = wc.get_batch_evaluation_domain();
+        let lagr = lagrange_coefficients(batch_dom, &sub_player_ids[..], &Scalar::ZERO);
+
+        // Interpolate the WVUF Proof
+        let mut k = 0;
+        let mut lhs = Vec::with_capacity(proof.len());
+        let mut rhs = Vec::with_capacity(proof.len());
+        for (player, share) in proof {
+            // println!(
+            //     "Flattening {} share(s) for player {player}",
+            //     sub_shares.len()
+            // );
+            let apk = apks[player.id].as_ref().ok_or(anyhow!("Missing APK for player {}", player))?;
+            let rks = &apk.0.rks;
+            let num_shares = rks.len();
+
+            rhs.push(share);
+            lhs.push(g1_multi_exp(&rks[..], &lagr[k..k + num_shares]));
+
+            k += num_shares;
+        }
+
+        Ok(multi_pairing(lhs.iter().map(|r| r), rhs.into_iter()))
     }
 
-    // NOTE: Dummy implementation; this WUF is not actually WVUF.
-    fn create_proof(sk: &Self::SecretKey, msg: &[u8]) -> Self::Proof {
-        Self::eval(sk, msg)
-    }
-
-    // NOTE: Dummy implementation; this WUF is not actually WVUF.
-    fn verify_eval(
-        _pp: &Self::PublicParameters,
+    /// Verifies the proof shares one by one
+    fn verify_proof(
+        pp: &Self::PublicParameters,
         _pk: &Self::PubKey,
-        _msg: &[u8],
-        _proof: &Self::Proof,
-        _eval: &Self::Evaluation,
+        apks: &[Option<Self::AugmentedPubKeyShare>],
+        msg: &[u8],
+        proof: &Self::Proof,
     ) -> anyhow::Result<()> {
+        if proof.len() >= apks.len() {
+            bail!("Number of proof shares ({}) exceeds number of APKs ({}) when verifying aggregated WVUF proof", proof.len(), apks.len());
+        }
+
+        for (player, proof) in proof {
+            let apk = &apks[player.id].as_ref().ok_or(anyhow!("Missing APK for player {}", player))?;
+            Self::verify_share(pp, apk, msg, proof)?;
+        }
+
         Ok(())
     }
 }

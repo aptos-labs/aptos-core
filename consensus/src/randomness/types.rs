@@ -281,14 +281,9 @@ impl BroadcastStatus<RandMessage> for ShareAckState {
         if self.validators.remove(&peer) {
             // If receive a decision, verify it and send it to the randomness manager and stop the reliable broadcast
             if let Some(decision) = ack.maybe_decision {
-                match decision.verify(&self.rand_config) {
-                    Ok(()) => {
-                        let _ = self.rand_decision_tx.unbounded_send(decision);
+                if decision.verify(&self.rand_config).is_ok() {
+                    let _ = self.rand_decision_tx.unbounded_send(decision);
                         return Ok(Some(()));
-                    },
-                    Err(e) => {
-                        bail!("[RandMessage] Invalid decision from {}: {}", peer, e);
-                    },
                 }
             }
             // If receive from all validators, stop the reliable broadcast

@@ -113,22 +113,38 @@ fn wvuf_aggregation_test<
     let msg = b"some msg";
     let eval = WVUF::eval(&sk, msg.as_slice());
 
+    let (mut sks, pks) : (Vec<WVUF::SecretKeyShare>, Vec<WVUF::PubKeyShare>)= (0..wc.get_total_num_players()).map(|p| {
+        let (sk, pk) = trx.decrypt_own_share(&wc, &wc.get_player(p), &dks[p]);
+        (sk, pk)
+    }).collect::<Vec<(WVUF::SecretKeyShare, WVUF::PubKeyShare)>>().into_iter().unzip();
+
+    // we are going to be popping the SKs in reverse below (simplest way to move them out of the Vec)
+    sks.reverse();
+    let augmented_key_pairs = (0..wc.get_total_num_players()).map(|p| {
+        let sk = sks.pop().unwrap();
+        let pk = pks[p].clone();
+        let (ask, apk) = WVUF::augment_key_pair(&vuf_pp, sk, pk.clone(), rng);
+
+        // Test that pubkey augmentation works
+        let delta = WVUF::get_public_delta(&apk);
+        assert_eq!(
+            apk,
+            WVUF::augment_pubkey(&vuf_pp, pk, delta.clone()).unwrap()
+        );
+
+        (ask, apk)
+    }).collect::<Vec<(WVUF::AugmentedSecretKeyShare, WVUF::AugmentedPubKeyShare)>>();
+
+    let apks = augmented_key_pairs.iter().map(|(_, apk)| Some(apk.clone())).collect::<Vec<Option<WVUF::AugmentedPubKeyShare>>>();
+
     let apks_and_proofs = wc
         .get_random_eligible_subset_of_players(rng)
         .into_iter()
         .map(|p| {
-            let (sk, pk) = trx.decrypt_own_share(&wc, &p, &dks[p.get_id()]);
+            let ask = &augmented_key_pairs[p.id].0;
+            let apk = augmented_key_pairs[p.id].1.clone();
 
-            let (ask, apk) = WVUF::augment_key_pair(&vuf_pp, sk, pk.clone(), rng);
-
-            // Test that pubkey augmentation works
-            let delta = WVUF::get_public_delta(&apk);
-            assert_eq!(
-                apk,
-                WVUF::augment_pubkey(&vuf_pp, pk, delta.clone()).unwrap()
-            );
-
-            let proof = WVUF::create_share(&ask, msg);
+            let proof = WVUF::create_share(ask, msg);
             WVUF::verify_share(&vuf_pp, &apk, msg, &proof).expect("WVUF proof share should verify");
 
             (p, apk, proof)
@@ -137,14 +153,19 @@ fn wvuf_aggregation_test<
 
     // Aggregate the VUF from the subset of capable players
     let proof = WVUF::aggregate_shares(&wc, &apks_and_proofs);
-    let eval_aggr = WVUF::derive_eval(&vuf_pp, msg, &proof);
+
+    // Make sure the aggregated proof is valid
+    WVUF::verify_proof(&vuf_pp, pk, &apks[..], msg, &proof)
+        .expect("WVUF aggregated proof should verify");
+
+    // Derive the VUF evaluation
+    let eval_aggr = WVUF::derive_eval(&wc, &vuf_pp, msg, &apks[..], &proof).expect("WVUF derivation was expected to succeed");
+
+    // TODO: we are not yet testing proof verification and derivation with missing APKs
 
     // Test that we can hash this via, say, SHA3
     let eval_bytes = bcs::to_bytes(&eval).unwrap();
     let _hash = Sha3_256::digest(eval_bytes.as_slice()).to_vec();
-
-    WVUF::verify_eval(&vuf_pp, pk, msg, &proof, &eval_aggr)
-        .expect("WVUF aggregated proof should verify");
 
     assert_eq!(eval_aggr, eval);
 }

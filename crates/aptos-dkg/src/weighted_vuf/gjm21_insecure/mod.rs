@@ -301,40 +301,27 @@ macro_rules! gjm21_wvuf_insecure_impl {
                 $pairing(&hash, &sk.as_group_element().to_affine())
             }
 
-            // NOTE: This VUF has the same evaluation as its proof
             fn derive_eval(
+                _wc: &WeightedConfig,
                 pp: &Self::PublicParameters,
                 msg: &[u8],
+                _apks: &[Option<Self::AugmentedPubKeyShare>],
                 proof: &Self::Proof,
-            ) -> Self::Evaluation {
+            ) -> anyhow::Result<Self::Evaluation> {
                 let hash = Self::hash_to_curve(msg);
 
                 let lhs = [hash, proof.pi_1, proof.pi_2];
                 let rhs = [proof.hat_p_2, pp.hat_h_3, pp.hat_h_4];
 
-                $multi_pairing(lhs.iter(), rhs.iter())
+                Ok($multi_pairing(lhs.iter(), rhs.iter()))
             }
 
-            /// Used for testing only.
-            fn create_proof(_sk: &Self::SecretKey, _msg: &[u8]) -> Self::Proof {
-                todo!();
-                // TODO: impl
-                // Self::Proof {
-                //     pi_1: $G1Projective::identity(),
-                //     pi_2: $G1Projective::identity(),
-                //     p_1: $G1Projective::identity(),
-                //     p_2: $G1Projective::identity(),
-                //     hat_p_1: $G2Projective::identity(),
-                //     hat_p_2: $G2Projective::identity(),
-                // }
-            }
-
-            fn verify_eval(
+            fn verify_proof(
                 pp: &Self::PublicParameters,
                 pk: &Self::PubKey,
+                _apks: &[Option<Self::AugmentedPubKeyShare>],
                 msg: &[u8],
                 proof: &Self::Proof,
-                _eval: &Self::Evaluation,
             ) -> anyhow::Result<()> {
                 let delta = EncryptedSKs {
                     p_1: proof.p_1,
@@ -343,11 +330,13 @@ macro_rules! gjm21_wvuf_insecure_impl {
                     hat_p_2: vec![proof.hat_p_2], // just one element
                 };
 
+                // Verify the aggregated pubkey
                 let pk_share = vec![pvss::dealt_pub_key_share::$g1::DealtPubKeyShare::new(
                     pk.clone(),
                 )];
                 let apk = Self::augment_pubkey(pp, pk_share, delta)?;
 
+                // Verify the aggregated share
                 let proof_share = (proof.pi_1, proof.pi_2);
                 Self::verify_share(pp, &apk, msg, &proof_share)
             }

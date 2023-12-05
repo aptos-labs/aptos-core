@@ -103,6 +103,12 @@ impl WeightedConfig {
         Player { id }
     }
 
+    pub fn get_all_virtual_players(&self, player: &Player) -> Vec<Player> {
+        let w = self.get_player_weight(player);
+
+        (0..w).map(|i| self.get_virtual_player(player, i)).collect::<Vec<Player>>()
+    }
+
     pub fn get_batch_evaluation_domain(&self) -> &BatchEvaluationDomain {
         &self.tc.get_batch_evaluation_domain()
     }

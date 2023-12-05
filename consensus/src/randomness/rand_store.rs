@@ -76,7 +76,7 @@ impl RandItem {
 
     // update metadata and remove inconsistent shares and decision, return decision if available
     pub fn update_metadata(&mut self, metadata: RandMetadata, rand_config: &RandConfig) {
-        assert!(self.metadata.is_none(), "[RandStore] RandMetadata should not be set yet!");
+        // assert!(self.metadata.is_none(), "[RandStore] RandMetadata should not be set yet!");
         self.metadata = Some(metadata.clone());
         self.shares.retain(|_, share| *share.metadata() == metadata);
         if self.decision.as_ref().map(|d| d.metadata()) != Some(&metadata) {
@@ -108,7 +108,7 @@ impl RandItem {
             }
 
             let proof = <WVUF as WeightedVUF>::aggregate_shares(&rand_config.wconfig, &apks_and_proofs);
-            let eval = <WVUF as WeightedVUF>::derive_eval(&rand_config.vuf_pp, metadata.to_bytes().as_slice(), &proof);
+            let eval = <WVUF as WeightedVUF>::derive_eval(&rand_config.wconfig, &rand_config.vuf_pp, metadata.to_bytes().as_slice(), &rand_config.get_all_certified_apk(), &proof)?;
             let eval_bytes = bcs::to_bytes(&eval).unwrap();
             let rand_bytes = Sha3_256::digest(eval_bytes.as_slice()).to_vec();
             let randomness = Randomness::new(metadata.clone(), rand_bytes);

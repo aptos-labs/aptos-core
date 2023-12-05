@@ -8,8 +8,8 @@ use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use crate::{block_info::Round, validator_verifier::ValidatorVerifier};
 
-// pub type WVUF = weighted_vuf::pinkas::PinkasWUF;
-pub type WVUF = weighted_vuf::gjm21_insecure::g1::GjmInsecureWVUF;
+pub type WVUF = weighted_vuf::pinkas::PinkasWUF;
+// pub type WVUF = weighted_vuf::gjm21_insecure::g1::GjmInsecureWVUF;
 pub type WvufPP = <WVUF as WeightedVUF>::PublicParameters;
 pub type PK = <WVUF as WeightedVUF>::PubKey;
 pub type PKShare = <WVUF as WeightedVUF>::PubKeyShare;
@@ -133,10 +133,10 @@ impl RandDecision {
     }
 
     pub fn verify(&self, rand_config: &RandConfig) -> anyhow::Result<()> {
-        // rand todo: if the caller locally does not have all the certified apks in Proof, the verification should fail.
-        // to fix after crypto API is fixed
-        <WVUF as WeightedVUF>::verify_eval(&rand_config.vuf_pp, &rand_config.pk, self.randomness.metadata.to_bytes().as_slice(), &self.proof, &self.eval)?;
-        Ok(())
+        // If the caller locally does not have all the certified apks corresponding to self.proof, the verification should fail.
+        // Then RandShare multicast may be retried periodically and the caller will receive RandDecision.
+        // Eventually the caller will receive certified apks to verify the proof in RandDecision.
+        <WVUF as WeightedVUF>::verify_proof(&rand_config.vuf_pp, &rand_config.pk, rand_config.get_all_certified_apk(), self.randomness.metadata.to_bytes().as_slice(), &self.proof)
     }
 }
 
@@ -220,6 +220,10 @@ impl RandConfig {
     pub fn get_certified_apk(&self, peer: &AccountAddress) -> Option<&APK> {
         let index = self.get_id(peer);
         self.keys.certified_apks[index].as_ref()
+    }
+
+    pub fn get_all_certified_apk(&self) -> &[Option<APK>] {
+        self.keys.certified_apks.as_slice()
     }
 
     pub fn add_certified_apk(&mut self, peer: &AccountAddress, apk: APK) -> anyhow::Result<()> {

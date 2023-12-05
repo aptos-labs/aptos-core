@@ -60,19 +60,18 @@ pub trait WeightedVUF {
     fn eval(sk: &Self::SecretKey, msg: &[u8]) -> Self::Evaluation;
 
     fn derive_eval(
+        wc: &WeightedConfig,
         pp: &Self::PublicParameters,
         msg: &[u8],
+        apks: &[Option<Self::AugmentedPubKeyShare>],
         proof: &Self::Proof,
-    ) -> Self::Evaluation;
+    ) -> anyhow::Result<Self::Evaluation>;
 
-    /// Used for testing only.
-    fn create_proof(sk: &Self::SecretKey, msg: &[u8]) -> Self::Proof;
-
-    fn verify_eval(
+    fn verify_proof(
         pp: &Self::PublicParameters,
         pk: &Self::PubKey,
+        apks: &[Option<Self::AugmentedPubKeyShare>],
         msg: &[u8],
         proof: &Self::Proof,
-        eval: &Self::Evaluation,
     ) -> anyhow::Result<()>;
 }
