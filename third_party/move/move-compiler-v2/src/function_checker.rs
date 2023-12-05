@@ -95,7 +95,8 @@ pub fn check_access_and_use(env: &mut GlobalEnv) {
                 };
 
                 // Check that inline functions being called are accessible
-                if let Some(def) = caller_func.get_def().deref() {
+                let optional_def_ref = caller_func.get_def();
+                if let Some(def) = &*optional_def_ref {
                     let callees_with_sites = def.called_funs_with_callsites();
                     for (callee, sites) in callees_with_sites {
                         let callee_env = env.get_function(callee);
