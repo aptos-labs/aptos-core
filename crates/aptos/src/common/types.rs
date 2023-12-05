@@ -1335,7 +1335,7 @@ impl From<&Transaction> for TransactionSummary {
                 pending: None,
                 sequence_number: None,
             },
-            Transaction::SystemTransaction(txn) => TransactionSummary {
+            Transaction::ValidatorTransaction(txn) => TransactionSummary {
                 transaction_hash: txn.info.hash,
                 gas_used: None,
                 gas_unit_price: None,

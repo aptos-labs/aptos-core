@@ -1795,7 +1795,7 @@ pub enum Transaction {
     /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
     StateCheckpoint(HashValue),
 
-    SystemTransaction(SystemTransaction),
+    ValidatorTransaction(SystemTransaction),
 }
 
 impl Transaction {
@@ -1825,7 +1825,7 @@ impl Transaction {
             // TODO: display proper information for client
             Transaction::StateCheckpoint(_) => String::from("state_checkpoint"),
             // TODO: display proper information for client
-            Transaction::SystemTransaction(_) => String::from("system_transaction"),
+            Transaction::ValidatorTransaction(_) => String::from("validator_transaction"),
         }
     }
 }

@@ -283,7 +283,7 @@ impl IndexerStreamCoordinator {
                             sct.info.block_height = Some(block_height_bcs);
                             sct.info.epoch = Some(epoch_bcs);
                         },
-                        Transaction::SystemTransaction(_) => todo!(),
+                        Transaction::ValidatorTransaction(_) => todo!(),
                     };
                     txn
                 }) {

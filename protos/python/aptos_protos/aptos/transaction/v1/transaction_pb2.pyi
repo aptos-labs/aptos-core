@@ -89,7 +89,7 @@ class Transaction(_message.Message):
         "genesis",
         "state_checkpoint",
         "user",
-        "system",
+        "validator",
     ]
 
     class TransactionType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
@@ -99,13 +99,13 @@ class Transaction(_message.Message):
         TRANSACTION_TYPE_BLOCK_METADATA: _ClassVar[Transaction.TransactionType]
         TRANSACTION_TYPE_STATE_CHECKPOINT: _ClassVar[Transaction.TransactionType]
         TRANSACTION_TYPE_USER: _ClassVar[Transaction.TransactionType]
-        TRANSACTION_TYPE_SYSTEM: _ClassVar[Transaction.TransactionType]
+        TRANSACTION_TYPE_VALIDATOR: _ClassVar[Transaction.TransactionType]
     TRANSACTION_TYPE_UNSPECIFIED: Transaction.TransactionType
     TRANSACTION_TYPE_GENESIS: Transaction.TransactionType
     TRANSACTION_TYPE_BLOCK_METADATA: Transaction.TransactionType
     TRANSACTION_TYPE_STATE_CHECKPOINT: Transaction.TransactionType
     TRANSACTION_TYPE_USER: Transaction.TransactionType
-    TRANSACTION_TYPE_SYSTEM: Transaction.TransactionType
+    TRANSACTION_TYPE_VALIDATOR: Transaction.TransactionType
     TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
     VERSION_FIELD_NUMBER: _ClassVar[int]
     INFO_FIELD_NUMBER: _ClassVar[int]
@@ -116,7 +116,7 @@ class Transaction(_message.Message):
     GENESIS_FIELD_NUMBER: _ClassVar[int]
     STATE_CHECKPOINT_FIELD_NUMBER: _ClassVar[int]
     USER_FIELD_NUMBER: _ClassVar[int]
-    SYSTEM_FIELD_NUMBER: _ClassVar[int]
+    VALIDATOR_FIELD_NUMBER: _ClassVar[int]
     timestamp: _timestamp_pb2.Timestamp
     version: int
     info: TransactionInfo
@@ -127,7 +127,7 @@ class Transaction(_message.Message):
     genesis: GenesisTransaction
     state_checkpoint: StateCheckpointTransaction
     user: UserTransaction
-    system: SystemTransaction
+    validator: ValidatorTransaction
     def __init__(
         self,
         timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...,
@@ -140,7 +140,7 @@ class Transaction(_message.Message):
         genesis: _Optional[_Union[GenesisTransaction, _Mapping]] = ...,
         state_checkpoint: _Optional[_Union[StateCheckpointTransaction, _Mapping]] = ...,
         user: _Optional[_Union[UserTransaction, _Mapping]] = ...,
-        system: _Optional[_Union[SystemTransaction, _Mapping]] = ...,
+        validator: _Optional[_Union[ValidatorTransaction, _Mapping]] = ...,
     ) -> None: ...
 
 class BlockMetadataTransaction(_message.Message):
@@ -190,7 +190,7 @@ class StateCheckpointTransaction(_message.Message):
     __slots__ = []
     def __init__(self) -> None: ...
 
-class SystemTransaction(_message.Message):
+class ValidatorTransaction(_message.Message):
     __slots__ = []
     def __init__(self) -> None: ...
 

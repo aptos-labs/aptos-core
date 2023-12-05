@@ -222,7 +222,7 @@ export interface Transaction {
   genesis?: GenesisTransaction | undefined;
   stateCheckpoint?: StateCheckpointTransaction | undefined;
   user?: UserTransaction | undefined;
-  system?: SystemTransaction | undefined;
+  validator?: ValidatorTransaction | undefined;
 }
 
 export enum Transaction_TransactionType {
@@ -231,7 +231,7 @@ export enum Transaction_TransactionType {
   TRANSACTION_TYPE_BLOCK_METADATA = 2,
   TRANSACTION_TYPE_STATE_CHECKPOINT = 3,
   TRANSACTION_TYPE_USER = 4,
-  TRANSACTION_TYPE_SYSTEM = 20,
+  TRANSACTION_TYPE_VALIDATOR = 20,
   UNRECOGNIZED = -1,
 }
 
@@ -253,8 +253,8 @@ export function transaction_TransactionTypeFromJSON(object: any): Transaction_Tr
     case "TRANSACTION_TYPE_USER":
       return Transaction_TransactionType.TRANSACTION_TYPE_USER;
     case 20:
-    case "TRANSACTION_TYPE_SYSTEM":
-      return Transaction_TransactionType.TRANSACTION_TYPE_SYSTEM;
+    case "TRANSACTION_TYPE_VALIDATOR":
+      return Transaction_TransactionType.TRANSACTION_TYPE_VALIDATOR;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -274,8 +274,8 @@ export function transaction_TransactionTypeToJSON(object: Transaction_Transactio
       return "TRANSACTION_TYPE_STATE_CHECKPOINT";
     case Transaction_TransactionType.TRANSACTION_TYPE_USER:
       return "TRANSACTION_TYPE_USER";
-    case Transaction_TransactionType.TRANSACTION_TYPE_SYSTEM:
-      return "TRANSACTION_TYPE_SYSTEM";
+    case Transaction_TransactionType.TRANSACTION_TYPE_VALIDATOR:
+      return "TRANSACTION_TYPE_VALIDATOR";
     case Transaction_TransactionType.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -299,7 +299,7 @@ export interface GenesisTransaction {
 export interface StateCheckpointTransaction {
 }
 
-export interface SystemTransaction {
+export interface ValidatorTransaction {
 }
 
 export interface UserTransaction {
@@ -1200,7 +1200,7 @@ function createBaseTransaction(): Transaction {
     genesis: undefined,
     stateCheckpoint: undefined,
     user: undefined,
-    system: undefined,
+    validator: undefined,
   };
 }
 
@@ -1245,8 +1245,8 @@ export const Transaction = {
     if (message.user !== undefined) {
       UserTransaction.encode(message.user, writer.uint32(82).fork()).ldelim();
     }
-    if (message.system !== undefined) {
-      SystemTransaction.encode(message.system, writer.uint32(170).fork()).ldelim();
+    if (message.validator !== undefined) {
+      ValidatorTransaction.encode(message.validator, writer.uint32(170).fork()).ldelim();
     }
     return writer;
   },
@@ -1333,7 +1333,7 @@ export const Transaction = {
             break;
           }
 
-          message.system = SystemTransaction.decode(reader, reader.uint32());
+          message.validator = ValidatorTransaction.decode(reader, reader.uint32());
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -1390,7 +1390,7 @@ export const Transaction = {
         ? StateCheckpointTransaction.fromJSON(object.stateCheckpoint)
         : undefined,
       user: isSet(object.user) ? UserTransaction.fromJSON(object.user) : undefined,
-      system: isSet(object.system) ? SystemTransaction.fromJSON(object.system) : undefined,
+      validator: isSet(object.validator) ? ValidatorTransaction.fromJSON(object.validator) : undefined,
     };
   },
 
@@ -1426,8 +1426,8 @@ export const Transaction = {
     if (message.user !== undefined) {
       obj.user = UserTransaction.toJSON(message.user);
     }
-    if (message.system !== undefined) {
-      obj.system = SystemTransaction.toJSON(message.system);
+    if (message.validator !== undefined) {
+      obj.validator = ValidatorTransaction.toJSON(message.validator);
     }
     return obj;
   },
@@ -1459,8 +1459,8 @@ export const Transaction = {
     message.user = (object.user !== undefined && object.user !== null)
       ? UserTransaction.fromPartial(object.user)
       : undefined;
-    message.system = (object.system !== undefined && object.system !== null)
-      ? SystemTransaction.fromPartial(object.system)
+    message.validator = (object.validator !== undefined && object.validator !== null)
+      ? ValidatorTransaction.fromPartial(object.validator)
       : undefined;
     return message;
   },
@@ -1853,19 +1853,19 @@ export const StateCheckpointTransaction = {
   },
 };
 
-function createBaseSystemTransaction(): SystemTransaction {
+function createBaseValidatorTransaction(): ValidatorTransaction {
   return {};
 }
 
-export const SystemTransaction = {
-  encode(_: SystemTransaction, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+export const ValidatorTransaction = {
+  encode(_: ValidatorTransaction, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
     return writer;
   },
 
-  decode(input: _m0.Reader | Uint8Array, length?: number): SystemTransaction {
+  decode(input: _m0.Reader | Uint8Array, length?: number): ValidatorTransaction {
     const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSystemTransaction();
+    const message = createBaseValidatorTransaction();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -1879,51 +1879,53 @@ export const SystemTransaction = {
   },
 
   // encodeTransform encodes a source of message objects.
-  // Transform<SystemTransaction, Uint8Array>
+  // Transform<ValidatorTransaction, Uint8Array>
   async *encodeTransform(
-    source: AsyncIterable<SystemTransaction | SystemTransaction[]> | Iterable<SystemTransaction | SystemTransaction[]>,
+    source:
+      | AsyncIterable<ValidatorTransaction | ValidatorTransaction[]>
+      | Iterable<ValidatorTransaction | ValidatorTransaction[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
       if (globalThis.Array.isArray(pkt)) {
         for (const p of (pkt as any)) {
-          yield* [SystemTransaction.encode(p).finish()];
+          yield* [ValidatorTransaction.encode(p).finish()];
         }
       } else {
-        yield* [SystemTransaction.encode(pkt as any).finish()];
+        yield* [ValidatorTransaction.encode(pkt as any).finish()];
       }
     }
   },
 
   // decodeTransform decodes a source of encoded messages.
-  // Transform<Uint8Array, SystemTransaction>
+  // Transform<Uint8Array, ValidatorTransaction>
   async *decodeTransform(
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
-  ): AsyncIterable<SystemTransaction> {
+  ): AsyncIterable<ValidatorTransaction> {
     for await (const pkt of source) {
       if (globalThis.Array.isArray(pkt)) {
         for (const p of (pkt as any)) {
-          yield* [SystemTransaction.decode(p)];
+          yield* [ValidatorTransaction.decode(p)];
         }
       } else {
-        yield* [SystemTransaction.decode(pkt as any)];
+        yield* [ValidatorTransaction.decode(pkt as any)];
       }
     }
   },
 
-  fromJSON(_: any): SystemTransaction {
+  fromJSON(_: any): ValidatorTransaction {
     return {};
   },
 
-  toJSON(_: SystemTransaction): unknown {
+  toJSON(_: ValidatorTransaction): unknown {
     const obj: any = {};
     return obj;
   },
 
-  create(base?: DeepPartial<SystemTransaction>): SystemTransaction {
-    return SystemTransaction.fromPartial(base ?? {});
+  create(base?: DeepPartial<ValidatorTransaction>): ValidatorTransaction {
+    return ValidatorTransaction.fromPartial(base ?? {});
   },
-  fromPartial(_: DeepPartial<SystemTransaction>): SystemTransaction {
-    const message = createBaseSystemTransaction();
+  fromPartial(_: DeepPartial<ValidatorTransaction>): ValidatorTransaction {
+    const message = createBaseValidatorTransaction();
     return message;
   },
 };

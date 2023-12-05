@@ -219,9 +219,9 @@ impl Transaction {
             APITransaction::PendingTransaction(..) => {
                 unreachable!()
             },
-            APITransaction::SystemTransaction(system_txn) => (
+            APITransaction::ValidatorTransaction(validator_txn) => (
                 Self::from_transaction_info(
-                    &system_txn.info,
+                    &validator_txn.info,
                     None,
                     transaction.type_str().to_string(),
                     0,

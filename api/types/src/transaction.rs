@@ -172,7 +172,7 @@ pub enum Transaction {
     GenesisTransaction(GenesisTransaction),
     BlockMetadataTransaction(BlockMetadataTransaction),
     StateCheckpointTransaction(StateCheckpointTransaction),
-    SystemTransaction(SystemTransaction),
+    ValidatorTransaction(ValidatorTransaction),
 }
 
 impl Transaction {
@@ -183,7 +183,7 @@ impl Transaction {
             Transaction::PendingTransaction(_) => 0,
             Transaction::GenesisTransaction(_) => 0,
             Transaction::StateCheckpointTransaction(txn) => txn.timestamp.0,
-            Transaction::SystemTransaction(txn) => txn.timestamp.0,
+            Transaction::ValidatorTransaction(txn) => txn.timestamp.0,
         }
     }
 
@@ -194,7 +194,7 @@ impl Transaction {
             Transaction::PendingTransaction(_) => None,
             Transaction::GenesisTransaction(txn) => Some(txn.info.version.into()),
             Transaction::StateCheckpointTransaction(txn) => Some(txn.info.version.into()),
-            Transaction::SystemTransaction(txn) => Some(txn.info.version.into()),
+            Transaction::ValidatorTransaction(txn) => Some(txn.info.version.into()),
         }
     }
 
@@ -205,7 +205,7 @@ impl Transaction {
             Transaction::PendingTransaction(_txn) => false,
             Transaction::GenesisTransaction(txn) => txn.info.success,
             Transaction::StateCheckpointTransaction(txn) => txn.info.success,
-            Transaction::SystemTransaction(txn) => txn.info.success,
+            Transaction::ValidatorTransaction(txn) => txn.info.success,
         }
     }
 
@@ -220,7 +220,7 @@ impl Transaction {
             Transaction::PendingTransaction(_txn) => "pending".to_owned(),
             Transaction::GenesisTransaction(txn) => txn.info.vm_status.clone(),
             Transaction::StateCheckpointTransaction(txn) => txn.info.vm_status.clone(),
-            Transaction::SystemTransaction(txn) => txn.info.vm_status.clone(),
+            Transaction::ValidatorTransaction(txn) => txn.info.vm_status.clone(),
         }
     }
 
@@ -231,7 +231,7 @@ impl Transaction {
             Transaction::GenesisTransaction(_) => "genesis_transaction",
             Transaction::BlockMetadataTransaction(_) => "block_metadata_transaction",
             Transaction::StateCheckpointTransaction(_) => "state_checkpoint_transaction",
-            Transaction::SystemTransaction(_) => "system_transaction",
+            Transaction::ValidatorTransaction(_) => "validator_transaction",
         }
     }
 
@@ -244,7 +244,7 @@ impl Transaction {
             },
             Transaction::GenesisTransaction(txn) => &txn.info,
             Transaction::StateCheckpointTransaction(txn) => &txn.info,
-            Transaction::SystemTransaction(txn) => &txn.info,
+            Transaction::ValidatorTransaction(txn) => &txn.info,
         })
     }
 }
@@ -328,7 +328,7 @@ impl From<(&SignedTransaction, TransactionPayload)> for UserTransactionRequest {
 
 impl From<(TransactionInfo, Vec<Event>, u64)> for Transaction {
     fn from((info, events, timestamp): (TransactionInfo, Vec<Event>, u64)) -> Self {
-        Transaction::SystemTransaction(SystemTransaction {
+        Transaction::ValidatorTransaction(ValidatorTransaction {
             info,
             events,
             timestamp: timestamp.into(),
@@ -541,7 +541,7 @@ pub struct BlockMetadataTransaction {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
-pub struct SystemTransaction {
+pub struct ValidatorTransaction {
     #[serde(flatten)]
     #[oai(flatten)]
     pub info: TransactionInfo,
