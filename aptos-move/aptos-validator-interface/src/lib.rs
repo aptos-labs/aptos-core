@@ -229,6 +229,9 @@ impl DebuggerStateView {
             .send((state_key.clone(), version, tx))
             .unwrap();
         let ret = rx.recv()?;
+        if state_key.is_aptos_path() {
+            return ret;
+        }
         if let Some(reads) = &self.data_read_state_keys {
             if !reads.lock().unwrap().contains_key(state_key) && ret.is_ok() {
                 let val = ret?.clone();
