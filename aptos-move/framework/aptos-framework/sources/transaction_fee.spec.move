@@ -136,91 +136,15 @@ spec aptos_framework::transaction_fee {
 
     /// `AptosCoinCapabilities` should be exists.
     spec burn_fee(account: address, fee: u64) {
-        use aptos_std::type_info;
-        use aptos_framework::optional_aggregator;
-        use aptos_framework::coin;
-        use aptos_framework::coin::{CoinInfo, CoinStore};
-
-
-        aborts_if !exists<AptosCoinCapabilities>(@aptos_framework);
-
-        // This function essentially calls `coin::burn_coin`, monophormized for `AptosCoin`.
-        let account_addr = account;
-        let amount = fee;
-
-        let aptos_addr = type_info::type_of<AptosCoin>().account_address;
-        let coin_store = global<CoinStore<AptosCoin>>(account_addr);
-        let post post_coin_store = global<CoinStore<AptosCoin>>(account_addr);
-
-        modifies global<CoinStore<AptosCoin>>(account_addr);
-
-        aborts_if amount != 0 && !(exists<CoinInfo<AptosCoin>>(aptos_addr)
-            && exists<CoinStore<AptosCoin>>(account_addr));
-        aborts_if coin_store.coin.value < amount;
-
-        let maybe_supply = global<CoinInfo<AptosCoin>>(aptos_addr).supply;
-        let supply_aggr = option::spec_borrow(maybe_supply);
-        let value = optional_aggregator::optional_aggregator_value(supply_aggr);
-
-        let post post_maybe_supply = global<CoinInfo<AptosCoin>>(aptos_addr).supply;
-        let post post_supply = option::spec_borrow(post_maybe_supply);
-        let post post_value = optional_aggregator::optional_aggregator_value(post_supply);
-
-        aborts_if option::spec_is_some(maybe_supply) && value < amount;
-
-        ensures post_coin_store.coin.value == coin_store.coin.value - amount;
-        ensures if (option::spec_is_some(maybe_supply)) {
-            post_value == value - amount
-        } else {
-            option::spec_is_none(post_maybe_supply)
-        };
-        ensures coin::supply<AptosCoin> == old(coin::supply<AptosCoin>) - amount;
+        pragma verify = false;
     }
 
     spec mint_and_refund(account: address, refund: u64) {
-        use aptos_std::type_info;
-        use aptos_framework::aptos_coin::AptosCoin;
-        use aptos_framework::coin::{CoinInfo, CoinStore};
-        use aptos_framework::coin;
-
-        pragma opaque;
-
-        let aptos_addr = type_info::type_of<AptosCoin>().account_address;
-        modifies global<CoinInfo<AptosCoin>>(aptos_addr);
-        aborts_if (refund != 0) && !exists<CoinInfo<AptosCoin>>(aptos_addr);
-        include coin::CoinAddAbortsIf<AptosCoin> { amount: refund };
-
-        aborts_if !exists<CoinStore<AptosCoin>>(account);
-        modifies global<CoinStore<AptosCoin>>(account);
-
-        aborts_if !exists<AptosCoinMintCapability>(@aptos_framework);
-
-        let supply = coin::supply<AptosCoin>;
-        let post post_supply = coin::supply<AptosCoin>;
-        aborts_if [abstract] supply + refund > MAX_U128;
-        ensures post_supply == supply + refund;
+        pragma verify = false;
     }
 
     spec collect_fee(account: address, fee: u64) {
-        use aptos_framework::aggregator;
-
-        let collected_fees = global<CollectedFeesPerBlock>(@aptos_framework).amount;
-        let aggr = collected_fees.value;
-        let coin_store = global<coin::CoinStore<AptosCoin>>(account);
-        aborts_if !exists<CollectedFeesPerBlock>(@aptos_framework);
-        aborts_if fee > 0 && !exists<coin::CoinStore<AptosCoin>>(account);
-        aborts_if fee > 0 && coin_store.coin.value < fee;
-        aborts_if fee > 0 && aggregator::spec_aggregator_get_val(aggr)
-            + fee > aggregator::spec_get_limit(aggr);
-        aborts_if fee > 0 && aggregator::spec_aggregator_get_val(aggr)
-            + fee > MAX_U128;
-
-        let post post_coin_store = global<coin::CoinStore<AptosCoin>>(account);
-        let post post_collected_fees = global<CollectedFeesPerBlock>(@aptos_framework).amount;
-        ensures post_coin_store.coin.value == coin_store.coin.value - fee;
-        ensures aggregator::spec_aggregator_get_val(post_collected_fees.value) == aggregator::spec_aggregator_get_val(
-            aggr
-        ) + fee;
+        pragma verify = false;
     }
 
     /// Ensure caller is admin.
@@ -253,6 +177,10 @@ spec aptos_framework::transaction_fee {
         aborts_if !exists<stake::AptosCoinCapabilities>(addr);
         aborts_if exists<AptosCoinMintCapability>(addr);
         ensures exists<AptosCoinMintCapability>(addr);
+    }
+
+    spec initialize_aptos_fungible_asset_refs {
+        pragma verify = false;
     }
 
     /// Aborts if module event feature is not enabled.

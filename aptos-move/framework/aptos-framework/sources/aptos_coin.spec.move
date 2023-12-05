@@ -33,9 +33,9 @@ spec aptos_framework::aptos_coin {
 
     // Only callable in tests and testnets. not needed verify.
     spec mint(
-        account: &signer,
-        dst_addr: address,
-        amount: u64,
+    account: &signer,
+    dst_addr: address,
+    amount: u64,
     ) {
         pragma verify = false;
     }
@@ -45,7 +45,11 @@ spec aptos_framework::aptos_coin {
         pragma verify = false;
     }
 
-    // Only callable in tests and testnets. not needed verify.
+    spec initialize_aptos_fungible_asset {
+        pragma verify = false;
+    }
+
+    // Only callable in tests and testnets.not needed verify.
     spec claim_mint_capability(account: &signer) {
         pragma verify = false;
     }
@@ -57,5 +61,4 @@ spec aptos_framework::aptos_coin {
     spec schema ExistsAptosCoin {
         requires exists<coin::CoinInfo<AptosCoin>>(@aptos_framework);
     }
-
 }

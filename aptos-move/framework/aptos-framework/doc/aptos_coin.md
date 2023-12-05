@@ -23,6 +23,7 @@ modified from https://github.com/move-language/move/tree/main/language/documenta
 -  [Function `find_delegation`](#0x1_aptos_coin_find_delegation)
 -  [Specification](#@Specification_1)
     -  [Function `initialize`](#@Specification_1_initialize)
+    -  [Function `initialize_aptos_fungible_asset`](#@Specification_1_initialize_aptos_fungible_asset)
     -  [Function `destroy_mint_cap`](#@Specification_1_destroy_mint_cap)
     -  [Function `configure_accounts_for_test`](#@Specification_1_configure_accounts_for_test)
     -  [Function `mint`](#@Specification_1_mint)
@@ -536,6 +537,22 @@ Claim the delegated mint capability and destroy the delegated token.
 <b>ensures</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">coin::CoinInfo</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">AptosCoin</a>&gt;&gt;(addr);
 <b>ensures</b> result_1 == BurnCapability&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">AptosCoin</a>&gt; {};
 <b>ensures</b> result_2 == MintCapability&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">AptosCoin</a>&gt; {};
+</code></pre>
+
+
+
+<a id="@Specification_1_initialize_aptos_fungible_asset"></a>
+
+### Function `initialize_aptos_fungible_asset`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_coin.md#0x1_aptos_coin_initialize_aptos_fungible_asset">initialize_aptos_fungible_asset</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 
