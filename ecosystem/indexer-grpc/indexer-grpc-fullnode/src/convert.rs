@@ -725,7 +725,9 @@ pub fn convert_transaction(
             transaction::transaction::TransactionType::StateCheckpoint
         },
         Transaction::PendingTransaction(_) => panic!("PendingTransaction is not supported"),
-        Transaction::ValidatorTransaction(_) => transaction::transaction::TransactionType::Validator,
+        Transaction::ValidatorTransaction(_) => {
+            transaction::transaction::TransactionType::Validator
+        },
     };
 
     let txn_data = match &transaction {
