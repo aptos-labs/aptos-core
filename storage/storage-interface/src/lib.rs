@@ -36,7 +36,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, path::PathBuf};
 use thiserror::Error;
 
 pub mod async_proof_fetcher;
@@ -452,6 +452,8 @@ pub trait DbReader: Send + Sync {
 
         /// Returns state storage usage at the end of an epoch.
         fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage>;
+
+        fn get_indexer_async_v2_next_version(&self) -> Result<Version>;
     ); // end delegated
 
     /// Returns the latest ledger info.
@@ -493,10 +495,9 @@ impl MoveStorage for &dyn DbReader {
 
     fn fetch_config_by_version(&self, config_id: ConfigID, version: Version) -> Result<Vec<u8>> {
         let config_value_option = self.get_state_value_by_version(
-            &StateKey::access_path(AccessPath::new(
-                CORE_CODE_ADDRESS,
-                access_path_for_config(config_id)?.path,
-            )),
+            &StateKey::access_path(
+                AccessPath::new(CORE_CODE_ADDRESS, access_path_for_config(config_id)?.path)
+            ),
             version,
         )?;
         config_value_option
@@ -568,6 +569,14 @@ pub trait DbWriter: Send + Sync {
         db_reader: Arc<dyn DbReader>,
         first_version: Version,
         write_sets: &[&WriteSet],
+        epoch: u64,
+    ) -> Result<()> {
+        unimplemented!()
+    }
+
+    fn create_checkpoint(
+        &self,
+        path: PathBuf,
     ) -> Result<()> {
         unimplemented!()
     }

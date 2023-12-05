@@ -185,6 +185,7 @@ pub struct AptosHandle {
     _api_runtime: Option<Runtime>,
     _backup_runtime: Option<Runtime>,
     _consensus_runtime: Option<Runtime>,
+    _indexer_table_info_runtime: Option<Runtime>,
     _indexer_grpc_runtime: Option<Runtime>,
     _indexer_runtime: Option<Runtime>,
     _mempool_runtime: Runtime,
@@ -627,7 +628,7 @@ pub fn setup_environment_and_start_node(
     );
 
     // Bootstrap the API and indexer
-    let (mempool_client_receiver, api_runtime, indexer_runtime, indexer_grpc_runtime) =
+    let (mempool_client_receiver, api_runtime, indexer_table_info_runtime, indexer_runtime, indexer_grpc_runtime) =
         services::bootstrap_api_and_indexer(&node_config, db_rw.clone(), chain_id)?;
 
     // Create mempool and get the consensus to mempool sender
@@ -670,6 +671,7 @@ pub fn setup_environment_and_start_node(
         _api_runtime: api_runtime,
         _backup_runtime: backup_service,
         _consensus_runtime: consensus_runtime,
+        _indexer_table_info_runtime: indexer_table_info_runtime,
         _indexer_grpc_runtime: indexer_grpc_runtime,
         _indexer_runtime: indexer_runtime,
         _mempool_runtime: mempool_runtime,

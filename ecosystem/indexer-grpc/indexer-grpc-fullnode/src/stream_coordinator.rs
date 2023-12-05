@@ -20,9 +20,6 @@ use aptos_protos::{
     },
     transaction::v1::Transaction as TransactionPB,
 };
-use aptos_storage_interface::DbWriter;
-#[cfg(feature = "indexer-async-v2")]
-use aptos_types::write_set::WriteSet;
 use aptos_vm::data_cache::AsMoveResolver;
 use std::{
     sync::Arc,
@@ -90,11 +87,12 @@ impl IndexerStreamCoordinator {
         let mut tasks = vec![];
         let batches = self.get_batches().await;
         let output_batch_size = self.output_batch_size;
+
         for batch in batches {
             let context = self.context.clone();
             let ledger_version = self.highest_known_version;
             let transaction_sender = self.transactions_sender.clone();
-            let db_writer = db_writer.clone();
+
             let task = tokio::spawn(async move {
                 let batch_start_time = std::time::Instant::now();
                 // Fetch and convert transactions from API
@@ -276,7 +274,6 @@ impl IndexerStreamCoordinator {
     async fn convert_to_api_txns(
         context: Arc<Context>,
         raw_txns: Vec<TransactionOnChainData>,
-        _db_writer: Arc<dyn DbWriter>,
     ) -> Vec<APITransaction> {
         if raw_txns.is_empty() {
             return vec![];
@@ -287,16 +284,6 @@ impl IndexerStreamCoordinator {
         let state_view = context.latest_state_view().unwrap();
         let resolver = state_view.as_move_resolver();
         let converter = resolver.as_converter(context.db.clone());
-
-        #[cfg(feature = "indexer-async-v2")]
-        {
-            let write_sets: Vec<WriteSet> =
-                raw_txns.iter().map(|txn| txn.changes.clone()).collect();
-            let write_sets_slice: Vec<&WriteSet> = write_sets.iter().collect();
-            let _ = _db_writer
-                .clone()
-                .index(context.db.clone(), first_version, &write_sets_slice);
-        }
 
         // Enrich data with block metadata
         let (_, _, block_event) = context

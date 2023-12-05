@@ -8,9 +8,8 @@ use aptos_protos::internal::fullnode::v1::{
     fullnode_data_server::FullnodeData, stream_status::StatusType, transactions_from_node_response,
     GetTransactionsFromNodeRequest, StreamStatus, TransactionsFromNodeResponse,
 };
-use aptos_storage_interface::DbWriter;
 use futures::Stream;
-use std::{pin::Pin, sync::Arc};
+use std::pin::Pin;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -63,7 +62,6 @@ impl FullnodeData for FullnodeDataService {
         // Creates a moving average to track tps
         let mut ma = MovingAverage::new(10_000);
 
-        let db_writer = self.db_writer.clone();
         // This is the main thread handling pushing to the stream
         tokio::spawn(async move {
             // Initialize the coordinator that tracks starting version and processes transactions
@@ -92,7 +90,6 @@ impl FullnodeData for FullnodeDataService {
                 },
             }
             let mut base: u64 = 0;
-            let db_writer = db_writer.clone();
             loop {
                 let start_time = std::time::Instant::now();
                 // Processes and sends batch of transactions to client

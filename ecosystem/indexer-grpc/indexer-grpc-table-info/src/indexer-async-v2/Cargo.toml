@@ -28,15 +28,24 @@ aptos-storage-interface = { workspace = true }
 aptos-temppath = { workspace = true, optional = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+backoff = { workspace = true }
 bcs = { workspace = true }
 byteorder = { workspace = true }
 bytes = { workspace = true }
+futures = { workspace = true }
 move-core-types = { workspace = true }
 move-resource-viewer = { workspace = true }
 num-derive = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
+async-trait = { workspace = true }
+tracing =  { workspace = true }
+cloud-storage = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+flate2 = { workspace = true }
 
 [dev-dependencies]
 aptos-proptest-helpers = { workspace = true }

@@ -89,7 +89,6 @@ use aptos_config::config::{
 };
 use aptos_crypto::HashValue;
 use aptos_db_indexer::Indexer;
-#[cfg(feature = "indexer-async-v2")]
 use aptos_db_indexer_async_v2::IndexerAsyncV2;
 use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
 use aptos_infallible::Mutex;
@@ -142,7 +141,7 @@ use std::{
     collections::HashMap,
     fmt::{Debug, Formatter},
     iter::Iterator,
-    path::Path,
+    path::{Path, PathBuf},
     sync::{mpsc, Arc},
     thread,
     thread::JoinHandle,
@@ -353,7 +352,6 @@ pub struct AptosDB {
     ledger_commit_lock: std::sync::Mutex<()>,
     indexer: Option<Indexer>,
     skip_index_and_usage: bool,
-    #[cfg(feature = "indexer-async-v2")]
     indexer_async_v2: Option<IndexerAsyncV2>,
 }
 
@@ -413,7 +411,6 @@ impl AptosDB {
             ledger_commit_lock: std::sync::Mutex::new(()),
             indexer: None,
             skip_index_and_usage,
-            #[cfg(feature = "indexer-async-v2")]
             indexer_async_v2: None,
         }
     }
@@ -427,6 +424,7 @@ impl AptosDB {
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
         empty_buffered_state_for_restore: bool,
+        enable_indexer_async_v2: bool,
     ) -> Result<Self> {
         ensure!(
             pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
@@ -458,11 +456,12 @@ impl AptosDB {
             )?;
         }
 
-        #[cfg(feature = "indexer-async-v2")]
-        myself.open_indexer_async_v2(
-            db_paths.default_root_path(),
-            rocksdb_configs.index_db_config,
-        )?;
+        if enable_indexer_async_v2 {
+            myself.open_indexer_async_v2(
+                db_paths.default_root_path(),
+                rocksdb_configs.index_db_config,
+            )?;
+        }
 
         Ok(myself)
     }
@@ -475,6 +474,7 @@ impl AptosDB {
         enable_indexer: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
+        enable_indexer_async_v2: bool,
     ) -> Result<Self> {
         Self::open_internal(
             &db_paths,
@@ -485,6 +485,7 @@ impl AptosDB {
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
             false,
+            enable_indexer_async_v2,
         )
     }
 
@@ -496,6 +497,7 @@ impl AptosDB {
         enable_indexer: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
+        enable_indexer_async_v2: bool,
     ) -> Result<Self> {
         Self::open_internal(
             &db_paths,
@@ -506,6 +508,7 @@ impl AptosDB {
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
             true,
+            enable_indexer_async_v2,
         )
     }
 
@@ -532,15 +535,18 @@ impl AptosDB {
         Ok((ledger_db, state_merkle_db, state_kv_db))
     }
 
-    #[cfg(feature = "indexer-async-v2")]
     fn open_indexer_async_v2(
         &mut self,
         db_root_path: impl AsRef<Path>,
         rocksdb_config: RocksdbConfig,
     ) -> Result<()> {
-        let indexer_async_v2 = IndexerAsyncV2::open(db_root_path, rocksdb_config)?;
+        let ledger_info = self.ledger_store.get_latest_ledger_info_option();
+        let latest_epoch = ledger_info
+            .map(|info| info.ledger_info().epoch())
+            .unwrap_or(0);
+        let indexer_async_v2 = IndexerAsyncV2::open(db_root_path, rocksdb_config, latest_epoch)?;
         self.indexer_async_v2 = Some(indexer_async_v2);
-        return Ok(());
+        Ok(())
     }
 
     fn open_indexer(
@@ -591,6 +597,7 @@ impl AptosDB {
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
         enable_indexer: bool,
+        enable_indexer_async_v2: bool,
     ) -> Self {
         Self::open(
             StorageDirPaths::from_path(db_root_path),
@@ -600,6 +607,7 @@ impl AptosDB {
             enable_indexer,
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
+            enable_indexer_async_v2,
         )
         .expect("Unable to open AptosDB")
     }
@@ -612,6 +620,7 @@ impl AptosDB {
             false,
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            false,
             false,
         )
     }
@@ -634,6 +643,7 @@ impl AptosDB {
             false,
             BUFFERED_STATE_TARGET_ITEMS,
             max_node_cache,
+            false,
         )
         .expect("Unable to open AptosDB")
     }
@@ -641,7 +651,14 @@ impl AptosDB {
     /// This opens db in non-readonly mode, without the pruner and cache.
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_for_test_no_cache<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        Self::new_without_pruner(db_root_path, false, BUFFERED_STATE_TARGET_ITEMS, 0, false)
+        Self::new_without_pruner(
+            db_root_path,
+            false,
+            BUFFERED_STATE_TARGET_ITEMS,
+            0,
+            false,
+            false,
+        )
     }
 
     /// This opens db in non-readonly mode, without the pruner, and with the indexer
@@ -652,6 +669,7 @@ impl AptosDB {
             false,
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            true,
             true,
         )
     }
@@ -668,6 +686,7 @@ impl AptosDB {
             buffered_state_target_items,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             false,
+            false,
         )
     }
 
@@ -679,6 +698,7 @@ impl AptosDB {
             true,
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            false,
             false,
         )
     }
@@ -837,15 +857,16 @@ impl AptosDB {
         error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
         let get_latest = order == Order::Descending && start_seq_num == u64::max_value();
 
-        let cursor = if get_latest {
-            // Caller wants the latest, figure out the latest seq_num.
-            // In the case of no events on that path, use 0 and expect empty result below.
-            self.event_store
-                .get_latest_sequence_number(ledger_version, event_key)?
-                .unwrap_or(0)
-        } else {
-            start_seq_num
-        };
+        let cursor =
+            if get_latest {
+                // Caller wants the latest, figure out the latest seq_num.
+                // In the case of no events on that path, use 0 and expect empty result below.
+                self.event_store
+                    .get_latest_sequence_number(ledger_version, event_key)?
+                    .unwrap_or(0)
+            } else {
+                start_seq_num
+            };
 
         // Convert requested range and order to a range in ascending order.
         let (first_seq, real_limit) = get_first_seq_num_and_limit(order, cursor, limit)?;
@@ -897,17 +918,36 @@ impl AptosDB {
     }
 
     fn get_table_info_option(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
-        #[cfg(feature = "indexer-async-v2")]
-        return self.get_table_info_from_async_v2(handle);
+        if self.indexer_async_v2_enabled() && self.indexer_enabled() {
+            let async_v2_result = self.get_table_info_from_indexer_async_v2(handle)?;
+            let indexer_result = self.get_table_info_from_indexer(handle)?;
+
+            if async_v2_result != indexer_result {
+                panic!(
+                    "Getting different TableInfo for TableHandle: {:?}. Indexer Async V2 Result: {:?}. Indexer Result: {:?}",
+                    handle,
+                    async_v2_result,
+                    indexer_result
+                );
+            }
+
+            return Ok(indexer_result);
+        }
+
+        if self.indexer_async_v2_enabled() {
+            return self.get_table_info_from_indexer_async_v2(handle);
+        }
 
         self.get_table_info_from_indexer(handle)
     }
 
-    #[cfg(feature = "indexer-async-v2")]
-    fn get_table_info_from_async_v2(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
+    fn get_table_info_from_indexer_async_v2(
+        &self,
+        handle: TableHandle,
+    ) -> Result<Option<TableInfo>> {
         match &self.indexer_async_v2 {
             Some(indexer_async_v2) => indexer_async_v2.get_table_info_with_retry(handle),
-            None => Ok(None),
+            None => bail!("Indexer Async V2 not enabled."),
         }
     }
 
@@ -1584,15 +1624,16 @@ impl DbReader for AptosDB {
             let txn_infos = (start_version..start_version + limit)
                 .map(|version| self.ledger_store.get_transaction_info(version))
                 .collect::<Result<Vec<_>>>()?;
-            let events = if fetch_events {
-                Some(
-                    (start_version..start_version + limit)
-                        .map(|version| self.event_store.get_events_by_version(version))
-                        .collect::<Result<Vec<_>>>()?,
-                )
-            } else {
-                None
-            };
+            let events =
+                if fetch_events {
+                    Some(
+                        (start_version..start_version + limit)
+                            .map(|version| self.event_store.get_events_by_version(version))
+                            .collect::<Result<Vec<_>>>()?,
+                    )
+                } else {
+                    None
+                };
             let proof = TransactionInfoListWithProof::new(
                 self.ledger_store.get_transaction_range_proof(
                     Some(start_version),
@@ -1602,12 +1643,7 @@ impl DbReader for AptosDB {
                 txn_infos,
             );
 
-            Ok(TransactionListWithProof::new(
-                txns,
-                events,
-                Some(start_version),
-                proof,
-            ))
+            Ok(TransactionListWithProof::new(txns, events, Some(start_version), proof))
         })
     }
 
@@ -1681,11 +1717,7 @@ impl DbReader for AptosDB {
                 txn_infos,
             );
 
-            Ok(TransactionOutputListWithProof::new(
-                txns_and_outputs,
-                Some(start_version),
-                proof,
-            ))
+            Ok(TransactionOutputListWithProof::new(txns_and_outputs, Some(start_version), proof))
         })
     }
 
@@ -1714,7 +1746,8 @@ impl DbReader for AptosDB {
             let iter = self
                 .transaction_store
                 .get_transaction_iter(start_version, limit as usize)?;
-            Ok(Box::new(iter) as Box<dyn Iterator<Item = Result<Transaction>> + '_>)
+            Ok(Box::new(iter)
+                as Box<dyn Iterator<Item = Result<Transaction>> + '_>)
         })
     }
 
@@ -1730,7 +1763,8 @@ impl DbReader for AptosDB {
             let iter = self
                 .ledger_store
                 .get_transaction_info_iter(start_version, limit as usize)?;
-            Ok(Box::new(iter) as Box<dyn Iterator<Item = Result<TransactionInfo>> + '_>)
+            Ok(Box::new(iter)
+                as Box<dyn Iterator<Item = Result<TransactionInfo>> + '_>)
         })
     }
 
@@ -1765,7 +1799,8 @@ impl DbReader for AptosDB {
             let iter = self
                 .transaction_store
                 .get_write_set_iter(start_version, limit as usize)?;
-            Ok(Box::new(iter) as Box<dyn Iterator<Item = Result<WriteSet>> + '_>)
+            Ok(Box::new(iter)
+                as Box<dyn Iterator<Item = Result<WriteSet>> + '_>)
         })
     }
 
@@ -2179,7 +2214,6 @@ impl DbReader for AptosDB {
     }
 
     /// Returns whether the indexer async v2 DB has been enabled or not
-    #[cfg(feature = "indexer-async-v2")]
     fn indexer_async_v2_enabled(&self) -> bool {
         self.indexer_async_v2.is_some()
     }
@@ -2192,20 +2226,41 @@ impl DbReader for AptosDB {
             self.state_store.get_usage(version)
         })
     }
+
+    fn get_indexer_async_v2_next_version(&self) -> Result<Version> {
+        gauged_api("get_indexer_async_v2_next_version", || {
+            Ok(self
+                .indexer_async_v2
+                .as_ref()
+                .map(|indexer| indexer.next_version())
+                .unwrap_or(0))
+        })
+    }
 }
 
 impl DbWriter for AptosDB {
-    #[cfg(feature = "indexer-async-v2")]
+    fn create_checkpoint(&self, path: PathBuf) -> Result<()> {
+        gauged_api("create_checkpoint", || {
+            self.indexer_async_v2
+                .as_ref()
+                .map(|indexer| indexer.create_checkpoint(path))
+                .unwrap_or(Ok(()))
+        })
+    }
+
     fn index(
         &self,
         db_reader: Arc<dyn DbReader>,
         first_version: Version,
         write_sets: &[&WriteSet],
+        block_event_epoch: u64,
     ) -> Result<()> {
         gauged_api("index", || {
             self.indexer_async_v2
                 .as_ref()
-                .map(|indexer| indexer.index(db_reader, first_version, write_sets))
+                .map(|indexer| {
+                    indexer.index(db_reader, first_version, write_sets, block_event_epoch)
+                })
                 .unwrap_or(Ok(()))
         })
     }
@@ -2449,17 +2504,18 @@ where
 
     let res = api_impl();
 
-    let res_type = match &res {
-        Ok(_) => "Ok",
-        Err(e) => {
-            warn!(
-                api_name = api_name,
-                error = ?e,
-                "AptosDB API returned error."
-            );
-            "Err"
-        },
-    };
+    let res_type =
+        match &res {
+            Ok(_) => "Ok",
+            Err(e) => {
+                warn!(
+                    api_name = api_name,
+                    error = ?e,
+                    "AptosDB API returned error."
+                );
+                "Err"
+            },
+        };
     API_LATENCY_SECONDS
         .with_label_values(&[api_name, res_type])
         .observe(timer.elapsed().as_secs_f64());

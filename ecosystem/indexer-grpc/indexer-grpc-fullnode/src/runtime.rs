@@ -19,7 +19,7 @@ use aptos_protos::{
 };
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::chain_id::ChainId;
-use std::{net::ToSocketAddrs, sync::Arc};
+use std::{env, net::ToSocketAddrs, sync::Arc};
 use tokio::runtime::Runtime;
 use tonic::{codec::CompressionEncoding, transport::Server};
 
@@ -51,12 +51,8 @@ pub fn bootstrap(
     let enable_expensive_logging = node_config.indexer_grpc.enable_expensive_logging;
 
     runtime.spawn(async move {
-        let context = Arc::new(Context::new(
-            chain_id,
-            db.reader.clone(),
-            mp_sender,
-            node_config,
-        ));
+        let context =
+            Arc::new(Context::new(chain_id, db.reader.clone(), mp_sender, node_config));
 
         let service_context = ServiceContext {
             context: context.clone(),

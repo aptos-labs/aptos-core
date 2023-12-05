@@ -291,6 +291,7 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
                 false,
                 BUFFERED_STATE_TARGET_ITEMS,
                 DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+                false,
             )?)
             .get_restore_handler();
 

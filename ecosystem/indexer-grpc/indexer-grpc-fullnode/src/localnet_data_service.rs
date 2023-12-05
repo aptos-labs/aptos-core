@@ -7,9 +7,8 @@ use aptos_protos::{
     indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
     internal::fullnode::v1::transactions_from_node_response,
 };
-use aptos_storage_interface::DbWriter;
 use futures::Stream;
-use std::{pin::Pin, sync::Arc};
+use std::pin::Pin;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -63,7 +62,6 @@ impl RawData for LocalnetDataService {
                 output_batch_size,
                 tx.clone(),
             );
-            let db_writer = db_writer.clone();
             loop {
                 // Processes and sends batch of transactions to client
                 let results = coordinator
