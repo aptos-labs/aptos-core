@@ -10,7 +10,7 @@ use move_model::{
     model::{FunId, GlobalEnv, QualifiedId},
     ty::Type,
 };
-use std::{collections::BTreeSet, iter::Iterator, ops::Deref, vec::Vec};
+use std::{collections::BTreeSet, iter::Iterator, vec::Vec};
 
 type QualifiedFunId = QualifiedId<FunId>;
 
