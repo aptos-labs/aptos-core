@@ -389,6 +389,11 @@ impl Type {
         }
     }
 
+    pub fn describe_valid_for_constant() -> &'static str {
+        "Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, \
+         or `vector<_>` with valid element type."
+    }
+
     /// Returns true if this type is a specification language only type or contains specification
     /// language only types
     pub fn is_spec(&self) -> bool {

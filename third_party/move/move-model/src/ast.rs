@@ -1428,6 +1428,7 @@ impl Operation {
                 | Not
                 | Cast
                 | Len
+                | Vector
         )
     }
 

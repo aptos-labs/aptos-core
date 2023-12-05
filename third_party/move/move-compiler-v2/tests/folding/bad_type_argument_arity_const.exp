@@ -1,31 +1,31 @@
 
 Diagnostics:
 error: type argument count mismatch (expected 1 but got 0)
-  ┌─ tests/checking/typing/bad_type_argument_arity_const.move:6:15
+  ┌─ tests/folding/bad_type_argument_arity_const.move:6:15
   │
 6 │     const S1: S = S { f: 0 };
   │               ^
 
 error: type argument count mismatch (expected 1 but got 0)
-  ┌─ tests/checking/typing/bad_type_argument_arity_const.move:7:15
+  ┌─ tests/folding/bad_type_argument_arity_const.move:7:15
   │
 7 │     const S2: S<> = S { f: 0 };
   │               ^
 
 error: type argument count mismatch (expected 1 but got 2)
-  ┌─ tests/checking/typing/bad_type_argument_arity_const.move:8:15
+  ┌─ tests/folding/bad_type_argument_arity_const.move:8:15
   │
 8 │     const S3: S<u64, bool> = S { f: 0 };
   │               ^
 
 error: type argument count mismatch (expected 1 but got 2)
-  ┌─ tests/checking/typing/bad_type_argument_arity_const.move:9:17
+  ┌─ tests/folding/bad_type_argument_arity_const.move:9:17
   │
 9 │     const S4: S<S<u64, bool>> = S { f: S { f: 0 } };
   │                 ^
 
 error: Not a valid constant expression.
-  ┌─ tests/checking/typing/bad_type_argument_arity_const.move:6:19
+  ┌─ tests/folding/bad_type_argument_arity_const.move:6:19
   │
 6 │     const S1: S = S { f: 0 };
   │                   ^^^^^^^^^^
@@ -33,7 +33,7 @@ error: Not a valid constant expression.
   │                   Invalid call or operation in constant
 
 error: Invalid type for constant
-  ┌─ tests/checking/typing/bad_type_argument_arity_const.move:6:19
+  ┌─ tests/folding/bad_type_argument_arity_const.move:6:19
   │
 6 │     const S1: S = S { f: 0 };
   │     --------------^^^^^^^^^^-
@@ -41,7 +41,7 @@ error: Invalid type for constant
   │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
 
 error: Not a valid constant expression.
-  ┌─ tests/checking/typing/bad_type_argument_arity_const.move:7:21
+  ┌─ tests/folding/bad_type_argument_arity_const.move:7:21
   │
 7 │     const S2: S<> = S { f: 0 };
   │                     ^^^^^^^^^^
@@ -49,7 +49,7 @@ error: Not a valid constant expression.
   │                     Invalid call or operation in constant
 
 error: Invalid type for constant
-  ┌─ tests/checking/typing/bad_type_argument_arity_const.move:7:21
+  ┌─ tests/folding/bad_type_argument_arity_const.move:7:21
   │
 7 │     const S2: S<> = S { f: 0 };
   │     ----------------^^^^^^^^^^-
@@ -57,7 +57,7 @@ error: Invalid type for constant
   │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
 
 error: Not a valid constant expression.
-  ┌─ tests/checking/typing/bad_type_argument_arity_const.move:8:30
+  ┌─ tests/folding/bad_type_argument_arity_const.move:8:30
   │
 8 │     const S3: S<u64, bool> = S { f: 0 };
   │                              ^^^^^^^^^^
@@ -65,7 +65,7 @@ error: Not a valid constant expression.
   │                              Invalid call or operation in constant
 
 error: Invalid type for constant
-  ┌─ tests/checking/typing/bad_type_argument_arity_const.move:8:30
+  ┌─ tests/folding/bad_type_argument_arity_const.move:8:30
   │
 8 │     const S3: S<u64, bool> = S { f: 0 };
   │     -------------------------^^^^^^^^^^-
@@ -73,7 +73,7 @@ error: Invalid type for constant
   │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
 
 error: Not a valid constant expression.
-  ┌─ tests/checking/typing/bad_type_argument_arity_const.move:9:33
+  ┌─ tests/folding/bad_type_argument_arity_const.move:9:33
   │
 9 │     const S4: S<S<u64, bool>> = S { f: S { f: 0 } };
   │                                 ^^^^^^^^^^^^^^^^^^^
@@ -82,7 +82,7 @@ error: Not a valid constant expression.
   │                                 Invalid call or operation in constant
 
 error: Invalid type for constant
-  ┌─ tests/checking/typing/bad_type_argument_arity_const.move:9:33
+  ┌─ tests/folding/bad_type_argument_arity_const.move:9:33
   │
 9 │     const S4: S<S<u64, bool>> = S { f: S { f: 0 } };
   │     ----------------------------^^^^^^^^^^^^^^^^^^^-
