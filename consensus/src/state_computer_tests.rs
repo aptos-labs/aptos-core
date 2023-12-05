@@ -208,7 +208,7 @@ async fn commit_should_discover_validator_txns() {
         None,
     );
 
-    // Eventually 4 txns: block metadata, sys txn 0, sys txn 1, state checkpoint.
+    // Eventually 4 txns: block metadata, validator txn 0, validator txn 1, state checkpoint.
     let state_compute_result = StateComputeResult::new_dummy_with_compute_status(vec![
             TransactionStatus::Keep(
                 ExecutionStatus::Success

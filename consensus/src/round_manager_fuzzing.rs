@@ -41,7 +41,6 @@ use aptos_types::{
     on_chain_config::{OnChainConsensusConfig, ValidatorSet},
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
-    validator_txn::pool::ValidatorTransactionPool,
     validator_verifier::ValidatorVerifier,
 };
 use futures::{channel::mpsc, executor::block_on};
@@ -183,7 +182,6 @@ fn create_node_for_fuzzing() -> RoundManager {
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
-        Arc::new(ValidatorTransactionPool::new()),
         false,
     );
 

@@ -12,7 +12,7 @@ use crate::{
         PROPOSER_DELAY_PROPOSAL, PROPOSER_PENDING_BLOCKS_COUNT,
         PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
     },
-    state_replication::PayloadClient,
+    payload_client::PayloadClient,
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
@@ -25,15 +25,12 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::{error, sample, sample::SampleRate, warn};
-use aptos_types::validator_txn::{
-    pool::{ValidatorTransactionFilter, ValidatorTransactionPoolClient},
-    ValidatorTransaction,
-};
+use aptos_types::validator_txn::{pool::ValidatorTransactionFilter, ValidatorTransaction};
 use futures::future::BoxFuture;
 use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 #[cfg(test)]
@@ -177,9 +174,7 @@ pub struct ProposalGenerator {
     // Last round that a proposal was generated
     last_round_generated: Round,
     quorum_store_enabled: bool,
-
-    validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
-    should_propose_validator_txns: bool,
+    validator_txn_enabled: bool,
 }
 
 impl ProposalGenerator {
@@ -195,8 +190,7 @@ impl ProposalGenerator {
         pipeline_backpressure_config: PipelineBackpressureConfig,
         chain_health_backoff_config: ChainHealthBackoffConfig,
         quorum_store_enabled: bool,
-        validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
-        should_propose_validator_txns: bool,
+        validator_txn_enabled: bool,
     ) -> Self {
         Self {
             author,
@@ -211,8 +205,7 @@ impl ProposalGenerator {
             chain_health_backoff_config,
             last_round_generated: 0,
             quorum_store_enabled,
-            validator_txn_pool_client,
-            should_propose_validator_txns,
+            validator_txn_enabled,
         }
     }
 
@@ -302,35 +295,9 @@ impl ProposalGenerator {
 
             let voting_power_ratio = proposer_election.get_voting_power_participation_ratio(round);
 
-            let (mut max_block_txns, mut max_block_bytes, mut proposal_delay) = self
+            let (max_block_txns, max_block_bytes, proposal_delay) = self
                 .calculate_max_block_sizes(voting_power_ratio, timestamp)
                 .await;
-
-            let validator_txn_pull_timer = Instant::now();
-            let validator_txns = if self.should_propose_validator_txns {
-                let pending_validator_txn_hashes: HashSet<HashValue> = pending_blocks
-                    .iter()
-                    .filter_map(|block| block.validator_txns())
-                    .flatten()
-                    .map(ValidatorTransaction::hash)
-                    .collect();
-
-                self.validator_txn_pool_client.pull(
-                    max_block_txns as usize,
-                    max_block_bytes as usize,
-                    ValidatorTransactionFilter::PendingTxnHashSet(pending_validator_txn_hashes),
-                )
-            } else {
-                vec![]
-            };
-
-            let validator_txn_total_bytes = validator_txns
-                .iter()
-                .map(|txn| txn.size_in_bytes() as u64)
-                .sum();
-            max_block_txns = max_block_txns.saturating_sub(validator_txns.len() as u64);
-            max_block_bytes = max_block_bytes.saturating_sub(validator_txn_total_bytes);
-            proposal_delay = proposal_delay.saturating_sub(validator_txn_pull_timer.elapsed());
 
             PROPOSER_DELAY_PROPOSAL.set(proposal_delay.as_secs_f64());
             if !proposal_delay.is_zero() {
@@ -352,12 +319,22 @@ impl ProposalGenerator {
                 .max(max_pending_block_bytes as f32 / self.max_block_bytes as f32);
             PROPOSER_PENDING_BLOCKS_COUNT.set(pending_blocks.len() as i64);
             PROPOSER_PENDING_BLOCKS_FILL_FRACTION.set(max_fill_fraction as f64);
-            let payload = self
+
+            let pending_validator_txn_hashes: HashSet<HashValue> = pending_blocks
+                .iter()
+                .filter_map(|block| block.validator_txns())
+                .flatten()
+                .map(ValidatorTransaction::hash)
+                .collect();
+            let validator_txn_filter =
+                ValidatorTransactionFilter::PendingTxnHashSet(pending_validator_txn_hashes);
+            let (validator_txns, payload) = self
                 .payload_client
                 .pull_payload(
                     self.quorum_store_poll_time.saturating_sub(proposal_delay),
                     max_block_txns,
                     max_block_bytes,
+                    validator_txn_filter,
                     payload_filter,
                     wait_callback,
                     pending_ordering,
@@ -378,7 +355,7 @@ impl ProposalGenerator {
             proposer_election,
         );
 
-        let block = if self.should_propose_validator_txns {
+        let block = if self.validator_txn_enabled {
             BlockData::new_proposal_ext(
                 validator_txns,
                 payload,

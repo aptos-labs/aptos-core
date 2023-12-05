@@ -2,7 +2,7 @@
 
 use crate::validator_txn::ValidatorTransaction;
 use aptos_crypto::HashValue;
-use std::collections::HashSet;
+use std::{collections::HashSet, time::Duration};
 
 pub enum ValidatorTransactionFilter {
     PendingTxnHashSet(HashSet<HashValue>),
@@ -11,8 +11,9 @@ pub enum ValidatorTransactionFilter {
 pub trait ValidatorTransactionPoolClient: Send + Sync {
     fn pull(
         &self,
-        max_items: usize,
-        max_bytes: usize,
+        max_time: Duration,
+        max_items: u64,
+        max_bytes: u64,
         exclude: ValidatorTransactionFilter,
     ) -> Vec<ValidatorTransaction>;
 }
@@ -33,8 +34,9 @@ impl Default for ValidatorTransactionPool {
 impl ValidatorTransactionPoolClient for ValidatorTransactionPool {
     fn pull(
         &self,
-        _max_items: usize,
-        _max_bytes: usize,
+        _max_time: Duration,
+        _max_items: u64,
+        _max_bytes: u64,
         _exclude: ValidatorTransactionFilter,
     ) -> Vec<ValidatorTransaction> {
         vec![]

@@ -19,7 +19,9 @@ use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
-use aptos_types::{epoch_state::EpochState, validator_signer::ValidatorSigner};
+use aptos_types::{
+    epoch_state::EpochState, validator_signer::ValidatorSigner, validator_txn::ValidatorTransaction,
+};
 use async_trait::async_trait;
 use std::{collections::BTreeMap, mem, sync::Arc};
 
@@ -31,6 +33,7 @@ pub(crate) struct NodeBroadcastHandler {
     storage: Arc<dyn DAGStorage>,
     fetch_requester: Arc<dyn TFetchRequester>,
     payload_config: DagPayloadConfig,
+    validator_txn_enabled: bool,
 }
 
 impl NodeBroadcastHandler {
@@ -41,6 +44,7 @@ impl NodeBroadcastHandler {
         storage: Arc<dyn DAGStorage>,
         fetch_requester: Arc<dyn TFetchRequester>,
         payload_config: DagPayloadConfig,
+        validator_txn_enabled: bool,
     ) -> Self {
         let epoch = epoch_state.epoch;
         let votes_by_round_peer = read_votes_from_storage(&storage, epoch);
@@ -53,6 +57,7 @@ impl NodeBroadcastHandler {
             storage,
             fetch_requester,
             payload_config,
+            validator_txn_enabled,
         }
     }
 
@@ -79,10 +84,18 @@ impl NodeBroadcastHandler {
     }
 
     fn validate(&self, node: Node) -> anyhow::Result<Node> {
-        ensure!(node.payload().len() as u64 <= self.payload_config.max_receiving_txns_per_round);
-        ensure!(
-            node.payload().size() as u64 <= self.payload_config.max_receiving_size_per_round_bytes
-        );
+        if !self.validator_txn_enabled {
+            ensure!(node.validator_txns().len() == 0);
+        }
+        let num_txns = node.validator_txns().len() + node.payload().len();
+        let txn_bytes = node
+            .validator_txns()
+            .iter()
+            .map(ValidatorTransaction::size_in_bytes)
+            .sum::<usize>()
+            + node.payload().size();
+        ensure!(num_txns as u64 <= self.payload_config.max_receiving_txns_per_round);
+        ensure!(txn_bytes as u64 <= self.payload_config.max_receiving_size_per_round_bytes);
 
         let current_round = node.metadata().round();
 

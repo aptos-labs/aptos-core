@@ -1,25 +1,21 @@
 // Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     counters::WAIT_FOR_FULL_BLOCKS_TRIGGERED, error::QuorumStoreError, monitor,
-    state_replication::PayloadClient,
+    payload_client::user::UserPayloadClient,
 };
-use anyhow::Result;
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter},
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
-use aptos_logger::prelude::*;
+use aptos_logger::info;
 use fail::fail_point;
-use futures::{
-    channel::{mpsc, oneshot},
-    future::BoxFuture,
-};
+use futures::future::BoxFuture;
+use futures_channel::{mpsc, oneshot};
 use std::time::{Duration, Instant};
 use tokio::time::{sleep, timeout};
 
-const NO_TXN_DELAY: u64 = 30; // TODO: consider moving to a config
+const NO_TXN_DELAY: u64 = 30;
 
 /// Client that pulls blocks from Quorum Store
 #[derive(Clone)]
@@ -52,7 +48,7 @@ impl QuorumStoreClient {
         max_bytes: u64,
         return_non_full: bool,
         exclude_payloads: PayloadFilter,
-    ) -> Result<Payload, QuorumStoreError> {
+    ) -> anyhow::Result<Payload, QuorumStoreError> {
         let (callback, callback_rcv) = oneshot::channel();
         let req = GetPayloadCommand::GetPayloadRequest(
             max_items,
@@ -82,18 +78,18 @@ impl QuorumStoreClient {
 }
 
 #[async_trait::async_trait]
-impl PayloadClient for QuorumStoreClient {
-    async fn pull_payload(
+impl UserPayloadClient for QuorumStoreClient {
+    async fn pull(
         &self,
         max_poll_time: Duration,
         max_items: u64,
         max_bytes: u64,
-        exclude_payloads: PayloadFilter,
+        exclude: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,
         pending_uncommitted_blocks: usize,
         recent_max_fill_fraction: f32,
-    ) -> Result<Payload, QuorumStoreError> {
+    ) -> anyhow::Result<Payload, QuorumStoreError> {
         let return_non_full = recent_max_fill_fraction
             < self.wait_for_full_blocks_above_recent_fill_threshold
             && pending_uncommitted_blocks < self.wait_for_full_blocks_above_pending_blocks;
@@ -116,7 +112,7 @@ impl PayloadClient for QuorumStoreClient {
                     max_items,
                     max_bytes,
                     return_non_full || return_empty || done,
-                    exclude_payloads.clone(),
+                    exclude.clone(),
                 )
                 .await?;
             if payload.is_empty() && !return_empty && !done {
@@ -140,6 +136,7 @@ impl PayloadClient for QuorumStoreClient {
             duration = start_time.elapsed().as_secs_f32(),
             "Pull payloads from QuorumStore: proposal"
         );
+
         Ok(payload)
     }
 }

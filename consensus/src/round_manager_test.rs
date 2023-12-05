@@ -66,7 +66,7 @@ use aptos_types::{
     on_chain_config::{ConsensusConfigV1Ext, ConsensusExtraFeature, OnChainConsensusConfig},
     transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
-    validator_txn::{pool::ValidatorTransactionPool, ValidatorTransaction},
+    validator_txn::ValidatorTransaction,
     validator_verifier::{generate_validator_verifier, random_validator_verifier},
     waypoint::Waypoint,
 };
@@ -272,8 +272,7 @@ impl NodeSetup {
             PipelineBackpressureConfig::new_no_backoff(),
             ChainHealthBackoffConfig::new_no_backoff(),
             false,
-            Arc::new(ValidatorTransactionPool::new()),
-            onchain_consensus_config.should_propose_validator_txns(),
+            onchain_consensus_config.validator_txn_enabled(),
         );
 
         let round_state = Self::create_round_state(time_service);
@@ -2052,10 +2051,9 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
 
     let mut onchain_config_inner = ConsensusConfigV1Ext::default_if_missing();
-    onchain_config_inner.update_extra_features(
-        vec![ConsensusExtraFeature::ProposalWithValidatorTransactions],
-        vec![],
-    );
+    onchain_config_inner
+        .extra_features
+        .update_extra_features(vec![ConsensusExtraFeature::ValidatorTransaction], vec![]);
 
     let local_config = ConsensusConfig {
         max_receiving_block_txns_quorum_store_override: 10,
