@@ -314,7 +314,7 @@ impl TransactionRestoreBatchController {
     fn loaded_chunk_stream(&self) -> Peekable<impl Stream<Item = Result<LoadedChunk>>> {
         let con = self.global_opt.concurrent_downloads;
 
-        let manifest_handle_stream = stream::iter(self.manifest_handles.clone().into_iter());
+        let manifest_handle_stream = stream::iter(self.manifest_handles.clone());
 
         let storage = self.storage.clone();
         let manifest_stream = manifest_handle_stream
@@ -630,7 +630,7 @@ impl TransactionRestoreBatchController {
                         .start_timer();
                     tokio::task::spawn_blocking(move || {
                         let committed_chunk = chunk_replayer.commit()?;
-                        let v = committed_chunk.result_view.version().unwrap_or(0);
+                        let v = committed_chunk.result_state.current_version.unwrap_or(0);
                         let total_replayed = v - first_version + 1;
                         TRANSACTION_REPLAY_VERSION.set(v as i64);
                         info!(

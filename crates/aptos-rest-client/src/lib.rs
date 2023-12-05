@@ -25,10 +25,10 @@ pub use aptos_api_types::{
 };
 use aptos_api_types::{
     deserialize_from_string,
-    mime_types::{BCS, BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, JSON},
+    mime_types::{BCS, BCS_SIGNED_TRANSACTION, BCS_VIEW_FUNCTION, JSON},
     AptosError, BcsBlock, Block, GasEstimation, HexEncodedBytes, IndexResponse, MoveModuleId,
     TransactionData, TransactionOnChainData, TransactionsBatchSubmissionResult, UserTransaction,
-    VersionedEvent, ViewRequest,
+    VersionedEvent, ViewFunction, ViewRequest,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{debug, info, sample, sample::SampleRate};
@@ -307,6 +307,30 @@ impl Client {
         self.json(response).await
     }
 
+    pub async fn view_bcs<T: DeserializeOwned>(
+        &self,
+        request: &ViewFunction,
+        version: Option<u64>,
+    ) -> AptosResult<Response<T>> {
+        let txn_payload = bcs::to_bytes(request)?;
+        let mut url = self.build_path("view")?;
+        if let Some(version) = version {
+            url.set_query(Some(format!("ledger_version={}", version).as_str()));
+        }
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, BCS_VIEW_FUNCTION)
+            .header(ACCEPT, BCS)
+            .body(txn_payload)
+            .send()
+            .await?;
+
+        let response = self.check_and_parse_bcs_response(response).await?;
+        Ok(response.and_then(|bytes| bcs::from_bytes(&bytes))?)
+    }
+
     pub async fn simulate(
         &self,
         txn: &SignedTransaction,
@@ -317,7 +341,7 @@ impl Client {
         let response = self
             .inner
             .post(url)
-            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
             .body(txn_payload)
             .send()
             .await?;
@@ -341,7 +365,7 @@ impl Client {
         let response = self
             .inner
             .post(url)
-            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
             .body(txn_payload)
             .send()
             .await?;
@@ -359,7 +383,7 @@ impl Client {
         let response = self
             .inner
             .post(url)
-            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
             .header(ACCEPT, BCS)
             .body(txn_payload)
             .send()
@@ -384,7 +408,7 @@ impl Client {
         let response = self
             .inner
             .post(url)
-            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
             .header(ACCEPT, BCS)
             .body(txn_payload)
             .send()
@@ -404,7 +428,7 @@ impl Client {
         let response = self
             .inner
             .post(url)
-            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
             .body(txn_payload)
             .send()
             .await?;
@@ -419,7 +443,7 @@ impl Client {
         let response = self
             .inner
             .post(url)
-            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
             .header(ACCEPT, BCS)
             .body(txn_payload)
             .send()
@@ -439,7 +463,7 @@ impl Client {
         let response = self
             .inner
             .post(url)
-            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
             .body(txn_payload)
             .send()
             .await?;
@@ -456,7 +480,7 @@ impl Client {
         let response = self
             .inner
             .post(url)
-            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
             .header(ACCEPT, BCS)
             .body(txn_payload)
             .send()
@@ -879,7 +903,7 @@ impl Client {
         start: Option<u64>,
         limit: Option<u64>,
     ) -> AptosResult<Response<Vec<Transaction>>> {
-        let url = self.build_path(&format!("accounts/{}/transactions", address))?;
+        let url = self.build_path(&format!("accounts/{}/transactions", address.to_hex()))?;
 
         let mut request = self.inner.get(url);
         if let Some(start) = start {
@@ -901,7 +925,7 @@ impl Client {
         start: Option<u64>,
         limit: Option<u16>,
     ) -> AptosResult<Response<Vec<TransactionOnChainData>>> {
-        let url = self.build_path(&format!("accounts/{}/transactions", address))?;
+        let url = self.build_path(&format!("accounts/{}/transactions", address.to_hex()))?;
         let response = self.get_bcs_with_page(url, start, limit).await?;
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
@@ -911,7 +935,7 @@ impl Client {
         address: AccountAddress,
     ) -> AptosResult<Response<Vec<Resource>>> {
         self.paginate_with_cursor(
-            &format!("accounts/{}/resources", address),
+            &format!("accounts/{}/resources", address.to_hex()),
             RESOURCES_PER_CALL_PAGINATION,
             None,
         )
@@ -923,7 +947,7 @@ impl Client {
         address: AccountAddress,
     ) -> AptosResult<Response<BTreeMap<StructTag, Vec<u8>>>> {
         self.paginate_with_cursor_bcs(
-            &format!("accounts/{}/resources", address),
+            &format!("accounts/{}/resources", address.to_hex()),
             RESOURCES_PER_CALL_PAGINATION,
             None,
         )
@@ -936,7 +960,7 @@ impl Client {
         version: u64,
     ) -> AptosResult<Response<Vec<Resource>>> {
         self.paginate_with_cursor(
-            &format!("accounts/{}/resources", address),
+            &format!("accounts/{}/resources", address.to_hex()),
             RESOURCES_PER_CALL_PAGINATION,
             Some(version),
         )
@@ -949,7 +973,7 @@ impl Client {
         version: u64,
     ) -> AptosResult<Response<BTreeMap<StructTag, Vec<u8>>>> {
         self.paginate_with_cursor_bcs(
-            &format!("accounts/{}/resources", address),
+            &format!("accounts/{}/resources", address.to_hex()),
             RESOURCES_PER_CALL_PAGINATION,
             Some(version),
         )
@@ -982,7 +1006,11 @@ impl Client {
         address: AccountAddress,
         resource_type: &str,
     ) -> AptosResult<Response<Option<Resource>>> {
-        let url = self.build_path(&format!("accounts/{}/resource/{}", address, resource_type))?;
+        let url = self.build_path(&format!(
+            "accounts/{}/resource/{}",
+            address.to_hex(),
+            resource_type
+        ))?;
 
         let response = self
             .inner
@@ -998,7 +1026,11 @@ impl Client {
         address: AccountAddress,
         resource_type: &str,
     ) -> AptosResult<Response<T>> {
-        let url = self.build_path(&format!("accounts/{}/resource/{}", address, resource_type))?;
+        let url = self.build_path(&format!(
+            "accounts/{}/resource/{}",
+            address.to_hex(),
+            resource_type
+        ))?;
         let response = self.get_bcs(url).await?;
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
@@ -1011,7 +1043,9 @@ impl Client {
     ) -> AptosResult<Response<T>> {
         let url = self.build_path(&format!(
             "accounts/{}/resource/{}?ledger_version={}",
-            address, resource_type, version
+            address.to_hex(),
+            resource_type,
+            version
         ))?;
 
         let response = self.get_bcs(url).await?;
@@ -1026,7 +1060,9 @@ impl Client {
     ) -> AptosResult<Response<Vec<u8>>> {
         let url = self.build_path(&format!(
             "accounts/{}/resource/{}?ledger_version={}",
-            address, resource_type, version
+            address.to_hex(),
+            resource_type,
+            version
         ))?;
 
         let response = self.get_bcs(url).await?;
@@ -1038,7 +1074,11 @@ impl Client {
         address: AccountAddress,
         resource_type: &str,
     ) -> AptosResult<Response<Vec<u8>>> {
-        let url = self.build_path(&format!("accounts/{}/resource/{}", address, resource_type))?;
+        let url = self.build_path(&format!(
+            "accounts/{}/resource/{}",
+            address.to_hex(),
+            resource_type
+        ))?;
 
         let response = self.get_bcs(url).await?;
         Ok(response.map(|inner| inner.to_vec()))
@@ -1052,7 +1092,9 @@ impl Client {
     ) -> AptosResult<Response<Option<Resource>>> {
         let url = self.build_path(&format!(
             "accounts/{}/resource/{}?ledger_version={}",
-            address, resource_type, version
+            address.to_hex(),
+            resource_type,
+            version
         ))?;
 
         let response = self.inner.get(url).send().await?;
@@ -1064,7 +1106,7 @@ impl Client {
         address: AccountAddress,
     ) -> AptosResult<Response<Vec<MoveModuleBytecode>>> {
         self.paginate_with_cursor(
-            &format!("accounts/{}/modules", address),
+            &format!("accounts/{}/modules", address.to_hex()),
             MODULES_PER_CALL_PAGINATION,
             None,
         )
@@ -1076,7 +1118,7 @@ impl Client {
         address: AccountAddress,
     ) -> AptosResult<Response<BTreeMap<MoveModuleId, Vec<u8>>>> {
         self.paginate_with_cursor_bcs(
-            &format!("accounts/{}/modules", address),
+            &format!("accounts/{}/modules", address.to_hex()),
             MODULES_PER_CALL_PAGINATION,
             None,
         )
@@ -1088,7 +1130,11 @@ impl Client {
         address: AccountAddress,
         module_name: &str,
     ) -> AptosResult<Response<MoveModuleBytecode>> {
-        let url = self.build_path(&format!("accounts/{}/module/{}", address, module_name))?;
+        let url = self.build_path(&format!(
+            "accounts/{}/module/{}",
+            address.to_hex(),
+            module_name
+        ))?;
         self.get(url).await
     }
 
@@ -1097,7 +1143,11 @@ impl Client {
         address: AccountAddress,
         module_name: &str,
     ) -> AptosResult<Response<bytes::Bytes>> {
-        let url = self.build_path(&format!("accounts/{}/module/{}", address, module_name))?;
+        let url = self.build_path(&format!(
+            "accounts/{}/module/{}",
+            address.to_hex(),
+            module_name
+        ))?;
         self.get_bcs(url).await
     }
 
@@ -1109,7 +1159,9 @@ impl Client {
     ) -> AptosResult<Response<bytes::Bytes>> {
         let url = self.build_path(&format!(
             "accounts/{}/module/{}?ledger_version={}",
-            address, module_name, version
+            address.to_hex(),
+            module_name,
+            version
         ))?;
         self.get_bcs(url).await
     }
@@ -1229,6 +1281,28 @@ impl Client {
         self.json(response).await
     }
 
+    pub async fn get_table_item_at_version<K: Serialize>(
+        &self,
+        table_handle: AccountAddress,
+        key_type: &str,
+        value_type: &str,
+        key: K,
+        version: u64,
+    ) -> AptosResult<Response<Value>> {
+        let url = self.build_path(&format!(
+            "tables/{}/item?ledger_version={}",
+            table_handle, version
+        ))?;
+        let data = json!({
+            "key_type": key_type,
+            "value_type": value_type,
+            "key": json!(key),
+        });
+
+        let response = self.inner.post(url).json(&data).send().await?;
+        self.json(response).await
+    }
+
     pub async fn get_table_item_bcs<K: Serialize, T: DeserializeOwned>(
         &self,
         table_handle: AccountAddress,
@@ -1237,6 +1311,28 @@ impl Client {
         key: K,
     ) -> AptosResult<Response<T>> {
         let url = self.build_path(&format!("tables/{}/item", table_handle))?;
+        let data = json!({
+            "key_type": key_type,
+            "value_type": value_type,
+            "key": json!(key),
+        });
+
+        let response = self.post_bcs(url, data).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
+    pub async fn get_table_item_bcs_at_version<K: Serialize, T: DeserializeOwned>(
+        &self,
+        table_handle: AccountAddress,
+        key_type: &str,
+        value_type: &str,
+        key: K,
+        version: u64,
+    ) -> AptosResult<Response<T>> {
+        let url = self.build_path(&format!(
+            "tables/{}/item?ledger_version={}",
+            table_handle, version
+        ))?;
         let data = json!({
             "key_type": key_type,
             "value_type": value_type,
@@ -1283,7 +1379,7 @@ impl Client {
     }
 
     pub async fn get_account(&self, address: AccountAddress) -> AptosResult<Response<Account>> {
-        let url = self.build_path(&format!("accounts/{}", address))?;
+        let url = self.build_path(&format!("accounts/{}", address.to_hex()))?;
         let response = self.inner.get(url).send().await?;
         self.json(response).await
     }
@@ -1292,7 +1388,7 @@ impl Client {
         &self,
         address: AccountAddress,
     ) -> AptosResult<Response<AccountResource>> {
-        let url = self.build_path(&format!("accounts/{}", address))?;
+        let url = self.build_path(&format!("accounts/{}", address.to_hex()))?;
         let response = self.get_bcs(url).await?;
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }

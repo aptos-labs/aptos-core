@@ -129,6 +129,52 @@ pub trait AptosDataClientInterface {
         include_events: bool,
         request_timeout_ms: u64,
     ) -> error::Result<Response<TransactionOrOutputListWithProof>>;
+
+    /// Subscribes to new transaction output lists with proofs. Subscriptions
+    /// start at `known_version + 1` and `known_epoch` (inclusive), as
+    /// specified by the stream metadata. The end version and proof version
+    /// are specified by the server. If the data cannot be fetched, an
+    /// error is returned.
+    async fn subscribe_to_transaction_outputs_with_proof(
+        &self,
+        subscription_request_metadata: SubscriptionRequestMetadata,
+        request_timeout_ms: u64,
+    ) -> error::Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>;
+
+    /// Subscribes to new transaction lists with proofs. Subscriptions start
+    /// at `known_version + 1` and `known_epoch` (inclusive), as specified
+    /// by the subscription metadata. If `include_events` is true,
+    /// events are included in the proof. The end version and proof version
+    /// are specified by the server. If the data cannot be fetched, an error
+    /// is returned.
+    async fn subscribe_to_transactions_with_proof(
+        &self,
+        subscription_request_metadata: SubscriptionRequestMetadata,
+        include_events: bool,
+        request_timeout_ms: u64,
+    ) -> error::Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>>;
+
+    /// Subscribes to new transaction or output lists with proofs. Subscriptions
+    /// start at `known_version + 1` and `known_epoch` (inclusive), as
+    /// specified by the subscription metadata. If `include_events` is true,
+    /// events are included in the proof. The end version and proof version
+    /// are specified by the server. If the data cannot be fetched, an error
+    /// is returned.
+    async fn subscribe_to_transactions_or_outputs_with_proof(
+        &self,
+        subscription_request_metadata: SubscriptionRequestMetadata,
+        include_events: bool,
+        request_timeout_ms: u64,
+    ) -> error::Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>;
+}
+
+/// Subscription stream metadata associated with each subscription request
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct SubscriptionRequestMetadata {
+    pub known_version_at_stream_start: u64, // The highest known transaction version at stream start
+    pub known_epoch_at_stream_start: u64,   // The highest known epoch at stream start
+    pub subscription_stream_id: u64,        // The unique id of the subscription stream
+    pub subscription_stream_index: u64,     // The index of the request in the subscription stream
 }
 
 /// A response error that users of the Aptos Data Client can use to notify
@@ -203,7 +249,7 @@ impl<T> Response<T> {
 }
 
 /// The different data client response payloads as an enum.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ResponsePayload {
     EpochEndingLedgerInfos(Vec<LedgerInfoWithSignatures>),
     NewTransactionOutputsWithProof((TransactionOutputListWithProof, LedgerInfoWithSignatures)),
@@ -215,6 +261,8 @@ pub enum ResponsePayload {
 }
 
 impl ResponsePayload {
+    /// Returns a label for the response payload. This is useful
+    /// for logging and metrics.
     pub fn get_label(&self) -> &'static str {
         match self {
             Self::EpochEndingLedgerInfos(_) => "epoch_ending_ledger_infos",
@@ -224,6 +272,34 @@ impl ResponsePayload {
             Self::StateValuesWithProof(_) => "state_values_with_proof",
             Self::TransactionOutputsWithProof(_) => "transaction_outputs_with_proof",
             Self::TransactionsWithProof(_) => "transactions_with_proof",
+        }
+    }
+
+    /// Returns the chunk size of the response payload (i.e., the
+    /// number of data items held in the response).
+    pub fn get_data_chunk_size(&self) -> usize {
+        match self {
+            Self::EpochEndingLedgerInfos(epoch_ending_ledger_infos) => {
+                epoch_ending_ledger_infos.len()
+            },
+            Self::NewTransactionOutputsWithProof((outputs_with_proof, _)) => {
+                outputs_with_proof.transactions_and_outputs.len()
+            },
+            Self::NewTransactionsWithProof((transactions_with_proof, _)) => {
+                transactions_with_proof.transactions.len()
+            },
+            Self::NumberOfStates(_) => {
+                1 // The number of states is a single u64
+            },
+            Self::StateValuesWithProof(state_values_with_proof) => {
+                state_values_with_proof.raw_values.len()
+            },
+            Self::TransactionOutputsWithProof(outputs_with_proof) => {
+                outputs_with_proof.transactions_and_outputs.len()
+            },
+            Self::TransactionsWithProof(transactions_with_proof) => {
+                transactions_with_proof.transactions.len()
+            },
         }
     }
 }

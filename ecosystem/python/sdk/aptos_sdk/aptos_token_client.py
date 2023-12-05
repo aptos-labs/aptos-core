@@ -27,7 +27,7 @@ class Object:
     def parse(resource: dict[str, Any]) -> Object:
         return Object(
             resource["allow_ungated_transfer"],
-            AccountAddress.from_str(resource["owner"]),
+            AccountAddress.from_str_relaxed(resource["owner"]),
         )
 
     def __str__(self) -> str:
@@ -54,7 +54,7 @@ class Collection:
     @staticmethod
     def parse(resource: dict[str, Any]) -> Collection:
         return Collection(
-            AccountAddress.from_str(resource["creator"]),
+            AccountAddress.from_str_relaxed(resource["creator"]),
             resource["description"],
             resource["name"],
             resource["uri"],
@@ -81,7 +81,7 @@ class Royalty:
         return Royalty(
             resource["numerator"],
             resource["denominator"],
-            AccountAddress.from_str(resource["payee_address"]),
+            AccountAddress.from_str_relaxed(resource["payee_address"]),
         )
 
 
@@ -114,7 +114,7 @@ class Token:
     @staticmethod
     def parse(resource: dict[str, Any]):
         return Token(
-            AccountAddress.from_str(resource["collection"]["inner"]),
+            AccountAddress.from_str_relaxed(resource["collection"]["inner"]),
             int(resource["index"]),
             resource["description"],
             resource["name"],
@@ -321,7 +321,7 @@ class ReadObject:
 
 
 class AptosTokenClient:
-    """A wrapper around reading and mutating AptosTokens also known as Token Objects"""
+    """A wrapper around reading and mutating Digital Assets also known as Token Objects"""
 
     client: RestClient
 
@@ -626,5 +626,5 @@ class AptosTokenClient:
         for event in output["events"]:
             if event["type"] != "0x4::collection::MintEvent":
                 continue
-            mints.append(AccountAddress.from_str(event["data"]["token"]))
+            mints.append(AccountAddress.from_str_relaxed(event["data"]["token"]))
         return mints

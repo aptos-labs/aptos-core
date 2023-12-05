@@ -180,6 +180,11 @@ module aptos_framework::object {
         exists<ObjectCore>(object)
     }
 
+    /// Returns true if there exists an object with resource T.
+    public fun object_exists<T: key>(object: address): bool {
+        exists<ObjectCore>(object) && exists_at<T>(object)
+    }
+
     /// Derives an object address from source material: sha3_256([creator address | seed | 0xFE]).
     public fun create_object_address(source: &address, seed: vector<u8>): address {
         let bytes = bcs::to_bytes(source);
@@ -467,21 +472,22 @@ module aptos_framework::object {
     ) acquires ObjectCore {
         let owner_address = signer::address_of(owner);
         verify_ungated_and_descendant(owner_address, object);
+        transfer_raw_inner(object, to);
+    }
 
+    inline fun transfer_raw_inner(object: address, to: address) acquires ObjectCore {
         let object_core = borrow_global_mut<ObjectCore>(object);
-        if (object_core.owner == to) {
-            return
+        if (object_core.owner != to) {
+            event::emit_event(
+                &mut object_core.transfer_events,
+                TransferEvent {
+                    object,
+                    from: object_core.owner,
+                    to,
+                },
+            );
+            object_core.owner = to;
         };
-
-        event::emit_event(
-            &mut object_core.transfer_events,
-            TransferEvent {
-                object: object,
-                from: object_core.owner,
-                to,
-            },
-        );
-        object_core.owner = to;
     }
 
     /// Transfer the given object to another object. See `transfer` for more information.
@@ -510,12 +516,19 @@ module aptos_framework::object {
         );
 
         let current_address = object.owner;
-
         let count = 0;
-        while (owner != current_address) {
+        while ({
+            spec {
+                invariant count < MAXIMUM_OBJECT_NESTING;
+                invariant forall i in 0..count:
+                    exists<ObjectCore>(current_address) && global<ObjectCore>(current_address).allow_ungated_transfer;
+                // invariant forall i in 0..count:
+                //     current_address == get_transfer_address(global<ObjectCore>(destination).owner, i);
+            };
+            owner != current_address
+        }) {
             let count = count + 1;
             assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING));
-
             // At this point, the first object exists and so the more likely case is that the
             // object's owner is not an object. So we return a more sensible error.
             assert!(
@@ -527,7 +540,6 @@ module aptos_framework::object {
                 object.allow_ungated_transfer,
                 error::permission_denied(ENO_UNGATED_TRANSFERS),
             );
-
             current_address = object.owner;
         };
     }
@@ -537,45 +549,23 @@ module aptos_framework::object {
     /// Original owners can reclaim burnt objects any time in the future by calling unburn.
     public entry fun burn<T: key>(owner: &signer, object: Object<T>) acquires ObjectCore {
         let original_owner = signer::address_of(owner);
-        assert!(owner(object) == original_owner, error::permission_denied(ENOT_OBJECT_OWNER));
+        assert!(is_owner(object, original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
         let object_addr = object.inner;
         move_to(&create_signer(object_addr), TombStone { original_owner });
-        let object = borrow_global_mut<ObjectCore>(object_addr);
-        object.owner = BURN_ADDRESS;
-
-        // Burn should still emit event to make sure ownership is upgrade correctly in indexing.
-        event::emit_event(
-            &mut object.transfer_events,
-            TransferEvent {
-                object: object_addr,
-                from: original_owner,
-                to: BURN_ADDRESS,
-            },
-        );
+        transfer_raw_inner(object_addr, BURN_ADDRESS);
     }
 
     /// Allow origin owners to reclaim any objects they previous burnt.
     public entry fun unburn<T: key>(
         original_owner: &signer,
         object: Object<T>,
-    ) acquires ObjectCore, TombStone {
+    ) acquires TombStone, ObjectCore {
         let object_addr = object.inner;
         assert!(exists<TombStone>(object_addr), error::invalid_argument(EOBJECT_NOT_BURNT));
 
         let TombStone { original_owner: original_owner_addr } = move_from<TombStone>(object_addr);
         assert!(original_owner_addr == signer::address_of(original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
-        let object = borrow_global_mut<ObjectCore>(object_addr);
-        object.owner = original_owner_addr;
-
-        // Unburn reclaims should still emit event to make sure ownership is upgrade correctly in indexing.
-        event::emit_event(
-            &mut object.transfer_events,
-            TransferEvent {
-                object: object_addr,
-                from: BURN_ADDRESS,
-                to: original_owner_addr,
-            },
-        );
+        transfer_raw_inner(object_addr, original_owner_addr);
     }
 
     /// Accessors
@@ -618,7 +608,14 @@ module aptos_framework::object {
         let current_address = object.owner;
 
         let count = 0;
-        while (owner != current_address) {
+        while ({
+            spec {
+                invariant count < MAXIMUM_OBJECT_NESTING;
+                invariant forall i in 0..count:
+                    owner != current_address && exists<ObjectCore>(current_address);
+            };
+            owner != current_address
+        }) {
             let count = count + 1;
             assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING));
             if (!exists<ObjectCore>(current_address)) {

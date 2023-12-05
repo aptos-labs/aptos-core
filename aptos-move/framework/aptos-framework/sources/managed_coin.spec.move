@@ -8,10 +8,7 @@ spec aptos_framework::managed_coin {
         account: &signer,
         amount: u64,
     ) {
-        use aptos_framework::optional_aggregator;
         use aptos_std::type_info;
-        use std::option;
-        use aptos_framework::aggregator;
 
         let account_addr = signer::address_of(account);
 
@@ -29,16 +26,13 @@ spec aptos_framework::managed_coin {
 
         let addr =  type_info::type_of<CoinType>().account_address;
         let maybe_supply = global<coin::CoinInfo<CoinType>>(addr).supply;
-
         // Ensure the amount won't be overflow.
         aborts_if amount <= 0;
         aborts_if !exists<coin::CoinInfo<CoinType>>(addr);
-        aborts_if option::is_some(maybe_supply) && optional_aggregator::is_parallelizable(option::borrow(maybe_supply))
-            && aggregator::spec_aggregator_get_val(option::borrow(option::borrow(maybe_supply).aggregator)) <
-            amount;
-        aborts_if option::is_some(maybe_supply) && !optional_aggregator::is_parallelizable(option::borrow(maybe_supply))
-            && option::borrow(option::borrow(maybe_supply).integer).value <
-            amount;
+        include coin::CoinSubAbortsIf<CoinType> { amount:amount };
+
+        // Ensure that the global 'supply' decreases by 'amount'.
+        ensures coin::supply<CoinType> == old(coin::supply<CoinType>) - amount;
     }
 
     /// Make sure `name` and `symbol` are legal length.
@@ -67,11 +61,17 @@ spec aptos_framework::managed_coin {
         dst_addr: address,
         amount: u64,
     ) {
+        use aptos_std::type_info;
         let account_addr = signer::address_of(account);
         aborts_if !exists<Capabilities<CoinType>>(account_addr);
+        let addr = type_info::type_of<CoinType>().account_address;
+        aborts_if (amount != 0) && !exists<coin::CoinInfo<CoinType>>(addr);
         let coin_store = global<coin::CoinStore<CoinType>>(dst_addr);
         aborts_if !exists<coin::CoinStore<CoinType>>(dst_addr);
         aborts_if coin_store.frozen;
+        include coin::CoinAddAbortsIf<CoinType>;
+        ensures coin::supply<CoinType> == old(coin::supply<CoinType>) + amount;
+        ensures global<coin::CoinStore<CoinType>>(dst_addr).coin.value == old(global<coin::CoinStore<CoinType>>(dst_addr)).coin.value + amount;
     }
 
     /// An account can only be registered once.
@@ -87,5 +87,7 @@ spec aptos_framework::managed_coin {
         aborts_if !exists<coin::CoinStore<CoinType>>(account_addr) && acc.guid_creation_num + 2 > MAX_U64;
         aborts_if !exists<coin::CoinStore<CoinType>>(account_addr) && !exists<account::Account>(account_addr);
         aborts_if !exists<coin::CoinStore<CoinType>>(account_addr) && !type_info::spec_is_struct<CoinType>();
+
+        ensures exists<coin::CoinStore<CoinType>>(account_addr);
     }
 }

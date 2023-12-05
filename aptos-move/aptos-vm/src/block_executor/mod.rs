@@ -5,50 +5,43 @@
 pub(crate) mod vm_wrapper;
 
 use crate::{
-    adapter_common::{preprocess_transaction, PreprocessedTransaction},
     block_executor::vm_wrapper::AptosExecutorTask,
-    counters::{
-        BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS,
-        BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS,
-    },
-    AptosVM,
+    counters::{BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS},
 };
-use aptos_aggregator::delta_change_set::DeltaOp;
+use aptos_aggregator::{
+    delayed_change::DelayedChange, delta_change_set::DeltaOp, types::DelayedFieldID,
+};
 use aptos_block_executor::{
-    errors::Error,
-    executor::BlockExecutor,
-    task::{
-        Transaction as BlockExecutorTransaction,
-        TransactionOutput as BlockExecutorTransactionOutput,
-    },
+    errors::Error, executor::BlockExecutor,
+    task::TransactionOutput as BlockExecutorTransactionOutput,
     txn_commit_hook::TransactionCommitHook,
 };
 use aptos_infallible::Mutex;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
+    block_executor::config::BlockExecutorConfig,
     contract_event::ContractEvent,
     executable::ExecutableTestType,
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
-    transaction::{Transaction, TransactionOutput, TransactionStatus},
+    transaction::{
+        signature_verified_transaction::SignatureVerifiedTransaction, BlockExecutableTransaction,
+        TransactionOutput, TransactionStatus,
+    },
     write_set::WriteOp,
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::output::VMOutput;
-use move_core_types::vm_status::VMStatus;
+use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::VMStatus};
 use once_cell::sync::OnceCell;
-use rayon::{prelude::*, ThreadPool};
-use std::{collections::HashMap, sync::Arc};
+use rayon::ThreadPool;
+use std::{collections::BTreeMap, sync::Arc};
 
-impl BlockExecutorTransaction for PreprocessedTransaction {
-    type Event = ContractEvent;
-    type Key = StateKey;
-    type Value = WriteOp;
-}
-
-// Wrapper to avoid orphan rule
+/// Output type wrapper used by block executor. VM output is stored first, then
+/// transformed into TransactionOutput type that is returned.
 #[derive(Debug)]
 pub struct AptosTransactionOutput {
+    // Note: should these mutexes be changed to ExplicitSyncSwapper?
     vm_output: Mutex<Option<VMOutput>>,
     committed_output: OnceCell<TransactionOutput>,
 }
@@ -68,100 +61,224 @@ impl AptosTransactionOutput {
     fn take_output(mut self) -> TransactionOutput {
         match self.committed_output.take() {
             Some(output) => output,
+            // TODO: revisit whether we should always get it via committed, or o.w. create a
+            // dedicated API without creating empty data structures.
             None => self
                 .vm_output
                 .lock()
                 .take()
                 .expect("Output must be set")
-                .into_transaction_output_with_materialized_deltas(vec![]),
+                .into_transaction_output_with_materialized_write_set(
+                    vec![],
+                    BTreeMap::new(),
+                    vec![],
+                    vec![],
+                ),
         }
     }
 }
 
 impl BlockExecutorTransactionOutput for AptosTransactionOutput {
-    type Txn = PreprocessedTransaction;
+    type Txn = SignatureVerifiedTransaction;
 
-    /// Execution output for transactions that comes after SkipRest signal.
+    /// Execution output for transactions that comes after SkipRest signal or when there was a
+    /// problem creating the output (e.g. group serialization issue).
     fn skip_output() -> Self {
         Self::new(VMOutput::empty_with_status(TransactionStatus::Retry))
     }
 
     // TODO: get rid of the cloning data-structures in the following APIs.
 
-    /// Should never be called after incorporate_delta_writes, as it
-    /// will consume vm_output to prepare an output with deltas.
-    fn resource_write_set(&self) -> HashMap<StateKey, WriteOp> {
+    /// Should never be called after incorporating materialized output, as that consumes vm_output.
+    fn resource_group_write_set(
+        &self,
+    ) -> Vec<(
+        StateKey,
+        WriteOp,
+        BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
+    )> {
         self.vm_output
             .lock()
             .as_ref()
-            .expect("Output to be set to get writes")
+            .expect("Output must be set to get resource group writes")
+            .change_set()
+            .resource_group_write_set()
+            .iter()
+            .map(|(group_key, group_write)| {
+                (
+                    group_key.clone(),
+                    group_write.metadata_op().clone(),
+                    group_write
+                        .inner_ops()
+                        .iter()
+                        .map(|(tag, (op, maybe_layout))| {
+                            (tag.clone(), (op.clone(), maybe_layout.clone()))
+                        })
+                        .collect(),
+                )
+            })
+            .collect()
+    }
+
+    /// More efficient implementation to avoid unnecessarily cloning inner_ops.
+    fn resource_group_metadata_ops(&self) -> Vec<(StateKey, WriteOp)> {
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output must be set to get metadata ops")
+            .change_set()
+            .resource_group_write_set()
+            .iter()
+            .map(|(group_key, group_write)| (group_key.clone(), group_write.metadata_op().clone()))
+            .collect()
+    }
+
+    /// Should never be called after incorporating materialized output, as that consumes vm_output.
+    fn resource_write_set(&self) -> BTreeMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)> {
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output must be set to get resource writes")
             .change_set()
             .resource_write_set()
             .clone()
     }
 
-    /// Should never be called after incorporate_delta_writes, as it
-    /// will consume vm_output to prepare an output with deltas.
-    fn module_write_set(&self) -> HashMap<StateKey, WriteOp> {
+    /// Should never be called after incorporating materialized output, as that consumes vm_output.
+    fn module_write_set(&self) -> BTreeMap<StateKey, WriteOp> {
         self.vm_output
             .lock()
             .as_ref()
-            .expect("Output to be set to get writes")
+            .expect("Output must be set to get module writes")
             .change_set()
             .module_write_set()
             .clone()
     }
 
-    /// Should never be called after incorporate_delta_writes, as it
-    /// will consume vm_output to prepare an output with deltas.
-    fn aggregator_v1_write_set(&self) -> HashMap<StateKey, WriteOp> {
+    /// Should never be called after incorporating materialized output, as that consumes vm_output.
+    fn aggregator_v1_write_set(&self) -> BTreeMap<StateKey, WriteOp> {
         self.vm_output
             .lock()
             .as_ref()
-            .expect("Output to be set to get writes")
+            .expect("Output must be set to get aggregator V1 writes")
             .change_set()
             .aggregator_v1_write_set()
             .clone()
     }
 
-    /// Should never be called after incorporate_delta_writes, as it
-    /// will consume vm_output to prepare an output with deltas.
-    fn aggregator_v1_delta_set(&self) -> HashMap<StateKey, DeltaOp> {
+    /// Should never be called after incorporating materialized output, as that consumes vm_output.
+    fn aggregator_v1_delta_set(&self) -> BTreeMap<StateKey, DeltaOp> {
         self.vm_output
             .lock()
             .as_ref()
-            .expect("Output to be set to get deltas")
+            .expect("Output must be set to get deltas")
             .change_set()
             .aggregator_v1_delta_set()
             .clone()
     }
 
-    /// Should never be called after incorporate_delta_writes, as it
-    /// will consume vm_output to prepare an output with deltas.
-    fn get_events(&self) -> Vec<ContractEvent> {
+    /// Should never be called after incorporating materialized output, as that consumes vm_output.
+    fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
         self.vm_output
             .lock()
             .as_ref()
-            .expect("Output to be set to get events")
+            .expect("Output must be set to get aggregator change set")
+            .change_set()
+            .delayed_field_change_set()
+            .clone()
+    }
+
+    fn reads_needing_delayed_field_exchange(
+        &self,
+    ) -> BTreeMap<
+        <Self::Txn as BlockExecutableTransaction>::Key,
+        (
+            <Self::Txn as BlockExecutableTransaction>::Value,
+            Arc<MoveTypeLayout>,
+        ),
+    > {
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get reads")
+            .change_set()
+            .reads_needing_delayed_field_exchange()
+            .clone()
+    }
+
+    fn group_reads_needing_delayed_field_exchange(
+        &self,
+    ) -> BTreeMap<
+        <Self::Txn as BlockExecutableTransaction>::Key,
+        <Self::Txn as BlockExecutableTransaction>::Value,
+    > {
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get reads")
+            .change_set()
+            .group_reads_needing_delayed_field_exchange()
+            .iter()
+            .map(|(key, (metadata_op, _group_size))| (key.clone(), metadata_op.clone()))
+            .collect()
+    }
+
+    /// Should never be called after incorporating materialized output, as that consumes vm_output.
+    fn get_events(&self) -> Vec<(ContractEvent, Option<MoveTypeLayout>)> {
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output must be set to get events")
             .change_set()
             .events()
             .to_vec()
     }
 
-    /// Can be called (at most) once after transaction is committed to internally
-    /// include the delta outputs with the transaction outputs.
-    fn incorporate_delta_writes(&self, delta_writes: Vec<(StateKey, WriteOp)>) {
+    fn incorporate_materialized_txn_output(
+        &self,
+        aggregator_v1_writes: Vec<(<Self::Txn as BlockExecutableTransaction>::Key, WriteOp)>,
+        patched_resource_write_set: BTreeMap<
+            <Self::Txn as BlockExecutableTransaction>::Key,
+            <Self::Txn as BlockExecutableTransaction>::Value,
+        >,
+        patched_events: Vec<<Self::Txn as BlockExecutableTransaction>::Event>,
+        serialized_groups: Vec<(
+            <Self::Txn as BlockExecutableTransaction>::Key,
+            <Self::Txn as BlockExecutableTransaction>::Value,
+        )>,
+    ) {
         assert!(
             self.committed_output
                 .set(
                     self.vm_output
                         .lock()
                         .take()
-                        .expect("Output must be set to combine with deltas")
-                        .into_transaction_output_with_materialized_deltas(delta_writes),
+                        .expect("Output must be set to incorporate materialized data")
+                        .into_transaction_output_with_materialized_write_set(
+                            aggregator_v1_writes,
+                            patched_resource_write_set,
+                            patched_events,
+                            serialized_groups,
+                        ),
                 )
                 .is_ok(),
-            "Could not combine VMOutput with deltas"
+            "Could not combine VMOutput with the patched resource and event data"
+        );
+    }
+
+    fn set_txn_output_for_non_dynamic_change_set(&self) {
+        assert!(
+            self.committed_output
+                .set(
+                    self.vm_output
+                        .lock()
+                        .take()
+                        .expect("Output must be set to incorporate materialized data")
+                        .into_transaction_output()
+                        .expect("We should be able to always convert to transaction output"),
+                )
+                .is_ok(),
+            "Could not combine VMOutput with the patched resource and event data"
         );
     }
 
@@ -180,36 +297,17 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 pub struct BlockAptosVM();
 
 impl BlockAptosVM {
-    fn verify_transactions(transactions: Vec<Transaction>) -> Vec<PreprocessedTransaction> {
-        transactions
-            .into_par_iter()
-            .with_min_len(25)
-            .map(preprocess_transaction::<AptosVM>)
-            .collect()
-    }
-
     pub fn execute_block<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
     >(
         executor_thread_pool: Arc<ThreadPool>,
-        transactions: Vec<Transaction>,
+        signature_verified_block: &[SignatureVerifiedTransaction],
         state_view: &S,
-        concurrency_level: usize,
-        maybe_block_gas_limit: Option<u64>,
+        config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
-        // Verify the signatures of all the transactions in parallel.
-        // This is time consuming so don't wait and do the checking
-        // sequentially while executing the transactions.
-        // TODO: state sync runs this code but doesn't need to verify signatures
-        let signature_verification_timer =
-            BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS.start_timer();
-        let signature_verified_block =
-            executor_thread_pool.install(|| Self::verify_transactions(transactions));
-        drop(signature_verification_timer);
-
         let num_txns = signature_verified_block.len();
         if state_view.id() != StateViewId::Miscellaneous {
             // Speculation is disabled in Miscellaneous context, which is used by testing and
@@ -217,19 +315,14 @@ impl BlockAptosVM {
             init_speculative_logs(num_txns);
         }
 
-        BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
+        BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
         let executor = BlockExecutor::<
-            PreprocessedTransaction,
+            SignatureVerifiedTransaction,
             AptosExecutorTask<S>,
             S,
             L,
             ExecutableTestType,
-        >::new(
-            concurrency_level,
-            executor_thread_pool,
-            maybe_block_gas_limit,
-            transaction_commit_listener,
-        );
+        >::new(config, executor_thread_pool, transaction_commit_listener);
 
         let ret = executor.execute_block(state_view, signature_verified_block, state_view);
         match ret {
@@ -250,8 +343,11 @@ impl BlockAptosVM {
 
                 Ok(output_vec)
             },
-            Err(Error::ModulePathReadWrite) => {
-                unreachable!("[Execution]: Must be handled by sequential fallback")
+            Err(Error::FallbackToSequential(e)) => {
+                unreachable!(
+                    "[Execution]: Must be handled by sequential fallback: {:?}",
+                    e
+                )
             },
             Err(Error::UserError(err)) => Err(err),
         }

@@ -311,7 +311,7 @@ module aptos_framework::aptos_governance {
     /// Create a single-step or multi-step proposal with the backing `stake_pool`.
     /// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
     /// only the exact script with matching hash can be successfully executed.
-    /// Return proposal_id when a proposal is sucessfully created.
+    /// Return proposal_id when a proposal is successfully created.
     public fun create_proposal_v2_impl(
         proposer: &signer,
         stake_pool: address,
@@ -624,7 +624,7 @@ module aptos_framework::aptos_governance {
     }
 
     #[test_only]
-    public entry fun resolve_proposal_for_test(proposal_id: u64, signer_address: address, multi_step: bool, finish_multi_step_execution: bool): signer acquires ApprovedExecutionHashes, GovernanceResponsbility {
+    public fun resolve_proposal_for_test(proposal_id: u64, signer_address: address, multi_step: bool, finish_multi_step_execution: bool): signer acquires ApprovedExecutionHashes, GovernanceResponsbility {
         if (multi_step) {
             let execution_hash = vector::empty<u8>();
             vector::push_back(&mut execution_hash, 1);

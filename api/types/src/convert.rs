@@ -9,7 +9,7 @@ use crate::{
         StateCheckpointTransaction, UserTransactionRequestInner, WriteModule, WriteResource,
         WriteTableItem,
     },
-    view::ViewRequest,
+    view::{ViewFunction, ViewRequest},
     Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event, HexEncodedBytes,
     MoveFunction, MoveModuleBytecode, MoveResource, MoveScriptBytecode, MoveType, MoveValue,
     PendingTransaction, ResourceGroup, ScriptPayload, ScriptWriteSet, SubmitTransactionRequest,
@@ -34,14 +34,14 @@ use aptos_types::{
     vm_status::AbortLocation,
     write_set::WriteOp,
 };
-use aptos_vm::move_vm_ext::MoveResolverExt;
 use move_binary_format::file_format::FunctionHandleIndex;
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    value::{MoveStructLayout, MoveTypeLayout},
+    resolver::MoveResolver,
+    value::{LayoutTag, MoveStructLayout, MoveTypeLayout},
 };
 use move_resource_viewer::MoveValueAnnotator;
 use serde_json::Value;
@@ -64,7 +64,7 @@ pub struct MoveConverter<'a, R: ?Sized> {
     db: Arc<dyn DbReader>,
 }
 
-impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
+impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
     pub fn new(inner: &'a R, db: Arc<dyn DbReader>) -> Self {
         Self {
             inner: MoveValueAnnotator::new(inner),
@@ -151,6 +151,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     timestamp: timestamp.into(),
                 })
             },
+            ValidatorTransaction(_txn) => todo!(),
         })
     }
 
@@ -333,7 +334,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         access_path: AccessPath,
         op: WriteOp,
     ) -> Result<Vec<WriteSetChange>> {
-        let ret = match op.into_bytes() {
+        let ret = match op.bytes() {
             None => match access_path.get_path() {
                 Path::Code(module_id) => vec![WriteSetChange::DeleteModule(DeleteModule {
                     address: access_path.address.into(),
@@ -355,15 +356,15 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                 Path::Code(_) => vec![WriteSetChange::WriteModule(WriteModule {
                     address: access_path.address.into(),
                     state_key_hash,
-                    data: MoveModuleBytecode::new(bytes).try_parse_abi()?,
+                    data: MoveModuleBytecode::new(bytes.to_vec()).try_parse_abi()?,
                 })],
                 Path::Resource(typ) => vec![WriteSetChange::WriteResource(WriteResource {
                     address: access_path.address.into(),
                     state_key_hash,
-                    data: self.try_into_resource(&typ, &bytes)?,
+                    data: self.try_into_resource(&typ, bytes)?,
                 })],
                 Path::ResourceGroup(_) => self
-                    .try_into_resources_from_resource_group(&bytes)?
+                    .try_into_resources_from_resource_group(bytes)?
                     .into_iter()
                     .map(|data| {
                         WriteSetChange::WriteResource(WriteResource {
@@ -387,7 +388,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
     ) -> Result<WriteSetChange> {
         let hex_handle = handle.0.to_vec().into();
         let key: HexEncodedBytes = key.into();
-        let ret = match op.into_bytes() {
+        let ret = match op.bytes() {
             None => {
                 let data = self.try_delete_table_item_into_deleted_table_data(handle, &key.0)?;
 
@@ -400,13 +401,13 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             },
             Some(bytes) => {
                 let data =
-                    self.try_write_table_item_into_decoded_table_data(handle, &key.0, &bytes)?;
+                    self.try_write_table_item_into_decoded_table_data(handle, &key.0, bytes)?;
 
                 WriteSetChange::WriteTableItem(WriteTableItem {
                     state_key_hash,
                     handle: hex_handle,
                     key,
-                    value: bytes.into(),
+                    value: bytes.to_vec().into(),
                     data,
                 })
             },
@@ -734,7 +735,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         );
         arg_types
             .into_iter()
-            .zip(args.into_iter())
+            .zip(args)
             .enumerate()
             .map(|(i, (arg_type, arg))| {
                 self.try_into_vm_value(&arg_type.clone().try_into()?, arg)
@@ -802,6 +803,11 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             },
             MoveTypeLayout::Signer => {
                 bail!("unexpected move type {:?} for value {:?}", layout, val)
+            },
+            MoveTypeLayout::Tagged(tag, inner_layout) => match tag {
+                LayoutTag::IdentifierMapping(_) => {
+                    self.try_into_vm_value_from_layout(inner_layout, val)?
+                },
             },
         })
     }
@@ -872,17 +878,17 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         self.inner.view_value(typ, bytes)?.try_into()
     }
 
-    pub fn function_return_types(&self, function: &EntryFunction) -> Result<Vec<MoveType>> {
-        let module = function.module().clone();
+    pub fn function_return_types(&self, function: &ViewFunction) -> Result<Vec<MoveType>> {
+        let module = function.module.clone();
         let code = self.inner.get_module(&module)? as Rc<dyn Bytecode>;
         let func = code
-            .find_function(function.function())
+            .find_function(function.function.as_ident_str())
             .ok_or_else(|| format_err!("could not find entry function by {:?}", function))?;
 
         Ok(func.return_)
     }
 
-    pub fn convert_view_function(&self, view_request: ViewRequest) -> Result<EntryFunction> {
+    pub fn convert_view_function(&self, view_request: ViewRequest) -> Result<ViewFunction> {
         let ViewRequest {
             function,
             type_arguments,
@@ -907,19 +913,19 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             .map(bcs::to_bytes)
             .collect::<Result<_, bcs::Error>>()?;
 
-        Ok(EntryFunction::new(
-            module.into(),
-            function.name.into(),
-            type_arguments
+        Ok(ViewFunction {
+            module: module.into(),
+            function: function.name.into(),
+            ty_args: type_arguments
                 .into_iter()
                 .map(|v| v.try_into())
                 .collect::<Result<_>>()?,
             args,
-        ))
+        })
     }
 }
 
-impl<'a, R: MoveResolverExt + ?Sized> ExplainVMStatus for MoveConverter<'a, R> {
+impl<'a, R: MoveResolver + ?Sized> ExplainVMStatus for MoveConverter<'a, R> {
     fn get_module_bytecode(&self, module_id: &ModuleId) -> Result<Rc<dyn Bytecode>> {
         self.inner
             .get_module(module_id)
@@ -930,7 +936,7 @@ pub trait AsConverter<R> {
     fn as_converter(&self, db: Arc<dyn DbReader>) -> MoveConverter<R>;
 }
 
-impl<R: MoveResolverExt> AsConverter<R> for R {
+impl<R: MoveResolver> AsConverter<R> for R {
     fn as_converter(&self, db: Arc<dyn DbReader>) -> MoveConverter<R> {
         MoveConverter::new(self, db)
     }

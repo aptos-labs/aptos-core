@@ -3,7 +3,11 @@
 
 use anyhow::Result;
 use aptos_language_e2e_tests::{account::AccountData, data_store::FakeDataStore};
-use aptos_types::{transaction::Transaction, write_set::WriteSet};
+use aptos_types::{
+    block_executor::config::BlockExecutorConfigFromOnchain,
+    transaction::{signature_verified_transaction::SignatureVerifiedTransaction, Transaction},
+    write_set::WriteSet,
+};
 use aptos_vm::{AptosVM, VMExecutor};
 use std::{
     collections::HashMap,
@@ -27,7 +31,7 @@ fn main() -> Result<()> {
 
     const NUM_TXNS: u64 = 100;
 
-    let txns = (0..NUM_TXNS)
+    let txns: Vec<SignatureVerifiedTransaction> = (0..NUM_TXNS)
         .map(|seq_num| {
             Transaction::UserTransaction(
                 alice
@@ -41,10 +45,15 @@ fn main() -> Result<()> {
                     .sequence_number(seq_num)
                     .sign(),
             )
+            .into()
         })
         .collect();
 
-    let res = AptosVM::execute_block(txns, &state_store, None)?;
+    let res = AptosVM::execute_block(
+        &txns,
+        &state_store,
+        BlockExecutorConfigFromOnchain::new_no_block_limit(),
+    )?;
     for i in 0..NUM_TXNS {
         assert!(res[i as usize].status().status().unwrap().is_success());
     }

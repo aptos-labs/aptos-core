@@ -9,7 +9,8 @@ use crate::{
         buffer::{Buffer, Cursor},
         buffer_item::BufferItem,
         commit_reliable_broadcast::{AckState, CommitMessage, DropGuard},
-        execution_phase::{ExecutionRequest, ExecutionResponse},
+        execution_schedule_phase::ExecutionRequest,
+        execution_wait_phase::{ExecutionResponse, ExecutionWaitRequest},
         persisting_phase::PersistingRequest,
         pipeline_phase::CountedRequest,
         signing_phase::{SigningRequest, SigningResponse},
@@ -19,6 +20,7 @@ use crate::{
     network_interface::ConsensusMsg,
     state_replication::StateComputerCommitCallBackType,
 };
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_consensus_types::{
     common::Author, executed_block::ExecutedBlock, experimental::commit_decision::CommitDecision,
 };
@@ -27,8 +29,8 @@ use aptos_logger::prelude::*;
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_address::AccountAddress, epoch_change::EpochChangeProof,
-    ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
+    account_address::AccountAddress, epoch_change::EpochChangeProof, epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
 };
 use futures::{
     channel::{
@@ -40,7 +42,7 @@ use futures::{
 };
 use once_cell::sync::OnceCell;
 use std::sync::{
-    atomic::{AtomicU64, Ordering},
+    atomic::{AtomicBool, AtomicU64, Ordering},
     Arc,
 };
 use tokio::time::{Duration, Instant};
@@ -83,8 +85,10 @@ pub struct BufferManager {
     // the roots point to the first *unprocessed* item.
     // None means no items ready to be processed (either all processed or no item finishes previous stage)
     execution_root: BufferItemRootType,
-    execution_phase_tx: Sender<CountedRequest<ExecutionRequest>>,
-    execution_phase_rx: Receiver<ExecutionResponse>,
+    execution_schedule_phase_tx: Sender<CountedRequest<ExecutionRequest>>,
+    execution_schedule_phase_rx: Receiver<ExecutionWaitRequest>,
+    execution_wait_phase_tx: Sender<CountedRequest<ExecutionWaitRequest>>,
+    execution_wait_phase_rx: Receiver<ExecutionResponse>,
 
     signing_root: BufferItemRootType,
     signing_phase_tx: Sender<CountedRequest<SigningRequest>>,
@@ -94,7 +98,9 @@ pub struct BufferManager {
     reliable_broadcast: ReliableBroadcast<CommitMessage, ExponentialBackoff>,
     commit_proof_rb_handle: Option<DropGuard>,
 
-    commit_msg_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, IncomingCommitRequest>,
+    // message received from the network
+    commit_msg_rx:
+        Option<aptos_channels::aptos_channel::Receiver<AccountAddress, IncomingCommitRequest>>,
 
     // we don't hear back from the persisting phase
     persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
@@ -103,7 +109,7 @@ pub struct BufferManager {
     reset_rx: UnboundedReceiver<ResetRequest>,
     stop: bool,
 
-    verifier: ValidatorVerifier,
+    epoch_state: Arc<EpochState>,
 
     ongoing_tasks: Arc<AtomicU64>,
     // Since proposal_generator is not aware of reconfiguration any more, the suffix blocks
@@ -115,13 +121,17 @@ pub struct BufferManager {
     // being updated on-chain.
     end_epoch_timestamp: OnceCell<u64>,
     previous_commit_time: Instant,
+    reset_flag: Arc<AtomicBool>,
 }
 
 impl BufferManager {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         author: Author,
-        execution_phase_tx: Sender<CountedRequest<ExecutionRequest>>,
-        execution_phase_rx: Receiver<ExecutionResponse>,
+        execution_schedule_phase_tx: Sender<CountedRequest<ExecutionRequest>>,
+        execution_schedule_phase_rx: Receiver<ExecutionWaitRequest>,
+        execution_wait_phase_tx: Sender<CountedRequest<ExecutionWaitRequest>>,
+        execution_wait_phase_rx: Receiver<ExecutionResponse>,
         signing_phase_tx: Sender<CountedRequest<SigningRequest>>,
         signing_phase_rx: Receiver<SigningResponse>,
         commit_msg_tx: Arc<NetworkSender>,
@@ -132,8 +142,9 @@ impl BufferManager {
         persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
         block_rx: UnboundedReceiver<OrderedBlocks>,
         reset_rx: UnboundedReceiver<ResetRequest>,
-        verifier: ValidatorVerifier,
+        epoch_state: Arc<EpochState>,
         ongoing_tasks: Arc<AtomicU64>,
+        reset_flag: Arc<AtomicBool>,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 
@@ -146,15 +157,17 @@ impl BufferManager {
             buffer,
 
             execution_root: None,
-            execution_phase_tx,
-            execution_phase_rx,
+            execution_schedule_phase_tx,
+            execution_schedule_phase_rx,
+            execution_wait_phase_tx,
+            execution_wait_phase_rx,
 
             signing_root: None,
             signing_phase_tx,
             signing_phase_rx,
 
             reliable_broadcast: ReliableBroadcast::new(
-                verifier.get_ordered_account_addresses(),
+                epoch_state.verifier.get_ordered_account_addresses(),
                 commit_msg_tx.clone(),
                 rb_backoff_policy,
                 TimeService::real(),
@@ -162,7 +175,7 @@ impl BufferManager {
             ),
             commit_proof_rb_handle: None,
             commit_msg_tx,
-            commit_msg_rx,
+            commit_msg_rx: Some(commit_msg_rx),
 
             persisting_phase_tx,
 
@@ -170,10 +183,11 @@ impl BufferManager {
             reset_rx,
             stop: false,
 
-            verifier,
+            epoch_state,
             ongoing_tasks,
             end_epoch_timestamp: OnceCell::new(),
             previous_commit_time: Instant::now(),
+            reset_flag,
         }
     }
 
@@ -181,7 +195,11 @@ impl BufferManager {
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let task = self.reliable_broadcast.broadcast(
             message,
-            AckState::new(self.verifier.get_ordered_account_addresses_iter()),
+            AckState::new(
+                self.epoch_state
+                    .verifier
+                    .get_ordered_account_addresses_iter(),
+            ),
         );
         tokio::spawn(Abortable::new(task, abort_registration));
         DropGuard::new(abort_handle)
@@ -208,7 +226,7 @@ impl BufferManager {
 
     /// process incoming ordered blocks
     /// push them into the buffer and update the roots if they are none.
-    fn process_ordered_blocks(&mut self, ordered_blocks: OrderedBlocks) {
+    async fn process_ordered_blocks(&mut self, ordered_blocks: OrderedBlocks) {
         let OrderedBlocks {
             ordered_blocks,
             ordered_proof,
@@ -220,6 +238,16 @@ impl BufferManager {
             ordered_proof.commit_info(),
             self.buffer.len() + 1,
         );
+
+        let request = self.create_new_request(ExecutionRequest {
+            ordered_blocks: ordered_blocks.clone(),
+            lifetime_guard: self.create_new_request(()),
+        });
+        self.execution_schedule_phase_tx
+            .send(request)
+            .await
+            .expect("Failed to send execution schedule request");
+
         let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback);
         self.buffer.push_back(item);
     }
@@ -237,19 +265,22 @@ impl BufferManager {
             "Advance execution root from {:?} to {:?}",
             cursor, self.execution_root
         );
-        if self.execution_root.is_some() {
+        if self.execution_root.is_some() && cursor == self.execution_root {
+            // Schedule retry.
+            // NOTE: probably should schedule retry for all ordered blocks, but since execution error
+            // is not expected nor retryable in reality, I'd rather remove retrying or do it more
+            // properly than complicating it here.
             let ordered_blocks = self.buffer.get(&self.execution_root).get_blocks().clone();
-            let request = self.create_new_request(ExecutionRequest { ordered_blocks });
-            if cursor == self.execution_root {
-                let sender = self.execution_phase_tx.clone();
-                Self::spawn_retry_request(sender, request, Duration::from_millis(100));
-            } else {
-                self.execution_phase_tx
-                    .send(request)
-                    .await
-                    .expect("Failed to send execution request")
-            }
+            let request = self.create_new_request(ExecutionRequest {
+                ordered_blocks,
+                lifetime_guard: self.create_new_request(()),
+            });
+            let sender = self.execution_schedule_phase_tx.clone();
+            Self::spawn_retry_request(sender, request, Duration::from_millis(100));
         }
+        // Otherwise do nothing, because the execution wait phase is driven by the response of
+        // the execution schedule phase, which is in turn fed as soon as the ordered blocks
+        // come in.
     }
 
     /// Set the signing root to the first not signed item (Executed) and send execution request
@@ -355,6 +386,7 @@ impl BufferManager {
         self.execution_root = None;
         self.signing_root = None;
         self.previous_commit_time = Instant::now();
+        self.commit_proof_rb_handle.take();
         // purge the incoming blocks queue
         while let Ok(Some(_)) = self.block_rx.try_next() {}
         // Wait for ongoing tasks to finish before sending back ack.
@@ -367,11 +399,22 @@ impl BufferManager {
     async fn process_reset_request(&mut self, request: ResetRequest) {
         let ResetRequest { tx, stop } = request;
         info!("Receive reset");
+        self.reset_flag.store(true, Ordering::SeqCst);
 
         self.stop = stop;
         self.reset().await;
-        tx.send(ResetAck::default()).unwrap();
+        let _ = tx.send(ResetAck::default());
+        self.reset_flag.store(false, Ordering::SeqCst);
         info!("Reset finishes");
+    }
+
+    async fn process_execution_schedule_response(&mut self, response: ExecutionWaitRequest) {
+        // pass through to the execution wait phase
+        let request = self.create_new_request(response);
+        self.execution_wait_phase_tx
+            .send(request)
+            .await
+            .expect("Failed to send execution wait request.");
     }
 
     /// If the response is successful, advance the item to Executed, otherwise panic (TODO fix).
@@ -394,6 +437,16 @@ impl BufferManager {
             "Receive executed response {}",
             executed_blocks.last().unwrap().block_info()
         );
+        let current_item = self.buffer.get(&current_cursor);
+
+        if current_item.block_id() != block_id {
+            error!(
+                block_id = block_id,
+                expected_block_id = current_item.block_id(),
+                "Received result for unexpected block id. Ignoring."
+            );
+            return;
+        }
 
         // Handle reconfiguration timestamp reconciliation.
         // end epoch timestamp is set to the first block that causes the reconfiguration.
@@ -414,7 +467,7 @@ impl BufferManager {
         let item = self.buffer.take(&current_cursor);
         let new_item = item.advance_to_executed_or_aggregated(
             executed_blocks,
-            &self.verifier,
+            &self.epoch_state.verifier,
             self.end_epoch_timestamp.get().cloned(),
         );
         let aggregated = new_item.is_aggregated();
@@ -489,10 +542,6 @@ impl BufferManager {
             protocol,
             response_sender,
         } = commit_msg;
-        if let Err(e) = req.verify(&self.verifier) {
-            warn!("Invalid commit message: {}", e);
-            return None;
-        }
         match req {
             CommitMessage::Vote(vote) => {
                 // find the corresponding item
@@ -512,7 +561,7 @@ impl BufferManager {
                             if let Ok(bytes) = protocol.to_bytes(&response) {
                                 let _ = response_sender.send(Ok(bytes.into()));
                             }
-                            item.try_advance_to_aggregated(&self.verifier)
+                            item.try_advance_to_aggregated(&self.epoch_state.verifier)
                         },
                         Err(e) => {
                             error!(
@@ -646,15 +695,34 @@ impl BufferManager {
             .set(pending_aggregated as i64);
     }
 
-    pub async fn start(mut self) {
+    pub async fn start(mut self, bounded_executor: BoundedExecutor) {
         info!("Buffer manager starts.");
+        let (verified_commit_msg_tx, mut verified_commit_msg_rx) = create_channel();
         let mut interval = tokio::time::interval(Duration::from_millis(LOOP_INTERVAL_MS));
+        let mut commit_msg_rx = self.commit_msg_rx.take().expect("commit msg rx must exist");
+        let epoch_state = self.epoch_state.clone();
+        spawn_named!("buffer manager verification", async move {
+            while let Some(commit_msg) = commit_msg_rx.next().await {
+                let tx = verified_commit_msg_tx.clone();
+                let epoch_state_clone = epoch_state.clone();
+                bounded_executor
+                    .spawn(async move {
+                        match commit_msg.req.verify(&epoch_state_clone.verifier) {
+                            Ok(_) => {
+                                let _ = tx.unbounded_send(commit_msg);
+                            },
+                            Err(e) => warn!("Invalid commit message: {}", e),
+                        }
+                    })
+                    .await;
+            }
+        });
         while !self.stop {
             // advancing the root will trigger sending requests to the pipeline
             ::futures::select! {
                 blocks = self.block_rx.select_next_some() => {
                     monitor!("buffer_manager_process_ordered", {
-                    self.process_ordered_blocks(blocks);
+                    self.process_ordered_blocks(blocks).await;
                     if self.execution_root.is_none() {
                         self.advance_execution_root().await;
                     }});
@@ -663,8 +731,12 @@ impl BufferManager {
                     monitor!("buffer_manager_process_reset",
                     self.process_reset_request(reset_event).await);
                 },
-                response = self.execution_phase_rx.select_next_some() => {
-                    monitor!("buffer_manager_process_execution_response", {
+                response = self.execution_schedule_phase_rx.select_next_some() => {
+                    monitor!("buffer_manager_process_execution_schedule_response", {
+                    self.process_execution_schedule_response(response).await;
+                })},
+                response = self.execution_wait_phase_rx.select_next_some() => {
+                    monitor!("buffer_manager_process_execution_wait_response", {
                     self.process_execution_response(response).await;
                     self.advance_execution_root().await;
                     if self.signing_root.is_none() {
@@ -677,9 +749,9 @@ impl BufferManager {
                     self.advance_signing_root().await
                     })
                 },
-                commit_msg = self.commit_msg_rx.select_next_some() => {
+                rpc_request = verified_commit_msg_rx.select_next_some() => {
                     monitor!("buffer_manager_process_commit_message",
-                    if let Some(aggregated_block_id) = self.process_commit_message(commit_msg) {
+                    if let Some(aggregated_block_id) = self.process_commit_message(rpc_request) {
                         self.advance_head(aggregated_block_id).await;
                         if self.execution_root.is_none() {
                             self.advance_execution_root().await;
@@ -688,7 +760,7 @@ impl BufferManager {
                             self.advance_signing_root().await;
                         }
                     });
-                },
+                }
                 _ = interval.tick().fuse() => {
                     monitor!("buffer_manager_process_interval_tick", {
                     self.update_buffer_manager_metrics();

@@ -3,26 +3,37 @@ module 0x42::globals {
     struct R {
         f: u64,
     }
-    private fun check(a: address) {
+    private fun check(a: address): bool {
         exists<globals::R>(a)
     }
     private fun publish(s: &signer) {
         MoveTo<globals::R>(s, pack globals::R(1));
         Tuple()
     }
-    private fun read(a: address) {
+    private fun read(a: address): u64 {
         {
           let r: &globals::R = BorrowGlobal(Immutable)<globals::R>(a);
           select globals::R.f(r)
         }
     }
-    private fun write(a: address,x: u64) {
+    private fun write(a: address,x: u64): u64 {
         {
           let r: &mut globals::R = BorrowGlobal(Mutable)<globals::R>(a);
           select globals::R.f(r) = 2;
           9
         }
     }
+    spec fun $check(a: address): bool {
+        exists<globals::R>(a)
+    }
+    spec fun $publish(s: &signer);
+    spec fun $read(a: address): u64 {
+        {
+          let r: globals::R = global<globals::R>(a);
+          select globals::R.f(r)
+        }
+    }
+    spec fun $write(a: address,x: u64): u64;
 } // end 0x42::globals
 
 ============ initial bytecode ================
@@ -53,7 +64,7 @@ fun globals::read($t0: address): u64 {
      var $t3: &globals::R
      var $t4: &u64
   0: $t3 := borrow_global<globals::R>($t0)
-  1: $t2 := move($t3)
+  1: $t2 := infer($t3)
   2: $t4 := borrow_field<globals::R>.f($t2)
   3: $t1 := read_ref($t4)
   4: return $t1
@@ -68,7 +79,7 @@ fun globals::write($t0: address, $t1: u64): u64 {
      var $t5: u64
      var $t6: &mut u64
   0: $t4 := borrow_global<globals::R>($t0)
-  1: $t3 := move($t4)
+  1: $t3 := infer($t4)
   2: $t5 := 2
   3: $t6 := borrow_field<globals::R>.f($t3)
   4: write_ref($t6, $t5)

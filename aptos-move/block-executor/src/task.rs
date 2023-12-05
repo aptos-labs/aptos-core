@@ -2,36 +2,35 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::delta_change_set::DeltaOp;
+use aptos_aggregator::{delayed_change::DelayedChange, delta_change_set::DeltaOp};
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::TStateView;
 use aptos_types::{
-    contract_event::ReadWriteEvent,
-    executable::ModulePath,
-    fee_statement::FeeStatement,
-    write_set::{TransactionWrite, WriteOp},
+    fee_statement::FeeStatement, transaction::BlockExecutableTransaction as Transaction,
+    write_set::WriteOp,
 };
-use std::{collections::HashMap, fmt::Debug, hash::Hash};
+use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
+use move_core_types::value::MoveTypeLayout;
+use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 
 /// The execution result of a transaction
 #[derive(Debug)]
-pub enum ExecutionStatus<T, E> {
+pub enum ExecutionStatus<O, E> {
     /// Transaction was executed successfully.
-    Success(T),
+    Success(O),
     /// Transaction hit a none recoverable error during execution, halt the execution and propagate
     /// the error back to the caller.
     Abort(E),
     /// Transaction was executed successfully, but will skip the execution of the trailing
     /// transactions in the list
-    SkipRest(T),
-}
-
-/// Trait that defines a transaction type that can be executed by the block executor. A transaction
-/// transaction will write to a key value storage as their side effect.
-pub trait Transaction: Sync + Send + Clone + 'static {
-    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
-    type Value: Send + Sync + Clone + TransactionWrite;
-    type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
+    SkipRest(O),
+    /// There is a DirectWriteTransaction with resolver not capable to handle it.
+    DirectWriteSetTransactionNotCapableError,
+    /// Transaction detected that it is in inconsistent state due to speculative
+    /// reads it did, and needs to be re-executed.
+    SpeculativeExecutionAbortError(String),
+    /// Code invariant error was detected during transaction execution, which
+    /// can only be caused by the bug in the code.
+    DelayedFieldsCodeInvariantError(String),
 }
 
 /// Inference result of a transaction.
@@ -62,11 +61,23 @@ pub trait ExecutorTask: Sync {
     /// Execute a single transaction given the view of the current state.
     fn execute_transaction(
         &self,
-        view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
+        view: &(impl TExecutorView<
+            <Self::Txn as Transaction>::Key,
+            <Self::Txn as Transaction>::Tag,
+            MoveTypeLayout,
+            <Self::Txn as Transaction>::Identifier,
+            <Self::Txn as Transaction>::Value,
+        > + TResourceGroupView<
+            GroupKey = <Self::Txn as Transaction>::Key,
+            ResourceTag = <Self::Txn as Transaction>::Tag,
+            Layout = MoveTypeLayout,
+        >),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         materialize_deltas: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
+
+    fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool;
 }
 
 /// Trait for execution result of a single transaction.
@@ -78,32 +89,94 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// aggregator_v1.
     fn resource_write_set(
         &self,
-    ) -> HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+    ) -> BTreeMap<
+        <Self::Txn as Transaction>::Key,
+        (
+            <Self::Txn as Transaction>::Value,
+            Option<Arc<MoveTypeLayout>>,
+        ),
+    >;
 
     fn module_write_set(
         &self,
-    ) -> HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+    ) -> BTreeMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
 
     fn aggregator_v1_write_set(
         &self,
-    ) -> HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+    ) -> BTreeMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
 
-    /// Get the aggregator deltas of a transaction from its output.
-    fn aggregator_v1_delta_set(&self) -> HashMap<<Self::Txn as Transaction>::Key, DeltaOp>;
+    /// Get the aggregator V1 deltas of a transaction from its output.
+    fn aggregator_v1_delta_set(&self) -> BTreeMap<<Self::Txn as Transaction>::Key, DeltaOp>;
+
+    /// Get the delayed field changes of a transaction from its output.
+    fn delayed_field_change_set(
+        &self,
+    ) -> BTreeMap<
+        <Self::Txn as Transaction>::Identifier,
+        DelayedChange<<Self::Txn as Transaction>::Identifier>,
+    >;
+
+    fn reads_needing_delayed_field_exchange(
+        &self,
+    ) -> BTreeMap<
+        <Self::Txn as Transaction>::Key,
+        (<Self::Txn as Transaction>::Value, Arc<MoveTypeLayout>),
+    >;
+
+    fn group_reads_needing_delayed_field_exchange(
+        &self,
+    ) -> BTreeMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
 
     /// Get the events of a transaction from its output.
-    fn get_events(&self) -> Vec<<Self::Txn as Transaction>::Event>;
+    fn get_events(&self) -> Vec<(<Self::Txn as Transaction>::Event, Option<MoveTypeLayout>)>;
+
+    fn resource_group_write_set(
+        &self,
+    ) -> Vec<(
+        <Self::Txn as Transaction>::Key,
+        <Self::Txn as Transaction>::Value,
+        BTreeMap<
+            <Self::Txn as Transaction>::Tag,
+            (
+                <Self::Txn as Transaction>::Value,
+                Option<Arc<MoveTypeLayout>>,
+            ),
+        >,
+    )>;
+
+    fn resource_group_metadata_ops(
+        &self,
+    ) -> Vec<(
+        <Self::Txn as Transaction>::Key,
+        <Self::Txn as Transaction>::Value,
+    )> {
+        self.resource_group_write_set()
+            .into_iter()
+            .map(|(key, op, _)| (key, op))
+            .collect()
+    }
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self;
 
-    /// In parallel execution, will be called once per transaction when the output is
-    /// ready to be committed. In sequential execution, won't be called (deltas are
-    /// materialized and incorporated during execution).
-    fn incorporate_delta_writes(
+    /// Will be called once per transaction when the output is ready to be committed.
+    /// Ensures that any writes corresponding to materialized deltas and group updates
+    /// (recorded in output separately) are incorporated into the transaction output.
+    fn incorporate_materialized_txn_output(
         &self,
-        delta_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
+        aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
+        patched_resource_write_set: BTreeMap<
+            <Self::Txn as Transaction>::Key,
+            <Self::Txn as Transaction>::Value,
+        >,
+        patched_events: Vec<<Self::Txn as Transaction>::Event>,
+        combined_groups: Vec<(
+            <Self::Txn as Transaction>::Key,
+            <Self::Txn as Transaction>::Value,
+        )>,
     );
+
+    fn set_txn_output_for_non_dynamic_change_set(&self);
 
     /// Return the fee statement of the transaction.
     fn fee_statement(&self) -> FeeStatement;

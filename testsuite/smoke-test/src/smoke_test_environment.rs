@@ -8,7 +8,7 @@ use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_faucet_core::server::{FunderKeyEnum, RunConfig};
 use aptos_forge::{ActiveNodesGuard, Factory, LocalFactory, LocalSwarm, Node};
 use aptos_framework::ReleaseBundle;
-use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
+use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn, InitGenesisStakeFn};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::chain_id::ChainId;
@@ -27,6 +27,7 @@ pub struct SwarmBuilder {
     genesis_framework: Option<ReleaseBundle>,
     init_config: Option<InitConfigFn>,
     vfn_config: Option<NodeConfig>,
+    init_genesis_stake: Option<InitGenesisStakeFn>,
     init_genesis_config: Option<InitGenesisConfigFn>,
 }
 
@@ -39,6 +40,7 @@ impl SwarmBuilder {
             genesis_framework: None,
             init_config: None,
             vfn_config: None,
+            init_genesis_stake: None,
             init_genesis_config: None,
         }
     }
@@ -64,6 +66,11 @@ impl SwarmBuilder {
 
     pub fn with_vfn_config(mut self, config: NodeConfig) -> Self {
         self.vfn_config = Some(config);
+        self
+    }
+
+    pub fn with_init_genesis_stake(mut self, init_genesis_stake: InitGenesisStakeFn) -> Self {
+        self.init_genesis_stake = Some(init_genesis_stake);
         self
     }
 
@@ -105,6 +112,7 @@ impl SwarmBuilder {
                 builder.genesis_framework,
                 builder.init_config,
                 builder.vfn_config,
+                builder.init_genesis_stake,
                 Some(Arc::new(move |genesis_config| {
                     if let Some(init_genesis_config) = &init_genesis_config {
                         (init_genesis_config)(genesis_config);
@@ -195,6 +203,7 @@ pub fn launch_faucet(
 ) -> JoinHandle<anyhow::Result<()>> {
     let faucet_config = RunConfig::build_for_cli(
         endpoint,
+        "0.0.0.0".to_string(),
         port,
         FunderKeyEnum::Key(ConfigKey::new(mint_key)),
         true,

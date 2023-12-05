@@ -12,7 +12,7 @@ module 0x8675309::M {
         Le<u128>(0, 1);
         Le<u128>(0, 1);
         Le<u64>(0, 1);
-        Le<u64>(x, x);
+        Le<u64>(Copy(x), Move(x));
         Le<u64>(select M::R.f(r), select M::R.f(r));
         And(Le<u64>(1, select M::R.f(r)), Le<u64>(select M::R.f(r), 0));
         {
@@ -20,4 +20,5 @@ module 0x8675309::M {
           Tuple()
         }
     }
+    spec fun $t0(x: u64,r: M::R);
 } // end 0x8675309::M

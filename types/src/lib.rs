@@ -21,6 +21,7 @@ pub mod governance;
 pub mod ledger_info;
 pub mod mempool_status;
 pub mod move_resource;
+pub mod move_utils;
 pub mod network_address;
 pub mod nibble;
 pub mod on_chain_config;
@@ -41,6 +42,7 @@ pub mod validator_config;
 pub mod validator_info;
 pub mod validator_performances;
 pub mod validator_signer;
+pub mod validator_txn;
 pub mod validator_verifier;
 pub mod vesting;
 pub mod vm_status;
@@ -52,7 +54,9 @@ pub use utility_coin::*;
 
 pub mod account_view;
 pub mod aggregate_signature;
+pub mod aggregator;
 pub mod block_executor;
+pub mod bytes;
 pub mod state_store;
 #[cfg(test)]
 mod unit_tests;

@@ -7,6 +7,7 @@ use aptos_types::{
     account_address::{AccountAddress, AccountAddressWithChecks},
     chain_id::ChainId,
     network_address::{DnsName, NetworkAddress, Protocol},
+    on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig},
     transaction::authenticator::AuthenticationKey,
 };
 use aptos_vm_genesis::{AccountBalance, EmployeePool, Validator, ValidatorWithCommissionRate};
@@ -66,6 +67,12 @@ pub struct Layout {
     pub employee_vesting_start: Option<u64>,
     /// Duration of each vesting period (in seconds).
     pub employee_vesting_period_duration: Option<u64>,
+    /// Onchain Consensus Config
+    #[serde(default = "OnChainConsensusConfig::default_for_genesis")]
+    pub on_chain_consensus_config: OnChainConsensusConfig,
+    /// Onchain Execution Config
+    #[serde(default = "OnChainExecutionConfig::default_for_genesis")]
+    pub on_chain_execution_config: OnChainExecutionConfig,
 }
 
 impl Layout {
@@ -103,6 +110,8 @@ impl Default for Layout {
             total_supply: None,
             employee_vesting_start: Some(1663456089),
             employee_vesting_period_duration: Some(5 * 60), // 5 minutes
+            on_chain_consensus_config: OnChainConsensusConfig::default(),
+            on_chain_execution_config: OnChainExecutionConfig::default_for_genesis(),
         }
     }
 }
@@ -194,32 +203,32 @@ impl TryFrom<ValidatorConfiguration> for Validator {
         };
 
         let auth_key = AuthenticationKey::ed25519(&config.owner_account_public_key);
-        let derived_address = auth_key.derived_address();
+        let account_address = auth_key.account_address();
         let owner_address = AccountAddress::from(config.owner_account_address);
-        if owner_address != derived_address {
+        if owner_address != account_address {
             return Err(anyhow::Error::msg(format!(
                 "owner_account_address {} does not match account key derived one {}",
-                owner_address, derived_address
+                owner_address, account_address
             )));
         }
 
         let auth_key = AuthenticationKey::ed25519(&config.operator_account_public_key);
-        let derived_address = auth_key.derived_address();
+        let account_address = auth_key.account_address();
         let operator_address = AccountAddress::from(config.operator_account_address);
-        if operator_address != derived_address {
+        if operator_address != account_address {
             return Err(anyhow::Error::msg(format!(
                 "operator_account_address {} does not match account key derived one {}",
-                operator_address, derived_address
+                operator_address, account_address
             )));
         }
 
         let auth_key = AuthenticationKey::ed25519(&config.voter_account_public_key);
-        let derived_address = auth_key.derived_address();
+        let account_address = auth_key.account_address();
         let voter_address = AccountAddress::from(config.voter_account_address);
-        if voter_address != derived_address {
+        if voter_address != account_address {
             return Err(anyhow::Error::msg(format!(
                 "voter_account_address {} does not match account key derived one {}",
-                voter_address, derived_address
+                voter_address, account_address
             )));
         }
 

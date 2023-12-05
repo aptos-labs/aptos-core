@@ -671,6 +671,7 @@ impl<'env> Docgen<'env> {
         if !module_env.get_structs().count() > 0 {
             for s in module_env
                 .get_structs()
+                .filter(|s| !s.is_test_only())
                 .sorted_by(|a, b| Ord::cmp(&a.get_loc(), &b.get_loc()))
             {
                 self.gen_struct(&spec_block_map, &s);
@@ -684,7 +685,7 @@ impl<'env> Docgen<'env> {
 
         let funs = module_env
             .get_functions()
-            .filter(|f| self.options.include_private_fun || f.is_exposed())
+            .filter(|f| (self.options.include_private_fun || f.is_exposed()) && !f.is_test_only())
             .sorted_by(|a, b| Ord::cmp(&a.get_loc(), &b.get_loc()))
             .collect_vec();
         if !funs.is_empty() {
@@ -1338,6 +1339,7 @@ impl<'env> Docgen<'env> {
         self.gen_spec_blocks(module_env, "", &SpecBlockTarget::Module, spec_block_map);
         for struct_env in module_env
             .get_structs()
+            .filter(|s| !s.is_test_only())
             .sorted_by(|a, b| Ord::cmp(&a.get_loc(), &b.get_loc()))
         {
             let target =
@@ -1355,6 +1357,7 @@ impl<'env> Docgen<'env> {
         }
         for func_env in module_env
             .get_functions()
+            .filter(|f| !f.is_test_only())
             .sorted_by(|a, b| Ord::cmp(&a.get_loc(), &b.get_loc()))
         {
             let target = SpecBlockTarget::Function(func_env.module_env.get_id(), func_env.get_id());
@@ -1463,13 +1466,13 @@ impl<'env> Docgen<'env> {
     /// Generate label.
     fn label(&self, label: &str) {
         emitln!(self.writer);
-        emitln!(self.writer, "<a name=\"{}\"></a>", label);
+        emitln!(self.writer, "<a id=\"{}\"></a>", label);
         emitln!(self.writer);
     }
 
     /// Generate label in code, without empty lines.
     fn label_in_code(&self, label: &str) {
-        emitln!(self.writer, "<a name=\"{}\"></a>", label);
+        emitln!(self.writer, "<a id=\"{}\"></a>", label);
     }
 
     /// Begins a collapsed section.
@@ -1869,7 +1872,11 @@ impl<'env> Docgen<'env> {
                 ))
                 .unwrap_or("");
             let newl_at = source_before.rfind('\n').unwrap_or(0);
-            let mut indent = source_before.len() - newl_at - 1;
+            let mut indent = if source_before.len() > newl_at {
+                source_before.len() - newl_at - 1
+            } else {
+                0
+            };
             if indent >= 4 && source_before.ends_with("spec ") {
                 // Special case for `spec define` and similar constructs.
                 indent -= 4;

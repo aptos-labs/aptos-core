@@ -23,9 +23,10 @@ use aptos_types::{
     contract_event::{ContractEvent, ContractEventV1},
     on_chain_config::{
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
-        TimedFeatures, APTOS_MAX_KNOWN_VERSION,
+        TimedFeaturesBuilder, APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
+    write_set::TransactionWrite,
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
@@ -36,7 +37,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
-    value::{serialize_values, MoveValue},
+    value::{serialize_values, MoveTypeLayout, MoveValue},
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
@@ -110,14 +111,15 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         LATEST_GAS_FEATURE_VERSION,
         ChainId::test().id(),
         Features::default(),
-        TimedFeatures::enable_all(),
+        TimedFeaturesBuilder::enable_all().build(),
+        &data_cache,
     )
     .unwrap();
     let id1 = HashValue::zero();
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
 
     // On-chain genesis process.
-    let consensus_config = OnChainConsensusConfig::default();
+    let consensus_config = OnChainConsensusConfig::default_for_genesis();
     let execution_config = OnChainExecutionConfig::default_for_genesis();
     let gas_schedule = default_gas_schedule();
     initialize(
@@ -140,7 +142,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     emit_new_block_and_epoch_event(&mut session);
 
     let configs = ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION);
-    let mut change_set = session.finish(&mut (), &configs).unwrap();
+    let mut change_set = session.finish(&configs).unwrap();
 
     // Publish the framework, using a different session id, in case both scripts creates tables
     let state_view = GenesisStateView::new();
@@ -151,7 +153,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let id2 = HashValue::new(id2_arr);
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
     publish_framework(&mut session, framework);
-    let additional_change_set = session.finish(&mut (), &configs).unwrap();
+    let additional_change_set = session.finish(&configs).unwrap();
     change_set
         .squash_additional_change_set(additional_change_set, &configs)
         .unwrap();
@@ -218,7 +220,8 @@ pub fn encode_genesis_change_set(
         LATEST_GAS_FEATURE_VERSION,
         ChainId::test().id(),
         Features::default(),
-        TimedFeatures::enable_all(),
+        TimedFeaturesBuilder::enable_all().build(),
+        &data_cache,
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -250,7 +253,7 @@ pub fn encode_genesis_change_set(
     emit_new_block_and_epoch_event(&mut session);
 
     let configs = ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION);
-    let mut change_set = session.finish(&mut (), &configs).unwrap();
+    let mut change_set = session.finish(&configs).unwrap();
 
     let state_view = GenesisStateView::new();
     let data_cache = state_view.as_move_resolver();
@@ -261,7 +264,7 @@ pub fn encode_genesis_change_set(
     let id2 = HashValue::new(id2_arr);
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
     publish_framework(&mut session, framework);
-    let additional_change_set = session.finish(&mut (), &configs).unwrap();
+    let additional_change_set = session.finish(&configs).unwrap();
     change_set
         .squash_additional_change_set(additional_change_set, &configs)
         .unwrap();
@@ -425,8 +428,14 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::EMIT_FEE_STATEMENT,
         FeatureFlag::STORAGE_DELETION_REFUND,
         FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX,
-        FeatureFlag::AGGREGATOR_SNAPSHOTS,
+        FeatureFlag::AGGREGATOR_V2_API,
         FeatureFlag::SAFER_RESOURCE_GROUPS,
+        FeatureFlag::SAFER_METADATA,
+        FeatureFlag::SINGLE_SENDER_AUTHENTICATOR,
+        FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION,
+        FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
+        FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
+        FeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
     ]
 }
 
@@ -637,10 +646,10 @@ fn emit_new_block_and_epoch_event(session: &mut SessionExt) {
 }
 
 /// Verify the consistency of the genesis `WriteSet`
-fn verify_genesis_write_set(events: &[ContractEvent]) {
+fn verify_genesis_write_set(events: &[(ContractEvent, Option<MoveTypeLayout>)]) {
     let new_epoch_events: Vec<&ContractEventV1> = events
         .iter()
-        .filter_map(|e| {
+        .filter_map(|(e, _)| {
             if e.event_key() == Some(&NewEpochEvent::event_key()) {
                 Some(e.v1().unwrap())
             } else {
@@ -751,7 +760,7 @@ impl TestValidator {
     fn gen(rng: &mut StdRng, initial_stake: Option<u64>) -> TestValidator {
         let key = Ed25519PrivateKey::generate(rng);
         let auth_key = AuthenticationKey::ed25519(&key.public_key());
-        let owner_address = auth_key.derived_address();
+        let owner_address = auth_key.account_address();
         let consensus_key = bls12381::PrivateKey::generate(rng);
         let consensus_pubkey = consensus_key.public_key().to_bytes().to_vec();
         let proof_of_possession = bls12381::ProofOfPossession::create(&consensus_key)
@@ -812,7 +821,7 @@ pub fn generate_test_genesis(
             employee_vesting_start: 1663456089,
             employee_vesting_period_duration: 5 * 60, // 5 minutes
         },
-        &OnChainConsensusConfig::default(),
+        &OnChainConsensusConfig::default_for_genesis(),
         &OnChainExecutionConfig::default_for_genesis(),
         &default_gas_schedule(),
     );
@@ -834,7 +843,7 @@ pub fn generate_mainnet_genesis(
         framework,
         ChainId::test(),
         &mainnet_genesis_config(),
-        &OnChainConsensusConfig::default(),
+        &OnChainConsensusConfig::default_for_genesis(),
         &OnChainExecutionConfig::default_for_genesis(),
         &default_gas_schedule(),
     );
@@ -902,7 +911,8 @@ pub fn test_genesis_module_publishing() {
         LATEST_GAS_FEATURE_VERSION,
         ChainId::test().id(),
         Features::default(),
-        TimedFeatures::enable_all(),
+        TimedFeaturesBuilder::enable_all().build(),
+        &data_cache,
     )
     .unwrap();
     let id1 = HashValue::zero();

@@ -46,26 +46,29 @@ impl RunnableConfig for IndexerGrpcPostProcessorConfig {
                 async move {
                     let public_fullnode_addresses = config.public_fullnode_addresses.clone();
                     loop {
-                        if let Ok(checker) = PfnLedgerChecker::new(
+                        match PfnLedgerChecker::new(
                             public_fullnode_addresses.clone(),
                             config.indexer_grpc_address.clone(),
                             config.indexer_grpc_auth_token.clone(),
                         )
                         .await
                         {
-                            info!("Starting PfnLedgerChecker");
-                            if let Err(err) = checker.run().await {
+                            Ok(checker) => {
+                                info!("Starting PfnLedgerChecker");
+                                if let Err(err) = checker.run().await {
+                                    tracing::error!("PfnLedgerChecker failed: {:?}", err);
+                                    TASK_FAILURE_COUNT
+                                        .with_label_values(&["pfn_ledger_checker"])
+                                        .inc();
+                                }
+                            },
+                            Err(err) => {
                                 tracing::error!("PfnLedgerChecker failed: {:?}", err);
                                 TASK_FAILURE_COUNT
                                     .with_label_values(&["pfn_ledger_checker"])
                                     .inc();
-                            }
-                        } else {
-                            tracing::error!("PfnLedgerChecker failed to initialize");
-                            TASK_FAILURE_COUNT
-                                .with_label_values(&["pfn_ledger_checker"])
-                                .inc();
-                        }
+                            },
+                        };
                     }
                 }
             }));

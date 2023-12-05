@@ -1,0 +1,53 @@
+// ---- Model Dump
+module 0x42::inline_specs {
+    private fun specs(): u64 {
+        {
+          let x: u64 = 0;
+          spec {
+            assert Eq<u64>(x, 0);
+          }
+          ;
+          x: u64 = inline_specs::succ(x);
+          spec {
+            assert Eq<u64>(x, 1);
+          }
+          ;
+          x
+        }
+    }
+    private fun succ(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    spec fun $specs(): u64;
+    spec fun $succ(x: u64): u64 {
+        Add(x, 1)
+    }
+} // end 0x42::inline_specs
+
+============ initial bytecode ================
+
+[variant baseline]
+fun inline_specs::specs(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := 0
+  1: $t1 := infer($t2)
+  2: assert Eq<u64>(x, 0)
+  3: $t3 := inline_specs::succ($t1)
+  4: $t1 := infer($t3)
+  5: assert Eq<u64>(x, 1)
+  6: $t0 := infer($t1)
+  7: return $t0
+}
+
+
+[variant baseline]
+fun inline_specs::succ($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := 1
+  1: $t1 := +($t0, $t2)
+  2: return $t1
+}

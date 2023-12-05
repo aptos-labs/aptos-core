@@ -1,5 +1,5 @@
 
-<a name="0x1_coin"></a>
+<a id="0x1_coin"></a>
 
 # Module `0x1::coin`
 
@@ -110,7 +110,7 @@ This module provides the foundation for typesafe Coins.
 
 
 
-<a name="0x1_coin_Coin"></a>
+<a id="0x1_coin_Coin"></a>
 
 ## Struct `Coin`
 
@@ -139,7 +139,7 @@ Main structure representing a coin/token in an account's custody.
 
 </details>
 
-<a name="0x1_coin_AggregatableCoin"></a>
+<a id="0x1_coin_AggregatableCoin"></a>
 
 ## Struct `AggregatableCoin`
 
@@ -169,7 +169,7 @@ used for gas fees distribution by Aptos Framework (0x1).
 
 </details>
 
-<a name="0x1_coin_CoinStore"></a>
+<a id="0x1_coin_CoinStore"></a>
 
 ## Resource `CoinStore`
 
@@ -216,7 +216,7 @@ These are kept in a single resource to ensure locality of data.
 
 </details>
 
-<a name="0x1_coin_SupplyConfig"></a>
+<a id="0x1_coin_SupplyConfig"></a>
 
 ## Resource `SupplyConfig`
 
@@ -245,7 +245,7 @@ is set, coin creators are allowed to upgrade to parallelizable implementations.
 
 </details>
 
-<a name="0x1_coin_CoinInfo"></a>
+<a id="0x1_coin_CoinInfo"></a>
 
 ## Resource `CoinInfo`
 
@@ -294,7 +294,7 @@ Information about a specific coin type. Stored on the creator of the coin's acco
 
 </details>
 
-<a name="0x1_coin_DepositEvent"></a>
+<a id="0x1_coin_DepositEvent"></a>
 
 ## Struct `DepositEvent`
 
@@ -322,7 +322,7 @@ Event emitted when some amount of a coin is deposited into an account.
 
 </details>
 
-<a name="0x1_coin_WithdrawEvent"></a>
+<a id="0x1_coin_WithdrawEvent"></a>
 
 ## Struct `WithdrawEvent`
 
@@ -350,7 +350,7 @@ Event emitted when some amount of a coin is withdrawn from an account.
 
 </details>
 
-<a name="0x1_coin_MintCapability"></a>
+<a id="0x1_coin_MintCapability"></a>
 
 ## Struct `MintCapability`
 
@@ -378,7 +378,7 @@ Capability required to mint coins.
 
 </details>
 
-<a name="0x1_coin_FreezeCapability"></a>
+<a id="0x1_coin_FreezeCapability"></a>
 
 ## Struct `FreezeCapability`
 
@@ -406,7 +406,7 @@ Capability required to freeze a coin store.
 
 </details>
 
-<a name="0x1_coin_BurnCapability"></a>
+<a id="0x1_coin_BurnCapability"></a>
 
 ## Struct `BurnCapability`
 
@@ -434,7 +434,7 @@ Capability required to burn coins.
 
 </details>
 
-<a name="0x1_coin_Ghost$supply"></a>
+<a id="0x1_coin_Ghost$supply"></a>
 
 ## Resource `Ghost$supply`
 
@@ -461,7 +461,7 @@ Capability required to burn coins.
 
 </details>
 
-<a name="0x1_coin_Ghost$aggregate_supply"></a>
+<a id="0x1_coin_Ghost$aggregate_supply"></a>
 
 ## Resource `Ghost$aggregate_supply`
 
@@ -488,12 +488,12 @@ Capability required to burn coins.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_coin_MAX_U64"></a>
+<a id="0x1_coin_MAX_U64"></a>
 
 Maximum possible aggregatable coin value.
 
@@ -503,7 +503,7 @@ Maximum possible aggregatable coin value.
 
 
 
-<a name="0x1_coin_MAX_U128"></a>
+<a id="0x1_coin_MAX_U128"></a>
 
 Maximum possible coin supply.
 
@@ -513,7 +513,7 @@ Maximum possible coin supply.
 
 
 
-<a name="0x1_coin_EAGGREGATABLE_COIN_VALUE_TOO_LARGE"></a>
+<a id="0x1_coin_EAGGREGATABLE_COIN_VALUE_TOO_LARGE"></a>
 
 The value of aggregatable coin used for transaction fees redistribution does not fit in u64.
 
@@ -523,7 +523,7 @@ The value of aggregatable coin used for transaction fees redistribution does not
 
 
 
-<a name="0x1_coin_ECOIN_INFO_ADDRESS_MISMATCH"></a>
+<a id="0x1_coin_ECOIN_INFO_ADDRESS_MISMATCH"></a>
 
 Address of account which is used to initialize a coin <code>CoinType</code> doesn't match the deployer of module
 
@@ -533,7 +533,7 @@ Address of account which is used to initialize a coin <code>CoinType</code> does
 
 
 
-<a name="0x1_coin_ECOIN_INFO_ALREADY_PUBLISHED"></a>
+<a id="0x1_coin_ECOIN_INFO_ALREADY_PUBLISHED"></a>
 
 <code>CoinType</code> is already initialized as a coin
 
@@ -543,7 +543,7 @@ Address of account which is used to initialize a coin <code>CoinType</code> does
 
 
 
-<a name="0x1_coin_ECOIN_INFO_NOT_PUBLISHED"></a>
+<a id="0x1_coin_ECOIN_INFO_NOT_PUBLISHED"></a>
 
 <code>CoinType</code> hasn't been initialized as a coin
 
@@ -553,7 +553,7 @@ Address of account which is used to initialize a coin <code>CoinType</code> does
 
 
 
-<a name="0x1_coin_ECOIN_NAME_TOO_LONG"></a>
+<a id="0x1_coin_ECOIN_NAME_TOO_LONG"></a>
 
 Name of the coin is too long
 
@@ -563,7 +563,7 @@ Name of the coin is too long
 
 
 
-<a name="0x1_coin_ECOIN_STORE_ALREADY_PUBLISHED"></a>
+<a id="0x1_coin_ECOIN_STORE_ALREADY_PUBLISHED"></a>
 
 Deprecated. Account already has <code><a href="coin.md#0x1_coin_CoinStore">CoinStore</a></code> registered for <code>CoinType</code>
 
@@ -573,7 +573,7 @@ Deprecated. Account already has <code><a href="coin.md#0x1_coin_CoinStore">CoinS
 
 
 
-<a name="0x1_coin_ECOIN_STORE_NOT_PUBLISHED"></a>
+<a id="0x1_coin_ECOIN_STORE_NOT_PUBLISHED"></a>
 
 Account hasn't registered <code><a href="coin.md#0x1_coin_CoinStore">CoinStore</a></code> for <code>CoinType</code>
 
@@ -583,7 +583,7 @@ Account hasn't registered <code><a href="coin.md#0x1_coin_CoinStore">CoinStore</
 
 
 
-<a name="0x1_coin_ECOIN_SUPPLY_UPGRADE_NOT_SUPPORTED"></a>
+<a id="0x1_coin_ECOIN_SUPPLY_UPGRADE_NOT_SUPPORTED"></a>
 
 Cannot upgrade the total supply of coins to different implementation.
 
@@ -593,7 +593,7 @@ Cannot upgrade the total supply of coins to different implementation.
 
 
 
-<a name="0x1_coin_ECOIN_SYMBOL_TOO_LONG"></a>
+<a id="0x1_coin_ECOIN_SYMBOL_TOO_LONG"></a>
 
 Symbol of the coin is too long
 
@@ -603,7 +603,7 @@ Symbol of the coin is too long
 
 
 
-<a name="0x1_coin_EDESTRUCTION_OF_NONZERO_TOKEN"></a>
+<a id="0x1_coin_EDESTRUCTION_OF_NONZERO_TOKEN"></a>
 
 Cannot destroy non-zero coins
 
@@ -613,7 +613,7 @@ Cannot destroy non-zero coins
 
 
 
-<a name="0x1_coin_EFROZEN"></a>
+<a id="0x1_coin_EFROZEN"></a>
 
 CoinStore is frozen. Coins cannot be deposited or withdrawn
 
@@ -623,7 +623,7 @@ CoinStore is frozen. Coins cannot be deposited or withdrawn
 
 
 
-<a name="0x1_coin_EINSUFFICIENT_BALANCE"></a>
+<a id="0x1_coin_EINSUFFICIENT_BALANCE"></a>
 
 Not enough coins to complete transaction
 
@@ -633,7 +633,7 @@ Not enough coins to complete transaction
 
 
 
-<a name="0x1_coin_EZERO_COIN_AMOUNT"></a>
+<a id="0x1_coin_EZERO_COIN_AMOUNT"></a>
 
 Coin amount cannot be zero
 
@@ -643,7 +643,7 @@ Coin amount cannot be zero
 
 
 
-<a name="0x1_coin_MAX_COIN_NAME_LENGTH"></a>
+<a id="0x1_coin_MAX_COIN_NAME_LENGTH"></a>
 
 
 
@@ -652,7 +652,7 @@ Coin amount cannot be zero
 
 
 
-<a name="0x1_coin_MAX_COIN_SYMBOL_LENGTH"></a>
+<a id="0x1_coin_MAX_COIN_SYMBOL_LENGTH"></a>
 
 
 
@@ -661,7 +661,7 @@ Coin amount cannot be zero
 
 
 
-<a name="0x1_coin_initialize_supply_config"></a>
+<a id="0x1_coin_initialize_supply_config"></a>
 
 ## Function `initialize_supply_config`
 
@@ -687,7 +687,7 @@ Publishes supply configuration. Initially, upgrading is not allowed.
 
 </details>
 
-<a name="0x1_coin_allow_supply_upgrades"></a>
+<a id="0x1_coin_allow_supply_upgrades"></a>
 
 ## Function `allow_supply_upgrades`
 
@@ -715,12 +715,12 @@ or disallow upgradability of total supply.
 
 </details>
 
-<a name="0x1_coin_initialize_aggregatable_coin"></a>
+<a id="0x1_coin_initialize_aggregatable_coin"></a>
 
 ## Function `initialize_aggregatable_coin`
 
 Creates a new aggregatable coin with value overflowing on <code>limit</code>. Note that this function can
-only be called by Aptos Framework (0x1) account for now becuase of <code>create_aggregator</code>.
+only be called by Aptos Framework (0x1) account for now because of <code>create_aggregator</code>.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_initialize_aggregatable_coin">initialize_aggregatable_coin</a>&lt;CoinType&gt;(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;CoinType&gt;
@@ -744,7 +744,7 @@ only be called by Aptos Framework (0x1) account for now becuase of <code>create_
 
 </details>
 
-<a name="0x1_coin_is_aggregatable_coin_zero"></a>
+<a id="0x1_coin_is_aggregatable_coin_zero"></a>
 
 ## Function `is_aggregatable_coin_zero`
 
@@ -770,7 +770,7 @@ Returns true if the value of aggregatable coin is zero.
 
 </details>
 
-<a name="0x1_coin_drain_aggregatable_coin"></a>
+<a id="0x1_coin_drain_aggregatable_coin"></a>
 
 ## Function `drain_aggregatable_coin`
 
@@ -810,7 +810,7 @@ Drains the aggregatable coin, setting it to zero and returning a standard coin.
 
 </details>
 
-<a name="0x1_coin_merge_aggregatable_coin"></a>
+<a id="0x1_coin_merge_aggregatable_coin"></a>
 
 ## Function `merge_aggregatable_coin`
 
@@ -843,7 +843,7 @@ Merges <code><a href="coin.md#0x1_coin">coin</a></code> into aggregatable coin (
 
 </details>
 
-<a name="0x1_coin_collect_into_aggregatable_coin"></a>
+<a id="0x1_coin_collect_into_aggregatable_coin"></a>
 
 ## Function `collect_into_aggregatable_coin`
 
@@ -879,7 +879,7 @@ Collects a specified amount of coin form an account into aggregatable coin.
 
 </details>
 
-<a name="0x1_coin_coin_address"></a>
+<a id="0x1_coin_coin_address"></a>
 
 ## Function `coin_address`
 
@@ -905,7 +905,7 @@ A helper function that returns the address of CoinType.
 
 </details>
 
-<a name="0x1_coin_balance"></a>
+<a id="0x1_coin_balance"></a>
 
 ## Function `balance`
 
@@ -935,7 +935,7 @@ Returns the balance of <code>owner</code> for provided <code>CoinType</code>.
 
 </details>
 
-<a name="0x1_coin_is_coin_initialized"></a>
+<a id="0x1_coin_is_coin_initialized"></a>
 
 ## Function `is_coin_initialized`
 
@@ -961,7 +961,7 @@ Returns <code><b>true</b></code> if the type <code>CoinType</code> is an initial
 
 </details>
 
-<a name="0x1_coin_is_coin_store_frozen"></a>
+<a id="0x1_coin_is_coin_store_frozen"></a>
 
 ## Function `is_coin_store_frozen`
 
@@ -992,7 +992,7 @@ Returns <code><b>true</b></code> is account_addr has frozen the CoinStore or if 
 
 </details>
 
-<a name="0x1_coin_is_account_registered"></a>
+<a id="0x1_coin_is_account_registered"></a>
 
 ## Function `is_account_registered`
 
@@ -1018,7 +1018,7 @@ Returns <code><b>true</b></code> if <code>account_addr</code> is registered to r
 
 </details>
 
-<a name="0x1_coin_name"></a>
+<a id="0x1_coin_name"></a>
 
 ## Function `name`
 
@@ -1044,7 +1044,7 @@ Returns the name of the coin.
 
 </details>
 
-<a name="0x1_coin_symbol"></a>
+<a id="0x1_coin_symbol"></a>
 
 ## Function `symbol`
 
@@ -1070,7 +1070,7 @@ Returns the symbol of the coin, usually a shorter version of the name.
 
 </details>
 
-<a name="0x1_coin_decimals"></a>
+<a id="0x1_coin_decimals"></a>
 
 ## Function `decimals`
 
@@ -1098,7 +1098,7 @@ be displayed to a user as <code>5.05</code> (<code>505 / 10 ** 2</code>).
 
 </details>
 
-<a name="0x1_coin_supply"></a>
+<a id="0x1_coin_supply"></a>
 
 ## Function `supply`
 
@@ -1132,7 +1132,7 @@ Returns the amount of coin in existence.
 
 </details>
 
-<a name="0x1_coin_burn"></a>
+<a id="0x1_coin_burn"></a>
 
 ## Function `burn`
 
@@ -1171,7 +1171,7 @@ The capability <code>_cap</code> should be passed as a reference to <code><a hre
 
 </details>
 
-<a name="0x1_coin_burn_from"></a>
+<a id="0x1_coin_burn_from"></a>
 
 ## Function `burn_from`
 
@@ -1211,7 +1211,7 @@ Note: This bypasses CoinStore::frozen -- coins within a frozen CoinStore can be 
 
 </details>
 
-<a name="0x1_coin_deposit"></a>
+<a id="0x1_coin_deposit"></a>
 
 ## Function `deposit`
 
@@ -1252,7 +1252,7 @@ Deposit the coin balance into the recipient's account and emit an event.
 
 </details>
 
-<a name="0x1_coin_force_deposit"></a>
+<a id="0x1_coin_force_deposit"></a>
 
 ## Function `force_deposit`
 
@@ -1285,7 +1285,7 @@ This is for internal use only and doesn't emit an DepositEvent.
 
 </details>
 
-<a name="0x1_coin_destroy_zero"></a>
+<a id="0x1_coin_destroy_zero"></a>
 
 ## Function `destroy_zero`
 
@@ -1316,7 +1316,7 @@ a <code><a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a></code> for 
 
 </details>
 
-<a name="0x1_coin_extract"></a>
+<a id="0x1_coin_extract"></a>
 
 ## Function `extract`
 
@@ -1349,7 +1349,7 @@ Extracts <code>amount</code> from the passed-in <code><a href="coin.md#0x1_coin"
 
 </details>
 
-<a name="0x1_coin_extract_all"></a>
+<a id="0x1_coin_extract_all"></a>
 
 ## Function `extract_all`
 
@@ -1382,7 +1382,7 @@ Extracts the entire amount from the passed-in <code><a href="coin.md#0x1_coin">c
 
 </details>
 
-<a name="0x1_coin_freeze_coin_store"></a>
+<a id="0x1_coin_freeze_coin_store"></a>
 
 ## Function `freeze_coin_store`
 
@@ -1412,7 +1412,7 @@ Freeze a CoinStore to prevent transfers
 
 </details>
 
-<a name="0x1_coin_unfreeze_coin_store"></a>
+<a id="0x1_coin_unfreeze_coin_store"></a>
 
 ## Function `unfreeze_coin_store`
 
@@ -1442,7 +1442,7 @@ Unfreeze a CoinStore to allow transfers
 
 </details>
 
-<a name="0x1_coin_upgrade_supply"></a>
+<a id="0x1_coin_upgrade_supply"></a>
 
 ## Function `upgrade_supply`
 
@@ -1490,7 +1490,7 @@ available.
 
 </details>
 
-<a name="0x1_coin_initialize"></a>
+<a id="0x1_coin_initialize"></a>
 
 ## Function `initialize`
 
@@ -1523,7 +1523,7 @@ The given signer also becomes the account hosting the information  about the coi
 
 </details>
 
-<a name="0x1_coin_initialize_with_parallelizable_supply"></a>
+<a id="0x1_coin_initialize_with_parallelizable_supply"></a>
 
 ## Function `initialize_with_parallelizable_supply`
 
@@ -1555,7 +1555,7 @@ Same as <code>initialize</code> but supply can be initialized to parallelizable 
 
 </details>
 
-<a name="0x1_coin_initialize_internal"></a>
+<a id="0x1_coin_initialize_internal"></a>
 
 ## Function `initialize_internal`
 
@@ -1609,7 +1609,7 @@ Same as <code>initialize</code> but supply can be initialized to parallelizable 
 
 </details>
 
-<a name="0x1_coin_merge"></a>
+<a id="0x1_coin_merge"></a>
 
 ## Function `merge`
 
@@ -1645,7 +1645,7 @@ to the sum of the two tokens (<code>dst_coin</code> and <code>source_coin</code>
 
 </details>
 
-<a name="0x1_coin_mint"></a>
+<a id="0x1_coin_mint"></a>
 
 ## Function `mint`
 
@@ -1676,6 +1676,14 @@ Returns minted <code><a href="coin.md#0x1_coin_Coin">Coin</a></code>.
     <b>let</b> maybe_supply = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(<a href="coin.md#0x1_coin_coin_address">coin_address</a>&lt;CoinType&gt;()).<a href="coin.md#0x1_coin_supply">supply</a>;
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(maybe_supply)) {
         <b>let</b> <a href="coin.md#0x1_coin_supply">supply</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow_mut">option::borrow_mut</a>(maybe_supply);
+        <b>spec</b> {
+            <b>use</b> aptos_framework::optional_aggregator;
+            <b>use</b> aptos_framework::aggregator;
+            <b>assume</b> <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">optional_aggregator::is_parallelizable</a>(<a href="coin.md#0x1_coin_supply">supply</a>) ==&gt; (<a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="coin.md#0x1_coin_supply">supply</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>))
+                + amount &lt;= <a href="aggregator.md#0x1_aggregator_spec_get_limit">aggregator::spec_get_limit</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="coin.md#0x1_coin_supply">supply</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>)));
+            <b>assume</b> !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">optional_aggregator::is_parallelizable</a>(<a href="coin.md#0x1_coin_supply">supply</a>) ==&gt;
+                (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="coin.md#0x1_coin_supply">supply</a>.integer).value + amount &lt;= <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="coin.md#0x1_coin_supply">supply</a>.integer).limit);
+        };
         <a href="optional_aggregator.md#0x1_optional_aggregator_add">optional_aggregator::add</a>(<a href="coin.md#0x1_coin_supply">supply</a>, (amount <b>as</b> u128));
     };
     <b>spec</b> {
@@ -1689,7 +1697,7 @@ Returns minted <code><a href="coin.md#0x1_coin_Coin">Coin</a></code>.
 
 </details>
 
-<a name="0x1_coin_register"></a>
+<a id="0x1_coin_register"></a>
 
 ## Function `register`
 
@@ -1726,7 +1734,7 @@ Returns minted <code><a href="coin.md#0x1_coin_Coin">Coin</a></code>.
 
 </details>
 
-<a name="0x1_coin_transfer"></a>
+<a id="0x1_coin_transfer"></a>
 
 ## Function `transfer`
 
@@ -1756,7 +1764,7 @@ Transfers <code>amount</code> of coins <code>CoinType</code> from <code>from</co
 
 </details>
 
-<a name="0x1_coin_value"></a>
+<a id="0x1_coin_value"></a>
 
 ## Function `value`
 
@@ -1781,11 +1789,11 @@ Returns the <code>value</code> passed in <code><a href="coin.md#0x1_coin">coin</
 
 </details>
 
-<a name="0x1_coin_withdraw"></a>
+<a id="0x1_coin_withdraw"></a>
 
 ## Function `withdraw`
 
-Withdraw specifed <code>amount</code> of coin <code>CoinType</code> from the signing account.
+Withdraw specified <code>amount</code> of coin <code>CoinType</code> from the signing account.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_withdraw">withdraw</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, amount: u64): <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;
@@ -1826,7 +1834,7 @@ Withdraw specifed <code>amount</code> of coin <code>CoinType</code> from the sig
 
 </details>
 
-<a name="0x1_coin_zero"></a>
+<a id="0x1_coin_zero"></a>
 
 ## Function `zero`
 
@@ -1856,7 +1864,7 @@ Create a new <code><a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;</cod
 
 </details>
 
-<a name="0x1_coin_destroy_freeze_cap"></a>
+<a id="0x1_coin_destroy_freeze_cap"></a>
 
 ## Function `destroy_freeze_cap`
 
@@ -1881,7 +1889,7 @@ Destroy a freeze capability. Freeze capability is dangerous and therefore should
 
 </details>
 
-<a name="0x1_coin_destroy_mint_cap"></a>
+<a id="0x1_coin_destroy_mint_cap"></a>
 
 ## Function `destroy_mint_cap`
 
@@ -1906,7 +1914,7 @@ Destroy a mint capability.
 
 </details>
 
-<a name="0x1_coin_destroy_burn_cap"></a>
+<a id="0x1_coin_destroy_burn_cap"></a>
 
 ## Function `destroy_burn_cap`
 
@@ -1931,16 +1939,16 @@ Destroy a burn capability.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
-<a name="0x1_coin_supply"></a>
+<a id="0x1_coin_supply"></a>
 <b>global</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt;: num;
-<a name="0x1_coin_aggregate_supply"></a>
+<a id="0x1_coin_aggregate_supply"></a>
 <b>global</b> <a href="coin.md#0x1_coin_aggregate_supply">aggregate_supply</a>&lt;CoinType&gt;: num;
 <b>apply</b> <a href="coin.md#0x1_coin_TotalSupplyTracked">TotalSupplyTracked</a>&lt;CoinType&gt; <b>to</b> *&lt;CoinType&gt; <b>except</b>
     initialize, initialize_internal, initialize_with_parallelizable_supply;
@@ -1951,7 +1959,7 @@ Destroy a burn capability.
 
 
 
-<a name="0x1_coin_spec_fun_supply_tracked"></a>
+<a id="0x1_coin_spec_fun_supply_tracked"></a>
 
 
 <pre><code><b>fun</b> <a href="coin.md#0x1_coin_spec_fun_supply_tracked">spec_fun_supply_tracked</a>&lt;CoinType&gt;(val: u64, <a href="coin.md#0x1_coin_supply">supply</a>: Option&lt;OptionalAggregator&gt;): bool {
@@ -1963,7 +1971,7 @@ Destroy a burn capability.
 
 
 
-<a name="0x1_coin_TotalSupplyTracked"></a>
+<a id="0x1_coin_TotalSupplyTracked"></a>
 
 
 <pre><code><b>schema</b> <a href="coin.md#0x1_coin_TotalSupplyTracked">TotalSupplyTracked</a>&lt;CoinType&gt; {
@@ -1977,7 +1985,7 @@ Destroy a burn capability.
 
 
 
-<a name="0x1_coin_spec_fun_supply_no_change"></a>
+<a id="0x1_coin_spec_fun_supply_no_change"></a>
 
 
 <pre><code><b>fun</b> <a href="coin.md#0x1_coin_spec_fun_supply_no_change">spec_fun_supply_no_change</a>&lt;CoinType&gt;(old_supply: Option&lt;OptionalAggregator&gt;,
@@ -1991,7 +1999,7 @@ Destroy a burn capability.
 
 
 
-<a name="0x1_coin_TotalSupplyNoChange"></a>
+<a id="0x1_coin_TotalSupplyNoChange"></a>
 
 
 <pre><code><b>schema</b> <a href="coin.md#0x1_coin_TotalSupplyNoChange">TotalSupplyNoChange</a>&lt;CoinType&gt; {
@@ -2003,7 +2011,7 @@ Destroy a burn capability.
 
 
 
-<a name="@Specification_1_AggregatableCoin"></a>
+<a id="@Specification_1_AggregatableCoin"></a>
 
 ### Struct `AggregatableCoin`
 
@@ -2029,7 +2037,7 @@ Destroy a burn capability.
 
 
 
-<a name="@Specification_1_initialize_supply_config"></a>
+<a id="@Specification_1_initialize_supply_config"></a>
 
 ### Function `initialize_supply_config`
 
@@ -2051,7 +2059,7 @@ Can only be published by reserved addresses.
 
 
 
-<a name="@Specification_1_allow_supply_upgrades"></a>
+<a id="@Specification_1_allow_supply_upgrades"></a>
 
 ### Function `allow_supply_upgrades`
 
@@ -2073,7 +2081,7 @@ Can only be updated by <code>@aptos_framework</code>.
 
 
 
-<a name="@Specification_1_initialize_aggregatable_coin"></a>
+<a id="@Specification_1_initialize_aggregatable_coin"></a>
 
 ### Function `initialize_aggregatable_coin`
 
@@ -2090,7 +2098,7 @@ Can only be updated by <code>@aptos_framework</code>.
 
 
 
-<a name="@Specification_1_is_aggregatable_coin_zero"></a>
+<a id="@Specification_1_is_aggregatable_coin_zero"></a>
 
 ### Function `is_aggregatable_coin_zero`
 
@@ -2107,7 +2115,7 @@ Can only be updated by <code>@aptos_framework</code>.
 
 
 
-<a name="@Specification_1_drain_aggregatable_coin"></a>
+<a id="@Specification_1_drain_aggregatable_coin"></a>
 
 ### Function `drain_aggregatable_coin`
 
@@ -2124,7 +2132,7 @@ Can only be updated by <code>@aptos_framework</code>.
 
 
 
-<a name="@Specification_1_merge_aggregatable_coin"></a>
+<a id="@Specification_1_merge_aggregatable_coin"></a>
 
 ### Function `merge_aggregatable_coin`
 
@@ -2136,15 +2144,17 @@ Can only be updated by <code>@aptos_framework</code>.
 
 
 <pre><code><b>let</b> aggr = dst_coin.value;
+<b>let</b> <b>post</b> p_aggr = dst_coin.value;
 <b>aborts_if</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(aggr)
     + <a href="coin.md#0x1_coin">coin</a>.value &gt; <a href="aggregator.md#0x1_aggregator_spec_get_limit">aggregator::spec_get_limit</a>(aggr);
 <b>aborts_if</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(aggr)
     + <a href="coin.md#0x1_coin">coin</a>.value &gt; <a href="coin.md#0x1_coin_MAX_U128">MAX_U128</a>;
+<b>ensures</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(aggr)+ <a href="coin.md#0x1_coin">coin</a>.value == <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(p_aggr);
 </code></pre>
 
 
 
-<a name="@Specification_1_collect_into_aggregatable_coin"></a>
+<a id="@Specification_1_collect_into_aggregatable_coin"></a>
 
 ### Function `collect_into_aggregatable_coin`
 
@@ -2156,18 +2166,22 @@ Can only be updated by <code>@aptos_framework</code>.
 
 
 <pre><code><b>let</b> aggr = dst_coin.value;
+<b>let</b> <b>post</b> p_aggr = dst_coin.value;
 <b>let</b> coin_store = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
+<b>let</b> <b>post</b> p_coin_store = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
 <b>aborts_if</b> amount &gt; 0 && !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
 <b>aborts_if</b> amount &gt; 0 && coin_store.<a href="coin.md#0x1_coin">coin</a>.<a href="coin.md#0x1_coin_value">value</a> &lt; amount;
 <b>aborts_if</b> amount &gt; 0 && <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(aggr)
     + amount &gt; <a href="aggregator.md#0x1_aggregator_spec_get_limit">aggregator::spec_get_limit</a>(aggr);
 <b>aborts_if</b> amount &gt; 0 && <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(aggr)
     + amount &gt; <a href="coin.md#0x1_coin_MAX_U128">MAX_U128</a>;
+<b>ensures</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(aggr)+ amount == <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(p_aggr);
+<b>ensures</b> coin_store.<a href="coin.md#0x1_coin">coin</a>.value - amount == p_coin_store.<a href="coin.md#0x1_coin">coin</a>.value;
 </code></pre>
 
 
 
-<a name="@Specification_1_coin_address"></a>
+<a id="@Specification_1_coin_address"></a>
 
 ### Function `coin_address`
 
@@ -2186,7 +2200,7 @@ Get address by reflection.
 
 
 
-<a name="@Specification_1_balance"></a>
+<a id="@Specification_1_balance"></a>
 
 ### Function `balance`
 
@@ -2204,7 +2218,7 @@ Get address by reflection.
 
 
 
-<a name="@Specification_1_is_coin_initialized"></a>
+<a id="@Specification_1_is_coin_initialized"></a>
 
 ### Function `is_coin_initialized`
 
@@ -2221,7 +2235,7 @@ Get address by reflection.
 
 
 
-<a name="@Specification_1_is_account_registered"></a>
+<a id="@Specification_1_is_account_registered"></a>
 
 ### Function `is_account_registered`
 
@@ -2239,7 +2253,7 @@ Get address by reflection.
 
 
 
-<a name="0x1_coin_get_coin_supply_opt"></a>
+<a id="0x1_coin_get_coin_supply_opt"></a>
 
 
 <pre><code><b>fun</b> <a href="coin.md#0x1_coin_get_coin_supply_opt">get_coin_supply_opt</a>&lt;CoinType&gt;(): Option&lt;OptionalAggregator&gt; {
@@ -2250,26 +2264,35 @@ Get address by reflection.
 
 
 
-<a name="0x1_coin_AbortsIfAggregator"></a>
+<a id="0x1_coin_CoinSubAbortsIf"></a>
 
 
-<pre><code><b>schema</b> <a href="coin.md#0x1_coin_AbortsIfAggregator">AbortsIfAggregator</a>&lt;CoinType&gt; {
-    <a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;;
+<pre><code><b>schema</b> <a href="coin.md#0x1_coin_CoinSubAbortsIf">CoinSubAbortsIf</a>&lt;CoinType&gt; {
+    amount: u64;
     <b>let</b> addr =  <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
     <b>let</b> maybe_supply = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(addr).<a href="coin.md#0x1_coin_supply">supply</a>;
-    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(maybe_supply) && <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">optional_aggregator::is_parallelizable</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(maybe_supply))
-        && <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(maybe_supply).<a href="aggregator.md#0x1_aggregator">aggregator</a>)) &lt;
-        <a href="coin.md#0x1_coin">coin</a>.value;
-    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(maybe_supply) && !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">optional_aggregator::is_parallelizable</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(maybe_supply))
-        && <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(maybe_supply).integer).<a href="coin.md#0x1_coin_value">value</a> &lt;
-        <a href="coin.md#0x1_coin">coin</a>.value;
+    <b>include</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(maybe_supply)) ==&gt; <a href="optional_aggregator.md#0x1_optional_aggregator_SubAbortsIf">optional_aggregator::SubAbortsIf</a> { <a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(maybe_supply), value: amount };
 }
 </code></pre>
 
 
 
 
-<a name="0x1_coin_AbortsIfNotExistCoinInfo"></a>
+<a id="0x1_coin_CoinAddAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="coin.md#0x1_coin_CoinAddAbortsIf">CoinAddAbortsIf</a>&lt;CoinType&gt; {
+    amount: u64;
+    <b>let</b> addr =  <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
+    <b>let</b> maybe_supply = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(addr).<a href="coin.md#0x1_coin_supply">supply</a>;
+    <b>include</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(maybe_supply)) ==&gt; <a href="optional_aggregator.md#0x1_optional_aggregator_AddAbortsIf">optional_aggregator::AddAbortsIf</a> { <a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(maybe_supply), value: amount };
+}
+</code></pre>
+
+
+
+
+<a id="0x1_coin_AbortsIfNotExistCoinInfo"></a>
 
 
 <pre><code><b>schema</b> <a href="coin.md#0x1_coin_AbortsIfNotExistCoinInfo">AbortsIfNotExistCoinInfo</a>&lt;CoinType&gt; {
@@ -2280,7 +2303,7 @@ Get address by reflection.
 
 
 
-<a name="@Specification_1_name"></a>
+<a id="@Specification_1_name"></a>
 
 ### Function `name`
 
@@ -2297,7 +2320,7 @@ Get address by reflection.
 
 
 
-<a name="@Specification_1_symbol"></a>
+<a id="@Specification_1_symbol"></a>
 
 ### Function `symbol`
 
@@ -2314,7 +2337,7 @@ Get address by reflection.
 
 
 
-<a name="@Specification_1_decimals"></a>
+<a id="@Specification_1_decimals"></a>
 
 ### Function `decimals`
 
@@ -2331,7 +2354,7 @@ Get address by reflection.
 
 
 
-<a name="@Specification_1_supply"></a>
+<a id="@Specification_1_supply"></a>
 
 ### Function `supply`
 
@@ -2357,7 +2380,7 @@ Get address by reflection.
 
 
 
-<a name="@Specification_1_burn"></a>
+<a id="@Specification_1_burn"></a>
 
 ### Function `burn`
 
@@ -2369,17 +2392,16 @@ Get address by reflection.
 
 
 <pre><code><b>let</b> addr =  <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(addr);
 <b>modifies</b> <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(addr);
 <b>include</b> <a href="coin.md#0x1_coin_AbortsIfNotExistCoinInfo">AbortsIfNotExistCoinInfo</a>&lt;CoinType&gt;;
 <b>aborts_if</b> <a href="coin.md#0x1_coin">coin</a>.value == 0;
-<b>include</b> <a href="coin.md#0x1_coin_AbortsIfAggregator">AbortsIfAggregator</a>&lt;CoinType&gt;;
+<b>include</b> <a href="coin.md#0x1_coin_CoinSubAbortsIf">CoinSubAbortsIf</a>&lt;CoinType&gt; { amount: <a href="coin.md#0x1_coin">coin</a>.value };
 <b>ensures</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; == <b>old</b>(<a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt;) - <a href="coin.md#0x1_coin">coin</a>.value;
 </code></pre>
 
 
 
-<a name="@Specification_1_burn_from"></a>
+<a id="@Specification_1_burn_from"></a>
 
 ### Function `burn_from`
 
@@ -2416,7 +2438,7 @@ Get address by reflection.
 
 
 
-<a name="@Specification_1_deposit"></a>
+<a id="@Specification_1_deposit"></a>
 
 ### Function `deposit`
 
@@ -2436,7 +2458,7 @@ Get address by reflection.
 
 
 
-<a name="0x1_coin_DepositAbortsIf"></a>
+<a id="0x1_coin_DepositAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="coin.md#0x1_coin_DepositAbortsIf">DepositAbortsIf</a>&lt;CoinType&gt; {
@@ -2450,7 +2472,7 @@ Get address by reflection.
 
 
 
-<a name="@Specification_1_force_deposit"></a>
+<a id="@Specification_1_force_deposit"></a>
 
 ### Function `force_deposit`
 
@@ -2468,7 +2490,7 @@ Get address by reflection.
 
 
 
-<a name="@Specification_1_destroy_zero"></a>
+<a id="@Specification_1_destroy_zero"></a>
 
 ### Function `destroy_zero`
 
@@ -2485,7 +2507,7 @@ The value of <code>zero_coin</code> must be 0.
 
 
 
-<a name="@Specification_1_extract"></a>
+<a id="@Specification_1_extract"></a>
 
 ### Function `extract`
 
@@ -2503,7 +2525,7 @@ The value of <code>zero_coin</code> must be 0.
 
 
 
-<a name="@Specification_1_extract_all"></a>
+<a id="@Specification_1_extract_all"></a>
 
 ### Function `extract_all`
 
@@ -2520,7 +2542,7 @@ The value of <code>zero_coin</code> must be 0.
 
 
 
-<a name="@Specification_1_freeze_coin_store"></a>
+<a id="@Specification_1_freeze_coin_store"></a>
 
 ### Function `freeze_coin_store`
 
@@ -2541,7 +2563,7 @@ The value of <code>zero_coin</code> must be 0.
 
 
 
-<a name="@Specification_1_unfreeze_coin_store"></a>
+<a id="@Specification_1_unfreeze_coin_store"></a>
 
 ### Function `unfreeze_coin_store`
 
@@ -2562,7 +2584,7 @@ The value of <code>zero_coin</code> must be 0.
 
 
 
-<a name="@Specification_1_upgrade_supply"></a>
+<a id="@Specification_1_upgrade_supply"></a>
 
 ### Function `upgrade_supply`
 
@@ -2598,7 +2620,7 @@ The creator of <code>CoinType</code> must be <code>@aptos_framework</code>.
 
 
 
-<a name="@Specification_1_initialize"></a>
+<a id="@Specification_1_initialize"></a>
 
 ### Function `initialize`
 
@@ -2618,7 +2640,7 @@ The creator of <code>CoinType</code> must be <code>@aptos_framework</code>.
 
 
 
-<a name="@Specification_1_initialize_with_parallelizable_supply"></a>
+<a id="@Specification_1_initialize_with_parallelizable_supply"></a>
 
 ### Function `initialize_with_parallelizable_supply`
 
@@ -2629,13 +2651,14 @@ The creator of <code>CoinType</code> must be <code>@aptos_framework</code>.
 
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
-<b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
 <b>aborts_if</b> addr != @aptos_framework;
+<b>aborts_if</b> monitor_supply && !<b>exists</b>&lt;<a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">aggregator_factory::AggregatorFactory</a>&gt;(@aptos_framework);
 <b>include</b> <a href="coin.md#0x1_coin_InitializeInternalSchema">InitializeInternalSchema</a>&lt;CoinType&gt;{
     name: name.bytes,
     symbol: symbol.bytes
 };
+<b>ensures</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(addr);
 </code></pre>
 
 
@@ -2643,7 +2666,7 @@ Make sure <code>name</code> and <code>symbol</code> are legal length.
 Only the creator of <code>CoinType</code> can initialize.
 
 
-<a name="0x1_coin_InitializeInternalSchema"></a>
+<a id="0x1_coin_InitializeInternalSchema"></a>
 
 
 <pre><code><b>schema</b> <a href="coin.md#0x1_coin_InitializeInternalSchema">InitializeInternalSchema</a>&lt;CoinType&gt; {
@@ -2661,7 +2684,7 @@ Only the creator of <code>CoinType</code> can initialize.
 
 
 
-<a name="@Specification_1_initialize_internal"></a>
+<a id="@Specification_1_initialize_internal"></a>
 
 ### Function `initialize_internal`
 
@@ -2701,7 +2724,7 @@ Only the creator of <code>CoinType</code> can initialize.
 
 
 
-<a name="@Specification_1_merge"></a>
+<a id="@Specification_1_merge"></a>
 
 ### Function `merge`
 
@@ -2717,7 +2740,7 @@ Only the creator of <code>CoinType</code> can initialize.
 
 
 
-<a name="@Specification_1_mint"></a>
+<a id="@Specification_1_mint"></a>
 
 ### Function `mint`
 
@@ -2728,17 +2751,16 @@ Only the creator of <code>CoinType</code> can initialize.
 
 
 
-<pre><code><b>pragma</b> opaque;
-<b>let</b> addr = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
 <b>modifies</b> <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(addr);
-<b>aborts_if</b> [abstract] <b>false</b>;
-<b>ensures</b> [abstract] result.value == amount;
+<b>aborts_if</b> (amount != 0) && !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(addr);
 <b>ensures</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; == <b>old</b>(<a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt;) + amount;
+<b>ensures</b> result.value == amount;
 </code></pre>
 
 
 
-<a name="@Specification_1_register"></a>
+<a id="@Specification_1_register"></a>
 
 ### Function `register`
 
@@ -2762,7 +2784,7 @@ Updating <code>Account.guid_creation_num</code> will not overflow.
 
 
 
-<a name="@Specification_1_transfer"></a>
+<a id="@Specification_1_transfer"></a>
 
 ### Function `transfer`
 
@@ -2794,7 +2816,7 @@ Updating <code>Account.guid_creation_num</code> will not overflow.
 
 
 
-<a name="@Specification_1_withdraw"></a>
+<a id="@Specification_1_withdraw"></a>
 
 ### Function `withdraw`
 
@@ -2819,7 +2841,7 @@ Account is not frozen and sufficient balance.
 
 
 
-<a name="0x1_coin_WithdrawAbortsIf"></a>
+<a id="0x1_coin_WithdrawAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="coin.md#0x1_coin_WithdrawAbortsIf">WithdrawAbortsIf</a>&lt;CoinType&gt; {

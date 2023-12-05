@@ -20,13 +20,14 @@ use crate::{
 use anyhow::Context;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
-    x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
+    encoding_type::{EncodingError, EncodingType},
+    x25519, PrivateKey, ValidCryptoMaterialStringExt,
 };
-use aptos_debugger::AptosDebugger;
 use aptos_gas_profiling::FrameName;
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
 use aptos_logger::Level;
+use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_rest_client::{
     aptos_api_types::{EntryFunctionId, HashValue, MoveType, ViewRequest},
     error::RestError,
@@ -184,7 +185,7 @@ impl From<hex::FromHexError> for CliError {
 
 impl From<anyhow::Error> for CliError {
     fn from(e: anyhow::Error) -> Self {
-        CliError::UnexpectedError(e.to_string())
+        CliError::UnexpectedError(format!("{:#}", e))
     }
 }
 
@@ -197,6 +198,17 @@ impl From<bcs::Error> for CliError {
 impl From<aptos_ledger::AptosLedgerError> for CliError {
     fn from(e: aptos_ledger::AptosLedgerError) -> Self {
         CliError::UnexpectedError(e.to_string())
+    }
+}
+
+impl From<EncodingError> for CliError {
+    fn from(e: EncodingError) -> Self {
+        match e {
+            EncodingError::BCS(s, e) => CliError::BCS(s, e),
+            EncodingError::UnableToParse(s, e) => CliError::UnableToParse(s, e),
+            EncodingError::UnableToReadFile(s, e) => CliError::UnableToReadFile(s, e),
+            EncodingError::UTF8(s) => CliError::UnexpectedError(s),
+        }
     }
 }
 
@@ -470,66 +482,6 @@ impl ProfileOptions {
     }
 }
 
-/// Types of encodings used by the blockchain
-#[derive(ValueEnum, Clone, Copy, Debug, Default)]
-pub enum EncodingType {
-    /// Binary Canonical Serialization
-    BCS,
-    /// Hex encoded e.g. 0xABCDE12345
-    #[default]
-    Hex,
-    /// Base 64 encoded
-    Base64,
-}
-
-impl EncodingType {
-    /// Encodes `Key` into one of the `EncodingType`s
-    pub fn encode_key<Key: ValidCryptoMaterial>(
-        &self,
-        name: &'static str,
-        key: &Key,
-    ) -> CliTypedResult<Vec<u8>> {
-        Ok(match self {
-            EncodingType::Hex => hex::encode_upper(key.to_bytes()).into_bytes(),
-            EncodingType::BCS => bcs::to_bytes(key).map_err(|err| CliError::BCS(name, err))?,
-            EncodingType::Base64 => base64::encode(key.to_bytes()).into_bytes(),
-        })
-    }
-
-    /// Loads a key from a file
-    pub fn load_key<Key: ValidCryptoMaterial>(
-        &self,
-        name: &'static str,
-        path: &Path,
-    ) -> CliTypedResult<Key> {
-        self.decode_key(name, read_from_file(path)?)
-    }
-
-    /// Decodes an encoded key given the known encoding
-    pub fn decode_key<Key: ValidCryptoMaterial>(
-        &self,
-        name: &'static str,
-        data: Vec<u8>,
-    ) -> CliTypedResult<Key> {
-        match self {
-            EncodingType::BCS => bcs::from_bytes(&data).map_err(|err| CliError::BCS(name, err)),
-            EncodingType::Hex => {
-                let hex_string = String::from_utf8(data)?;
-                Key::from_encoded_string(hex_string.trim())
-                    .map_err(|err| CliError::UnableToParse(name, err.to_string()))
-            },
-            EncodingType::Base64 => {
-                let string = String::from_utf8(data)?;
-                let bytes = base64::decode(string.trim())
-                    .map_err(|err| CliError::UnableToParse(name, err.to_string()))?;
-                Key::try_from(bytes.as_slice()).map_err(|err| {
-                    CliError::UnableToParse(name, format!("Failed to parse key {:?}", err))
-                })
-            },
-        }
-    }
-}
-
 #[derive(Clone, Debug, Parser)]
 pub struct RngArgs {
     /// The seed used for key generation, should be a 64 character hex string and only used for testing
@@ -572,30 +524,6 @@ impl RngArgs {
             Ok(KeyGen::from_seed(seed_slice))
         } else {
             Ok(KeyGen::from_os_rng())
-        }
-    }
-}
-
-impl Display for EncodingType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            EncodingType::BCS => "bcs",
-            EncodingType::Hex => "hex",
-            EncodingType::Base64 => "base64",
-        };
-        write!(f, "{}", str)
-    }
-}
-
-impl FromStr for EncodingType {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "hex" => Ok(EncodingType::Hex),
-            "bcs" => Ok(EncodingType::BCS),
-            "base64" => Ok(EncodingType::Base64),
-            _ => Err("Invalid encoding type"),
         }
     }
 }
@@ -700,10 +628,10 @@ impl ExtractPublicKey for PublicKeyInputOptions {
         profile: &ProfileOptions,
     ) -> CliTypedResult<Ed25519PublicKey> {
         if let Some(ref file) = self.public_key_file {
-            encoding.load_key("--public-key-file", file.as_path())
+            Ok(encoding.load_key("--public-key-file", file.as_path())?)
         } else if let Some(ref key) = self.public_key {
             let key = key.as_bytes().to_vec();
-            encoding.decode_key("--public-key", key)
+            Ok(encoding.decode_key("--public-key", key)?)
         } else if let Some(Some(public_key)) = CliConfig::load_profile(
             profile.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
@@ -999,7 +927,7 @@ pub fn account_address_from_public_key(public_key: &Ed25519PublicKey) -> Account
 }
 
 pub fn account_address_from_auth_key(auth_key: &AuthenticationKey) -> AccountAddress {
-    AccountAddress::new(*auth_key.derived_address())
+    AccountAddress::new(*auth_key.account_address())
 }
 
 #[derive(Debug, Parser)]
@@ -1044,6 +972,12 @@ pub struct RestOptions {
     /// Connection timeout in seconds, used for the REST endpoint of the fullnode
     #[clap(long, default_value_t = DEFAULT_EXPIRATION_SECS, alias = "connection-timeout-s")]
     pub connection_timeout_secs: u64,
+
+    /// Key to use for ratelimiting purposes with the node API. This value will be used
+    /// as `Authorization: Bearer <key>`. You may also set this with the NODE_API_KEY
+    /// environment variable.
+    #[clap(long, env)]
+    pub node_api_key: Option<String>,
 }
 
 impl RestOptions {
@@ -1051,6 +985,7 @@ impl RestOptions {
         RestOptions {
             url,
             connection_timeout_secs: connection_timeout_secs.unwrap_or(DEFAULT_EXPIRATION_SECS),
+            node_api_key: None,
         }
     }
 
@@ -1072,10 +1007,13 @@ impl RestOptions {
     }
 
     pub fn client(&self, profile: &ProfileOptions) -> CliTypedResult<Client> {
-        Ok(Client::builder(AptosBaseUrl::Custom(self.url(profile)?))
+        let mut client = Client::builder(AptosBaseUrl::Custom(self.url(profile)?))
             .timeout(Duration::from_secs(self.connection_timeout_secs))
-            .header(aptos_api_types::X_APTOS_CLIENT, X_APTOS_CLIENT_VALUE)?
-            .build())
+            .header(aptos_api_types::X_APTOS_CLIENT, X_APTOS_CLIENT_VALUE)?;
+        if let Some(node_api_key) = &self.node_api_key {
+            client = client.api_key(node_api_key)?;
+        }
+        Ok(client.build())
     }
 }
 
@@ -1119,12 +1057,20 @@ pub struct MovePackageDir {
     pub bytecode_version: Option<u32>,
 
     /// Specify the version of the compiler.
-    #[clap(long)]
+    ///
+    /// Currently hidden until the official launch of Compiler V2
+    #[clap(long, hide = true)]
     pub compiler_version: Option<CompilerVersion>,
 
     /// Do not complain about unknown attributes in Move code.
     #[clap(long)]
     pub skip_attribute_checks: bool,
+
+    /// Do apply extended checks for Aptos (e.g. `#[view]` attribute) also on test code.
+    /// NOTE: this behavior will become the default in the future.
+    /// See https://github.com/aptos-labs/aptos-core/issues/10335
+    #[clap(long, env = "APTOS_CHECK_TEST_CODE")]
+    pub check_test_code: bool,
 }
 
 impl MovePackageDir {
@@ -1138,6 +1084,7 @@ impl MovePackageDir {
             bytecode_version: None,
             compiler_version: None,
             skip_attribute_checks: false,
+            check_test_code: false,
         }
     }
 
@@ -1178,11 +1125,7 @@ impl FromStr for AccountAddressWrapper {
 
 /// Loads an account arg and allows for naming based on profiles
 pub fn load_account_arg(str: &str) -> Result<AccountAddress, CliError> {
-    if str.starts_with("0x") {
-        AccountAddress::from_hex_literal(str).map_err(|err| {
-            CliError::CommandArgumentError(format!("Failed to parse AccountAddress {}", err))
-        })
-    } else if let Ok(account_address) = AccountAddress::from_str(str) {
+    if let Ok(account_address) = AccountAddress::from_str(str) {
         Ok(account_address)
     } else if let Some(Some(account_address)) =
         CliConfig::load_profile(Some(str), ConfigSearchMode::CurrentDirAndParents)?
@@ -1222,12 +1165,6 @@ impl FromStr for MoveManifestAccountWrapper {
 pub fn load_manifest_account_arg(str: &str) -> Result<Option<AccountAddress>, CliError> {
     if str == "_" {
         Ok(None)
-    } else if str.starts_with("0x") {
-        AccountAddress::from_hex_literal(str)
-            .map(Some)
-            .map_err(|err| {
-                CliError::CommandArgumentError(format!("Failed to parse AccountAddress {}", err))
-            })
     } else if let Ok(account_address) = AccountAddress::from_str(str) {
         Ok(Some(account_address))
     } else if let Some(Some(private_key)) =
@@ -1249,6 +1186,11 @@ pub trait CliCommand<T: Serialize + Send>: Sized + Send {
     /// Returns a name for logging purposes
     fn command_name(&self) -> &'static str;
 
+    /// Returns whether the error should be JSONifyed.
+    fn jsonify_error_output(&self) -> bool {
+        true
+    }
+
     /// Executes the command, returning a command specific type
     async fn execute(self) -> CliTypedResult<T>;
 
@@ -1263,14 +1205,28 @@ pub trait CliCommand<T: Serialize + Send>: Sized + Send {
         let command_name = self.command_name();
         start_logger(level);
         let start_time = Instant::now();
-        to_common_result(command_name, start_time, self.execute().await).await
+        let jsonify_error_output = self.jsonify_error_output();
+        to_common_result(
+            command_name,
+            start_time,
+            self.execute().await,
+            jsonify_error_output,
+        )
+        .await
     }
 
     /// Same as execute serialized without setting up logging
     async fn execute_serialized_without_logger(self) -> CliResult {
         let command_name = self.command_name();
         let start_time = Instant::now();
-        to_common_result(command_name, start_time, self.execute().await).await
+        let jsonify_error_output = self.jsonify_error_output();
+        to_common_result(
+            command_name,
+            start_time,
+            self.execute().await,
+            jsonify_error_output,
+        )
+        .await
     }
 
     /// Executes the command, and throws away Ok(result) for the string Success
@@ -1278,7 +1234,14 @@ pub trait CliCommand<T: Serialize + Send>: Sized + Send {
         start_logger(Level::Warn);
         let command_name = self.command_name();
         let start_time = Instant::now();
-        to_common_success_result(command_name, start_time, self.execute().await).await
+        let jsonify_error_output = self.jsonify_error_output();
+        to_common_success_result(
+            command_name,
+            start_time,
+            self.execute().await,
+            jsonify_error_output,
+        )
+        .await
     }
 }
 
@@ -1754,7 +1717,6 @@ impl TransactionOptions {
     ) -> CliTypedResult<TransactionSummary> {
         println!();
         println!("Simulating transaction locally with the gas profiler...");
-        println!("This is still experimental so results may be inaccurate.");
 
         let client = self.rest_client()?;
 
@@ -1804,7 +1766,7 @@ impl TransactionOptions {
             CliError::UnexpectedError(format!("failed to simulate txn with gas profiler: {}", err))
         })?;
 
-        // Generate the file name for the flamegraphs
+        // Generate a humen-readable name for the report
         let entry_point = gas_log.entry_point();
 
         let human_readable_name = match entry_point {
@@ -1823,74 +1785,9 @@ impl TransactionOptions {
         };
         let raw_file_name = format!("txn-{}-{}", hash, human_readable_name);
 
-        // Create the directory if it does not exist yet.
-        let dir: &Path = Path::new("gas-profiling");
-
-        macro_rules! create_dir {
-            () => {
-                if let Err(err) = std::fs::create_dir(dir) {
-                    if err.kind() != std::io::ErrorKind::AlreadyExists {
-                        return Err(CliError::UnexpectedError(format!(
-                            "failed to create directory {}",
-                            dir.display()
-                        )));
-                    }
-                }
-            };
-        }
-
-        // Generate the execution & IO flamegraph.
-        println!();
-        match gas_log
-            .exec_io
-            .to_flamegraph(format!("Transaction {} -- Execution & IO", hash))?
-        {
-            Some(graph_bytes) => {
-                create_dir!();
-                let graph_file_path = Path::join(dir, format!("{}.exec_io.svg", raw_file_name));
-                std::fs::write(&graph_file_path, graph_bytes).map_err(|err| {
-                    CliError::UnexpectedError(format!(
-                        "Failed to write flamegraph to file {} : {:?}",
-                        graph_file_path.display(),
-                        err
-                    ))
-                })?;
-                println!(
-                    "Execution & IO Gas flamegraph saved to {}",
-                    graph_file_path.display()
-                );
-            },
-            None => {
-                println!("Skipped generating execution & IO flamegraph");
-            },
-        }
-
-        // Generate the storage fee flamegraph.
-        match gas_log
-            .storage
-            .to_flamegraph(format!("Transaction {} -- Storage Fee", hash))?
-        {
-            Some(graph_bytes) => {
-                create_dir!();
-                let graph_file_path = Path::join(dir, format!("{}.storage.svg", raw_file_name));
-                std::fs::write(&graph_file_path, graph_bytes).map_err(|err| {
-                    CliError::UnexpectedError(format!(
-                        "Failed to write flamegraph to file {} : {:?}",
-                        graph_file_path.display(),
-                        err
-                    ))
-                })?;
-                println!(
-                    "Storage fee flamegraph saved to {}",
-                    graph_file_path.display()
-                );
-            },
-            None => {
-                println!("Skipped generating storage fee flamegraph");
-            },
-        }
-
-        println!();
+        // Generate the report
+        let path = Path::new("gas-profiling").join(raw_file_name);
+        gas_log.generate_html_report(path, format!("Gas Report - {}", human_readable_name))?;
 
         // Generate the transaction summary
 
@@ -1943,25 +1840,6 @@ pub struct PoolAddressArgs {
     /// Address of the Staking pool
     #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) pool_address: AccountAddress,
-}
-
-// This struct includes TypeInfo (account_address, module_name, and struct_name)
-// and RotationProofChallenge-specific information (sequence_number, originator, current_auth_key, and new_public_key)
-// Since the struct RotationProofChallenge is defined in "0x1::account::RotationProofChallenge",
-// we will be passing in "0x1" to `account_address`, "account" to `module_name`, and "RotationProofChallenge" to `struct_name`
-// Originator refers to the user's address
-#[derive(Serialize, Deserialize)]
-pub struct RotationProofChallenge {
-    // Should be `CORE_CODE_ADDRESS`
-    pub account_address: AccountAddress,
-    // Should be `account`
-    pub module_name: String,
-    // Should be `RotationProofChallenge`
-    pub struct_name: String,
-    pub sequence_number: u64,
-    pub originator: AccountAddress,
-    pub current_auth_key: AccountAddress,
-    pub new_public_key: Vec<u8>,
 }
 
 /// Common options for interactions with a multisig account.

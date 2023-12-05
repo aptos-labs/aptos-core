@@ -20,10 +20,15 @@ aptos-gas-schedule = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
+bytes = { workspace = true }
+claims = { workspace = true }
 either = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
+serde = { workspace = true }
 
 [dev-dependencies]
+aptos-aggregator = { workspace = true, features = ["testing"] }
 aptos-language-e2e-tests = { workspace = true }
-claims = { workspace = true }
+aptos-vm = { workspace = true }
+test-case = { workspace = true }

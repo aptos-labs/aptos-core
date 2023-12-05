@@ -58,56 +58,74 @@ impl<'env> Context<'env> {
         prog: &E::Program,
     ) -> Self {
         use ResolvedType as RT;
-        let all_modules = || {
-            prog.modules
-                .key_cloned_iter()
-                .chain(pre_compiled_lib.iter().flat_map(|pre_compiled| {
-                    pre_compiled
-                        .expansion
-                        .modules
-                        .key_cloned_iter()
-                        .filter(|(mident, _m)| !prog.modules.contains_key(mident))
-                }))
-        };
-        let scoped_types = all_modules()
+
+        // make a list of all modules first to avoid repeated visitation.
+        let all_modules: Vec<_> = prog
+            .modules
+            .key_cloned_iter()
+            .chain(pre_compiled_lib.iter().flat_map(|pre_compiled| {
+                pre_compiled
+                    .expansion
+                    .modules
+                    .key_cloned_iter()
+                    .filter(|(mident, _m)| !prog.modules.contains_key(mident))
+            }))
+            .collect();
+
+        // for each module name ModuleIdent, map each struct name in the module to a set of
+        // properties: (Loc, ModuleIdent, AbilitySet, usize).
+        let scoped_types = all_modules
+            .iter()
             .map(|(mident, mdef)| {
-                let mems = mdef
+                let mems: BTreeMap<_, _> = mdef
                     .structs
                     .key_cloned_iter()
                     .map(|(s, sdef)| {
                         let abilities = sdef.abilities.clone();
                         let arity = sdef.type_parameters.len();
                         let sname = s.value();
-                        (sname, (s.loc(), mident, abilities, arity))
+                        (sname, (s.loc(), *mident, abilities, arity))
                     })
                     .collect();
-                (mident, mems)
+                (*mident, mems)
             })
             .collect();
-        let scoped_functions = all_modules()
+
+        // For each module name ModuleIdent, map each function name in the module to the name and location
+        // of the function.  Why this info?  It doesn't seem to be used, so maybe it doesn't matter.
+        // Leave it alone for now.
+        let scoped_functions = all_modules
+            .iter()
             .map(|(mident, mdef)| {
-                let mems = mdef
+                let mems: BTreeMap<_, _> = mdef
                     .functions
                     .iter()
                     .map(|(nloc, n, _)| (*n, nloc))
                     .collect();
-                (mident, mems)
+                (*mident, mems)
             })
             .collect();
-        let scoped_constants = all_modules()
+
+        // For each module name ModuleIdent, map each constant name in the module to the name and location
+        // of the constant.  Why this info?  It doesn't seem to be used, so maybe it doesn't matter.
+        // Leave it alone for now.
+        let scoped_constants = all_modules
+            .iter()
             .map(|(mident, mdef)| {
-                let mems = mdef
+                let mems: BTreeMap<_, _> = mdef
                     .constants
                     .iter()
                     .map(|(nloc, n, _)| (*n, nloc))
                     .collect();
-                (mident, mems)
+                (*mident, mems)
             })
             .collect();
+
         let unscoped_types = N::BuiltinTypeName_::all_names()
             .iter()
             .map(|s| (*s, RT::BuiltinType))
             .collect();
+
         Self {
             env: compilation_env,
             current_module: None,
@@ -199,7 +217,7 @@ impl<'env> Context<'env> {
         &mut self,
         loc: Loc,
         m: &ModuleIdent,
-        n: Name,
+        n: &Name,
     ) -> Option<ConstantName> {
         let constants = match self.scoped_constants.get(m) {
             None => {
@@ -221,7 +239,7 @@ impl<'env> Context<'env> {
                     .add_diag(diag!(NameResolution::UnboundModuleMember, (loc, msg)));
                 None
             },
-            Some(_) => Some(ConstantName(n)),
+            Some(_) => Some(ConstantName(*n)),
         }
     }
 
@@ -294,7 +312,7 @@ impl<'env> Context<'env> {
                 },
                 Some(_) => Some((None, ConstantName(n))),
             },
-            EA::ModuleAccess(m, n) => match self.resolve_module_constant(loc, &m, n) {
+            EA::ModuleAccess(m, n) => match self.resolve_module_constant(loc, &m, &n) {
                 None => {
                     assert!(self.env.has_errors());
                     None
@@ -370,6 +388,7 @@ fn module(
         functions: efunctions,
         constants: econstants,
         specs: _specs,
+        use_decls: _,
     } = mdef;
     let friends = efriends.filter_map(|mident, f| friend(context, mident, f));
     let unscoped = context.save_unscoped();
@@ -419,6 +438,7 @@ fn script(context: &mut Context, escript: E::Script) -> N::Script {
         function_name,
         function: efunction,
         specs: _specs,
+        use_decls: _,
     } = escript;
     let outer_unscoped = context.save_unscoped();
     for (loc, s, _) in &econstants {
@@ -492,6 +512,7 @@ fn function(
         entry,
         signature,
         acquires,
+        access_specifiers: _,
         body,
         specs: _,
     } = ef;

@@ -2,7 +2,9 @@
 title: "Self-Hosted Indexer API"
 ---
 
-# Self-Hosted Indexer API
+import BetaNotice from '../../../src/components/_indexer_beta_notice.mdx';
+
+<BetaNotice />
 
 This guide will walk you through setting up a self-hosted Indexer API.
 
@@ -22,7 +24,8 @@ To run the service we need to define a config file. We will start with this temp
 ```yaml
 health_check_port: 8084
 server_config:
-  processor_name: default_processor
+  processor_config:
+    type: default_processor
   postgres_connection_string: postgresql://postgres:@localhost:5432/indexer
   indexer_grpc_data_service_address: 127.0.0.1:50051
   indexer_grpc_http2_ping_interval_in_secs: 60
@@ -88,3 +91,5 @@ docker run -it --network host --mount type=bind,source=/tmp/config.yaml,target=/
 ```
 
 This command binds the container to the host network and mounts the config file from the host into the container. This specific invocation assumes that your config file in the host is at `/tmp/config.yaml`.
+
+See the image on DockerHub here: https://hub.docker.com/r/aptoslabs/indexer-processor-rust/tags.

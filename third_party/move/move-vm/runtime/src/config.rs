@@ -1,15 +1,20 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use move_binary_format::file_format_common::VERSION_MAX;
+use move_binary_format::{
+    deserializer::DeserializerConfig,
+    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_MAX},
+};
 use move_bytecode_verifier::VerifierConfig;
+use serde::Serialize;
 
 pub const DEFAULT_MAX_VALUE_NEST_DEPTH: u64 = 128;
 
 /// Dynamic config options for the Move VM.
+#[derive(Clone, Serialize)]
 pub struct VMConfig {
     pub verifier: VerifierConfig,
-    pub max_binary_format_version: u32,
+    pub deserializer_config: DeserializerConfig,
     // When this flag is set to true, MoveVM will perform type check at every instruction
     // execution to ensure that type safety cannot be violated at runtime.
     pub paranoid_type_checks: bool,
@@ -21,13 +26,14 @@ pub struct VMConfig {
     pub type_max_cost: u64,
     pub type_base_cost: u64,
     pub type_byte_cost: u64,
+    pub aggregator_v2_type_tagging: bool,
 }
 
 impl Default for VMConfig {
     fn default() -> Self {
         Self {
             verifier: VerifierConfig::default(),
-            max_binary_format_version: VERSION_MAX,
+            deserializer_config: DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX),
             paranoid_type_checks: false,
             enable_invariant_violation_check_in_swap_loc: true,
             type_size_limit: false,
@@ -35,6 +41,7 @@ impl Default for VMConfig {
             type_max_cost: 0,
             type_base_cost: 0,
             type_byte_cost: 0,
+            aggregator_v2_type_tagging: true,
         }
     }
 }

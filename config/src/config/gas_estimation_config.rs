@@ -50,9 +50,9 @@ impl Default for GasEstimationConfig {
 
 impl ConfigSanitizer for GasEstimationConfig {
     fn sanitize(
-        node_config: &mut NodeConfig,
+        node_config: &NodeConfig,
         _node_type: NodeType,
-        _chain_id: ChainId,
+        _chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
         let gas_estimation_config = &node_config.api.gas_estimation;
@@ -89,5 +89,129 @@ impl ConfigSanitizer for GasEstimationConfig {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::ApiConfig;
+
+    #[test]
+    fn test_sanitize_invalid_aggressive_low_block_history() {
+        // Create a node config with an aggressive block history that is too low
+        let node_config = NodeConfig {
+            api: ApiConfig {
+                gas_estimation: GasEstimationConfig {
+                    low_block_history: 11,
+                    aggressive_block_history: 10,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = GasEstimationConfig::sanitize(
+            &node_config,
+            NodeType::Validator,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_invalid_aggressive_market_block_history() {
+        // Create a node config with an aggressive block history that is too low
+        let node_config = NodeConfig {
+            api: ApiConfig {
+                gas_estimation: GasEstimationConfig {
+                    market_block_history: 31,
+                    aggressive_block_history: 30,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = GasEstimationConfig::sanitize(
+            &node_config,
+            NodeType::Validator,
+            Some(ChainId::testnet()),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_invalid_zero_low_block_history() {
+        // Create a node config with a zero low block history
+        let node_config = NodeConfig {
+            api: ApiConfig {
+                gas_estimation: GasEstimationConfig {
+                    low_block_history: 0,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = GasEstimationConfig::sanitize(
+            &node_config,
+            NodeType::Validator,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_invalid_zero_market_block_history() {
+        // Create a node config with a zero market block history
+        let node_config = NodeConfig {
+            api: ApiConfig {
+                gas_estimation: GasEstimationConfig {
+                    market_block_history: 0,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = GasEstimationConfig::sanitize(
+            &node_config,
+            NodeType::Validator,
+            Some(ChainId::testnet()),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_invalid_zero_aggressive_block_history() {
+        // Create a node config with a zero aggressive block history
+        let node_config = NodeConfig {
+            api: ApiConfig {
+                gas_estimation: GasEstimationConfig {
+                    aggressive_block_history: 0,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error =
+            GasEstimationConfig::sanitize(&node_config, NodeType::Validator, None).unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
 }

@@ -127,9 +127,9 @@ impl Default for NodeMonitoringConfig {
 
 impl ConfigSanitizer for PeerMonitoringServiceConfig {
     fn sanitize(
-        node_config: &mut NodeConfig,
+        node_config: &NodeConfig,
         node_type: NodeType,
-        chain_id: ChainId,
+        chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
         // Sanitize the performance monitoring config
         PerformanceMonitoringConfig::sanitize(node_config, node_type, chain_id)
@@ -138,9 +138,9 @@ impl ConfigSanitizer for PeerMonitoringServiceConfig {
 
 impl ConfigSanitizer for PerformanceMonitoringConfig {
     fn sanitize(
-        node_config: &mut NodeConfig,
+        node_config: &NodeConfig,
         _node_type: NodeType,
-        chain_id: ChainId,
+        chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
         let performance_monitoring_config =
@@ -149,14 +149,18 @@ impl ConfigSanitizer for PerformanceMonitoringConfig {
         // Verify that performance monitoring is not enabled in mainnet
         let enable_direct_send_testing = performance_monitoring_config.enable_direct_send_testing;
         let enable_rpc_testing = performance_monitoring_config.enable_rpc_testing;
-        if chain_id.is_mainnet()
-            && (is_network_perf_test_enabled() || enable_direct_send_testing || enable_rpc_testing)
-        {
-            return Err(Error::ConfigSanitizerFailed(
-                sanitizer_name,
-                "Performance monitoring should not be enabled in mainnet!".into(),
-            ));
-        };
+        if let Some(chain_id) = chain_id {
+            if chain_id.is_mainnet()
+                && (is_network_perf_test_enabled()
+                    || enable_direct_send_testing
+                    || enable_rpc_testing)
+            {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name,
+                    "Performance monitoring should not be enabled in mainnet!".into(),
+                ));
+            };
+        }
 
         // Verify that at least one performance monitoring mode is enabled if the feature exists
         if is_network_perf_test_enabled() && !enable_direct_send_testing && !enable_rpc_testing {
@@ -202,7 +206,7 @@ impl ConfigOptimizer for PeerMonitoringServiceConfig {
         node_config: &mut NodeConfig,
         local_config_yaml: &Value,
         node_type: NodeType,
-        chain_id: ChainId,
+        chain_id: Option<ChainId>,
     ) -> Result<bool, Error> {
         let peer_monitoring_config = &mut node_config.peer_monitoring_service;
         let local_monitoring_config_yaml = &local_config_yaml["peer_monitoring_service"];
@@ -234,7 +238,7 @@ impl ConfigOptimizer for PerformanceMonitoringConfig {
         node_config: &mut NodeConfig,
         local_config_yaml: &Value,
         _node_type: NodeType,
-        _chain_id: ChainId,
+        _chain_id: Option<ChainId>,
     ) -> Result<bool, Error> {
         let performance_monitoring_config =
             &mut node_config.peer_monitoring_service.performance_monitoring;
@@ -270,7 +274,7 @@ mod tests {
                 &mut node_config.clone(),
                 &serde_yaml::from_str("{}").unwrap(), // An empty local config,
                 NodeType::Validator,
-                *chain_id,
+                Some(*chain_id),
             )
             .unwrap();
             assert!(!modified_config);
@@ -303,7 +307,7 @@ mod tests {
             &mut node_config.clone(),
             &local_config_yaml,
             NodeType::PublicFullnode,
-            ChainId::test(),
+            Some(ChainId::test()),
         )
         .unwrap();
         assert!(!modified_config);

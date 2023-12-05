@@ -16,13 +16,12 @@ use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::{bls12381, HashValue};
 use aptos_infallible::Mutex;
 use aptos_keygen::KeyGen;
-use aptos_storage_interface::{DbReader, Order};
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},
     contract_event::{ContractEvent, EventWithVersion},
     epoch_state::EpochState,
-    event::EventKey,
     transaction::Version,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
@@ -322,7 +321,7 @@ fn test_api(use_root_hash: bool) {
             (epoch, 2),
             aptos_db.add_event_with_data(proposers[0], vec![3], vec![])
         );
-        let backend = Box::new(AptosDBBackend::new(1, 4, aptos_db.clone()));
+        let backend = Arc::new(AptosDBBackend::new(1, 4, aptos_db.clone()));
         let leader_reputation = LeaderReputation::new(
             epoch,
             HashMap::from([(epoch, proposers.clone())]),
@@ -484,22 +483,13 @@ impl MockDbReader {
 }
 
 impl DbReader for MockDbReader {
-    fn get_events(
-        &self,
-        _event_key: &EventKey,
-        start: u64,
-        order: Order,
-        limit: u64,
-        _ledger_version: Version,
-    ) -> anyhow::Result<Vec<EventWithVersion>> {
+    fn get_latest_block_events(&self, num_events: usize) -> anyhow::Result<Vec<EventWithVersion>> {
         *self.fetched.lock() += 1;
-        assert_eq!(start, u64::max_value());
-        assert!(order == Order::Descending);
         let events = self.events.lock();
         // println!("Events {:?}", *events);
         Ok(events
             .iter()
-            .skip(events.len().saturating_sub(limit as usize))
+            .skip(events.len().saturating_sub(num_events))
             .rev()
             .cloned()
             .collect())

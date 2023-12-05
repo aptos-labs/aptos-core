@@ -11,7 +11,6 @@ pub mod cryptography;
 pub mod debug;
 pub mod event;
 pub mod hash;
-mod helpers;
 pub mod object;
 pub mod state_storage;
 pub mod string_utils;
@@ -23,7 +22,7 @@ use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory, aggregator_v2};
 use aptos_native_interface::SafeNativeBuilder;
 use cryptography::ed25519;
-use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::native_functions::{make_table_from_iter, NativeFunctionTable};
 
 pub mod status {
@@ -82,13 +81,4 @@ pub fn all_natives(
     add_natives_from_module!("string_utils", string_utils::make_all(builder));
 
     make_table_from_iter(framework_addr, natives)
-}
-
-/// A temporary hack to patch Table -> table module name as long as it is not upgraded
-/// in the Move repo.
-pub fn patch_table_module(table: NativeFunctionTable) -> NativeFunctionTable {
-    table
-        .into_iter()
-        .map(|(m, _, f, i)| (m, Identifier::new("table").unwrap(), f, i))
-        .collect()
 }

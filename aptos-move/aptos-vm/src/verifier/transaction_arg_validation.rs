@@ -98,7 +98,7 @@ pub(crate) fn get_allowed_structs(
 /// 3. check arg types are allowed after signers
 ///
 /// after validation, add senders and non-signer arguments to generate the final args
-pub(crate) fn validate_combine_signer_and_txn_args(
+pub fn validate_combine_signer_and_txn_args(
     session: &mut SessionExt,
     senders: Vec<AccountAddress>,
     args: Vec<Vec<u8>>,
@@ -196,13 +196,11 @@ pub(crate) fn is_valid_txn_arg(
     match typ {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
         Vector(inner) => is_valid_txn_arg(session, inner, allowed_structs),
-        Struct(idx) | StructInstantiation(idx, _) => {
-            if let Some(st) = session.get_struct_type(*idx) {
+        Struct { idx, .. } | StructInstantiation { idx, .. } => {
+            session.get_struct_type(*idx).is_some_and(|st| {
                 let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
                 allowed_structs.contains_key(&full_name)
-            } else {
-                false
-            }
+            })
         },
         Signer | Reference(_) | MutableReference(_) | TyParam(_) => false,
     }
@@ -225,7 +223,7 @@ pub(crate) fn construct_args(
     if types.len() != args.len() {
         return Err(invalid_signature());
     }
-    for (ty, arg) in types.iter().zip(args.into_iter()) {
+    for (ty, arg) in types.iter().zip(args) {
         let arg = construct_arg(
             session,
             &ty.subst(ty_args).unwrap(),
@@ -254,7 +252,7 @@ fn construct_arg(
     use move_vm_types::loaded_data::runtime_types::Type::*;
     match ty {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => Ok(arg),
-        Vector(_) | Struct(_) | StructInstantiation(_, _) => {
+        Vector(_) | Struct { .. } | StructInstantiation { .. } => {
             let mut cursor = Cursor::new(&arg[..]);
             let mut new_arg = vec![];
             let mut max_invocations = 10; // Read from config in the future
@@ -322,12 +320,11 @@ pub(crate) fn recursively_construct_arg(
                 len -= 1;
             }
         },
-        Struct(idx) | StructInstantiation(idx, _) => {
-            // validate the struct value, we use `expect()` because that check was already
-            // performed in `is_valid_txn_arg`
+        Struct { idx, .. } | StructInstantiation { idx, .. } => {
             let st = session
                 .get_struct_type(*idx)
                 .ok_or_else(invalid_signature)?;
+
             let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
             let constructor = allowed_structs
                 .get(&full_name)

@@ -13,7 +13,7 @@ use crate::{
     persistent_liveness_storage::{
         PersistentLivenessStorage, RecoveryData, RootInfo, RootMetadata,
     },
-    quorum_store,
+    state_computer::PipelineExecutionResult,
     state_replication::StateComputer,
     util::time_service::TimeService,
 };
@@ -23,12 +23,11 @@ use aptos_consensus_types::{
     sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
-use aptos_executor_types::{Error, StateComputeResult};
+use aptos_executor_types::{ExecutorError, ExecutorResult, StateComputeResult};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
-use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::TransactionStatus};
+use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use futures::executor::block_on;
-use move_core_types::vm_status::DiscardedVMStatus;
 #[cfg(test)]
 use std::collections::VecDeque;
 #[cfg(any(test, feature = "fuzzing"))]
@@ -47,49 +46,6 @@ const MAX_ORDERING_PIPELINE_LATENCY_REDUCTION: Duration = Duration::from_secs(1)
 fn update_counters_for_ordered_blocks(ordered_blocks: &[Arc<ExecutedBlock>]) {
     for block in ordered_blocks {
         observe_block(block.block().timestamp_usecs(), BlockStage::ORDERED);
-    }
-}
-
-pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBlock>]) {
-    for block in blocks_to_commit {
-        observe_block(block.block().timestamp_usecs(), BlockStage::COMMITTED);
-        let txn_status = block.compute_result().compute_status();
-        counters::NUM_TXNS_PER_BLOCK.observe(txn_status.len() as f64);
-        counters::COMMITTED_BLOCKS_COUNT.inc();
-        counters::LAST_COMMITTED_ROUND.set(block.round() as i64);
-        counters::LAST_COMMITTED_VERSION.set(block.compute_result().num_leaves() as i64);
-
-        let failed_rounds = block
-            .block()
-            .block_data()
-            .failed_authors()
-            .map(|v| v.len())
-            .unwrap_or(0);
-        if failed_rounds > 0 {
-            counters::COMMITTED_FAILED_ROUNDS_COUNT.inc_by(failed_rounds as u64);
-        }
-
-        // Quorum store metrics
-        quorum_store::counters::NUM_BATCH_PER_BLOCK.observe(block.block().payload_size() as f64);
-
-        for status in txn_status.iter() {
-            let commit_status = match status {
-                TransactionStatus::Keep(_) => counters::TXN_COMMIT_SUCCESS_LABEL,
-                TransactionStatus::Discard(reason) => {
-                    if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW {
-                        counters::TXN_COMMIT_RETRY_LABEL
-                    } else if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD {
-                        counters::TXN_COMMIT_FAILED_DUPLICATE_LABEL
-                    } else {
-                        counters::TXN_COMMIT_FAILED_LABEL
-                    }
-                },
-                TransactionStatus::Retry => counters::TXN_COMMIT_RETRY_LABEL,
-            };
-            counters::COMMITTED_TXNS_COUNT
-                .with_label_values(&[commit_status])
-                .inc();
-        }
     }
 }
 
@@ -221,6 +177,7 @@ impl BlockStore {
 
         let executed_root_block = ExecutedBlock::new(
             *root_block,
+            vec![],
             // Create a dummy state_compute_result with necessary fields filled in.
             result,
         );
@@ -370,7 +327,7 @@ impl BlockStore {
 
         let executed_block = match self.execute_block(block.clone()).await {
             Ok(res) => Ok(res),
-            Err(Error::BlockNotFound(parent_block_id)) => {
+            Err(ExecutorError::BlockNotFound(parent_block_id)) => {
                 // recover the block tree in executor
                 let blocks_to_reexecute = self
                     .path_from_ordered_root(parent_block_id)
@@ -397,24 +354,25 @@ impl BlockStore {
             }
             self.time_service.wait_until(block_time).await;
         }
-        self.payload_manager
-            .prefetch_payload_data(executed_block.block())
-            .await;
+        if let Some(payload) = executed_block.block().payload() {
+            self.payload_manager
+                .prefetch_payload_data(payload, executed_block.block().timestamp_usecs());
+        }
         self.storage
             .save_tree(vec![executed_block.block().clone()], vec![])
             .context("Insert block failed when saving block")?;
         self.inner.write().insert_block(executed_block)
     }
 
-    async fn execute_block(&self, block: Block) -> anyhow::Result<ExecutedBlock, Error> {
+    async fn execute_block(&self, block: Block) -> ExecutorResult<ExecutedBlock> {
         // Although NIL blocks don't have a payload, we still send a T::default() to compute
         // because we may inject a block prologue transaction.
-        let state_compute_result = self
+        let pipeline_result = self
             .state_computer
             .compute(&block, block.parent_id())
             .await?;
-
-        Ok(ExecutedBlock::new(block, state_compute_result))
+        let PipelineExecutionResult { input_txns, result } = pipeline_result;
+        Ok(ExecutedBlock::new(block, input_txns, result))
     }
 
     /// Validates quorum certificates and inserts it into block tree assuming dependencies exist.

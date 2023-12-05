@@ -12,9 +12,10 @@ module 0x8675309::M {
         Add<u8>(0, 1);
         Shr<u128>(0, 1);
         Shr<u64>(0, 1);
-        Shr<u64>(x, b);
+        Shr<u64>(Copy(x), Copy(b));
         Shr<u64>(select M::R.f(r), select M::R.b(r));
         Shr<u64>(Shr<u64>(Shr<u64>(1, select M::R.b(r)), select M::R.b(r)), 0);
         M::R{ f: _, b: _ } = r
     }
+    spec fun $t0(x: u64,b: u8,r: M::R);
 } // end 0x8675309::M

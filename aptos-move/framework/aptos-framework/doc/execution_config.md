@@ -1,5 +1,5 @@
 
-<a name="0x1_execution_config"></a>
+<a id="0x1_execution_config"></a>
 
 # Module `0x1::execution_config`
 
@@ -21,7 +21,7 @@ Reconfiguration, and may be updated by root.
 
 
 
-<a name="0x1_execution_config_ExecutionConfig"></a>
+<a id="0x1_execution_config_ExecutionConfig"></a>
 
 ## Resource `ExecutionConfig`
 
@@ -48,12 +48,12 @@ Reconfiguration, and may be updated by root.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_execution_config_EINVALID_CONFIG"></a>
+<a id="0x1_execution_config_EINVALID_CONFIG"></a>
 
 The provided on chain config bytes are empty or invalid
 
@@ -63,7 +63,7 @@ The provided on chain config bytes are empty or invalid
 
 
 
-<a name="0x1_execution_config_set"></a>
+<a id="0x1_execution_config_set"></a>
 
 ## Function `set`
 
@@ -98,7 +98,7 @@ This can be called by on-chain governance to update on-chain execution configs.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -110,7 +110,7 @@ This can be called by on-chain governance to update on-chain execution configs.
 
 
 
-<a name="@Specification_1_set"></a>
+<a id="@Specification_1_set"></a>
 
 ### Function `set`
 
@@ -123,16 +123,18 @@ Ensure the caller is admin
 When setting now time must be later than last_reconfiguration_time.
 
 
-<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
 <b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
 <b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
 <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);
 <b>requires</b> <b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">staking_config::StakingRewardsConfig</a>&gt;(@aptos_framework);
 <b>requires</b> len(config) &gt; 0;
 <b>include</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>() ==&gt; <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigEnabledRequirement">staking_config::StakingRewardsConfigEnabledRequirement</a>;
-<b>include</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_collect_and_distribute_gas_fees_enabled">features::spec_collect_and_distribute_gas_fees_enabled</a>() ==&gt; <a href="aptos_coin.md#0x1_aptos_coin_ExistsAptosCoin">aptos_coin::ExistsAptosCoin</a>;
+<b>include</b> <a href="aptos_coin.md#0x1_aptos_coin_ExistsAptosCoin">aptos_coin::ExistsAptosCoin</a>;
 <b>requires</b> <a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(addr);
 <b>requires</b> <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() &gt;= <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>();
+<b>ensures</b> <b>exists</b>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;(@aptos_framework);
 </code></pre>
 
 

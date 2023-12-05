@@ -4,6 +4,14 @@ title: "Running Locally"
 
 # Running the Transaction Stream Service Locally
 
+import BetaNotice from '../../../src/components/_indexer_beta_notice.mdx';
+
+<BetaNotice />
+
+:::info
+This has been tested on MacOS 13 on ARM and Debian 11 on x86_64.
+:::
+
 When building a custom processor, you might find it helpful to develop against a local development stack. The Transaction Stream Service is a complicated, multi-component system. To assist with local development, we offer a Python script that wraps a Docker compose file to set up the entire system.
 
 This script sets up the following:
@@ -19,11 +27,15 @@ You can learn more about the Transaction Stream Service architecture [here](/ind
 
 ## Prerequisites
 In order to use the local development script you must have the following installed:
-- Python 3.7+: [Installation Guide](https://docs.python-guide.org/starting/installation/#python-3-installation-guides).
+- Python 3.8+: [Installation Guide](https://docs.python-guide.org/starting/installation/#python-3-installation-guides).
 - Poetry: [Installation Guide](https://python-poetry.org/docs/#installation).
 - Docker: [Installation Guide](https://docs.docker.com/get-docker/).
-
-Make sure Docker is running.
+- Docker Compose v2: This should be installed by default with modern Docker installations, verify with this command:
+```bash
+docker-compose version --short
+```
+- grpcurl: [Installation Guide](https://github.com/fullstorydev/grpcurl#installation)
+- OpenSSL
 
 ## Preparation
 Clone the aptos-core repo:
@@ -64,15 +76,9 @@ poetry run python indexer_grpc_local.py stop
 ```
 
 ### Wiping the data
-When you start, stop, and start the service again, it will re-use the same local testnet data. If you wish to wipe the local testnet and start from scratch, you can run the following command:
+When you start, stop, and start the service again, it will re-use the same local testnet data. If you wish to wipe the local testnet and start from scratch you can run the following command:
 ```
 poetry run python indexer_grpc_local.py wipe
-```
-
-### Usage on ARM systems
-If you have a machine with an ARM processor, e.g. an M1/M2 Mac, you should set the following environment variable before running any of these commands:
-```
-DOCKER_DEFAULT_PLATFORM=linux/amd64
 ```
 
 ## Using the local service
@@ -86,3 +92,32 @@ You can connect to the node at the following address:
 ```
 http://127.0.0.1:8080/v1
 ```
+
+## Debugging
+
+### Usage on ARM systems
+If you have a machine with an ARM processor, e.g. an M1/M2 Mac, the script should detect that and set the appropriate environment variables to ensure that the correct images will be used. If you have issues with this, try setting the following environment variable:
+```bash
+export DOCKER_DEFAULT_PLATFORM=linux/amd64
+```
+
+Additionally, make sure the following settings are correct in Docker Desktop:
+- Enabled: Preferences > General > Use Virtualization framework
+- Enabled: Preferences > General > Use Docker Compose V2
+- Disabled: Features in development -> Use Rosetta for x86/amd64 emulation on Apple Silicon
+
+This script has not been tested on Linux ARM systems.
+
+### Redis fails to start
+Try setting the following environment variable before running the script:
+```bash
+export REDIS_IMAGE_REPO=arm64v8/redis
+```
+
+### Cache worker is crashlooping or `Redis latest version update failed.` in log
+Wipe the data:
+```bash
+poetry run python indexer_grpc_local.py wipe
+```
+
+This means historical data will be lost.

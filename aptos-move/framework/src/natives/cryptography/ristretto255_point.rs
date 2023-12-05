@@ -4,11 +4,11 @@
 //! A crate which extends Move with a RistrettoPoint struct that points to a Rust-native
 //! curve25519_dalek::ristretto::RistrettoPoint.
 
-use crate::natives::{
-    cryptography::ristretto255::{
+use crate::natives::cryptography::{
+    helpers::log2_floor,
+    ristretto255::{
         pop_64_byte_slice, pop_scalar_from_bytes, scalar_from_struct, COMPRESSED_POINT_NUM_BYTES,
     },
-    helpers::log2_floor,
 };
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
@@ -559,9 +559,9 @@ pub(crate) fn native_double_scalar_mul(
         point_data.get_point(&handle2),
     ];
 
-    let scalars = vec![scalar1, scalar2];
+    let scalars = [scalar1, scalar2];
 
-    let result = RistrettoPoint::vartime_multiscalar_mul(scalars.iter(), points.into_iter());
+    let result = RistrettoPoint::vartime_multiscalar_mul(scalars.iter(), points);
 
     let result_handle = point_data.safe_add_point(result)?;
 
@@ -629,7 +629,7 @@ pub(crate) fn safe_native_multi_scalar_mul_no_floating_point(
         //  1. Strauss, when n <= 190, see https://www.jstor.org/stable/2310929
         //  2. Pippinger, when n > 190, which roughly requires O(n / log_2 n) scalar multiplications
         // For simplicity, we estimate the complexity as O(n / log_2 n)
-        RistrettoPoint::vartime_multiscalar_mul(scalars.iter(), points.into_iter())
+        RistrettoPoint::vartime_multiscalar_mul(scalars.iter(), points)
     };
 
     let mut point_data_mut = context

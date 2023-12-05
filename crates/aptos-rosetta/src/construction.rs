@@ -195,7 +195,7 @@ async fn construction_derive(
 
     let public_key: Ed25519PublicKey =
         decode_key(&request.public_key.hex_bytes, "Ed25519PublicKey")?;
-    let address = AuthenticationKey::ed25519(&public_key).derived_address();
+    let address = AuthenticationKey::ed25519(&public_key).account_address();
 
     Ok(ConstructionDeriveResponse {
         account_identifier: AccountIdentifier::base_account(address),
@@ -500,7 +500,7 @@ async fn construction_parse(
         let mut account_identifier_signers: Vec<_> =
             vec![AccountIdentifier::base_account(signed_txn.sender())];
 
-        for account in signed_txn.authenticator().secondary_signer_addreses() {
+        for account in signed_txn.authenticator().secondary_signer_addresses() {
             account_identifier_signers.push(AccountIdentifier::base_account(account))
         }
 

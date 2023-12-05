@@ -17,6 +17,8 @@ pub enum Error {
     InvalidRequest(String),
     #[error("Invalid response: {0}")]
     InvalidResponse(String),
+    #[error("The subscription stream is lagging behind the data advertisements: {0}")]
+    SubscriptionStreamIsLagging(String),
     #[error("Timed out waiting for a response: {0}")]
     TimeoutWaitingForResponse(String),
     #[error("Unexpected error encountered: {0}")]
@@ -31,9 +33,15 @@ impl Error {
             Self::DataIsTooLarge(_) => "data_is_too_large",
             Self::InvalidRequest(_) => "invalid_request",
             Self::InvalidResponse(_) => "invalid_response",
+            Self::SubscriptionStreamIsLagging(_) => "subscription_stream_is_lagging",
             Self::TimeoutWaitingForResponse(_) => "timeout_waiting_for_response",
             Self::UnexpectedErrorEncountered(_) => "unexpected_error_encountered",
         }
+    }
+
+    /// Returns true iff the error is a timeout error
+    pub fn is_timeout(&self) -> bool {
+        matches!(self, Self::TimeoutWaitingForResponse(_))
     }
 }
 

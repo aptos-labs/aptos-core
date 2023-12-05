@@ -46,11 +46,18 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-use arc_swap::ArcSwapOption;
 use dashmap::DashMap;
 use itertools::zip_eq;
 use move_core_types::move_resource::MoveStructType;
-use std::{borrow::Borrow, collections::HashMap, mem::swap, sync::Arc};
+use std::{
+    borrow::Borrow,
+    collections::HashMap,
+    mem::swap,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+};
 
 /// Alternate implementation of [crate::state_store::buffered_state::BufferedState] for use with consensus-only-perf-test feature.
 /// It stores the [StateDelta]s in memory similar to [crate::state_store::buffered_state::BufferedState] except that it does not
@@ -144,10 +151,10 @@ pub struct FakeAptosDB {
     txn_info_by_version: Arc<DashMap<Version, TransactionInfo>>,
     // A map of Position to transaction HashValue
     txn_hash_by_position: Arc<DashMap<Position, HashValue>>,
-    // Max version and transaction
-    latest_txn_info: ArcSwapOption<(Version, TransactionInfo)>,
     // A map of account address to the highest executed sequence number
     account_seq_num: Arc<DashMap<AccountAddress, u64>>,
+    // A map of transaction version to block timestamp
+    latest_block_timestamp: AtomicU64,
     ledger_commit_lock: std::sync::Mutex<()>,
     buffered_state: Mutex<FakeBufferedState>,
 }
@@ -160,8 +167,8 @@ impl FakeAptosDB {
             txn_version_by_hash: Arc::new(DashMap::new()),
             txn_info_by_version: Arc::new(DashMap::new()),
             txn_hash_by_position: Arc::new(DashMap::new()),
-            latest_txn_info: ArcSwapOption::from(None),
             account_seq_num: Arc::new(DashMap::new()),
+            latest_block_timestamp: AtomicU64::new(0),
             ledger_commit_lock: std::sync::Mutex::new(()),
             buffered_state: Mutex::new(FakeBufferedState::new_empty()),
         }
@@ -221,7 +228,7 @@ impl FakeAptosDB {
             // code in genesis is necessary for benchmark execution. Note that only the genesis
             // transaction is executed on the VM when consensus-only-perf-test feature is enabled.
             if first_version == 0 {
-                self.inner.save_transactions(
+                self.inner.save_transactions_for_test(
                     &txns_to_commit
                         .iter()
                         .map(|txn| txn.borrow().clone())
@@ -273,14 +280,6 @@ impl FakeAptosDB {
                     buffered_state.state_after_checkpoint.current_version,
                 );
 
-                // Ensure the incoming committing requests are always consecutive and the version in
-                // buffered state is consistent with that in db.
-                let next_version_in_buffered_state = buffered_state
-                    .state_after_checkpoint
-                    .current_version
-                    .map(|version| version + 1)
-                    .unwrap_or(0);
-
                 let updates_until_latest_checkpoint_since_current = if let Some(
                     latest_checkpoint_version,
                 ) =
@@ -321,15 +320,11 @@ impl FakeAptosDB {
             // Iterate through the transactions and update the in-memory maps
             zip_eq(first_version..=last_version, txns_to_commit).try_for_each(
                 |(ver, txn_to_commit)| -> Result<(), anyhow::Error> {
-                    let txn_to_commit = txn_to_commit.borrow();
+                    let txn_to_commit: &TransactionToCommit = txn_to_commit.borrow();
                     self.txn_by_version
                         .insert(ver, txn_to_commit.transaction().clone());
                     self.txn_info_by_version
                         .insert(ver, txn_to_commit.transaction_info().clone());
-                    self.latest_txn_info.store(Some(Arc::new((
-                        ver,
-                        txn_to_commit.transaction_info().clone(),
-                    ))));
                     self.txn_version_by_hash
                         .insert(txn_to_commit.transaction().hash(), ver);
 
@@ -342,6 +337,12 @@ impl FakeAptosDB {
                             })
                             .or_insert(user_txn.sequence_number());
                     }
+
+                    if let Some(txn) = txn_to_commit.transaction().try_as_block_metadata() {
+                        self.latest_block_timestamp
+                            .fetch_max(txn.timestamp_usecs(), Ordering::Relaxed);
+                    }
+
                     Ok::<(), anyhow::Error>(())
                 },
             )?;
@@ -386,27 +387,8 @@ impl DbWriter for FakeAptosDB {
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
         latest_in_memory_state: StateDelta,
-    ) -> Result<()> {
-        self.save_transactions_impl(
-            txns_to_commit,
-            first_version,
-            base_state_version,
-            ledger_info_with_sigs,
-            sync_commit,
-            latest_in_memory_state,
-        )
-    }
-
-    fn save_transaction_block(
-        &self,
-        txns_to_commit: &[Arc<TransactionToCommit>],
-        first_version: Version,
-        base_state_version: Option<Version>,
-        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        sync_commit: bool,
-        latest_in_memory_state: StateDelta,
-        _block_state_updates: ShardedStateUpdates,
-        _sharded_state_cache: &ShardedStateCache,
+        _state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
+        _sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<()> {
         self.save_transactions_impl(
             txns_to_commit,
@@ -604,7 +586,16 @@ impl DbReader for FakeAptosDB {
     }
 
     fn get_block_timestamp(&self, version: Version) -> Result<u64> {
-        self.inner.get_block_timestamp(version)
+        gauged_api("get_block_timestamp", || {
+            ensure!(version <= self.get_latest_version()?);
+
+            let timestamp = self.latest_block_timestamp.load(Ordering::Relaxed);
+            if timestamp > 0 {
+                Ok(timestamp)
+            } else {
+                Err(AptosDbError::NotFound("NewBlockEvent".to_string()).into())
+            }
+        })
     }
 
     fn get_next_block_event(&self, version: Version) -> Result<(Version, NewBlockEvent)> {
@@ -735,7 +726,7 @@ impl DbReader for FakeAptosDB {
                 EventHandle::new(EventKey::new(1, account_address), 0),
             );
             let bytes = bcs::to_bytes(&account)?;
-            Ok(Some(StateValue::new_legacy(bytes)))
+            Ok(Some(StateValue::new_legacy(bytes.into())))
         } else {
             self.inner.get_state_value_by_version(state_key, version)
         }
@@ -889,7 +880,7 @@ mod tests {
     };
     use anyhow::{anyhow, ensure, Result};
     use aptos_crypto::{hash::CryptoHash, HashValue};
-    use aptos_storage_interface::{DbReader, DbWriter};
+    use aptos_storage_interface::{cached_state_view::ShardedStateCache, DbReader, DbWriter};
     use aptos_temppath::TempPath;
     use aptos_types::{
         account_address::AccountAddress,
@@ -926,6 +917,8 @@ mod tests {
                     Some(ledger_info_with_sigs),
                     false, /* sync_commit */
                     in_memory_state.clone(),
+                    None, // ignored
+                    Some(&ShardedStateCache::default()) // ignored
                 )
                 .unwrap();
 

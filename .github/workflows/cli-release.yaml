@@ -18,21 +18,21 @@ on:
         type: boolean
         required: false
         default: true
-        description: "If true, the release will not be created"
+        description: "Dry run - If checked, the release will not be created"
 
 jobs:
   build-ubuntu20-binary:
     name: "Build Ubuntu 20.04 binary"
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh "Ubuntu"
       - name: Upload Binary
-        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin@v3
+        uses: actions/upload-artifact@v3
         with:
           name: cli-builds
           path: aptos-cli-*.zip
@@ -41,29 +41,14 @@ jobs:
     name: "Build Ubuntu 22.04 binary"
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh "Ubuntu-22.04"
       - name: Upload Binary
-        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin@v3
-        with:
-          name: cli-builds
-          path: aptos-cli-*.zip
-
-  build-os-x-binary:
-    name: "Build OS X binary"
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
-        with:
-          ref: ${{ github.event.inputs.source_git_ref_override }}
-      - name: Build CLI
-        run: scripts/cli/build_cli_release.sh "MacOSX"
-      - name: Upload Binary
-        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin@v3
+        uses: actions/upload-artifact@v3
         with:
           name: cli-builds
           path: aptos-cli-*.zip
@@ -72,13 +57,13 @@ jobs:
     name: "Build Windows binary"
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - name: Build CLI
         run: scripts\cli\build_cli_release.ps1
       - name: Upload Binary
-        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin@v3
+        uses: actions/upload-artifact@v3
         with:
           name: cli-builds
           path: aptos-cli-*.zip
@@ -88,7 +73,6 @@ jobs:
     needs:
       - build-ubuntu20-binary
       - build-ubuntu22-binary
-      - build-os-x-binary
       - build-windows-binary
     runs-on: ubuntu-latest
     permissions:
@@ -97,7 +81,7 @@ jobs:
     if: ${{ inputs.dry_run }} == 'false'
     steps:
       - name: Download prebuilt binaries
-        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # pin@v3
+        uses: actions/download-artifact@v3
         with:
           name: cli-builds
       - name: Create GitHub Release
@@ -109,3 +93,24 @@ jobs:
           title: "${{ format('Aptos CLI Release v{0}', inputs.release_version) }}"
           files: |
             aptos-cli-*.zip
+
+  bump-homebrew-version-pr:
+    name: "Make PR to bump version in Homebrew"
+    needs:
+      - release-binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: mislav/bump-homebrew-formula-action@v3
+        with:
+          formula-name: aptos
+          tag-name: "${{ format('aptos-cli-v{0}', inputs.release_version) }}"
+          base-branch: master
+          create-pullrequest: true
+          commit-message: |
+            {{formulaName}} {{version}}
+
+            Created by https://github.com/mislav/bump-homebrew-formula-action
+
+            From CLI release run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        env:
+          COMMITTER_TOKEN: ${{ secrets.APTOS_BOT_GH_PAT_APTOS_CORE_HOMEBREW_BUMPER }}

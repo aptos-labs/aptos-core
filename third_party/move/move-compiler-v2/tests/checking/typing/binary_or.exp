@@ -8,7 +8,7 @@ module 0x8675309::M {
         Or(false, true);
         Or(true, false);
         Or(true, true);
-        Or(x, x);
+        Or(Copy(x), Move(x));
         Or(select M::R.f(r), select M::R.f(r));
         Or(Or(true, false), Or(true, false));
         {
@@ -16,4 +16,5 @@ module 0x8675309::M {
           Tuple()
         }
     }
+    spec fun $t0(x: bool,r: M::R);
 } // end 0x8675309::M

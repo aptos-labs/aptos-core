@@ -1,0 +1,48 @@
+inputs:
+  GIT_CREDENTIALS:
+    description: "Optional credentials to pass to git"
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - run: sudo apt-get update && sudo apt-get install build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config lsof lld --no-install-recommends --assume-yes
+      shell: bash
+
+    - uses: dsherret/rust-toolchain-file@v1
+
+    # rust-cache action will cache ~/.cargo and ./target
+    # https://github.com/Swatinem/rust-cache#cache-details
+    - name: Run cargo cache
+      uses: Swatinem/rust-cache@359a70e43a0bb8a13953b04a90f76428b4959bb6 # pin@v2.2.0
+
+    - name: install related tools and prover dependencies
+      shell: bash
+      run: scripts/dev_setup.sh -b -p -r -y -P -t
+
+    - name: prepare move lang prover tooling.
+      shell: bash
+      run: |
+        echo 'Z3_EXE='/home/runner/bin/z3 | tee -a $GITHUB_ENV
+        echo 'CVC5_EXE='/home/runner/bin/cvc5 | tee -a $GITHUB_ENV
+        echo 'DOTNET_ROOT='/home/runner/.dotnet/ | tee -a $GITHUB_ENV
+        echo 'BOOGIE_EXE='/home/runner/.dotnet/tools/boogie | tee -a $GITHUB_ENV
+        echo 'MVP_TEST_ON_CI'='1' | tee -a $GITHUB_ENV
+        echo "/home/runner/bin" | tee -a $GITHUB_PATH
+        echo "/home/runner/.dotnet" | tee -a $GITHUB_PATH
+        echo "/home/runner/.dotnet/tools" | tee -a $GITHUB_PATH
+
+    - run: echo "/home/runner/.cargo/bin" | tee -a $GITHUB_PATH
+      shell: bash
+
+    - name: Setup git credentials
+      if: inputs.GIT_CREDENTIALS != ''
+      shell: bash
+      run: |
+        git config --global credential.helper store
+        echo "${{ inputs.GIT_CREDENTIALS }}" > ~/.git-credentials
+
+    # Display the rust toolchain version being installed
+    - name: Setup rust toolchain
+      shell: bash
+      run: rustup show

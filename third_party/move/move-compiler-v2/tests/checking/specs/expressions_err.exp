@@ -1,0 +1,49 @@
+
+Diagnostics:
+error: undeclared `M::x`
+   ┌─ tests/checking/specs/expressions_err.move:11:7
+   │
+11 │       x // Undeclared simple name.
+   │       ^
+
+error: no function named `not_declared` found
+   ┌─ tests/checking/specs/expressions_err.move:15:7
+   │
+15 │       not_declared() // Undeclared function.
+   │       ^^^^^^^^^^^^^^
+
+error: expected `num` but found `bool`
+   ┌─ tests/checking/specs/expressions_err.move:19:7
+   │
+19 │       false // Wrong result type.
+   │       ^^^^^
+
+error: invalid call of `>`: expected `num` but found `vector<num>` for argument 1
+   ┌─ tests/checking/specs/expressions_err.move:23:7
+   │
+23 │       x > y // No matching function.
+   │       ^
+
+error: expected `(num, bool)` but found `bool`
+   ┌─ tests/checking/specs/expressions_err.move:27:7
+   │
+27 │       false // Wrong result type tuple.
+   │       ^^^^^
+
+error: invalid call of `M::wrongly_typed_callee`: expected `bool` but found `u256` for argument 2
+   ┌─ tests/checking/specs/expressions_err.move:32:31
+   │
+32 │       wrongly_typed_callee(1, 1) // Wrongly typed function application
+   │                               ^
+
+error: invalid call of `M::wrongly_typed_fun_arg_callee`: expected `num` but found `bool` for argument 1
+   ┌─ tests/checking/specs/expressions_err.move:37:36
+   │
+37 │       wrongly_typed_fun_arg_callee(|x| false) // Wrongly typed function argument.
+   │                                    ^^^^^^^^^
+
+error: invalid call of `M::wrong_instantiation`: generic count mismatch (expected 2 but found 1)
+   ┌─ tests/checking/specs/expressions_err.move:42:7
+   │
+42 │       wrong_instantiation<u64>(x) // Wrong instantiation
+   │       ^^^^^^^^^^^^^^^^^^^^^^^^^^^

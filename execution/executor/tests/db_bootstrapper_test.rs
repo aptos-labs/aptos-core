@@ -30,7 +30,7 @@ use aptos_types::{
     event::EventHandle,
     on_chain_config::{access_path_for_config, ConfigurationResource, OnChainConfig, ValidatorSet},
     state_store::state_key::StateKey,
-    test_helpers::transaction_test_helpers::{block, BLOCK_GAS_LIMIT},
+    test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     trusted_state::TrustedState,
     validator_signer::ValidatorSigner,
@@ -75,7 +75,9 @@ fn test_empty_db() {
     assert!(trusted_state_change.is_epoch_change());
 
     // `maybe_bootstrap()` does nothing on non-empty DB.
-    assert!(!maybe_bootstrap::<AptosVM>(&db_rw, &genesis_txn, waypoint).unwrap());
+    assert!(maybe_bootstrap::<AptosVM>(&db_rw, &genesis_txn, waypoint)
+        .unwrap()
+        .is_none());
 }
 
 fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &ValidatorSigner) {
@@ -87,9 +89,9 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
     let executor = BlockExecutor::<AptosVM>::new(db.clone());
     let output = executor
         .execute_block(
-            (block_id, block(txns, BLOCK_GAS_LIMIT)).into(),
+            (block_id, block(txns, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG)).into(),
             executor.committed_block_id(),
-            BLOCK_GAS_LIMIT,
+            TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         )
         .unwrap();
     assert_eq!(output.num_leaves(), target_version + 1);
@@ -113,12 +115,12 @@ fn get_demo_accounts() -> (
     let privkey1 = Ed25519PrivateKey::generate(&mut rng);
     let pubkey1 = privkey1.public_key();
     let account1_auth_key = AuthenticationKey::ed25519(&pubkey1);
-    let account1 = account1_auth_key.derived_address();
+    let account1 = account1_auth_key.account_address();
 
     let privkey2 = Ed25519PrivateKey::generate(&mut rng);
     let pubkey2 = privkey2.public_key();
     let account2_auth_key = AuthenticationKey::ed25519(&pubkey2);
-    let account2 = account2_auth_key.derived_address();
+    let account2 = account2_auth_key.account_address();
 
     (account1, privkey1, account2, privkey2)
 }
@@ -227,14 +229,18 @@ fn test_new_genesis() {
                 StateKey::access_path(
                     access_path_for_config(ValidatorSet::CONFIG_ID).expect("access path in test"),
                 ),
-                WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
+                WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap().into()),
             ),
             (
                 StateKey::access_path(AccessPath::new(
                     CORE_CODE_ADDRESS,
                     ConfigurationResource::resource_path(),
                 )),
-                WriteOp::Modification(bcs::to_bytes(&configuration.bump_epoch_for_test()).unwrap()),
+                WriteOp::Modification(
+                    bcs::to_bytes(&configuration.bump_epoch_for_test())
+                        .unwrap()
+                        .into(),
+                ),
             ),
             (
                 StateKey::access_path(AccessPath::new(
@@ -248,7 +254,8 @@ fn test_new_genesis() {
                         EventHandle::random(0),
                         EventHandle::random(0),
                     ))
-                    .unwrap(),
+                    .unwrap()
+                    .into(),
                 ),
             ),
         ])
@@ -274,7 +281,9 @@ fn test_new_genesis() {
 
     // Bootstrap DB into new genesis.
     let waypoint = generate_waypoint::<AptosVM>(&db, &genesis_txn).unwrap();
-    assert!(maybe_bootstrap::<AptosVM>(&db, &genesis_txn, waypoint).unwrap());
+    assert!(maybe_bootstrap::<AptosVM>(&db, &genesis_txn, waypoint)
+        .unwrap()
+        .is_some());
     assert_eq!(waypoint.version(), 6);
 
     // Client bootable from waypoint.

@@ -164,7 +164,9 @@ impl Interpreter {
                     }
                 },
                 ExitCode::Call(fh_idx) => {
-                    let func = resolver.function_from_handle(fh_idx);
+                    let func = resolver
+                        .function_from_handle(fh_idx)
+                        .map_err(|e| self.set_location(e))?;
 
                     if self.paranoid_type_checks {
                         self.check_friend_or_private_call(&current_frame.function, &func)?;
@@ -218,7 +220,9 @@ impl Interpreter {
                     let ty_args = resolver
                         .instantiate_generic_function(idx, current_frame.ty_args())
                         .map_err(|e| set_err_info!(current_frame, e))?;
-                    let func = resolver.function_from_instantiation(idx);
+                    let func = resolver
+                        .function_from_instantiation(idx)
+                        .map_err(|e| self.set_location(e))?;
 
                     if self.paranoid_type_checks {
                         self.check_friend_or_private_call(&current_frame.function, &func)?;
@@ -358,9 +362,15 @@ impl Interpreter {
             ty_args,
         )
         .map_err(|e| match function.module_id() {
-            Some(id) => e
-                .at_code_offset(function.index(), 0)
-                .finish(Location::Module(id.clone())),
+            Some(id) => {
+                let e = if cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
+                    e.with_exec_state(self.get_internal_state())
+                } else {
+                    e
+                };
+                e.at_code_offset(function.index(), 0)
+                    .finish(Location::Module(id.clone()))
+            },
             None => {
                 let err = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message("Unexpected native function not located in a module".to_owned());
@@ -576,7 +586,9 @@ impl Interpreter {
             TypeWithLoader { ty, loader },
             res.is_ok(),
         )?;
-        self.operand_stack.push(res?)?;
+        self.operand_stack.push(res.map_err(|err| {
+            err.with_message(format!("Failed to borrow global resource from {:?}", addr))
+        })?)?;
         Ok(())
     }
 
@@ -607,22 +619,23 @@ impl Interpreter {
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
-        let resource =
-            match Self::load_resource(loader, data_store, gas_meter, addr, ty)?.move_from() {
-                Ok(resource) => {
-                    gas_meter.charge_move_from(
-                        is_generic,
-                        TypeWithLoader { ty, loader },
-                        Some(&resource),
-                    )?;
-                    resource
-                },
-                Err(err) => {
-                    let val: Option<&Value> = None;
-                    gas_meter.charge_move_from(is_generic, TypeWithLoader { ty, loader }, val)?;
-                    return Err(err);
-                },
-            };
+        let resource = match Self::load_resource(loader, data_store, gas_meter, addr, ty)?
+            .move_from()
+        {
+            Ok(resource) => {
+                gas_meter.charge_move_from(
+                    is_generic,
+                    TypeWithLoader { ty, loader },
+                    Some(&resource),
+                )?;
+                resource
+            },
+            Err(err) => {
+                let val: Option<&Value> = None;
+                gas_meter.charge_move_from(is_generic, TypeWithLoader { ty, loader }, val)?;
+                return Err(err.with_message(format!("Failed to move resource from {:?}", addr)));
+            },
+        };
         self.operand_stack.push(resource)?;
         Ok(())
     }
@@ -658,7 +671,7 @@ impl Interpreter {
                     &resource,
                     false,
                 )?;
-                Err(err)
+                Err(err.with_message(format!("Failed to move resource into {:?}", addr)))
             },
         }
     }
@@ -679,7 +692,7 @@ impl Interpreter {
             err = new_err.finish(err.location().clone())
         }
         if err.status_type() == StatusType::InvariantViolation
-            && err.major_status() != StatusCode::STORAGE_ERROR
+            && err.major_status() != StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
         {
             let location = err.location().clone();
             let state = self.internal_state_str(current_frame);
@@ -707,7 +720,7 @@ impl Interpreter {
 
         debug_write!(buf, "    [{}] ", idx)?;
         if let Some(module) = func.module_id() {
-            debug_write!(buf, "{}::{}::", module.address(), module.name(),)?;
+            debug_write!(buf, "{}::{}::", module.address().to_hex(), module.name(),)?;
         }
         debug_write!(buf, "{}", func.name())?;
         let ty_args = frame.ty_args();
@@ -1040,22 +1053,16 @@ fn check_depth_of_type_impl(
         | Type::Signer => check_depth!(0),
         // Even though this is recursive this is OK since the depth of this recursion is
         // bounded by the depth of the type arguments, which we have already checked.
-        Type::Reference(ty) | Type::MutableReference(ty) | Type::Vector(ty) => {
+        Type::Reference(ty) | Type::MutableReference(ty) => {
             check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(1))?
         },
-        Type::Struct(si) => {
-            let struct_type = resolver.loader().get_struct_type(*si).ok_or_else(|| {
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Struct Definition not resolved".to_string())
-            })?;
-            check_depth!(struct_type
-                .depth
-                .as_ref()
-                .ok_or_else(|| { PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED) })?
-                .solve(&[]))
+        Type::Vector(ty) => check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(1))?,
+        Type::Struct { idx, .. } => {
+            let formula = resolver.loader().calculate_depth_of_struct(*idx)?;
+            check_depth!(formula.solve(&[]))
         },
         // NB: substitution must be performed before calling this function
-        Type::StructInstantiation(si, ty_args) => {
+        Type::StructInstantiation { idx, ty_args, .. } => {
             // Calculate depth of all type arguments, and make sure they themselves are not too deep.
             let ty_arg_depths = ty_args
                 .iter()
@@ -1064,15 +1071,8 @@ fn check_depth_of_type_impl(
                     check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(0))
                 })
                 .collect::<PartialVMResult<Vec<_>>>()?;
-            let struct_type = resolver.loader().get_struct_type(*si).ok_or_else(|| {
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Struct Definition not resolved".to_string())
-            })?;
-            check_depth!(struct_type
-                .depth
-                .as_ref()
-                .ok_or_else(|| { PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED) })?
-                .solve(&ty_arg_depths))
+            let formula = resolver.loader().calculate_depth_of_struct(*idx)?;
+            check_depth!(formula.solve(&ty_arg_depths))
         },
         Type::TyParam(_) => {
             return Err(
@@ -1145,7 +1145,7 @@ impl Frame {
         local_tys: &[Type],
         locals: &Locals,
         _ty_args: &[Type],
-        resolver: &Resolver,
+        _resolver: &Resolver,
         interpreter: &mut Interpreter,
         instruction: &Bytecode,
     ) -> PartialVMResult<()> {
@@ -1159,7 +1159,7 @@ impl Frame {
             Bytecode::Ret => {
                 for (idx, ty) in local_tys.iter().enumerate() {
                     if !locals.is_invalid(idx)? {
-                        check_ability(resolver.loader().abilities(ty)?.has_drop())?;
+                        check_ability(ty.abilities()?.has_drop())?;
                     }
                 }
             },
@@ -1172,7 +1172,7 @@ impl Frame {
                 let val_ty = interpreter.operand_stack.pop_ty()?;
                 ty.check_eq(&val_ty)?;
                 if !locals.is_invalid(*idx as usize)? {
-                    check_ability(resolver.loader().abilities(&ty)?.has_drop())?;
+                    check_ability(ty.abilities()?.has_drop())?;
                 }
             },
             // We will check the rest of the instructions after execution phase.
@@ -1271,7 +1271,7 @@ impl Frame {
             },
             Bytecode::Pop => {
                 let ty = interpreter.operand_stack.pop_ty()?;
-                check_ability(resolver.loader().abilities(&ty)?.has_drop())?;
+                check_ability(ty.abilities()?.has_drop())?;
             },
             Bytecode::LdU8(_) => interpreter.operand_stack.push_ty(Type::U8)?,
             Bytecode::LdU16(_) => interpreter.operand_stack.push_ty(Type::U16)?,
@@ -1290,7 +1290,7 @@ impl Frame {
             },
             Bytecode::CopyLoc(idx) => {
                 let ty = local_tys[*idx as usize].clone();
-                check_ability(resolver.loader().abilities(&ty)?.has_copy())?;
+                check_ability(ty.abilities()?.has_copy())?;
                 interpreter.operand_stack.push_ty(ty)?;
             },
             Bytecode::MoveLoc(idx) => {
@@ -1311,7 +1311,7 @@ impl Frame {
                     .push_ty(Type::Reference(Box::new(ty)))?;
             },
             Bytecode::ImmBorrowField(fh_idx) => {
-                let expected_ty = resolver.field_handle_to_struct(*fh_idx);
+                let expected_ty = resolver.field_handle_to_struct(*fh_idx)?;
                 let top_ty = interpreter.operand_stack.pop_ty()?;
                 top_ty.check_ref_eq(&expected_ty)?;
                 interpreter
@@ -1319,7 +1319,7 @@ impl Frame {
                     .push_ty(Type::Reference(Box::new(resolver.get_field_type(*fh_idx)?)))?;
             },
             Bytecode::MutBorrowField(fh_idx) => {
-                let expected_ty = resolver.field_handle_to_struct(*fh_idx);
+                let expected_ty = resolver.field_handle_to_struct(*fh_idx)?;
                 let top_ty = interpreter.operand_stack.pop_ty()?;
                 top_ty.check_eq(&Type::MutableReference(Box::new(expected_ty)))?;
                 interpreter
@@ -1333,7 +1333,7 @@ impl Frame {
                 let top_ty = interpreter.operand_stack.pop_ty()?;
                 top_ty.check_ref_eq(&expected_ty)?;
                 interpreter.operand_stack.push_ty(Type::Reference(Box::new(
-                    resolver.instantiate_generic_field(*idx, ty_args)?,
+                    resolver.get_field_type_generic(*idx, ty_args)?,
                 )))?;
             },
             Bytecode::MutBorrowFieldGeneric(idx) => {
@@ -1343,14 +1343,14 @@ impl Frame {
                 interpreter
                     .operand_stack
                     .push_ty(Type::MutableReference(Box::new(
-                        resolver.instantiate_generic_field(*idx, ty_args)?,
+                        resolver.get_field_type_generic(*idx, ty_args)?,
                     )))?;
             },
             Bytecode::Pack(idx) => {
                 let field_count = resolver.field_count(*idx);
                 let args_ty = resolver.get_struct_fields(*idx)?;
-                let output_ty = resolver.get_struct_type(*idx);
-                let ability = resolver.loader().abilities(&output_ty)?;
+                let output_ty = resolver.get_struct_type(*idx)?;
+                let ability = output_ty.abilities()?;
 
                 // If the struct has a key ability, we expects all of its field to have store ability but not key ability.
                 let field_expected_abilities = if ability.has_key() {
@@ -1376,9 +1376,7 @@ impl Frame {
                 {
                     // Fields ability should be a subset of the struct ability because abilities can be weakened but not the other direction.
                     // For example, it is ok to have a struct that doesn't have a copy capability where its field is a struct that has copy capability but not vice versa.
-                    check_ability(
-                        field_expected_abilities.is_subset(resolver.loader().abilities(&ty)?),
-                    )?;
+                    check_ability(field_expected_abilities.is_subset(ty.abilities()?))?;
                     ty.check_eq(expected_ty)?;
                 }
 
@@ -1387,8 +1385,8 @@ impl Frame {
             Bytecode::PackGeneric(idx) => {
                 let field_count = resolver.field_instantiation_count(*idx);
                 let args_ty = resolver.instantiate_generic_struct_fields(*idx, ty_args)?;
-                let output_ty = resolver.instantiate_generic_type(*idx, ty_args)?;
-                let ability = resolver.loader().abilities(&output_ty)?;
+                let output_ty = resolver.get_struct_type_generic(*idx, ty_args)?;
+                let ability = output_ty.abilities()?;
 
                 // If the struct has a key ability, we expects all of its field to have store ability but not key ability.
                 let field_expected_abilities = if ability.has_key() {
@@ -1414,9 +1412,7 @@ impl Frame {
                 {
                     // Fields ability should be a subset of the struct ability because abilities can be weakened but not the other direction.
                     // For example, it is ok to have a struct that doesn't have a copy capability where its field is a struct that has copy capability but not vice versa.
-                    check_ability(
-                        field_expected_abilities.is_subset(resolver.loader().abilities(&ty)?),
-                    )?;
+                    check_ability(field_expected_abilities.is_subset(ty.abilities()?))?;
                     ty.check_eq(expected_ty)?;
                 }
 
@@ -1424,7 +1420,7 @@ impl Frame {
             },
             Bytecode::Unpack(idx) => {
                 let struct_ty = interpreter.operand_stack.pop_ty()?;
-                struct_ty.check_eq(&resolver.get_struct_type(*idx))?;
+                struct_ty.check_eq(&resolver.get_struct_type(*idx)?)?;
                 let struct_decl = resolver.get_struct_fields(*idx)?;
                 for ty in struct_decl.fields.iter() {
                     interpreter.operand_stack.push_ty(ty.clone())?;
@@ -1432,7 +1428,7 @@ impl Frame {
             },
             Bytecode::UnpackGeneric(idx) => {
                 let struct_ty = interpreter.operand_stack.pop_ty()?;
-                struct_ty.check_eq(&resolver.instantiate_generic_type(*idx, ty_args)?)?;
+                struct_ty.check_eq(&resolver.get_struct_type_generic(*idx, ty_args)?)?;
 
                 let struct_decl = resolver.instantiate_generic_struct_fields(*idx, ty_args)?;
                 for ty in struct_decl.into_iter() {
@@ -1443,7 +1439,7 @@ impl Frame {
                 let ref_ty = interpreter.operand_stack.pop_ty()?;
                 match ref_ty {
                     Type::Reference(inner) | Type::MutableReference(inner) => {
-                        check_ability(resolver.loader().abilities(&inner)?.has_copy())?;
+                        check_ability(inner.abilities()?.has_copy())?;
                         interpreter.operand_stack.push_ty(inner.as_ref().clone())?;
                     },
                     _ => {
@@ -1460,7 +1456,7 @@ impl Frame {
                 match ref_ty {
                     Type::MutableReference(inner) => {
                         if *inner == val_ty {
-                            check_ability(resolver.loader().abilities(&inner)?.has_drop())?;
+                            check_ability(inner.abilities()?.has_drop())?;
                         } else {
                             return Err(PartialVMError::new(
                                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -1542,7 +1538,7 @@ impl Frame {
                             ),
                     );
                 }
-                check_ability(resolver.loader().abilities(&lhs)?.has_drop())?;
+                check_ability(lhs.abilities()?.has_drop())?;
                 interpreter.operand_stack.push_ty(Type::Bool)?;
             },
             Bytecode::MutBorrowGlobal(idx) => {
@@ -1550,8 +1546,8 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .check_eq(&Type::Address)?;
-                let ty = resolver.get_struct_type(*idx);
-                check_ability(resolver.loader().abilities(&ty)?.has_key())?;
+                let ty = resolver.get_struct_type(*idx)?;
+                check_ability(ty.abilities()?.has_key())?;
                 interpreter
                     .operand_stack
                     .push_ty(Type::MutableReference(Box::new(ty)))?;
@@ -1561,8 +1557,8 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .check_eq(&Type::Address)?;
-                let ty = resolver.get_struct_type(*idx);
-                check_ability(resolver.loader().abilities(&ty)?.has_key())?;
+                let ty = resolver.get_struct_type(*idx)?;
+                check_ability(ty.abilities()?.has_key())?;
                 interpreter
                     .operand_stack
                     .push_ty(Type::Reference(Box::new(ty)))?;
@@ -1572,8 +1568,8 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .check_eq(&Type::Address)?;
-                let ty = resolver.instantiate_generic_type(*idx, ty_args)?;
-                check_ability(resolver.loader().abilities(&ty)?.has_key())?;
+                let ty = resolver.get_struct_type_generic(*idx, ty_args)?;
+                check_ability(ty.abilities()?.has_key())?;
                 interpreter
                     .operand_stack
                     .push_ty(Type::MutableReference(Box::new(ty)))?;
@@ -1583,8 +1579,8 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .check_eq(&Type::Address)?;
-                let ty = resolver.instantiate_generic_type(*idx, ty_args)?;
-                check_ability(resolver.loader().abilities(&ty)?.has_key())?;
+                let ty = resolver.get_struct_type_generic(*idx, ty_args)?;
+                check_ability(ty.abilities()?.has_key())?;
                 interpreter
                     .operand_stack
                     .push_ty(Type::Reference(Box::new(ty)))?;
@@ -1602,8 +1598,8 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .check_eq(&Type::Reference(Box::new(Type::Signer)))?;
-                ty.check_eq(&resolver.get_struct_type(*idx))?;
-                check_ability(resolver.loader().abilities(&ty)?.has_key())?;
+                ty.check_eq(&resolver.get_struct_type(*idx)?)?;
+                check_ability(ty.abilities()?.has_key())?;
             },
             Bytecode::MoveToGeneric(idx) => {
                 let ty = interpreter.operand_stack.pop_ty()?;
@@ -1611,16 +1607,16 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .check_eq(&Type::Reference(Box::new(Type::Signer)))?;
-                ty.check_eq(&resolver.instantiate_generic_type(*idx, ty_args)?)?;
-                check_ability(resolver.loader().abilities(&ty)?.has_key())?;
+                ty.check_eq(&resolver.get_struct_type_generic(*idx, ty_args)?)?;
+                check_ability(ty.abilities()?.has_key())?;
             },
             Bytecode::MoveFrom(idx) => {
                 interpreter
                     .operand_stack
                     .pop_ty()?
                     .check_eq(&Type::Address)?;
-                let ty = resolver.get_struct_type(*idx);
-                check_ability(resolver.loader().abilities(&ty)?.has_key())?;
+                let ty = resolver.get_struct_type(*idx)?;
+                check_ability(ty.abilities()?.has_key())?;
                 interpreter.operand_stack.push_ty(ty)?;
             },
             Bytecode::MoveFromGeneric(idx) => {
@@ -1628,8 +1624,8 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .check_eq(&Type::Address)?;
-                let ty = resolver.instantiate_generic_type(*idx, ty_args)?;
-                check_ability(resolver.loader().abilities(&ty)?.has_key())?;
+                let ty = resolver.get_struct_type_generic(*idx, ty_args)?;
+                check_ability(ty.abilities()?.has_key())?;
                 interpreter.operand_stack.push_ty(ty)?;
             },
             Bytecode::FreezeRef => {
@@ -1658,7 +1654,7 @@ impl Frame {
                 }
                 interpreter
                     .operand_stack
-                    .push_ty(Type::Vector(Box::new(ty)))?;
+                    .push_ty(Type::Vector(triomphe::Arc::new(ty)))?;
             },
             Bytecode::VecLen(si) => {
                 let ty = resolver.instantiate_single_type(*si, ty_args)?;
@@ -1950,7 +1946,7 @@ impl Frame {
                     },
                     Bytecode::Pack(sd_idx) => {
                         let field_count = resolver.field_count(*sd_idx);
-                        let struct_type = resolver.get_struct_type(*sd_idx);
+                        let struct_type = resolver.get_struct_type(*sd_idx)?;
                         check_depth_of_type(resolver, &struct_type)?;
                         gas_meter.charge_pack(
                             false,
@@ -1963,7 +1959,7 @@ impl Frame {
                     },
                     Bytecode::PackGeneric(si_idx) => {
                         let field_count = resolver.field_instantiation_count(*si_idx);
-                        let ty = resolver.instantiate_generic_type(*si_idx, self.ty_args())?;
+                        let ty = resolver.get_struct_type_generic(*si_idx, self.ty_args())?;
                         check_depth_of_type(resolver, &ty)?;
                         gas_meter.charge_pack(
                             true,
@@ -2153,7 +2149,7 @@ impl Frame {
                     Bytecode::MutBorrowGlobal(sd_idx) | Bytecode::ImmBorrowGlobal(sd_idx) => {
                         let is_mut = matches!(instruction, Bytecode::MutBorrowGlobal(_));
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let ty = resolver.get_struct_type(*sd_idx);
+                        let ty = resolver.get_struct_type(*sd_idx)?;
                         interpreter.borrow_global(
                             is_mut,
                             false,
@@ -2168,7 +2164,7 @@ impl Frame {
                     | Bytecode::ImmBorrowGlobalGeneric(si_idx) => {
                         let is_mut = matches!(instruction, Bytecode::MutBorrowGlobalGeneric(_));
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let ty = resolver.instantiate_generic_type(*si_idx, self.ty_args())?;
+                        let ty = resolver.get_struct_type_generic(*si_idx, self.ty_args())?;
                         interpreter.borrow_global(
                             is_mut,
                             true,
@@ -2181,7 +2177,7 @@ impl Frame {
                     },
                     Bytecode::Exists(sd_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let ty = resolver.get_struct_type(*sd_idx);
+                        let ty = resolver.get_struct_type(*sd_idx)?;
                         interpreter.exists(
                             false,
                             resolver.loader(),
@@ -2193,7 +2189,7 @@ impl Frame {
                     },
                     Bytecode::ExistsGeneric(si_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let ty = resolver.instantiate_generic_type(*si_idx, self.ty_args())?;
+                        let ty = resolver.get_struct_type_generic(*si_idx, self.ty_args())?;
                         interpreter.exists(
                             true,
                             resolver.loader(),
@@ -2205,7 +2201,7 @@ impl Frame {
                     },
                     Bytecode::MoveFrom(sd_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let ty = resolver.get_struct_type(*sd_idx);
+                        let ty = resolver.get_struct_type(*sd_idx)?;
                         interpreter.move_from(
                             false,
                             resolver.loader(),
@@ -2217,7 +2213,7 @@ impl Frame {
                     },
                     Bytecode::MoveFromGeneric(si_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let ty = resolver.instantiate_generic_type(*si_idx, self.ty_args())?;
+                        let ty = resolver.get_struct_type_generic(*si_idx, self.ty_args())?;
                         interpreter.move_from(
                             true,
                             resolver.loader(),
@@ -2235,7 +2231,7 @@ impl Frame {
                             .value_as::<Reference>()?
                             .read_ref()?
                             .value_as::<AccountAddress>()?;
-                        let ty = resolver.get_struct_type(*sd_idx);
+                        let ty = resolver.get_struct_type(*sd_idx)?;
                         // REVIEW: Can we simplify Interpreter::move_to?
                         interpreter.move_to(
                             false,
@@ -2255,7 +2251,7 @@ impl Frame {
                             .value_as::<Reference>()?
                             .read_ref()?
                             .value_as::<AccountAddress>()?;
-                        let ty = resolver.instantiate_generic_type(*si_idx, self.ty_args())?;
+                        let ty = resolver.get_struct_type_generic(*si_idx, self.ty_args())?;
                         interpreter.move_to(
                             true,
                             resolver.loader(),

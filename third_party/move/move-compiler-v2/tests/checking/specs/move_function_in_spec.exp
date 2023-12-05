@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: calling impure function `move_function_in_spec::change` is not allowed
+   ┌─ tests/checking/specs/move_function_in_spec.move:20:20
+   │
+20 │             assert change(account_address, account_address);
+   │                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = impure function `move_function_in_spec::change(address, address): bool`

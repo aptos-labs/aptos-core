@@ -60,7 +60,7 @@ pub enum MoveValue {
 }
 
 /// A layout associated with a named field
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
 pub struct MoveFieldLayout {
     pub name: Identifier,
@@ -73,7 +73,7 @@ impl MoveFieldLayout {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
 pub enum MoveStructLayout {
     /// The representation used by the MoveVM
@@ -87,7 +87,25 @@ pub enum MoveStructLayout {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Used to distinguish between aggregators ans snapshots.
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+pub enum IdentifierMappingKind {
+    Aggregator,
+    Snapshot,
+}
+
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+pub enum LayoutTag {
+    /// The current type corresponds to an aggregator or a snapshot values
+    /// and requires special handling in serialization and deserialization:
+    /// the concrete values have to be replaced with unique identifiers and
+    /// back.
+    IdentifierMapping(IdentifierMappingKind),
+}
+
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
 pub enum MoveTypeLayout {
     #[serde(rename(serialize = "bool", deserialize = "bool"))]
@@ -114,6 +132,8 @@ pub enum MoveTypeLayout {
     U32,
     #[serde(rename(serialize = "u256", deserialize = "u256"))]
     U256,
+
+    Tagged(LayoutTag, Box<MoveTypeLayout>),
 }
 
 impl MoveValue {
@@ -328,6 +348,11 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
             MoveTypeLayout::Vector(layout) => Ok(MoveValue::Vector(
                 deserializer.deserialize_seq(VectorElementVisitor(layout))?,
             )),
+            MoveTypeLayout::Tagged(tag, layout) => match tag {
+                // Serialization ignores the tag for types which correspond to aggregator or
+                // snapshot values.
+                LayoutTag::IdentifierMapping(_) => layout.deserialize(deserializer),
+            },
         }
     }
 }
@@ -529,6 +554,9 @@ impl fmt::Display for MoveTypeLayout {
             Vector(typ) => write!(f, "vector<{}>", typ),
             Struct(s) => write!(f, "{}", s),
             Signer => write!(f, "signer"),
+            Tagged(tag, typ) => match tag {
+                LayoutTag::IdentifierMapping(_) => write!(f, "{}", typ),
+            },
         }
     }
 }
@@ -573,11 +601,11 @@ impl TryInto<TypeTag> for &MoveTypeLayout {
             MoveTypeLayout::U128 => TypeTag::U128,
             MoveTypeLayout::U256 => TypeTag::U256,
             MoveTypeLayout::Signer => TypeTag::Signer,
-            MoveTypeLayout::Vector(v) => {
-                let inner_type = &**v;
-                TypeTag::Vector(Box::new(inner_type.try_into()?))
-            },
+            MoveTypeLayout::Vector(v) => TypeTag::Vector(Box::new(v.as_ref().try_into()?)),
             MoveTypeLayout::Struct(v) => TypeTag::Struct(Box::new(v.try_into()?)),
+            MoveTypeLayout::Tagged(tag, v) => match tag {
+                LayoutTag::IdentifierMapping(_) => v.as_ref().try_into()?,
+            },
         })
     }
 }

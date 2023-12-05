@@ -37,8 +37,19 @@ pub enum FeatureFlag {
     EMIT_FEE_STATEMENT = 27,
     STORAGE_DELETION_REFUND = 28,
     SIGNATURE_CHECKER_V2_SCRIPT_FIX = 29,
-    AGGREGATOR_SNAPSHOTS = 30,
+    AGGREGATOR_V2_API = 30,
     SAFER_RESOURCE_GROUPS = 31,
+    SAFER_METADATA = 32,
+    SINGLE_SENDER_AUTHENTICATOR = 33,
+    SPONSORED_AUTOMATIC_ACCOUNT_CREATION = 34,
+    FEE_PAYER_ACCOUNT_OPTIONAL = 35,
+    AGGREGATOR_V2_DELAYED_FIELDS = 36,
+    CONCURRENT_ASSETS = 37,
+    LIMIT_MAX_IDENTIFIER_LENGTH = 38,
+    OPERATOR_BENEFICIARY_CHANGE = 39,
+    VM_BINARY_FORMAT_V7 = 40,
+    RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM = 41,
+    COMMISSION_CHANGE_DELEGATION_POOL = 42,
 }
 
 /// Representation of features on chain as a bitset.
@@ -50,9 +61,20 @@ pub struct Features {
 
 impl Default for Features {
     fn default() -> Self {
-        Features {
-            features: vec![0b00100000, 0b00100000, 0b00001100, 0b00100000],
-        }
+        let mut features = Features {
+            features: vec![0; 5],
+        };
+
+        use FeatureFlag::*;
+        features.enable(VM_BINARY_FORMAT_V6);
+        features.enable(BLS12_381_STRUCTURES);
+        features.enable(SIGNATURE_CHECKER_V2);
+        features.enable(STORAGE_SLOT_METADATA);
+        features.enable(APTOS_UNIQUE_IDENTIFIERS);
+        features.enable(SIGNATURE_CHECKER_V2_SCRIPT_FIX);
+        features.enable(AGGREGATOR_V2_API);
+
+        features
     }
 }
 
@@ -62,6 +84,16 @@ impl OnChainConfig for Features {
 }
 
 impl Features {
+    pub fn enable(&mut self, flag: FeatureFlag) {
+        let byte_index = (flag as u64 / 8) as usize;
+        let bit_mask = 1 << (flag as u64 % 8);
+        while self.features.len() <= byte_index {
+            self.features.push(0);
+        }
+
+        self.features[byte_index] |= bit_mask;
+    }
+
     pub fn is_enabled(&self, flag: FeatureFlag) -> bool {
         let val = flag as u64;
         let byte_index = (val / 8) as usize;
@@ -92,10 +124,23 @@ impl Features {
             && self.is_enabled(FeatureFlag::STORAGE_DELETION_REFUND)
     }
 
-    pub fn is_aggregator_snapshots_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::AGGREGATOR_SNAPSHOTS)
+    /// Whether the Aggregator V2 API feature is enabled.
+    /// Once enabled, the functions from aggregator_v2.move will be available for use.
+    pub fn is_aggregator_v2_api_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::AGGREGATOR_V2_API)
+    }
+
+    /// Whether the Aggregator V2 delayed fields feature is enabled.
+    /// Once enabled, Aggregator V2 functions become parallel.
+    pub fn is_aggregator_v2_delayed_fields_enabled(&self) -> bool {
+        // This feature depends on resource groups being split inside VMChange set,
+        // which is gated by RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM feature, so
+        // require that feature to be enabled as well.
+        self.is_enabled(FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS)
+            && self.is_resource_group_charge_as_size_sum_enabled()
+    }
+
+    pub fn is_resource_group_charge_as_size_sum_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM)
     }
 }
-
-// --------------------------------------------------------------------------------------------
-// Code Publishing

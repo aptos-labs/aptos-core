@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::NetworkLoadTest;
+use crate::{generate_onchain_config_blob, NetworkLoadTest};
 use anyhow::Ok;
 use aptos::test::CliTestFramework;
 use aptos_forge::{NetworkTest, NodeExt, SwarmExt, Test};
@@ -11,7 +11,7 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{ConsensusConfigV1, OnChainConsensusConfig},
 };
-use std::{fmt::Write, time::Duration};
+use std::time::Duration;
 use tokio::runtime::Runtime;
 
 const MAX_NODE_LAG_SECS: u64 = 360;
@@ -69,6 +69,7 @@ impl NetworkLoadTest for QuorumStoreOnChainEnableTest {
             let inner = match current_consensus_config {
                 OnChainConsensusConfig::V1(inner) => inner,
                 OnChainConsensusConfig::V2(_) => panic!("Unexpected V2 config"),
+                _ => unimplemented!()
             };
 
             // Change to V2
@@ -86,7 +87,7 @@ impl NetworkLoadTest for QuorumStoreOnChainEnableTest {
             }}
         }}
         "#,
-                generate_blob(&bcs::to_bytes(&new_consensus_config).unwrap())
+                generate_onchain_config_blob(&bcs::to_bytes(&new_consensus_config).unwrap())
             );
 
             cli.run_script_with_default_framework(root_cli_index, &update_consensus_config_script)
@@ -111,22 +112,4 @@ impl NetworkTest for QuorumStoreOnChainEnableTest {
     fn run(&self, ctx: &mut aptos_forge::NetworkContext<'_>) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
-}
-
-fn generate_blob(data: &[u8]) -> String {
-    let mut buf = String::new();
-
-    write!(buf, "vector[").unwrap();
-    for (i, b) in data.iter().enumerate() {
-        if i % 20 == 0 {
-            if i > 0 {
-                writeln!(buf).unwrap();
-            }
-        } else {
-            write!(buf, " ").unwrap();
-        }
-        write!(buf, "{}u8,", b).unwrap();
-    }
-    write!(buf, "]").unwrap();
-    buf
 }

@@ -6,6 +6,7 @@ use aptos_package_builder::PackageBuilder;
 use aptos_types::{account_address::AccountAddress, on_chain_config::FeatureFlag};
 use move_core_types::{identifier::Identifier, language_storage::StructTag, vm_status::StatusCode};
 use serde::Deserialize;
+use test_case::test_case;
 
 #[derive(Debug, Deserialize, Eq, PartialEq)]
 struct Primary {
@@ -17,9 +18,20 @@ struct Secondary {
     value: u32,
 }
 
-#[test]
-fn test_resource_groups() {
+#[test_case(true)]
+#[test_case(false)]
+fn test_resource_groups(resource_group_charge_as_sum_enabled: bool) {
     let mut h = MoveHarness::new();
+    if resource_group_charge_as_sum_enabled {
+        h.enable_features(
+            vec![FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM],
+            vec![],
+        );
+    } else {
+        h.enable_features(vec![], vec![
+            FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM,
+        ]);
+    }
 
     let primary_addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
     let primary_account = h.new_account_at(primary_addr);
@@ -81,7 +93,7 @@ fn test_resource_groups() {
     // Initialize secondary and verify it exists and nothing else does
     let result = h.run_entry_function(
         &user_account,
-        str::parse(&format!("0x{}::secondary::init", secondary_addr)).unwrap(),
+        str::parse(&format!("0x{}::secondary::init", secondary_addr.to_hex())).unwrap(),
         vec![],
         vec![bcs::to_bytes::<u32>(&22).unwrap()],
     );
@@ -112,7 +124,7 @@ fn test_resource_groups() {
     // Initialize primary and verify it exists with secondary
     let result = h.run_entry_function(
         &user_account,
-        str::parse(&format!("0x{}::primary::init", primary_addr)).unwrap(),
+        str::parse(&format!("0x{}::primary::init", primary_addr.to_hex())).unwrap(),
         vec![],
         vec![bcs::to_bytes::<u64>(&11122).unwrap()],
     );
@@ -145,7 +157,11 @@ fn test_resource_groups() {
     // Modify secondary and verify primary stays consistent
     let result = h.run_entry_function(
         &user_account,
-        str::parse(&format!("0x{}::secondary::set_value", secondary_addr)).unwrap(),
+        str::parse(&format!(
+            "0x{}::secondary::set_value",
+            secondary_addr.to_hex()
+        ))
+        .unwrap(),
         vec![],
         vec![bcs::to_bytes::<u32>(&5).unwrap()],
     );
@@ -178,7 +194,7 @@ fn test_resource_groups() {
     // Delete the first and verify the second remains
     let result = h.run_entry_function(
         &user_account,
-        str::parse(&format!("0x{}::primary::remove", primary_addr)).unwrap(),
+        str::parse(&format!("0x{}::primary::remove", primary_addr.to_hex())).unwrap(),
         vec![],
         vec![],
     );
@@ -209,7 +225,7 @@ fn test_resource_groups() {
     // Delete the second and verify nothing remains
     let result = h.run_entry_function(
         &user_account,
-        str::parse(&format!("0x{}::secondary::remove", secondary_addr)).unwrap(),
+        str::parse(&format!("0x{}::secondary::remove", secondary_addr.to_hex())).unwrap(),
         vec![],
         vec![],
     );

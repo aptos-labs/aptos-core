@@ -4,6 +4,10 @@
 
 use clap::Parser;
 use codespan_reporting::diagnostic::Severity;
+use move_command_line_common::env::read_bool_env_var;
+use move_compiler::command_line as cli;
+use once_cell::sync::Lazy;
+use std::collections::BTreeSet;
 
 /// Defines options for a run of the compiler.
 #[derive(Parser, Clone, Debug)]
@@ -24,12 +28,19 @@ pub struct Options {
     /// Output directory.
     #[clap(short, long, default_value = "")]
     pub output_dir: String,
+    /// Debug compiler by printing out internal information
+    #[clap(long = cli::DEBUG_FLAG, default_value=debug_compiler_env_var_str())]
+    pub debug: bool,
     /// Whether to dump intermediate bytecode for debugging.
     #[clap(long = "dump-bytecode")]
     pub dump_bytecode: bool,
     /// Do not complain about unknown attributes in Move code.
     #[clap(long, default_value = "false")]
     pub skip_attribute_checks: bool,
+    /// Known attributes for this dialect of move; if empty, assumes third-party Move.
+    /// Only used if skip_attribute_checks is false.
+    #[clap(skip)]
+    pub known_attributes: BTreeSet<String>,
     /// Whether we generate code for tests. This specifically guarantees stable output
     /// for baseline testing.
     #[clap(long)]
@@ -62,5 +73,19 @@ impl Options {
     /// Returns true if an experiment is on.
     pub fn experiment_on(&self, name: &str) -> bool {
         self.experiments.iter().any(|s| s == name)
+    }
+}
+
+fn debug_compiler_env_var() -> bool {
+    static DEBUG_COMPILER: Lazy<bool> =
+        Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_DEBUG_ENV_VAR));
+    *DEBUG_COMPILER
+}
+
+fn debug_compiler_env_var_str() -> &'static str {
+    if debug_compiler_env_var() {
+        "true"
+    } else {
+        "false"
     }
 }

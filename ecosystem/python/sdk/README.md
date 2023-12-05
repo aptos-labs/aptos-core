@@ -25,7 +25,7 @@ make test
 ## E2E testing and Using the Aptos CLI
 
 * Download the [Aptos CLI](https://aptos.dev/tools/aptos-cli/install-cli/).
-* Set the environment variable `APTOS_CLI_PATH` to the full path the the CLI.
+* Set the environment variable `APTOS_CLI_PATH` to the full path of the CLI.
 * `make examples_cli`
 
 We of course allow you to do this a bit more manually by:
@@ -33,7 +33,7 @@ We of course allow you to do this a bit more manually by:
 First, run a local testnet (run this from the root of aptos-core):
 
 ```bash
-cargo run -p aptos -- node run-local-testnet --with-faucet --faucet-port 8081 --force-restart --assume-yes
+cargo run -p aptos -- node run-local-testnet --force-restart --assume-yes
 ```
 
 Next, tell the end-to-end tests to talk to this locally running testnet:
@@ -59,7 +59,7 @@ make fmt
 ## Package Publishing
 
 * Download the [Aptos CLI](https://aptos.dev/tools/aptos-cli/install-cli/).
-* Set the environment variable `APTOS_CLI_PATH` to the full path the the CLI.
+* Set the environment variable `APTOS_CLI_PATH` to the full path of the CLI.
 * `poetry run python -m aptos_sdk.cli` and set the appropriate command-line parameters
 
 ## Generating types

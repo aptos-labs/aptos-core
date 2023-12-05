@@ -142,7 +142,7 @@ module aptos_framework::account {
     const ENO_VALID_FRAMEWORK_RESERVED_ADDRESS: u64 = 11;
     /// Specified scheme required to proceed with the smart contract operation - can only be ED25519_SCHEME(0) OR MULTI_ED25519_SCHEME(1)
     const EINVALID_SCHEME: u64 = 12;
-    /// Abort the transaction if the expected originating address is different from the originating addres on-chain
+    /// Abort the transaction if the expected originating address is different from the originating address on-chain
     const EINVALID_ORIGINATING_ADDRESS: u64 = 13;
     /// The signer capability offer doesn't exist at the given address
     const ENO_SUCH_SIGNER_CAPABILITY: u64 = 14;
@@ -171,6 +171,12 @@ module aptos_framework::account {
         move_to(aptos_framework, OriginatingAddress {
             address_map: table::new(),
         });
+    }
+
+    fun create_account_if_does_not_exist(account_address: address) {
+        if (!exists<Account>(account_address)) {
+            create_account(account_address);
+        }
     }
 
     /// Publishes a new `Account` resource under `new_address`. A signer representing `new_address`
@@ -946,7 +952,7 @@ module aptos_framework::account {
     }
 
     #[test_only]
-    public entry fun create_account_from_ed25519_public_key(pk_bytes: vector<u8>): signer {
+    public fun create_account_from_ed25519_public_key(pk_bytes: vector<u8>): signer {
         let pk = ed25519::new_unvalidated_public_key_from_bytes(pk_bytes);
         let curr_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&pk);
         let alice_address = from_bcs::to_address(curr_auth_key);

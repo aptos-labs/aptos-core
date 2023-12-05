@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::{
+    deserializer::DeserializerConfig,
     file_format::{basic_test_module, basic_test_script},
-    file_format_common::VERSION_MAX,
+    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_MAX},
 };
 use move_core_types::{account_address::AccountAddress, vm_status::StatusCode};
 use move_vm_runtime::{config::VMConfig, move_vm::MoveVM};
@@ -54,7 +55,10 @@ fn test_publish_module_with_custom_max_binary_format_version() {
                 move_stdlib::natives::GasParameters::zeros(),
             ),
             VMConfig {
-                max_binary_format_version: VERSION_MAX.checked_sub(1).unwrap(),
+                deserializer_config: DeserializerConfig::new(
+                    VERSION_MAX.checked_sub(1).unwrap(),
+                    IDENTIFIER_SIZE_MAX,
+                ),
                 ..Default::default()
             },
         )
@@ -118,7 +122,10 @@ fn test_run_script_with_custom_max_binary_format_version() {
                 move_stdlib::natives::GasParameters::zeros(),
             ),
             VMConfig {
-                max_binary_format_version: VERSION_MAX.checked_sub(1).unwrap(),
+                deserializer_config: DeserializerConfig::new(
+                    VERSION_MAX.checked_sub(1).unwrap(),
+                    IDENTIFIER_SIZE_MAX,
+                ),
                 ..Default::default()
             },
         )

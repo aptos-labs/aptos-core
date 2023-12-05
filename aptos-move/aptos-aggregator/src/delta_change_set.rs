@@ -5,261 +5,179 @@
 //! (for accessing the storage) and an operation: a partial function with a
 //! postcondition.
 
-use crate::module::AGGREGATOR_MODULE;
-use aptos_state_view::StateView;
-use aptos_types::{
-    state_store::state_key::StateKey,
-    vm_status::{StatusCode, VMStatus},
-    write_set::WriteOp,
+use crate::{
+    bounded_math::{BoundedMath, SignedU128},
+    delta_math::{merge_data_and_delta, merge_two_deltas, DeltaHistory},
+    types::{
+        code_invariant_error, DelayedFieldsSpeculativeError, DeltaApplicationFailureReason, PanicOr,
+    },
 };
-use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
 
-/// When `Addition` operation overflows the `limit`.
-const EADD_OVERFLOW: u64 = 0x02_0001;
-
-/// When `Subtraction` operation goes below zero.
-const ESUB_UNDERFLOW: u64 = 0x02_0002;
-
-/// Represents an update from aggregator's operation.
-#[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
-pub struct DeltaOp {
-    /// Maximum positive delta seen during execution.
-    max_positive: u128,
-    /// Smallest negative delta seen during execution.
-    min_negative: u128,
-    /// Postcondition: delta overflows on exceeding this limit or going below
-    /// zero.
-    limit: u128,
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub struct DeltaWithMax {
     /// Delta which is the result of the execution.
-    update: DeltaUpdate,
+    pub update: SignedU128,
+    /// The maximum value the aggregator can reach.
+    pub max_value: u128,
 }
 
-/// Different delta functions.
-#[derive(Copy, Clone, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
-pub enum DeltaUpdate {
-    Plus(u128),
-    Minus(u128),
-}
-
-impl DeltaOp {
+impl DeltaWithMax {
     /// Creates a new delta op.
-    pub fn new(update: DeltaUpdate, limit: u128, max_positive: u128, min_negative: u128) -> Self {
-        Self {
-            max_positive,
-            min_negative,
-            limit,
-            update,
-        }
+    pub fn new(update: SignedU128, max_value: u128) -> Self {
+        Self { max_value, update }
     }
 
     /// Returns the kind of update for the delta op.
-    pub fn get_update(&self) -> DeltaUpdate {
+    pub fn get_update(&self) -> SignedU128 {
         self.update
     }
 
     /// Returns the result of delta application to `base` or error if
     /// postcondition is not satisfied.
-    pub fn apply_to(&self, base: u128) -> PartialVMResult<u128> {
-        // First, validate if delta op can be applied to `base`. Note that
-        // this is possible if the values observed during execution didn't
-        // overflow or dropped below zero. The check can be emulated by actually
-        // doing addition and subtraction.
-        addition(base, self.max_positive, self.limit)?;
-        subtraction(base, self.min_negative)?;
-
-        // If delta has been successfully validated, apply the update.
+    pub fn apply_to(&self, base: u128) -> Result<u128, DelayedFieldsSpeculativeError> {
+        let math = BoundedMath::new(self.max_value);
         match self.update {
-            DeltaUpdate::Plus(value) => addition(base, value, self.limit),
-            DeltaUpdate::Minus(value) => subtraction(base, value),
+            SignedU128::Positive(value) => math.unsigned_add(base, value).map_err(|_e| {
+                DelayedFieldsSpeculativeError::DeltaApplication {
+                    base_value: base,
+                    max_value: self.max_value,
+                    delta: self.update,
+                    reason: DeltaApplicationFailureReason::Overflow,
+                }
+            }),
+            SignedU128::Negative(value) => math.unsigned_subtract(base, value).map_err(|_e| {
+                DelayedFieldsSpeculativeError::DeltaApplication {
+                    base_value: base,
+                    max_value: self.max_value,
+                    delta: self.update,
+                    reason: DeltaApplicationFailureReason::Underflow,
+                }
+            }),
         }
     }
 
-    /// Shifts by a `delta` the maximum positive value seen by `self`.
-    fn shifted_max_positive_by(&self, delta: &DeltaOp) -> PartialVMResult<u128> {
-        match delta.update {
-            // Suppose that maximum value seen is +M and we shift by +V. Then the
-            // new maximum value is M+V provided addition do no overflow.
-            DeltaUpdate::Plus(value) => addition(value, self.max_positive, self.limit),
-            // Suppose that maximum value seen is +M and we shift by -V this time.
-            // If M >= V, the result is +(M-V). Otherwise, `self` should have never
-            // reached any positive value. By convention, we use 0 for the latter
-            // case. Also, we can reuse `subtraction` which throws an error when M < V,
-            // simply mapping the error to 0.
-            DeltaUpdate::Minus(value) => Ok(subtraction(self.max_positive, value).unwrap_or(0)),
+    pub fn create_merged_delta(
+        prev_delta: &DeltaWithMax,
+        next_delta: &DeltaWithMax,
+    ) -> Result<DeltaWithMax, PanicOr<DelayedFieldsSpeculativeError>> {
+        if prev_delta.max_value != next_delta.max_value {
+            Err(code_invariant_error(
+                "Cannot merge deltas with different limits",
+            ))?;
+        }
+
+        let new_delta = BoundedMath::new(prev_delta.max_value)
+            .signed_add(&prev_delta.update, &next_delta.update)
+            .map_err(|_| DelayedFieldsSpeculativeError::DeltaMerge {
+                base_delta: prev_delta.update,
+                delta: next_delta.update,
+                max_value: prev_delta.max_value,
+            })?;
+
+        Ok(DeltaWithMax::new(new_delta, prev_delta.max_value))
+    }
+
+    pub fn into_op_no_additional_history(self) -> DeltaOp {
+        let mut history = DeltaHistory::new();
+        history.record_success(self.update);
+        DeltaOp::new(self.update, self.max_value, history)
+    }
+}
+
+/// Represents an update from aggregator's operation.
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub struct DeltaOp {
+    /// History computed during the transaction execution.
+    history: DeltaHistory,
+    /// The maximum value the aggregator can reach.
+    max_value: u128,
+    /// Delta which is the result of the execution.
+    update: SignedU128,
+}
+
+impl DeltaOp {
+    /// Creates a new delta op.
+    pub fn new(update: SignedU128, max_value: u128, history: DeltaHistory) -> Self {
+        Self {
+            history,
+            max_value,
+            update,
         }
     }
 
-    /// Shifts by a `delta` the minimum negative value seen by `self`.
-    fn shifted_min_negative_by(&self, delta: &DeltaOp) -> PartialVMResult<u128> {
-        match delta.update {
-            // Suppose that minimum value seen is -M and we shift by +V. Then this case
-            // is symmetric to +M-V in `shifted_max_positive_by`. Indeed, if M >= V, then
-            // the minimum value should become -(M-V). Otherwise, delta had never been
-            // negative and the minimum value capped to 0.
-            DeltaUpdate::Plus(value) => Ok(subtraction(self.min_negative, value).unwrap_or(0)),
-            // Otherwise, given  the minimum value of -M and the shift of -V the new
-            // minimum value becomes -(M+V), which of course can overflow on addition,
-            // implying that we subtracted too much and there was an underflow.
-            DeltaUpdate::Minus(value) => addition(value, self.min_negative, self.limit),
+    /// Returns the kind of update for the delta op.
+    pub fn get_update(&self) -> SignedU128 {
+        self.update
+    }
+
+    /// Returns the result of delta application to `base` or error if
+    /// postcondition is not satisfied.
+    pub fn apply_to(&self, base: u128) -> Result<u128, PanicOr<DelayedFieldsSpeculativeError>> {
+        merge_data_and_delta(base, &self.update, &self.history, self.max_value)
+    }
+
+    pub fn create_merged_delta(
+        prev_delta: &DeltaOp,
+        next_delta: &DeltaOp,
+    ) -> Result<DeltaOp, PanicOr<DelayedFieldsSpeculativeError>> {
+        if prev_delta.max_value != next_delta.max_value {
+            Err(code_invariant_error(
+                "Cannot merge deltas with different limits",
+            ))?;
         }
+
+        let (new_update, new_history) = merge_two_deltas(
+            &prev_delta.update,
+            &prev_delta.history,
+            &next_delta.update,
+            &next_delta.history,
+            next_delta.max_value,
+        )?;
+
+        Ok(DeltaOp::new(new_update, next_delta.max_value, new_history))
     }
 
     /// Applies self on top of previous delta, merging them together. Note
     /// that the strict ordering here is crucial for catching overflows
     /// correctly.
-    pub fn merge_with_previous_delta(&mut self, previous_delta: DeltaOp) -> PartialVMResult<()> {
-        use DeltaUpdate::*;
-
-        assert_eq!(
-            self.limit, previous_delta.limit,
-            "Cannot merge deltas with different limits",
-        );
-
-        // First, update the history values of this delta given that it starts from
-        // +value or -value instead of 0. We should do this check to avoid cases like this:
-        //
-        // Suppose we have deltas with limit of 100, and we have some `d2` which is +3 but it
-        // was +99 at some point. Now, if we merge some `d1` which is +2 with `d2`, we get
-        // the result is +5. However, it should not have happened because `d2` should hit
-        // +2+99 > 100 at some point in history and fail.
-        let shifted_max_positive = self.shifted_max_positive_by(&previous_delta)?;
-        let shifted_min_negative = self.shifted_min_negative_by(&previous_delta)?;
-
-        // Useful macro for merging deltas of the same sign, e.g. +A+B or -A-B.
-        // In this cases we compute the absolute sum of deltas (A+B) and use plus
-        // or minus sign accordingly.
-        macro_rules! update_same_sign {
-            ($sign:ident, $a:ident, $b:ident) => {
-                self.update = $sign(addition($a, $b, self.limit)?)
-            };
-        }
-
-        // Another useful macro, this time for merging deltas with different signs, such
-        // as +A-B and -A+B. In these cases we have to check which of A or B is greater
-        // and possibly flip a sign.
-        macro_rules! update_different_sign {
-            ($a:ident, $b:ident) => {
-                if $a >= $b {
-                    self.update = Plus(subtraction($a, $b)?);
-                } else {
-                    self.update = Minus(subtraction($b, $a)?);
-                }
-            };
-        }
-
-        // History check passed, and we are ready to update the actual values now.
-        match previous_delta.update {
-            Plus(prev_value) => match self.update {
-                Plus(self_value) => update_same_sign!(Plus, prev_value, self_value),
-                Minus(self_value) => update_different_sign!(prev_value, self_value),
-            },
-            Minus(prev_value) => match self.update {
-                Plus(self_value) => update_different_sign!(self_value, prev_value),
-                Minus(self_value) => update_same_sign!(Minus, prev_value, self_value),
-            },
-        }
-
-        // Deltas have been merged successfully - update the history as well.
-        self.max_positive = u128::max(previous_delta.max_positive, shifted_max_positive);
-        self.min_negative = u128::max(previous_delta.min_negative, shifted_min_negative);
+    pub fn merge_with_previous_delta(
+        &mut self,
+        previous_delta: DeltaOp,
+    ) -> Result<(), PanicOr<DelayedFieldsSpeculativeError>> {
+        *self = Self::create_merged_delta(&previous_delta, self)?;
         Ok(())
     }
 
     /// Applies next delta on top of self, merging two deltas together. This is a reverse
     /// of `merge_with_previous_delta`.
-    pub fn merge_with_next_delta(&mut self, next_delta: DeltaOp) -> PartialVMResult<()> {
-        // Now self follows the other delta.
-        let mut previous_delta = next_delta;
-        std::mem::swap(self, &mut previous_delta);
-
-        // Perform the merge.
-        self.merge_with_previous_delta(previous_delta)?;
+    pub fn merge_with_next_delta(
+        &mut self,
+        next_delta: DeltaOp,
+    ) -> Result<(), PanicOr<DelayedFieldsSpeculativeError>> {
+        *self = Self::create_merged_delta(self, &next_delta)?;
         Ok(())
     }
 
-    /// Consumes a single delta and tries to materialize it with a given state
-    /// key. If materialization succeeds, a write op is produced. Otherwise, an
-    /// error VM status is returned.
-    pub fn try_into_write_op(
-        self,
-        state_view: &dyn StateView,
-        state_key: &StateKey,
-    ) -> anyhow::Result<WriteOp, VMStatus> {
-        // In case storage fails to fetch the value, return immediately.
-        let maybe_value = state_view
-            .get_state_value_u128(state_key)
-            .map_err(|e| VMStatus::error(StatusCode::STORAGE_ERROR, Some(e.to_string())))?;
-
-        // Otherwise we have to apply delta to the storage value.
-        match maybe_value {
-            Some(base) => {
-                self.apply_to(base)
-                    .map_err(|partial_error| {
-                        // If delta application fails, transform partial VM
-                        // error into an appropriate VM status.
-                        partial_error
-                            .finish(Location::Module(AGGREGATOR_MODULE.clone()))
-                            .into_vm_status()
-                    })
-                    .map(|result| WriteOp::Modification(serialize(&result)))
-            },
-            // Something is wrong, the value to which we apply delta should
-            // always exist. Guard anyway.
-            None => Err(VMStatus::error(
-                StatusCode::STORAGE_ERROR,
-                Some("Aggregator value does not exist in storage.".to_string()),
-            )),
-        }
+    pub fn into_inner(self) -> (SignedU128, DeltaHistory, u128) {
+        (self.update, self.history, self.max_value)
     }
-}
-
-/// Implements application of `Addition` to `base`.
-pub fn addition(base: u128, value: u128, limit: u128) -> PartialVMResult<u128> {
-    if limit < base || value > (limit - base) {
-        Err(abort_error(
-            format!("overflow when adding {} to {}", value, base),
-            EADD_OVERFLOW,
-        ))
-    } else {
-        Ok(base + value)
-    }
-}
-
-/// Implements application of `Subtraction` to `base`.
-pub fn subtraction(base: u128, value: u128) -> PartialVMResult<u128> {
-    if value > base {
-        Err(abort_error(
-            format!("underflow when subtracting {} from {}", value, base),
-            ESUB_UNDERFLOW,
-        ))
-    } else {
-        Ok(base - value)
-    }
-}
-
-/// Error for delta application. Can be used by delta partial functions
-/// to return descriptive error messages and an appropriate error code.
-fn abort_error(message: impl ToString, code: u64) -> PartialVMError {
-    PartialVMError::new(StatusCode::ABORTED)
-        .with_message(message.to_string())
-        .with_sub_status(code)
 }
 
 impl std::fmt::Debug for DeltaOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.update {
-            DeltaUpdate::Plus(value) => {
+            SignedU128::Positive(value) => {
                 write!(
                     f,
-                    "+{} ensures 0 <= result <= {}, range [-{}, {}]",
-                    value, self.limit, self.min_negative, self.max_positive
+                    "+{} ensures 0 <= result <= {}, {:?}",
+                    value, self.max_value, self.history
                 )
             },
-            DeltaUpdate::Minus(value) => {
+            SignedU128::Negative(value) => {
                 write!(
                     f,
-                    "-{} ensures 0 <= result <= {}, range [-{}, {}]",
-                    value, self.limit, self.min_negative, self.max_positive
+                    "-{} ensures 0 <= result <= {}, {:?}",
+                    value, self.max_value, self.history
                 )
             },
         }
@@ -271,38 +189,62 @@ pub fn serialize(value: &u128) -> Vec<u8> {
     bcs::to_bytes(value).expect("unexpected serialization error in aggregator")
 }
 
-// Helper for tests, #[cfg(test)] doesn't work for cross-crate.
-pub fn delta_sub(v: u128, limit: u128) -> DeltaOp {
-    DeltaOp::new(DeltaUpdate::Minus(v), limit, 0, v)
+#[cfg(any(test, feature = "testing"))]
+pub fn delta_sub(v: u128, max_value: u128) -> DeltaOp {
+    DeltaOp::new(SignedU128::Negative(v), max_value, DeltaHistory {
+        max_achieved_positive_delta: 0,
+        min_achieved_negative_delta: v,
+        min_overflow_positive_delta: None,
+        max_underflow_negative_delta: None,
+    })
 }
 
-// Helper for tests, #[cfg(test)] doesn't work for cross-crate.
-pub fn delta_add(v: u128, limit: u128) -> DeltaOp {
-    DeltaOp::new(DeltaUpdate::Plus(v), limit, v, 0)
+#[cfg(any(test, feature = "testing"))]
+pub fn delta_add(v: u128, max_value: u128) -> DeltaOp {
+    DeltaOp::new(SignedU128::Positive(v), max_value, DeltaHistory {
+        max_achieved_positive_delta: v,
+        min_achieved_negative_delta: 0,
+        min_overflow_positive_delta: None,
+        max_underflow_negative_delta: None,
+    })
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::AggregatorStore;
-    use aptos_state_view::TStateView;
-    use aptos_types::state_store::{
-        state_storage_usage::StateStorageUsage, state_value::StateValue,
+    use crate::{
+        aggregator_v1_extension::{EADD_OVERFLOW, ESUB_UNDERFLOW},
+        resolver::{TAggregatorV1View, TDelayedFieldView},
+        types::DelayedFieldValue,
+        FakeAggregatorView,
+    };
+    use aptos_types::{
+        aggregator::PanicError,
+        state_store::{state_key::StateKey, state_value::StateValue},
+        write_set::WriteOp,
     };
     use claims::{assert_err, assert_matches, assert_ok, assert_ok_eq};
+    use move_core_types::{
+        value::MoveTypeLayout,
+        vm_status::{StatusCode, VMStatus},
+    };
     use once_cell::sync::Lazy;
+    use std::{
+        collections::{BTreeMap, HashSet},
+        sync::Arc,
+    };
 
-    fn delta_add_with_history(v: u128, limit: u128, max: u128, min: u128) -> DeltaOp {
-        let mut delta = delta_add(v, limit);
-        delta.max_positive = max;
-        delta.min_negative = min;
+    fn delta_add_with_history(v: u128, max_value: u128, max: u128, min: u128) -> DeltaOp {
+        let mut delta = delta_add(v, max_value);
+        delta.history.max_achieved_positive_delta = max;
+        delta.history.min_achieved_negative_delta = min;
         delta
     }
 
-    fn delta_sub_with_history(v: u128, limit: u128, max: u128, min: u128) -> DeltaOp {
-        let mut delta = delta_sub(v, limit);
-        delta.max_positive = max;
-        delta.min_negative = min;
+    fn delta_sub_with_history(v: u128, max_value: u128, max: u128, min: u128) -> DeltaOp {
+        let mut delta = delta_sub(v, max_value);
+        delta.history.max_achieved_positive_delta = max;
+        delta.history.min_achieved_negative_delta = min;
         delta
     }
 
@@ -316,8 +258,8 @@ mod test {
 
         // Testing a delta of +5 with history now. We should consider three
         // cases: underflow, overflow, and successful application.
-        add5.max_positive = 50;
-        add5.min_negative = 10;
+        add5.history.max_achieved_positive_delta = 50;
+        add5.history.min_achieved_negative_delta = 10;
         assert_err!(add5.apply_to(5)); // underflow: 5 - 10 < 0!
         assert_err!(add5.apply_to(51)); // overflow: 51 + 50 > 100!
         assert_ok_eq!(add5.apply_to(10), 15);
@@ -332,8 +274,8 @@ mod test {
 
         // Now, similarly to addition test, update the delta with
         // some random history. Again, we have three cases to check.
-        sub5.max_positive = 10;
-        sub5.min_negative = 20;
+        sub5.history.max_achieved_positive_delta = 10;
+        sub5.history.min_achieved_negative_delta = 20;
         assert_err!(sub5.apply_to(19)); // underflow: 19 - 20 < 0!
         assert_err!(sub5.apply_to(91)); // overflow:  91 + 10 > 100!
         assert_ok_eq!(sub5.apply_to(20), 15);
@@ -342,7 +284,7 @@ mod test {
 
     #[test]
     fn test_delta_merge_plus() {
-        use DeltaUpdate::*;
+        use SignedU128::*;
 
         // Case 1: preserving old history and updating the value.
         // Explanation: value becomes +2+1 = +3, history remains unchanged
@@ -355,9 +297,9 @@ mod test {
         assert_ok!(b.merge_with_previous_delta(a));
         assert_ok!(c.merge_with_next_delta(d));
         assert_eq!(b, c);
-        assert_eq!(b.update, Plus(3));
-        assert_eq!(b.max_positive, 4);
-        assert_eq!(b.min_negative, 3);
+        assert_eq!(b.update, Positive(3));
+        assert_eq!(b.history.max_achieved_positive_delta, 4);
+        assert_eq!(b.history.min_achieved_negative_delta, 3);
 
         // Case 2: updating history upper bound.
         // Explanation: again, value is clearly +3, but this time the upper bound
@@ -371,9 +313,9 @@ mod test {
         assert_ok!(b.merge_with_previous_delta(a));
         assert_ok!(c.merge_with_next_delta(d));
         assert_eq!(b, c);
-        assert_eq!(b.update, Plus(5));
-        assert_eq!(b.max_positive, 6);
-        assert_eq!(b.min_negative, 3);
+        assert_eq!(b.update, Positive(5));
+        assert_eq!(b.history.max_achieved_positive_delta, 6);
+        assert_eq!(b.history.min_achieved_negative_delta, 3);
 
         // Case 3: updating history lower bound.
         // Explanation: clearly, upper bound remains at +90, but lower bound
@@ -386,9 +328,9 @@ mod test {
         assert_ok!(b.merge_with_previous_delta(a));
         assert_ok!(c.merge_with_next_delta(d));
         assert_eq!(b, c);
-        assert_eq!(b.update, Plus(15));
-        assert_eq!(b.max_positive, 90);
-        assert_eq!(b.min_negative, 5);
+        assert_eq!(b.update, Positive(15));
+        assert_eq!(b.history.max_achieved_positive_delta, 90);
+        assert_eq!(b.history.min_achieved_negative_delta, 5);
 
         // Case 4: overflow on value.
         // Explanation: value overflows because +51+50 > 100.
@@ -423,7 +365,7 @@ mod test {
         assert_ok!(b.merge_with_previous_delta(a));
         assert_ok!(c.merge_with_next_delta(d));
         assert_eq!(b, c);
-        assert_eq!(b.update, Plus(1));
+        assert_eq!(b.update, Positive(1));
 
         // Case 7: updating value with changing the sign.
         // Explanation: +23-24 = -1
@@ -435,12 +377,12 @@ mod test {
         assert_ok!(b.merge_with_previous_delta(a));
         assert_ok!(c.merge_with_next_delta(d));
         assert_eq!(b, c);
-        assert_eq!(b.update, Minus(1));
+        assert_eq!(b.update, Negative(1));
     }
 
     #[test]
     fn test_delta_merge_minus() {
-        use DeltaUpdate::*;
+        use SignedU128::*;
 
         // Case 1: preserving old history and updating the value.
         // Explanation: value becomes -20-20 = -40, history remains unchanged
@@ -453,9 +395,9 @@ mod test {
         assert_ok!(b.merge_with_previous_delta(a));
         assert_ok!(c.merge_with_next_delta(d));
         assert_eq!(b, c);
-        assert_eq!(b.update, Minus(40));
-        assert_eq!(b.max_positive, 1);
-        assert_eq!(b.min_negative, 40);
+        assert_eq!(b.update, Negative(40));
+        assert_eq!(b.history.max_achieved_positive_delta, 1);
+        assert_eq!(b.history.min_achieved_negative_delta, 40);
 
         // Case 2: updating history upper bound.
         // Explanation: upper bound is changed because -2+7 > 4. Lower bound
@@ -468,9 +410,9 @@ mod test {
         assert_ok!(b.merge_with_previous_delta(a));
         assert_ok!(c.merge_with_next_delta(d));
         assert_eq!(b, c);
-        assert_eq!(b.update, Minus(5));
-        assert_eq!(b.max_positive, 5);
-        assert_eq!(b.min_negative, 10);
+        assert_eq!(b.update, Negative(5));
+        assert_eq!(b.history.max_achieved_positive_delta, 5);
+        assert_eq!(b.history.min_achieved_negative_delta, 10);
 
         // Case 3: updating history lower bound.
         // Explanation: +90 > -5+95 and therefore upper bound remains the same.
@@ -483,9 +425,9 @@ mod test {
         assert_ok!(b.merge_with_previous_delta(a));
         assert_ok!(c.merge_with_next_delta(d));
         assert_eq!(b, c);
-        assert_eq!(b.update, Minus(15));
-        assert_eq!(b.max_positive, 90);
-        assert_eq!(b.min_negative, 9);
+        assert_eq!(b.update, Negative(15));
+        assert_eq!(b.history.max_achieved_positive_delta, 90);
+        assert_eq!(b.history.min_achieved_negative_delta, 9);
 
         // Case 4: underflow on value.
         // Explanation: value underflows because -50-51 clearly should have
@@ -518,7 +460,7 @@ mod test {
         assert_ok!(b.merge_with_previous_delta(a));
         assert_ok!(c.merge_with_next_delta(d));
         assert_eq!(b, c);
-        assert_eq!(b.update, Minus(1));
+        assert_eq!(b.update, Negative(1));
 
         // Case 7: updating value with changing the sign.
         // Explanation: +23-24 = +1.
@@ -530,19 +472,19 @@ mod test {
         assert_ok!(b.merge_with_previous_delta(a));
         assert_ok!(c.merge_with_next_delta(d));
         assert_eq!(b, c);
-        assert_eq!(b.update, Minus(1));
+        assert_eq!(b.update, Negative(1));
     }
 
     static KEY: Lazy<StateKey> = Lazy::new(|| StateKey::raw(String::from("test-key").into_bytes()));
 
     #[test]
     fn test_failed_write_op_conversion_because_of_empty_storage() {
-        let state_view = AggregatorStore::default();
+        let state_view = FakeAggregatorView::default();
         let delta_op = delta_add(10, 1000);
         assert_matches!(
-            delta_op.try_into_write_op(&state_view, &KEY),
+            state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &delta_op,),
             Err(VMStatus::Error {
-                status_code: StatusCode::STORAGE_ERROR,
+                status_code: StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                 message: Some(_),
                 sub_status: None
             })
@@ -551,29 +493,86 @@ mod test {
 
     struct BadStorage;
 
-    impl TStateView for BadStorage {
-        type Key = StateKey;
+    impl TAggregatorV1View for BadStorage {
+        type Identifier = StateKey;
 
-        fn get_state_value(&self, _state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+        fn get_aggregator_v1_state_value(
+            &self,
+            _id: &Self::Identifier,
+        ) -> anyhow::Result<Option<StateValue>> {
             Err(anyhow::Error::new(VMStatus::error(
-                StatusCode::STORAGE_ERROR,
+                StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                 Some("Error message from BadStorage.".to_string()),
             )))
         }
+    }
 
-        fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
-            unreachable!()
+    impl TDelayedFieldView for BadStorage {
+        type Identifier = ();
+        type ResourceGroupTag = ();
+        type ResourceKey = ();
+        type ResourceValue = ();
+
+        fn is_delayed_field_optimization_capable(&self) -> bool {
+            unimplemented!("Irrelevant for the test")
+        }
+
+        fn get_delayed_field_value(
+            &self,
+            _id: &Self::Identifier,
+        ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
+            Err(code_invariant_error("Error message from BadStorage.").into())
+        }
+
+        fn delayed_field_try_add_delta_outcome(
+            &self,
+            _id: &Self::Identifier,
+            _base_delta: &SignedU128,
+            _delta: &SignedU128,
+            _max_value: u128,
+        ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
+            Err(code_invariant_error("Error message from BadStorage.").into())
+        }
+
+        fn generate_delayed_field_id(&self) -> Self::Identifier {
+            unimplemented!("Irrelevant for the test")
+        }
+
+        fn validate_and_convert_delayed_field_id(
+            &self,
+            _id: u64,
+        ) -> Result<Self::Identifier, PanicError> {
+            unimplemented!("Irrelevant for the test")
+        }
+
+        fn get_reads_needing_exchange(
+            &self,
+            _delayed_write_set_keys: &HashSet<Self::Identifier>,
+            _skip: &HashSet<Self::ResourceKey>,
+        ) -> Result<
+            BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>,
+            PanicError,
+        > {
+            unimplemented!("Irrelevant for the test")
+        }
+
+        fn get_group_reads_needing_exchange(
+            &self,
+            _delayed_write_set_keys: &HashSet<Self::Identifier>,
+            _skip: &HashSet<Self::ResourceKey>,
+        ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+            unimplemented!("Irrelevant for the test")
         }
     }
 
     #[test]
-    fn test_failed_write_op_conversion_because_of_storage_error() {
+    fn test_failed_write_op_conversion_because_of_speculative_error() {
         let state_view = BadStorage;
         let delta_op = delta_add(10, 1000);
         assert_matches!(
-            delta_op.try_into_write_op(&state_view, &KEY),
+            state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &delta_op,),
             Err(VMStatus::Error {
-                status_code: StatusCode::STORAGE_ERROR,
+                status_code: StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                 message: Some(_),
                 sub_status: None
             })
@@ -582,23 +581,23 @@ mod test {
 
     #[test]
     fn test_successful_write_op_conversion() {
-        let mut state_view = AggregatorStore::default();
+        let mut state_view = FakeAggregatorView::default();
         state_view.set_from_state_key(KEY.clone(), 100);
 
         // Both addition and subtraction should succeed!
         let add_op = delta_add(100, 200);
         let sub_op = delta_sub(100, 200);
 
-        let add_result = add_op.try_into_write_op(&state_view, &KEY);
-        assert_ok_eq!(add_result, WriteOp::Modification(serialize(&200)));
+        let add_result = state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &add_op);
+        assert_ok_eq!(add_result, WriteOp::Modification(serialize(&200).into()));
 
-        let sub_result = sub_op.try_into_write_op(&state_view, &KEY);
-        assert_ok_eq!(sub_result, WriteOp::Modification(serialize(&0)));
+        let sub_result = state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &sub_op);
+        assert_ok_eq!(sub_result, WriteOp::Modification(serialize(&0).into()));
     }
 
     #[test]
     fn test_unsuccessful_write_op_conversion() {
-        let mut state_view = AggregatorStore::default();
+        let mut state_view = FakeAggregatorView::default();
         state_view.set_from_state_key(KEY.clone(), 100);
 
         // Both addition and subtraction should fail!
@@ -606,11 +605,11 @@ mod test {
         let sub_op = delta_sub(101, 1000);
 
         assert_matches!(
-            add_op.try_into_write_op(&state_view, &KEY),
+            state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &add_op,),
             Err(VMStatus::MoveAbort(_, EADD_OVERFLOW))
         );
         assert_matches!(
-            sub_op.try_into_write_op(&state_view, &KEY),
+            state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &sub_op,),
             Err(VMStatus::MoveAbort(_, ESUB_UNDERFLOW))
         );
     }

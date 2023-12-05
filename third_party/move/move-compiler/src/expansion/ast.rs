@@ -5,7 +5,7 @@
 use crate::{
     parser::ast::{
         self as P, Ability, Ability_, BinOp, ConstantName, Field, FunctionName, ModuleName,
-        QuantKind, SpecApplyPattern, StructName, UnaryOp, Var, ENTRY_MODIFIER,
+        QuantKind, SpecApplyPattern, StructName, UnaryOp, UseDecl, Var, ENTRY_MODIFIER,
     },
     shared::{
         ast_debug::*,
@@ -15,6 +15,7 @@ use crate::{
         *,
     },
 };
+use move_binary_format::file_format;
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
 use std::{
@@ -90,6 +91,7 @@ pub struct Script {
     pub function_name: FunctionName,
     pub function: Function,
     pub specs: Vec<SpecBlock>,
+    pub use_decls: Vec<UseDecl>,
 }
 
 //**************************************************************************************************
@@ -125,6 +127,7 @@ pub struct ModuleDefinition {
     pub functions: UniqueMap<FunctionName, Function>,
     pub constants: UniqueMap<ConstantName, Constant>,
     pub specs: Vec<SpecBlock>,
+    pub use_decls: Vec<UseDecl>,
 }
 
 //**************************************************************************************************
@@ -208,9 +211,34 @@ pub struct Function {
     pub entry: Option<Loc>,
     pub signature: FunctionSignature,
     pub acquires: Vec<ModuleAccess>,
+    // Only v2 compiler
+    pub access_specifiers: Option<Vec<AccessSpecifier>>,
     pub body: FunctionBody,
     pub specs: BTreeMap<SpecId, SpecBlock>,
 }
+
+#[derive(PartialEq, Clone, Debug)]
+pub struct AccessSpecifier_ {
+    pub kind: file_format::AccessKind,
+    pub negated: bool,
+    pub module_address: Option<Address>,
+    pub module_name: Option<ModuleName>,
+    pub resource_name: Option<Name>,
+    pub type_args: Option<Vec<Type>>,
+    pub address: AddressSpecifier,
+}
+
+pub type AccessSpecifier = Spanned<AccessSpecifier_>;
+
+#[derive(PartialEq, Clone, Debug)]
+pub enum AddressSpecifier_ {
+    Any,
+    Literal(NumericalAddress),
+    Name(Name),
+    Call(ModuleAccess, Option<Vec<Type>>, Name),
+}
+
+pub type AddressSpecifier = Spanned<AddressSpecifier_>;
 
 //**************************************************************************************************
 // Constants
@@ -917,6 +945,7 @@ impl AstDebug for Script {
             function_name,
             function,
             specs,
+            use_decls: _,
         } = self;
         if let Some(n) = package_name {
             w.writeln(&format!("{}", n))
@@ -957,6 +986,7 @@ impl AstDebug for ModuleDefinition {
             functions,
             constants,
             specs,
+            use_decls: _,
         } = self;
         if let Some(n) = package_name {
             w.writeln(&format!("{}", n))
@@ -1244,6 +1274,7 @@ impl AstDebug for (FunctionName, &Function) {
                 entry,
                 signature,
                 acquires,
+                access_specifiers: _,
                 body,
                 specs: _specs,
             },

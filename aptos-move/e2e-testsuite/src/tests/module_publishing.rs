@@ -30,7 +30,7 @@ fn bad_module_address() {
         module 0x{}.M {{
         }}
         ",
-        account1.address()
+        account1.address().to_hex()
     );
 
     // compile with account 1's address
@@ -275,7 +275,7 @@ pub fn test_publishing_modules_proper_sender() {
         module 0x{}.M {{
         }}
         ",
-        sender.address(),
+        sender.address().to_hex(),
     );
 
     let random_script = compile_module(&program).1;
@@ -339,7 +339,7 @@ pub fn test_publishing_allow_modules() {
         module 0x{}.M {{
         }}
         ",
-        sender.address(),
+        sender.address().to_hex(),
     );
 
     let random_script = compile_module(&program).1;

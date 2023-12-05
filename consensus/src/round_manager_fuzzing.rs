@@ -21,7 +21,10 @@ use crate::{
     util::{mock_time_service::SimulatedTimeService, time_service::TimeService},
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
-use aptos_config::{config::ConsensusConfig, network_id::NetworkId};
+use aptos_config::{
+    config::{ConsensusConfig, QcAggregatorType},
+    network_id::NetworkId,
+};
 use aptos_consensus_types::proposal_msg::ProposalMsg;
 use aptos_infallible::Mutex;
 use aptos_network::{
@@ -41,6 +44,7 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use futures::{channel::mpsc, executor::block_on};
+use futures_channel::mpsc::unbounded;
 use maplit::hashmap;
 use once_cell::sync::Lazy;
 use std::{sync::Arc, time::Duration};
@@ -101,8 +105,16 @@ fn create_round_state() -> RoundState {
     let base_timeout = std::time::Duration::new(60, 0);
     let time_interval = Box::new(ExponentialTimeInterval::fixed(base_timeout));
     let (round_timeout_sender, _) = aptos_channels::new_test(1_024);
+    let (delayed_qc_tx, _) = unbounded();
     let time_service = Arc::new(SimulatedTimeService::new());
-    RoundState::new(time_interval, time_service, round_timeout_sender)
+
+    RoundState::new(
+        time_interval,
+        time_service,
+        round_timeout_sender,
+        delayed_qc_tx,
+        QcAggregatorType::NoDelay,
+    )
 }
 
 // Creates an RoundManager for fuzzing
@@ -139,10 +151,10 @@ fn create_node_for_fuzzing() -> RoundManager {
 
     let (self_sender, _self_receiver) = aptos_channels::new_test(8);
 
-    let epoch_state = EpochState {
+    let epoch_state = Arc::new(EpochState {
         epoch: 1,
         verifier: storage.get_validator_set().into(),
-    };
+    });
     let network = NetworkSender::new(
         signer.author(),
         consensus_network_client,
@@ -170,13 +182,14 @@ fn create_node_for_fuzzing() -> RoundManager {
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
+        false,
     );
 
     //
     let round_state = create_round_state();
 
     // TODO: have two different nodes, one for proposing, one for accepting a proposal
-    let proposer_election = Box::new(RotatingProposer::new(vec![signer.author()], 1));
+    let proposer_election = Arc::new(RotatingProposer::new(vec![signer.author()], 1));
 
     let (round_manager_tx, _) = aptos_channel::new(QueueStyle::LIFO, 1, None);
 

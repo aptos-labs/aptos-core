@@ -6,6 +6,7 @@ use crate::{
     config::VMConfig, data_cache::TransactionDataCache, loader::LoadedFunction, move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
 };
+use bytes::Bytes;
 use move_binary_format::{
     compatibility::Compatibility,
     errors::*,
@@ -21,7 +22,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::runtime_types::{CachedStructIndex, StructType, Type},
+    loaded_data::runtime_types::{StructNameIndex, StructType, Type},
     values::{GlobalValue, Value},
 };
 use std::{borrow::Borrow, sync::Arc};
@@ -264,8 +265,8 @@ impl<'r, 'l> Session<'r, 'l> {
 
     pub fn finish_with_custom_effects<Resource>(
         self,
-        resource_converter: &dyn Fn(Value, MoveTypeLayout) -> PartialVMResult<Resource>,
-    ) -> VMResult<Changes<Vec<u8>, Resource>> {
+        resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
+    ) -> VMResult<Changes<Bytes, Resource>> {
         self.data_cache
             .into_custom_effects(resource_converter, self.move_vm.runtime.loader())
             .map_err(|e| e.finish(Location::Undefined))
@@ -286,8 +287,8 @@ impl<'r, 'l> Session<'r, 'l> {
 
     pub fn finish_with_extensions_with_custom_effects<Resource>(
         self,
-        resource_converter: &dyn Fn(Value, MoveTypeLayout) -> PartialVMResult<Resource>,
-    ) -> VMResult<(Changes<Vec<u8>, Resource>, NativeContextExtensions<'r>)> {
+        resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
+    ) -> VMResult<(Changes<Bytes, Resource>, NativeContextExtensions<'r>)> {
         let Session {
             data_cache,
             native_extensions,
@@ -311,7 +312,7 @@ impl<'r, 'l> Session<'r, 'l> {
     }
 
     /// Get the serialized format of a `CompiledModule` given a `ModuleId`.
-    pub fn load_module(&self, module_id: &ModuleId) -> VMResult<Vec<u8>> {
+    pub fn load_module(&self, module_id: &ModuleId) -> VMResult<Bytes> {
         self.data_cache.load_module(module_id)
     }
 
@@ -399,19 +400,9 @@ impl<'r, 'l> Session<'r, 'l> {
             .map_err(|e| e.finish(Location::Undefined))
     }
 
-    /// Fetch a struct type from cache, if the index is in bounds
-    /// Helpful when paired with load_type, or any other API that returns 'Type'
-    pub fn get_struct_type(&self, index: CachedStructIndex) -> Option<Arc<StructType>> {
-        self.move_vm.runtime.loader().get_struct_type(index)
-    }
-
     /// Gets the abilities for this type, at it's particular instantiation
     pub fn get_type_abilities(&self, ty: &Type) -> VMResult<AbilitySet> {
-        self.move_vm
-            .runtime /**/
-            .loader()
-            .abilities(ty)
-            .map_err(|e| e.finish(Location::Undefined))
+        ty.abilities().map_err(|e| e.finish(Location::Undefined))
     }
 
     /// Gets the underlying native extensions.
@@ -425,6 +416,14 @@ impl<'r, 'l> Session<'r, 'l> {
 
     pub fn get_vm_config(&self) -> &'l VMConfig {
         self.move_vm.runtime.loader().vm_config()
+    }
+
+    pub fn get_struct_type(&self, index: StructNameIndex) -> Option<Arc<StructType>> {
+        self.move_vm
+            .runtime
+            .loader()
+            .get_struct_type_by_idx(index)
+            .ok()
     }
 }
 

@@ -4,7 +4,7 @@ use crate::{transactions, transactions::RAYON_EXEC_POOL};
 use aptos_bitvec::BitVec;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_block_partitioner::{
-    sharded_block_partitioner::config::PartitionerV1Config, BlockPartitioner,
+    v2::config::PartitionerV2Config, BlockPartitioner, PartitionerConfig,
 };
 use aptos_crypto::HashValue;
 use aptos_language_e2e_tests::{
@@ -13,12 +13,18 @@ use aptos_language_e2e_tests::{
     executor::FakeExecutor,
 };
 use aptos_types::{
-    block_executor::partitioner::PartitionedTransactions,
+    block_executor::{
+        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain},
+        partitioner::PartitionedTransactions,
+    },
     block_metadata::BlockMetadata,
     on_chain_config::{OnChainConfig, ValidatorSet},
     transaction::{
-        analyzed_transaction::AnalyzedTransaction, ExecutionStatus, Transaction, TransactionOutput,
-        TransactionStatus,
+        analyzed_transaction::AnalyzedTransaction,
+        signature_verified_transaction::{
+            into_signature_verified_block, SignatureVerifiedTransaction,
+        },
+        ExecutionStatus, Transaction, TransactionOutput, TransactionStatus,
     },
     vm_status::VMStatus,
 };
@@ -99,8 +105,7 @@ where
             (
                 Some(parallel_block_executor),
                 Some(
-                    PartitionerV1Config::default()
-                        .num_shards(num_executor_shards)
+                    PartitionerV2Config::default()
                         .max_partitioning_rounds(4)
                         .cross_shard_dep_avoid_threshold(0.9)
                         .partition_last_round(true)
@@ -127,7 +132,7 @@ where
         }
     }
 
-    pub fn gen_transaction(&mut self) -> Vec<Transaction> {
+    pub fn gen_transaction(&mut self) -> Vec<SignatureVerifiedTransaction> {
         let mut runner = TestRunner::default();
         let transaction_gens = vec(&self.strategy, self.num_transactions)
             .new_tree(&mut runner)
@@ -157,19 +162,19 @@ where
         );
 
         transactions.insert(0, Transaction::BlockMetadata(new_block));
-        transactions
+        into_signature_verified_block(transactions)
     }
 
     pub fn partition_txns_if_needed(
         &mut self,
-        txns: &[Transaction],
+        txns: &[SignatureVerifiedTransaction],
     ) -> Option<PartitionedTransactions> {
         if self.is_shareded() {
             Some(
                 self.block_partitioner.as_ref().unwrap().partition(
                     txns.iter()
                         .skip(1)
-                        .map(|txn| txn.clone().into())
+                        .map(|txn| txn.expect_valid().clone().into())
                         .collect::<Vec<AnalyzedTransaction>>(),
                     self.sharded_block_executor.as_ref().unwrap().num_shards(),
                 ),
@@ -184,7 +189,7 @@ where
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
         let txns = self.gen_transaction();
-        self.execute_benchmark_sequential(txns, None);
+        self.execute_benchmark_sequential(&txns, None);
     }
 
     /// Executes this state in a single block.
@@ -192,7 +197,7 @@ where
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
         let txns = self.gen_transaction();
-        self.execute_benchmark_parallel(txns, num_cpus::get(), None);
+        self.execute_benchmark_parallel(&txns, num_cpus::get(), None);
     }
 
     fn is_shareded(&self) -> bool {
@@ -201,7 +206,7 @@ where
 
     fn execute_benchmark_sequential(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: &[SignatureVerifiedTransaction],
         maybe_block_gas_limit: Option<u64>,
     ) -> (Vec<TransactionOutput>, usize) {
         let block_size = transactions.len();
@@ -213,8 +218,7 @@ where
             Arc::clone(&RAYON_EXEC_POOL),
             transactions,
             self.state_view.as_ref(),
-            1,
-            maybe_block_gas_limit,
+            BlockExecutorConfig::new_maybe_block_limit(1, maybe_block_gas_limit),
             None,
         )
         .expect("VM should not fail to start");
@@ -239,7 +243,7 @@ where
                 self.state_view.clone(),
                 transactions,
                 concurrency_level_per_shard,
-                maybe_block_gas_limit,
+                BlockExecutorConfigFromOnchain::new_maybe_block_limit(maybe_block_gas_limit),
             )
             .expect("VM should not fail to start");
         let exec_time = timer.elapsed().as_millis();
@@ -249,7 +253,7 @@ where
 
     fn execute_benchmark_parallel(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: &[SignatureVerifiedTransaction],
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> (Vec<TransactionOutput>, usize) {
@@ -262,8 +266,10 @@ where
             Arc::clone(&RAYON_EXEC_POOL),
             transactions,
             self.state_view.as_ref(),
-            concurrency_level_per_shard,
-            maybe_block_gas_limit,
+            BlockExecutorConfig::new_maybe_block_limit(
+                concurrency_level_per_shard,
+                maybe_block_gas_limit,
+            ),
             None,
         )
         .expect("VM should not fail to start");
@@ -274,7 +280,7 @@ where
 
     pub(crate) fn execute_blockstm_benchmark(
         &mut self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<SignatureVerifiedTransaction>,
         partitioned_txns: Option<PartitionedTransactions>,
         run_par: bool,
         run_seq: bool,
@@ -291,7 +297,7 @@ where
                 )
             } else {
                 self.execute_benchmark_parallel(
-                    transactions.clone(),
+                    &transactions,
                     conurrency_level_per_shard,
                     maybe_block_gas_limit,
                 )
@@ -310,7 +316,7 @@ where
         let (output, seq_tps) = if run_seq {
             println!("Sequential execution starts...");
             let (output, tps) =
-                self.execute_benchmark_sequential(transactions, maybe_block_gas_limit);
+                self.execute_benchmark_sequential(&transactions, maybe_block_gas_limit);
             println!("Sequential execution finishes, TPS = {}", tps);
             (output, tps)
         } else {

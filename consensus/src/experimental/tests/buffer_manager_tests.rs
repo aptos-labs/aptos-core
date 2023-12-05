@@ -8,7 +8,8 @@ use crate::{
             create_channel, BufferManager, OrderedBlocks, Receiver, ResetAck, ResetRequest, Sender,
         },
         decoupled_execution_utils::prepare_phases_and_buffer_manager,
-        execution_phase::ExecutionPhase,
+        execution_schedule_phase::ExecutionSchedulePhase,
+        execution_wait_phase::ExecutionWaitPhase,
         ordering_state_computer::OrderingStateComputer,
         persisting_phase::PersistingPhase,
         pipeline_phase::PipelinePhase,
@@ -23,6 +24,7 @@ use crate::{
         RandomComputeResultStateComputer,
     },
 };
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
@@ -43,6 +45,7 @@ use aptos_safety_rules::{PersistentSafetyStorage, SafetyRulesManager};
 use aptos_secure_storage::Storage;
 use aptos_types::{
     account_address::AccountAddress,
+    epoch_state::EpochState,
     ledger_info::LedgerInfo,
     validator_signer::ValidatorSigner,
     validator_verifier::{random_validator_verifier, ValidatorVerifier},
@@ -60,7 +63,8 @@ pub fn prepare_buffer_manager() -> (
     Sender<ResetRequest>,
     aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
     aptos_channels::Receiver<Event<ConsensusMsg>>,
-    PipelinePhase<ExecutionPhase>,
+    PipelinePhase<ExecutionSchedulePhase>,
+    PipelinePhase<ExecutionWaitPhase>,
     PipelinePhase<SigningPhase>,
     PipelinePhase<PersistingPhase>,
     HashValue,
@@ -137,7 +141,8 @@ pub fn prepare_buffer_manager() -> (
     let hash_val = mocked_execution_proxy.get_root_hash();
 
     let (
-        execution_phase_pipeline,
+        execution_schedule_phase_pipeline,
+        execution_wait_phase_pipeline,
         signing_phase_pipeline,
         persisting_phase_pipeline,
         buffer_manager,
@@ -150,7 +155,10 @@ pub fn prepare_buffer_manager() -> (
         persisting_proxy,
         block_rx,
         buffer_reset_rx,
-        validators.clone(),
+        Arc::new(EpochState {
+            epoch: 1,
+            verifier: validators.clone(),
+        }),
     );
 
     (
@@ -159,7 +167,8 @@ pub fn prepare_buffer_manager() -> (
         buffer_reset_tx,
         msg_tx,       // channel to pass commit messages into the buffer manager
         self_loop_rx, // channel to receive message from the buffer manager itself
-        execution_phase_pipeline,
+        execution_schedule_phase_pipeline,
+        execution_wait_phase_pipeline,
         signing_phase_pipeline,
         persisting_phase_pipeline,
         hash_val,
@@ -188,7 +197,8 @@ pub fn launch_buffer_manager() -> (
         reset_tx,
         msg_tx,       // channel to pass commit messages into the buffer manager
         self_loop_rx, // channel to receive message from the buffer manager itself
-        execution_phase_pipeline,
+        execution_schedule_phase_pipeline,
+        execution_wait_phase_pipeline,
         signing_phase_pipeline,
         persisting_phase_pipeline,
         hash_val,
@@ -196,11 +206,13 @@ pub fn launch_buffer_manager() -> (
         result_rx,
         validators,
     ) = prepare_buffer_manager();
+    let bounded_executor = BoundedExecutor::new(1, runtime.handle().clone());
 
-    runtime.spawn(execution_phase_pipeline.start());
+    runtime.spawn(execution_schedule_phase_pipeline.start());
+    runtime.spawn(execution_wait_phase_pipeline.start());
     runtime.spawn(signing_phase_pipeline.start());
     runtime.spawn(persisting_phase_pipeline.start());
-    runtime.spawn(buffer_manager.start());
+    runtime.spawn(buffer_manager.start(bounded_executor));
 
     (
         block_tx,
@@ -216,12 +228,12 @@ pub fn launch_buffer_manager() -> (
 }
 
 async fn loopback_commit_vote(
-    self_loop_rx: &mut aptos_channels::Receiver<Event<ConsensusMsg>>,
+    msg: Event<ConsensusMsg>,
     msg_tx: &aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
     verifier: &ValidatorVerifier,
 ) {
-    match self_loop_rx.next().await {
-        Some(Event::RpcRequest(author, msg, protocol, callback)) => {
+    match msg {
+        Event::RpcRequest(author, msg, protocol, callback) => {
             if let ConsensusMsg::CommitMessage(msg) = msg {
                 msg.verify(verifier).unwrap();
                 let request = IncomingCommitRequest {
@@ -307,7 +319,9 @@ fn buffer_manager_happy_path_test() {
 
         // commit decision will be sent too, so 3 * 2
         for _ in 0..6 {
-            loopback_commit_vote(&mut self_loop_rx, &msg_tx, &verifier).await;
+            if let Some(msg) = self_loop_rx.next().await {
+                loopback_commit_vote(msg, &msg_tx, &verifier).await;
+            }
         }
 
         // make sure the order is correct
@@ -377,8 +391,8 @@ fn buffer_manager_sync_test() {
 
         // start sending back commit vote after reset, to avoid [0..dropped_batches] being sent to result_rx
         tokio::spawn(async move {
-            loop {
-                loopback_commit_vote(&mut self_loop_rx, &msg_tx, &verifier).await;
+            while let Some(msg) = self_loop_rx.next().await {
+                loopback_commit_vote(msg, &msg_tx, &verifier).await;
             }
         });
 
@@ -396,6 +410,6 @@ fn buffer_manager_sync_test() {
         // we should only see batches[dropped_batches..num_batches]
         assert_results(batches.drain(dropped_batches..).collect(), &mut result_rx).await;
 
-        assert!(matches!(result_rx.next().now_or_never(), None));
+        assert!(result_rx.next().now_or_never().is_none());
     });
 }

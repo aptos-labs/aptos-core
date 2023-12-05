@@ -1,18 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::helpers::MockPayloadManager;
 use crate::dag::{
     dag_store::Dag,
-    storage::DAGStorage,
-    tests::helpers::new_certified_node,
+    storage::{CommitEvent, DAGStorage},
+    tests::helpers::{new_certified_node, TEST_DAG_WINDOW},
     types::{CertifiedNode, DagSnapshotBitmask, Node},
     NodeId, Vote,
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_types::{
-    epoch_state::EpochState, validator_signer::ValidatorSigner,
-    validator_verifier::random_validator_verifier,
+    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
+    validator_signer::ValidatorSigner, validator_verifier::random_validator_verifier,
 };
 use std::{collections::HashMap, sync::Arc};
 
@@ -20,6 +21,7 @@ pub struct MockStorage {
     node_data: Mutex<Option<Node>>,
     vote_data: Mutex<HashMap<NodeId, Vote>>,
     certified_node_data: Mutex<HashMap<HashValue, CertifiedNode>>,
+    latest_ledger_info: Option<LedgerInfoWithSignatures>,
 }
 
 impl MockStorage {
@@ -28,6 +30,16 @@ impl MockStorage {
             node_data: Mutex::new(None),
             vote_data: Mutex::new(HashMap::new()),
             certified_node_data: Mutex::new(HashMap::new()),
+            latest_ledger_info: None,
+        }
+    }
+
+    pub fn new_with_ledger_info(ledger_info: LedgerInfoWithSignatures) -> Self {
+        Self {
+            node_data: Mutex::new(None),
+            vote_data: Mutex::new(HashMap::new()),
+            certified_node_data: Mutex::new(HashMap::new()),
+            latest_ledger_info: Some(ledger_info),
         }
     }
 }
@@ -86,16 +98,14 @@ impl DAGStorage for MockStorage {
         Ok(())
     }
 
-    fn save_ordered_anchor_id(&self, _node_id: &NodeId) -> anyhow::Result<()> {
-        Ok(())
-    }
-
-    fn get_ordered_anchor_ids(&self) -> anyhow::Result<Vec<(NodeId, ())>> {
+    fn get_latest_k_committed_events(&self, _k: u64) -> anyhow::Result<Vec<CommitEvent>> {
         Ok(vec![])
     }
 
-    fn delete_ordered_anchor_ids(&self, _node_ids: Vec<NodeId>) -> anyhow::Result<()> {
-        Ok(())
+    fn get_latest_ledger_info(&self) -> anyhow::Result<LedgerInfoWithSignatures> {
+        self.latest_ledger_info
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("ledger info not set"))
     }
 }
 
@@ -106,7 +116,14 @@ fn setup() -> (Vec<ValidatorSigner>, Arc<EpochState>, Dag, Arc<MockStorage>) {
         verifier: validator_verifier,
     });
     let storage = Arc::new(MockStorage::new());
-    let dag = Dag::new(epoch_state.clone(), storage.clone(), 1);
+    let payload_manager = Arc::new(MockPayloadManager {});
+    let dag = Dag::new(
+        epoch_state.clone(),
+        storage.clone(),
+        payload_manager,
+        1,
+        TEST_DAG_WINDOW,
+    );
     (signers, epoch_state, dag, storage)
 }
 
@@ -194,7 +211,13 @@ fn test_dag_recover_from_storage() {
             assert!(dag.add_node(node).is_ok());
         }
     }
-    let new_dag = Dag::new(epoch_state.clone(), storage.clone(), 1);
+    let new_dag = Dag::new(
+        epoch_state.clone(),
+        storage.clone(),
+        Arc::new(MockPayloadManager {}),
+        0,
+        TEST_DAG_WINDOW,
+    );
 
     for metadata in &metadatas {
         assert!(new_dag.exists(metadata));
@@ -205,7 +228,13 @@ fn test_dag_recover_from_storage() {
         verifier: epoch_state.verifier.clone(),
     });
 
-    let _new_epoch_dag = Dag::new(new_epoch_state, storage.clone(), 1);
+    let _new_epoch_dag = Dag::new(
+        new_epoch_state,
+        storage.clone(),
+        Arc::new(MockPayloadManager {}),
+        0,
+        TEST_DAG_WINDOW,
+    );
     assert!(storage.certified_node_data.lock().is_empty());
 }
 
@@ -213,7 +242,10 @@ fn test_dag_recover_from_storage() {
 fn test_dag_bitmask() {
     let (signers, epoch_state, mut dag, _) = setup();
 
-    assert_eq!(dag.bitmask(15), DagSnapshotBitmask::new(1, vec![]));
+    assert_eq!(
+        dag.bitmask(15),
+        DagSnapshotBitmask::new(1, vec![vec![false; 4]; 15])
+    );
 
     for round in 1..5 {
         let parents = dag
@@ -224,10 +256,9 @@ fn test_dag_bitmask() {
             assert!(dag.add_node(node).is_ok());
         }
     }
-    assert_eq!(
-        dag.bitmask(15),
-        DagSnapshotBitmask::new(1, vec![vec![true, true, true, false]; 4])
-    );
+    let mut bitmask = vec![vec![true, true, true, false]; 4];
+    bitmask.resize(15, vec![false; 4]);
+    assert_eq!(dag.bitmask(15), DagSnapshotBitmask::new(1, bitmask));
 
     // Populate the fourth author for all rounds
     for round in 1..5 {
@@ -237,6 +268,12 @@ fn test_dag_bitmask() {
         let node = new_certified_node(round, signers[3].author(), parents.clone());
         assert!(dag.add_node(node).is_ok());
     }
-    assert_eq!(dag.bitmask(15), DagSnapshotBitmask::new(5, vec![]));
-    assert_eq!(dag.bitmask(6), DagSnapshotBitmask::new(5, vec![]));
+    assert_eq!(
+        dag.bitmask(15),
+        DagSnapshotBitmask::new(5, vec![vec![false; 4]; 11])
+    );
+    assert_eq!(
+        dag.bitmask(6),
+        DagSnapshotBitmask::new(5, vec![vec![false; 4]; 2])
+    );
 }

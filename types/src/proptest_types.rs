@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::arc_with_non_send_sync)]
+
 use crate::{
     access_path::AccessPath,
     account_address::{self, AccountAddress},
@@ -26,6 +28,7 @@ use crate::{
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
+    validator_txn::{DummyValidatorTransaction, ValidatorTransaction},
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -38,6 +41,7 @@ use aptos_crypto::{
     HashValue,
 };
 use arr_macro::arr;
+use bytes::Bytes;
 use move_core_types::language_storage::TypeTag;
 use proptest::{
     collection::{vec, SizeRange},
@@ -55,7 +59,7 @@ use std::{
 
 impl WriteOp {
     pub fn value_strategy() -> impl Strategy<Value = Self> {
-        vec(any::<u8>(), 0..64).prop_map(WriteOp::Modification)
+        vec(any::<u8>(), 0..64).prop_map(|bytes| WriteOp::Modification(bytes.into()))
     }
 
     pub fn deletion_strategy() -> impl Strategy<Value = Self> {
@@ -181,7 +185,7 @@ impl AccountInfoUniverse {
     ) -> Self {
         let mut accounts: Vec<_> = account_private_keys
             .into_iter()
-            .zip(consensus_private_keys.into_iter())
+            .zip(consensus_private_keys)
             .map(|(private_key, consensus_private_key)| {
                 AccountInfo::new(private_key, consensus_private_key)
             })
@@ -806,9 +810,9 @@ impl TransactionToCommitGen {
                         (
                             (
                                 state_key.clone(),
-                                Some(StateValue::new_legacy(value.clone())),
+                                Some(StateValue::new_legacy(Bytes::copy_from_slice(&value))),
                             ),
-                            (state_key, WriteOp::Modification(value)),
+                            (state_key, WriteOp::Modification(value.into())),
                         )
                     })
             })
@@ -1207,6 +1211,22 @@ impl Arbitrary for ValidatorVerifier {
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         vec(any::<ValidatorConsensusInfo>(), 1..1000)
             .prop_map(ValidatorVerifier::new)
+            .boxed()
+    }
+}
+
+#[cfg(any(test, feature = "fuzzing"))]
+impl Arbitrary for ValidatorTransaction {
+    type Parameters = SizeRange;
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        Just(Value::Null)
+            .prop_map(|_| {
+                ValidatorTransaction::DummyTopic(DummyValidatorTransaction {
+                    payload: vec![0xFF; 16],
+                })
+            })
             .boxed()
     }
 }

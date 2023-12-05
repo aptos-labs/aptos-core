@@ -107,7 +107,7 @@ ARGS:
 ## Folder Structure
 
 ```text
-move-compiler                                     # Main crate
+move-compiler                                 # Main crate
 ├── src                                       # Source code for Move lang
 │   ├── lib.rs                                # The entry points into compilation
 |   |

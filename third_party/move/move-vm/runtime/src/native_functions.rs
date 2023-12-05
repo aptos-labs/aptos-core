@@ -59,6 +59,7 @@ pub fn make_table_from_iter<S: Into<Box<str>>>(
         .collect()
 }
 
+#[derive(Clone)]
 pub(crate) struct NativeFunctions(
     HashMap<AccountAddress, HashMap<String, HashMap<String, NativeFunction>>>,
 );
@@ -145,6 +146,14 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
 
     pub fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
         self.resolver.type_to_type_layout(ty)
+    }
+
+    pub fn type_to_type_layout_with_identifier_mappings(
+        &self,
+        ty: &Type,
+    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
+        self.resolver
+            .type_to_type_layout_with_identifier_mappings(ty)
     }
 
     pub fn type_to_fully_annotated_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {

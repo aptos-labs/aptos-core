@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    register_histogram, register_histogram_vec, register_int_gauge, Histogram, HistogramVec,
-    IntGauge,
+    exponential_buckets, register_histogram, register_histogram_vec, register_int_gauge, Histogram,
+    HistogramVec, IntGauge,
 };
 use once_cell::sync::Lazy;
 
@@ -55,6 +55,20 @@ pub static SHARDED_BLOCK_EXECUTOR_TXN_COUNT: Lazy<HistogramVec> = Lazy::new(|| {
         "sharded_block_executor_txn_count",
         "Count of number of transactions per shard per round in sharded execution",
         &["shard_id", "round_id"]
+    )
+    .unwrap()
+});
+
+pub static SHARDED_EXECUTOR_SERVICE_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        // metric name
+        "sharded_executor_execute_block_seconds",
+        // metric description
+        "Time spent in seconds on executing a block on a shard including: \
+         1. execute_block: fetching state values and cross-shard communications; \
+         2. result_tx: TX of results to coordinator.",
+        &["shard_id", "name"],
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     )
     .unwrap()
 });

@@ -25,7 +25,7 @@ pub fn generate_upgrade_proposals(
 ) -> Result<Vec<(String, String)>> {
     const APTOS_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-core.git";
 
-    let mut package_path_list = vec![
+    let mut package_path_list = [
         ("0x1", "aptos-move/framework/move-stdlib"),
         ("0x1", "aptos-move/framework/aptos-stdlib"),
         ("0x1", "aptos-move/framework/aptos-framework"),

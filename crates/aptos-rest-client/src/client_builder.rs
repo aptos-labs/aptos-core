@@ -7,10 +7,10 @@ use crate::{
 use anyhow::Result;
 use aptos_api_types::X_APTOS_CLIENT;
 use reqwest::{
-    header::{HeaderMap, HeaderName, HeaderValue},
+    header::{self, HeaderMap, HeaderName, HeaderValue},
     Client as ReqwestClient, ClientBuilder as ReqwestClientBuilder,
 };
-use std::{str::FromStr, time::Duration};
+use std::{env, str::FromStr, time::Duration};
 use url::Url;
 
 pub enum AptosBaseUrl {
@@ -51,13 +51,18 @@ impl ClientBuilder {
             HeaderValue::from_static(X_APTOS_SDK_HEADER_VALUE),
         );
 
-        Self {
+        let mut client_builder = Self {
             reqwest_builder: ReqwestClient::builder(),
             base_url: aptos_base_url.to_url(),
             version_path_base: DEFAULT_VERSION_PATH_BASE.to_string(),
             timeout: Duration::from_secs(10), // Default to 10 seconds
             headers,
+        };
+
+        if let Ok(key) = env::var("X_API_KEY") {
+            client_builder = client_builder.api_key(&key).unwrap();
         }
+        client_builder
     }
 
     pub fn base_url(mut self, base_url: Url) -> Self {
@@ -74,6 +79,14 @@ impl ClientBuilder {
         self.headers.insert(
             HeaderName::from_str(header_key)?,
             HeaderValue::from_str(header_val)?,
+        );
+        Ok(self)
+    }
+
+    pub fn api_key(mut self, api_key: &str) -> Result<Self> {
+        self.headers.insert(
+            header::AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {}", api_key))?,
         );
         Ok(self)
     }

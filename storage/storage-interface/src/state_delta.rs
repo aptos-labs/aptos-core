@@ -5,12 +5,11 @@ use aptos_crypto::HashValue;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_types::{
     state_store::{
-        create_empty_sharded_state_updates, state_storage_usage::StateStorageUsage,
-        state_value::StateValue, ShardedStateUpdates,
+        combine_sharded_state_updates, create_empty_sharded_state_updates,
+        state_storage_usage::StateStorageUsage, state_value::StateValue, ShardedStateUpdates,
     },
     transaction::Version,
 };
-use itertools::zip_eq;
 
 /// This represents two state sparse merkle trees at their versions in memory with the updates
 /// reflecting the difference of `current` on top of `base`.
@@ -36,6 +35,7 @@ impl StateDelta {
         current_version: Option<Version>,
         updates_since_base: ShardedStateUpdates,
     ) -> Self {
+        assert!(base.is_family(&current));
         assert!(base_version.map_or(0, |v| v + 1) <= current_version.map_or(0, |v| v + 1));
         Self {
             base,
@@ -74,13 +74,7 @@ impl StateDelta {
 
     pub fn merge(&mut self, other: StateDelta) {
         assert!(other.follow(self));
-        zip_eq(
-            self.updates_since_base.iter_mut(),
-            other.updates_since_base.into_iter(),
-        )
-        .for_each(|(base, delta)| {
-            base.extend(delta);
-        });
+        combine_sharded_state_updates(&mut self.updates_since_base, other.updates_since_base);
 
         self.current = other.current;
         self.current_version = other.current_version;
@@ -101,5 +95,20 @@ impl StateDelta {
 
     pub fn root_hash(&self) -> HashValue {
         self.current.root_hash()
+    }
+
+    pub fn next_version(&self) -> Version {
+        self.current_version.map_or(0, |v| v + 1)
+    }
+
+    pub fn replace_with(&mut self, mut rhs: Self) -> Self {
+        std::mem::swap(self, &mut rhs);
+        rhs
+    }
+}
+
+impl Default for StateDelta {
+    fn default() -> Self {
+        Self::new_empty()
     }
 }

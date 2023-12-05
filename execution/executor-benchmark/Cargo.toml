@@ -20,8 +20,10 @@ aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-db = { workspace = true }
 aptos-executor = { workspace = true }
+aptos-executor-service = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-experimental-ptx-executor = { workspace = true }
+aptos-experimental-runtimes = { workspace = true }
 aptos-genesis = { workspace = true, features = ["testing"] }
 aptos-jellyfish-merkle = { workspace = true }
 aptos-logger = { workspace = true }
@@ -47,6 +49,7 @@ once_cell = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
+thread_local = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
 

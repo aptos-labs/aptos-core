@@ -6,7 +6,7 @@ Ok(
                     WriteSetMut {
                         write_set: {
                             StateKey {
-                                inner: AccessPath { address: 0xa550c18, path: "Code(0xa550c18::M)" },
+                                inner: AccessPath { address: 0xa550c18, path: "Code(000000000000000000000000000000000000000000000000000000000a550c18::M)" },
                                 hash: OnceCell(Uninit),
                             }: CreationWithMetadata(a11ceb0b06000000030100020702020804200000014d000000000000000000000000000000000000000000000000000000000a550c1800, metadata:V0 { deposit: 0, creation_time_usecs: 0 }),
                             StateKey {

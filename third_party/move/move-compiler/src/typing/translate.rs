@@ -1064,7 +1064,7 @@ fn sequence(context: &mut Context, seq: N::Sequence) -> T::Sequence {
                 e,
             } => {
                 context.close_locals_scope(old_locals, declared);
-                let lvalue_ty = lvalues_expected_types(context, &b);
+                let lvalue_ty = lvalues_expected_types(&b);
                 resulting_sequence.push_front(sp(loc, TS::Bind(b, lvalue_ty, e)))
             },
         }
@@ -1073,7 +1073,7 @@ fn sequence(context: &mut Context, seq: N::Sequence) -> T::Sequence {
     resulting_sequence
 }
 
-fn sequence_type(seq: &T::Sequence) -> &Type {
+pub fn sequence_type(seq: &T::Sequence) -> &Type {
     use T::SequenceItem_ as TS;
     match seq.back().unwrap() {
         sp!(_, TS::Bind(_, _, _)) | sp!(_, TS::Declare(_)) => {
@@ -1343,7 +1343,7 @@ fn exp_inner(context: &mut Context, sp!(eloc, ne_): N::Exp) -> T::Exp {
         NE::Assign(na, nr) => {
             let er = exp(context, nr);
             let a = assign_list(context, na, er.ty.clone());
-            let lvalue_ty = lvalues_expected_types(context, &a);
+            let lvalue_ty = lvalues_expected_types(&a);
             (sp(eloc, Type_::Unit), TE::Assign(a, lvalue_ty, er))
         },
 
@@ -1626,16 +1626,11 @@ fn loop_body(
 // Locals and LValues
 //**************************************************************************************************
 
-fn lvalues_expected_types(
-    context: &mut Context,
-    sp!(_loc, bs_): &T::LValueList,
-) -> Vec<Option<N::Type>> {
-    bs_.iter()
-        .map(|b| lvalue_expected_types(context, b))
-        .collect()
+pub fn lvalues_expected_types(sp!(_loc, bs_): &T::LValueList) -> Vec<Option<N::Type>> {
+    bs_.iter().map(lvalue_expected_types).collect()
 }
 
-fn lvalue_expected_types(_context: &mut Context, sp!(loc, b_): &T::LValue) -> Option<N::Type> {
+fn lvalue_expected_types(sp!(loc, b_): &T::LValue) -> Option<N::Type> {
     use N::Type_::*;
     use T::LValue_ as L;
     let loc = *loc;

@@ -1,10 +1,13 @@
-// ---- Model Dump
-module 0x2::X {
-} // end 0x2::X
-module 0x2::M {
-    private fun foo() {
-        0;
-        0;
-        Tuple()
-    }
-} // end 0x2::M
+
+Diagnostics:
+error: constant `0x2::X::C` cannot be used here because it is private to the module `0x2::X`
+   ┌─ tests/checking/typing/constant_internal.move:10:9
+   │
+10 │         X::C;
+   │         ^^^^
+
+error: constant `0x2::X::C` cannot be used here because it is private to the module `0x2::X`
+   ┌─ tests/checking/typing/constant_internal.move:11:9
+   │
+11 │         C;
+   │         ^

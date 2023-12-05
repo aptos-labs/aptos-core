@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::on_chain_config::OnChainConfig;
+use crate::{
+    block_executor::config::BlockExecutorConfigFromOnchain, on_chain_config::OnChainConfig,
+};
 use anyhow::{format_err, Result};
 use serde::{Deserialize, Serialize};
 
@@ -30,12 +32,22 @@ impl OnChainExecutionConfig {
     }
 
     /// The per-block gas limit being used.
-    pub fn block_gas_limit(&self) -> Option<u64> {
+    pub fn block_gas_limit_type(&self) -> BlockGasLimitType {
         match &self {
-            OnChainExecutionConfig::Missing => None,
-            OnChainExecutionConfig::V1(_config) => None,
-            OnChainExecutionConfig::V2(config) => config.block_gas_limit,
-            OnChainExecutionConfig::V3(config) => config.block_gas_limit,
+            OnChainExecutionConfig::Missing => BlockGasLimitType::NoLimit,
+            OnChainExecutionConfig::V1(_config) => BlockGasLimitType::NoLimit,
+            OnChainExecutionConfig::V2(config) => config
+                .block_gas_limit
+                .map_or(BlockGasLimitType::NoLimit, BlockGasLimitType::Limit),
+            OnChainExecutionConfig::V3(config) => config
+                .block_gas_limit
+                .map_or(BlockGasLimitType::NoLimit, BlockGasLimitType::Limit),
+        }
+    }
+
+    pub fn block_executor_onchain_config(&self) -> BlockExecutorConfigFromOnchain {
+        BlockExecutorConfigFromOnchain {
+            block_gas_limit_type: self.block_gas_limit_type(),
         }
     }
 
@@ -118,6 +130,21 @@ pub enum TransactionDeduperType {
     TxnHashAndAuthenticatorV1,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum BlockGasLimitType {
+    NoLimit,
+    Limit(u64),
+}
+
+impl BlockGasLimitType {
+    pub fn block_gas_limit(&self) -> Option<u64> {
+        match self {
+            BlockGasLimitType::NoLimit => None,
+            BlockGasLimitType::Limit(limit) => Some(*limit),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -167,7 +194,10 @@ mod test {
             result.transaction_shuffler_type(),
             TransactionShufflerType::SenderAwareV2(32)
         ));
-        assert!(result.block_gas_limit() == Some(rand_gas_limit));
+        assert_eq!(
+            result.block_gas_limit_type(),
+            BlockGasLimitType::Limit(rand_gas_limit)
+        );
 
         // V2 test with no per-block gas limit
         let config = OnChainExecutionConfig::V2(ExecutionConfigV2 {
@@ -181,7 +211,7 @@ mod test {
             result.transaction_shuffler_type(),
             TransactionShufflerType::SenderAwareV2(32)
         ));
-        assert!(matches!(result.block_gas_limit(), None));
+        assert_eq!(result.block_gas_limit_type(), BlockGasLimitType::NoLimit);
     }
 
     #[test]
@@ -226,7 +256,10 @@ mod test {
             result.transaction_shuffler_type(),
             TransactionShufflerType::SenderAwareV2(32)
         ));
-        assert!(result.block_gas_limit() == Some(rand_gas_limit));
+        assert_eq!(
+            result.block_gas_limit_type(),
+            BlockGasLimitType::Limit(rand_gas_limit)
+        );
 
         // V2 test with no per-block gas limit
         let execution_config = OnChainExecutionConfig::V2(ExecutionConfigV2 {
@@ -248,6 +281,6 @@ mod test {
             result.transaction_shuffler_type(),
             TransactionShufflerType::SenderAwareV2(32)
         ));
-        assert!(matches!(result.block_gas_limit(), None));
+        assert_eq!(result.block_gas_limit_type(), BlockGasLimitType::NoLimit);
     }
 }

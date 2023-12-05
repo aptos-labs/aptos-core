@@ -8,8 +8,8 @@ use crate::{
     utils::{
         constants::{MAX_RETRY_TIME_SECONDS, URI_SKIP_LIST},
         counters::{
-            DUPLICATE_RAW_ANIMATION_URI_COUNT, DUPLICATE_RAW_IMAGE_URI_COUNT,
-            DUPLICATE_TOKEN_URI_COUNT, GOT_CONNECTION_COUNT, OPTIMIZE_IMAGE_TYPE_COUNT,
+            DUPLICATE_ASSET_URI_COUNT, DUPLICATE_RAW_ANIMATION_URI_COUNT,
+            DUPLICATE_RAW_IMAGE_URI_COUNT, GOT_CONNECTION_COUNT, OPTIMIZE_IMAGE_TYPE_COUNT,
             PARSER_FAIL_COUNT, PARSER_INVOCATIONS_COUNT, PARSER_SUCCESSES_COUNT,
             PARSE_URI_TYPE_COUNT, PUBSUB_ACK_SUCCESS_COUNT, PUBSUB_STREAM_RESET_COUNT,
             SKIP_URI_COUNT, UNABLE_TO_GET_CONNECTION_COUNT,
@@ -31,15 +31,17 @@ use diesel::{
 };
 use futures::{future::join_all, StreamExt};
 use google_cloud_pubsub::{
-    client::{Client, ClientConfig},
+    client::{Client as PubsubClient, ClientConfig as PubsubClientConfig},
     subscription::{MessageStream, Subscription},
 };
+use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GCSClientConfig};
 use image::ImageFormat;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::time::{Duration, Instant};
 use tokio::task::JoinHandle;
 use tracing::{error, info, warn};
+use url::Url;
 
 /// Structs to hold config from YAML
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -62,11 +64,13 @@ async fn spawn_parser(
     parser_config: ParserConfig,
     pool: Pool<ConnectionManager<PgConnection>>,
     subscription: Subscription,
+    gcs_client: GCSClient,
     ack_parsed_uris: bool,
 ) {
     let mut db_chain_id = None;
     let mut stream = get_new_subscription_stream(&subscription).await;
     while let Some(msg) = stream.next().await {
+        PARSER_INVOCATIONS_COUNT.inc();
         let start_time = Instant::now();
         let pubsub_message = String::from_utf8(msg.message.clone().data).unwrap_or_else(|e| {
             error!(
@@ -85,6 +89,7 @@ async fn spawn_parser(
         if pubsub_message.matches(',').count() != 5 {
             // Sends ack to PubSub only if ack_parsed_uris flag is true
             info!("[NFT Metadata Crawler] More than 5 commas, skipping message");
+            SKIP_URI_COUNT.with_label_values(&["invalid"]).inc();
             if ack_parsed_uris {
                 info!(
                     pubsub_message = pubsub_message,
@@ -92,16 +97,17 @@ async fn spawn_parser(
                     "[NFT Metadata Crawler] Received worker, acking message"
                 );
                 if let Err(e) = send_ack(&subscription, msg.ack_id()).await {
-                    error!(
+                    warn!(
                         pubsub_message = pubsub_message,
                         error = ?e,
                         "[NFT Metadata Crawler] Resetting stream"
                     );
                     stream = get_new_subscription_stream(&subscription).await;
+                    continue;
                 }
                 PUBSUB_ACK_SUCCESS_COUNT.inc();
-                continue;
             }
+            continue;
         }
 
         // Parse PubSub message
@@ -109,7 +115,15 @@ async fn spawn_parser(
 
         // Perform chain id check
         // If chain id is not set, set it
-        let mut conn = get_conn(pool.clone());
+        let mut conn = pool.get().unwrap_or_else(|e| {
+            error!(
+                pubsub_message = pubsub_message,
+                error = ?e,
+                "[NFT Metadata Crawler] Failed to get DB connection from pool");
+            UNABLE_TO_GET_CONNECTION_COUNT.inc();
+            panic!();
+        });
+        GOT_CONNECTION_COUNT.inc();
 
         let grpc_chain_id = parts[4].parse::<u64>().unwrap_or_else(|e| {
             error!(
@@ -138,6 +152,7 @@ async fn spawn_parser(
         let mut worker = Worker::new(
             parser_config.clone(),
             conn,
+        gcs_client.clone(),
             pubsub_message.clone(),
             parts[0].to_string(),
             parts[1].to_string(),
@@ -170,7 +185,7 @@ async fn spawn_parser(
                 "[NFT Metadata Crawler] Received worker, acking message"
             );
             if let Err(e) = send_ack(&subscription, msg.ack_id()).await {
-                error!(
+                warn!(
                     pubsub_message = pubsub_message,
                     error = ?e,
                     "[NFT Metadata Crawler] Resetting stream"
@@ -186,7 +201,6 @@ async fn spawn_parser(
             "[NFT Metadata Crawler] Starting worker"
         );
 
-        PARSER_INVOCATIONS_COUNT.inc();
         if let Err(e) = worker.parse().await {
             warn!(
                 pubsub_message = pubsub_message,
@@ -194,8 +208,6 @@ async fn spawn_parser(
                 "[NFT Metadata Crawler] Parsing failed"
             );
             PARSER_FAIL_COUNT.inc();
-        } else {
-            PARSER_SUCCESSES_COUNT.inc();
         }
 
         info!(
@@ -228,28 +240,6 @@ async fn send_ack(subscription: &Subscription, ack_id: &str) -> anyhow::Result<(
     .context("Failed to ack message to PubSub")
 }
 
-/// Gets a Postgres connection from the pool
-fn get_conn(
-    pool: Pool<ConnectionManager<PgConnection>>,
-) -> PooledConnection<ConnectionManager<PgConnection>> {
-    loop {
-        match pool.get() {
-            Ok(conn) => {
-                GOT_CONNECTION_COUNT.inc();
-                return conn;
-            },
-            Err(err) => {
-                UNABLE_TO_GET_CONNECTION_COUNT.inc();
-                error!(
-                    "Could not get DB connection from pool, will retry in {:?}. Err: {:?}",
-                    pool.connection_timeout(),
-                    err
-                );
-            },
-        };
-    }
-}
-
 #[async_trait::async_trait]
 impl RunnableConfig for ParserConfig {
     /// Main driver function that establishes a connection to Pubsub and parses the Pubsub entries in parallel
@@ -274,8 +264,28 @@ impl RunnableConfig for ParserConfig {
             );
         }
 
-        // Establish gRPC client
-        let config = ClientConfig::default()
+        // Establish PubSub client
+        let pubsub_config = PubsubClientConfig::default()
+            .with_auth()
+            .await
+            .unwrap_or_else(|e| {
+                error!(
+                    error = ?e,
+                    "[NFT Metadata Crawler] Failed to create PubSub client config"
+                );
+                panic!();
+            });
+        let pubsub_client = PubsubClient::new(pubsub_config).await.unwrap_or_else(|e| {
+            error!(
+                error = ?e,
+                "[NFT Metadata Crawler] Failed to create PubSub client"
+            );
+            panic!();
+        });
+        let subscription = pubsub_client.subscription(&self.subscription_name);
+
+        // Establish GCS client
+        let gcs_config = GCSClientConfig::default()
             .with_auth()
             .await
             .unwrap_or_else(|e| {
@@ -285,14 +295,7 @@ impl RunnableConfig for ParserConfig {
                 );
                 panic!();
             });
-        let client = Client::new(config).await.unwrap_or_else(|e| {
-            error!(
-                error = ?e,
-                "[NFT Metadata Crawler] Failed to create gRPC client"
-            );
-            panic!();
-        });
-        let subscription = client.subscription(&self.subscription_name);
+        let gcs_client = GCSClient::new(gcs_config);
 
         // Spawns workers
         let mut workers: Vec<JoinHandle<()>> = Vec::new();
@@ -301,6 +304,7 @@ impl RunnableConfig for ParserConfig {
                 self.clone(),
                 pool.clone(),
                 subscription.clone(),
+                gcs_client.clone(),
                 self.ack_parsed_uris.unwrap_or(false),
             ));
 
@@ -320,10 +324,11 @@ impl RunnableConfig for ParserConfig {
 pub struct Worker {
     config: ParserConfig,
     conn: PooledConnection<ConnectionManager<PgConnection>>,
+    gcs_client: GCSClient,
     pubsub_message: String,
     model: NFTMetadataCrawlerURIs,
-    token_data_id: String,
-    token_uri: String,
+    asset_data_id: String,
+    asset_uri: String,
     last_transaction_version: i32,
     last_transaction_timestamp: chrono::NaiveDateTime,
     force: bool,
@@ -333,9 +338,10 @@ impl Worker {
     pub fn new(
         config: ParserConfig,
         conn: PooledConnection<ConnectionManager<PgConnection>>,
+        gcs_client: GCSClient,
         pubsub_message: String,
-        token_data_id: String,
-        token_uri: String,
+        asset_data_id: String,
+        asset_uri: String,
         last_transaction_version: i32,
         last_transaction_timestamp: chrono::NaiveDateTime,
         force: bool,
@@ -343,10 +349,11 @@ impl Worker {
         let worker = Self {
             config,
             conn,
+            gcs_client,
             pubsub_message,
-            model: NFTMetadataCrawlerURIs::new(token_uri.clone()),
-            token_data_id,
-            token_uri,
+            model: NFTMetadataCrawlerURIs::new(asset_uri.clone()),
+            asset_data_id,
+            asset_uri,
             last_transaction_version,
             last_transaction_timestamp,
             force,
@@ -357,35 +364,42 @@ impl Worker {
 
     /// Main parsing flow
     pub async fn parse(&mut self) -> anyhow::Result<()> {
-        // Deduplicate token_uri
-        // Exit if not force or if token_uri has already been parsed
+        // Deduplicate asset_uri
+        // Exit if not force or if asset_uri has already been parsed
         if !self.force
-            && NFTMetadataCrawlerURIsQuery::get_by_token_uri(self.token_uri.clone(), &mut self.conn)
+            && NFTMetadataCrawlerURIsQuery::get_by_asset_uri(self.asset_uri.clone(), &mut self.conn)
                 .is_some()
         {
-            self.log_info("Duplicate token_uri found, skipping parse");
-            DUPLICATE_TOKEN_URI_COUNT.inc();
+            self.log_info("Duplicate asset_uri found, skipping parse");
+            DUPLICATE_ASSET_URI_COUNT.inc();
             return Ok(());
         }
 
-        // Skip if token_uri contains any of the uris in URI_SKIP_LIST
+        // Skip if asset_uri contains any of the uris in URI_SKIP_LIST
         if URI_SKIP_LIST
             .iter()
-            .any(|&uri| self.token_uri.contains(uri))
+            .any(|&uri| self.asset_uri.contains(uri))
         {
             self.log_info("Found match in URI skip list, skipping parse");
-            SKIP_URI_COUNT.inc();
+            SKIP_URI_COUNT.with_label_values(&["blacklist"]).inc();
             return Ok(());
         }
 
-        // Parse token_uri
-        self.log_info("Parsing token_uri");
+        // Skip if asset_uri is not a valid URI
+        if Url::parse(&self.asset_uri).is_err() {
+            self.log_info("URI is invalid, skipping parse");
+            SKIP_URI_COUNT.with_label_values(&["invalid"]).inc();
+            return Ok(());
+        }
+
+        // Parse asset_uri
+        self.log_info("Parsing asset_uri");
         let json_uri =
-            URIParser::parse(self.config.ipfs_prefix.clone(), self.model.get_token_uri())
+            URIParser::parse(self.config.ipfs_prefix.clone(), self.model.get_asset_uri())
                 .unwrap_or_else(|_| {
-                    self.log_warn("Failed to parse token_uri", None);
+                    self.log_warn("Failed to parse asset_uri", None);
                     PARSE_URI_TYPE_COUNT.with_label_values(&["other"]).inc();
-                    self.model.get_token_uri()
+                    self.model.get_asset_uri()
                 });
 
         // Parse JSON for raw_image_uri and raw_animation_uri
@@ -406,12 +420,19 @@ impl Worker {
         // Save parsed JSON to GCS
         if json != Value::Null {
             self.log_info("Writing JSON to GCS");
-            let cdn_json_uri_result =
-                write_json_to_gcs(self.config.bucket.clone(), self.token_data_id.clone(), json)
-                    .await;
+            let cdn_json_uri_result = write_json_to_gcs(
+                self.config.bucket.clone(),
+                self.asset_data_id.clone(),
+                json,
+                &self.gcs_client,
+            )
+            .await;
 
             if let Err(e) = cdn_json_uri_result.as_ref() {
-                self.log_error("Failed to write JSON to GCS", e);
+                self.log_warn(
+                    "Failed to write JSON to GCS, maybe upload timed out?",
+                    Some(e),
+                );
             }
 
             let cdn_json_uri = cdn_json_uri_result
@@ -428,11 +449,11 @@ impl Worker {
 
         // Deduplicate raw_image_uri
         // Proceed with image optimization of force or if raw_image_uri has not been parsed
-        // Since we default to token_uri, this check works if raw_image_uri is null because deduplication for token_uri has already taken place
+        // Since we default to asset_uri, this check works if raw_image_uri is null because deduplication for asset_uri has already taken place
         if self.force
             || self.model.get_raw_image_uri().map_or(true, |uri_option| {
                 match NFTMetadataCrawlerURIsQuery::get_by_raw_image_uri(
-                    self.token_uri.clone(),
+                    self.asset_uri.clone(),
                     uri_option,
                     &mut self.conn,
                 ) {
@@ -446,12 +467,12 @@ impl Worker {
                 }
             })
         {
-            // Parse raw_image_uri, use token_uri if parsing fails
+            // Parse raw_image_uri, use asset_uri if parsing fails
             self.log_info("Parsing raw_image_uri");
             let raw_image_uri = self
                 .model
                 .get_raw_image_uri()
-                .unwrap_or(self.model.get_token_uri());
+                .unwrap_or(self.model.get_asset_uri());
             let img_uri = URIParser::parse(self.config.ipfs_prefix.clone(), raw_image_uri.clone())
                 .unwrap_or_else(|_| {
                     self.log_warn("Failed to parse raw_image_uri", None);
@@ -483,13 +504,17 @@ impl Worker {
                 let cdn_image_uri_result = write_image_to_gcs(
                     format,
                     self.config.bucket.clone(),
-                    self.token_data_id.clone(),
+                    self.asset_data_id.clone(),
                     image,
+                    &self.gcs_client,
                 )
                 .await;
 
                 if let Err(e) = cdn_image_uri_result.as_ref() {
-                    self.log_error("Failed to write image to GCS", e);
+                    self.log_warn(
+                        "Failed to write image to GCS, maybe upload timed out?",
+                        Some(e),
+                    );
                 }
 
                 let cdn_image_uri = cdn_image_uri_result
@@ -511,7 +536,7 @@ impl Worker {
         if !self.force
             && raw_animation_uri_option.clone().map_or(true, |uri| {
                 match NFTMetadataCrawlerURIsQuery::get_by_raw_animation_uri(
-                    self.token_uri.clone(),
+                    self.asset_uri.clone(),
                     uri,
                     &mut self.conn,
                 ) {
@@ -563,8 +588,9 @@ impl Worker {
                 let cdn_animation_uri_result = write_image_to_gcs(
                     format,
                     self.config.bucket.clone(),
-                    self.token_data_id.clone(),
+                    self.asset_data_id.clone(),
                     animation,
+                    &self.gcs_client,
                 )
                 .await;
 
@@ -585,14 +611,15 @@ impl Worker {
             self.log_error("Commit to Postgres failed", &e);
         }
 
+        PARSER_SUCCESSES_COUNT.inc();
         Ok(())
     }
 
     fn log_info(&self, message: &str) {
         info!(
             pubsub_message = self.pubsub_message,
-            token_data_id = self.token_data_id,
-            token_uri = self.token_uri,
+            asset_data_id = self.asset_data_id,
+            asset_uri = self.asset_uri,
             last_transaction_version = self.last_transaction_version,
             last_transaction_timestamp = self.last_transaction_timestamp.to_string(),
             "[NFT Metadata Crawler] {}",
@@ -603,8 +630,8 @@ impl Worker {
     fn log_warn(&self, message: &str, e: Option<&anyhow::Error>) {
         warn!(
             pubsub_message = self.pubsub_message,
-            token_data_id = self.token_data_id,
-            token_uri = self.token_uri,
+            asset_data_id = self.asset_data_id,
+            asset_uri = self.asset_uri,
             last_transaction_version = self.last_transaction_version,
             last_transaction_timestamp = self.last_transaction_timestamp.to_string(),
             error = ?e,
@@ -616,8 +643,8 @@ impl Worker {
     fn log_error(&self, message: &str, e: &anyhow::Error) {
         error!(
             pubsub_message = self.pubsub_message,
-            token_data_id = self.token_data_id,
-            token_uri = self.token_uri,
+            asset_data_id = self.asset_data_id,
+            asset_uri = self.asset_uri,
             last_transaction_version = self.last_transaction_version,
             last_transaction_timestamp = self.last_transaction_timestamp.to_string(),
             error = ?e,

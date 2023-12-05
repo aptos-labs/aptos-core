@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use super::types::DAGMessage;
+use super::{types::DAGMessage, DAGRpcResult};
 use aptos_consensus_types::common::Author;
 use aptos_reliable_broadcast::RBNetworkSender;
 use aptos_time_service::{Interval, TimeService, TimeServiceTrait};
@@ -17,30 +17,33 @@ use std::{
     time::Duration,
 };
 
+#[async_trait]
 pub trait RpcHandler {
     type Request;
     type Response;
 
-    fn process(&mut self, message: Self::Request) -> anyhow::Result<Self::Response>;
+    async fn process(&mut self, message: Self::Request) -> anyhow::Result<Self::Response>;
 }
 
 #[async_trait]
-pub trait TDAGNetworkSender: Send + Sync + RBNetworkSender<DAGMessage> {
+pub trait TDAGNetworkSender: Send + Sync + RBNetworkSender<DAGMessage, DAGRpcResult> {
     async fn send_rpc(
         &self,
         receiver: Author,
         message: DAGMessage,
         timeout: Duration,
-    ) -> anyhow::Result<DAGMessage>;
+    ) -> anyhow::Result<DAGRpcResult>;
 
     /// Given a list of potential responders, sending rpc to get response from any of them and could
     /// fallback to more in case of failures.
     async fn send_rpc_with_fallbacks(
-        &self,
+        self: Arc<Self>,
         responders: Vec<Author>,
         message: DAGMessage,
         retry_interval: Duration,
         rpc_timeout: Duration,
+        min_concurrent_responders: u32,
+        max_concurrent_responders: u32,
     ) -> RpcWithFallback;
 }
 
@@ -71,15 +74,19 @@ impl Responders {
     }
 }
 
+pub struct RpcResultWithResponder {
+    pub result: anyhow::Result<DAGRpcResult>,
+    pub responder: Author,
+}
+
 pub struct RpcWithFallback {
     responders: Responders,
     message: DAGMessage,
     rpc_timeout: Duration,
 
     terminated: bool,
-    futures: Pin<
-        Box<FuturesUnordered<Pin<Box<dyn Future<Output = anyhow::Result<DAGMessage>> + Send>>>>,
-    >,
+    futures:
+        Pin<Box<FuturesUnordered<Pin<Box<dyn Future<Output = RpcResultWithResponder> + Send>>>>>,
     sender: Arc<dyn TDAGNetworkSender>,
     interval: Pin<Box<Interval>>,
 }
@@ -92,9 +99,15 @@ impl RpcWithFallback {
         rpc_timeout: Duration,
         sender: Arc<dyn TDAGNetworkSender>,
         time_service: TimeService,
+        min_concurrent_responders: u32,
+        max_concurrent_responders: u32,
     ) -> Self {
         Self {
-            responders: Responders::new(responders, 1, 4),
+            responders: Responders::new(
+                responders,
+                min_concurrent_responders,
+                max_concurrent_responders,
+            ),
             message,
             rpc_timeout,
 
@@ -111,12 +124,15 @@ async fn send_rpc(
     peer: Author,
     message: DAGMessage,
     timeout: Duration,
-) -> anyhow::Result<DAGMessage> {
-    sender.send_rpc(peer, message, timeout).await
+) -> RpcResultWithResponder {
+    RpcResultWithResponder {
+        responder: peer,
+        result: sender.send_rpc(peer, message, timeout).await,
+    }
 }
 
 impl Stream for RpcWithFallback {
-    type Item = anyhow::Result<DAGMessage>;
+    type Item = RpcResultWithResponder;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if !self.futures.is_empty() {

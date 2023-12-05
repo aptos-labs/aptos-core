@@ -154,6 +154,9 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
                 continue;
             }
             for ref fun in module.get_functions() {
+                if fun.is_inline() {
+                    continue;
+                }
                 for (variant, target) in targets.get_targets(fun) {
                     let spec = &*target.get_spec();
                     if !spec.conditions.is_empty() {
@@ -831,7 +834,7 @@ impl<'a> Instrumenter<'a> {
         for (node_id, kind, exp) in traces {
             let env = self.builder.global_env();
             let loc = env.get_node_loc(*node_id);
-            if !exp.free_vars(env).is_empty() {
+            if !exp.free_vars_with_types(env).is_empty() {
                 continue;
             }
             self.builder.set_loc(loc);

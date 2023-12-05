@@ -4,7 +4,7 @@
 
 use crate::proof_of_store::{BatchInfo, ProofOfStore};
 use aptos_crypto::HashValue;
-use aptos_executor_types::Error;
+use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
 use aptos_types::{
     account_address::AccountAddress, transaction::SignedTransaction,
@@ -43,10 +43,33 @@ impl fmt::Display for TransactionSummary {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone)]
 pub struct TransactionInProgress {
-    pub summary: TransactionSummary,
     pub gas_unit_price: u64,
+    pub count: u64,
+}
+
+impl TransactionInProgress {
+    pub fn new(gas_unit_price: u64) -> Self {
+        Self {
+            gas_unit_price,
+            count: 0,
+        }
+    }
+
+    pub fn gas_unit_price(&self) -> u64 {
+        self.gas_unit_price
+    }
+
+    pub fn decrement(&mut self) -> u64 {
+        self.count -= 1;
+        self.count
+    }
+
+    pub fn increment(&mut self) -> u64 {
+        self.count += 1;
+        self.count
+    }
 }
 
 #[derive(Clone)]
@@ -63,7 +86,7 @@ pub enum DataStatus {
     Requested(
         Vec<(
             HashValue,
-            oneshot::Receiver<Result<Vec<SignedTransaction>, Error>>,
+            oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>,
         )>,
     ),
 }
@@ -71,7 +94,7 @@ pub enum DataStatus {
 impl DataStatus {
     pub fn extend(&mut self, other: DataStatus) {
         match (self, other) {
-            (DataStatus::Requested(v1), DataStatus::Requested(v2)) => v1.extend(v2.into_iter()),
+            (DataStatus::Requested(v1), DataStatus::Requested(v2)) => v1.extend(v2),
             (_, _) => unreachable!(),
         }
     }

@@ -1,36 +1,48 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    db_options::state_merkle_db_column_families, ledger_db::LedgerDb, STATE_MERKLE_DB_NAME,
-};
+use crate::{db_debugger::ShardingConfig, ledger_db::LedgerDb, state_merkle_db::StateMerkleDb};
 use anyhow::Result;
-use aptos_config::config::RocksdbConfigs;
+use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
 use aptos_types::nibble::{nibble_path::NibblePath, Nibble};
 use clap::Parser;
+use core::default::Default;
 use std::path::{Path, PathBuf};
 
 pub const PAGE_SIZE: usize = 10;
 
-#[derive(Parser)]
+#[derive(Parser, Clone)]
 pub struct DbDir {
+    // TODO(grao): Support path override here.
     #[clap(long, value_parser)]
     db_dir: PathBuf,
+
+    #[clap(flatten)]
+    pub sharding_config: ShardingConfig,
 }
 
 impl DbDir {
-    // TODO(grao): Use StateMerkleDb struct.
-    pub fn open_state_merkle_db(&self) -> Result<aptos_schemadb::DB> {
-        aptos_schemadb::DB::open_cf_readonly(
-            &aptos_schemadb::Options::default(),
-            self.db_dir.join(STATE_MERKLE_DB_NAME).as_path(),
-            STATE_MERKLE_DB_NAME,
-            state_merkle_db_column_families(),
+    pub fn open_state_merkle_db(&self) -> Result<StateMerkleDb> {
+        StateMerkleDb::new(
+            &StorageDirPaths::from_path(&self.db_dir),
+            RocksdbConfigs {
+                enable_storage_sharding: self.sharding_config.enable_storage_sharding,
+                ..Default::default()
+            },
+            false,
+            0,
         )
     }
 
     pub fn open_ledger_db(&self) -> Result<LedgerDb> {
-        LedgerDb::new(self.db_dir.as_path(), RocksdbConfigs::default(), true)
+        LedgerDb::new(
+            self.db_dir.as_path(),
+            RocksdbConfigs {
+                enable_storage_sharding: self.sharding_config.enable_storage_sharding,
+                ..Default::default()
+            },
+            true,
+        )
     }
 }
 

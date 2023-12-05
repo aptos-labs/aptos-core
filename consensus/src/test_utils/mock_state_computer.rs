@@ -6,6 +6,7 @@ use crate::{
     error::StateSyncError,
     experimental::buffer_manager::OrderedBlocks,
     payload_manager::PayloadManager,
+    state_computer::{PipelineExecutionResult, StateComputeResultFut},
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     test_utils::mock_storage::MockStorage,
     transaction_deduper::TransactionDeduper,
@@ -14,11 +15,12 @@ use crate::{
 use anyhow::{format_err, Result};
 use aptos_consensus_types::{block::Block, common::Payload, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
-use aptos_executor_types::{Error, StateComputeResult};
+use aptos_executor_types::{ExecutorError, ExecutorResult, StateComputeResult};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction,
+    block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction,
 };
 use futures::{channel::mpsc, SinkExt};
 use futures_channel::mpsc::UnboundedSender;
@@ -47,7 +49,7 @@ impl MockStateComputer {
         }
     }
 
-    pub async fn commit_to_storage(&self, blocks: OrderedBlocks) -> Result<(), Error> {
+    pub async fn commit_to_storage(&self, blocks: OrderedBlocks) -> ExecutorResult<()> {
         let OrderedBlocks {
             ordered_blocks,
             ordered_proof,
@@ -84,12 +86,12 @@ impl StateComputer for MockStateComputer {
         &self,
         block: &Block,
         _parent_block_id: HashValue,
-    ) -> Result<StateComputeResult, Error> {
+    ) -> ExecutorResult<PipelineExecutionResult> {
         self.block_cache.lock().insert(
             block.id(),
             block.payload().unwrap_or(&Payload::empty(false)).clone(),
         );
-        let result = StateComputeResult::new_dummy();
+        let result = PipelineExecutionResult::new_dummy();
         Ok(result)
     }
 
@@ -98,7 +100,7 @@ impl StateComputer for MockStateComputer {
         blocks: &[Arc<ExecutedBlock>],
         finality_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
-    ) -> Result<(), Error> {
+    ) -> ExecutorResult<()> {
         assert!(!blocks.is_empty());
         info!(
             "MockStateComputer commit put on queue {:?}",
@@ -139,7 +141,7 @@ impl StateComputer for MockStateComputer {
         _: &EpochState,
         _: Arc<PayloadManager>,
         _: Arc<dyn TransactionShuffler>,
-        _: Option<u64>,
+        _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
     ) {
     }
@@ -155,8 +157,8 @@ impl StateComputer for EmptyStateComputer {
         &self,
         _block: &Block,
         _parent_block_id: HashValue,
-    ) -> Result<StateComputeResult, Error> {
-        Ok(StateComputeResult::new_dummy())
+    ) -> ExecutorResult<PipelineExecutionResult> {
+        Ok(PipelineExecutionResult::new_dummy())
     }
 
     async fn commit(
@@ -164,7 +166,7 @@ impl StateComputer for EmptyStateComputer {
         _blocks: &[Arc<ExecutedBlock>],
         _commit: LedgerInfoWithSignatures,
         _call_back: StateComputerCommitCallBackType,
-    ) -> Result<(), Error> {
+    ) -> ExecutorResult<()> {
         Ok(())
     }
 
@@ -177,7 +179,7 @@ impl StateComputer for EmptyStateComputer {
         _: &EpochState,
         _: Arc<PayloadManager>,
         _: Arc<dyn TransactionShuffler>,
-        _: Option<u64>,
+        _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
     ) {
     }
@@ -206,19 +208,21 @@ impl RandomComputeResultStateComputer {
 
 #[async_trait::async_trait]
 impl StateComputer for RandomComputeResultStateComputer {
-    async fn compute(
+    async fn schedule_compute(
         &self,
         _block: &Block,
         parent_block_id: HashValue,
-    ) -> Result<StateComputeResult, Error> {
+    ) -> StateComputeResultFut {
         // trapdoor for Execution Error
-        if parent_block_id == self.random_compute_result_root_hash {
-            Err(Error::BlockNotFound(parent_block_id))
+        let res = if parent_block_id == self.random_compute_result_root_hash {
+            Err(ExecutorError::BlockNotFound(parent_block_id))
         } else {
             Ok(StateComputeResult::new_dummy_with_root_hash(
                 self.random_compute_result_root_hash,
             ))
-        }
+        };
+        let pipeline_execution_res = res.map(|res| PipelineExecutionResult::new(vec![], res));
+        Box::pin(async move { pipeline_execution_res })
     }
 
     async fn commit(
@@ -226,7 +230,7 @@ impl StateComputer for RandomComputeResultStateComputer {
         _blocks: &[Arc<ExecutedBlock>],
         _commit: LedgerInfoWithSignatures,
         _call_back: StateComputerCommitCallBackType,
-    ) -> Result<(), Error> {
+    ) -> ExecutorResult<()> {
         Ok(())
     }
 
@@ -239,7 +243,7 @@ impl StateComputer for RandomComputeResultStateComputer {
         _: &EpochState,
         _: Arc<PayloadManager>,
         _: Arc<dyn TransactionShuffler>,
-        _: Option<u64>,
+        _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
     ) {
     }

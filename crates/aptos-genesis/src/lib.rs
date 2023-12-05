@@ -13,8 +13,8 @@ pub mod test_utils;
 
 use crate::{builder::GenesisConfiguration, config::ValidatorConfiguration};
 use aptos_config::config::{
-    RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-    NO_OP_STORAGE_PRUNER_CONFIG,
+    RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
+    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_db::AptosDB;
@@ -149,7 +149,7 @@ impl GenesisInfo {
         let genesis = self.get_genesis();
         let path = TempPath::new();
         let aptosdb = AptosDB::open(
-            &path,
+            StorageDirPaths::from_path(path),
             false,
             NO_OP_STORAGE_PRUNER_CONFIG,
             RocksdbConfigs::default(),

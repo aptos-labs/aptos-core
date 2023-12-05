@@ -22,10 +22,9 @@ jobs:
     name: "Build Aptos Node Binary on ${{ matrix.os }}"
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
         with:
-          # ref: ${{ github.event.inputs.git_ref }}
-          ref: aptos-node-v1.4.3
+          ref: ${{ github.event.inputs.git_ref }}
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - name: Build Aptos Node Binary ${{ matrix.os }}
         run: |
@@ -41,7 +40,7 @@ jobs:
           mv "$TARNAME" ../../
 
       - name: Upload Binary
-        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin@v3
+        uses: actions/upload-artifact@v3
         with:
           name: aptos-node-${{ matrix.os }}
           path: aptos-node-*.tgz

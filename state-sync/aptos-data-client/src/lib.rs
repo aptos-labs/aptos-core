@@ -10,8 +10,9 @@ pub mod interface;
 mod latency_monitor;
 mod logging;
 mod metrics;
-mod peer_states;
-mod poller;
+pub mod peer_states;
+pub mod poller;
+mod utils;
 
 #[cfg(test)]
 mod tests;

@@ -13,12 +13,13 @@ module 0x8675309::M {
             let s: M::S = pack M::S(false);
             {
               let r: M::R = pack M::R(false);
-              u;
-              s;
-              M::R{ dummy_field: _ } = r;
+              Move(u);
+              Move(s);
+              M::R{ dummy_field: _ } = Move(r);
               Tuple()
             }
           }
         }
     }
+    spec fun $t();
 } // end 0x8675309::M

@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
+aptos-drop-helper = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
@@ -22,27 +23,37 @@ aptos-mvhashmap = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-logging = { workspace = true }
+aptos-vm-types = { workspace = true }
 arc-swap = { workspace = true }
 bcs = { workspace = true }
+bytes = { workspace = true }
 claims = { workspace = true }
+concurrent-queue = { workspace = true }
 criterion = { workspace = true, optional = true }
 crossbeam = { workspace = true }
 dashmap = { workspace = true }
+derivative = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
+move-vm-types = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
 parking_lot = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
+rand = { workspace = true }
 rayon = { workspace = true }
+scopeguard = { workspace = true }
+serde = { workspace = true }
 
 [dev-dependencies]
+aptos-aggregator = { workspace = true, features = ["testing"] }
 criterion = { workspace = true }
 itertools = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rand = { workspace = true }
+test-case = { workspace = true }
 
 [features]
 fuzzing = ["criterion", "proptest", "proptest-derive"]

@@ -3,7 +3,10 @@ description: |
   Runs the tests for the Aptos faucet against a local testnet built from a particular release branch
 inputs:
   NETWORK:
-    description: "The network branch for running the local testnet: devnet or testnet."
+    description: "The network branch for running the local testnet: devnet, testnet, or custom for a specific tag."
+    required: true
+  IMAGE_TAG:
+    description: "The docker image tag to use for the local testnet if NETWORK=custom."
     required: true
   GCP_DOCKER_ARTIFACT_REPO:
     description: "The GCP Docker artifact repository."
@@ -33,9 +36,21 @@ runs:
 
     # Run the faucet integration tests. This script will handle starting the local
     # testnet, moving the mint key where the tests expect it to be, and running the
-    # integration tests.
+    # integration tests. This one runs if the network is custom, in which case we
+    # pass the image tag.
     - name: Run integration tests
-      run: poetry run python main.py --base-network ${{ inputs.NETWORK }} --external-test-dir ${{ runner.temp }}/testnet --image-repo-with-project ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
+      if: ${{ inputs.NETWORK == 'custom' }}
+      run: poetry run python main.py --tag ${{ inputs.IMAGE_TAG }} --base-network ${{ inputs.NETWORK }} --external-test-dir ${{ runner.temp }}/testnet --image-repo-with-project ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
+      working-directory: crates/aptos-faucet/integration-tests
+      shell: bash
+
+    # Run the faucet integration tests. This script will handle starting the local
+    # testnet, moving the mint key where the tests expect it to be, and running the
+    # integration tests. This one runs when the network isn't custom, in which case
+    # we don't pass the image tag.
+    - name: Run integration tests
+      if: ${{ inputs.NETWORK != 'custom' }}
+      run: poetry run python main.py --base-network ${{ inputs.NETWORK }} ${{ endif }} --external-test-dir ${{ runner.temp }}/testnet --image-repo-with-project ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
       working-directory: crates/aptos-faucet/integration-tests
       shell: bash
 

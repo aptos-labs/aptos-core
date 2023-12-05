@@ -1,0 +1,173 @@
+============ initial bytecode ================
+
+[variant baseline]
+public fun m::destroy_none<#0>($t0: m::Option<#0>) {
+     var $t1: bool
+     var $t2: &m::Option<#0>
+     var $t3: u64
+     var $t4: vector<#0>
+  0: $t2 := borrow_local($t0)
+  1: $t1 := m::is_none<#0>($t2)
+  2: if ($t1) goto 3 else goto 5
+  3: label L0
+  4: goto 8
+  5: label L1
+  6: $t3 := 262144
+  7: abort($t3)
+  8: label L2
+  9: $t4 := unpack m::Option<#0>($t0)
+ 10: vector::destroy_empty<#0>($t4)
+ 11: return ()
+}
+
+
+[variant baseline]
+public fun m::foo<#0>($t0: m::E<#0>, $t1: &mut #0) {
+     var $t2: m::E<#0>
+     var $t3: m::E<#0>
+     var $t4: #0
+     var $t5: u64
+     var $t6: u64
+  0: $t2 := infer($t0)
+  1: $t3 := infer($t2)
+  2: $t4 := unpack m::E<#0>($t3)
+  3: $t6 := 3
+  4: $t5 := infer($t6)
+  5: write_ref($t1, $t4)
+  6: return ()
+}
+
+
+[variant baseline]
+public fun m::is_none<#0>($t0: &m::Option<#0>): bool {
+     var $t1: bool
+     var $t2: &vector<#0>
+  0: $t2 := borrow_field<m::Option<#0>>.vec($t0)
+  1: $t1 := vector::is_empty<#0>($t2)
+  2: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::destroy_none<#0>($t0: m::Option<#0>) {
+     var $t1: bool
+     var $t2: &m::Option<#0>
+     var $t3: u64
+     var $t4: vector<#0>
+     # live vars: $t0
+  0: $t2 := borrow_local($t0)
+     # live vars: $t0, $t2
+  1: $t1 := m::is_none<#0>($t2)
+     # live vars: $t0, $t1
+  2: if ($t1) goto 3 else goto 5
+     # live vars: $t0
+  3: label L0
+     # live vars: $t0
+  4: goto 8
+     # live vars:
+  5: label L1
+     # live vars:
+  6: $t3 := 262144
+     # live vars: $t3
+  7: abort($t3)
+     # live vars: $t0
+  8: label L2
+     # live vars: $t0
+  9: $t4 := unpack m::Option<#0>($t0)
+     # live vars: $t4
+ 10: vector::destroy_empty<#0>($t4)
+     # live vars:
+ 11: return ()
+}
+
+
+[variant baseline]
+public fun m::foo<#0>($t0: m::E<#0>, $t1: &mut #0) {
+     var $t2: m::E<#0>
+     var $t3: m::E<#0>
+     var $t4: #0
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t2 := move($t0)
+     # live vars: $t1, $t2
+  1: $t3 := move($t2)
+     # live vars: $t1, $t3
+  2: $t4 := unpack m::E<#0>($t3)
+     # live vars: $t1, $t4
+  3: $t6 := 3
+     # live vars: $t1, $t4
+  4: $t5 := move($t6)
+     # live vars: $t1, $t4
+  5: write_ref($t1, $t4)
+     # live vars:
+  6: return ()
+}
+
+
+[variant baseline]
+public fun m::is_none<#0>($t0: &m::Option<#0>): bool {
+     var $t1: bool
+     var $t2: &vector<#0>
+     # live vars: $t0
+  0: $t2 := borrow_field<m::Option<#0>>.vec($t0)
+     # live vars: $t2
+  1: $t1 := vector::is_empty<#0>($t2)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.m {
+use 0000000000000000000000000000000000000000000000000000000000000001::vector;
+
+
+struct E<Ty0> has copy, drop, store {
+	key: Ty0
+}
+struct Option<Ty0> has copy, drop, store {
+	vec: vector<Ty0>
+}
+
+public destroy_none<Ty0>(Arg0: Option<Ty0>) {
+B0:
+	0: ImmBorrowLoc[0](Arg0: Option<Ty0>)
+	1: Call is_none<Ty0>(&Option<Ty0>): bool
+	2: BrFalse(4)
+B1:
+	3: Branch(6)
+B2:
+	4: LdU64(262144)
+	5: Abort
+B3:
+	6: MoveLoc[0](Arg0: Option<Ty0>)
+	7: UnpackGeneric[0](Option<Ty0>)
+	8: VecUnpack(2, 0)
+	9: Ret
+}
+public foo<Ty0: drop + store>(Arg0: E<Ty0>, Arg1: &mut Ty0) {
+L0:	loc2: u64
+B0:
+	0: MoveLoc[0](Arg0: E<Ty0>)
+	1: StLoc[2](loc0: E<Ty0>)
+	2: MoveLoc[2](loc0: E<Ty0>)
+	3: StLoc[3](loc1: E<Ty0>)
+	4: MoveLoc[3](loc1: E<Ty0>)
+	5: UnpackGeneric[1](E<Ty0>)
+	6: LdU64(3)
+	7: StLoc[4](loc2: u64)
+	8: MoveLoc[1](Arg1: &mut Ty0)
+	9: WriteRef
+	10: Ret
+}
+public is_none<Ty0>(Arg0: &Option<Ty0>): bool {
+B0:
+	0: MoveLoc[0](Arg0: &Option<Ty0>)
+	1: ImmBorrowFieldGeneric[0](Option.vec: vector<Ty0>)
+	2: Call vector::is_empty<Ty0>(&vector<Ty0>): bool
+	3: Ret
+}
+}

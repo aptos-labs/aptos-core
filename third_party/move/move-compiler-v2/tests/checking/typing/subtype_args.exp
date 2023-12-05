@@ -3,16 +3,16 @@ module 0x8675309::M {
     struct S {
         dummy_field: bool,
     }
-    private fun imm<T>(_x: &T) {
+    private fun imm<T>(_x: &#0) {
         Tuple()
     }
-    private fun imm_imm<T>(_x: &T,_y: &T) {
+    private fun imm_imm<T>(_x: &#0,_y: &#0) {
         Tuple()
     }
-    private fun imm_mut<T>(_x: &T,_y: &mut T) {
+    private fun imm_mut<T>(_x: &#0,_y: &mut #0) {
         Tuple()
     }
-    private fun mut_imm<T>(_x: &mut T,_y: &T) {
+    private fun mut_imm<T>(_x: &mut #0,_y: &#0) {
         Tuple()
     }
     private fun t0() {
@@ -28,4 +28,19 @@ module 0x8675309::M {
         M::imm_imm<u64>(Borrow(Mutable)(0), Borrow(Mutable)(0));
         Tuple()
     }
+    spec fun $imm<T>(_x: #0) {
+        Tuple()
+    }
+    spec fun $imm_imm<T>(_x: #0,_y: #0) {
+        Tuple()
+    }
+    spec fun $imm_mut<T>(_x: #0,_y: #0) {
+        Tuple()
+    }
+    spec fun $mut_imm<T>(_x: #0,_y: #0) {
+        Tuple()
+    }
+    spec fun $t0();
+    spec fun $t1();
+    spec fun $t2(f: |(&u64, &mut u64)|());
 } // end 0x8675309::M

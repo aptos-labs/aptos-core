@@ -1,5 +1,5 @@
 
-<a name="0x1_transaction_fee"></a>
+<a id="0x1_transaction_fee"></a>
 
 # Module `0x1::transaction_fee`
 
@@ -51,7 +51,7 @@ This module provides an interface to burn or collect and redistribute transactio
 
 
 
-<a name="0x1_transaction_fee_AptosCoinCapabilities"></a>
+<a id="0x1_transaction_fee_AptosCoinCapabilities"></a>
 
 ## Resource `AptosCoinCapabilities`
 
@@ -79,7 +79,7 @@ Stores burn capability to burn the gas fees.
 
 </details>
 
-<a name="0x1_transaction_fee_AptosCoinMintCapability"></a>
+<a id="0x1_transaction_fee_AptosCoinMintCapability"></a>
 
 ## Resource `AptosCoinMintCapability`
 
@@ -107,7 +107,7 @@ Stores mint capability to mint the refunds.
 
 </details>
 
-<a name="0x1_transaction_fee_CollectedFeesPerBlock"></a>
+<a id="0x1_transaction_fee_CollectedFeesPerBlock"></a>
 
 ## Resource `CollectedFeesPerBlock`
 
@@ -148,11 +148,27 @@ collected when executing the block.
 
 </details>
 
-<a name="0x1_transaction_fee_FeeStatement"></a>
+<a id="0x1_transaction_fee_FeeStatement"></a>
 
 ## Struct `FeeStatement`
 
-Summary of the fees charged and refunds issued for a transaction.
+Breakdown of fee charge and refund for a transaction.
+The structure is:
+
+- Net charge or refund (not in the statement)
+- total charge: total_charge_gas_units, matches <code>gas_used</code> in the on-chain <code>TransactionInfo</code>.
+This is the sum of the sub-items below. Notice that there's potential precision loss when
+the conversion between internal and external gas units and between native token and gas
+units, so it's possible that the numbers don't add up exactly. -- This number is the final
+charge, while the break down is merely informational.
+- gas charge for execution (CPU time): <code>execution_gas_units</code>
+- gas charge for IO (storage random access): <code>io_gas_units</code>
+- storage fee charge (storage space): <code>storage_fee_octas</code>, to be included in
+<code>total_charge_gas_unit</code>, this number is converted to gas units according to the user
+specified <code>gas_unit_price</code> on the transaction.
+- storage deletion refund: <code>storage_fee_refund_octas</code>, this is not included in <code>gas_used</code> or
+<code>total_charge_gas_units</code>, the net charge / refund is calculated by
+<code>total_charge_gas_units</code> * <code>gas_unit_price</code> - <code>storage_fee_refund_octas</code>.
 
 This is meant to emitted as a module event.
 
@@ -203,12 +219,12 @@ This is meant to emitted as a module event.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_transaction_fee_EALREADY_COLLECTING_FEES"></a>
+<a id="0x1_transaction_fee_EALREADY_COLLECTING_FEES"></a>
 
 Gas fees are already being collected and the struct holding
 information about collected amounts is already published.
@@ -219,7 +235,7 @@ information about collected amounts is already published.
 
 
 
-<a name="0x1_transaction_fee_EINVALID_BURN_PERCENTAGE"></a>
+<a id="0x1_transaction_fee_EINVALID_BURN_PERCENTAGE"></a>
 
 The burn percentage is out of range [0, 100].
 
@@ -229,7 +245,7 @@ The burn percentage is out of range [0, 100].
 
 
 
-<a name="0x1_transaction_fee_initialize_fee_collection_and_distribution"></a>
+<a id="0x1_transaction_fee_initialize_fee_collection_and_distribution"></a>
 
 ## Function `initialize_fee_collection_and_distribution`
 
@@ -271,7 +287,7 @@ distribution. Should be called by on-chain governance.
 
 </details>
 
-<a name="0x1_transaction_fee_is_fees_collection_enabled"></a>
+<a id="0x1_transaction_fee_is_fees_collection_enabled"></a>
 
 ## Function `is_fees_collection_enabled`
 
@@ -295,7 +311,7 @@ distribution. Should be called by on-chain governance.
 
 </details>
 
-<a name="0x1_transaction_fee_upgrade_burn_percentage"></a>
+<a id="0x1_transaction_fee_upgrade_burn_percentage"></a>
 
 ## Function `upgrade_burn_percentage`
 
@@ -335,7 +351,7 @@ Sets the burn percentage for collected fees to a new value. Should be called by 
 
 </details>
 
-<a name="0x1_transaction_fee_register_proposer_for_fee_collection"></a>
+<a id="0x1_transaction_fee_register_proposer_for_fee_collection"></a>
 
 ## Function `register_proposer_for_fee_collection`
 
@@ -364,7 +380,7 @@ can only be called at the beginning of the block.
 
 </details>
 
-<a name="0x1_transaction_fee_burn_coin_fraction"></a>
+<a id="0x1_transaction_fee_burn_coin_fraction"></a>
 
 ## Function `burn_coin_fraction`
 
@@ -403,7 +419,7 @@ Burns a specified fraction of the coin.
 
 </details>
 
-<a name="0x1_transaction_fee_process_collected_fees"></a>
+<a id="0x1_transaction_fee_process_collected_fees"></a>
 
 ## Function `process_collected_fees`
 
@@ -471,7 +487,7 @@ at the beginning of the block or during reconfiguration.
 
 </details>
 
-<a name="0x1_transaction_fee_burn_fee"></a>
+<a id="0x1_transaction_fee_burn_fee"></a>
 
 ## Function `burn_fee`
 
@@ -500,7 +516,7 @@ Burn transaction fees in epilogue.
 
 </details>
 
-<a name="0x1_transaction_fee_mint_and_refund"></a>
+<a id="0x1_transaction_fee_mint_and_refund"></a>
 
 ## Function `mint_and_refund`
 
@@ -527,7 +543,7 @@ Mint refund in epilogue.
 
 </details>
 
-<a name="0x1_transaction_fee_collect_fee"></a>
+<a id="0x1_transaction_fee_collect_fee"></a>
 
 ## Function `collect_fee`
 
@@ -558,7 +574,7 @@ Collect transaction fees in epilogue.
 
 </details>
 
-<a name="0x1_transaction_fee_store_aptos_coin_burn_cap"></a>
+<a id="0x1_transaction_fee_store_aptos_coin_burn_cap"></a>
 
 ## Function `store_aptos_coin_burn_cap`
 
@@ -584,7 +600,7 @@ Only called during genesis.
 
 </details>
 
-<a name="0x1_transaction_fee_store_aptos_coin_mint_cap"></a>
+<a id="0x1_transaction_fee_store_aptos_coin_mint_cap"></a>
 
 ## Function `store_aptos_coin_mint_cap`
 
@@ -610,7 +626,7 @@ Only called during genesis.
 
 </details>
 
-<a name="0x1_transaction_fee_initialize_storage_refund"></a>
+<a id="0x1_transaction_fee_initialize_storage_refund"></a>
 
 ## Function `initialize_storage_refund`
 
@@ -635,7 +651,7 @@ Only called during genesis.
 
 </details>
 
-<a name="0x1_transaction_fee_emit_fee_statement"></a>
+<a id="0x1_transaction_fee_emit_fee_statement"></a>
 
 ## Function `emit_fee_statement`
 
@@ -659,7 +675,7 @@ Only called during genesis.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -672,7 +688,7 @@ Only called during genesis.
 
 
 
-<a name="@Specification_1_CollectedFeesPerBlock"></a>
+<a id="@Specification_1_CollectedFeesPerBlock"></a>
 
 ### Resource `CollectedFeesPerBlock`
 
@@ -710,7 +726,7 @@ Only called during genesis.
 
 
 
-<a name="@Specification_1_initialize_fee_collection_and_distribution"></a>
+<a id="@Specification_1_initialize_fee_collection_and_distribution"></a>
 
 ### Function `initialize_fee_collection_and_distribution`
 
@@ -726,7 +742,7 @@ Only called during genesis.
 <b>let</b> aptos_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(aptos_addr);
 <b>aborts_if</b> <b>exists</b>&lt;ValidatorFees&gt;(aptos_addr);
-<b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a> {<a href="account.md#0x1_account">account</a>: aptos_framework};
+<b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a> { <a href="account.md#0x1_account">account</a>: aptos_framework };
 <b>include</b> <a href="aggregator_factory.md#0x1_aggregator_factory_CreateAggregatorInternalAbortsIf">aggregator_factory::CreateAggregatorInternalAbortsIf</a>;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(aptos_addr);
 <b>ensures</b> <b>exists</b>&lt;ValidatorFees&gt;(aptos_addr);
@@ -735,7 +751,7 @@ Only called during genesis.
 
 
 
-<a name="@Specification_1_upgrade_burn_percentage"></a>
+<a id="@Specification_1_upgrade_burn_percentage"></a>
 
 ### Function `upgrade_burn_percentage`
 
@@ -756,7 +772,7 @@ Only called during genesis.
 
 
 
-<a name="@Specification_1_register_proposer_for_fee_collection"></a>
+<a id="@Specification_1_register_proposer_for_fee_collection"></a>
 
 ### Function `register_proposer_for_fee_collection`
 
@@ -774,7 +790,7 @@ Only called during genesis.
 
 
 
-<a name="@Specification_1_burn_coin_fraction"></a>
+<a id="@Specification_1_burn_coin_fraction"></a>
 
 ### Function `burn_coin_fraction`
 
@@ -789,14 +805,14 @@ Only called during genesis.
 <b>requires</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework);
 <b>requires</b> <b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);
 <b>let</b> amount_to_burn = (burn_percentage * <a href="coin.md#0x1_coin_value">coin::value</a>(<a href="coin.md#0x1_coin">coin</a>)) / 100;
-<b>include</b> amount_to_burn &gt; 0 ==&gt; <a href="coin.md#0x1_coin_AbortsIfAggregator">coin::AbortsIfAggregator</a>&lt;AptosCoin&gt;{ <a href="coin.md#0x1_coin">coin</a>: Coin&lt;AptosCoin&gt;{ value: amount_to_burn } };
+<b>include</b> amount_to_burn &gt; 0 ==&gt; <a href="coin.md#0x1_coin_CoinSubAbortsIf">coin::CoinSubAbortsIf</a>&lt;AptosCoin&gt; { amount: amount_to_burn };
 <b>ensures</b> <a href="coin.md#0x1_coin">coin</a>.value == <b>old</b>(<a href="coin.md#0x1_coin">coin</a>).value - amount_to_burn;
 </code></pre>
 
 
 
 
-<a name="0x1_transaction_fee_collectedFeesAggregator"></a>
+<a id="0x1_transaction_fee_collectedFeesAggregator"></a>
 
 
 <pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_collectedFeesAggregator">collectedFeesAggregator</a>(): AggregatableCoin&lt;AptosCoin&gt; {
@@ -807,7 +823,7 @@ Only called during genesis.
 
 
 
-<a name="0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply"></a>
+<a id="0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply"></a>
 
 
 <pre><code><b>schema</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">RequiresCollectedFeesPerValueLeqBlockAptosSupply</a> {
@@ -815,14 +831,16 @@ Only called during genesis.
     <b>requires</b>
         (<a href="transaction_fee.md#0x1_transaction_fee_is_fees_collection_enabled">is_fees_collection_enabled</a>() && <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(maybe_supply)) ==&gt;
             (<a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(<b>global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework).amount.value) &lt;=
-                <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator::optional_aggregator_value</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(<a href="coin.md#0x1_coin_get_coin_supply_opt">coin::get_coin_supply_opt</a>&lt;AptosCoin&gt;())));
+                <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator::optional_aggregator_value</a>(
+                    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(<a href="coin.md#0x1_coin_get_coin_supply_opt">coin::get_coin_supply_opt</a>&lt;AptosCoin&gt;())
+                ));
 }
 </code></pre>
 
 
 
 
-<a name="0x1_transaction_fee_ProcessCollectedFeesRequiresAndEnsures"></a>
+<a id="0x1_transaction_fee_ProcessCollectedFeesRequiresAndEnsures"></a>
 
 
 <pre><code><b>schema</b> <a href="transaction_fee.md#0x1_transaction_fee_ProcessCollectedFeesRequiresAndEnsures">ProcessCollectedFeesRequiresAndEnsures</a> {
@@ -844,9 +862,12 @@ Only called during genesis.
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(collected_fees.proposer) ==&gt;
         <b>if</b> (proposer != @vm_reserved) {
             <b>if</b> (<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(fees_table, proposer)) {
-                <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(post_fees_table, proposer).value == <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(fees_table, proposer).value + fee_to_add
+                <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(post_fees_table, proposer).value == <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(
+                    fees_table,
+                    proposer
+                ).value + fee_to_add
             } <b>else</b> {
-            <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(post_fees_table, proposer).value == fee_to_add
+                <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(post_fees_table, proposer).value == fee_to_add
             }
         } <b>else</b> {
             <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(post_collected_fees.proposer) && post_amount == 0
@@ -856,7 +877,7 @@ Only called during genesis.
 
 
 
-<a name="@Specification_1_process_collected_fees"></a>
+<a id="@Specification_1_process_collected_fees"></a>
 
 ### Function `process_collected_fees`
 
@@ -872,7 +893,7 @@ Only called during genesis.
 
 
 
-<a name="@Specification_1_burn_fee"></a>
+<a id="@Specification_1_burn_fee"></a>
 
 ### Function `burn_fee`
 
@@ -912,7 +933,7 @@ Only called during genesis.
 
 
 
-<a name="@Specification_1_mint_and_refund"></a>
+<a id="@Specification_1_mint_and_refund"></a>
 
 ### Function `mint_and_refund`
 
@@ -926,6 +947,8 @@ Only called during genesis.
 <pre><code><b>pragma</b> opaque;
 <b>let</b> aptos_addr = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;AptosCoin&gt;().account_address;
 <b>modifies</b> <b>global</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr);
+<b>aborts_if</b> (refund != 0) && !<b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr);
+<b>include</b> <a href="coin.md#0x1_coin_CoinAddAbortsIf">coin::CoinAddAbortsIf</a>&lt;AptosCoin&gt; { amount: refund };
 <b>aborts_if</b> !<b>exists</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(<a href="account.md#0x1_account">account</a>);
 <b>modifies</b> <b>global</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(<a href="account.md#0x1_account">account</a>);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCapability">AptosCoinMintCapability</a>&gt;(@aptos_framework);
@@ -937,7 +960,7 @@ Only called during genesis.
 
 
 
-<a name="@Specification_1_collect_fee"></a>
+<a id="@Specification_1_collect_fee"></a>
 
 ### Function `collect_fee`
 
@@ -961,12 +984,14 @@ Only called during genesis.
 <b>let</b> <b>post</b> post_coin_store = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(<a href="account.md#0x1_account">account</a>);
 <b>let</b> <b>post</b> post_collected_fees = <b>global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework).amount;
 <b>ensures</b> post_coin_store.<a href="coin.md#0x1_coin">coin</a>.value == coin_store.<a href="coin.md#0x1_coin">coin</a>.value - fee;
-<b>ensures</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(post_collected_fees.value) == <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(aggr) + fee;
+<b>ensures</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(post_collected_fees.value) == <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(
+    aggr
+) + fee;
 </code></pre>
 
 
 
-<a name="@Specification_1_store_aptos_coin_burn_cap"></a>
+<a id="@Specification_1_store_aptos_coin_burn_cap"></a>
 
 ### Function `store_aptos_coin_burn_cap`
 
@@ -987,7 +1012,7 @@ Aborts if <code><a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabil
 
 
 
-<a name="@Specification_1_store_aptos_coin_mint_cap"></a>
+<a id="@Specification_1_store_aptos_coin_mint_cap"></a>
 
 ### Function `store_aptos_coin_mint_cap`
 
@@ -1008,7 +1033,7 @@ Aborts if <code><a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCap
 
 
 
-<a name="@Specification_1_initialize_storage_refund"></a>
+<a id="@Specification_1_initialize_storage_refund"></a>
 
 ### Function `initialize_storage_refund`
 
@@ -1031,7 +1056,7 @@ Aborts if <code><a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCap
 
 
 
-<a name="@Specification_1_emit_fee_statement"></a>
+<a id="@Specification_1_emit_fee_statement"></a>
 
 ### Function `emit_fee_statement`
 
@@ -1041,10 +1066,6 @@ Aborts if <code><a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCap
 
 
 Aborts if module event feature is not enabled.
-
-
-<pre><code><b>aborts_if</b> !std::features::spec_module_event_enabled();
-</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

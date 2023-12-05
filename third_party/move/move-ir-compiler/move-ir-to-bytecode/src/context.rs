@@ -346,7 +346,7 @@ impl<'a> Context<'a> {
     }
 
     fn materialize_map<T: Clone>(m: HashMap<T, TableIndex>) -> Vec<T> {
-        Self::materialize_pool(m.len(), m.into_iter())
+        Self::materialize_pool(m.len(), m)
     }
 
     /// Finish compilation, and materialize the pools for file format.
@@ -666,6 +666,7 @@ impl<'a> Context<'a> {
             parameters: SignatureIndex(params_idx as TableIndex),
             return_: SignatureIndex(return_idx as TableIndex),
             type_parameters,
+            access_specifiers: None,
         };
         // handle duplicate declarations
         // erroring on duplicates needs to be done by the bytecode verifier

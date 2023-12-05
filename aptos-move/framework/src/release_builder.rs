@@ -6,7 +6,7 @@ use crate::{
     path_relative_to_crate,
     release_bundle::{ReleaseBundle, ReleasePackage},
 };
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use aptos_sdk_builder::rust;
 use aptos_types::transaction::EntryABI;
 use clap::Parser;
@@ -47,12 +47,26 @@ impl ReleaseOptions {
         let mut source_paths = vec![];
         for (package_path, rust_binding_path) in packages.into_iter().zip(rust_bindings.into_iter())
         {
-            let built = BuiltPackage::build(package_path.clone(), build_options.clone())?;
+            let built = BuiltPackage::build(package_path.clone(), build_options.clone())
+                .with_context(|| {
+                    format!(
+                        "Failed to build package at path: {}",
+                        package_path.display()
+                    )
+                })?;
             if !rust_binding_path.is_empty() {
                 let abis = built
                     .extract_abis()
-                    .ok_or_else(|| anyhow!("abis not available, can't generate sdk"))?;
-                Self::generate_rust_bindings(&abis, &PathBuf::from(rust_binding_path))?;
+                    .ok_or_else(|| anyhow!("ABIs not available, can't generate sdk"))?;
+                let binding_path = rust_binding_path.clone();
+                Self::generate_rust_bindings(&abis, &PathBuf::from(rust_binding_path))
+                    .with_context(|| {
+                        format!(
+                            "Failed to generate Rust bindings for {} at binding path {}",
+                            package_path.display(),
+                            binding_path
+                        )
+                    })?;
             }
             let released = ReleasePackage::new(built)?;
             let size = bcs::to_bytes(&released)?.len();
@@ -66,21 +80,30 @@ impl ReleaseOptions {
             source_paths.push(relative_path.display().to_string());
         }
         let bundle = ReleaseBundle::new(released_packages, source_paths);
-        std::fs::create_dir_all(output.parent().unwrap())?;
-        std::fs::write(&output, bcs::to_bytes(&bundle)?)?;
+        let parent = output.parent().expect("Failed to get parent directory");
+        std::fs::create_dir_all(parent).context("Failed to create dirs")?;
+        std::fs::write(&output, bcs::to_bytes(&bundle)?).context("Failed to write output")?;
         Ok(())
     }
 
     fn generate_rust_bindings(abis: &[EntryABI], path: &Path) -> anyhow::Result<()> {
         {
-            let mut file = std::fs::File::create(path)?;
-            rust::output(&mut file, abis, true)?;
+            let mut file = std::fs::File::create(path)
+                .with_context(|| format!("Failed to create {}", path.display()))?;
+            rust::output(&mut file, abis, true)
+                .with_context(|| format!("Failed to output rust bindings to {}", path.display()))?;
         }
         std::process::Command::new("rustfmt")
             .arg("--config")
             .arg("imports_granularity=crate")
             .arg(path)
-            .status()?;
+            .output()
+            .with_context(|| {
+                format!(
+                    "Failed to run rustfmt on {}, is rustfmt installed?",
+                    path.display()
+                )
+            })?;
         Ok(())
     }
 }

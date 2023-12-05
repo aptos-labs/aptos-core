@@ -48,15 +48,16 @@ pub use transaction::{
     AccountSignature, BlockMetadataTransaction, DeleteModule, DeleteResource, DeleteTableItem,
     DirectWriteSet, Ed25519Signature, EncodeSubmissionRequest, EntryFunctionPayload, Event,
     FeePayerSignature, GasEstimation, GasEstimationBcs, GenesisPayload, GenesisTransaction,
-    ModuleBundlePayload, MultiAgentSignature, MultiEd25519Signature, MultisigPayload,
-    MultisigTransactionPayload, PendingTransaction, ScriptPayload, ScriptWriteSet,
-    SubmitTransactionRequest, Transaction, TransactionData, TransactionId, TransactionInfo,
-    TransactionOnChainData, TransactionPayload, TransactionSignature, TransactionSigningMessage,
-    TransactionsBatchSingleSubmissionFailure, TransactionsBatchSubmissionResult,
-    UserCreateSigningMessageRequest, UserTransaction, UserTransactionRequest, VersionedEvent,
-    WriteModule, WriteResource, WriteSet, WriteSetChange, WriteSetPayload, WriteTableItem,
+    ModuleBundlePayload, MultiAgentSignature, MultiEd25519Signature, MultiKeySignature,
+    MultisigPayload, MultisigTransactionPayload, PendingTransaction, PublicKey, ScriptPayload,
+    ScriptWriteSet, Signature, SingleKeySignature, SubmitTransactionRequest, Transaction,
+    TransactionData, TransactionId, TransactionInfo, TransactionOnChainData, TransactionPayload,
+    TransactionSignature, TransactionSigningMessage, TransactionsBatchSingleSubmissionFailure,
+    TransactionsBatchSubmissionResult, UserCreateSigningMessageRequest, UserTransaction,
+    UserTransactionRequest, VersionedEvent, WriteModule, WriteResource, WriteSet, WriteSetChange,
+    WriteSetPayload, WriteTableItem,
 };
-pub use view::ViewRequest;
+pub use view::{ViewFunction, ViewRequest};
 pub use wrappers::{EventGuid, IdentifierWrapper, StateKeyWrapper};
 
 pub fn deserialize_from_string<'de, D, T>(deserializer: D) -> Result<T, D::Error>

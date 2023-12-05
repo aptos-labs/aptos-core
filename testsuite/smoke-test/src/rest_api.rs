@@ -12,7 +12,7 @@ use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_forge::{LocalSwarm, NodeExt, Swarm, TransactionType};
 use aptos_global_constants::{DEFAULT_BUCKETS, GAS_UNIT_PRICE};
 use aptos_rest_client::{
-    aptos_api_types::{MoveModuleId, TransactionData},
+    aptos_api_types::{MoveModuleId, TransactionData, ViewFunction, ViewRequest},
     Client,
 };
 use aptos_sdk::move_types::language_storage::StructTag;
@@ -21,6 +21,10 @@ use aptos_types::{
     account_config::{AccountResource, CORE_CODE_ADDRESS},
     on_chain_config::{ExecutionConfigV2, OnChainExecutionConfig, TransactionShufflerType},
     transaction::{authenticator::AuthenticationKey, SignedTransaction, Transaction},
+};
+use move_core_types::{
+    ident_str,
+    language_storage::{ModuleId, TypeTag},
 };
 use std::{convert::TryFrom, str::FromStr, sync::Arc, time::Duration};
 
@@ -526,4 +530,58 @@ async fn test_bcs() {
         json_events.first().unwrap().version.0,
         bcs_events.first().unwrap().transaction_version
     );
+
+    // Test that more than 25 transactions can be retrieved
+    let json_txns = client
+        .get_transactions(Some(0), Some(30))
+        .await
+        .unwrap()
+        .into_inner();
+    let bcs_txns = client
+        .get_transactions_bcs(Some(0), Some(30))
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(json_txns.len(), 30);
+    assert_eq!(json_txns.len(), bcs_txns.len());
+}
+
+#[tokio::test]
+async fn test_view_function() {
+    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let info = swarm.aptos_public_info();
+    let client: &Client = info.client();
+
+    let address = AccountAddress::ONE;
+
+    // Non-BCS
+    let view_request = ViewRequest {
+        function: "0x1::coin::is_account_registered".parse().unwrap(),
+        type_arguments: vec!["0x1::aptos_coin::AptosCoin".parse().unwrap()],
+        arguments: vec![serde_json::Value::String(address.to_hex_literal())],
+    };
+
+    // Balance should be 0 and there should only be one return value
+    let json_ret_values = client.view(&view_request, None).await.unwrap().into_inner();
+    assert_eq!(json_ret_values.len(), 1);
+    assert!(!json_ret_values[0].as_bool().unwrap());
+
+    // BCS
+    let bcs_view_request = ViewFunction {
+        module: ModuleId::new(address, ident_str!("coin").into()),
+        function: ident_str!("is_account_registered").into(),
+        ty_args: vec![TypeTag::Struct(Box::new(
+            StructTag::from_str("0x1::aptos_coin::AptosCoin").unwrap(),
+        ))],
+        args: vec![bcs::to_bytes(&address).unwrap()],
+    };
+
+    // Balance should be 0 and there should only be one return value
+    let bcs_ret_values: Vec<bool> = client
+        .view_bcs(&bcs_view_request, None)
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(bcs_ret_values.len(), 1);
+    assert!(!bcs_ret_values[0]);
 }

@@ -3,11 +3,7 @@
 
 use crate::{
     counters,
-    network::NetworkSender,
-    quorum_store::{
-        batch_store::{BatchReader, BatchStore},
-        quorum_store_coordinator::CoordinatorCommand,
-    },
+    quorum_store::{batch_store::BatchReader, quorum_store_coordinator::CoordinatorCommand},
 };
 use aptos_consensus_types::{
     block::Block,
@@ -15,28 +11,38 @@ use aptos_consensus_types::{
     proof_of_store::ProofOfStore,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::{Error::DataNotFound, *};
+use aptos_executor_types::{ExecutorError::DataNotFound, *};
 use aptos_logger::prelude::*;
 use aptos_types::transaction::SignedTransaction;
-use futures::{channel::mpsc::Sender, SinkExt};
+use futures::channel::mpsc::Sender;
 use std::sync::Arc;
 use tokio::sync::oneshot;
+
+pub trait TPayloadManager: Send + Sync {
+    fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64);
+}
 
 /// Responsible to extract the transactions out of the payload and notify QuorumStore about commits.
 /// If QuorumStore is enabled, has to ask BatchReader for the transaction behind the proofs of availability in the payload.
 pub enum PayloadManager {
     DirectMempool,
-    InQuorumStore(Arc<BatchStore<NetworkSender>>, Sender<CoordinatorCommand>),
+    InQuorumStore(Arc<dyn BatchReader>, Sender<CoordinatorCommand>),
+}
+
+impl TPayloadManager for PayloadManager {
+    fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64) {
+        self.prefetch_payload_data(payload, timestamp);
+    }
 }
 
 impl PayloadManager {
-    async fn request_transactions(
+    fn request_transactions(
         proofs: Vec<ProofOfStore>,
         block_timestamp: u64,
-        batch_store: &BatchStore<NetworkSender>,
+        batch_reader: Arc<dyn BatchReader>,
     ) -> Vec<(
         HashValue,
-        oneshot::Receiver<Result<Vec<SignedTransaction>, aptos_executor_types::Error>>,
+        oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>,
     )> {
         let mut receivers = Vec::new();
         for pos in proofs {
@@ -47,7 +53,7 @@ impl PayloadManager {
                 block_timestamp
             );
             if block_timestamp <= pos.expiration() {
-                receivers.push((*pos.digest(), batch_store.get_batch(pos)));
+                receivers.push((*pos.digest(), batch_reader.get_batch(pos)));
             } else {
                 debug!("QSE: skipped expired pos {}", pos.digest());
             }
@@ -56,14 +62,11 @@ impl PayloadManager {
     }
 
     ///Pass commit information to BatchReader and QuorumStore wrapper for their internal cleanups.
-    pub async fn notify_commit(&self, block_timestamp: u64, payloads: Vec<Payload>) {
+    pub fn notify_commit(&self, block_timestamp: u64, payloads: Vec<Payload>) {
         match self {
             PayloadManager::DirectMempool => {},
-            PayloadManager::InQuorumStore(batch_store, coordinator_tx) => {
-                // TODO: move this to somewhere in quorum store, so this can be a batch reader
-                batch_store
-                    .update_certified_timestamp(block_timestamp)
-                    .await;
+            PayloadManager::InQuorumStore(batch_reader, coordinator_tx) => {
+                batch_reader.update_certified_timestamp(block_timestamp);
 
                 let batches: Vec<_> = payloads
                     .into_iter()
@@ -78,13 +81,10 @@ impl PayloadManager {
 
                 let mut tx = coordinator_tx.clone();
 
-                if let Err(e) = tx
-                    .send(CoordinatorCommand::CommitNotification(
-                        block_timestamp,
-                        batches,
-                    ))
-                    .await
-                {
+                if let Err(e) = tx.try_send(CoordinatorCommand::CommitNotification(
+                    block_timestamp,
+                    batches,
+                )) {
                     warn!(
                         "CommitNotification failed. Is the epoch shutting down? error: {}",
                         e
@@ -95,22 +95,17 @@ impl PayloadManager {
     }
 
     /// Called from consensus to pre-fetch the transaction behind the batches in the block.
-    pub async fn prefetch_payload_data(&self, block: &Block) {
-        let payload = match block.payload() {
-            Some(p) => p,
-            None => return,
-        };
+    pub fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64) {
         match self {
             PayloadManager::DirectMempool => {},
-            PayloadManager::InQuorumStore(batch_store, _) => match payload {
+            PayloadManager::InQuorumStore(batch_reader, _) => match payload {
                 Payload::InQuorumStore(proof_with_status) => {
                     if proof_with_status.status.lock().is_none() {
                         let receivers = PayloadManager::request_transactions(
                             proof_with_status.proofs.clone(),
-                            block.timestamp_usecs(),
-                            batch_store,
-                        )
-                        .await;
+                            timestamp,
+                            batch_reader.clone(),
+                        );
                         proof_with_status
                             .status
                             .lock()
@@ -126,7 +121,7 @@ impl PayloadManager {
 
     /// Extract transaction from a given block
     /// Assumes it is never called for the same block concurrently. Otherwise status can be None.
-    pub async fn get_transactions(&self, block: &Block) -> Result<Vec<SignedTransaction>, Error> {
+    pub async fn get_transactions(&self, block: &Block) -> ExecutorResult<Vec<SignedTransaction>> {
         let payload = match block.payload() {
             Some(p) => p,
             None => return Ok(Vec::new()),
@@ -135,7 +130,7 @@ impl PayloadManager {
         match (self, payload) {
             (PayloadManager::DirectMempool, Payload::DirectMempool(txns)) => Ok(txns.clone()),
             (
-                PayloadManager::InQuorumStore(batch_store, _),
+                PayloadManager::InQuorumStore(batch_reader, _),
                 Payload::InQuorumStore(proof_with_data),
             ) => {
                 let status = proof_with_data.status.lock().take();
@@ -166,9 +161,8 @@ impl PayloadManager {
                                     let new_receivers = PayloadManager::request_transactions(
                                         proof_with_data.proofs.clone(),
                                         block.timestamp_usecs(),
-                                        batch_store,
-                                    )
-                                    .await;
+                                        batch_reader.clone(),
+                                    );
                                     // Could not get all data so requested again
                                     proof_with_data
                                         .status
@@ -183,9 +177,8 @@ impl PayloadManager {
                                     let new_receivers = PayloadManager::request_transactions(
                                         proof_with_data.proofs.clone(),
                                         block.timestamp_usecs(),
-                                        batch_store,
-                                    )
-                                    .await;
+                                        batch_reader.clone(),
+                                    );
                                     // Could not get all data so requested again
                                     proof_with_data
                                         .status

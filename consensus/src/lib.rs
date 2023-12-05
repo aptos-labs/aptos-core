@@ -9,9 +9,11 @@
 //! The consensus protocol implemented is AptosBFT (based on
 //! [DiemBFT](https://developers.diem.com/papers/diem-consensus-state-machine-replication-in-the-diem-blockchain/2021-08-17.pdf)).
 
-#![cfg_attr(not(feature = "fuzzing"), deny(missing_docs))]
 #![cfg_attr(feature = "fuzzing", allow(dead_code))]
 #![recursion_limit = "512"]
+
+#[macro_use(defer)]
+extern crate scopeguard;
 
 extern crate core;
 
@@ -29,28 +31,35 @@ mod network;
 mod network_tests;
 mod payload_client;
 mod pending_votes;
-mod persistent_liveness_storage;
-mod quorum_store;
+pub mod persistent_liveness_storage;
+pub mod quorum_store;
+mod rand;
 mod recovery_manager;
 mod round_manager;
 mod state_computer;
+#[cfg(test)]
+mod state_computer_tests;
 mod state_replication;
 #[cfg(any(test, feature = "fuzzing"))]
 mod test_utils;
 #[cfg(test)]
 mod twins;
 mod txn_notifier;
-mod util;
+pub mod util;
 
+mod block_preparer;
 /// AptosBFT implementation
 pub mod consensus_provider;
 /// Required by the telemetry service
 pub mod counters;
+mod execution_pipeline;
 /// AptosNet interface.
 pub mod network_interface;
 mod payload_manager;
+mod qc_aggregator;
 mod sender_aware_shuffler;
 mod transaction_deduper;
+mod transaction_filter;
 mod transaction_shuffler;
 mod txn_hash_and_authenticator_deduper;
 

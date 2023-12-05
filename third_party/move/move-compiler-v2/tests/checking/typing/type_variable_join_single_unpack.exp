@@ -4,20 +4,24 @@ module 0x8675309::M {
         f1: #0,
         f2: #0,
     }
-    private fun new<T>() {
+    private fun new<T>(): M::Box<#0> {
         Abort(0)
     }
     private fun t0() {
         {
-          let M::Box<?2>{ f1: f1: u64, f2: f2: u64 } = M::new<u64>();
+          let M::Box<u64>{ f1: f1: u64, f2: f2: u64 } = M::new<u64>();
           f1;
           f2;
           {
-            let M::Box<?7>{ f1: f1: M::Box<u64>, f2: f2: M::Box<u64> } = M::new<M::Box<u64>>();
+            let M::Box<M::Box<u64>>{ f1: f1: M::Box<u64>, f2: f2: M::Box<u64> } = M::new<M::Box<u64>>();
             f1;
             f2;
             Tuple()
           }
         }
     }
+    spec fun $new<T>(): M::Box<#0> {
+        Abort(0)
+    }
+    spec fun $t0();
 } // end 0x8675309::M

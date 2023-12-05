@@ -38,7 +38,7 @@ jobs:
     timeout-minutes: ${{ inputs.TIMEOUT_MINUTES }}
     runs-on: ${{ inputs.RUNS_ON }}
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
         with:
           ref: ${{ inputs.GIT_SHA }}
 
@@ -52,9 +52,15 @@ jobs:
           scripts/dev_setup.sh -b -i awscli
           echo "${HOME}/bin/" >> $GITHUB_PATH # default INSTALL_DIR to path
 
+      - name: Install s5cmd
+        shell: bash
+        run: |
+          scripts/dev_setup.sh -b -i s5cmd
+          echo "${HOME}/bin/" >> $GITHUB_PATH # default INSTALL_DIR to path
+
       - name: Build CLI binaries in release mode
         shell: bash
-        run: cargo build --release -p aptos-db-tool
+        run: cargo build --release -p aptos-debugger
 
       - name: Run module-verify in parallel
         shell: bash

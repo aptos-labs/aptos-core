@@ -8,6 +8,9 @@ inputs:
   GCP_DOCKER_ARTIFACT_REPO:
     description: "The GCP Docker artifact repository"
     required: true
+  WITH_INDEXER_API:
+    description: "If true, run an indexer API as well"
+    required: true
 
 runs:
   using: composite
@@ -18,22 +21,34 @@ runs:
       run: mkdir -p ${{ runner.temp }}/testnet
       shell: bash
 
-    # Run a local testnet. We mount in the testnet directory we just created.
-    - run: docker run -p 8080:8080 -p 8081:8081 -v ${{ runner.temp }}/testnet:/testnet --name=local-testnet-${{ inputs.IMAGE_TAG }} --detach ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.IMAGE_TAG }} aptos node run-local-testnet --with-faucet --test-dir /testnet
+    # Run a local testnet. We mount in the testnet directory we just created. We bind
+    # the Docker daemon Unix socket from the host into the container so the CLI inside
+    # the container can run containers on the host (e.g. postgres and the indexer API).
+    - run: |
+        docker run \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        --network host \
+        -v ${{ runner.temp }}/testnet:/testnet \
+        --name=local-testnet-${{ inputs.IMAGE_TAG }} \
+        --detach ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.IMAGE_TAG }} \
+        aptos node run-local-testnet \
+        --test-dir /testnet \
+        ${{ inputs.WITH_INDEXER_API == 'true' && '--with-indexer-api' || ' ' }}
+
       shell: bash
 
+
     # Install node + npm.
-    - uses: actions/setup-node@969bd2663942d722d85b6a8626225850c2f7be4b # pin@v3
+    - uses: actions/setup-node@v3
       with:
         node-version-file: .node-version
         registry-url: "https://registry.npmjs.org"
 
-    # Wait for the node API and faucet of the local testnet to start up.
+    # Wait for all the services of the local testnet to start up by waiting for the
+    # readiness endpoint to return 200.
     - run: npm install -g wait-on
       shell: bash
-    - run: wait-on -t 60000 --httpTimeout 60000 http-get://127.0.0.1:8080/v1
-      shell: bash
-    - run: wait-on -t 60000 --httpTimeout 60000 http-get://127.0.0.1:8081
+    - run: wait-on -t 120000 --httpTimeout 120000 http-get://127.0.0.1:8070
       shell: bash
 
     # Print the logs from the local testnet if the tests failed.

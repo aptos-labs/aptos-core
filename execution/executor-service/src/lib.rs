@@ -1,19 +1,26 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use aptos_state_view::in_memory_state_view::InMemoryStateView;
 use aptos_types::{
-    block_executor::partitioner::SubBlocksForShard,
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain,
+        partitioner::{ShardId, SubBlocksForShard},
+    },
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
     vm_status::VMStatus,
 };
 use serde::{Deserialize, Serialize};
 
 mod error;
+pub mod local_executor_helper;
+mod metrics;
 pub mod process_executor_service;
 mod remote_cordinator_client;
 mod remote_cross_shard_client;
-mod remote_executor_client;
+pub mod remote_executor_client;
 pub mod remote_executor_service;
+mod remote_state_view;
+mod remote_state_view_service;
 #[cfg(test)]
 mod test_utils;
 #[cfg(test)]
@@ -40,14 +47,8 @@ pub enum RemoteExecutionRequest {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ExecuteBlockCommand {
     pub(crate) sub_blocks: SubBlocksForShard<AnalyzedTransaction>,
-    // Currently we only support the state view backed by in-memory hashmap, which means that
-    // the controller needs to pre-read all the KV pairs from the storage and pass them to the
-    // executor service. In the future, we will support other types of state view, e.g., the
-    // state view backed by remote storage service, which will allow the executor service to read the KV pairs
-    // directly from the storage.
-    pub(crate) state_view: InMemoryStateView,
     pub(crate) concurrency_level: usize,
-    pub(crate) maybe_block_gas_limit: Option<u64>,
+    pub(crate) onchain_config: BlockExecutorConfigFromOnchain,
 }
 
 impl ExecuteBlockCommand {
@@ -55,15 +56,36 @@ impl ExecuteBlockCommand {
         self,
     ) -> (
         SubBlocksForShard<AnalyzedTransaction>,
-        InMemoryStateView,
         usize,
-        Option<u64>,
+        BlockExecutorConfigFromOnchain,
     ) {
-        (
-            self.sub_blocks,
-            self.state_view,
-            self.concurrency_level,
-            self.maybe_block_gas_limit,
-        )
+        (self.sub_blocks, self.concurrency_level, self.onchain_config)
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RemoteKVRequest {
+    pub(crate) shard_id: ShardId,
+    pub(crate) keys: Vec<StateKey>,
+}
+
+impl RemoteKVRequest {
+    pub fn new(shard_id: ShardId, keys: Vec<StateKey>) -> Self {
+        Self { shard_id, keys }
+    }
+
+    pub fn into(self) -> (ShardId, Vec<StateKey>) {
+        (self.shard_id, self.keys)
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RemoteKVResponse {
+    pub(crate) inner: Vec<(StateKey, Option<StateValue>)>,
+}
+
+impl RemoteKVResponse {
+    pub fn new(inner: Vec<(StateKey, Option<StateValue>)>) -> Self {
+        Self { inner }
     }
 }

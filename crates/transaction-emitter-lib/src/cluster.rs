@@ -168,7 +168,7 @@ impl Cluster {
         let address = if self.coin_source_is_root {
             aptos_test_root_address()
         } else {
-            account_key.authentication_key().derived_address()
+            account_key.authentication_key().account_address()
         };
 
         let sequence_number = query_sequence_number(client, address).await.map_err(|e| {

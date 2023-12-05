@@ -11,12 +11,13 @@ module 0x8675309::M {
           let u: u64 = 0;
           {
             let s: M::S = pack M::S(false);
-            u;
-            s;
+            Copy(u);
+            Copy(s);
             s;
             u;
             Tuple()
           }
         }
     }
+    spec fun $t();
 } // end 0x8675309::M

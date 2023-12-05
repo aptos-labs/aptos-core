@@ -18,7 +18,7 @@ use move_bytecode_source_map::source_map::SourceMap;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_ir_types::ast as IR_AST;
 use move_model::{
-    ast::Address,
+    ast::{AccessSpecifier, Address, AddressSpecifier, ResourceSpecifier},
     model::{
         FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, Parameter, QualifiedId,
         StructEnv, StructId, TypeParameter, TypeParameterKind,
@@ -27,10 +27,11 @@ use move_model::{
     ty::{PrimitiveType, ReferenceKind, Type},
 };
 use move_stackless_bytecode::{
-    function_target_pipeline::FunctionTargetsHolder, stackless_bytecode::Constant,
+    function_target_pipeline::{FunctionTargetsHolder, FunctionVariant},
+    stackless_bytecode::{Bytecode, Constant, Operation},
 };
 use move_symbol_pool::symbol as IR_SYMBOL;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Internal state of the module code generator
 #[derive(Debug)]
@@ -75,7 +76,7 @@ pub struct ModuleGenerator {
     pub source_map: SourceMap,
 }
 
-/// Immutable context for a module code generation, seperated from the mutable generator
+/// Immutable context for a module code generation, separated from the mutable generator
 /// state to reduce borrow conflicts.
 #[derive(Debug, Clone)]
 pub struct ModuleContext<'env> {
@@ -92,7 +93,7 @@ impl ModuleGenerator {
         module_env: &ModuleEnv,
     ) -> (FF::CompiledModule, SourceMap, Option<FF::FunctionHandle>) {
         let module = move_binary_format::CompiledModule {
-            version: file_format_common::VERSION_EXPERIMENTAL,
+            version: file_format_common::VERSION_NEXT,
             self_module_handle_idx: FF::ModuleHandleIndex(0),
             ..Default::default()
         };
@@ -144,13 +145,19 @@ impl ModuleGenerator {
         for struct_env in module_env.get_structs() {
             self.gen_struct(ctx, &struct_env)
         }
+
+        let acquires_map = ctx.generate_acquires_map(module_env);
         for fun_env in module_env.get_functions() {
-            FunctionGenerator::run(self, ctx, fun_env);
+            let acquires_list = &acquires_map[&fun_env.get_id()];
+            FunctionGenerator::run(self, ctx, fun_env, acquires_list);
         }
     }
 
     /// Generate information for a struct.
     fn gen_struct(&mut self, ctx: &ModuleContext, struct_env: &StructEnv<'_>) {
+        if struct_env.is_ghost_memory() {
+            return;
+        }
         let loc = &struct_env.get_loc();
         let struct_handle = self.struct_index(ctx, loc, struct_env);
         let field_information = FF::StructFieldInformation::Declared(
@@ -223,12 +230,12 @@ impl ModuleGenerator {
                 Address => FF::SignatureToken::Address,
                 Signer => FF::SignatureToken::Signer,
                 Num | Range | EventStore => {
-                    ctx.internal_error(loc, "unexpected specification type");
+                    ctx.internal_error(loc, format!("unexpected specification type {:#?}", ty));
                     FF::SignatureToken::Bool
                 },
             },
             Tuple(_) => {
-                ctx.internal_error(loc, "unexpected tuple type");
+                ctx.internal_error(loc, format!("unexpected tuple type {:#?}", ty));
                 FF::SignatureToken::Bool
             },
             Vector(ty) => FF::SignatureToken::Vector(Box::new(self.signature_token(ctx, loc, ty))),
@@ -381,12 +388,18 @@ impl ModuleGenerator {
             loc,
             fun_env.get_result_type().flatten().into_iter().collect(),
         );
+        let access_specifiers = fun_env.get_access_specifiers().as_ref().map(|v| {
+            v.iter()
+                .map(|s| self.access_specifier(ctx, fun_env, s))
+                .collect()
+        });
         let handle = FF::FunctionHandle {
             module,
             name,
             type_parameters,
             parameters,
             return_,
+            access_specifiers,
         };
         let idx = if fun_env.module_env.is_script_module() {
             self.main_handle = Some(handle);
@@ -403,6 +416,77 @@ impl ModuleGenerator {
         };
         self.fun_to_idx.insert(fun_env.get_qualified_id(), idx);
         idx
+    }
+
+    pub fn access_specifier(
+        &mut self,
+        ctx: &ModuleContext,
+        fun_env: &FunctionEnv,
+        access_specifier: &AccessSpecifier,
+    ) -> FF::AccessSpecifier {
+        let resource = match &access_specifier.resource.1 {
+            ResourceSpecifier::Any => FF::ResourceSpecifier::Any,
+            ResourceSpecifier::DeclaredAtAddress(addr) => FF::ResourceSpecifier::DeclaredAtAddress(
+                self.address_index(ctx, &access_specifier.resource.0, addr.expect_numerical()),
+            ),
+            ResourceSpecifier::DeclaredInModule(module_id) => {
+                FF::ResourceSpecifier::DeclaredInModule(self.module_index(
+                    ctx,
+                    &access_specifier.resource.0,
+                    &ctx.env.get_module(*module_id),
+                ))
+            },
+            ResourceSpecifier::Resource(struct_id) => {
+                let struct_env = ctx.env.get_struct(struct_id.to_qualified_id());
+                if struct_id.inst.is_empty() {
+                    FF::ResourceSpecifier::Resource(self.struct_index(
+                        ctx,
+                        &access_specifier.loc,
+                        &struct_env,
+                    ))
+                } else {
+                    FF::ResourceSpecifier::ResourceInstantiation(
+                        self.struct_index(ctx, &access_specifier.loc, &struct_env),
+                        self.signature(ctx, &access_specifier.loc, struct_id.inst.to_vec()),
+                    )
+                }
+            },
+        };
+        let address =
+            match &access_specifier.address.1 {
+                AddressSpecifier::Any => FF::AddressSpecifier::Any,
+                AddressSpecifier::Address(addr) => FF::AddressSpecifier::Literal(
+                    self.address_index(ctx, &access_specifier.address.0, addr.expect_numerical()),
+                ),
+                AddressSpecifier::Parameter(name) => {
+                    let param_index = fun_env
+                        .get_parameters()
+                        .iter()
+                        .position(|Parameter(n, _)| n == name)
+                        .expect("parameter defined") as u8;
+                    FF::AddressSpecifier::Parameter(param_index, None)
+                },
+                AddressSpecifier::Call(fun, name) => {
+                    let param_index = fun_env
+                        .get_parameters()
+                        .iter()
+                        .position(|Parameter(n, _)| n == name)
+                        .expect("parameter defined") as u8;
+                    let fun_index = self.function_instantiation_index(
+                        ctx,
+                        &access_specifier.address.0,
+                        &ctx.env.get_function(fun.to_qualified_id()),
+                        fun.inst.clone(),
+                    );
+                    FF::AddressSpecifier::Parameter(param_index, Some(fun_index))
+                },
+            };
+        FF::AccessSpecifier {
+            kind: access_specifier.kind,
+            negated: access_specifier.negated,
+            resource,
+            address,
+        }
     }
 
     pub fn function_instantiation_index(
@@ -687,5 +771,63 @@ impl<'env> ModuleContext<'env> {
     /// Convert the symbol into a string.
     pub fn symbol_to_str(&self, s: Symbol) -> String {
         s.display(self.env.symbol_pool()).to_string()
+    }
+}
+
+impl<'env> ModuleContext<'env> {
+    /// Acquires analysis. This is temporary until we have the full reference analysis.
+    fn generate_acquires_map(&self, module: &ModuleEnv) -> BTreeMap<FunId, BTreeSet<StructId>> {
+        // Compute map with direct usage of resources
+        let mut usage_map = module
+            .get_functions()
+            .map(|f| (f.get_id(), self.get_direct_function_acquires(&f)))
+            .collect::<BTreeMap<_, _>>();
+        // Now run a fixed-point loop: add resources used by called functions until there are no
+        // changes.
+        loop {
+            let mut changes = false;
+            for fun in module.get_functions() {
+                if let Some(callees) = fun.get_called_functions() {
+                    let mut usage = usage_map[&fun.get_id()].clone();
+                    let count = usage.len();
+                    // Extend usage by that of callees from the same module. Acquires is only
+                    // local to a module.
+                    for callee in callees {
+                        if callee.module_id == module.get_id() {
+                            usage.extend(usage_map[&callee.id].iter().cloned());
+                        }
+                    }
+                    if usage.len() > count {
+                        *usage_map.get_mut(&fun.get_id()).unwrap() = usage;
+                        changes = true;
+                    }
+                }
+            }
+            if !changes {
+                break;
+            }
+        }
+        usage_map
+    }
+
+    fn get_direct_function_acquires(&self, fun: &FunctionEnv) -> BTreeSet<StructId> {
+        let mut result = BTreeSet::new();
+        let target = self.targets.get_target(fun, &FunctionVariant::Baseline);
+        for bc in target.get_bytecode() {
+            use Bytecode::*;
+            use Operation::*;
+            match bc {
+                Call(_, _, MoveFrom(mid, sid, ..), ..)
+                | Call(_, _, BorrowGlobal(mid, sid, ..), ..)
+                // GetGlobal from spec language, but cover it anyway.
+                | Call(_, _, GetGlobal(mid, sid, ..), ..)
+                if *mid == fun.module_env.get_id() =>
+                    {
+                        result.insert(*sid);
+                    },
+                _ => {},
+            }
+        }
+        result
     }
 }

@@ -10,7 +10,7 @@ edition = "2018"
 cargo-fuzz = true
 
 [dependencies]
-arbitrary = "1.1.7"
+arbitrary = "1.3.2"
 libfuzzer-sys = "0.4"
 move-binary-format = { path = "../../move-binary-format", features = ["fuzzing"] }
 move-bytecode-verifier = { path = "../" }

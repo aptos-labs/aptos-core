@@ -154,6 +154,12 @@ impl<E: Ord + Clone> SetDomain<E> {
     pub fn is_disjoint(&self, other: &Self) -> bool {
         self.iter().all(move |e| !other.contains(e))
     }
+
+    /// Implements string formatting. Not using Display because of context dependent element
+    /// display.
+    pub fn to_string(&self, to_str: impl Fn(&E) -> String) -> String {
+        format!("{{{}}}", self.0.iter().map(to_str).join(","))
+    }
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -263,6 +269,22 @@ impl<K: Ord + Clone, V: AbstractDomain + Clone> MapDomain<K, V> {
             });
         change
     }
+
+    /// Implements string formatting. Not using Display because of context dependent element
+    /// display.
+    pub fn to_string(
+        &self,
+        k_to_str: impl Fn(&K) -> String,
+        v_to_str: impl Fn(&V) -> String,
+    ) -> String {
+        format!(
+            "{{{}}}",
+            self.0
+                .iter()
+                .map(|(k, v)| format!("{}={}", k_to_str(k), v_to_str(v)))
+                .join(",")
+        )
+    }
 }
 
 impl<K: Ord + Clone, V: AbstractDomain + Clone + PartialEq> MapDomain<K, V> {
@@ -285,6 +307,6 @@ impl<K: Ord + Clone, V: AbstractDomain + Clone + PartialEq> MapDomain<K, V> {
                 }
             })
             .collect_vec();
-        self.extend(new_values.into_iter());
+        self.extend(new_values);
     }
 }

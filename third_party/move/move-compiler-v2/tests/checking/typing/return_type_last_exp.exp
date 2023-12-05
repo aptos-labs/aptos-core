@@ -6,10 +6,19 @@ module 0x8675309::M {
     private fun t0() {
         Tuple()
     }
-    private fun t1() {
+    private fun t1(): u64 {
         0
     }
-    private fun t2() {
+    private fun t2(): (u64, bool, M::R) {
+        Tuple(0, false, pack M::R(false))
+    }
+    spec fun $t0() {
+        Tuple()
+    }
+    spec fun $t1(): u64 {
+        0
+    }
+    spec fun $t2(): (u64, bool, M::R) {
         Tuple(0, false, pack M::R(false))
     }
 } // end 0x8675309::M

@@ -371,6 +371,8 @@ fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
         );
         // Assign new module id in the model.
         let module_id = ModuleId::new(module_count);
+        // Associate the module name with the module id for lookups.
+        builder.module_table.insert(module_name.clone(), module_id);
         let mut module_translator = ModuleBuilder::new(&mut builder, module_id, module_name);
         module_translator.translate(loc, module_def, None);
     }
@@ -383,12 +385,25 @@ fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
         module_translator.translate(loc, module_def, None);
     }
 
+    let module_table = std::mem::take(&mut builder.module_table);
+    // Patch up information about friend module ids, as all the modules have ids by now.
+    for module in env.module_data.iter_mut() {
+        let mut friend_modules = BTreeSet::new();
+        for friend_decl in module.friend_decls.iter_mut() {
+            if let Some(friend_mod_id) = module_table.get(&friend_decl.module_name) {
+                friend_decl.module_id = Some(*friend_mod_id);
+                friend_modules.insert(*friend_mod_id);
+            } // else: unresolved friend module, which should be reported elsewhere.
+        }
+        module.friend_modules = friend_modules;
+    }
     // Compute information derived from AST (currently callgraph)
     for module in env.module_data.iter_mut() {
         for fun_data in module.function_data.values_mut() {
             fun_data.called_funs = Some(
                 fun_data
                     .def
+                    .borrow()
                     .clone()
                     .map(|e| e.called_funs())
                     .unwrap_or_default(),
@@ -511,6 +526,7 @@ fn script_into_module(compiled_script: CompiledScript) -> CompiledModule {
         parameters: script.parameters,
         return_: return_sig_idx,
         type_parameters: script.type_parameters,
+        access_specifiers: None, // TODO: access specifiers for script functions
     });
 
     // Create a function definition for the main function.
@@ -717,6 +733,7 @@ fn retrospective_lambda_lifting(
             },
             entry: None,
             acquires: vec![], // TODO: might need inference here
+            access_specifiers: None,
             body: new_body,
             specs: BTreeMap::new(),
         };
@@ -752,6 +769,7 @@ fn expansion_script_to_module(script: E::Script) -> E::ModuleDefinition {
         constants,
         function,
         specs,
+        use_decls,
     } = script;
 
     // Construct a pseudo module definition.
@@ -771,6 +789,7 @@ fn expansion_script_to_module(script: E::Script) -> E::ModuleDefinition {
         constants,
         functions,
         specs,
+        use_decls,
     }
 }
 

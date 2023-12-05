@@ -51,6 +51,9 @@ pub trait PersistentLivenessStorage: Send + Sync {
 
     /// Returns a handle of the aptosdb.
     fn aptos_db(&self) -> Arc<dyn DbReader>;
+
+    // Returns a handle of the consensus db
+    fn consensus_db(&self) -> Arc<ConsensusDB>;
 }
 
 #[derive(Clone)]
@@ -443,5 +446,9 @@ impl PersistentLivenessStorage for StorageWriteProxy {
 
     fn aptos_db(&self) -> Arc<dyn DbReader> {
         self.aptos_db.clone()
+    }
+
+    fn consensus_db(&self) -> Arc<ConsensusDB> {
+        self.db.clone()
     }
 }

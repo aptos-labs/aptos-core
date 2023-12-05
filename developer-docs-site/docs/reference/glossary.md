@@ -28,7 +28,7 @@ See [Accounts](../concepts/accounts.md) for more information.
 
 ### API
 
-- An **Application Programming Interface (API)(** is a set of protocols and tools that allow users to interact with Aptos blockchain nodes and client networks via external applications. Aptos offers a REST API for this purpose. See the [Aptos API reference](https://aptos.dev/nodes/aptos-api-spec#/) documentation and [Use the Aptos API](../integration/aptos-apis.md) for more details.
+- An **Application Programming Interface (API)(** is a set of protocols and tools that allow users to interact with Aptos blockchain nodes and client networks via external applications. Aptos offers a REST API for this purpose. See the [Aptos API reference](https://aptos.dev/nodes/aptos-api-spec#/) documentation and [Use the Aptos API](../apis/fullnode-rest-api.md) for more details.
 
 ### APT
 
@@ -213,11 +213,10 @@ then there is a guarantee that T_N will never be included in the blockchain.
 - The gas required for a transaction depends on the size of the transaction, the computational cost of executing the transaction, and the amount of additional global state created by the transaction (e.g., if new accounts are created).
 - The purpose of gas is regulating demand for the limited computational and storage resources of the validators, including preventing denial of service (DoS) attacks.
 
-### Gas Price
+### Gas Unit Price
 
-- Each transaction specifies the **gas price** the sender is willing to pay. Gas price is specified in currency/gas units.
+- Each transaction specifies the **gas unit price** the sender is willing to pay per unit of gas.
 - The price of gas required for a transaction depends on the current demand for usage of the network.
-- The gas cost is fixed at a point in time. Gas costs are denominated in gas units.
 
 ## H
 
@@ -350,7 +349,7 @@ See [Resource accounts](../move/move-on-aptos/resource-accounts.md) for instruct
 
 ### REST Service
 
-- The **REST Service** component is the external interface of a Aptos node. Any incoming client request, such as submitted transactions or queries, must first go through the REST Service. A client needs to go through the REST Service component to access storage or any other component in the system. This filters requests and protects the system.
+- The **REST Service** component is the external interface of an Aptos node. Any incoming client request, such as submitted transactions or queries, must first go through the REST Service. A client needs to go through the REST Service component to access storage or any other component in the system. This filters requests and protects the system.
 - Whenever a client submits a new transaction, the REST Service passes it to [mempool](#mempool).
 
 ### Round

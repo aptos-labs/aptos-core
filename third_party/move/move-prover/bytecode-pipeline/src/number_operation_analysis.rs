@@ -64,6 +64,9 @@ impl NumberOperationProcessor {
             match item {
                 Either::Left(fid) => {
                     let func_env = env.get_function(*fid);
+                    if func_env.is_inline() {
+                        continue;
+                    }
                     for (_, target) in targets.get_targets(&func_env) {
                         if target.data.code.is_empty() {
                             continue;
@@ -74,6 +77,9 @@ impl NumberOperationProcessor {
                 Either::Right(scc) => {
                     for fid in scc {
                         let func_env = env.get_function(*fid);
+                        if func_env.is_inline() {
+                            continue;
+                        }
                         for (_, target) in targets.get_targets(&func_env) {
                             if target.data.code.is_empty() {
                                 continue;
@@ -335,7 +341,7 @@ impl<'a> NumberOperationAnalysis<'a> {
                                     ret_vec.push(Bottom);
                                     if callee_spec_fun.body.is_some() {
                                         let body_exp = callee_spec_fun.body.as_ref().unwrap();
-                                        let local_map = body_exp.free_local_vars_with_node_id();
+                                        let local_map = body_exp.bound_local_vars_with_node_id();
                                         for (i, Parameter(sym, _)) in
                                             callee_spec_fun.params.iter().enumerate()
                                         {

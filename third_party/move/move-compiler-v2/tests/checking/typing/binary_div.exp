@@ -12,7 +12,7 @@ module 0x8675309::M {
         Div<u128>(0, 1);
         Div<u128>(0, 1);
         Div<u64>(0, 1);
-        Div<u64>(x, x);
+        Div<u64>(Copy(x), Move(x));
         Div<u64>(select M::R.f(r), select M::R.f(r));
         Div<u64>(Div<u64>(Div<u64>(1, select M::R.f(r)), select M::R.f(r)), 0);
         {
@@ -20,4 +20,5 @@ module 0x8675309::M {
           Tuple()
         }
     }
+    spec fun $t0(x: u64,r: M::R);
 } // end 0x8675309::M
