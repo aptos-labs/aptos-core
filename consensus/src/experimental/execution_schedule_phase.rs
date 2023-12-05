@@ -6,6 +6,7 @@ use crate::{
         execution_wait_phase::ExecutionWaitRequest,
         pipeline_phase::{CountedRequest, StatelessPipeline},
     },
+    state_computer::PipelineExecutionResult,
     state_replication::StateComputer,
 };
 use aptos_consensus_types::executed_block::ExecutedBlock;
@@ -92,7 +93,8 @@ impl StatelessPipeline for ExecutionSchedulePhase {
             let mut results = vec![];
             for (block, fut) in itertools::zip_eq(ordered_blocks, futs) {
                 debug!("try to receive compute result for block {}", block.id());
-                results.push(block.replace_result(fut.await?));
+                let PipelineExecutionResult { input_txns, result } = fut.await?;
+                results.push(block.replace_result(input_txns, result));
             }
             drop(lifetime_guard);
             Ok(results)

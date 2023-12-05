@@ -216,7 +216,11 @@ async fn commit_should_discover_validator_txns() {
             4
         ]);
 
-    let blocks = vec![Arc::new(ExecutedBlock::new(block, state_compute_result))];
+    let blocks = vec![Arc::new(ExecutedBlock::new(
+        block,
+        vec![],
+        state_compute_result,
+    ))];
     let epoch_state = EpochState::empty();
 
     execution_policy.new_epoch(

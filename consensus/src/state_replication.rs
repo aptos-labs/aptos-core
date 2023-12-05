@@ -3,13 +3,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    error::StateSyncError, payload_manager::PayloadManager, state_computer::StateComputeResultFut,
-    transaction_deduper::TransactionDeduper, transaction_shuffler::TransactionShuffler,
+    error::StateSyncError,
+    payload_manager::PayloadManager,
+    state_computer::{PipelineExecutionResult, StateComputeResultFut},
+    transaction_deduper::TransactionDeduper,
+    transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
 use aptos_consensus_types::{block::Block, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
-use aptos_executor_types::{ExecutorResult, StateComputeResult};
+use aptos_executor_types::ExecutorResult;
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
@@ -33,7 +36,7 @@ pub trait StateComputer: Send + Sync {
         block: &Block,
         // The parent block root hash.
         parent_block_id: HashValue,
-    ) -> ExecutorResult<StateComputeResult> {
+    ) -> ExecutorResult<PipelineExecutionResult> {
         self.schedule_compute(block, parent_block_id).await.await
     }
 
