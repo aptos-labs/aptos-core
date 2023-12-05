@@ -14,7 +14,7 @@ This tutorial introduces how you can compile, deploy, and mint your own coin, na
 
 Install your preferred SDK from the below list:
 
-* [TypeScript SDK](../sdks/ts-sdk-v2/index.md)
+* [TypeScript SDK](../sdks/new-ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
 * [Rust SDK](../sdks/rust-sdk.md)
 
@@ -359,7 +359,7 @@ There are two separate withdraw and deposit events instead of a single transfer 
 
 ## Supporting documentation
 * [Aptos CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md)
-* [TypeScript SDK](../sdks/ts-sdk-v2/index.md)
+* [TypeScript SDK](../sdks/new-ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
 * [Rust SDK](../sdks/rust-sdk.md)
 * [REST API specification](https://aptos.dev/nodes/aptos-api-spec#/)
