@@ -22,10 +22,26 @@ fun this_is_a_test() { ... }
 fun this_is_not_correct(arg: signer) { ... }
 ```
 
-A test can also be annotated as an `#[expected_failure]`. This annotation marks that the test should is expected to raise an error. 
-You can ensure that a test is aborting with a specific abort `<code>` in the module `<loc>`.
-by annotating it with `#[expected_failure(abort_code = <code>, location = <loc>)]`, 
-if it then fails with a different abort code, in a different module or with a non-abort error the test will fail. Note that `<loc>` can be `Self`(in the current module) or a qualified name, e.g. `vector::std`.
+### Expected Failure
+
+A test can also be annotated as an `#[expected_failure]`. This
+annotation marks that the test should is expected to raise an error.
+
+You can ensure that a test is aborting with a specific abort `<code>`
+by annotating it with `#[expected_failure(abort_code = <code>)]`,
+corresponding to the parameter to an `abort` statement (or
+failing `assert!` macro).
+
+Instead of an `abort_code`, an `expected_failure` may specify program
+execution errors, such as `arithmetic_error`, `major_status`,
+`vector_error`, and `out_of_gas`.  For more specifity, a
+'minor_status' may optionally be specified.
+
+If the error is expected from a specific location, that may also be specified:
+`#[expected_failure(abort_code = <code>, location = <loc>)]`.
+If the test then fails with a different abort code, in a different module or with a non-abort error the test will fail.
+Note that `<loc>` can be `Self`(in the current module) or a qualified name, e.g. `vector::std`.
+
 Only functions that have the `#[test]` annotation can also be annotated as an #`[expected_failure]`.
 
 ```
@@ -43,7 +59,17 @@ public fun test_will_error_and_fail() { 1/0; }
 
 #[test, expected_failure] // Can have multiple in one attribute. This test will pass.
 public fun this_other_test_will_abort_and_pass() { abort 1 }
+
+#[test]
+#[expected_failure(vector_error, minor_status = 1, location = Self)]
+fun borrow_out_of_range() { ... }
+
+#[test]
+#[expected_failure(abort_code = 26113, location = extensions::table)]
+fun test_destroy_fails() { ... }
 ```
+
+### Test parameters
 
 With arguments, a test annotation takes the form `#[test(<param_name_1> = <address>, ..., <param_name_n> = <address>)]`. If a function is annotated in such a manner, the function's parameters must be a permutation of the parameters <`param_name_1>, ..., <param_name_n>`, i.e., the order of these parameters as they occur in the function and their order in the test annotation do not have to be the same, but they must be able to be matched up with each other by name.
 
@@ -66,6 +92,8 @@ address TEST_NAMED_ADDR = @0x1;
 #[test(arg = @TEST_NAMED_ADDR)] // Named addresses are supported!
 fun this_is_correct_now(arg: signer) { ... }
 ```
+
+### Arbitrary code to support tests
 
 A module and any of its members can be declared as test only. In such a case the item will only be included in the compiled Move bytecode when compiled in test mode. Additionally, when compiled outside of test mode, any non-test `use`s of a `#[test_only]` module will raise an error during compilation.
 
