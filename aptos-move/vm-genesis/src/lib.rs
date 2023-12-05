@@ -281,7 +281,7 @@ pub fn encode_genesis_change_set(
 
     assert!(!change_set
         .concrete_write_set_iter()
-        .any(|(_, op)| op.unwrap().is_deletion()));
+        .any(|(_, op)| op.expect("expect only concrete write ops").is_deletion()));
     verify_genesis_write_set(change_set.events());
     change_set
         .try_into_storage_change_set()

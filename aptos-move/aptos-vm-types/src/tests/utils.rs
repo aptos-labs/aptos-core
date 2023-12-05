@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    change_set::{AbstractResourceWriteOp, VMChangeSet, WriteWithDelayedFieldsOp},
+    change_set::VMChangeSet,
     check_change_set::CheckChangeSet,
-    output::VMOutput,
+    output::VMOutput, abstract_write_op::{AbstractResourceWriteOp, WriteWithDelayedFieldsOp},
 };
 use aptos_aggregator::{
     delayed_change::DelayedChange,
@@ -141,23 +141,93 @@ pub(crate) fn mock_tag_2() -> StructTag {
     }
 }
 
-pub(crate) fn build_change_set(
-    resource_write_set: impl IntoIterator<Item = (StateKey, AbstractResourceWriteOp)>,
-    module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
-    delayed_field_change_set: impl IntoIterator<Item = (DelayedFieldID, DelayedChange<DelayedFieldID>)>,
-    aggregator_v1_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
-    aggregator_v1_delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
-) -> VMChangeSet {
-    VMChangeSet::new(
-        BTreeMap::from_iter(resource_write_set),
-        BTreeMap::from_iter(module_write_set),
-        vec![],
-        BTreeMap::from_iter(delayed_field_change_set),
-        BTreeMap::from_iter(aggregator_v1_write_set),
-        BTreeMap::from_iter(aggregator_v1_delta_set),
-        &MockChangeSetChecker,
-    )
-    .unwrap()
+pub(crate) struct VMChangeSetBuilder {
+    resource_write_set: BTreeMap<StateKey, AbstractResourceWriteOp>,
+    module_write_set: BTreeMap<StateKey, WriteOp>,
+    events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
+    delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
+    aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
+    aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
+}
+
+impl VMChangeSetBuilder {
+    pub(crate) fn new() -> Self {
+        Self {
+            resource_write_set: BTreeMap::new(),
+            module_write_set: BTreeMap::new(),
+            events: vec![],
+            delayed_field_change_set: BTreeMap::new(),
+            aggregator_v1_write_set: BTreeMap::new(),
+            aggregator_v1_delta_set: BTreeMap::new(),
+        }
+    }
+
+    pub(crate) fn with_resource_write_set(
+        mut self,
+        resource_write_set: impl IntoIterator<Item = (StateKey, AbstractResourceWriteOp)>,
+    ) -> Self {
+        assert!(self.resource_write_set.is_empty());
+        self.resource_write_set.extend(resource_write_set);
+        self
+    }
+
+    pub(crate) fn with_module_write_set(
+        mut self,
+        module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
+    ) -> Self {
+        assert!(self.module_write_set.is_empty());
+        self.module_write_set.extend(module_write_set);
+        self
+    }
+
+    pub(crate) fn with_events(
+        mut self,
+        events: impl IntoIterator<Item = (ContractEvent, Option<MoveTypeLayout>)>,
+    ) -> Self {
+        assert!(self.events.is_empty());
+        self.events.extend(events);
+        self
+    }
+
+    pub(crate) fn with_delayed_field_change_set(
+        mut self,
+        delayed_field_change_set: impl IntoIterator<Item = (DelayedFieldID, DelayedChange<DelayedFieldID>)>,
+    ) -> Self {
+        assert!(self.delayed_field_change_set.is_empty());
+        self.delayed_field_change_set.extend(delayed_field_change_set);
+        self
+    }
+
+    pub(crate) fn with_aggregator_v1_write_set(
+        mut self,
+        aggregator_v1_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
+    ) -> Self {
+        assert!(self.aggregator_v1_write_set.is_empty());
+        self.aggregator_v1_write_set.extend(aggregator_v1_write_set);
+        self
+    }
+
+    pub(crate) fn with_aggregator_v1_delta_set(
+        mut self,
+        aggregator_v1_delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
+    ) -> Self {
+        assert!(self.aggregator_v1_delta_set.is_empty());
+        self.aggregator_v1_delta_set.extend(aggregator_v1_delta_set);
+        self
+    }
+
+    pub(crate) fn build(self) -> VMChangeSet {
+        VMChangeSet::new(
+            self.resource_write_set,
+            self.module_write_set,
+            self.events,
+            self.delayed_field_change_set,
+            self.aggregator_v1_write_set,
+            self.aggregator_v1_delta_set,
+            &MockChangeSetChecker,
+        )
+        .unwrap()
+    }
 }
 
 // For testing, output has always a success execution status and uses 100 gas units.
@@ -171,14 +241,141 @@ pub(crate) fn build_vm_output(
     const GAS_USED: u64 = 100;
     const STATUS: TransactionStatus = TransactionStatus::Keep(ExecutionStatus::Success);
     VMOutput::new(
-        build_change_set(
-            resource_write_set,
-            module_write_set,
-            delayed_field_change_set,
-            aggregator_v1_write_set,
-            aggregator_v1_delta_set,
-        ),
+        VMChangeSetBuilder::new()
+            .with_resource_write_set(resource_write_set)
+            .with_module_write_set(module_write_set)
+            .with_delayed_field_change_set(delayed_field_change_set)
+            .with_aggregator_v1_write_set(aggregator_v1_write_set)
+            .with_aggregator_v1_delta_set(aggregator_v1_delta_set)
+            .build(),
         FeeStatement::new(GAS_USED, GAS_USED, 0, 0, 0),
         STATUS,
     )
+}
+
+pub(crate) struct ExpandedVMChangeSetBuilder {
+    resource_write_set: BTreeMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
+    resource_group_write_set: BTreeMap<StateKey, GroupWrite>,
+    module_write_set: BTreeMap<StateKey, WriteOp>,
+    aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
+    aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
+    delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
+    reads_needing_delayed_field_exchange: BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
+    group_reads_needing_delayed_field_exchange: BTreeMap<StateKey, (WriteOp, u64)>,
+    events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
+}
+
+impl ExpandedVMChangeSetBuilder {
+    pub(crate) fn new() -> Self {
+        Self {
+            resource_write_set: BTreeMap::new(),
+            resource_group_write_set: BTreeMap::new(),
+            module_write_set: BTreeMap::new(),
+            aggregator_v1_write_set: BTreeMap::new(),
+            aggregator_v1_delta_set: BTreeMap::new(),
+            delayed_field_change_set: BTreeMap::new(),
+            reads_needing_delayed_field_exchange: BTreeMap::new(),
+            group_reads_needing_delayed_field_exchange: BTreeMap::new(),
+            events: vec![],
+        }
+    }
+
+    pub(crate) fn with_resource_write_set(
+        mut self,
+        resource_write_set: impl IntoIterator<Item = (StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>))>,
+    ) -> Self {
+        assert!(self.resource_write_set.is_empty());
+        self.resource_write_set.extend(resource_write_set);
+        self
+    }
+
+    pub(crate) fn with_resource_group_write_set(
+        mut self,
+        resource_group_write_set: impl IntoIterator<Item = (StateKey, GroupWrite)>,
+    ) -> Self {
+        assert!(self.resource_group_write_set.is_empty());
+        self.resource_group_write_set.extend(resource_group_write_set);
+        self
+    }
+
+    pub(crate) fn with_module_write_set(
+        mut self,
+        module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
+    ) -> Self {
+        assert!(self.module_write_set.is_empty());
+        self.module_write_set.extend(module_write_set);
+        self
+    }
+
+    pub(crate) fn with_aggregator_v1_write_set(
+        mut self,
+        aggregator_v1_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
+    ) -> Self {
+        assert!(self.aggregator_v1_write_set.is_empty());
+        self.aggregator_v1_write_set.extend(aggregator_v1_write_set);
+        self
+    }
+
+    pub(crate) fn with_aggregator_v1_delta_set(
+        mut self,
+        aggregator_v1_delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
+    ) -> Self {
+        assert!(self.aggregator_v1_delta_set.is_empty());
+        self.aggregator_v1_delta_set.extend(aggregator_v1_delta_set);
+        self
+    }
+
+    pub(crate) fn with_delayed_field_change_set(
+        mut self,
+        delayed_field_change_set: impl IntoIterator<Item = (DelayedFieldID, DelayedChange<DelayedFieldID>)>,
+    ) -> Self {
+        assert!(self.delayed_field_change_set.is_empty());
+        self.delayed_field_change_set.extend(delayed_field_change_set);
+        self
+    }
+
+    pub(crate) fn with_reads_needing_delayed_field_exchange(
+        mut self,
+        reads_needing_delayed_field_exchange: impl IntoIterator<Item = (StateKey, (WriteOp, Arc<MoveTypeLayout>))>,
+    ) -> Self {
+        assert!(self.reads_needing_delayed_field_exchange.is_empty());
+        self.reads_needing_delayed_field_exchange
+            .extend(reads_needing_delayed_field_exchange);
+        self
+    }
+
+    pub(crate) fn with_group_reads_needing_delayed_field_exchange(
+        mut self,
+        group_reads_needing_delayed_field_exchange: impl IntoIterator<Item = (StateKey, (WriteOp, u64))>,
+    ) -> Self {
+        assert!(self.group_reads_needing_delayed_field_exchange.is_empty());
+        self.group_reads_needing_delayed_field_exchange
+            .extend(group_reads_needing_delayed_field_exchange);
+        self
+    }
+
+    pub(crate) fn with_events(
+        mut self,
+        events: impl IntoIterator<Item = (ContractEvent, Option<MoveTypeLayout>)>,
+    ) -> Self {
+        assert!(self.events.is_empty());
+        self.events.extend(events);
+        self
+    }
+
+    pub(crate) fn build(self) -> ExpandedVMChangeSet {
+        ExpandedVMChangeSet::new_expanded(
+            self.resource_write_set,
+            self.resource_group_write_set,
+            self.module_write_set,
+            self.aggregator_v1_write_set,
+            self.aggregator_v1_delta_set,
+            self.delayed_field_change_set,
+            self.reads_needing_delayed_field_exchange,
+            self.group_reads_needing_delayed_field_exchange,
+            self.events,
+            &MockChangeSetChecker,
+        )
+        .unwrap()
+    }
 }

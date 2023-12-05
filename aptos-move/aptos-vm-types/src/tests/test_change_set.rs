@@ -4,7 +4,7 @@
 use crate::{
     change_set::VMChangeSet,
     tests::utils::{
-        build_change_set, mock_add, mock_create, mock_create_with_layout, mock_delete,
+        mock_add, mock_create, mock_create_with_layout, mock_delete,
         mock_delete_with_layout, mock_modify, mock_modify_with_layout, MockChangeSetChecker,
     },
 };
@@ -29,6 +29,8 @@ use move_core_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use std::collections::BTreeMap;
+
+use super::utils::VMChangeSetBuilder;
 
 /// Testcases:
 /// ```text
@@ -172,13 +174,12 @@ fn build_change_sets_for_test() -> (VMChangeSet, VMChangeSet) {
         mock_add("22a", 22),
         mock_add("23a", 23),
     ];
-    let change_set_1 = build_change_set(
-        resource_write_set_1,
-        module_write_set_1,
-        vec![],
-        aggregator_write_set_1,
-        aggregator_delta_set_1,
-    );
+    let change_set_1 = VMChangeSetBuilder::new()
+        .with_resource_write_set(resource_write_set_1)
+        .with_module_write_set(module_write_set_1)
+        .with_aggregator_v1_write_set(aggregator_write_set_1)
+        .with_aggregator_v1_delta_set(aggregator_delta_set_1)
+        .build();
 
     descriptor = "r";
     let resource_write_set_2 = resource_write_set_2!(descriptor);
@@ -191,13 +192,12 @@ fn build_change_sets_for_test() -> (VMChangeSet, VMChangeSet) {
         mock_add("18a", 118),
         mock_add("19a", 119),
     ];
-    let change_set_2 = build_change_set(
-        resource_write_set_2,
-        module_write_set_2,
-        vec![],
-        aggregator_write_set_2,
-        aggregator_delta_set_2,
-    );
+    let change_set_2 = VMChangeSetBuilder::new()
+        .with_resource_write_set(resource_write_set_2)
+        .with_module_write_set(module_write_set_2)
+        .with_aggregator_v1_write_set(aggregator_write_set_2)
+        .with_aggregator_v1_delta_set(aggregator_delta_set_2)
+        .build();
 
     (change_set_1, change_set_2)
 }
@@ -254,16 +254,16 @@ macro_rules! assert_invariant_violation {
             );
         };
 
-        let mut cs1 = build_change_set($w1.clone(), vec![], vec![], vec![], vec![]);
-        let cs2 = build_change_set($w2.clone(), vec![], vec![], vec![], vec![]);
+        let mut cs1 = VMChangeSetBuilder::new().with_resource_write_set($w1.clone()).build();
+        let cs2 = VMChangeSetBuilder::new().with_resource_write_set($w2.clone()).build();
         let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
         check(res);
-        let mut cs1 = build_change_set(vec![], $w3.clone(), vec![], vec![], vec![]);
-        let cs2 = build_change_set(vec![], $w4.clone(), vec![], vec![], vec![]);
+        let mut cs1 = VMChangeSetBuilder::new().with_module_write_set($w3.clone()).build();
+        let cs2 = VMChangeSetBuilder::new().with_module_write_set($w4.clone()).build();
         let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
         check(res);
-        let mut cs1 = build_change_set(vec![], vec![], vec![], $w3.clone(), vec![]);
-        let cs2 = build_change_set(vec![], vec![], vec![], $w4.clone(), vec![]);
+        let mut cs1 = VMChangeSetBuilder::new().aggregator_v1_write_set($w3.clone());
+        let cs2 = VMChangeSetBuilder::new().aggregator_v1_write_set($w4.clone());
         let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
         check(res);
     };
@@ -315,9 +315,8 @@ fn test_unsuccessful_squash_delete_delta() {
     let aggregator_write_set_1 = vec![mock_delete("20")];
     let aggregator_delta_set_2 = vec![mock_add("20", 120)];
 
-    let mut change_set = build_change_set(vec![], vec![], vec![], aggregator_write_set_1, vec![]);
-    let additional_change_set =
-        build_change_set(vec![], vec![], vec![], vec![], aggregator_delta_set_2);
+    let mut change_set = VMChangeSetBuilder::new().with_aggregator_v1_write_set(aggregator_write_set_1).build();
+    let additional_change_set = VMChangeSetBuilder::new().with_aggregator_v1_delta_set(aggregator_delta_set_2).build();
     let res = change_set.squash_additional_change_set(additional_change_set, &MockChangeSetChecker);
     assert_matches!(
         res,
@@ -335,9 +334,8 @@ fn test_unsuccessful_squash_delta_create() {
     let aggregator_delta_set_1 = vec![mock_add("21", 21)];
     let aggregator_write_set_2 = vec![mock_create("21", 121)];
 
-    let mut change_set = build_change_set(vec![], vec![], vec![], vec![], aggregator_delta_set_1);
-    let additional_change_set =
-        build_change_set(vec![], vec![], vec![], aggregator_write_set_2, vec![]);
+    let mut change_set = VMChangeSetBuilder::new().with_aggregator_v1_delta_set(aggregator_delta_set_1).build();
+    let additional_change_set =VMChangeSetBuilder::new().with_aggregator_v1_write_set(aggregator_write_set_2).build();
     let res = change_set.squash_additional_change_set(additional_change_set, &MockChangeSetChecker);
     assert_matches!(
         res,
@@ -384,13 +382,10 @@ fn test_roundtrip_to_storage_change_set() {
 fn test_failed_conversion_to_change_set() {
     let resource_write_set = vec![mock_delete_with_layout("a")];
     let aggregator_delta_set = vec![mock_add("b", 100)];
-    let change_set = build_change_set(
-        resource_write_set,
-        vec![],
-        vec![],
-        vec![],
-        aggregator_delta_set,
-    );
+    let change_set = VMChangeSetBuilder::new()
+        .with_resource_write_set(resource_write_set)
+        .with_aggregator_v1_delta_set(aggregator_delta_set)
+        .build();
 
     // Unchecked conversion ignores deltas.
     let vm_status = change_set.try_into_storage_change_set();
@@ -401,13 +396,10 @@ fn test_failed_conversion_to_change_set() {
 fn test_conversion_to_change_set_fails() {
     let resource_write_set = vec![mock_delete_with_layout("a")];
     let aggregator_delta_set = vec![mock_add("b", 100)];
-    let change_set = build_change_set(
-        resource_write_set,
-        vec![],
-        vec![],
-        vec![],
-        aggregator_delta_set,
-    );
+    let change_set = VMChangeSetBuilder::new()
+        .with_resource_write_set(resource_write_set)
+        .with_aggregator_v1_delta_set(aggregator_delta_set)
+        .build();
 
     assert_err!(change_set.clone().try_into_storage_change_set());
 }
@@ -423,7 +415,7 @@ fn test_aggregator_v2_snapshots_and_derived() {
             delta: DeltaWithMax::new(SignedU128::Positive(3), 100),
         }),
     )];
-    let mut change_set_1 = build_change_set(vec![], vec![], agg_changes_1, vec![], vec![]);
+    let mut change_set_1 = VMChangeSetBuilder::new().with_delayed_field_change_set(agg_changes_1).build();
 
     let agg_changes_2 = vec![
         (
@@ -450,7 +442,7 @@ fn test_aggregator_v2_snapshots_and_derived() {
             }),
         ),
     ];
-    let change_set_2 = build_change_set(vec![], vec![], agg_changes_2, vec![], vec![]);
+    let change_set_2 = VMChangeSetBuilder::new().with_delayed_field_change_set(agg_changes_2);
 
     assert_ok!(change_set_1.squash_additional_change_set(change_set_2, &MockChangeSetChecker));
 

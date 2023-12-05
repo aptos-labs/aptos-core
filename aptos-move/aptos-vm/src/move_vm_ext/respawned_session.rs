@@ -21,12 +21,15 @@ use aptos_state_view::StateViewId;
 use aptos_types::{
     aggregator::PanicError,
     state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        state_key::StateKey,
+        state_storage_usage::StateStorageUsage,
+        state_value::{StateValue, StateValueMetadataKind},
     },
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_types::{
-    change_set::{AbstractResourceWriteOp, VMChangeSet, WriteWithDelayedFieldsOp},
+    abstract_write_op::{AbstractResourceWriteOp, WriteWithDelayedFieldsOp},
+    change_set::VMChangeSet,
     resolver::{
         ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TModuleView,
         TResourceGroupView, TResourceView,
@@ -336,17 +339,40 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
                     ..
                 }),
             ) => Ok(write_op.as_state_value()),
-            // TODO[agg_v2](fix): Is this really unreachable, or is this called for metadata,
-            // and metadata should be returned here?
-            Some(&AbstractResourceWriteOp::WriteResourceGroup(_)) => {
-                unreachable!();
-            },
             // We could either return from the read, or do the base read again.
-            Some(&AbstractResourceWriteOp::InPlaceDelayedFieldChange(_))
-            | Some(&AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(_))
-            | None => self
+            Some(AbstractResourceWriteOp::InPlaceDelayedFieldChange(_)) | None => self
                 .base_executor_view
                 .get_resource_state_value(state_key, maybe_layout),
+            // TODO[agg_v2](fix): Is this really unreachable, or is this called for metadata,
+            // and metadata should be returned here?
+            Some(AbstractResourceWriteOp::WriteResourceGroup(_))
+            | Some(AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(_)) => {
+                unreachable!();
+            },
+        }
+    }
+
+    fn get_resource_state_value_metadata(
+        &self,
+        state_key: &Self::Key,
+    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+        match self.change_set.resource_write_set().get(state_key) {
+            Some(
+                AbstractResourceWriteOp::Write(write_op)
+                | AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFieldsOp {
+                    write_op,
+                    ..
+                }),
+            ) => Ok(write_op.as_state_value_metadata()),
+            Some(AbstractResourceWriteOp::WriteResourceGroup(write_op)) => {
+                Ok(write_op.metadata_op().as_state_value_metadata())
+            },
+            // We could either return from the read, or do the base read again.
+            Some(AbstractResourceWriteOp::InPlaceDelayedFieldChange(_))
+            | Some(AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(_))
+            | None => self
+                .base_executor_view
+                .get_resource_state_value_metadata(state_key),
         }
     }
 }
@@ -435,7 +461,7 @@ mod test {
     use aptos_aggregator::delta_change_set::{delta_add, serialize};
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::{account_address::AccountAddress, write_set::WriteOp};
-    use aptos_vm_types::{change_set::GroupWrite, check_change_set::CheckChangeSet};
+    use aptos_vm_types::{abstract_write_op::GroupWrite, check_change_set::CheckChangeSet};
     use move_core_types::{
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},

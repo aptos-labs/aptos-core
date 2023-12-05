@@ -287,6 +287,14 @@ pub trait StateValueMetadataResolver {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ResourceGroupSize {
     Concrete(u64),
+    /// Combined represents what would the size be if we know individual
+    /// parts that contribute to it. This is useful when individual parts
+    /// are changing, and we want to know what the size of the group would be.
+    ///
+    /// Formula is based on how bcs serializes the BTreeMap:
+    ///   varint encoding len(num_tagged_resources) + all_tagged_resources_size
+    /// Also, if num_tagged_resources is 0, then the size is 0, because we will not store
+    /// empty resource group in storage.
     Combined {
         num_tagged_resources: usize,
         all_tagged_resources_size: u64,
@@ -330,4 +338,13 @@ impl ResourceGroupSize {
             },
         }
     }
+}
+
+#[test]
+fn test_size_u32_as_uleb128() {
+    assert_eq!(size_u32_as_uleb128(0), 1);
+    assert_eq!(size_u32_as_uleb128(127), 1);
+    assert_eq!(size_u32_as_uleb128(128), 2);
+    assert_eq!(size_u32_as_uleb128(128 * 128 - 1), 2);
+    assert_eq!(size_u32_as_uleb128(128 * 128), 3);
 }

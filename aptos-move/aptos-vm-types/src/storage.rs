@@ -54,7 +54,7 @@ impl StoragePricingV1 {
             }
     }
 
-    fn io_gas_per_write(&self, key: &StateKey, op: &WriteOpSize) -> InternalGas {
+    fn io_gas_per_write(&self, key: &StateKey, op_size: &WriteOpSize) -> InternalGas {
         use aptos_types::write_set::WriteOpSize::*;
 
         let mut cost = self.write_data_per_op * NumArgs::new(1);
@@ -68,7 +68,7 @@ impl StoragePricingV1 {
                 );
         }
 
-        match op {
+        match op_size {
             Creation { write_len } => {
                 cost += self.write_data_per_new_item * NumArgs::new(1)
                     + self.write_data_per_byte_in_val * NumBytes::new(*write_len);
@@ -147,10 +147,10 @@ impl StoragePricingV2 {
         self.per_item_read * (NumArgs::from(1)) + self.per_byte_read * loaded
     }
 
-    fn io_gas_per_write(&self, key: &StateKey, op: &WriteOpSize) -> InternalGas {
+    fn io_gas_per_write(&self, key: &StateKey, op_size: &WriteOpSize) -> InternalGas {
         use aptos_types::write_set::WriteOpSize::*;
 
-        match op {
+        match op_size {
             Creation { write_len } => {
                 self.per_item_create * NumArgs::new(1)
                     + self.write_op_size(key, *write_len) * self.per_byte_create
@@ -191,9 +191,9 @@ impl StoragePricingV3 {
     fn io_gas_per_write(
         &self,
         key: &StateKey,
-        op: &WriteOpSize,
+        op_size: &WriteOpSize,
     ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
-        op.write_len().map_or_else(
+        op_size.write_len().map_or_else(
             || Either::Right(InternalGas::zero()),
             |write_len| {
                 Either::Left(
@@ -262,14 +262,14 @@ impl StoragePricing {
     pub fn io_gas_per_write(
         &self,
         key: &StateKey,
-        op: &WriteOpSize,
+        op_size: &WriteOpSize,
     ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
         use StoragePricing::*;
 
         match self {
-            V1(v1) => Either::Left(v1.io_gas_per_write(key, op)),
-            V2(v2) => Either::Left(v2.io_gas_per_write(key, op)),
-            V3(v3) => Either::Right(v3.io_gas_per_write(key, op)),
+            V1(v1) => Either::Left(v1.io_gas_per_write(key, op_size)),
+            V2(v2) => Either::Left(v2.io_gas_per_write(key, op_size)),
+            V3(v3) => Either::Right(v3.io_gas_per_write(key, op_size)),
         }
     }
 }

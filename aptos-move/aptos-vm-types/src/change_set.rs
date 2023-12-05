@@ -1,7 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::check_change_set::CheckChangeSet;
+use crate::{
+    abstract_write_op::{
+        AbstractResourceWriteOp, GroupWrite, InPlaceDelayedFieldChangeOp,
+        ResourceGroupInPlaceDelayedFieldChangeOp, WriteWithDelayedFieldsOp,
+    },
+    check_change_set::CheckChangeSet,
+};
 use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{serialize, DeltaOp},
@@ -18,10 +24,8 @@ use aptos_types::{
     transaction::ChangeSet as StorageChangeSet,
     write_set::{TransactionWrite, WriteOp, WriteOpSize, WriteSetMut},
 };
-use claims::assert_none;
 use move_binary_format::errors::{Location, PartialVMError};
 use move_core_types::{
-    language_storage::StructTag,
     value::MoveTypeLayout,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
@@ -33,189 +37,6 @@ use std::{
     hash::Hash,
     sync::Arc,
 };
-
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub enum AbstractResourceWriteOp {
-    Write(WriteOp),
-    WriteWithDelayedFields(WriteWithDelayedFieldsOp),
-    // Prior to adding a dedicated write-set for resource groups, all resource group
-    // updates are merged into a single WriteOp included in the resource_write_set.
-    WriteResourceGroup(GroupWrite),
-    // No writes in the resource, except for delayed field changes.
-    InPlaceDelayedFieldChange(InPlaceDelayedFieldChangeOp),
-    // No writes in the resource group, except for delayed field changes.
-    ResourceGroupInPlaceDelayedFieldChange(ResourceGroupInPlaceDelayedFieldChangeOp),
-}
-
-impl AbstractResourceWriteOp {
-    pub fn try_as_concrete_write(&self) -> Option<&WriteOp> {
-        if let AbstractResourceWriteOp::Write(write_op) = self {
-            Some(write_op)
-        } else {
-            None
-        }
-    }
-
-    pub fn try_into_concrete_write(self) -> Option<WriteOp> {
-        if let AbstractResourceWriteOp::Write(write_op) = self {
-            Some(write_op)
-        } else {
-            None
-        }
-    }
-
-    pub fn materialized_size(&self) -> WriteOpSize {
-        use AbstractResourceWriteOp::*;
-        match self {
-            Write(write) => write.into(),
-            WriteWithDelayedFields(WriteWithDelayedFieldsOp {
-                write_op,
-                materialized_size,
-                ..
-            })
-            | WriteResourceGroup(GroupWrite {
-                metadata_op: write_op,
-                maybe_group_op_size: materialized_size,
-                ..
-            }) => {
-                use WriteOp::*;
-                match write_op {
-                    Creation(_) | CreationWithMetadata { .. } => WriteOpSize::Creation {
-                        write_len: materialized_size.unwrap(),
-                    },
-                    Modification(_) | ModificationWithMetadata { .. } => {
-                        WriteOpSize::Modification {
-                            write_len: materialized_size.unwrap(),
-                        }
-                    },
-                    Deletion => WriteOpSize::Deletion,
-                    DeletionWithMetadata { metadata } => WriteOpSize::DeletionWithDeposit {
-                        deposit: metadata.deposit(),
-                    },
-                }
-            },
-            InPlaceDelayedFieldChange(InPlaceDelayedFieldChangeOp {
-                materialized_size, ..
-            })
-            | ResourceGroupInPlaceDelayedFieldChange(ResourceGroupInPlaceDelayedFieldChangeOp {
-                materialized_size,
-                ..
-            }) => WriteOpSize::Modification {
-                write_len: *materialized_size,
-            },
-        }
-    }
-
-    pub fn get_creation_metadata_mut(&mut self) -> Option<&mut StateValueMetadata> {
-        use AbstractResourceWriteOp::*;
-        match self {
-            Write(WriteOp::CreationWithMetadata { metadata, .. })
-            | WriteWithDelayedFields(WriteWithDelayedFieldsOp {
-                write_op: WriteOp::CreationWithMetadata { metadata, .. },
-                ..
-            })
-            | WriteResourceGroup(GroupWrite {
-                metadata_op: WriteOp::CreationWithMetadata { metadata, .. },
-                ..
-            }) => Some(metadata),
-            _ => None,
-        }
-    }
-}
-
-/// Describes an update to a resource group granularly, with WriteOps to affected
-/// member resources of the group, as well as a separate WriteOp for metadata and size.
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub struct GroupWrite {
-    /// Op of the correct kind (creation / modification / deletion) and metadata, and
-    /// the size of the group after the updates encoded in the bytes (no bytes for
-    /// deletion). Relevant during block execution, where the information read to
-    /// derive metadata_op will be validated during parallel execution to make sure
-    /// it is correct, and the bytes will be replaced after the transaction is committed
-    /// with correct serialized group update to obtain storage WriteOp.
-    pub metadata_op: WriteOp,
-    /// Updates to individual group members. WriteOps are 'legacy', i.e. no metadata.
-    /// If the metadata_op is a deletion, all (correct) inner_ops should be deletions,
-    /// and if metadata_op is a creation, then there may not be a creation inner op.
-    /// Not vice versa, e.g. for deleted inner ops, other untouched resources may still
-    /// exist in the group. Note: During parallel block execution, due to speculative
-    /// reads, this invariant may be violated (and lead to speculation error if observed)
-    /// but guaranteed to fail validation and lead to correct re-execution in that case.
-    inner_ops: BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
-    /// Group size as used for gas charging, None if (metadata_)op is Deletion.
-    maybe_group_op_size: Option<u64>,
-}
-
-impl GroupWrite {
-    /// Creates a group write and ensures that the format is correct: in particular,
-    /// sets the bytes of a non-deletion metadata_op by serializing the provided size,
-    /// and ensures inner ops do not contain any metadata.
-    pub fn new(
-        metadata_op: WriteOp,
-        inner_ops: Vec<(StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>))>,
-        group_size: u64,
-    ) -> Self {
-        assert!(
-            metadata_op.bytes().is_none() || metadata_op.bytes().unwrap().is_empty(),
-            "Metadata op should have empty bytes. metadata_op: {:?}",
-            metadata_op
-        );
-        for (_tag, (v, _layout)) in &inner_ops {
-            assert_none!(v.metadata(), "Group inner ops must have no metadata");
-        }
-
-        let maybe_group_op_size = (!metadata_op.is_deletion()).then_some(group_size);
-
-        Self {
-            metadata_op,
-            // TODO[agg_v2](optimize): We are using BTreeMap and Vec in different places to
-            // store resources in resources groups. Inefficient to convert the datastructures
-            // back and forth. Need to optimize this.
-            inner_ops: inner_ops.into_iter().collect(),
-            maybe_group_op_size,
-        }
-    }
-
-    /// Utility method that extracts the serialized group size from metadata_op. Returns
-    /// None if group is being deleted, otherwise asserts on deserializing the size.
-    pub fn maybe_group_op_size(&self) -> Option<u64> {
-        self.maybe_group_op_size
-    }
-
-    // TODO: refactor storage fee & refund interfaces to operate on metadata directly,
-    // as that would avoid providing &mut to the whole metadata op in here, including
-    // bytes that are not raw bytes (encoding group size) and must not be modified.
-    pub fn metadata_op_mut(&mut self) -> &mut WriteOp {
-        &mut self.metadata_op
-    }
-
-    pub fn metadata_op(&self) -> &WriteOp {
-        &self.metadata_op
-    }
-
-    pub fn inner_ops(&self) -> &BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)> {
-        &self.inner_ops
-    }
-}
-
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub struct WriteWithDelayedFieldsOp {
-    pub write_op: WriteOp,
-    pub layout: Arc<MoveTypeLayout>,
-    pub materialized_size: Option<u64>,
-}
-
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub struct InPlaceDelayedFieldChangeOp {
-    pub layout: Arc<MoveTypeLayout>,
-    pub materialized_size: u64,
-}
-
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub struct ResourceGroupInPlaceDelayedFieldChangeOp {
-    pub metadata_op: WriteOp,
-    pub materialized_size: u64,
-}
 
 /// A change set produced by the VM.
 ///
@@ -303,21 +124,10 @@ impl VMChangeSet {
         Self::new(
             resource_write_set
                 .into_iter()
-                .map(|(k, (w, l))| {
+                .map::<Result<_, VMStatus>, _>(|(k, (w, l))| {
                     Ok((
                         k,
-                        if let Some(layout) = l {
-                            let materialized_size = WriteOpSize::from(&w).write_len();
-                            AbstractResourceWriteOp::WriteWithDelayedFields(
-                                WriteWithDelayedFieldsOp {
-                                    write_op: w,
-                                    layout,
-                                    materialized_size,
-                                },
-                            )
-                        } else {
-                            AbstractResourceWriteOp::Write(w)
-                        },
+                        AbstractResourceWriteOp::from_resource_write_with_maybe_layout(w, l),
                     ))
                 })
                 .chain(
@@ -362,7 +172,20 @@ impl VMChangeSet {
                         ))
                     },
                 ))
-                .collect::<Result<BTreeMap<_, _>, VMStatus>>()?,
+                .try_fold::<_, _, Result<BTreeMap<_, _>, VMStatus>>(
+                    BTreeMap::new(),
+                    |mut acc, element| {
+                        let (key, value) = element?;
+                        if acc.insert(key, value).is_some() {
+                            Err(VMStatus::error(
+                                StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+                                err_msg("Found duplicate key across resouce change sets."),
+                            ))
+                        } else {
+                            Ok(acc)
+                        }
+                    },
+                )?,
             module_write_set,
             events,
             delayed_field_change_set,
@@ -514,6 +337,8 @@ impl VMChangeSet {
             + self.aggregator_v1_write_set().len()
     }
 
+    /// Deposit amount is inserted into metadata at a different time than the WriteOp is created.
+    /// So this method is needed to be able to update metadata generically across different variants.
     pub fn write_set_iter_mut(
         &mut self,
     ) -> impl Iterator<Item = (&StateKey, WriteOpSize, Option<&mut StateValueMetadata>)> {
@@ -555,32 +380,30 @@ impl VMChangeSet {
         &mut self,
         patched_resource_writes: impl Iterator<Item = (StateKey, WriteOp)>,
     ) -> Result<(), PanicError> {
-        for (k, new_write) in patched_resource_writes {
-            match self.resource_write_set.entry(k) {
-                Vacant(v) => {
-                    return Err(code_invariant_error(format!(
-                        "Cannot patch a resource which does not exist, for: {:?}.",
-                        v.key()
-                    )));
-                },
-                Occupied(mut o) => {
-                    if let AbstractResourceWriteOp::Write(w) = o.get() {
-                        return Err(code_invariant_error(format!(
-                            "Trying to patch the value that is already materialized: {:?}: {:?} into {:?}.", o.key(), w, new_write
-                        )));
-                    }
+        for (key, new_write) in patched_resource_writes {
+            let abstract_write = self.resource_write_set.get_mut(&key).ok_or_else(|| {
+                code_invariant_error(format!(
+                    "Cannot patch a resource which does not exist, for: {:?}.",
+                    key
+                ))
+            })?;
 
-                    let new_length = WriteOpSize::from(&new_write).write_len();
-                    let old_length = o.get().materialized_size().write_len();
-                    if new_length != old_length {
-                        return Err(code_invariant_error(format!(
-                            "Trying to patch the value that changed size during materialization: {:?}: {:?} into {:?}. \nValues {:?} into {:?}.", o.key(), old_length, new_length, o.get(), new_write,
-                        )));
-                    }
-
-                    o.insert(AbstractResourceWriteOp::Write(new_write));
-                },
+            if let AbstractResourceWriteOp::Write(w) = &abstract_write {
+                return Err(code_invariant_error(format!(
+                    "Trying to patch the value that is already materialized: {:?}: {:?} into {:?}.",
+                    key, w, new_write
+                )));
             }
+
+            let new_length = WriteOpSize::from(&new_write).write_len();
+            let old_length = abstract_write.materialized_size().write_len();
+            if new_length != old_length {
+                return Err(code_invariant_error(format!(
+                    "Trying to patch the value that changed size during materialization: {:?}: {:?} into {:?}. \nValues {:?} into {:?}.", key, old_length, new_length, abstract_write, new_write,
+                )));
+            }
+
+            *abstract_write = AbstractResourceWriteOp::Write(new_write);
         }
         Ok(())
     }
@@ -1060,6 +883,7 @@ mod tests {
     use crate::tests::utils::{mock_tag_0, mock_tag_1, mock_tag_2, raw_metadata};
     use bytes::Bytes;
     use claims::{assert_err, assert_ok, assert_some_eq};
+    use move_core_types::language_storage::StructTag;
     use test_case::test_case;
 
     const CREATION: u8 = 0;

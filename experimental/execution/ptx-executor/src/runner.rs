@@ -274,6 +274,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                     let (_vm_status, vm_output, _msg) = vm_output.expect("VM execution failed.");
 
                     // inform output state values to the manager
+                    // TODO use try_into_storage_change_set() instead, and ChangeSet it returns, instead of VMOutput.
                     for (key, op) in vm_output.change_set().concrete_write_set_iter() {
                         self.scheduler.try_inform_state_value(
                             (key.clone(), txn_idx),

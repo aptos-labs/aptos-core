@@ -53,7 +53,8 @@ use aptos_types::{
 use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
 use aptos_vm_types::{
-    change_set::{AbstractResourceWriteOp, VMChangeSet},
+    abstract_write_op::AbstractResourceWriteOp,
+    change_set::VMChangeSet,
     output::VMOutput,
     resolver::{ExecutorView, ResourceGroupView},
     storage::{ChangeSetConfigs, StorageGasParameters},

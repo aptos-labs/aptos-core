@@ -18,7 +18,12 @@ fn assert_eq_outputs(vm_output: &VMOutput, txn_output: TransactionOutput) {
     let vm_output_writes = &vm_output
         .change_set()
         .concrete_write_set_iter()
-        .map(|(k, v)| (k.clone(), v.unwrap().clone()))
+        .map(|(k, v)| {
+            (
+                k.clone(),
+                v.expect("expect only concrete write ops").clone(),
+            )
+        })
         .collect::<BTreeMap<StateKey, WriteOp>>();
 
     // A way to obtain a reference to the map inside a WriteSet.
@@ -48,15 +53,15 @@ fn test_ok_output_equality_no_deltas() {
     //       simply merges writes for materialized deltas & combined groups.
     let materialized_vm_output = assert_ok!(vm_output.clone().try_materialize(&state_view));
     let txn_output_1 = assert_ok!(vm_output.clone().try_into_transaction_output(&state_view));
-    let txn_output_2 = vm_output
+    let txn_output_2 = assert_ok!(vm_output
         .clone()
-        .into_transaction_output_with_materialized_write_set(vec![], vec![], vec![]);
+        .into_transaction_output_with_materialized_write_set(vec![], vec![], vec![]));
 
     // Because there are no deltas, we should not see any difference in write sets and
     // also all calls must succeed.
     assert_eq!(&vm_output, &materialized_vm_output);
     assert_eq_outputs(&vm_output, txn_output_1);
-    assert_eq_outputs(&vm_output, txn_output_2.unwrap());
+    assert_eq_outputs(&vm_output, txn_output_2);
 }
 
 #[test]

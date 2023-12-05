@@ -31,7 +31,7 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
-use aptos_vm_types::{change_set::AbstractResourceWriteOp, output::VMOutput};
+use aptos_vm_types::{abstract_write_op::AbstractResourceWriteOp, output::VMOutput};
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::VMStatus};
 use once_cell::sync::OnceCell;
 use rayon::ThreadPool;
