@@ -192,6 +192,7 @@ members = [
     "third_party/move/move-command-line-common",
     "third_party/move/move-compiler",
     "third_party/move/move-compiler-v2",
+    "third_party/move/move-compiler-v2/tools/testdiff",
     "third_party/move/move-compiler-v2/transactional-tests",
     "third_party/move/move-compiler/transactional-tests",
     "third_party/move/move-core/types",
