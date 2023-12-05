@@ -436,15 +436,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         et.set_translate_move_fun();
         let loc = et.to_loc(&def.loc);
         let ty = et.translate_type(&def.signature);
-        et.parent.parent.define_const(
-            qsym,
-            ConstEntry {
-                loc,
-                ty,
-                value: Value::Bool(false), // dummy value, actual will be assigned in def_ana
-                visibility: EntryVisibility::SpecAndImpl,
-            },
-        );
+        et.parent.parent.define_const(qsym, ConstEntry {
+            loc,
+            ty,
+            value: Value::Bool(false), // dummy value, actual will be assigned in def_ana
+            visibility: EntryVisibility::SpecAndImpl,
+        });
     }
 
     fn decl_ana_struct(&mut self, name: &PA::StructName, def: &EA::StructDefinition) {
@@ -507,29 +504,25 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         };
         let is_native = matches!(def.body.value, EA::FunctionBody_::Native);
         let loc = et.to_loc(&def.loc);
-        et.parent.parent.define_fun(
-            qsym.clone(),
-            FunEntry {
-                loc: loc.clone(),
-                module_id: et.parent.module_id,
-                fun_id,
-                visibility,
-                is_native,
-                kind,
-                type_params: type_params.clone(),
-                params: params.clone(),
-                result_type: result_type.clone(),
-                is_pure: false,
-                attributes,
-                inline_specs: def.specs.clone(),
-            },
-        );
+        et.parent.parent.define_fun(qsym.clone(), FunEntry {
+            loc: loc.clone(),
+            module_id: et.parent.module_id,
+            fun_id,
+            visibility,
+            is_native,
+            kind,
+            type_params: type_params.clone(),
+            params: params.clone(),
+            result_type: result_type.clone(),
+            is_pure: false,
+            attributes,
+            inline_specs: def.specs.clone(),
+        });
 
         // Add function as a spec fun entry as well.
         let spec_fun_id = SpecFunId::new(self.spec_funs.len());
-        self.parent.define_spec_or_builtin_fun(
-            qsym,
-            SpecOrBuiltinFunEntry {
+        self.parent
+            .define_spec_or_builtin_fun(qsym, SpecOrBuiltinFunEntry {
                 loc: loc.clone(),
                 oper: Operation::SpecFunction(self.module_id, spec_fun_id, None),
                 type_params: type_params.clone(),
@@ -537,8 +530,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 params: params.clone(),
                 result_type: result_type.clone(),
                 visibility: EntryVisibility::Spec,
-            },
-        );
+            });
 
         // Add $ to the name so the spec version does not name clash with the Move version.
         let spec_fun_name = self.symbol_pool().make(&format!("${}", name.0.value));
@@ -2568,15 +2560,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             .vars
             .iter()
             .map(|Parameter(n, ty)| {
-                (
-                    *n,
-                    LocalVarEntry {
-                        loc: loc.clone(),
-                        type_: ty.clone(),
-                        operation: None,
-                        temp_index: None,
-                    },
-                )
+                (*n, LocalVarEntry {
+                    loc: loc.clone(),
+                    type_: ty.clone(),
+                    operation: None,
+                    temp_index: None,
+                })
             })
             .collect();
         let mut included_spec = Spec::default();
@@ -2962,15 +2951,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             } else if allow_new_vars {
                 // Name does not yet exists in inclusion context, but is allowed to be introduced.
                 // This happens if we include a schema in another schema.
-                vars.insert(
-                    *name,
-                    LocalVarEntry {
-                        loc: loc.clone(),
-                        type_: ty.clone(),
-                        operation: None,
-                        temp_index: None,
-                    },
-                );
+                vars.insert(*name, LocalVarEntry {
+                    loc: loc.clone(),
+                    type_: ty.clone(),
+                    operation: None,
+                    temp_index: None,
+                });
             } else {
                 et.error(
                     loc,
@@ -3651,15 +3637,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 fields
                     .iter()
                     .map(|(name, (loc, offset, ty))| {
-                        (
-                            FieldId::new(*name),
-                            FieldData {
-                                name: *name,
-                                loc: loc.clone(),
-                                offset: *offset,
-                                ty: ty.clone(),
-                            },
-                        )
+                        (FieldId::new(*name), FieldData {
+                            name: *name,
+                            loc: loc.clone(),
+                            offset: *offset,
+                            ty: ty.clone(),
+                        })
                     })
                     .collect::<BTreeMap<_, _>>()
             } else {
