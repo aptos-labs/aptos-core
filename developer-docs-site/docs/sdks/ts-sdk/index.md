@@ -7,7 +7,7 @@ hidden: false
 # Aptos TypeScript SDK
 
 :::note
-This documentation is for TypeScript SDK V1, aka `aptos`. For a more robust and better SDK support, we recommend upgrading to the new TypeScript SDK [@aptos-labs/ts-sdk](https://github.com/aptos-labs/aptos-ts-sdk). Take a look at the [documentation](../ts-sdk-v2/index.md) and the [migration guide](../ts-sdk-v2/migration-guide.md)
+This documentation is for the **old TypeScript SDK**, aka `aptos`. For a more robust and better SDK support, we recommend upgrading to the **new TypeScript SDK** [@aptos-labs/ts-sdk](https://github.com/aptos-labs/aptos-ts-sdk). Take a look at the [documentation](../new-ts-sdk/index.md) and the [migration guide](../new-ts-sdk/migration-guide.md)
 :::
 
 Aptos provides a fully supported TypeScript SDK with the source code in the [Aptos-core GitHub](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk) repository. Much of the functionality of the TypeScript SDK can be found in the [Rust](../rust-sdk.md) and [Python](../python-sdk.md) SDKs. Nevertheless, Aptos strongly encourages you to use the TypeScript SDK for app development whenever possible.
