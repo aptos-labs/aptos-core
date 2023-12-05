@@ -11,7 +11,7 @@
 //    // Contextual code to show how types might be filled in:
 //    let mut et = ExpTranslator::new(...);
 //    let exp = et.translate_exp(...).into_exp();
-//    let.finalize_types();
+//    et.finalize_types();
 //    let mut reasons = Vec::new();
 //    if exp.is_valid_for_constant(&global_env, &mut reasons) {
 //        // This is the actual constant folding part:
