@@ -1049,7 +1049,8 @@ impl ExpData {
     }
 
     /// A function which can be used by a `node_rewriter` argument to `ExpData::rewrite_node_id` to
-    /// update node location (`Loc`), in addition to instantiating types.
+    /// update node location (`Loc`), in addition to instantiating types.  This is currently only
+    /// useful in inlining, but is cleaner to implement here.
     pub fn instantiate_node_new_loc(
         env: &GlobalEnv,
         id: NodeId,

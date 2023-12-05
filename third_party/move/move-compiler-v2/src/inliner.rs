@@ -1059,7 +1059,9 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
         self.shadow_stack.exit_scope();
     }
 
-    /// Instantiates `self.type_args` on every node in the inlined function
+    /// Instantiates `self.type_args` on a node in an inlined function
+    /// Also updates the `Loc` for the node to indicate the inlined
+    /// call site.
     fn rewrite_node_id(&mut self, id: NodeId) -> Option<NodeId> {
         let loc = self.env.get_node_loc(id);
         let new_loc = loc.inlined_from(self.call_site_loc);
@@ -1108,15 +1110,10 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
     /// convert the body, formal parameters, and actual arguments into a let expression which
     /// can be used in place of the call.
     fn rewrite_invoke(&mut self, id: NodeId, target: &Exp, args: &[Exp]) -> Option<Exp> {
-        let mut target_id = None;
         let optional_lambda_target: Option<&Exp> = match target.as_ref() {
-            ExpData::LocalVar(node_id, symbol) => {
-                target_id = Some(node_id);
-                self.lambda_param_map.get(symbol).copied()
-            },
-            ExpData::Temporary(node_id, idx) => {
+            ExpData::LocalVar(_, symbol) => self.lambda_param_map.get(symbol).copied(),
+            ExpData::Temporary(_, idx) => {
                 if *idx < self.inlined_formal_params.len() {
-                    target_id = Some(node_id);
                     let param = &self.inlined_formal_params[*idx];
                     let sym = param.0;
                     self.lambda_param_map.get(&sym).copied()
@@ -1148,17 +1145,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
                 None
             }
         } else {
-            let target_loc = target_id
-                .map(|id| self.env.get_node_loc(*id))
-                .unwrap_or(call_loc);
-            self.env.error(
-                &target_loc,
-                concat!(
-                    "Invalid call target: currently indirect call must be",
-                    " a parameter to an inline function called with an argument",
-                    " which is a literal lambda expression"
-                ),
-            );
+            // This is an error, but it is flagged elsewhere.
             None
         }
     }

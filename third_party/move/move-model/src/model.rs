@@ -131,9 +131,11 @@ impl Loc {
         }
     }
 
+    // If `self` is an inlined `Loc`, then add the same
+    // inlining info to the parameter `loc`.
     fn inline_if_needed(&self, loc: Loc) -> Loc {
         if let Some(locbox) = &self.inlined_from_loc {
-            let source_loc = &**locbox;
+            let source_loc = locbox.as_ref();
             loc.inlined_from(source_loc)
         } else {
             loc
@@ -825,10 +827,12 @@ impl GlobalEnv {
         self.diag_with_notes(Severity::Error, loc, msg, notes)
     }
 
+    /// Add a label to `labels` to specify "inlined from loc" for the `loc` in `inlined_from`,
+    /// and, if that is inlined from someplace, repeat as needed, etc.
     fn add_inlined_from_labels(labels: &mut Vec<Label<FileId>>, inlined_from: &Option<Box<Loc>>) {
         let mut inlined_from = inlined_from;
         while let Some(boxed_loc) = inlined_from {
-            let loc = &**boxed_loc;
+            let loc = boxed_loc.as_ref();
             let new_label = Label::secondary(loc.file_id, loc.span)
                 .with_message("in a call inlined at this callsite");
             labels.push(new_label);
@@ -931,11 +935,8 @@ impl GlobalEnv {
                 loc.file_hash()
             )
         });
-        Loc {
-            file_id,
-            span: Span::new(loc.start(), loc.end()),
-            inlined_from_loc: None, // move-compiler doesn't use "inlined from"
-        }
+        // Note that move-compiler doesn't use "inlined from"
+        Loc::new(file_id, Span::new(loc.start(), loc.end()))
     }
 
     /// Converts a location back into a MoveIrLoc. If the location is not convertible, unknown
