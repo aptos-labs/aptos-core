@@ -1,5 +1,5 @@
 
-<a name="0x4_collection"></a>
+<a id="0x4_collection"></a>
 
 # Module `0x4::collection`
 
@@ -70,7 +70,7 @@ require adding the field original_name.
 
 
 
-<a name="0x4_collection_Collection"></a>
+<a id="0x4_collection_Collection"></a>
 
 ## Resource `Collection`
 
@@ -124,7 +124,7 @@ Represents the common fields for a collection.
 
 </details>
 
-<a name="0x4_collection_MutatorRef"></a>
+<a id="0x4_collection_MutatorRef"></a>
 
 ## Struct `MutatorRef`
 
@@ -152,7 +152,7 @@ This enables mutating description and URI by higher level services.
 
 </details>
 
-<a name="0x4_collection_MutationEvent"></a>
+<a id="0x4_collection_MutationEvent"></a>
 
 ## Struct `MutationEvent`
 
@@ -181,7 +181,7 @@ directly understand the behavior in a writeset.
 
 </details>
 
-<a name="0x4_collection_FixedSupply"></a>
+<a id="0x4_collection_FixedSupply"></a>
 
 ## Resource `FixedSupply`
 
@@ -235,7 +235,7 @@ and adding events and supply tracking to a collection.
 
 </details>
 
-<a name="0x4_collection_UnlimitedSupply"></a>
+<a id="0x4_collection_UnlimitedSupply"></a>
 
 ## Resource `UnlimitedSupply`
 
@@ -282,7 +282,7 @@ Unlimited supply tracker, this is useful for adding events and supply tracking t
 
 </details>
 
-<a name="0x4_collection_ConcurrentSupply"></a>
+<a id="0x4_collection_ConcurrentSupply"></a>
 
 ## Resource `ConcurrentSupply`
 
@@ -318,7 +318,7 @@ If max_value is not set to U64_MAX, this ensures that a limited number of tokens
 
 </details>
 
-<a name="0x4_collection_BurnEvent"></a>
+<a id="0x4_collection_BurnEvent"></a>
 
 ## Struct `BurnEvent`
 
@@ -351,7 +351,7 @@ If max_value is not set to U64_MAX, this ensures that a limited number of tokens
 
 </details>
 
-<a name="0x4_collection_ConcurrentBurnEvent"></a>
+<a id="0x4_collection_ConcurrentBurnEvent"></a>
 
 ## Struct `ConcurrentBurnEvent`
 
@@ -391,7 +391,7 @@ If max_value is not set to U64_MAX, this ensures that a limited number of tokens
 
 </details>
 
-<a name="0x4_collection_MintEvent"></a>
+<a id="0x4_collection_MintEvent"></a>
 
 ## Struct `MintEvent`
 
@@ -424,7 +424,7 @@ If max_value is not set to U64_MAX, this ensures that a limited number of tokens
 
 </details>
 
-<a name="0x4_collection_ConcurrentMintEvent"></a>
+<a id="0x4_collection_ConcurrentMintEvent"></a>
 
 ## Struct `ConcurrentMintEvent`
 
@@ -464,12 +464,12 @@ If max_value is not set to U64_MAX, this ensures that a limited number of tokens
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x4_collection_MAX_U64"></a>
+<a id="0x4_collection_MAX_U64"></a>
 
 
 
@@ -478,7 +478,7 @@ If max_value is not set to U64_MAX, this ensures that a limited number of tokens
 
 
 
-<a name="0x4_collection_EURI_TOO_LONG"></a>
+<a id="0x4_collection_EURI_TOO_LONG"></a>
 
 The URI is over the maximum length
 
@@ -488,7 +488,7 @@ The URI is over the maximum length
 
 
 
-<a name="0x4_collection_MAX_URI_LENGTH"></a>
+<a id="0x4_collection_MAX_URI_LENGTH"></a>
 
 
 
@@ -497,7 +497,7 @@ The URI is over the maximum length
 
 
 
-<a name="0x4_collection_EALREADY_CONCURRENT"></a>
+<a id="0x4_collection_EALREADY_CONCURRENT"></a>
 
 Tried upgrading collection to concurrent, but collection is already concurrent
 
@@ -507,7 +507,7 @@ Tried upgrading collection to concurrent, but collection is already concurrent
 
 
 
-<a name="0x4_collection_ECOLLECTION_DOES_NOT_EXIST"></a>
+<a id="0x4_collection_ECOLLECTION_DOES_NOT_EXIST"></a>
 
 The collection does not exist
 
@@ -517,7 +517,7 @@ The collection does not exist
 
 
 
-<a name="0x4_collection_ECOLLECTION_NAME_TOO_LONG"></a>
+<a id="0x4_collection_ECOLLECTION_NAME_TOO_LONG"></a>
 
 The collection name is over the maximum length
 
@@ -527,7 +527,7 @@ The collection name is over the maximum length
 
 
 
-<a name="0x4_collection_ECOLLECTION_SUPPLY_EXCEEDED"></a>
+<a id="0x4_collection_ECOLLECTION_SUPPLY_EXCEEDED"></a>
 
 The collection has reached its supply and no more tokens can be minted, unless some are burned
 
@@ -537,7 +537,7 @@ The collection has reached its supply and no more tokens can be minted, unless s
 
 
 
-<a name="0x4_collection_ECONCURRENT_NOT_ENABLED"></a>
+<a id="0x4_collection_ECONCURRENT_NOT_ENABLED"></a>
 
 Concurrent feature flag is not yet enabled, so the function cannot be performed
 
@@ -547,7 +547,7 @@ Concurrent feature flag is not yet enabled, so the function cannot be performed
 
 
 
-<a name="0x4_collection_EDESCRIPTION_TOO_LONG"></a>
+<a id="0x4_collection_EDESCRIPTION_TOO_LONG"></a>
 
 The description is over the maximum length
 
@@ -557,7 +557,7 @@ The description is over the maximum length
 
 
 
-<a name="0x4_collection_EMAX_SUPPLY_CANNOT_BE_ZERO"></a>
+<a id="0x4_collection_EMAX_SUPPLY_CANNOT_BE_ZERO"></a>
 
 The max supply must be positive
 
@@ -567,7 +567,7 @@ The max supply must be positive
 
 
 
-<a name="0x4_collection_MAX_COLLECTION_NAME_LENGTH"></a>
+<a id="0x4_collection_MAX_COLLECTION_NAME_LENGTH"></a>
 
 
 
@@ -576,7 +576,7 @@ The max supply must be positive
 
 
 
-<a name="0x4_collection_MAX_DESCRIPTION_LENGTH"></a>
+<a id="0x4_collection_MAX_DESCRIPTION_LENGTH"></a>
 
 
 
@@ -585,7 +585,7 @@ The max supply must be positive
 
 
 
-<a name="0x4_collection_create_fixed_collection"></a>
+<a id="0x4_collection_create_fixed_collection"></a>
 
 ## Function `create_fixed_collection`
 
@@ -659,7 +659,7 @@ Beyond that, it adds supply tracking with events.
 
 </details>
 
-<a name="0x4_collection_create_unlimited_collection"></a>
+<a id="0x4_collection_create_unlimited_collection"></a>
 
 ## Function `create_unlimited_collection`
 
@@ -727,7 +727,7 @@ the supply of tokens.
 
 </details>
 
-<a name="0x4_collection_create_untracked_collection"></a>
+<a id="0x4_collection_create_untracked_collection"></a>
 
 ## Function `create_untracked_collection`
 
@@ -771,7 +771,7 @@ TODO: Hide this until we bring back meaningful way to enforce burns
 
 </details>
 
-<a name="0x4_collection_create_collection_internal"></a>
+<a id="0x4_collection_create_collection_internal"></a>
 
 ## Function `create_collection_internal`
 
@@ -831,7 +831,7 @@ TODO: Hide this until we bring back meaningful way to enforce burns
 
 </details>
 
-<a name="0x4_collection_create_collection_address"></a>
+<a id="0x4_collection_create_collection_address"></a>
 
 ## Function `create_collection_address`
 
@@ -856,7 +856,7 @@ Generates the collections address based upon the creators address and the collec
 
 </details>
 
-<a name="0x4_collection_create_collection_seed"></a>
+<a id="0x4_collection_create_collection_seed"></a>
 
 ## Function `create_collection_seed`
 
@@ -882,7 +882,7 @@ Named objects are derived from a seed, the collection's seed is its name.
 
 </details>
 
-<a name="0x4_collection_increment_supply"></a>
+<a id="0x4_collection_increment_supply"></a>
 
 ## Function `increment_supply`
 
@@ -917,7 +917,7 @@ increment_concurrent_supply cannot be used until AGGREGATOR_API_V2 is enabled.
 
 </details>
 
-<a name="0x4_collection_increment_concurrent_supply"></a>
+<a id="0x4_collection_increment_concurrent_supply"></a>
 
 ## Function `increment_concurrent_supply`
 
@@ -990,7 +990,7 @@ Called by token on mint to increment supply if there's an appropriate Supply str
 
 </details>
 
-<a name="0x4_collection_decrement_supply"></a>
+<a id="0x4_collection_decrement_supply"></a>
 
 ## Function `decrement_supply`
 
@@ -1050,7 +1050,7 @@ Called by token on burn to decrement supply if there's an appropriate Supply str
 
 </details>
 
-<a name="0x4_collection_generate_mutator_ref"></a>
+<a id="0x4_collection_generate_mutator_ref"></a>
 
 ## Function `generate_mutator_ref`
 
@@ -1076,7 +1076,7 @@ Creates a MutatorRef, which gates the ability to mutate any fields that support 
 
 </details>
 
-<a name="0x4_collection_upgrade_to_concurrent"></a>
+<a id="0x4_collection_upgrade_to_concurrent"></a>
 
 ## Function `upgrade_to_concurrent`
 
@@ -1144,7 +1144,7 @@ Creates a MutatorRef, which gates the ability to mutate any fields that support 
 
 </details>
 
-<a name="0x4_collection_check_collection_exists"></a>
+<a id="0x4_collection_check_collection_exists"></a>
 
 ## Function `check_collection_exists`
 
@@ -1171,7 +1171,7 @@ Creates a MutatorRef, which gates the ability to mutate any fields that support 
 
 </details>
 
-<a name="0x4_collection_borrow"></a>
+<a id="0x4_collection_borrow"></a>
 
 ## Function `borrow`
 
@@ -1197,7 +1197,7 @@ Creates a MutatorRef, which gates the ability to mutate any fields that support 
 
 </details>
 
-<a name="0x4_collection_count"></a>
+<a id="0x4_collection_count"></a>
 
 ## Function `count`
 
@@ -1240,7 +1240,7 @@ it from being parallelized.
 
 </details>
 
-<a name="0x4_collection_creator"></a>
+<a id="0x4_collection_creator"></a>
 
 ## Function `creator`
 
@@ -1265,7 +1265,7 @@ it from being parallelized.
 
 </details>
 
-<a name="0x4_collection_description"></a>
+<a id="0x4_collection_description"></a>
 
 ## Function `description`
 
@@ -1290,7 +1290,7 @@ it from being parallelized.
 
 </details>
 
-<a name="0x4_collection_name"></a>
+<a id="0x4_collection_name"></a>
 
 ## Function `name`
 
@@ -1315,7 +1315,7 @@ it from being parallelized.
 
 </details>
 
-<a name="0x4_collection_uri"></a>
+<a id="0x4_collection_uri"></a>
 
 ## Function `uri`
 
@@ -1340,7 +1340,7 @@ it from being parallelized.
 
 </details>
 
-<a name="0x4_collection_borrow_mut"></a>
+<a id="0x4_collection_borrow_mut"></a>
 
 ## Function `borrow_mut`
 
@@ -1365,7 +1365,7 @@ it from being parallelized.
 
 </details>
 
-<a name="0x4_collection_set_description"></a>
+<a id="0x4_collection_set_description"></a>
 
 ## Function `set_description`
 
@@ -1395,7 +1395,7 @@ it from being parallelized.
 
 </details>
 
-<a name="0x4_collection_set_uri"></a>
+<a id="0x4_collection_set_uri"></a>
 
 ## Function `set_uri`
 

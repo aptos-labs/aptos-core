@@ -7,8 +7,11 @@ use move_binary_format::{binary_views::BinaryIndexedView, file_format as FF};
 use move_command_line_common::files::FileHash;
 use move_compiler::compiled_unit::CompiledUnit;
 use move_compiler_v2::{
+    inliner,
     pipeline::{
-        livevar_analysis_processor::LiveVarAnalysisProcessor, visibility_checker::VisibilityChecker,
+        livevar_analysis_processor::LiveVarAnalysisProcessor,
+        reference_safety_processor::ReferenceSafetyProcessor,
+        visibility_checker::VisibilityChecker,
     },
     run_file_format_gen, Options,
 };
@@ -76,8 +79,19 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
 impl TestConfig {
     fn get_config_from_path(path: &Path) -> TestConfig {
         let path = path.to_string_lossy();
+        let verbose = cfg!(feature = "verbose-debug-print");
         let mut pipeline = FunctionTargetPipeline::default();
-        if path.contains("/checking/") {
+        if path.contains("/checking/inlining/") {
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(VisibilityChecker {}));
+            Self {
+                type_check_only: false,
+                dump_ast: true,
+                pipeline,
+                generate_file_format: false,
+                dump_annotated_targets: false,
+            }
+        } else if path.contains("/checking/") {
             Self {
                 type_check_only: true,
                 dump_ast: true,
@@ -111,6 +125,25 @@ impl TestConfig {
                 generate_file_format: false,
                 dump_annotated_targets: false,
             }
+        } else if path.contains("/live-var/") {
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+            Self {
+                type_check_only: false,
+                dump_ast: false,
+                pipeline,
+                generate_file_format: false,
+                dump_annotated_targets: true,
+            }
+        } else if path.contains("/reference-safety/") {
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+            Self {
+                type_check_only: false,
+                dump_ast: verbose,
+                pipeline,
+                generate_file_format: false,
+                dump_annotated_targets: verbose,
+            }
         } else {
             panic!(
                 "unexpected test path `{}`, cannot derive configuration",
@@ -133,8 +166,23 @@ impl TestConfig {
         let test_output = RefCell::new(String::new());
 
         // Run context checker
-        let env = move_compiler_v2::run_checker(options)?;
-        let ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
+        let mut env = move_compiler_v2::run_checker(options.clone())?;
+        let mut ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
+
+        if ok {
+            if options.debug {
+                eprint!("After error check, GlobalEnv={}", env.dump_env());
+            }
+
+            // Run inlining.
+            inliner::run_inlining(&mut env);
+            ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
+
+            if ok && options.debug {
+                eprint!("After inlining, GlobalEnv={}", env.dump_env());
+            }
+        }
+
         if ok && self.dump_ast {
             let out = &mut test_output.borrow_mut();
             out.push_str("// ---- Model Dump\n");
@@ -208,7 +256,8 @@ impl TestConfig {
 
     /// Callback from the framework to register formatters for annotations.
     fn register_formatters(target: &FunctionTarget) {
-        LiveVarAnalysisProcessor::register_formatters(target)
+        LiveVarAnalysisProcessor::register_formatters(target);
+        ReferenceSafetyProcessor::register_formatters(target)
     }
 
     fn check_diags(baseline: &mut String, env: &GlobalEnv) -> bool {

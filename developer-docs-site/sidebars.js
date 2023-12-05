@@ -44,6 +44,7 @@ const sidebars = {
           collapsed: true,
           items: ["concepts/validator-nodes", "concepts/fullnodes", "concepts/node-networks-sync"],
         },
+        "concepts/move",
         "concepts/accounts",
         "concepts/resources",
         "concepts/events",
@@ -63,23 +64,7 @@ const sidebars = {
       ],
     },
     "guides/explore-aptos",
-    {
-      type: "category",
-      label: "Latest Releases",
-      collapsible: true,
-      collapsed: true,
-      link: { type: "doc", id: "releases/index" },
-      items: [
-        {
-          type: "category",
-          label: "Node and Framework Release",
-          collapsible: true,
-          collapsed: true,
-          link: { type: "doc", id: "releases/mainnet-release" },
-          items: ["releases/mainnet-release", "releases/testnet-release", "releases/devnet-release"],
-        },
-      ],
-    },
+    "releases/index",
     "nodes/networks",
     "guides/system-integrators-guide",
   ],
@@ -112,20 +97,6 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
-        {
-          type: "category",
-          label: "Move on Aptos",
-          link: { type: "doc", id: "move/move-on-aptos" },
-          collapsible: true,
-          collapsed: true,
-          items: [
-            "move/move-on-aptos/resource-accounts",
-            "move/move-on-aptos/modules-on-aptos",
-            "move/move-on-aptos/move-scripts",
-            "move/move-on-aptos/cli",
-            "move/move-on-aptos/cryptography",
-          ],
-        },
         {
           type: "category",
           label: "The Move Book",
@@ -193,6 +164,26 @@ const sidebars = {
               collapsed: true,
               items: ["move/book/standard-library", "move/book/coding-conventions"],
             },
+          ],
+        },
+        {
+          type: "category",
+          label: "Advanced Move Guides",
+          collapsible: true,
+          collapsed: true,
+          link: {
+            type: "generated-index",
+            title: "Advanced Move Guides",
+            description: "Take the next step into building complex Move applications on Aptos.",
+            slug: "move/aptos-move",
+          },
+          items: [
+            "move/move-on-aptos/resource-accounts",
+            "move/move-on-aptos/modules-on-aptos",
+            "move/move-on-aptos/move-scripts",
+            "move/move-on-aptos/cli",
+            "move/move-on-aptos/cryptography",
+            "move/move-on-aptos/gas-profiling",
           ],
         },
         {
@@ -287,7 +278,7 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
-        "integration/sign-a-transaction",
+        "guides/nfts/aptos-token-overview",
         {
           type: "category",
           label: "Integrate with Wallets",
@@ -297,6 +288,7 @@ const sidebars = {
           collapsed: true,
         },
         "integration/aptos-names-service-package",
+        "reference/error-codes",
       ],
     },
     {
@@ -358,6 +350,23 @@ const sidebars = {
           items: [
             {
               type: "category",
+              label: "New TypeScript SDK",
+              link: { type: "doc", id: "sdks/new-ts-sdk/index" },
+              collapsible: true,
+              collapsed: true,
+              items: [
+                "sdks/new-ts-sdk/migration-guide",
+                "sdks/new-ts-sdk/account",
+                "sdks/new-ts-sdk/sdk-configuration",
+                "sdks/new-ts-sdk/fetch-data-from-chain",
+                "sdks/new-ts-sdk/transaction-builder",
+                "sdks/new-ts-sdk/http-client",
+                "sdks/new-ts-sdk/move-types",
+                "sdks/new-ts-sdk/typescript",
+              ],
+            },
+            {
+              type: "category",
               label: "TypeScript SDK",
               link: { type: "doc", id: "sdks/ts-sdk/index" },
               collapsible: true,
@@ -384,20 +393,6 @@ const sidebars = {
         },
         "guides/building-from-source",
       ],
-    },
-    {
-      type: "category",
-      label: "Create NFTs",
-      collapsible: true,
-      collapsed: true,
-      link: {
-        type: "generated-index",
-        title: "Create Tokens on Aptos",
-        description: "Learn the various ways to mint and exchange tokens.",
-        slug: "/category/nft",
-        keywords: ["nft"],
-      },
-      items: ["guides/nfts/aptos-token-comparison", "guides/nfts/mint-nft-cli", "guides/nfts/mint-onchain-data"],
     },
     {
       type: "category",
@@ -433,11 +428,13 @@ const sidebars = {
           collapsible: true,
           collapsed: true,
           items: [
+            "guides/sponsored-transactions",
             "guides/local-development-network",
             "nodes/local-testnet/run-a-local-testnet",
             "guides/running-a-local-multi-node-network",
           ],
         },
+        "guides/sponsored-transactions",
         "guides/transaction-management",
         "guides/account-management/key-rotation",
       ],

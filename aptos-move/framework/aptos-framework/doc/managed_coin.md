@@ -1,5 +1,5 @@
 
-<a name="0x1_managed_coin"></a>
+<a id="0x1_managed_coin"></a>
 
 # Module `0x1::managed_coin`
 
@@ -29,7 +29,7 @@ By utilizing this current module, a developer can create his own coin and care l
 
 
 
-<a name="0x1_managed_coin_Capabilities"></a>
+<a id="0x1_managed_coin_Capabilities"></a>
 
 ## Resource `Capabilities`
 
@@ -70,12 +70,12 @@ The resource is stored on the account that initialized coin <code>CoinType</code
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_managed_coin_ENO_CAPABILITIES"></a>
+<a id="0x1_managed_coin_ENO_CAPABILITIES"></a>
 
 Account has no capabilities (burn/mint).
 
@@ -85,7 +85,7 @@ Account has no capabilities (burn/mint).
 
 
 
-<a name="0x1_managed_coin_burn"></a>
+<a id="0x1_managed_coin_burn"></a>
 
 ## Function `burn`
 
@@ -123,7 +123,7 @@ Withdraw an <code>amount</code> of coin <code>CoinType</code> from <code><a href
 
 </details>
 
-<a name="0x1_managed_coin_initialize"></a>
+<a id="0x1_managed_coin_initialize"></a>
 
 ## Function `initialize`
 
@@ -167,7 +167,7 @@ Mint and Burn Capabilities will be stored under <code><a href="account.md#0x1_ac
 
 </details>
 
-<a name="0x1_managed_coin_mint"></a>
+<a id="0x1_managed_coin_mint"></a>
 
 ## Function `mint`
 
@@ -205,7 +205,7 @@ Create new coins <code>CoinType</code> and deposit them into dst_addr's account.
 
 </details>
 
-<a name="0x1_managed_coin_register"></a>
+<a id="0x1_managed_coin_register"></a>
 
 ## Function `register`
 
@@ -231,7 +231,7 @@ Required if user wants to start accepting deposits of <code>CoinType</code> in h
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -243,7 +243,7 @@ Required if user wants to start accepting deposits of <code>CoinType</code> in h
 
 
 
-<a name="@Specification_1_burn"></a>
+<a id="@Specification_1_burn"></a>
 
 ### Function `burn`
 
@@ -271,7 +271,7 @@ Required if user wants to start accepting deposits of <code>CoinType</code> in h
 
 
 
-<a name="@Specification_1_initialize"></a>
+<a id="@Specification_1_initialize"></a>
 
 ### Function `initialize`
 
@@ -296,7 +296,7 @@ The Capabilities<CoinType> should be under the signer after creating;
 
 
 
-<a name="@Specification_1_mint"></a>
+<a id="@Specification_1_mint"></a>
 
 ### Function `mint`
 
@@ -323,7 +323,7 @@ The <code>dst_addr</code> should not be frozen.
 
 
 
-<a name="@Specification_1_register"></a>
+<a id="@Specification_1_register"></a>
 
 ### Function `register`
 

@@ -30,6 +30,7 @@ AptosRelease
 AptosToken
 AptosWalletAdapterProvider
 BCS
+BetaNotice
 BFT
 BIP
 BLS
@@ -127,6 +128,8 @@ EntryFunctionPayload
 Enums
 EpochChangeProof
 Ethereum
+EventHandle
+EventHandles
 ExtendRef
 ExternalMarkdown
 FA
@@ -344,7 +347,6 @@ ZKRP
 Zxing
 accessors
 accountHasList
-acount
 addr
 ait
 allowfullscreen
@@ -388,6 +390,7 @@ cli
 clippy
 cn
 codebase
+composability
 composable
 config
 configs
@@ -399,6 +402,7 @@ cryptographically
 cryptosystem
 cryptosystems
 crytographic
+customizability
 customizable
 dApp
 dApps
@@ -476,6 +480,7 @@ illiquid
 img
 incrementing
 init
+inlining
 instantiation
 integrations
 integrators
@@ -664,3 +669,15 @@ yamls
 zkSNARK
 zksnark
 observability
+Profiler
+profiler
+html
+Flamegraphs
+flamegraphs
+namespaces
+typedoc
+MoveVector
+MoveString
+MoveOption
+autocomplete
+AccountAddress

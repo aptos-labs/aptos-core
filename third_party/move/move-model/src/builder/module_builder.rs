@@ -6,8 +6,8 @@ use crate::{
     ast::{
         AccessSpecifier, Address, Attribute, AttributeValue, Condition, ConditionKind, Exp,
         ExpData, FriendDecl, GlobalInvariant, ModuleName, Operation, PropertyBag, PropertyValue,
-        QualifiedSymbol, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl,
-        Value,
+        QualifiedSymbol, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, TempIndex,
+        UseDecl, Value,
     },
     builder::{
         exp_builder::ExpTranslator,
@@ -114,7 +114,10 @@ pub enum SpecBlockContext<'a> {
     Struct(QualifiedSymbol),
     Function(QualifiedSymbol),
     FunctionCode(QualifiedSymbol, &'a SpecInfo),
-    FunctionCodeV2(QualifiedSymbol, BTreeMap<Symbol, (Loc, Type)>),
+    FunctionCodeV2(
+        QualifiedSymbol,                                  // function name
+        BTreeMap<Symbol, (Loc, Type, Option<TempIndex>)>, // local variables
+    ),
     Schema(QualifiedSymbol),
 }
 
@@ -849,9 +852,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             self.def_ana_constant(&name, def, compiled_module);
         }
 
-        // Analyze all functions.
+        // Need to run def_ana_fun twice.
+        // In the first time we need to analyze all functions in the spec mode
+        // then we can check whether the function is pure or not
         for (idx, (name, fun_def)) in module_def.functions.key_cloned_iter().enumerate() {
-            self.def_ana_fun(&name, fun_def, idx);
+            self.def_ana_fun(&name, fun_def, idx, true);
         }
 
         // Propagate the impurity of functions: a Move function which calls an
@@ -868,6 +873,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 .fun_table
                 .entry(self.qualified_by_module_from_name(&name.0))
                 .and_modify(|e| e.is_pure = is_pure);
+        }
+
+        // Run def_ana_fun the second time in the move function mode
+        // Inline spec will be checked in this pass
+        for (idx, (name, fun_def)) in module_def.functions.key_cloned_iter().enumerate() {
+            self.def_ana_fun(&name, fun_def, idx, false);
         }
 
         // Analyze all schemas. This must be done before other things because schemas need to be
@@ -1223,9 +1234,17 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     /// Definition analysis for Move functions.
+    /// When as_spec_fun is true, the function is translated into a spec function.
+    /// When as_spec_fun is false, the function is translated as a move function.
     /// If the function is pure, we translate its body.
     /// If we are operating as a Move compiler, we also translate its body.
-    fn def_ana_fun(&mut self, name: &PA::FunctionName, def: &EA::Function, fun_idx: usize) {
+    fn def_ana_fun(
+        &mut self,
+        name: &PA::FunctionName,
+        def: &EA::Function,
+        fun_idx: usize,
+        as_spec_fun: bool,
+    ) {
         let body = &def.body;
         if let EA::FunctionBody_::Defined(seq) = &body.value {
             let full_name = self.qualified_by_module_from_name(&name.0);
@@ -1261,31 +1280,29 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 };
                 let mut result = et.translate_seq(&loc, seq, &result_type);
                 et.finalize_types();
-                if !as_spec_fun {
-                    result = et.post_process_spec_blocks(result.into_exp()).into();
-                }
+                result = et.post_process_body(result.into_exp()).into();
                 (result, access_specifiers)
             };
 
             // Attempt to translate as specification function
-            let mut et = ExpTranslator::new(self);
-            let (translated, _) = body_translator(&mut et, true);
-            if !et.had_errors {
-                // Rewrite all type annotations in expressions to skip references.
-                for node_id in translated.node_ids() {
-                    let ty = et.get_node_type(node_id);
-                    et.update_node_type(node_id, ty.skip_reference().clone());
+            if as_spec_fun {
+                let mut et = ExpTranslator::new(self);
+                let (translated, _) = body_translator(&mut et, true);
+                if !et.had_errors {
+                    // Rewrite all type annotations in expressions to skip references.
+                    for node_id in translated.node_ids() {
+                        let ty = et.get_node_type(node_id);
+                        et.update_node_type(node_id, ty.skip_reference().clone());
+                    }
+                    et.called_spec_funs.iter().for_each(|(mid, fid)| {
+                        self.parent.add_edge_to_move_fun_call_graph(
+                            self.module_id.qualified(SpecFunId::new(fun_idx)),
+                            mid.qualified(*fid),
+                        );
+                    });
+                    self.spec_funs[self.spec_fun_index].body = Some(translated.into_exp());
                 }
-                et.called_spec_funs.iter().for_each(|(mid, fid)| {
-                    self.parent.add_edge_to_move_fun_call_graph(
-                        self.module_id.qualified(SpecFunId::new(fun_idx)),
-                        mid.qualified(*fid),
-                    );
-                });
-                self.spec_funs[self.spec_fun_index].body = Some(translated.into_exp());
-            }
-
-            if self.compile_move {
+            } else if self.compile_move {
                 // Also translate as regular Move function
                 let mut et = ExpTranslator::new(self);
                 et.set_spec_block_map(spec_block_map);
@@ -1304,7 +1321,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 }
             }
         }
-        self.spec_fun_index += 1; // TODO: why is this at the end? Document or move close to use
+        if as_spec_fun {
+            self.spec_fun_index += 1; // TODO: why is this at the end? Document or move close to use
+        }
     }
 
     /// Propagate the impurity of Move functions from callees to callers so
@@ -1793,8 +1812,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 }
 
                 et.enter_scope();
-                for (sym, (loc, type_)) in locals {
-                    et.define_local(loc, *sym, type_.clone(), None, None)
+                for (sym, (loc, type_, index)) in locals {
+                    et.define_local(loc, *sym, type_.clone(), None, *index)
                 }
                 et
             },
@@ -1919,7 +1938,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             // Check whether the inclusion is correct regards usage of post state.
 
             // First check for lets.
-            for (name, _) in cond.exp.free_vars(self.parent.env) {
+            for (name, _) in cond.exp.free_vars_with_types(self.parent.env) {
                 if let Some((true, id)) = self.spec_block_lets.get(&name) {
                     let label_cond = (cond.loc.clone(), "not allowed to use post state".to_owned());
                     let label_let = (
@@ -2997,7 +3016,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             // that conflicts with variables defined in the condition, return an error
             for bound_expr in argument_map.values() {
                 let exp_loc = self.parent.env.get_node_loc(bound_expr.node_id());
-                for loc_sym in bound_expr.free_local_vars_with_node_id().keys() {
+                for loc_sym in bound_expr.bound_local_vars_with_node_id().keys() {
                     match kind {
                         ConditionKind::LetPost(name) | ConditionKind::LetPre(name) => {
                             if name == loc_sym {
@@ -3393,11 +3412,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 ExpData::Call(node_id, Operation::Global(_), _)
                 | ExpData::Call(node_id, Operation::Exists(_), _) => {
                     if !self.parent.env.has_errors() {
-                        // We would crash if the type is not valid, so only do this if no errors
-                        // have been reported so far.
                         let ty = &self.parent.env.get_node_instantiation(*node_id)[0];
-                        let (mid, sid, inst) = ty.require_struct();
-                        used_memory.insert(mid.qualified_inst(sid, inst.to_owned()));
+                        if let Type::Struct(mid, sid, inst) = ty {
+                            used_memory.insert(mid.qualified_inst(*sid, inst.to_owned()));
+                        }
                     }
                 },
                 _ => {},
@@ -3622,7 +3640,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         }
         let mut function_data: BTreeMap<FunId, FunctionData> = Default::default();
         for (name, entry) in &self.parent.fun_table {
-            if name.module_name != self.module_name {
+            if entry.module_id != self.module_id {
                 continue;
             }
             // New function
@@ -3643,7 +3661,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 result_type: entry.result_type.clone(),
                 access_specifiers,
                 spec: spec.into(),
-                def,
+                def: def.into(),
                 called_funs: None,
                 calling_funs: RefCell::default(),
                 transitive_closure_of_called_funs: RefCell::default(),

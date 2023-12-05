@@ -45,6 +45,7 @@ use aptos_types::{
     },
     transaction::SignedTransaction,
     validator_info::ValidatorInfo,
+    validator_txn::pool::{ValidatorTransactionPool, ValidatorTransactionPoolClient},
     waypoint::Waypoint,
 };
 use futures::{channel::mpsc, StreamExt};
@@ -73,6 +74,7 @@ impl SMRNode {
         consensus_config: OnChainConsensusConfig,
         storage: Arc<MockStorage>,
         twin_id: TwinId,
+        validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
     ) -> Self {
         // Create a runtime for the twin
         let thread_name = format!("twin-{}", twin_id.id);
@@ -158,6 +160,7 @@ impl SMRNode {
             reconfig_listener,
             bounded_executor,
             aptos_time_service::TimeService::real(),
+            validator_txn_pool_client,
         );
         let (network_task, network_receiver) =
             NetworkTask::new(network_service_events, self_receiver);
@@ -283,12 +286,14 @@ impl SMRNode {
                 ..ConsensusConfigV1::default()
             });
 
+            let validator_txn_pool = Arc::new(ValidatorTransactionPool::new());
             smr_nodes.push(Self::start(
                 playground,
                 config,
                 consensus_config,
                 storage,
                 twin_id,
+                validator_txn_pool,
             ));
         }
         smr_nodes

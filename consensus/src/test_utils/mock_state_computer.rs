@@ -6,7 +6,7 @@ use crate::{
     error::StateSyncError,
     experimental::buffer_manager::OrderedBlocks,
     payload_manager::PayloadManager,
-    state_computer::StateComputeResultFut,
+    state_computer::{PipelineExecutionResult, StateComputeResultFut},
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     test_utils::mock_storage::MockStorage,
     transaction_deduper::TransactionDeduper,
@@ -19,7 +19,8 @@ use aptos_executor_types::{ExecutorError, ExecutorResult, StateComputeResult};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction,
+    block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction,
 };
 use futures::{channel::mpsc, SinkExt};
 use futures_channel::mpsc::UnboundedSender;
@@ -85,12 +86,12 @@ impl StateComputer for MockStateComputer {
         &self,
         block: &Block,
         _parent_block_id: HashValue,
-    ) -> ExecutorResult<StateComputeResult> {
+    ) -> ExecutorResult<PipelineExecutionResult> {
         self.block_cache.lock().insert(
             block.id(),
             block.payload().unwrap_or(&Payload::empty(false)).clone(),
         );
-        let result = StateComputeResult::new_dummy();
+        let result = PipelineExecutionResult::new_dummy();
         Ok(result)
     }
 
@@ -140,7 +141,7 @@ impl StateComputer for MockStateComputer {
         _: &EpochState,
         _: Arc<PayloadManager>,
         _: Arc<dyn TransactionShuffler>,
-        _: Option<u64>,
+        _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
     ) {
     }
@@ -156,8 +157,8 @@ impl StateComputer for EmptyStateComputer {
         &self,
         _block: &Block,
         _parent_block_id: HashValue,
-    ) -> ExecutorResult<StateComputeResult> {
-        Ok(StateComputeResult::new_dummy())
+    ) -> ExecutorResult<PipelineExecutionResult> {
+        Ok(PipelineExecutionResult::new_dummy())
     }
 
     async fn commit(
@@ -178,7 +179,7 @@ impl StateComputer for EmptyStateComputer {
         _: &EpochState,
         _: Arc<PayloadManager>,
         _: Arc<dyn TransactionShuffler>,
-        _: Option<u64>,
+        _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
     ) {
     }
@@ -220,7 +221,8 @@ impl StateComputer for RandomComputeResultStateComputer {
                 self.random_compute_result_root_hash,
             ))
         };
-        Box::pin(async move { res })
+        let pipeline_execution_res = res.map(|res| PipelineExecutionResult::new(vec![], res));
+        Box::pin(async move { pipeline_execution_res })
     }
 
     async fn commit(
@@ -241,7 +243,7 @@ impl StateComputer for RandomComputeResultStateComputer {
         _: &EpochState,
         _: Arc<PayloadManager>,
         _: Arc<dyn TransactionShuffler>,
-        _: Option<u64>,
+        _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
     ) {
     }

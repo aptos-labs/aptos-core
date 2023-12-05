@@ -457,6 +457,8 @@ pub enum ExpData {
     LocalVar(NodeId, Symbol),
     /// Represents a reference to a temporary used in bytecode, if this expression is associated
     /// with bytecode.
+    /// When compiling from Move source code, represents a parameter to a function: TempIndex
+    /// indicates the index into the list of function parameters.
     Temporary(NodeId, TempIndex),
     /// Represents a call to an operation. The `Operation` enum covers all builtin functions
     /// (including operators, constants, ...) as well as user functions.
@@ -495,7 +497,9 @@ pub enum ExpData {
     /// Represents a loop continuation for the enclosing loop. The bool indicates whether the
     /// loop is continued (true) or broken (false).
     LoopCont(NodeId, bool),
-    /// Assignment to a pattern. Can be a tuple pattern and a tuple expression.
+    /// Assignment to a pattern. Can be a tuple pattern and a tuple expression.  Note that Assign
+    /// does *not* introduce new variables; they apparently be introduced by a Block or Lambda, or
+    /// as a function formal parameter.
     Assign(NodeId, Pattern, Exp),
     /// Mutation of a lhs reference, as in `*lhs = rhs`.
     Mutate(NodeId, Exp, Exp),
@@ -615,9 +619,40 @@ impl ExpData {
 
     /// Returns the free local variables, inclusive their types, used in this expression.
     /// Result is ordered by occurrence.
-    pub fn free_vars(&self, env: &GlobalEnv) -> Vec<(Symbol, Type)> {
+    pub fn free_vars_with_types(&self, env: &GlobalEnv) -> Vec<(Symbol, Type)> {
         let mut vars = vec![];
-        let mut shadowed = vec![]; // Should be multiset but don't have this
+        let var_collector = |id: &NodeId, sym: &Symbol| {
+            if !vars.iter().any(|(s, _)| s == sym) {
+                vars.push((*sym, env.get_node_type(*id)));
+            }
+        };
+        self.visit_free_local_vars(var_collector);
+        vars
+    }
+
+    /// Returns the bound local variables with node id in this expression
+    pub fn bound_local_vars_with_node_id(&self) -> BTreeMap<Symbol, NodeId> {
+        let mut vars = BTreeMap::new();
+        let mut visitor = |up: bool, e: &ExpData| {
+            use ExpData::*;
+            if up {
+                if let LocalVar(id, sym) = e {
+                    if !vars.iter().any(|(s, _)| s == sym) {
+                        vars.insert(*sym, *id);
+                    }
+                }
+            }
+        };
+        self.visit_pre_post(&mut visitor);
+        vars
+    }
+
+    /// Visits free local variables with node id in this expression.
+    fn visit_free_local_vars<F>(&self, mut node_symbol_visitor: F)
+    where
+        F: FnMut(&NodeId, &Symbol),
+    {
+        let mut shadowed: BTreeMap<Symbol, usize> = BTreeMap::new();
         let mut visitor = |up: bool, e: &ExpData| {
             use ExpData::*;
             let decls = match e {
@@ -631,40 +666,46 @@ impl ExpData {
                 _ => vec![],
             };
             if !up {
-                shadowed.extend(decls.iter());
-            } else {
-                for sym in decls {
-                    if let Some(pos) = shadowed.iter().position(|s| *s == sym) {
-                        // Remove one instance of this symbol. The same symbol can appear
-                        // multiple times in `shadowed`.
-                        shadowed.remove(pos);
+                // Visit the Assigned pat on the way down, before visiting the RHS expression
+                if let Assign(_, pat, _) = e {
+                    for (id, sym) in pat.vars().iter() {
+                        if shadowed.get(sym).cloned().unwrap_or(0) == 0 {
+                            node_symbol_visitor(id, sym);
+                        }
                     }
-                }
-                if let LocalVar(id, sym) = e {
-                    if !shadowed.contains(sym) && !vars.iter().any(|(s, _)| s == sym) {
-                        vars.push((*sym, env.get_node_type(*id)));
+                } else {
+                    for sym in &decls {
+                        shadowed
+                            .entry(*sym)
+                            .and_modify(|curr| *curr += 1)
+                            .or_insert(1);
                     }
                 }
             }
-        };
-        self.visit_pre_post(&mut visitor);
-        vars
-    }
-
-    /// Returns the free local variables with node id in this expression
-    pub fn free_local_vars_with_node_id(&self) -> BTreeMap<Symbol, NodeId> {
-        let mut vars = BTreeMap::new();
-        let mut visitor = |up: bool, e: &ExpData| {
-            use ExpData::*;
             if up {
                 if let LocalVar(id, sym) = e {
-                    if !vars.iter().any(|(s, _)| s == sym) {
-                        vars.insert(*sym, *id);
+                    if shadowed.get(sym).cloned().unwrap_or(0) == 0 {
+                        node_symbol_visitor(id, sym);
+                    }
+                } else {
+                    for sym in &decls {
+                        if let Some(x) = shadowed.get_mut(sym) {
+                            *x -= 1;
+                        }
                     }
                 }
             }
         };
         self.visit_pre_post(&mut visitor);
+    }
+
+    /// Returns just the free local variables in this expression.
+    pub fn free_vars(&self) -> BTreeSet<Symbol> {
+        let mut vars = BTreeSet::new();
+        let just_vars_collector = |_id: &NodeId, sym: &Symbol| {
+            vars.insert(*sym);
+        };
+        self.visit_free_local_vars(just_vars_collector);
         vars
     }
 
@@ -721,6 +762,21 @@ impl ExpData {
         let mut visitor = |e: &ExpData| {
             if let ExpData::Call(_, Operation::MoveFunction(mid, fid), _) = e {
                 called.insert(mid.qualified(*fid));
+            }
+        };
+        self.visit(&mut visitor);
+        called
+    }
+
+    /// Returns the Move functions called by this expression, along with nodes of call sites.
+    pub fn called_funs_with_callsites(&self) -> BTreeMap<QualifiedId<FunId>, BTreeSet<NodeId>> {
+        let mut called: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
+        let mut visitor = |e: &ExpData| {
+            if let ExpData::Call(node_id, Operation::MoveFunction(mid, fid), _) = e {
+                called
+                    .entry(mid.qualified(*fid))
+                    .or_default()
+                    .insert(*node_id);
             }
         };
         self.visit(&mut visitor);
@@ -894,6 +950,24 @@ impl ExpData {
         ExpRewriter {
             exp_rewriter,
             node_rewriter: &mut |_| None,
+            pattern_rewriter: &mut |_, _| None,
+        }
+        .rewrite_exp(exp)
+    }
+
+    pub fn rewrite_exp_and_pattern<F, G>(
+        exp: Exp,
+        exp_rewriter: &mut F,
+        pattern_rewriter: &mut G,
+    ) -> Exp
+    where
+        F: FnMut(Exp) -> Result<Exp, Exp>,
+        G: FnMut(&Pattern, bool) -> Option<Pattern>,
+    {
+        ExpRewriter {
+            exp_rewriter,
+            node_rewriter: &mut |_| None,
+            pattern_rewriter,
         }
         .rewrite_exp(exp)
     }
@@ -907,6 +981,7 @@ impl ExpData {
         ExpRewriter {
             exp_rewriter: &mut Err,
             node_rewriter,
+            pattern_rewriter: &mut |_, _| None,
         }
         .rewrite_exp(exp)
     }
@@ -924,6 +999,7 @@ impl ExpData {
         ExpRewriter {
             exp_rewriter,
             node_rewriter,
+            pattern_rewriter: &mut |_, _| None,
         }
         .rewrite_exp(exp)
     }
@@ -1040,11 +1116,22 @@ impl ExpData {
             }
         });
     }
+
+    /// Returns the node id of the inner expression which delivers the result. For blocks,
+    /// this traverses into the body.
+    pub fn result_node_id(&self) -> NodeId {
+        if let ExpData::Block(_, _, _, body) = self {
+            body.result_node_id()
+        } else {
+            self.node_id()
+        }
+    }
 }
 
 struct ExpRewriter<'a> {
     exp_rewriter: &'a mut dyn FnMut(Exp) -> Result<Exp, Exp>,
     node_rewriter: &'a mut dyn FnMut(NodeId) -> Option<NodeId>,
+    pattern_rewriter: &'a mut dyn FnMut(&Pattern, bool) -> Option<Pattern>,
 }
 
 impl<'a> ExpRewriterFunctions for ExpRewriter<'a> {
@@ -1057,6 +1144,10 @@ impl<'a> ExpRewriterFunctions for ExpRewriter<'a> {
 
     fn rewrite_node_id(&mut self, id: NodeId) -> Option<NodeId> {
         (*self.node_rewriter)(id)
+    }
+
+    fn rewrite_pattern(&mut self, pat: &Pattern, entering_scope: bool) -> Option<Pattern> {
+        (*self.pattern_rewriter)(pat, entering_scope)
     }
 }
 
@@ -1097,6 +1188,10 @@ pub enum Operation {
     Gt,
     Le,
     Ge,
+
+    // Copy and Move
+    Copy,
+    Move,
 
     // Unary operators
     Not,
@@ -1214,7 +1309,7 @@ impl Pattern {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum TraceKind {
     /// A user level TRACE(..) in the source.
     User,

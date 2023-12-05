@@ -110,7 +110,9 @@ pub fn prepare_executed_blocks_with_ledger_info(
 
     let executed_blocks: Vec<ExecutedBlock> = proposals
         .iter()
-        .map(|proposal| ExecutedBlock::new(proposal.block().clone(), compute_result.clone()))
+        .map(|proposal| {
+            ExecutedBlock::new(proposal.block().clone(), vec![], compute_result.clone())
+        })
         .collect();
 
     (executed_blocks, li_sig, proposals)

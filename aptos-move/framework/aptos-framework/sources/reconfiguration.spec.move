@@ -85,19 +85,18 @@ spec aptos_framework::reconfiguration {
         use aptos_framework::transaction_fee;
         use aptos_framework::staking_config;
 
-        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
-
+        // TODO: set because of timeout (property proved)
+        pragma verify_duration_estimate = 120;
         requires exists<stake::ValidatorFees>(@aptos_framework);
 
+        let success = !(chain_status::is_genesis() || timestamp::spec_now_microseconds() == 0 || !reconfiguration_enabled())
+            && timestamp::spec_now_microseconds() != global<Configuration>(@aptos_framework).last_reconfiguration_time;
         include features::spec_periodical_reward_rate_decrease_enabled() ==> staking_config::StakingRewardsConfigEnabledRequirement;
         include success ==> aptos_coin::ExistsAptosCoin;
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         aborts_if false;
-
         // The ensure conditions of the reconfigure function are not fully written, because there is a new cycle in it,
         // but its existing ensure conditions satisfy hp.
-        let success = !(chain_status::is_genesis() || timestamp::spec_now_microseconds() == 0 || !reconfiguration_enabled())
-            && timestamp::spec_now_microseconds() != global<Configuration>(@aptos_framework).last_reconfiguration_time;
         // The property below is not proved within 500s and still cause an timeout
         // property 3: Synchronization of NewEpochEvent counter with configuration epoch.
         ensures success ==> global<Configuration>(@aptos_framework).epoch == old(global<Configuration>(@aptos_framework).epoch) + 1;

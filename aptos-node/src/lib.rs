@@ -23,7 +23,7 @@ use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
-use aptos_types::chain_id::ChainId;
+use aptos_types::{chain_id::ChainId, validator_txn::pool::ValidatorTransactionPool};
 use clap::Parser;
 use futures::channel::mpsc;
 use hex::{FromHex, FromHexError};
@@ -552,7 +552,7 @@ pub fn setup_environment_and_start_node(
     logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) -> anyhow::Result<AptosHandle> {
     // Log the node config at node startup
-    info!("Using node config {:?}", &node_config);
+    node_config.log_all_configs();
 
     // Starts the admin service
     let admin_service = services::start_admin_service(&node_config);
@@ -642,6 +642,8 @@ pub fn setup_environment_and_start_node(
             peers_and_metadata,
         );
 
+    let validator_txn_pool = Arc::new(ValidatorTransactionPool::new());
+
     // Create the consensus runtime (this blocks on state sync first)
     let consensus_runtime = consensus_network_interfaces.map(|consensus_network_interfaces| {
         // Wait until state sync has been initialized
@@ -657,6 +659,7 @@ pub fn setup_environment_and_start_node(
             consensus_network_interfaces,
             consensus_notifier,
             consensus_to_mempool_sender,
+            validator_txn_pool,
         );
         admin_service.set_consensus_dbs(consensus_db, quorum_store_db);
         runtime

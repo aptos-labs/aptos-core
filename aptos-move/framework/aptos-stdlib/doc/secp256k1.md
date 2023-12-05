@@ -1,5 +1,5 @@
 
-<a name="0x1_secp256k1"></a>
+<a id="0x1_secp256k1"></a>
 
 # Module `0x1::secp256k1`
 
@@ -30,7 +30,7 @@ This module implements ECDSA signatures based on the prime-order secp256k1 ellpt
 
 
 
-<a name="0x1_secp256k1_ECDSARawPublicKey"></a>
+<a id="0x1_secp256k1_ECDSARawPublicKey"></a>
 
 ## Struct `ECDSARawPublicKey`
 
@@ -58,7 +58,7 @@ A 64-byte ECDSA public key.
 
 </details>
 
-<a name="0x1_secp256k1_ECDSASignature"></a>
+<a id="0x1_secp256k1_ECDSASignature"></a>
 
 ## Struct `ECDSASignature`
 
@@ -86,12 +86,12 @@ A 64-byte ECDSA signature.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_secp256k1_SIGNATURE_NUM_BYTES"></a>
+<a id="0x1_secp256k1_SIGNATURE_NUM_BYTES"></a>
 
 The size of a secp256k1-based ECDSA signature, in bytes.
 
@@ -101,7 +101,7 @@ The size of a secp256k1-based ECDSA signature, in bytes.
 
 
 
-<a name="0x1_secp256k1_E_DESERIALIZE"></a>
+<a id="0x1_secp256k1_E_DESERIALIZE"></a>
 
 An error occurred while deserializing, for example due to wrong input size.
 
@@ -111,7 +111,7 @@ An error occurred while deserializing, for example due to wrong input size.
 
 
 
-<a name="0x1_secp256k1_RAW_PUBLIC_KEY_NUM_BYTES"></a>
+<a id="0x1_secp256k1_RAW_PUBLIC_KEY_NUM_BYTES"></a>
 
 The size of a secp256k1-based ECDSA public key, in bytes.
 
@@ -121,7 +121,7 @@ The size of a secp256k1-based ECDSA public key, in bytes.
 
 
 
-<a name="0x1_secp256k1_ecdsa_signature_from_bytes"></a>
+<a id="0x1_secp256k1_ecdsa_signature_from_bytes"></a>
 
 ## Function `ecdsa_signature_from_bytes`
 
@@ -147,7 +147,7 @@ Constructs an ECDSASignature struct from the given 64 bytes.
 
 </details>
 
-<a name="0x1_secp256k1_ecdsa_raw_public_key_from_64_bytes"></a>
+<a id="0x1_secp256k1_ecdsa_raw_public_key_from_64_bytes"></a>
 
 ## Function `ecdsa_raw_public_key_from_64_bytes`
 
@@ -173,7 +173,7 @@ Constructs an ECDSARawPublicKey struct, given a 64-byte raw representation.
 
 </details>
 
-<a name="0x1_secp256k1_ecdsa_raw_public_key_to_bytes"></a>
+<a id="0x1_secp256k1_ecdsa_raw_public_key_to_bytes"></a>
 
 ## Function `ecdsa_raw_public_key_to_bytes`
 
@@ -198,7 +198,7 @@ Serializes an ECDSARawPublicKey struct to 64-bytes.
 
 </details>
 
-<a name="0x1_secp256k1_ecdsa_signature_to_bytes"></a>
+<a id="0x1_secp256k1_ecdsa_signature_to_bytes"></a>
 
 ## Function `ecdsa_signature_to_bytes`
 
@@ -223,7 +223,7 @@ Serializes an ECDSASignature struct to 64-bytes.
 
 </details>
 
-<a name="0x1_secp256k1_ecdsa_recover"></a>
+<a id="0x1_secp256k1_ecdsa_recover"></a>
 
 ## Function `ecdsa_recover`
 
@@ -262,7 +262,7 @@ public key (or its hash) is known beforehand.
 
 </details>
 
-<a name="0x1_secp256k1_ecdsa_recover_internal"></a>
+<a id="0x1_secp256k1_ecdsa_recover_internal"></a>
 
 ## Function `ecdsa_recover_internal`
 
@@ -290,12 +290,12 @@ and returns <code>([], <b>false</b>)</code> otherwise.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
 
-<a name="@Specification_1_ecdsa_signature_from_bytes"></a>
+<a id="@Specification_1_ecdsa_signature_from_bytes"></a>
 
 ### Function `ecdsa_signature_from_bytes`
 
@@ -312,7 +312,7 @@ and returns <code>([], <b>false</b>)</code> otherwise.
 
 
 
-<a name="@Specification_1_ecdsa_raw_public_key_from_64_bytes"></a>
+<a id="@Specification_1_ecdsa_raw_public_key_from_64_bytes"></a>
 
 ### Function `ecdsa_raw_public_key_from_64_bytes`
 
@@ -329,7 +329,7 @@ and returns <code>([], <b>false</b>)</code> otherwise.
 
 
 
-<a name="@Specification_1_ecdsa_raw_public_key_to_bytes"></a>
+<a id="@Specification_1_ecdsa_raw_public_key_to_bytes"></a>
 
 ### Function `ecdsa_raw_public_key_to_bytes`
 
@@ -346,7 +346,7 @@ and returns <code>([], <b>false</b>)</code> otherwise.
 
 
 
-<a name="@Specification_1_ecdsa_signature_to_bytes"></a>
+<a id="@Specification_1_ecdsa_signature_to_bytes"></a>
 
 ### Function `ecdsa_signature_to_bytes`
 
@@ -363,7 +363,7 @@ and returns <code>([], <b>false</b>)</code> otherwise.
 
 
 
-<a name="@Specification_1_ecdsa_recover"></a>
+<a id="@Specification_1_ecdsa_recover"></a>
 
 ### Function `ecdsa_recover`
 
@@ -383,7 +383,7 @@ and returns <code>([], <b>false</b>)</code> otherwise.
 
 
 
-<a name="@Specification_1_ecdsa_recover_internal"></a>
+<a id="@Specification_1_ecdsa_recover_internal"></a>
 
 ### Function `ecdsa_recover_internal`
 
@@ -404,7 +404,7 @@ and returns <code>([], <b>false</b>)</code> otherwise.
 
 
 
-<a name="0x1_secp256k1_ecdsa_recover_internal_abort_condition"></a>
+<a id="0x1_secp256k1_ecdsa_recover_internal_abort_condition"></a>
 
 
 <pre><code><b>fun</b> <a href="secp256k1.md#0x1_secp256k1_ecdsa_recover_internal_abort_condition">ecdsa_recover_internal_abort_condition</a>(message: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, recovery_id: u8, signature: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
@@ -413,7 +413,7 @@ and returns <code>([], <b>false</b>)</code> otherwise.
 
 
 
-<a name="0x1_secp256k1_spec_ecdsa_recover_internal_result_1"></a>
+<a id="0x1_secp256k1_spec_ecdsa_recover_internal_result_1"></a>
 
 
 <pre><code><b>fun</b> <a href="secp256k1.md#0x1_secp256k1_spec_ecdsa_recover_internal_result_1">spec_ecdsa_recover_internal_result_1</a>(message: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, recovery_id: u8, signature: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
@@ -422,7 +422,7 @@ and returns <code>([], <b>false</b>)</code> otherwise.
 
 
 
-<a name="0x1_secp256k1_spec_ecdsa_recover_internal_result_2"></a>
+<a id="0x1_secp256k1_spec_ecdsa_recover_internal_result_2"></a>
 
 
 <pre><code><b>fun</b> <a href="secp256k1.md#0x1_secp256k1_spec_ecdsa_recover_internal_result_2">spec_ecdsa_recover_internal_result_2</a>(message: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, recovery_id: u8, signature: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;

@@ -51,7 +51,7 @@ pub mod signature_verified_transaction;
 
 use crate::{
     contract_event::TransactionEvent, executable::ModulePath, fee_statement::FeeStatement,
-    proof::accumulator::InMemoryEventAccumulator, system_txn::SystemTransaction,
+    proof::accumulator::InMemoryEventAccumulator, validator_txn::ValidatorTransaction,
     write_set::TransactionWrite,
 };
 pub use change_set::ChangeSet;
@@ -1795,7 +1795,8 @@ pub enum Transaction {
     /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
     StateCheckpoint(HashValue),
 
-    ValidatorTransaction(SystemTransaction),
+    /// Transaction that only proposed by a validator mainly to update on-chain configs.
+    ValidatorTransaction(ValidatorTransaction),
 }
 
 impl Transaction {
@@ -1809,6 +1810,13 @@ impl Transaction {
     pub fn try_as_block_metadata(&self) -> Option<&BlockMetadata> {
         match self {
             Transaction::BlockMetadata(v1) => Some(v1),
+            _ => None,
+        }
+    }
+
+    pub fn try_as_validator_txn(&self) -> Option<&ValidatorTransaction> {
+        match self {
+            Transaction::ValidatorTransaction(t) => Some(t),
             _ => None,
         }
     }

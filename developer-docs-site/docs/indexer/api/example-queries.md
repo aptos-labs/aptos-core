@@ -4,13 +4,17 @@ title: "Example Queries"
 
 # Example Indexer API Queries
 
+import BetaNotice from '../../../src/components/_indexer_beta_notice.mdx';
+
+<BetaNotice />
+
 ## Running example queries
 
 1. Open the Hasura Explorer for the network you want to query. You can find the URLs [here](/indexer/api/labs-hosted#hasura-explorer).
 1. Paste the **Query** code from an example into the main query section, and the **Query Variables** code from the same example into the Query Variables section (below the main query section).
 
 ## More Examples
-You can find many more example queries in the [TypeScript SDK](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk/src/indexer/queries). Indeed if you're using the TypeScript SDK, you should look at the [IndexerClient](../../sdks/ts-sdk/typescript-sdk-indexer-client-class).
+You can find many more example queries in the [TypeScript SDK](https://github.com/aptos-labs/aptos-ts-sdk/tree/main/src/internal/queries). Indeed if you're using the TypeScript SDK, you should look at the [API](https://github.com/aptos-labs/aptos-ts-sdk/tree/main/src/api).
 
 ## Example Token Queries
 
