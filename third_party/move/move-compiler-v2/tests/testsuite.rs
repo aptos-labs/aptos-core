@@ -63,27 +63,38 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
 
     // For each experiment, run the test at `path`.
     for experiment in experiments {
-        // Construct options, compiler and collect output.
-        let options = Options {
+        let mut options = Options {
             testing: true,
             sources: sources.clone(),
             dependencies: deps.clone(),
             named_address_mapping: vec!["std=0x1".to_string()],
             ..Options::default()
         };
-        TestConfig::get_config_from_path(path).run(path, experiment, options)?
+        TestConfig::get_config_from_path(path, &mut options).run(path, experiment, options)?
     }
     Ok(())
 }
 
 impl TestConfig {
-    fn get_config_from_path(path: &Path) -> TestConfig {
+    fn get_config_from_path(path: &Path, options: &mut Options) -> TestConfig {
+        // Construct options, compiler and collect output.
         let path = path.to_string_lossy();
         let verbose = cfg!(feature = "verbose-debug-print");
         let mut pipeline = FunctionTargetPipeline::default();
-        if path.contains("/checking/inlining/") {
+        if path.contains("/folding/") || path.contains("/inlining/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
             pipeline.add_processor(Box::new(VisibilityChecker {}));
+            Self {
+                type_check_only: false,
+                dump_ast: true,
+                pipeline,
+                generate_file_format: false,
+                dump_annotated_targets: false,
+            }
+        } else if path.contains("/unit_test/") {
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(VisibilityChecker {}));
+            options.testing = true;
             Self {
                 type_check_only: false,
                 dump_ast: true,
