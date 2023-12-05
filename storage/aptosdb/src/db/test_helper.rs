@@ -18,7 +18,9 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::ProofReader;
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
 use aptos_schemadb::SchemaBatch;
-use aptos_storage_interface::{state_delta::StateDelta, DbReader, DbWriter, Order};
+use aptos_storage_interface::{
+    state_delta::StateDelta, state_reader::StateReader, DbReader, DbWriter, Order,
+};
 use aptos_temppath::TempPath;
 #[cfg(test)]
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;

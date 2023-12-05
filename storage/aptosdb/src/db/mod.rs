@@ -37,8 +37,9 @@ use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{ReadOptions, SchemaBatch};
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
-    cached_state_view::ShardedStateCache, state_delta::StateDelta, state_view::DbStateView,
-    DbReader, DbWriter, ExecutedTrees, Order, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
+    cached_state_view::ShardedStateCache, read_delegation::ReadDelegation, state_delta::StateDelta,
+    state_reader::StateReader, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
+    StateSnapshotReceiver, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     account_address::AccountAddress,

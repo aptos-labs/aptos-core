@@ -14,7 +14,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_storage_interface::DbReader;
+use aptos_storage_interface::{state_reader::StateReader, DbReader};
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,

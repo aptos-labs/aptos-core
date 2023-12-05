@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{metrics::TIMER, DbReader};
+use crate::{metrics::TIMER, state_reader::StateReader};
 use anyhow::{anyhow, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::{error, sample, sample::SampleRate};
@@ -37,14 +37,14 @@ struct Proof {
 }
 
 pub struct AsyncProofFetcher {
-    reader: Arc<dyn DbReader>,
+    reader: Arc<dyn StateReader>,
     data_sender: Sender<Proof>,
     data_receiver: Receiver<Proof>,
     num_proofs_to_read: AtomicUsize,
 }
 
 impl AsyncProofFetcher {
-    pub fn new(reader: Arc<dyn DbReader>) -> Self {
+    pub fn new(reader: Arc<dyn StateReader>) -> Self {
         let (data_sender, data_receiver) = unbounded();
 
         Self {

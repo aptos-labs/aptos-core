@@ -51,7 +51,9 @@ use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher,
     cached_state_view::{CachedStateView, ShardedStateCache},
+    read_delegation::ReadDelegation,
     state_delta::StateDelta,
+    state_reader::StateReader,
     DbReader, StateSnapshotReceiver,
 };
 use aptos_types::{
@@ -115,12 +117,9 @@ impl Deref for StateStore {
     }
 }
 
-// "using an Arc<dyn DbReader> as an Arc<dyn StateReader>" is not allowed in stable Rust. Actually we
-// want another trait, `StateReader`, which is a subset of `DbReader` here but Rust does not support trait
-// upcasting coercion for now. Should change it to a different trait once upcasting is stabilized.
-// ref: https://github.com/rust-lang/rust/issues/65991
-impl DbReader for StateDb {
-    /// Returns the latest state snapshot strictly before `next_version` if any.
+impl ReadDelegation for StateDb {}
+
+impl StateReader for StateDb {
     fn get_state_snapshot_before(
         &self,
         next_version: Version,
@@ -131,9 +130,6 @@ impl DbReader for StateDb {
             .transpose()
     }
 
-    /// Get the latest state value of the given key up to the given version. Only used for testing for now
-    /// but should replace the `get_value_with_proof_by_version` call for VM execution if just fetch the
-    /// value without proof.
     fn get_state_value_by_version(
         &self,
         state_key: &StateKey,
@@ -144,8 +140,6 @@ impl DbReader for StateDb {
             .map(|(_, value)| value))
     }
 
-    /// Gets the latest state value and its corresponding version when it's of the given key up
-    /// to the given version.
     fn get_state_value_with_version_by_version(
         &self,
         state_key: &StateKey,
@@ -165,7 +159,6 @@ impl DbReader for StateDb {
             .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
     }
 
-    /// Returns the proof of the given state key and version.
     fn get_state_proof_by_version_ext(
         &self,
         state_key: &StateKey,
@@ -177,7 +170,6 @@ impl DbReader for StateDb {
         Ok(proof)
     }
 
-    /// Get the state value with proof given the state key and version
     fn get_state_value_with_proof_by_version_ext(
         &self,
         state_key: &StateKey,
@@ -233,12 +225,9 @@ impl StateDb {
     }
 }
 
-impl DbReader for StateStore {
-    fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>> {
-        Ok(self.smt_ancestors.lock().get_youngest())
-    }
+impl ReadDelegation for StateStore {}
 
-    /// Returns the latest state snapshot strictly before `next_version` if any.
+impl StateReader for StateStore {
     fn get_state_snapshot_before(
         &self,
         next_version: Version,
@@ -246,9 +235,6 @@ impl DbReader for StateStore {
         self.deref().get_state_snapshot_before(next_version)
     }
 
-    /// Get the latest state value of the given key up to the given version. Only used for testing for now
-    /// but should replace the `get_value_with_proof_by_version` call for VM execution if just fetch the
-    /// value without proof.
     fn get_state_value_by_version(
         &self,
         state_key: &StateKey,
@@ -257,8 +243,6 @@ impl DbReader for StateStore {
         self.deref().get_state_value_by_version(state_key, version)
     }
 
-    /// Gets the latest state value and the its corresponding version when its of the given key up
-    /// to the given version.
     fn get_state_value_with_version_by_version(
         &self,
         state_key: &StateKey,
@@ -268,7 +252,6 @@ impl DbReader for StateStore {
             .get_state_value_with_version_by_version(state_key, version)
     }
 
-    /// Returns the proof of the given state key and version.
     fn get_state_proof_by_version_ext(
         &self,
         state_key: &StateKey,
@@ -278,7 +261,6 @@ impl DbReader for StateStore {
             .get_state_proof_by_version_ext(state_key, version)
     }
 
-    /// Get the state value with proof extension given the state key and version
     fn get_state_value_with_proof_by_version_ext(
         &self,
         state_key: &StateKey,
@@ -286,6 +268,12 @@ impl DbReader for StateStore {
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         self.deref()
             .get_state_value_with_proof_by_version_ext(state_key, version)
+    }
+}
+
+impl DbReader for StateStore {
+    fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>> {
+        Ok(self.smt_ancestors.lock().get_youngest())
     }
 }
 

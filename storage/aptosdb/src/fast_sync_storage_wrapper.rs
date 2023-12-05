@@ -7,8 +7,8 @@ use aptos_config::config::{NodeConfig, StorageDirPaths};
 use aptos_crypto::HashValue;
 use aptos_infallible::RwLock;
 use aptos_storage_interface::{
-    cached_state_view::ShardedStateCache, state_delta::StateDelta, DbReader, DbWriter,
-    StateSnapshotReceiver,
+    cached_state_view::ShardedStateCache, read_delegation::ReadDelegation, state_delta::StateDelta,
+    state_reader::StateReader, DbReader, DbWriter, StateSnapshotReceiver,
 };
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -177,8 +177,10 @@ impl DbWriter for FastSyncStorageWrapper {
     }
 }
 
-impl DbReader for FastSyncStorageWrapper {
+impl ReadDelegation for FastSyncStorageWrapper {
     fn get_read_delegatee(&self) -> &dyn DbReader {
         self.get_aptos_db_read_ref()
     }
 }
+
+impl StateReader for FastSyncStorageWrapper {}

@@ -390,59 +390,6 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_state_value_by_version(
-        &self,
-        state_store_key: &StateKey,
-        version: Version,
-    ) -> Result<Option<StateValue>> {
-        gauged_api("get_state_value_by_version", || {
-            self.error_if_state_kv_pruned("StateValue", version)?;
-
-            self.state_store
-                .get_state_value_by_version(state_store_key, version)
-        })
-    }
-
-    fn get_state_value_with_version_by_version(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<Option<(Version, StateValue)>> {
-        gauged_api("get_state_value_with_version_by_version", || {
-            self.error_if_state_kv_pruned("StateValue", version)?;
-
-            self.state_store
-                .get_state_value_with_version_by_version(state_key, version)
-        })
-    }
-
-    /// Returns the proof of the given state key and version.
-    fn get_state_proof_by_version_ext(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<SparseMerkleProofExt> {
-        gauged_api("get_state_proof_by_version_ext", || {
-            self.error_if_state_merkle_pruned("State merkle", version)?;
-
-            self.state_store
-                .get_state_proof_by_version_ext(state_key, version)
-        })
-    }
-
-    fn get_state_value_with_proof_by_version_ext(
-        &self,
-        state_store_key: &StateKey,
-        version: Version,
-    ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
-        gauged_api("get_state_value_with_proof_by_version_ext", || {
-            self.error_if_state_merkle_pruned("State merkle", version)?;
-
-            self.state_store
-                .get_state_value_with_proof_by_version_ext(state_store_key, version)
-        })
-    }
-
     fn get_latest_epoch_state(&self) -> Result<EpochState> {
         gauged_api("get_latest_epoch_state", || {
             let latest_ledger_info = self.ledger_store.get_latest_ledger_info()?;
@@ -636,16 +583,6 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_state_snapshot_before(
-        &self,
-        next_version: Version,
-    ) -> Result<Option<(Version, HashValue)>> {
-        self.error_if_state_merkle_pruned("State merkle", next_version)?;
-        gauged_api("get_state_snapshot_before", || {
-            self.state_store.get_state_snapshot_before(next_version)
-        })
-    }
-
     fn get_accumulator_root_hash(&self, version: Version) -> Result<HashValue> {
         gauged_api("get_accumulator_root_hash", || {
             self.error_if_ledger_pruned("Transaction accumulator", version)?;
@@ -739,6 +676,72 @@ impl DbReader for AptosDB {
     /// Returns whether the indexer DB has been enabled or not
     fn indexer_enabled(&self) -> bool {
         self.indexer.is_some()
+    }
+}
+
+impl ReadDelegation for AptosDB {}
+
+impl StateReader for AptosDB {
+    fn get_state_snapshot_before(
+        &self,
+        next_version: Version,
+    ) -> Result<Option<(Version, HashValue)>> {
+        self.error_if_state_merkle_pruned("State merkle", next_version)?;
+        gauged_api("get_state_snapshot_before", || {
+            self.state_store.get_state_snapshot_before(next_version)
+        })
+    }
+
+    fn get_state_value_by_version(
+        &self,
+        state_store_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<StateValue>> {
+        gauged_api("get_state_value_by_version", || {
+            self.error_if_state_kv_pruned("StateValue", version)?;
+
+            self.state_store
+                .get_state_value_by_version(state_store_key, version)
+        })
+    }
+
+    fn get_state_value_with_version_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        gauged_api("get_state_value_with_version_by_version", || {
+            self.error_if_state_kv_pruned("StateValue", version)?;
+
+            self.state_store
+                .get_state_value_with_version_by_version(state_key, version)
+        })
+    }
+
+    fn get_state_proof_by_version_ext(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<SparseMerkleProofExt> {
+        gauged_api("get_state_proof_by_version_ext", || {
+            self.error_if_state_merkle_pruned("State merkle", version)?;
+
+            self.state_store
+                .get_state_proof_by_version_ext(state_key, version)
+        })
+    }
+
+    fn get_state_value_with_proof_by_version_ext(
+        &self,
+        state_store_key: &StateKey,
+        version: Version,
+    ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
+        gauged_api("get_state_value_with_proof_by_version_ext", || {
+            self.error_if_state_merkle_pruned("State merkle", version)?;
+
+            self.state_store
+                .get_state_value_with_proof_by_version_ext(state_store_key, version)
+        })
     }
 
     fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {

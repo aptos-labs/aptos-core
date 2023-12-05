@@ -4,7 +4,7 @@
 
 //! This module provides mock dbreader for tests.
 
-use crate::{DbReader, DbWriter};
+use crate::{read_delegation::ReadDelegation, state_reader::StateReader, DbReader, DbWriter};
 use anyhow::{anyhow, Result};
 use aptos_types::{
     account_address::AccountAddress,
@@ -23,12 +23,9 @@ use move_core_types::move_resource::MoveResource;
 /// This is a mock of the DbReaderWriter in tests.
 pub struct MockDbReaderWriter;
 
-impl DbReader for MockDbReaderWriter {
-    fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
-        // return a dummy version for tests
-        Ok(Some(1))
-    }
+impl ReadDelegation for MockDbReaderWriter {}
 
+impl StateReader for MockDbReaderWriter {
     fn get_state_proof_by_version_ext(
         &self,
         _state_key: &StateKey,
@@ -63,6 +60,13 @@ impl DbReader for MockDbReaderWriter {
         Ok(self
             .get_state_value_by_version(state_key, version)?
             .map(|value| (version, value)))
+    }
+}
+
+impl DbReader for MockDbReaderWriter {
+    fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
+        // return a dummy version for tests
+        Ok(Some(1))
     }
 }
 

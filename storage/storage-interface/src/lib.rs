@@ -2,7 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::cached_state_view::ShardedStateCache;
+use crate::{
+    cached_state_view::ShardedStateCache, macros::delegate_read, read_delegation::ReadDelegation,
+    state_reader::StateReader,
+};
 use anyhow::{anyhow, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
@@ -17,14 +20,13 @@ use aptos_types::{
     move_resource::MoveStorage,
     on_chain_config::{access_path_for_config, ConfigID},
     proof::{
-        AccumulatorConsistencyProof, SparseMerkleProof, SparseMerkleProofExt,
-        SparseMerkleRangeProof, TransactionAccumulatorRangeProof, TransactionAccumulatorSummary,
+        AccumulatorConsistencyProof, SparseMerkleProof, SparseMerkleRangeProof,
+        TransactionAccumulatorRangeProof, TransactionAccumulatorSummary,
     },
     state_proof::StateProof,
     state_store::{
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
-        state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table::{TableHandle, TableInfo},
         ShardedStateUpdates,
@@ -42,10 +44,13 @@ use thiserror::Error;
 pub mod async_proof_fetcher;
 pub mod cached_state_view;
 mod executed_trees;
+mod macros;
 mod metrics;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod mock;
+pub mod read_delegation;
 pub mod state_delta;
+pub mod state_reader;
 pub mod state_view;
 
 use crate::state_delta::StateDelta;
@@ -101,28 +106,10 @@ pub enum Order {
     Descending,
 }
 
-macro_rules! delegate_read {
-    ($(
-        $(#[$($attr:meta)*])*
-        fn $name:ident(&self $(, $arg: ident : $ty: ty $(,)?)*) -> $return_type:ty;
-    )+) => {
-        $(
-            $(#[$($attr)*])*
-            fn $name(&self, $($arg: $ty),*) -> $return_type {
-                self.get_read_delegatee().$name($($arg),*)
-            }
-        )+
-    };
-}
-
 /// Trait that is implemented by a DB that supports certain public (to client) read APIs
 /// expected of an Aptos DB
 #[allow(unused_variables)]
-pub trait DbReader: Send + Sync {
-    fn get_read_delegatee(&self) -> &dyn DbReader {
-        unimplemented!("Implement desired method or get_delegatee().");
-    }
-
+pub trait DbReader: Send + Sync + StateReader + ReadDelegation {
     delegate_read!(
         /// See [AptosDB::get_epoch_ending_ledger_infos].
         ///
@@ -155,7 +142,7 @@ pub trait DbReader: Send + Sync {
             fetch_events: bool,
         ) -> Result<Option<TransactionWithProof>>;
 
-        /// See [AptosDB::get_transaction_by_version].
+        /// See [AptosDB::ge_transaction_by_version].
         ///
         /// [AptosDB::get_transaction_by_version]: ../aptosdb/struct.AptosDB.html#method.get_transaction_by_version
         fn get_transaction_by_version(
@@ -287,12 +274,6 @@ pub trait DbReader: Send + Sync {
         /// Returns the latest state checkpoint version if any.
         fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>>;
 
-        /// Returns the latest state snapshot strictly before `next_version` if any.
-        fn get_state_snapshot_before(
-            &self,
-            next_version: Version,
-        ) -> Result<Option<(Version, HashValue)>>;
-
         /// Returns a transaction that is the `seq_num`-th one associated with the given account. If
         /// the transaction with given `seq_num` doesn't exist, returns `None`.
         fn get_account_transaction(
@@ -326,50 +307,6 @@ pub trait DbReader: Send + Sync {
 
         /// Returns proof of new state relative to version known to client
         fn get_state_proof(&self, known_version: u64) -> Result<StateProof>;
-
-        /// Gets the state value by state key at version.
-        /// See [AptosDB::get_state_value_by_version].
-        ///
-        /// [AptosDB::get_state_value_by_version]:
-        /// ../aptosdb/struct.AptosDB.html#method.get_state_value_by_version
-        fn get_state_value_by_version(
-            &self,
-            state_key: &StateKey,
-            version: Version,
-        ) -> Result<Option<StateValue>>;
-
-        /// Get the latest state value and its corresponding version when it's of the given key up
-        /// to the given version.
-        /// See [AptosDB::get_state_value_with_version_by_version].
-        ///
-        /// [AptosDB::get_state_value_with_version_by_version]:
-        /// ../aptosdb/struct.AptosDB.html#method.get_state_value_with_version_by_version
-        fn get_state_value_with_version_by_version(
-            &self,
-            state_key: &StateKey,
-            version: Version,
-        ) -> Result<Option<(Version, StateValue)>>;
-
-        /// Returns the proof of the given state key and version.
-        fn get_state_proof_by_version_ext(
-            &self,
-            state_key: &StateKey,
-            version: Version,
-        ) -> Result<SparseMerkleProofExt>;
-
-        /// Gets a state value by state key along with the proof, out of the ledger state indicated by the state
-        /// Merkle tree root with a sparse merkle proof proving state tree root.
-        /// See [AptosDB::get_account_state_with_proof_by_version].
-        ///
-        /// [AptosDB::get_account_state_with_proof_by_version]:
-        /// ../aptosdb/struct.AptosDB.html#method.get_account_state_with_proof_by_version
-        ///
-        /// This is used by aptos core (executor) internally.
-        fn get_state_value_with_proof_by_version_ext(
-            &self,
-            state_key: &StateKey,
-            version: Version,
-        ) -> Result<(Option<StateValue>, SparseMerkleProofExt)>;
 
         /// Gets the latest ExecutedTrees no matter if db has been bootstrapped.
         /// Used by the Db-bootstrapper.
@@ -445,9 +382,6 @@ pub trait DbReader: Send + Sync {
 
         /// Returns whether the internal indexer DB has been enabled or not
         fn indexer_enabled(&self) -> bool;
-
-        /// Returns state storage usage at the end of an epoch.
-        fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage>;
     ); // end delegated
 
     /// Returns the latest ledger info.
