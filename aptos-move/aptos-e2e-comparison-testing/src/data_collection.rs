@@ -2,14 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    dump_and_compile_from_package_metadata, is_aptos_package, CompilationCache, DataManager,
-    IndexWriter, PackageInfo, TxnIndex,
+    compile_aptos_packages, dump_and_compile_from_package_metadata, is_aptos_package,
+    CompilationCache, DataManager, ExecutionMode, IndexWriter, PackageInfo, TxnIndex,
+    APTOS_COMMONS,
 };
 use anyhow::{format_err, Result};
 use aptos_framework::natives::code::PackageMetadata;
+use aptos_language_e2e_tests::data_store::FakeDataStore;
 use aptos_rest_client::Client;
 use aptos_state_view::TStateView;
 use aptos_types::{
+    block_executor::config::BlockExecutorConfigFromOnchain,
+    on_chain_config::{FeatureFlag, Features, OnChainConfig},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
@@ -35,6 +39,8 @@ pub struct DataCollection {
     batch_size: u64,
     dump_write_set: bool,
     filter_condition: FilterCondition,
+    execution_only: bool,
+    execution_mode: ExecutionMode,
 }
 
 impl DataCollection {
@@ -46,6 +52,8 @@ impl DataCollection {
         skip_publish_txns: bool,
         dump_write_set: bool,
         skip_source_code: bool,
+        execution_only: bool,
+        execution_mode: ExecutionMode,
     ) -> Self {
         Self {
             debugger,
@@ -57,6 +65,8 @@ impl DataCollection {
                 skip_publish_txns,
                 check_source_code: !skip_source_code,
             },
+            execution_only,
+            execution_mode,
         }
     }
 
@@ -68,6 +78,8 @@ impl DataCollection {
         skip_publish_txns: bool,
         dump_write_set: bool,
         skip_source_code: bool,
+        execution_only: bool,
+        execution_mode: ExecutionMode,
     ) -> Result<Self> {
         Ok(Self::new(
             Arc::new(RestDebuggerInterface::new(rest_client)),
@@ -77,6 +89,8 @@ impl DataCollection {
             skip_publish_txns,
             dump_write_set,
             skip_source_code,
+            execution_only,
+            execution_mode,
         ))
     }
 
@@ -101,6 +115,7 @@ impl DataCollection {
         package_name: String,
         map: HashMap<(AccountAddress, String), PackageMetadata>,
         compilation_cache: &mut CompilationCache,
+        execution_mode: Option<ExecutionMode>,
         current_dir: PathBuf,
     ) -> Option<PackageInfo> {
         let upgrade_number = if is_aptos_package(&package_name) {
@@ -129,7 +144,7 @@ impl DataCollection {
                 current_dir,
                 &map,
                 compilation_cache,
-                None,
+                execution_mode,
             );
             if res.is_err() {
                 println!("compile package failed at:{}", version);
@@ -167,6 +182,24 @@ impl DataCollection {
         )));
         let index_writer = Arc::new(Mutex::new(IndexWriter::new(&self.current_dir)));
 
+        if self.execution_only {
+            let aptos_commons_path = self.current_dir.join(APTOS_COMMONS);
+            if self.execution_mode.is_v1_or_compare() {
+                compile_aptos_packages(
+                    &aptos_commons_path,
+                    &mut compilation_cache.lock().unwrap().compiled_package_cache_v1,
+                    false,
+                )?;
+            }
+            if self.execution_mode.is_v2_or_compare() {
+                compile_aptos_packages(
+                    &aptos_commons_path,
+                    &mut compilation_cache.lock().unwrap().compiled_package_cache_v2,
+                    true,
+                )?;
+            }
+        }
+
         let mut cur_version = begin;
 
         while cur_version < begin + limit {
@@ -195,13 +228,16 @@ impl DataCollection {
                     let compilation_cache = compilation_cache.clone();
                     let current_dir = self.current_dir.clone();
                     let dump_write_set = self.dump_write_set;
+                    let execution_only = self.execution_only;
                     let data_manager = data_manager.clone();
                     let index = index_writer.clone();
+                    let execution_mode = self.execution_mode;
 
                     let state_view =
                         DebuggerStateView::new_with_data_reads(self.debugger.clone(), version);
 
                     let txn_execution_thread = tokio::task::spawn_blocking(move || {
+                        let executor = crate::Execution::new(current_dir.clone(), execution_mode);
                         let epoch_result_res =
                             Self::execute_transactions_at_version_with_state_view(
                                 vec![txn.clone()],
@@ -223,12 +259,18 @@ impl DataCollection {
 
                         // handle source code
                         if let Some((address, package_name, map)) = source_code_data {
+                            let execution_mode_opt = if execution_only {
+                                Some(execution_mode)
+                            } else {
+                                None
+                            };
                             let package_info_opt = Self::dump_and_check_src(
                                 version,
                                 address,
                                 package_name,
                                 map,
                                 &mut compilation_cache.lock().unwrap(),
+                                execution_mode_opt,
                                 current_dir.clone(),
                             );
                             if package_info_opt.is_none() {
@@ -236,18 +278,52 @@ impl DataCollection {
                             }
                             version_idx.package_info = package_info_opt.unwrap();
                         }
-
-                        // dump through data_manager
-                        Self::dump_txn_index(
-                            &mut data_manager.lock().unwrap(),
-                            version_idx,
-                            &state_view.get_state_keys().lock().unwrap(),
-                            epoch_result_res,
-                            dump_write_set,
-                        );
-
-                        // Log version
-                        index.lock().unwrap().add_version(version);
+                        if !execution_only {
+                            // dump through data_manager
+                            Self::dump_txn_index(
+                                &mut data_manager.lock().unwrap(),
+                                version_idx,
+                                &state_view.get_state_keys().lock().unwrap(),
+                                epoch_result_res,
+                                dump_write_set,
+                            );
+                            // Log version
+                            index.lock().unwrap().add_version(version);
+                        } else {
+                            use aptos_vm::data_cache::AsMoveResolver;
+                            let state_store = FakeDataStore::new_with_state_value(
+                                state_view
+                                    .get_state_keys()
+                                    .lock()
+                                    .unwrap()
+                                    .deref()
+                                    .to_owned(),
+                            );
+                            let state_view = state_store.as_move_resolver();
+                            let mut features =
+                                Features::fetch_config(&state_view).unwrap_or_default();
+                            if executor.bytecode_version == 6 {
+                                features.enable(FeatureFlag::VM_BINARY_FORMAT_V6);
+                            }
+                            let cache_v1 = compilation_cache
+                                .lock()
+                                .unwrap()
+                                .compiled_package_cache_v1
+                                .clone();
+                            let cache_v2 = compilation_cache
+                                .lock()
+                                .unwrap()
+                                .compiled_package_cache_v2
+                                .clone();
+                            executor.execute_and_compare(
+                                version,
+                                &state_store,
+                                &features,
+                                &version_idx,
+                                &cache_v1,
+                                &cache_v2,
+                            );
+                        }
                     });
                     txn_execution_ths.push(txn_execution_thread);
                 }

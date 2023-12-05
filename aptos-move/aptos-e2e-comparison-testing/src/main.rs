@@ -35,6 +35,13 @@ pub enum Cmd {
         /// Dump the write set of txns
         #[clap(long, default_value_t = false)]
         dump_write_set: bool,
+        /// Directly execute the txns without dumping the data
+        #[clap(long, default_value_t = false)]
+        execution_only: bool,
+        /// Whether to execute against V1, V2 alone or both compilers for comparison
+        /// Used when execution_only is true
+        #[clap(long)]
+        execution_mode: Option<ExecutionMode>,
     },
     /// Execution of txns
     Execute {
@@ -72,6 +79,8 @@ async fn main() -> Result<()> {
             skip_publish_txns,
             skip_source_code_check: skip_source_code,
             dump_write_set,
+            execution_only,
+            execution_mode,
         } => {
             let batch_size = BATCH_SIZE;
             let output = if let Some(path) = output_path {
@@ -93,6 +102,8 @@ async fn main() -> Result<()> {
                 skip_publish_txns,
                 dump_write_set,
                 skip_source_code,
+                execution_only,
+                execution_mode.unwrap_or_default(),
             )?;
             data_collector
                 .dump_data(args.begin_version, args.limit)
