@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use super::ModuleAdapter;
+use super::ModuleStorageAdapter;
 use crate::{
     loader::{Loader, Module, Resolver, ScriptHash},
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
@@ -139,7 +139,7 @@ impl Function {
     pub(crate) fn get_resolver<'a>(
         &self,
         loader: &'a Loader,
-        module_store: &'a ModuleAdapter,
+        module_store: &'a ModuleStorageAdapter,
     ) -> Resolver<'a> {
         match &self.scope {
             Scope::Module(module_id) => {

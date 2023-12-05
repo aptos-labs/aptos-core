@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::loader::{Loader, ModuleAdapter};
+use crate::loader::{Loader, ModuleStorageAdapter};
 use bytes::Bytes;
 use move_binary_format::errors::*;
 use move_core_types::{
@@ -162,7 +162,7 @@ impl<'r> TransactionDataCache<'r> {
         loader: &Loader,
         addr: AccountAddress,
         ty: &Type,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
     ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
         let account_cache = Self::get_mut_or_insert_with(&mut self.account_map, &addr, || {
             (addr, AccountDataCache::new())

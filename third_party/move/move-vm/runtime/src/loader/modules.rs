@@ -41,11 +41,11 @@ pub trait ModuleStorage {
     fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>>;
 }
 
-pub(crate) struct ModuleCache(Arc<RwLock<BinaryCache<ModuleId, Module>>>);
+pub(crate) struct ModuleCache(RwLock<BinaryCache<ModuleId, Module>>);
 
 impl ModuleCache {
     pub fn new() -> Self {
-        ModuleCache(Arc::new(RwLock::new(BinaryCache::new())))
+        ModuleCache(RwLock::new(BinaryCache::new()))
     }
 
     pub fn flush(&self) {
@@ -55,7 +55,7 @@ impl ModuleCache {
 
 impl Clone for ModuleCache {
     fn clone(&self) -> Self {
-        ModuleCache(Arc::new(RwLock::new(self.0.read().clone())))
+        ModuleCache(RwLock::new(self.0.read().clone()))
     }
 }
 
@@ -72,12 +72,12 @@ impl ModuleStorage for ModuleCache {
     }
 }
 
-pub(crate) struct ModuleAdapter<'a> {
-    modules: &'a dyn ModuleStorage,
+pub(crate) struct ModuleStorageAdapter {
+    modules: Arc<dyn ModuleStorage>,
 }
 
-impl<'a> ModuleAdapter<'a> {
-    pub(crate) fn new(modules: &'a dyn ModuleStorage) -> Self {
+impl ModuleStorageAdapter {
+    pub(crate) fn new(modules: Arc<dyn ModuleStorage>) -> Self {
         Self { modules }
     }
 
@@ -251,7 +251,7 @@ impl Module {
     pub(crate) fn new(
         natives: &NativeFunctions,
         module: CompiledModule,
-        cache: &ModuleAdapter,
+        cache: &ModuleStorageAdapter,
         name_cache: &StructNameCache,
     ) -> Result<Self, (PartialVMError, CompiledModule)> {
         let id = module.self_id();

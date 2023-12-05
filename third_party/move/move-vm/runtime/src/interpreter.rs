@@ -4,7 +4,7 @@
 
 use crate::{
     data_cache::TransactionDataCache,
-    loader::{Function, Loader, ModuleAdapter, Resolver},
+    loader::{Function, Loader, ModuleStorageAdapter, Resolver},
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
     trace,
@@ -89,7 +89,7 @@ impl Interpreter {
         ty_args: Vec<Type>,
         args: Vec<Value>,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
         loader: &Loader,
@@ -121,7 +121,7 @@ impl Interpreter {
         mut self,
         loader: &Loader,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
         function: Arc<Function>,
@@ -287,7 +287,7 @@ impl Interpreter {
     fn make_call_frame(
         &mut self,
         loader: &Loader,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         func: Arc<Function>,
         ty_args: Vec<Type>,
     ) -> PartialVMResult<Frame> {
@@ -325,7 +325,7 @@ impl Interpreter {
     fn make_new_frame(
         &self,
         loader: &Loader,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         function: Arc<Function>,
         ty_args: Vec<Type>,
         locals: Locals,
@@ -559,7 +559,7 @@ impl Interpreter {
     fn load_resource<'c>(
         loader: &Loader,
         data_store: &'c mut TransactionDataCache,
-        module_store: &'c ModuleAdapter,
+        module_store: &'c ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
@@ -587,7 +587,7 @@ impl Interpreter {
         is_generic: bool,
         loader: &Loader,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
@@ -612,7 +612,7 @@ impl Interpreter {
         is_generic: bool,
         loader: &Loader,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
@@ -630,7 +630,7 @@ impl Interpreter {
         is_generic: bool,
         loader: &Loader,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
@@ -665,7 +665,7 @@ impl Interpreter {
         is_generic: bool,
         loader: &Loader,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
@@ -1147,7 +1147,7 @@ impl Frame {
         resolver: &Resolver,
         interpreter: &mut Interpreter,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
     ) -> VMResult<ExitCode> {
         self.execute_code_impl(resolver, interpreter, data_store, module_store, gas_meter)
@@ -1763,7 +1763,7 @@ impl Frame {
         resolver: &Resolver,
         interpreter: &mut Interpreter,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
     ) -> PartialVMResult<ExitCode> {
         use SimpleInstruction as S;
@@ -2417,7 +2417,7 @@ impl Frame {
         &self.ty_args
     }
 
-    fn resolver<'a>(&self, loader: &'a Loader, module_store: &'a ModuleAdapter) -> Resolver<'a> {
+    fn resolver<'a>(&self, loader: &'a Loader, module_store: &'a ModuleStorageAdapter) -> Resolver<'a> {
         self.function.get_resolver(loader, module_store)
     }
 

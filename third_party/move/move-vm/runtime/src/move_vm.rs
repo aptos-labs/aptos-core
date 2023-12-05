@@ -5,7 +5,7 @@
 use crate::{
     config::VMConfig,
     data_cache::TransactionDataCache,
-    loader::ModuleAdapter,
+    loader::{ModuleStorageAdapter, ModuleStorage},
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunction,
     runtime::VMRuntime,
@@ -70,9 +70,22 @@ impl MoveVM {
         Session {
             move_vm: self,
             data_cache: TransactionDataCache::new(remote),
-            module_store: ModuleAdapter::new(
-                &self.runtime.loader().module_cache,
-            ),
+            module_store: ModuleStorageAdapter::new(self.runtime.module_storage()),
+            native_extensions,
+        }
+    }
+
+    /// Create a new session, as in `new_session`, but provide native context extensions and custome storage for resolved modules.
+    pub fn new_session_with_extensions_and_modules<'r>(
+        &self,
+        remote: &'r dyn MoveResolver,
+        module_storage: Arc<dyn ModuleStorage>,
+        native_extensions: NativeContextExtensions<'r>,
+    ) -> Session<'r, '_> {
+        Session {
+            move_vm: self,
+            data_cache: TransactionDataCache::new(remote),
+            module_store: ModuleStorageAdapter::new(module_storage),
             native_extensions,
         }
     }
@@ -88,9 +101,7 @@ impl MoveVM {
             .load_module(
                 module_id,
                 &TransactionDataCache::new(remote),
-                &ModuleAdapter::new(
-                    &self.runtime.loader().module_cache
-                ),
+                &ModuleStorageAdapter::new(self.runtime.module_storage()),
             )
             .map(|arc_module| arc_module.arc_module())
     }
@@ -115,6 +126,9 @@ impl MoveVM {
     /// outstanding sessions created from this VM.
     /// TODO: new loader architecture
     pub fn flush_loader_cache_if_invalidated(&self) {
+        if self.runtime.loader().is_invalidated() {
+            self.runtime.module_cache.flush();
+        };
         self.runtime.loader().flush_if_invalidated()
     }
 
@@ -135,6 +149,11 @@ impl MoveVM {
     where
         F: FnOnce(&[Metadata]) -> Option<T>,
     {
-        f(&self.runtime.loader().get_module(module)?.module().metadata)
+        f(&self
+            .runtime
+            .module_cache
+            .fetch_module(module)?
+            .module()
+            .metadata)
     }
 }

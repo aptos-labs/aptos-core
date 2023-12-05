@@ -6,7 +6,7 @@ use crate::{
     config::VMConfig,
     data_cache::TransactionDataCache,
     interpreter::Interpreter,
-    loader::{Function, LoadedFunction, Loader, ModuleAdapter},
+    loader::{Function, LoadedFunction, Loader, ModuleStorageAdapter, ModuleCache, ModuleStorage},
     native_extensions::NativeContextExtensions,
     native_functions::{NativeFunction, NativeFunctions},
     session::{LoadedFunctionInstantiation, SerializedReturnValues},
@@ -34,9 +34,18 @@ use move_vm_types::{
 use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
 
 /// An instantiation of the MoveVM.
-#[derive(Clone)]
 pub(crate) struct VMRuntime {
     loader: Loader,
+    pub(crate) module_cache: Arc<ModuleCache>,
+}
+
+impl Clone for VMRuntime {
+    fn clone(&self) -> Self {
+        Self {
+            loader: self.loader.clone(),
+            module_cache: Arc::new(ModuleCache::clone(&self.module_cache)),
+        }
+    }
 }
 
 impl VMRuntime {
@@ -46,6 +55,7 @@ impl VMRuntime {
     ) -> PartialVMResult<Self> {
         Ok(VMRuntime {
             loader: Loader::new(NativeFunctions::new(natives)?, vm_config),
+            module_cache: Arc::new(ModuleCache::new()),
         })
     }
 
@@ -54,7 +64,7 @@ impl VMRuntime {
         modules: Vec<Vec<u8>>,
         sender: AccountAddress,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         _gas_meter: &mut impl GasMeter,
         compat: Compatibility,
     ) -> VMResult<()> {
@@ -198,7 +208,7 @@ impl VMRuntime {
 
     fn deserialize_value(
         &self,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         ty: &Type,
         arg: impl Borrow<[u8]>,
     ) -> PartialVMResult<Value> {
@@ -223,7 +233,7 @@ impl VMRuntime {
 
     fn deserialize_args(
         &self,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         arg_tys: Vec<Type>,
         serialized_args: Vec<impl Borrow<[u8]>>,
     ) -> PartialVMResult<(Locals, Vec<Value>)> {
@@ -266,7 +276,7 @@ impl VMRuntime {
 
     fn serialize_return_value(
         &self,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         ty: &Type,
         value: Value,
     ) -> PartialVMResult<(Vec<u8>, MoveTypeLayout)> {
@@ -300,7 +310,7 @@ impl VMRuntime {
 
     fn serialize_return_values(
         &self,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         return_types: &[Type],
         return_values: Vec<Value>,
     ) -> PartialVMResult<Vec<(Vec<u8>, MoveTypeLayout)>> {
@@ -332,7 +342,7 @@ impl VMRuntime {
         return_types: Vec<Type>,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<SerializedReturnValues> {
@@ -404,7 +414,7 @@ impl VMRuntime {
         ty_args: Vec<TypeTag>,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
         bypass_declared_entry_check: bool,
@@ -432,7 +442,7 @@ impl VMRuntime {
         function_instantiation: LoadedFunctionInstantiation,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
         bypass_declared_entry_check: bool,
@@ -494,7 +504,7 @@ impl VMRuntime {
         ty_args: Vec<TypeTag>,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<SerializedReturnValues> {
@@ -525,5 +535,9 @@ impl VMRuntime {
 
     pub(crate) fn loader(&self) -> &Loader {
         &self.loader
+    }
+
+    pub(crate) fn module_storage(&self) -> Arc<dyn ModuleStorage> {
+        self.module_cache.clone() as Arc<dyn ModuleStorage>
     }
 }

@@ -3,9 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::VMConfig, data_cache::TransactionDataCache, loader::modules::ModuleCache,
-    logging::expect_no_verification_errors, native_functions::NativeFunctions,
-    session::LoadedFunctionInstantiation,
+    config::VMConfig, data_cache::TransactionDataCache, logging::expect_no_verification_errors,
+    native_functions::NativeFunctions, session::LoadedFunctionInstantiation,
 };
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
@@ -44,7 +43,7 @@ mod script;
 mod type_loader;
 
 pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunction, Scope};
-pub(crate) use modules::{Module, ModuleAdapter, ModuleStorage};
+pub(crate) use modules::{Module, ModuleStorageAdapter, ModuleCache, ModuleStorage};
 pub(crate) use script::{Script, ScriptCache};
 use type_loader::intern_type;
 
@@ -137,7 +136,6 @@ impl StructNameCache {
 // The `pub(crate)` API is what a Loader offers to the runtime.
 pub(crate) struct Loader {
     scripts: RwLock<ScriptCache>,
-    pub(crate) module_cache: ModuleCache,
     type_cache: RwLock<TypeCache>,
     natives: NativeFunctions,
     pub(crate) name_cache: StructNameCache,
@@ -179,7 +177,6 @@ impl Clone for Loader {
     fn clone(&self) -> Self {
         Self {
             scripts: RwLock::new(self.scripts.read().clone()),
-            module_cache: ModuleCache::clone(&self.module_cache),
             type_cache: RwLock::new(self.type_cache.read().clone()),
             natives: self.natives.clone(),
             name_cache: self.name_cache.clone(),
@@ -194,7 +191,6 @@ impl Loader {
     pub(crate) fn new(natives: NativeFunctions, vm_config: VMConfig) -> Self {
         Self {
             scripts: RwLock::new(ScriptCache::new()),
-            module_cache: ModuleCache::new(),
             type_cache: RwLock::new(TypeCache::new()),
             name_cache: StructNameCache::new(),
             natives,
@@ -213,7 +209,6 @@ impl Loader {
         let mut invalidated = self.invalidated.write();
         if *invalidated {
             *self.scripts.write() = ScriptCache::new();
-            self.module_cache.flush();
             *self.type_cache.write() = TypeCache::new();
             *invalidated = false;
         }
@@ -246,7 +241,7 @@ impl Loader {
         script_blob: &[u8],
         ty_args: &[TypeTag],
         data_store: &TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
     ) -> VMResult<(Arc<Function>, LoadedFunctionInstantiation)> {
         // retrieve or load the script
         let mut sha3_256 = Sha3_256::new();
@@ -300,7 +295,7 @@ impl Loader {
         &self,
         script: &[u8],
         data_store: &TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
     ) -> VMResult<CompiledScript> {
         let script = match CompiledScript::deserialize_with_config(
             script,
@@ -360,7 +355,7 @@ impl Loader {
         module_id: &ModuleId,
         function_name: &IdentStr,
         data_store: &TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
     ) -> VMResult<(Arc<Module>, Arc<Function>, Vec<Type>, Vec<Type>)> {
         let module = self.load_module(module_id, data_store, module_store)?;
         let func = module_store
@@ -467,7 +462,7 @@ impl Loader {
         function_name: &IdentStr,
         expected_return_type: &Type,
         data_store: &TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
     ) -> VMResult<(LoadedFunction, LoadedFunctionInstantiation)> {
         let (module, func, parameters, return_vec) = self.load_function_without_type_args(
             module_id,
@@ -534,7 +529,7 @@ impl Loader {
         function_name: &IdentStr,
         ty_args: &[TypeTag],
         data_store: &TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
     ) -> VMResult<(Arc<Module>, Arc<Function>, LoadedFunctionInstantiation)> {
         let (module, func, parameters, return_) = self.load_function_without_type_args(
             module_id,
@@ -575,7 +570,7 @@ impl Loader {
         &self,
         modules: &[CompiledModule],
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
     ) -> VMResult<()> {
         fail::fail_point!("verifier-failpoint-1", |_| { Ok(()) });
 
@@ -614,7 +609,7 @@ impl Loader {
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         bundle_unverified: &BTreeSet<ModuleId>,
         data_store: &TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
     ) -> VMResult<()> {
         // Performs all verification steps to load the module without loading it, i.e., the new
         // module will NOT show up in `module_cache`. In the module republishing case, it means
@@ -669,7 +664,7 @@ impl Loader {
         module: &CompiledModule,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         bundle_unverified: &BTreeSet<ModuleId>,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
     ) -> VMResult<()> {
         // let module_cache = self.module_cache.read();
         cyclic_dependencies::verify_module(
@@ -734,7 +729,7 @@ impl Loader {
         &self,
         type_tag: &TypeTag,
         data_store: &TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
     ) -> VMResult<Type> {
         Ok(match type_tag {
             TypeTag::Bool => Type::Bool,
@@ -789,7 +784,7 @@ impl Loader {
         &self,
         id: &ModuleId,
         data_store: &TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
     ) -> VMResult<Arc<Module>> {
         self.load_module_internal(id, data_store, module_store)
     }
@@ -800,7 +795,7 @@ impl Loader {
         &self,
         id: &ModuleId,
         data_store: &TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
     ) -> VMResult<Arc<Module>> {
         // if the module is already in the code cache, load the cached version
         if let Some(cached) = module_store.module_at(id) {
@@ -883,7 +878,7 @@ impl Loader {
         id: &ModuleId,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         data_store: &TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         visited: &mut BTreeSet<ModuleId>,
         friends_discovered: &mut BTreeSet<ModuleId>,
         allow_module_loading_failure: bool,
@@ -926,7 +921,7 @@ impl Loader {
         module: &CompiledModule,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         data_store: &TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         visited: &mut BTreeSet<ModuleId>,
         friends_discovered: &mut BTreeSet<ModuleId>,
         allow_dependency_loading_failure: bool,
@@ -993,7 +988,7 @@ impl Loader {
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         bundle_unverified: &BTreeSet<ModuleId>,
         data_store: &TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         allow_module_loading_failure: bool,
         dependencies_depth: usize,
     ) -> VMResult<Arc<Module>> {
@@ -1033,7 +1028,7 @@ impl Loader {
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         bundle_unverified: &BTreeSet<ModuleId>,
         data_store: &TransactionDataCache,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         allow_friend_loading_failure: bool,
         dependencies_depth: usize,
     ) -> VMResult<()> {
@@ -1153,10 +1148,6 @@ impl Loader {
     // Internal helpers
     //
 
-    pub(crate) fn get_module(&self, idx: &ModuleId) -> Option<Arc<Module>> {
-        self.module_cache.fetch_module(idx)
-    }
-
     fn get_script(&self, hash: &ScriptHash) -> Arc<Script> {
         Arc::clone(
             self.scripts
@@ -1183,14 +1174,14 @@ enum BinaryType {
 // needs.
 pub(crate) struct Resolver<'a> {
     loader: &'a Loader,
-    module_store: &'a ModuleAdapter<'a>,
+    module_store: &'a ModuleStorageAdapter,
     binary: BinaryType,
 }
 
 impl<'a> Resolver<'a> {
     fn for_module(
         loader: &'a Loader,
-        module_store: &'a ModuleAdapter,
+        module_store: &'a ModuleStorageAdapter,
         module: Arc<Module>,
     ) -> Self {
         let binary = BinaryType::Module(module);
@@ -1203,7 +1194,7 @@ impl<'a> Resolver<'a> {
 
     fn for_script(
         loader: &'a Loader,
-        module_store: &'a ModuleAdapter,
+        module_store: &'a ModuleStorageAdapter,
         script: Arc<Script>,
     ) -> Self {
         let binary = BinaryType::Script(script);
@@ -1524,7 +1515,7 @@ impl<'a> Resolver<'a> {
     }
 
     // get the loader
-    pub(crate) fn module_store(&self) -> &ModuleAdapter {
+    pub(crate) fn module_store(&self) -> &ModuleStorageAdapter {
         &self.module_store
     }
 }
@@ -1709,7 +1700,7 @@ impl Loader {
 
     fn struct_name_to_type_layout(
         &self,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         struct_idx: StructNameIndex,
         ty_args: &[Type],
         count: &mut u64,
@@ -1812,7 +1803,7 @@ impl Loader {
     fn type_to_type_layout_impl(
         &self,
         ty: &Type,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
@@ -1894,7 +1885,7 @@ impl Loader {
     fn struct_name_to_fully_annotated_layout(
         &self,
         struct_idx: StructNameIndex,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         ty_args: &[Type],
         count: &mut u64,
         depth: u64,
@@ -1959,7 +1950,7 @@ impl Loader {
     fn type_to_fully_annotated_layout_impl(
         &self,
         ty: &Type,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<MoveTypeLayout> {
@@ -2006,7 +1997,7 @@ impl Loader {
     pub(crate) fn calculate_depth_of_struct(
         &self,
         struct_idx: StructNameIndex,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
     ) -> PartialVMResult<DepthFormula> {
         let name = &*self.name_cache.idx_to_identifier(struct_idx);
         if let Some(depth_formula) = self.type_cache.read().depth_formula.get(name) {
@@ -2038,7 +2029,7 @@ impl Loader {
     fn calculate_depth_of_type(
         &self,
         ty: &Type,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
     ) -> PartialVMResult<DepthFormula> {
         Ok(match ty {
             Type::Bool
@@ -2097,7 +2088,7 @@ impl Loader {
     pub(crate) fn type_to_type_layout_with_identifier_mappings(
         &self,
         ty: &Type,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
         let mut count = 0;
         self.type_to_type_layout_impl(ty, module_store, &mut count, 1)
@@ -2106,7 +2097,7 @@ impl Loader {
     pub(crate) fn type_to_type_layout(
         &self,
         ty: &Type,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
     ) -> PartialVMResult<MoveTypeLayout> {
         let mut count = 0;
         let (layout, _has_identifier_mappings) =
@@ -2117,7 +2108,7 @@ impl Loader {
     pub(crate) fn type_to_fully_annotated_layout(
         &self,
         ty: &Type,
-        module_store: &ModuleAdapter,
+        module_store: &ModuleStorageAdapter,
     ) -> PartialVMResult<MoveTypeLayout> {
         let mut count = 0;
         self.type_to_fully_annotated_layout_impl(ty, module_store, &mut count, 1)
@@ -2130,7 +2121,7 @@ impl Loader {
         &self,
         type_tag: &TypeTag,
         move_storage: &TransactionDataCache,
-        module_storage: &ModuleAdapter,
+        module_storage: &ModuleStorageAdapter,
     ) -> VMResult<MoveTypeLayout> {
         let ty = self.load_type(type_tag, move_storage, module_storage)?;
         self.type_to_type_layout(&ty, module_storage)
@@ -2141,7 +2132,7 @@ impl Loader {
         &self,
         type_tag: &TypeTag,
         move_storage: &TransactionDataCache,
-        module_storage: &ModuleAdapter,
+        module_storage: &ModuleStorageAdapter,
     ) -> VMResult<MoveTypeLayout> {
         let ty = self.load_type(type_tag, move_storage, module_storage)?;
         self.type_to_fully_annotated_layout(&ty, module_storage)

@@ -5,7 +5,7 @@
 use crate::{
     config::VMConfig,
     data_cache::TransactionDataCache,
-    loader::{LoadedFunction, ModuleAdapter},
+    loader::{LoadedFunction, ModuleStorageAdapter},
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
 };
@@ -33,7 +33,7 @@ use std::{borrow::Borrow, sync::Arc};
 pub struct Session<'r, 'l> {
     pub(crate) move_vm: &'l MoveVM,
     pub(crate) data_cache: TransactionDataCache<'r>,
-    pub(crate) module_store: ModuleAdapter<'l>,
+    pub(crate) module_store: ModuleStorageAdapter,
     pub(crate) native_extensions: NativeContextExtensions<'r>,
 }
 

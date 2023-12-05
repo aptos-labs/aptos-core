@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
-    intern_type, BinaryCache, Function, FunctionHandle, FunctionInstantiation, ModuleAdapter,
+    intern_type, BinaryCache, Function, FunctionHandle, FunctionInstantiation, ModuleStorageAdapter,
     Scope, ScriptHash, StructNameCache,
 };
 use move_binary_format::{
@@ -48,7 +48,7 @@ impl Script {
     pub(crate) fn new(
         script: CompiledScript,
         script_hash: &ScriptHash,
-        cache: &ModuleAdapter,
+        cache: &ModuleStorageAdapter,
         name_cache: &StructNameCache,
     ) -> VMResult<Self> {
         let mut struct_names = vec![];
