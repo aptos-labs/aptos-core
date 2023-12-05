@@ -37,6 +37,12 @@ jobs:
         with:
           required-permission: write
           comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
+      - name: Debug concurrency
+        run: |
+          echo "GITHUB EVENT NAME: ${{ github.event_name }}"
+          echo "GITHUB REF: ${{ github.ref }}"
+          echo "GITHUB SHA: ${{ github.sha }}"
+          echo "CONCURRENCY GROUP: ${{ github.workflow }}-${{ (github.event_name == 'pull_request_target' && github.ref) || github.sha }}"
 
   # This job determines which files were changed
   file_change_determinator:
