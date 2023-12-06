@@ -1151,21 +1151,10 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
                 .get_shadow_symbol(*sym, entering_scope)
                 .map(|new_sym| Pattern::Var(new_id, new_sym))
                 .or_else(|| new_id_opt.map(|id| Pattern::Var(id, *sym))),
-            Pattern::Tuple(_, pattern_vec) => self
-                .rewrite_pattern_vector(pattern_vec, entering_scope)
-                .map(|rewritten_vec| Pattern::Tuple(new_id, rewritten_vec))
-                .or_else(|| new_id_opt.map(|id| Pattern::Tuple(id, pattern_vec.clone()))),
+            Pattern::Tuple(_, pattern_vec) => Some(Pattern::Tuple(new_id, pattern_vec.clone())),
             Pattern::Struct(_, struct_id, pattern_vec) => {
                 let new_struct_id = struct_id.clone().instantiate(self.type_args);
-                self.rewrite_pattern_vector(pattern_vec, entering_scope)
-                    .map(|rewritten_vec| {
-                        Pattern::Struct(new_id, new_struct_id.clone(), rewritten_vec)
-                    })
-                    .or_else(|| {
-                        // Always create a new struct, both the node id and the struct id may
-                        // have changed
-                        Some(Pattern::Struct(new_id, new_struct_id, pattern_vec.clone()))
-                    })
+                Some(Pattern::Struct(new_id, new_struct_id, pattern_vec.clone()))
             },
             Pattern::Wildcard(_) => None,
             Pattern::Error(_) => None,
