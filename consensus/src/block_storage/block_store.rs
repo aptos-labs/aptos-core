@@ -490,6 +490,11 @@ impl BlockStore {
         let pending_rounds = pending_path.len();
         let oldest_not_committed = pending_path.into_iter().min_by_key(|b| b.round());
 
+        let oldest_not_committed_spent_in_pipeline = oldest_not_committed
+            .as_ref()
+            .and_then(|b| b.elapsed_in_pipeline())
+            .unwrap_or(Duration::ZERO);
+
         let ordered_round = ordered_root.round();
         let oldest_not_committed_round = oldest_not_committed.as_ref().map_or(0, |b| b.round());
         let commit_round = commit_root.round();
@@ -521,6 +526,8 @@ impl BlockStore {
             ordered_round = ordered_round,
             oldest_not_committed_round = oldest_not_committed_round,
             commit_round = commit_round,
+            oldest_not_committed_spent_in_pipeline =
+                oldest_not_committed_spent_in_pipeline.as_millis() as u64,
             latency_to_ordered_ms = latency_to_ordered.as_millis() as u64,
             latency_to_oldest_not_committed = latency_to_oldest_not_committed.as_millis() as u64,
             latency_to_committed_ms = latency_to_committed.as_millis() as u64,
@@ -531,10 +538,19 @@ impl BlockStore {
 
         counters::CONSENSUS_PROPOSAL_PENDING_ROUNDS.observe(pending_rounds as f64);
         counters::CONSENSUS_PROPOSAL_PENDING_DURATION
-            .observe(latency_to_oldest_not_committed.as_secs_f64());
+            .observe(oldest_not_committed_spent_in_pipeline.as_secs_f64());
 
-        latency_to_oldest_not_committed
-            .saturating_sub(latency_to_ordered.min(MAX_ORDERING_PIPELINE_LATENCY_REDUCTION))
+        if pending_rounds > 1 {
+            // TODO cleanup
+            // previous logic was using difference between committed and ordered.
+            // keeping it until we test out the new logic.
+            // latency_to_oldest_not_committed
+            //     .saturating_sub(latency_to_ordered.min(MAX_ORDERING_PIPELINE_LATENCY_REDUCTION))
+
+            oldest_not_committed_spent_in_pipeline
+        } else {
+            Duration::ZERO
+        }
     }
 }
 
