@@ -161,7 +161,11 @@ fn released_temps(
     }
     // this is needed because unused vars are not released by live var info
     for dst in bytecode.dests() {
-        if !live_var_info.before.contains_key(&dst) && !live_var_info.after.contains_key(&dst) {
+        if !live_var_info.before.contains_key(&dst)
+            && !live_var_info.after.contains_key(&dst)
+            && !life_time_info.before.is_borrowed(dst)
+            && !life_time_info.after.is_borrowed(dst)
+        {
             // todo: triggered in ability-checker/ability_violation.move
             // debug_assert!(
             //     !life_time_info.after.is_borrowed(dst),
