@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::experimental::{buffer_item::ExecutionFut, pipeline_phase::StatelessPipeline};
+use crate::pipeline::{buffer_item::ExecutionFut, pipeline_phase::StatelessPipeline};
 use aptos_consensus_types::executed_block::ExecutedBlock;
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;

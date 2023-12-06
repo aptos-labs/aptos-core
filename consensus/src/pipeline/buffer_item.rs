@@ -3,12 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    experimental::{commit_reliable_broadcast::DropGuard, hashable::Hashable},
+    pipeline::{commit_reliable_broadcast::DropGuard, hashable::Hashable},
     state_replication::StateComputerCommitCallBackType,
 };
 use anyhow::anyhow;
 use aptos_consensus_types::{
-    common::Author, executed_block::ExecutedBlock, experimental::commit_vote::CommitVote,
+    common::Author, executed_block::ExecutedBlock, pipeline::commit_vote::CommitVote,
 };
 use aptos_crypto::{bls12381, HashValue};
 use aptos_executor_types::ExecutorResult;

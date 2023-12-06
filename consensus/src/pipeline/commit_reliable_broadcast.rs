@@ -5,7 +5,7 @@ use crate::{network::NetworkSender, network_interface::ConsensusMsg};
 use anyhow::bail;
 use aptos_consensus_types::{
     common::Author,
-    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
 };
 use aptos_reliable_broadcast::{BroadcastStatus, RBMessage, RBNetworkSender};
 use aptos_types::validator_verifier::ValidatorVerifier;
