@@ -8,7 +8,13 @@ hide_table_of_contents: true
 
 # Aptos Developer Documentation
 
-Welcome! Aptos is a Layer 1 for everyone. In the [Ohlone language](https://en.wikipedia.org/wiki/Ohlone_languages), ["Aptos"](https://en.wikipedia.org/wiki/Aptos,_California) means "The People." This site is here to help you grow a [web3 ecosystem project](https://github.com/aptos-foundation/ecosystem-projects) that benefits the entire world through easier development, more reliable services, faster transactions, and a supportive, decentralized family. 
+:::info Aptos Learn
+Create your own decentralized app with the recently launched Aptos Learn [website](https://learn.aptoslabs.com/)!
+:::
+
+<br />
+
+Welcome! Aptos is a Layer 1 for everyone. In the [Ohlone language](https://en.wikipedia.org/wiki/Ohlone_languages), ["Aptos"](https://en.wikipedia.org/wiki/Aptos,_California) means "The People." This site is here to help you grow a [web3 ecosystem project](https://github.com/aptos-foundation/ecosystem-projects) that benefits the entire world through easier development, more reliable services, faster transactions, and a supportive, decentralized family.
 
 This documentation will help you develop applications for the Aptos blockchain, run nodes, and be a part of the blossoming Aptos community. This documentation covers both basic and advanced topics. Here you will find concepts, how-to guides, quickstarts, tutorials, API references, code examples, release notes, and more.
 
@@ -134,12 +140,12 @@ The Aptos devnet is reset every Thursday. See the latest updates in the [Aptos D
 
 We are excited that you are here, and we look forward to getting to know you. Welcome to the Aptos community! Find out more about us and exchange ideas at:
 
-* [Discord](https://discord.gg/aptosnetwork)
-* [Stack Overflow](https://stackoverflow.com/questions/tagged/aptos)
-* [Forum](https://forum.aptoslabs.com/)
-* [Medium](https://medium.com/aptoslabs)
-* [Telegram](https://t.me/aptos_official)
-* [Twitter](https://twitter.com/Aptos_Network)
+- [Discord](https://discord.gg/aptosnetwork)
+- [Stack Overflow](https://stackoverflow.com/questions/tagged/aptos)
+- [Forum](https://forum.aptoslabs.com/)
+- [Medium](https://medium.com/aptoslabs)
+- [Telegram](https://t.me/aptos_official)
+- [Twitter](https://twitter.com/Aptos_Network)
 
 ## Community projects on Aptos
 
