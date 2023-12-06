@@ -133,6 +133,19 @@ pub struct ShareAck<P> {
     maybe_decision: Option<RandDecision<P>>,
 }
 
+impl<P> ShareAck<P> {
+    pub fn new(epoch: u64, maybe_decision: Option<RandDecision<P>>) -> Self {
+        Self {
+            epoch,
+            maybe_decision,
+        }
+    }
+
+    pub fn into_maybe_decision(self) -> Option<RandDecision<P>> {
+        self.maybe_decision
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct AugData<D> {
     epoch: u64,
