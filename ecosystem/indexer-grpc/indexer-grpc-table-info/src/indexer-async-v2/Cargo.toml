@@ -29,9 +29,11 @@ aptos-temppath = { workspace = true, optional = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 backoff = { workspace = true }
+once_cell = { workspace = true }
 bcs = { workspace = true }
 byteorder = { workspace = true }
 bytes = { workspace = true }
+chrono = { workspace = true }
 futures = { workspace = true }
 move-core-types = { workspace = true }
 move-resource-viewer = { workspace = true }

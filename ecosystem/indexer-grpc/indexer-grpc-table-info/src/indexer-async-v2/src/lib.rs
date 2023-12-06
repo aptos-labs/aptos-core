@@ -4,6 +4,7 @@
 pub mod db;
 mod metadata;
 mod schema;
+pub mod counters;
 use crate::{
     db::INDEX_ASYNC_V2_DB_NAME,
     metadata::{MetadataKey, MetadataValue},

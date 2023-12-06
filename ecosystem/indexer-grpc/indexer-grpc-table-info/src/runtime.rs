@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::table_info_parser::TableInfoParser;
+use aptos_db_indexer_async_v2::counters::{
+    IndexerTableInfoStep, DURATION_IN_SECS, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_COUNT, SERVICE_TYPE
+};
 use aptos_api::context::Context;
 use aptos_config::config::NodeConfig;
 use aptos_logger::{error, info};
@@ -50,7 +53,7 @@ pub fn bootstrap(
                 parser_batch_size,
             );
         loop {
-            let start_millis = chrono::Utc::now().naive_utc();
+            let start_time = std::time::Instant::now();
             let results = parser.process_next_batch(db_writer.clone()).await;
             let max_version =
             match TableInfoParser::get_max_batch_version(results) {
@@ -63,9 +66,34 @@ pub fn bootstrap(
                     break;
                 },
             };
-            let parse_millis = (chrono::Utc::now().naive_utc() - start_millis).num_milliseconds();
+            LATEST_PROCESSED_VERSION
+                .with_label_values(&[
+                    SERVICE_TYPE,
+                    IndexerTableInfoStep::TableInfoProcessed.get_step(),
+                    IndexerTableInfoStep::TableInfoProcessed.get_label(),
+                ])
+                .set(max_version as i64);
+            let processed_versions = max_version - parser.current_version + 1;
+            NUM_TRANSACTIONS_COUNT
+                .with_label_values(&[
+                    SERVICE_TYPE,
+                    IndexerTableInfoStep::TableInfoProcessed.get_step(),
+                    IndexerTableInfoStep::TableInfoProcessed.get_label(),
+                ])
+                .set(processed_versions as i64);
+            let duration = start_time.elapsed();
+            DURATION_IN_SECS
+                .with_label_values(&[
+                    SERVICE_TYPE,
+                    IndexerTableInfoStep::TableInfoProcessed.get_step(),
+                    IndexerTableInfoStep::TableInfoProcessed.get_label(),
+                ])
+                .set(duration.as_secs_f64());
+
+            let parse_millis = duration.as_millis();
             let new_base: u64 = ma.sum() / (1000_u64);
-            ma.tick_now(max_version - parser.current_version + 1);
+            
+            ma.tick_now(processed_versions);
             if base != new_base {
                 base = new_base;
 
