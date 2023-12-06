@@ -296,7 +296,7 @@ impl ProposalGenerator {
             let voting_power_ratio = proposer_election.get_voting_power_participation_ratio(round);
 
             let (max_block_txns, max_block_bytes, proposal_delay) = self
-                .calculate_max_block_sizes(voting_power_ratio, timestamp)
+                .calculate_max_block_sizes(voting_power_ratio, timestamp, round)
                 .await;
 
             PROPOSER_DELAY_PROPOSAL.set(proposal_delay.as_secs_f64());
@@ -383,6 +383,7 @@ impl ProposalGenerator {
         &mut self,
         voting_power_ratio: f64,
         timestamp: Duration,
+        round: Round,
     ) -> (u64, u64, Duration) {
         let mut values_max_block_txns = vec![self.max_block_txns];
         let mut values_max_block_bytes = vec![self.max_block_bytes];
@@ -418,12 +419,13 @@ impl ProposalGenerator {
 
         if pipeline_backpressure.is_some() || chain_health_backoff.is_some() {
             warn!(
-                "Generating proposal: reducing limits to {} txns and {} bytes, due to pipeline_backpressure: {}, chain health backoff: {}. Delaying sending proposal by {}ms",
+                "Generating proposal: reducing limits to {} txns and {} bytes, due to pipeline_backpressure: {}, chain health backoff: {}. Delaying sending proposal by {}ms. Round: {}",
                 max_block_txns,
                 max_block_bytes,
                 pipeline_backpressure.is_some(),
                 chain_health_backoff.is_some(),
                 proposal_delay.as_millis(),
+                round,
             );
         }
         (max_block_txns, max_block_bytes, proposal_delay)
