@@ -48,7 +48,6 @@ or if their stake drops below the min required, they would get removed at the en
 -  [Resource `AllowedValidators`](#0x1_stake_AllowedValidators)
 -  [Resource `Ghost$ghost_valid_perf`](#0x1_stake_Ghost$ghost_valid_perf)
 -  [Resource `Ghost$ghost_proposer_idx`](#0x1_stake_Ghost$ghost_proposer_idx)
--  [Resource `Ghost$ghost_withdraw_amount`](#0x1_stake_Ghost$ghost_withdraw_amount)
 -  [Constants](#@Constants_0)
 -  [Function `initialize_validator_fees`](#0x1_stake_initialize_validator_fees)
 -  [Function `add_transaction_fee`](#0x1_stake_add_transaction_fee)
@@ -1095,33 +1094,6 @@ security of the testnet. This will NOT be enabled in Mainnet.
 <dl>
 <dt>
 <code>v: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a id="0x1_stake_Ghost$ghost_withdraw_amount"></a>
-
-## Resource `Ghost$ghost_withdraw_amount`
-
-
-
-<pre><code><b>struct</b> Ghost$<a href="stake.md#0x1_stake_ghost_withdraw_amount">ghost_withdraw_amount</a> <b>has</b> <b>copy</b>, drop, store, key
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>v: u64</code>
 </dt>
 <dd>
 
@@ -2845,11 +2817,6 @@ Withdraw from <code>pool_address</code>'s inactive stake with the corresponding 
 
     // Cap withdraw amount by total inactive coins.
     withdraw_amount = <b>min</b>(withdraw_amount, <a href="coin.md#0x1_coin_value">coin::value</a>(&stake_pool.inactive));
-
-    <b>spec</b> {
-        <b>assume</b> <a href="stake.md#0x1_stake_ghost_withdraw_amount">ghost_withdraw_amount</a> == <b>min</b>(withdraw_amount, <a href="coin.md#0x1_coin_value">coin::value</a>(stake_pool.inactive));
-    };
-
     <b>if</b> (withdraw_amount == 0) <b>return</b> <a href="coin.md#0x1_coin_zero">coin::zero</a>&lt;AptosCoin&gt;();
 
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
@@ -3663,8 +3630,6 @@ Returns validator's next epoch voting power, including pending_active, active, a
 <b>global</b> <a href="stake.md#0x1_stake_ghost_valid_perf">ghost_valid_perf</a>: <a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>;
 <a id="0x1_stake_ghost_proposer_idx"></a>
 <b>global</b> <a href="stake.md#0x1_stake_ghost_proposer_idx">ghost_proposer_idx</a>: Option&lt;u64&gt;;
-<a id="0x1_stake_ghost_withdraw_amount"></a>
-<b>global</b> <a href="stake.md#0x1_stake_ghost_withdraw_amount">ghost_withdraw_amount</a>: u64;
 </code></pre>
 
 
@@ -4178,10 +4143,10 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 120;
-<b>aborts_if</b> !<a href="staking_config.md#0x1_staking_config_get_allow_validator_set_change">staking_config::get_allow_validator_set_change</a>(<a href="staking_config.md#0x1_staking_config_get">staking_config::get</a>());
+<pre><code><b>aborts_if</b> !<a href="staking_config.md#0x1_staking_config_get_allow_validator_set_change">staking_config::get_allow_validator_set_change</a>(<a href="staking_config.md#0x1_staking_config_get">staking_config::get</a>());
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(pool_address);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>&gt;(pool_address);
+<b>aborts_if</b> !<b>exists</b>&lt;StakingConfig&gt;(@aptos_framework);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework);
 <b>let</b> stake_pool = <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(pool_address);
 <b>let</b> validator_set = <b>global</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework);
@@ -4198,13 +4163,20 @@ Returns validator's next epoch voting power, including pending_active, active, a
 <b>aborts_if</b> voting_power &gt;maximum_stake;
 <b>let</b> validator_config = <b>global</b>&lt;<a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>&gt;(pool_address);
 <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_is_empty">vector::is_empty</a>(validator_config.consensus_pubkey);
-<b>let</b> validator_set_size = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(validator_set.active_validators) + <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(validator_set.pending_active);
+<b>let</b> validator_set_size = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(validator_set.active_validators) + <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(validator_set.pending_active) + 1;
 <b>aborts_if</b> validator_set_size &gt; <a href="stake.md#0x1_stake_MAX_VALIDATOR_SET_SIZE">MAX_VALIDATOR_SET_SIZE</a>;
 <b>let</b> voting_power_increase_limit = (<a href="staking_config.md#0x1_staking_config_get_voting_power_increase_limit">staking_config::get_voting_power_increase_limit</a>(config) <b>as</b> u128);
+<b>aborts_if</b> (validator_set.total_joining_power + (voting_power <b>as</b> u128)) &gt; MAX_U128;
+<b>aborts_if</b> validator_set.total_voting_power * voting_power_increase_limit &gt; MAX_U128;
 <b>aborts_if</b> validator_set.total_voting_power &gt; 0 &&
-    validator_set.total_joining_power &gt; validator_set.total_voting_power * voting_power_increase_limit / 100;
-<b>ensures</b> validator_set.total_voting_power + voting_power == p_validator_set.total_voting_power;
-<b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(<a href="stake.md#0x1_stake_spec_find_validator">spec_find_validator</a>(p_validator_set.pending_active, pool_address));
+    (validator_set.total_joining_power + (voting_power <b>as</b> u128)) * 100 &gt; validator_set.total_voting_power * voting_power_increase_limit;
+<b>let</b> <b>post</b> p_validator_info = <a href="stake.md#0x1_stake_ValidatorInfo">ValidatorInfo</a> {
+    addr: pool_address,
+    voting_power,
+    config: validator_config,
+};
+<b>ensures</b> validator_set.total_joining_power + voting_power == p_validator_set.total_joining_power;
+<b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(p_validator_set.pending_active, p_validator_info);
 </code></pre>
 
 
@@ -4256,14 +4228,22 @@ Returns validator's next epoch voting power, including pending_active, active, a
             !<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(<a href="stake.md#0x1_stake_spec_find_validator">spec_find_validator</a>(validator_set.pending_inactive, pool_address)) &&
                 !<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(<a href="stake.md#0x1_stake_spec_find_validator">spec_find_validator</a>(validator_set.pending_active, pool_address));
 <b>aborts_if</b> bool_find_validator && !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
-<b>let</b> new_withdraw_amount = <b>min</b>(withdraw_amount, stake_pool.inactive.value);
-<b>aborts_if</b> new_withdraw_amount &gt; 0 && stake_pool.inactive.value &lt; new_withdraw_amount;
+<b>let</b> new_withdraw_amount_1 = <b>min</b>(withdraw_amount, stake_pool.inactive.value + stake_pool.pending_inactive.value);
+<b>let</b> new_withdraw_amount_2 = <b>min</b>(withdraw_amount, stake_pool.inactive.value);
+<b>aborts_if</b> bool_find_validator && <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt; stake_pool.locked_until_secs &&
+            new_withdraw_amount_1 &gt; 0 && stake_pool.inactive.value + stake_pool.pending_inactive.value &lt; new_withdraw_amount_1;
+<b>aborts_if</b> !(bool_find_validator && <b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework)) &&
+            new_withdraw_amount_2 &gt; 0 && stake_pool.inactive.value &lt; new_withdraw_amount_2;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(addr);
 <b>include</b> <a href="coin.md#0x1_coin_DepositAbortsIf">coin::DepositAbortsIf</a>&lt;AptosCoin&gt;{account_addr: addr};
 <b>let</b> coin_store = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(addr);
 <b>let</b> <b>post</b> p_coin_store = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(addr);
-<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr) && <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(addr) ==&gt;
-            coin_store.<a href="coin.md#0x1_coin">coin</a>.value + <a href="stake.md#0x1_stake_ghost_withdraw_amount">ghost_withdraw_amount</a> == p_coin_store.<a href="coin.md#0x1_coin">coin</a>.value;
+<b>ensures</b> bool_find_validator && <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt; stake_pool.locked_until_secs
+            && <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr) && <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(addr) ==&gt;
+                coin_store.<a href="coin.md#0x1_coin">coin</a>.value + new_withdraw_amount_1 == p_coin_store.<a href="coin.md#0x1_coin">coin</a>.value;
+<b>ensures</b> !(bool_find_validator && <b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework))
+            && <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr) && <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(addr) ==&gt;
+                coin_store.<a href="coin.md#0x1_coin">coin</a>.value + new_withdraw_amount_2 == p_coin_store.<a href="coin.md#0x1_coin">coin</a>.value;
 </code></pre>
 
 

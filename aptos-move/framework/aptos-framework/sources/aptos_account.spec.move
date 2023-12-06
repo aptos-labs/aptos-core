@@ -223,4 +223,19 @@ spec aptos_framework::aptos_account {
         aborts_if type_info::type_of<CoinType>() != type_info::type_of<AptosCoin>()
             && !coin::is_account_registered<CoinType>(to) && !can_receive_direct_coin_transfers(to);
     }
+
+    spec schema TransferEnsures<CoinType> {
+        to: address;
+        account_addr_source: address;
+        amount: u64;
+
+        let if_exist_account = exists<account::Account>(to);
+        let if_exist_coin = exists<coin::CoinStore<CoinType>>(to);
+        let coin_store_to = global<coin::CoinStore<CoinType>>(to);
+        let coin_store_source = global<coin::CoinStore<CoinType>>(account_addr_source);
+        let post p_coin_store_to = global<coin::CoinStore<CoinType>>(to);
+        let post p_coin_store_source = global<coin::CoinStore<CoinType>>(account_addr_source);
+        ensures coin_store_source.coin.value - amount == p_coin_store_source.coin.value;
+        ensures if_exist_account && if_exist_coin ==> coin_store_to.coin.value + amount == p_coin_store_to.coin.value;
+    }
 }

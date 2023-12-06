@@ -903,11 +903,6 @@ module aptos_framework::stake {
 
         // Cap withdraw amount by total inactive coins.
         withdraw_amount = min(withdraw_amount, coin::value(&stake_pool.inactive));
-
-        spec {
-            assume ghost_withdraw_amount == min(withdraw_amount, coin::value(stake_pool.inactive));
-        };
-
         if (withdraw_amount == 0) return coin::zero<AptosCoin>();
 
         event::emit_event(

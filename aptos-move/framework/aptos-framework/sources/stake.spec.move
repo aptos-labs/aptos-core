@@ -17,7 +17,6 @@ spec aptos_framework::stake {
         // ghost variable
         global ghost_valid_perf: ValidatorPerformance;
         global ghost_proposer_idx: Option<u64>;
-        global ghost_withdraw_amount: u64;
     }
 
     // property 1: the validator set resource stores consensus information for each validator.
@@ -111,10 +110,11 @@ spec aptos_framework::stake {
     )
     {
         // This function casue timeout (property proved)
-        pragma verify_duration_estimate = 120;
+        // pragma verify_duration_estimate = 120;
         aborts_if !staking_config::get_allow_validator_set_change(staking_config::get());
         aborts_if !exists<StakePool>(pool_address);
         aborts_if !exists<ValidatorConfig>(pool_address);
+        aborts_if !exists<StakingConfig>(@aptos_framework);
         aborts_if !exists<ValidatorSet>(@aptos_framework);
 
         let stake_pool = global<StakePool>(pool_address);
@@ -136,16 +136,24 @@ spec aptos_framework::stake {
         let validator_config = global<ValidatorConfig>(pool_address);
         aborts_if vector::is_empty(validator_config.consensus_pubkey);
 
-        let validator_set_size = vector::length(validator_set.active_validators) + vector::length(validator_set.pending_active);
+        let validator_set_size = vector::length(validator_set.active_validators) + vector::length(validator_set.pending_active) + 1;
         aborts_if validator_set_size > MAX_VALIDATOR_SET_SIZE;
 
         let voting_power_increase_limit = (staking_config::get_voting_power_increase_limit(config) as u128);
-        // This statement casued timeout
-        aborts_if validator_set.total_voting_power > 0 &&
-            validator_set.total_joining_power > validator_set.total_voting_power * voting_power_increase_limit / 100;
 
-        ensures validator_set.total_voting_power + voting_power == p_validator_set.total_voting_power;
-        ensures option::spec_is_some(spec_find_validator(p_validator_set.pending_active, pool_address));
+        aborts_if (validator_set.total_joining_power + (voting_power as u128)) > MAX_U128;
+        aborts_if validator_set.total_voting_power * voting_power_increase_limit > MAX_U128;
+        aborts_if validator_set.total_voting_power > 0 &&
+            (validator_set.total_joining_power + (voting_power as u128)) * 100 > validator_set.total_voting_power * voting_power_increase_limit;
+
+        let post p_validator_info = ValidatorInfo {
+            addr: pool_address,
+            voting_power,
+            config: validator_config,
+        };
+
+        ensures validator_set.total_joining_power + voting_power == p_validator_set.total_joining_power;
+        ensures vector::spec_contains(p_validator_set.pending_active, p_validator_info);
     }
 
     spec withdraw(
@@ -166,15 +174,23 @@ spec aptos_framework::stake {
                     !option::spec_is_some(spec_find_validator(validator_set.pending_inactive, pool_address)) &&
                         !option::spec_is_some(spec_find_validator(validator_set.pending_active, pool_address));
         aborts_if bool_find_validator && !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
-        let new_withdraw_amount = min(withdraw_amount, stake_pool.inactive.value);
-        aborts_if new_withdraw_amount > 0 && stake_pool.inactive.value < new_withdraw_amount;
+        let new_withdraw_amount_1 = min(withdraw_amount, stake_pool.inactive.value + stake_pool.pending_inactive.value);
+        let new_withdraw_amount_2 = min(withdraw_amount, stake_pool.inactive.value);
+        aborts_if bool_find_validator && timestamp::now_seconds() > stake_pool.locked_until_secs &&
+                    new_withdraw_amount_1 > 0 && stake_pool.inactive.value + stake_pool.pending_inactive.value < new_withdraw_amount_1;
+        aborts_if !(bool_find_validator && exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework)) &&
+                    new_withdraw_amount_2 > 0 && stake_pool.inactive.value < new_withdraw_amount_2;
         aborts_if !exists<coin::CoinStore<AptosCoin>>(addr);
         include coin::DepositAbortsIf<AptosCoin>{account_addr: addr};
 
         let coin_store = global<coin::CoinStore<AptosCoin>>(addr);
         let post p_coin_store = global<coin::CoinStore<AptosCoin>>(addr);
-        ensures exists<account::Account>(addr) && exists<coin::CoinStore<AptosCoin>>(addr) ==>
-                    coin_store.coin.value + ghost_withdraw_amount == p_coin_store.coin.value;
+        ensures bool_find_validator && timestamp::now_seconds() > stake_pool.locked_until_secs
+                    && exists<account::Account>(addr) && exists<coin::CoinStore<AptosCoin>>(addr) ==>
+                        coin_store.coin.value + new_withdraw_amount_1 == p_coin_store.coin.value;
+        ensures !(bool_find_validator && exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework))
+                    && exists<account::Account>(addr) && exists<coin::CoinStore<AptosCoin>>(addr) ==>
+                        coin_store.coin.value + new_withdraw_amount_2 == p_coin_store.coin.value;
     }
 
     spec leave_validator_set(
