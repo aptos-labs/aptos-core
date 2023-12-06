@@ -7,8 +7,15 @@ use aptos_crypto::{bls12381, PrivateKey, Uniform};
 use aptos_gas_algebra::GasQuantity;
 use aptos_gas_profiling::TransactionGasLog;
 use aptos_language_e2e_tests::account::Account;
-use aptos_transaction_generator_lib::{EntryPoints, publishing::{publish_util::PackageHandler, module_simple::MultiSigConfig}};
-use aptos_types::{account_address::{default_stake_pool_address, AccountAddress}, fee_statement::FeeStatement, transaction::TransactionPayload};
+use aptos_transaction_generator_lib::{
+    publishing::{module_simple::MultiSigConfig, publish_util::PackageHandler},
+    EntryPoints,
+};
+use aptos_types::{
+    account_address::{default_stake_pool_address, AccountAddress},
+    fee_statement::FeeStatement,
+    transaction::TransactionPayload,
+};
 use aptos_vm::AptosVM;
 use rand::{rngs::StdRng, SeedableRng};
 use std::path::Path;
@@ -36,8 +43,16 @@ fn summarize_exe_and_io(log: TransactionGasLog) -> SummaryExeAndIO {
     let aggregated = log.exec_io.aggregate_gas_events();
 
     let execution = aggregated.ops.iter().map(|(_, _, v)| cast(*v)).sum::<f64>();
-    let read = aggregated.storage_reads.iter().map(|(_, _, v)| cast(*v)).sum::<f64>();
-    let write = aggregated.storage_writes.iter().map(|(_, _, v)| cast(*v)).sum::<f64>();
+    let read = aggregated
+        .storage_reads
+        .iter()
+        .map(|(_, _, v)| cast(*v))
+        .sum::<f64>();
+    let write = aggregated
+        .storage_writes
+        .iter()
+        .map(|(_, _, v)| cast(*v))
+        .sum::<f64>();
     SummaryExeAndIO {
         intrinsic_cost: cast(log.exec_io.intrinsic_cost) / scale,
         execution_cost: execution / scale,
@@ -56,19 +71,33 @@ impl Runner {
         if !self.profile_gas {
             print_gas_cost(function, self.harness.evaluate_gas(account, payload));
         } else {
-            let (log, gas_used, fee_statement) = self.harness.evaluate_gas_with_profiler(account, payload);
+            let (log, gas_used, fee_statement) =
+                self.harness.evaluate_gas_with_profiler(account, payload);
             save_profiling_results(function, &log);
             print_gas_cost_with_statement(function, gas_used, fee_statement);
         }
     }
 
-    pub fn run_with_tps_estimate(&mut self, function: &str, account: &Account, payload: TransactionPayload, tps: f64) {
+    pub fn run_with_tps_estimate(
+        &mut self,
+        function: &str,
+        account: &Account,
+        payload: TransactionPayload,
+        tps: f64,
+    ) {
         if !self.profile_gas {
             print_gas_cost(function, self.harness.evaluate_gas(account, payload));
         } else {
-            let (log, gas_used, fee_statement) = self.harness.evaluate_gas_with_profiler(account, payload);
+            let (log, gas_used, fee_statement) =
+                self.harness.evaluate_gas_with_profiler(account, payload);
             save_profiling_results(function, &log);
-            print_gas_cost_with_statement_and_tps(function, gas_used, fee_statement, summarize_exe_and_io(log), tps);
+            print_gas_cost_with_statement_and_tps(
+                function,
+                gas_used,
+                fee_statement,
+                summarize_exe_and_io(log),
+                tps,
+            );
         }
     }
 
@@ -76,7 +105,9 @@ impl Runner {
         if !self.profile_gas {
             print_gas_cost(name, self.harness.evaluate_publish_gas(account, path));
         } else {
-            let (log, gas_used, fee_statement) = self.harness.evaluate_publish_gas_with_profiler(account, path);
+            let (log, gas_used, fee_statement) = self
+                .harness
+                .evaluate_publish_gas_with_profiler(account, path);
             save_profiling_results(name, &log);
             print_gas_cost_with_statement(name, gas_used, fee_statement);
         }
@@ -106,7 +137,10 @@ fn test_gas() {
         Err(_) => true,
     };
 
-    let mut runner = Runner { harness, profile_gas };
+    let mut runner = Runner {
+        harness,
+        profile_gas,
+    };
 
     AptosVM::set_paranoid_type_checks(true);
 
@@ -121,7 +155,9 @@ fn test_gas() {
         (1809., EntryPoints::InitializeVectorPicture { length: 40 }),
         (2721., EntryPoints::VectorPicture { length: 40 }),
         (2549., EntryPoints::VectorPictureRead { length: 40 }),
-        (32., EntryPoints::InitializeVectorPicture { length: 30 * 1024 }),
+        (32., EntryPoints::InitializeVectorPicture {
+            length: 30 * 1024,
+        }),
         (181., EntryPoints::VectorPicture { length: 30 * 1024 }),
         (200., EntryPoints::VectorPictureRead { length: 30 * 1024 }),
         (18.9, EntryPoints::SmartTablePicture {
@@ -145,15 +181,28 @@ fn test_gas() {
             let mut package_handler = PackageHandler::new(entry_point.package_name());
             let mut rng = StdRng::seed_from_u64(14);
             let package = package_handler.pick_package(&mut rng, publisher.address().clone());
-            runner.harness.run_transaction_payload(&publisher, package.publish_transaction_payload());
+            runner
+                .harness
+                .run_transaction_payload(&publisher, package.publish_transaction_payload());
             if let Some(init_entry_point) = entry_point.initialize_entry_point() {
-                runner.harness.run_transaction_payload(&publisher, init_entry_point.create_payload(package.get_module_id(init_entry_point.module_name()), Some(&mut rng), Some(publisher.address())));
+                runner.harness.run_transaction_payload(
+                    &publisher,
+                    init_entry_point.create_payload(
+                        package.get_module_id(init_entry_point.module_name()),
+                        Some(&mut rng),
+                        Some(publisher.address()),
+                    ),
+                );
             }
 
             runner.run_with_tps_estimate(
                 &format!("entry_point_{entry_point:?}"),
                 &user,
-                entry_point.create_payload(package.get_module_id(entry_point.module_name()), Some(&mut rng), Some(publisher.address())),
+                entry_point.create_payload(
+                    package.get_module_id(entry_point.module_name()),
+                    Some(&mut rng),
+                    Some(publisher.address()),
+                ),
                 *tps,
             );
         } else {
@@ -386,7 +435,11 @@ pub fn print_gas_cost(function: &str, gas_units: u64) {
     );
 }
 
-pub fn print_gas_cost_with_statement(function: &str, gas_units: u64, fee_statement: Option<FeeStatement>) {
+pub fn print_gas_cost_with_statement(
+    function: &str,
+    gas_units: u64,
+    fee_statement: Option<FeeStatement>,
+) {
     println!(
         "{:8} | {:.6} | {:.6} | {:.6} | {:8} | {:8} | {:8} | {}",
         gas_units,
@@ -419,8 +472,17 @@ pub fn print_gas_cost_with_statement_and_tps_header() {
     );
 }
 
-pub fn print_gas_cost_with_statement_and_tps(function: &str, gas_units: u64, fee_statement: Option<FeeStatement>, summary: SummaryExeAndIO, tps: f64) {
-    println!(
+const ALT_MODE: bool = true;
+
+pub fn print_gas_cost_with_statement_and_tps(
+    function: &str,
+    gas_units: u64,
+    fee_statement: Option<FeeStatement>,
+    summary: SummaryExeAndIO,
+    tps: f64,
+) {
+    if !ALT_MODE {
+        println!(
         "{:9} | {:9.6} | {:9.6} | {:9.6} | {:8} | {:8.2} | {:8.2} | {:8.2} | {:8.2} | {:8.0} | {}",
         gas_units,
         dollar_cost(gas_units, 5),
@@ -433,7 +495,19 @@ pub fn print_gas_cost_with_statement_and_tps(function: &str, gas_units: u64, fee
         summary.execution_cost,
         summary.read_cost,
         summary.write_cost,
-        (fee_statement.unwrap().execution_gas_used() + fee_statement.unwrap().io_gas_used()) as f64 * tps,
+        (fee_statement.unwrap().execution_gas_used() + fee_statement.unwrap().io_gas_used()) as f64
+            * tps,
         function,
     );
+    } else {
+        println!(
+            "[\"{}\", {}, {}, {}, {}, {}],",
+            function,
+            tps,
+            summary.intrinsic_cost,
+            summary.execution_cost,
+            summary.read_cost,
+            summary.write_cost,
+        );
+    }
 }
