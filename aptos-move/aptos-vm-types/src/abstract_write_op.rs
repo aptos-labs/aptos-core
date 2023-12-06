@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::{
     state_store::state_value::StateValueMetadata,
@@ -82,27 +83,24 @@ impl AbstractResourceWriteOp {
 
     /// Deposit amount is inserted into metadata at a different time than the WriteOp is created.
     /// So this method is needed to be able to update metadata generically across different variants.
-    pub fn get_creation_metadata_mut(&mut self) -> Option<&mut StateValueMetadata> {
+    pub fn get_metadata_mut(&mut self) -> Option<&mut StateValueMetadata> {
         use AbstractResourceWriteOp::*;
         match self {
-            Write(WriteOp::CreationWithMetadata { metadata, .. })
-            | WriteWithDelayedFields(WriteWithDelayedFieldsOp {
-                write_op: WriteOp::CreationWithMetadata { metadata, .. },
-                ..
-            })
+            Write(write_op)
+            | WriteWithDelayedFields(WriteWithDelayedFieldsOp { write_op, .. })
             | WriteResourceGroup(GroupWrite {
-                metadata_op: WriteOp::CreationWithMetadata { metadata, .. },
+                metadata_op: write_op,
                 ..
-            }) => Some(metadata),
-            _ => None,
+            }) => write_op.get_metadata_mut(),
+            InPlaceDelayedFieldChange(_) | ResourceGroupInPlaceDelayedFieldChange(_) => None,
         }
     }
 
     pub fn from_resource_write_with_maybe_layout(
         write_op: WriteOp,
-        l: Option<Arc<MoveTypeLayout>>,
+        maybe_layout: Option<Arc<MoveTypeLayout>>,
     ) -> Self {
-        if let Some(layout) = l {
+        if let Some(layout) = maybe_layout {
             let materialized_size = WriteOpSize::from(&write_op).write_len();
             Self::WriteWithDelayedFields(WriteWithDelayedFieldsOp {
                 write_op,
@@ -172,13 +170,6 @@ impl GroupWrite {
     /// None if group is being deleted, otherwise asserts on deserializing the size.
     pub fn maybe_group_op_size(&self) -> Option<u64> {
         self.maybe_group_op_size
-    }
-
-    // TODO: refactor storage fee & refund interfaces to operate on metadata directly,
-    // as that would avoid providing &mut to the whole metadata op in here, including
-    // bytes that are not raw bytes (encoding group size) and must not be modified.
-    pub fn metadata_op_mut(&mut self) -> &mut WriteOp {
-        &mut self.metadata_op
     }
 
     pub fn metadata_op(&self) -> &WriteOp {

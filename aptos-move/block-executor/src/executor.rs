@@ -870,9 +870,12 @@ where
             last_input_output.reads_needing_delayed_field_exchange(txn_idx)
         {
             for (key, layout) in reads_needing_delayed_field_exchange.into_iter() {
-                if let Ok(MVDataOutput::Versioned(_, ValueWithLayout::Exchanged(value, _))) =
-                    versioned_cache.data().fetch_data(&key, txn_idx)
+                if let Ok(MVDataOutput::Versioned(
+                    _,
+                    ValueWithLayout::Exchanged(value, _existing_layout),
+                )) = versioned_cache.data().fetch_data(&key, txn_idx)
                 {
+                    // TODO[agg_v2](fix) add randomly_check_layout_matches(Some(_existing_layout), layout);
                     patched_resource_write_set.insert(
                         key,
                         Self::replace_ids_with_values(&value, layout.as_ref(), &latest_view),

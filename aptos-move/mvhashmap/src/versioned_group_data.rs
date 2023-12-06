@@ -339,11 +339,9 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
             .versioned_map
             .iter()
             .flat_map(|(tag, tree)| {
-                match tree
-                    .range(ShiftedTxnIndex::zero_idx()..ShiftedTxnIndex::new(txn_idx))
+                tree.range(ShiftedTxnIndex::zero_idx()..ShiftedTxnIndex::new(txn_idx))
                     .next_back()
-                {
-                    Some((idx, entry)) => {
+                    .and_then(|(idx, entry)| {
                         if entry.flag == Flag::Estimate {
                             Some(Err(MVGroupError::Dependency(
                                 idx.idx().expect("May not depend on storage version"),
@@ -354,9 +352,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                                 .bytes_len()
                                 .map(|bytes_len| Ok((tag, bytes_len)))
                         }
-                    },
-                    None => None,
-                }
+                    })
             })
             .collect::<Result<Vec<_>, MVGroupError>>()?;
         group_size_as_sum(sizes.into_iter()).map_err(|_| MVGroupError::TagSerializationError)

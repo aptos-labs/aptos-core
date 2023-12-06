@@ -142,6 +142,17 @@ impl WriteOp {
             | DeletionWithMetadata { metadata, .. } => Some(metadata),
         }
     }
+
+    pub fn get_metadata_mut(&mut self) -> Option<&mut StateValueMetadata> {
+        use WriteOp::*;
+
+        match self {
+            Creation(_) | Modification(_) | Deletion => None,
+            CreationWithMetadata { metadata, .. }
+            | ModificationWithMetadata { metadata, .. }
+            | DeletionWithMetadata { metadata, .. } => Some(metadata),
+        }
+    }
 }
 
 pub enum WriteOpSize {

@@ -49,10 +49,10 @@ pub(crate) use as_state_key;
 
 macro_rules! as_bytes {
     ($v:ident) => {
-        bcs::to_bytes(&$v).expect("unexpected serialization")
+        bcs::to_bytes(&$v).expect("unexpected serialization error")
     };
     ($v:expr) => {
-        bcs::to_bytes(&$v).expect("unexpected serialization")
+        bcs::to_bytes(&$v).expect("unexpected serialization error")
     };
 }
 

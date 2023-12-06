@@ -344,17 +344,12 @@ impl VMChangeSet {
     ) -> impl Iterator<Item = (&StateKey, WriteOpSize, Option<&mut StateValueMetadata>)> {
         self.resource_write_set
             .iter_mut()
-            .map(|(k, v)| (k, v.materialized_size(), v.get_creation_metadata_mut()))
+            .map(|(k, v)| (k, v.materialized_size(), v.get_metadata_mut()))
             .chain(
                 self.module_write_set
                     .iter_mut()
                     .chain(self.aggregator_v1_write_set.iter_mut())
-                    .map(|(k, v)| {
-                        (k, WriteOpSize::from(v as &WriteOp), match v {
-                            WriteOp::CreationWithMetadata { metadata, .. } => Some(metadata),
-                            _ => None,
-                        })
-                    }),
+                    .map(|(k, v)| (k, WriteOpSize::from(v as &WriteOp), v.get_metadata_mut())),
             )
     }
 
@@ -769,7 +764,8 @@ impl VMChangeSet {
                                 },
                             ),
                         ) => {
-                            // newer read should've read the original write and contain all info from it, but could have additional delayed field writes, that change the size.
+                            // newer read should've read the original write and contain all info from it,
+                            // but could have additional delayed field writes, that change the size.
                             *materialized_size = Some(*additional_materialized_size);
                             (false, false)
                         },

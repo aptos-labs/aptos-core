@@ -343,11 +343,13 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
             Some(AbstractResourceWriteOp::InPlaceDelayedFieldChange(_)) | None => self
                 .base_executor_view
                 .get_resource_state_value(state_key, maybe_layout),
-            // TODO[agg_v2](fix): Is this really unreachable, or is this called for metadata,
-            // and metadata should be returned here?
             Some(AbstractResourceWriteOp::WriteResourceGroup(_))
             | Some(AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(_)) => {
-                unreachable!();
+                // In case this is a resource group, and feature is enabled that creates these ops,
+                // this should never be called.
+                // Call to metadata should go through get_resource_state_value_metadata(), and
+                // calls to individual tagged resources should go through their trait.
+                unreachable!("get_resource_state_value should never be called for resource group");
             },
         }
     }
@@ -396,16 +398,19 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<Bytes>> {
+        use AbstractResourceWriteOp::*;
         if let Some((write_op, layout)) = self
             .change_set
             .resource_write_set()
             .get(group_key)
             .and_then(|write| match write {
-                AbstractResourceWriteOp::WriteResourceGroup(group_write) => Some(Ok(group_write)),
-                AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(_) => None,
-                _ => Some(Err(anyhow::anyhow!(
-                    "Non-ResourceGroup write found for key in get_resource_from_group call"
-                ))),
+                WriteResourceGroup(group_write) => Some(Ok(group_write)),
+                ResourceGroupInPlaceDelayedFieldChange(_) => None,
+                Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
+                    Some(Err(anyhow::anyhow!(
+                        "Non-ResourceGroup write found for key in get_resource_from_group call"
+                    )))
+                },
             })
             .transpose()?
             .and_then(|g| g.inner_ops().get(resource_tag))

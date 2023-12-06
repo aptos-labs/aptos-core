@@ -25,8 +25,8 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, BlockExecutableTransaction,
-        TransactionOutput, TransactionStatus,
+        signature_verified_transaction::SignatureVerifiedTransaction, TransactionOutput,
+        TransactionStatus,
     },
     write_set::WriteOp,
 };
@@ -223,12 +223,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .collect()
     }
 
-    fn group_reads_needing_delayed_field_exchange(
-        &self,
-    ) -> Vec<(
-        <Self::Txn as BlockExecutableTransaction>::Key,
-        <Self::Txn as BlockExecutableTransaction>::Value,
-    )> {
+    fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(StateKey, WriteOp)> {
         self.vm_output
             .lock()
             .as_ref()
@@ -261,12 +256,9 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     fn incorporate_materialized_txn_output(
         &self,
-        aggregator_v1_writes: Vec<(<Self::Txn as BlockExecutableTransaction>::Key, WriteOp)>,
-        patched_resource_write_set: Vec<(
-            <Self::Txn as BlockExecutableTransaction>::Key,
-            <Self::Txn as BlockExecutableTransaction>::Value,
-        )>,
-        patched_events: Vec<<Self::Txn as BlockExecutableTransaction>::Event>,
+        aggregator_v1_writes: Vec<(StateKey, WriteOp)>,
+        patched_resource_write_set: Vec<(StateKey, WriteOp)>,
+        patched_events: Vec<ContractEvent>,
     ) {
         assert!(
             self.committed_output
