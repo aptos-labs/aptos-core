@@ -407,6 +407,8 @@ pub fn print_gas_cost_with_statement_and_tps_header() {
     );
 }
 
+const ALT_MODE: bool = true;
+
 pub fn print_gas_cost_with_statement_and_tps(
     function: &str,
     gas_units: u64,
@@ -414,7 +416,8 @@ pub fn print_gas_cost_with_statement_and_tps(
     summary: SummaryExeAndIO,
     tps: f64,
 ) {
-    println!(
+    if !ALT_MODE {
+        println!(
         "{:9} | {:9.6} | {:9.6} | {:9.6} | {:8} | {:8.2} | {:8.2} | {:8.2} | {:8.2} | {:8.0} | {}",
         gas_units,
         dollar_cost(gas_units, 5),
@@ -431,6 +434,17 @@ pub fn print_gas_cost_with_statement_and_tps(
             * tps,
         function,
     );
+    } else {
+        println!(
+            "[\"{}\", {}, {}, {}, {}, {}],",
+            function,
+            tps,
+            summary.intrinsic_cost,
+            summary.execution_cost,
+            summary.read_cost,
+            summary.write_cost,
+        );
+    }
 }
 
 #[test]
