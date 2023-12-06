@@ -5,8 +5,9 @@
 
 This module defines marker types, constants and test cases for working with BN254 curves using the generic API defined in <code>algebra.<b>move</b></code>.
 BN254 was sampled as part of the [\[BCTV14\]](https://eprint.iacr.org/2013/879.pdf) paper .
-The name denotes that it is a Barreto--Naehrig curve of embedding degree 12,
-defined over a 254-bit (prime) field. The scalar field is highly 2-adic.
+The name denotes that it is a Barreto--Naehrig curve of embedding degree 12, defined over a 254-bit (prime) field.
+The scalar field is highly 2-adic which supports subgroups of roots of unity of size <= 2^28.
+(as (21888242871839275222246405745257275088548364400416034343698204186575808495617 - 1) mod 2^28 = 0)
 
 This curve is also implemented in [libff](https://github.com/scipr-lab/libff/tree/master/libff/algebra/curves/alt_bn128) under the name <code>bn128</code>.
 It is the same as the <code>bn254</code> curve used in Ethereum (eg: [go-ethereum](https://github.com/ethereum/go-ethereum/tree/master/crypto/bn254/cloudflare)).
@@ -17,6 +18,8 @@ It is the same as the <code>bn254</code> curve used in Ethereum (eg: [go-ethereu
 ## CAUTION
 
 **This curve does not satisfy the 128-bit security level anymore.**
+
+Its current security is estimated at 128-bits (see "Updating Key Size Estimations for Pairings"; by Barbulescu, Razvan and Duquesne, Sylvain; in Journal of Cryptology; 2019; https://doi.org/10.1007/s00145-018-9280-5)
 
 
 Curve information:
@@ -79,7 +82,6 @@ It contains the prime-order subgroup $G_2$ used in pairing.
 -  [Struct `FormatG2Compr`](#0x1_bn254_algebra_FormatG2Compr)
 -  [Struct `Gt`](#0x1_bn254_algebra_Gt)
 -  [Struct `FormatGt`](#0x1_bn254_algebra_FormatGt)
--  [Constants](#@Constants_1)
 
 
 <pre><code></code></pre>
@@ -712,18 +714,6 @@ NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
 
 
 </details>
-
-<a id="@Constants_1"></a>
-
-## Constants
-
-
-<a id="0x1_bn254_algebra_FQ_R_SERIALIZED"></a>
-
-
-
-<pre><code><b>const</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FQ_R_SERIALIZED">FQ_R_SERIALIZED</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [71, 253, 124, 216, 22, 140, 32, 60, 141, 202, 113, 104, 145, 106, 129, 151, 93, 88, 129, 129, 182, 69, 80, 184, 41, 160, 49, 225, 114, 78, 100, 48];
-</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

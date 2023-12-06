@@ -1,13 +1,16 @@
 /// This module defines marker types, constants and test cases for working with BN254 curves using the generic API defined in `algebra.move`.
 /// BN254 was sampled as part of the [\[BCTV14\]](https://eprint.iacr.org/2013/879.pdf) paper .
-/// The name denotes that it is a Barreto--Naehrig curve of embedding degree 12,
-/// defined over a 254-bit (prime) field. The scalar field is highly 2-adic.
+/// The name denotes that it is a Barreto--Naehrig curve of embedding degree 12, defined over a 254-bit (prime) field.
+/// The scalar field is highly 2-adic which supports subgroups of roots of unity of size <= 2^28.
+/// (as (21888242871839275222246405745257275088548364400416034343698204186575808495617 - 1) mod 2^28 = 0)
 ///
 /// This curve is also implemented in [libff](https://github.com/scipr-lab/libff/tree/master/libff/algebra/curves/alt_bn128) under the name `bn128`.
 /// It is the same as the `bn254` curve used in Ethereum (eg: [go-ethereum](https://github.com/ethereum/go-ethereum/tree/master/crypto/bn254/cloudflare)).
 ///
 /// #CAUTION
 /// **This curve does not satisfy the 128-bit security level anymore.**
+///
+/// Its current security is estimated at 128-bits (see "Updating Key Size Estimations for Pairings"; by Barbulescu, Razvan and Duquesne, Sylvain; in Journal of Cryptology; 2019; https://doi.org/10.1007/s00145-018-9280-5)
 ///
 ///
 /// Curve information:
@@ -737,6 +740,7 @@ module std::bn254_algebra {
         assert!(eq(&mul(&val_x, &val_x), &sqr(&val_x)), 1);
     }
 
+    #[test_only]
     const FQ_R_SERIALIZED: vector<u8> = x"47fd7cd8168c203c8dca7168916a81975d588181b64550b829a031e1724e6430";
     #[test_only]
     const FQ_VAL_0_SERIALIZED_LSB: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
