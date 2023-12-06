@@ -1,5 +1,5 @@
 use super::{
-    livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
+    livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset, LiveVarAnalysisProcessor},
     reference_safety_processor::{LifetimeAnnotation, LifetimeInfoAtCodeOffset},
 };
 use move_binary_format::file_format::CodeOffset;
@@ -29,6 +29,8 @@ impl FunctionTargetProcessor for ExplicateDrop {
         let mut transformer = ExplicateDropTransformer::new(target);
         transformer.transform();
         data.code = transformer.transformed;
+        data.annotations.remove::<LiveVarAnnotation>();
+        data.annotations.remove::<LifetimeAnnotation>();
         data
     }
 
