@@ -666,11 +666,11 @@ pub static PENDING_QUORUM_STORE_COMMIT_NOTIFICATION: Lazy<IntGauge> = Lazy::new(
     .unwrap()
 });
 
-/// Counters related to pending commit votes
-pub static BUFFER_MANAGER_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+/// Counters related to pending commit messages
+pub static PIPELINE_MANAGER_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_consensus_buffer_manager_msgs_count",
-        "Counters(queued,dequeued,dropped) related to pending commit votes",
+        "aptos_consensus_pipeline_manager_msgs_count",
+        "Counters(queued,dequeued,dropped) related to pending commit messages",
         &["state"]
     )
     .unwrap()
@@ -686,11 +686,11 @@ pub static CONSENSUS_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Counters(queued,dequeued,dropped) related to buffer manager channel
-pub static BUFFER_MANAGER_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+/// Counters(queued,dequeued,dropped) related to pipeline manager channel
+pub static PIPELINE_MANAGER_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_buffer_manager_channel_msgs_count",
-        "Counters(queued,dequeued,dropped) related to buffer manager channel",
+        "aptos_pipeline_manager_channel_msgs_count",
+        "Counters(queued,dequeued,dropped) related to pipeline manager channel",
         &["state"]
     )
     .unwrap()
@@ -756,11 +756,11 @@ pub static BLOCK_RETRIEVAL_TASK_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Count of the buffer manager retry requests since last restart.
-pub static BUFFER_MANAGER_RETRY_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+/// Count of the pipeline manager retry requests since last restart.
+pub static PIPELINE_MANAGER_RETRY_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "aptos_consensus_buffer_manager_retry_count",
-        "Count of the buffer manager retry requests since last restart"
+        "aptos_consensus_pipeline_manager_retry_count",
+        "Count of the pipeline manager retry requests since last restart"
     )
     .unwrap()
 });
@@ -801,13 +801,13 @@ pub static BATCH_WAIT_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
     )
 });
 
-/// Histogram of timers for each of the buffer manager phase processors.
-pub static BUFFER_MANAGER_PHASE_PROCESS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+/// Histogram of timers for each of the pipeline manager phase processors.
+pub static PIPELINE_MANAGER_PHASE_PROCESS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         // metric name
-        "aptos_consensus_buffer_manager_phase_process_seconds",
+        "aptos_consensus_pipeline_manager_phase_process_seconds",
         // metric description
-        "Timer for buffer manager PipelinePhase::process()",
+        "Timer for pipeline manager PipelinePhase::process()",
         // metric labels (dimensions)
         &["name"],
         exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22).unwrap(),

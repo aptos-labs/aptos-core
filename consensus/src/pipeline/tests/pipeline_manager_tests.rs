@@ -7,14 +7,15 @@ use crate::{
     network::{IncomingCommitRequest, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     pipeline::{
-        buffer_manager::{
-            create_channel, BufferManager, OrderedBlocks, Receiver, ResetAck, ResetRequest, Sender,
-        },
-        decoupled_execution_utils::prepare_phases_and_buffer_manager,
+        decoupled_execution_utils::prepare_phases_and_pipeline_manager,
         execution_schedule_phase::ExecutionSchedulePhase,
         execution_wait_phase::ExecutionWaitPhase,
         ordering_state_computer::OrderingStateComputer,
         persisting_phase::PersistingPhase,
+        pipeline_manager::{
+            create_channel, OrderedBlocks, PipelineManager, Receiver, ResetAck, ResetRequest,
+            Sender,
+        },
         pipeline_phase::PipelinePhase,
         signing_phase::SigningPhase,
         tests::test_utils::prepare_executed_blocks_with_ledger_info,
@@ -57,8 +58,8 @@ use maplit::hashmap;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
-pub fn prepare_buffer_manager() -> (
-    BufferManager,
+pub fn prepare_pipeline_manager() -> (
+    PipelineManager,
     Sender<OrderedBlocks>,
     Sender<ResetRequest>,
     aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
@@ -135,7 +136,7 @@ pub fn prepare_buffer_manager() -> (
     ));
 
     let (block_tx, block_rx) = create_channel::<OrderedBlocks>();
-    let (buffer_reset_tx, buffer_reset_rx) = create_channel::<ResetRequest>();
+    let (pipeline_reset_tx, pipeline_reset_rx) = create_channel::<ResetRequest>();
 
     let mocked_execution_proxy = Arc::new(RandomComputeResultStateComputer::new());
     let hash_val = mocked_execution_proxy.get_root_hash();
@@ -145,8 +146,8 @@ pub fn prepare_buffer_manager() -> (
         execution_wait_phase_pipeline,
         signing_phase_pipeline,
         persisting_phase_pipeline,
-        buffer_manager,
-    ) = prepare_phases_and_buffer_manager(
+        pipeline_manager,
+    ) = prepare_phases_and_pipeline_manager(
         author,
         mocked_execution_proxy,
         Arc::new(Mutex::new(safety_rules)),
@@ -154,7 +155,7 @@ pub fn prepare_buffer_manager() -> (
         msg_rx,
         persisting_proxy,
         block_rx,
-        buffer_reset_rx,
+        pipeline_reset_rx,
         Arc::new(EpochState {
             epoch: 1,
             verifier: validators.clone(),
@@ -162,11 +163,11 @@ pub fn prepare_buffer_manager() -> (
     );
 
     (
-        buffer_manager,
+        pipeline_manager,
         block_tx,
-        buffer_reset_tx,
-        msg_tx,       // channel to pass commit messages into the buffer manager
-        self_loop_rx, // channel to receive message from the buffer manager itself
+        pipeline_reset_tx,
+        msg_tx,       // channel to pass commit messages into the pipeline manager
+        self_loop_rx, // channel to receive message from the pipeline manager itself
         execution_schedule_phase_pipeline,
         execution_wait_phase_pipeline,
         signing_phase_pipeline,
@@ -178,7 +179,7 @@ pub fn prepare_buffer_manager() -> (
     )
 }
 
-pub fn launch_buffer_manager() -> (
+pub fn launch_pipeline_manager() -> (
     Sender<OrderedBlocks>,
     Sender<ResetRequest>,
     aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
@@ -192,11 +193,11 @@ pub fn launch_buffer_manager() -> (
     let runtime = consensus_runtime();
 
     let (
-        buffer_manager,
+        pipeline_manager,
         block_tx,
         reset_tx,
-        msg_tx,       // channel to pass commit messages into the buffer manager
-        self_loop_rx, // channel to receive message from the buffer manager itself
+        msg_tx,       // channel to pass commit messages into the pipeline manager
+        self_loop_rx, // channel to receive message from the pipeline manager itself
         execution_schedule_phase_pipeline,
         execution_wait_phase_pipeline,
         signing_phase_pipeline,
@@ -205,14 +206,14 @@ pub fn launch_buffer_manager() -> (
         signers,
         result_rx,
         validators,
-    ) = prepare_buffer_manager();
+    ) = prepare_pipeline_manager();
     let bounded_executor = BoundedExecutor::new(1, runtime.handle().clone());
 
     runtime.spawn(execution_schedule_phase_pipeline.start());
     runtime.spawn(execution_wait_phase_pipeline.start());
     runtime.spawn(signing_phase_pipeline.start());
     runtime.spawn(persisting_phase_pipeline.start());
-    runtime.spawn(buffer_manager.start(bounded_executor));
+    runtime.spawn(pipeline_manager.start(bounded_executor));
 
     (
         block_tx,
@@ -266,7 +267,7 @@ async fn assert_results(batches: Vec<Vec<ExecutedBlock>>, result_rx: &mut Receiv
 }
 
 #[test]
-fn buffer_manager_happy_path_test() {
+fn pipeline_manager_happy_path_test() {
     // happy path
     let (
         mut block_tx,
@@ -278,7 +279,7 @@ fn buffer_manager_happy_path_test() {
         signers,
         mut result_rx,
         verifier,
-    ) = launch_buffer_manager();
+    ) = launch_pipeline_manager();
 
     let genesis_qc = certificate_for_genesis();
     let num_batches = 3;
@@ -330,7 +331,7 @@ fn buffer_manager_happy_path_test() {
 }
 
 #[test]
-fn buffer_manager_sync_test() {
+fn pipeline_manager_sync_test() {
     // happy path
     let (
         mut block_tx,
@@ -342,7 +343,7 @@ fn buffer_manager_sync_test() {
         signers,
         mut result_rx,
         verifier,
-    ) = launch_buffer_manager();
+    ) = launch_pipeline_manager();
 
     let genesis_qc = certificate_for_genesis();
     let num_batches = 100;

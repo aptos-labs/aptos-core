@@ -1291,7 +1291,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
           "editorMode": "code",
-          "expr": "avg by (name) (rate(aptos_consensus_buffer_manager_phase_process_seconds_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} [1m]))",
+          "expr": "avg by (name) (rate(aptos_consensus_pipeline_manager_phase_process_seconds_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} [1m]))",
           "instant": false,
           "legendFormat": "{{name}}",
           "range": true,
@@ -1359,7 +1359,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
           "editorMode": "code",
-          "expr": "sum(avg by (op) (rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", op=~\"buffer_manager_process_.*\"}[1m])))",
+          "expr": "sum(avg by (op) (rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", op=~\"pipeline_manager_process_.*\"}[1m])))",
           "instant": false,
           "legendFormat": "TOTAL",
           "range": true,
@@ -1368,7 +1368,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
           "editorMode": "code",
-          "expr": "avg by (op) (rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", op=~\"buffer_manager_process_.*\"}[1m]))",
+          "expr": "avg by (op) (rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", op=~\"pipeline_manager_process_.*\"}[1m]))",
           "hide": false,
           "instant": false,
           "legendFormat": "__auto",
@@ -3095,7 +3095,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "aptos_consensus_buffer_manager_retry_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "aptos_consensus_pipeline_manager_retry_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "format": "time_series",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}: {{op}}",
           "range": true,
@@ -3104,7 +3104,7 @@
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Buffer Manager Retry count",
+      "title": "pipeline manager Retry count",
       "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
       "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
@@ -5887,13 +5887,13 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_consensus_buffer_manager_msgs_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=\"$namespace\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval])",
+          "expr": "rate(aptos_consensus_pipeline_manager_msgs_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=\"$namespace\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Buffer manager Enqueue rate",
+      "title": "pipeline manager Enqueue rate",
       "type": "timeseries"
     },
     {
@@ -5940,13 +5940,13 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_consensus_buffer_manager_msgs_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\",namespace=\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
+          "expr": "rate(aptos_consensus_pipeline_manager_msgs_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\",namespace=\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Buffer manager Dequeue rate",
+      "title": "pipeline manager Dequeue rate",
       "type": "timeseries"
     },
     {
@@ -5993,13 +5993,13 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_consensus_buffer_manager_msgs_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", state=\"dropped\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_consensus_pipeline_manager_msgs_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", state=\"dropped\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "range": true,
           "refId": "C"
         }
       ],
-      "title": "Buffer manager Dropped rate",
+      "title": "pipeline manager Dropped rate",
       "type": "timeseries"
     },
     {
@@ -6046,13 +6046,13 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_consensus_buffer_manager_rand_msgs_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=\"$namespace\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval])",
+          "expr": "rate(aptos_consensus_pipeline_manager_rand_msgs_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=\"$namespace\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$__rate_interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Buffer manager rand msg Enqueue rate",
+      "title": "pipeline manager rand msg Enqueue rate",
       "type": "timeseries"
     },
     {
@@ -6099,13 +6099,13 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_consensus_buffer_manager_rand_msgs_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\",namespace=\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
+          "expr": "rate(aptos_consensus_pipeline_manager_rand_msgs_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\",namespace=\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Buffer manager rand msg Dequeue rate",
+      "title": "pipeline manager rand msg Dequeue rate",
       "type": "timeseries"
     },
     {
@@ -6152,13 +6152,13 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_consensus_buffer_manager_rand_msgs_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", state=\"dropped\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_consensus_pipeline_manager_rand_msgs_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", state=\"dropped\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "range": true,
           "refId": "C"
         }
       ],
-      "title": "Buffer manager rand msg Dropped rate",
+      "title": "pipeline manager rand msg Dropped rate",
       "type": "timeseries"
     },
     {

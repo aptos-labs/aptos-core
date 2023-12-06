@@ -14,8 +14,8 @@ use std::{
 
 /// [ This class is used when consensus.decoupled = true ]
 /// ExecutionPhase is a singleton that receives ordered blocks from
-/// the buffer manager and execute them. After the execution is done,
-/// ExecutionPhase sends the ordered blocks back to the buffer manager.
+/// the pipeline manager and execute them. After the execution is done,
+/// ExecutionPhase sends the ordered blocks back to the pipeline manager.
 ///
 
 pub struct ExecutionRequest {

@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    counters::BUFFER_MANAGER_PHASE_PROCESS_SECONDS,
-    pipeline::buffer_manager::{Receiver, Sender},
+    counters::PIPELINE_MANAGER_PHASE_PROCESS_SECONDS,
+    pipeline::pipeline_manager::{Receiver, Sender},
 };
 use aptos_logger::debug;
 use async_trait::async_trait;
@@ -83,14 +83,14 @@ impl<T: StatelessPipeline> PipelinePhase<T> {
                 continue;
             }
             let response = {
-                let _timer = BUFFER_MANAGER_PHASE_PROCESS_SECONDS
+                let _timer = PIPELINE_MANAGER_PHASE_PROCESS_SECONDS
                     .with_label_values(&[T::NAME])
                     .start_timer();
                 self.processor.process(req).await
             };
             if let Some(tx) = &mut self.maybe_tx {
                 if tx.send(response).await.is_err() {
-                    debug!("Failed to send response, buffer manager probably dropped");
+                    debug!("Failed to send response, pipeline manager probably dropped");
                     break;
                 }
             }

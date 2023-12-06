@@ -46,7 +46,7 @@ pub enum NeedFetchResult {
 
 impl BlockStore {
     /// Check if we're far away from this ledger info and need to sync.
-    /// This ensures that the block referred by the ledger info is not in buffer manager.
+    /// This ensures that the block referred by the ledger info is not in pipeline manager.
     pub fn need_sync_for_ledger_info(&self, li: &LedgerInfoWithSignatures) -> bool {
         (self.ordered_root().round() < li.commit_info().round()
             && !self.block_exists(li.commit_info().id()))

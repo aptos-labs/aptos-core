@@ -128,7 +128,7 @@ impl StateSyncTrigger {
     }
 
     /// Check if we're far away from this ledger info and need to sync.
-    /// This ensures that the block referred by the ledger info is not in buffer manager.
+    /// This ensures that the block referred by the ledger info is not in pipeline manager.
     fn need_sync_for_ledger_info(&self, li: &LedgerInfoWithSignatures) -> bool {
         if li.commit_info().round()
             <= self

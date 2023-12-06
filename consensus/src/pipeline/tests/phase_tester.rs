@@ -4,7 +4,7 @@
 
 use crate::{
     pipeline::{
-        buffer_manager::{Receiver, Sender},
+        pipeline_manager::{Receiver, Sender},
         pipeline_phase::{CountedRequest, StatelessPipeline},
     },
     test_utils::{consensus_runtime, timed_block_on},

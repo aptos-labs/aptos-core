@@ -6,8 +6,8 @@ use crate::{
     error::StateSyncError,
     payload_manager::PayloadManager,
     pipeline::{
-        buffer_manager::{OrderedBlocks, ResetAck, ResetRequest},
         errors::Error,
+        pipeline_manager::{OrderedBlocks, ResetAck, ResetRequest},
     },
     state_computer::PipelineExecutionResult,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
@@ -97,7 +97,7 @@ impl StateComputer for OrderingStateComputer {
             .await
             .is_err()
         {
-            debug!("Failed to send to buffer manager, maybe epoch ends");
+            debug!("Failed to send to pipeline manager, maybe epoch ends");
         }
 
         Ok(())
@@ -121,7 +121,7 @@ impl StateComputer for OrderingStateComputer {
             .map_err(|_| Error::ResetDropped)?;
         rx.await.map_err(|_| Error::ResetDropped)?;
 
-        // TODO: handle the sync error, should re-push the ordered blocks to buffer manager
+        // TODO: handle the sync error, should re-push the ordered blocks to pipeline manager
         // when it's reset but sync fails.
         self.state_computer_for_sync.sync_to(target).await?;
         Ok(())

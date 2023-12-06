@@ -5,10 +5,10 @@
 use crate::{
     network::{IncomingCommitRequest, NetworkSender},
     pipeline::{
-        buffer_manager::{create_channel, BufferManager, OrderedBlocks, ResetRequest},
         execution_schedule_phase::{ExecutionRequest, ExecutionSchedulePhase},
         execution_wait_phase::{ExecutionResponse, ExecutionWaitPhase, ExecutionWaitRequest},
         persisting_phase::{PersistingPhase, PersistingRequest},
+        pipeline_manager::{create_channel, OrderedBlocks, PipelineManager, ResetRequest},
         pipeline_phase::{CountedRequest, PipelinePhase},
         signing_phase::{CommitSignerProvider, SigningPhase, SigningRequest, SigningResponse},
     },
@@ -23,8 +23,8 @@ use std::sync::{
     Arc,
 };
 
-/// build channels and return phases and buffer manager
-pub fn prepare_phases_and_buffer_manager(
+/// build channels and return phases and pipeline manager
+pub fn prepare_phases_and_pipeline_manager(
     author: Author,
     execution_proxy: Arc<dyn StateComputer>,
     safety_rules: Arc<dyn CommitSignerProvider>,
@@ -39,7 +39,7 @@ pub fn prepare_phases_and_buffer_manager(
     PipelinePhase<ExecutionWaitPhase>,
     PipelinePhase<SigningPhase>,
     PipelinePhase<PersistingPhase>,
-    BufferManager,
+    PipelineManager,
 ) {
     let reset_flag = Arc::new(AtomicBool::new(false));
     let ongoing_tasks = Arc::new(AtomicU64::new(0));
@@ -100,7 +100,7 @@ pub fn prepare_phases_and_buffer_manager(
         execution_wait_phase,
         signing_phase,
         persisting_phase,
-        BufferManager::new(
+        PipelineManager::new(
             author,
             execution_schedule_phase_request_tx,
             execution_schedule_phase_response_rx,

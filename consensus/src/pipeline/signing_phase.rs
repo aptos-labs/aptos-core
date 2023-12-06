@@ -14,7 +14,7 @@ use std::{
 
 /// [ This class is used when consensus.decoupled = true ]
 /// SigningPhase is a singleton that receives executed blocks from
-/// the buffer manager and sign them. After getting the signature from
+/// the pipeline manager and sign them. After getting the signature from
 /// the safety rule, SigningPhase sends the signature and error (if any) back.
 
 pub struct SigningRequest {

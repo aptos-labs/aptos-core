@@ -5,7 +5,7 @@
 use crate::{
     error::StateSyncError,
     payload_manager::PayloadManager,
-    pipeline::buffer_manager::OrderedBlocks,
+    pipeline::pipeline_manager::OrderedBlocks,
     state_computer::{PipelineExecutionResult, StateComputeResultFut},
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     test_utils::mock_storage::MockStorage,
@@ -120,7 +120,7 @@ impl StateComputer for MockStateComputer {
             .await
             .is_err()
         {
-            debug!("Failed to send to buffer manager, maybe epoch ends");
+            debug!("Failed to send to pipeline manager, maybe epoch ends");
         }
 
         Ok(())

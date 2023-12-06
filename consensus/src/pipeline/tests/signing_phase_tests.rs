@@ -4,7 +4,7 @@
 
 use crate::{
     pipeline::{
-        buffer_manager::{create_channel, Receiver, Sender},
+        pipeline_manager::{create_channel, Receiver, Sender},
         pipeline_phase::{CountedRequest, PipelinePhase},
         signing_phase::{SigningPhase, SigningRequest, SigningResponse},
         tests::{

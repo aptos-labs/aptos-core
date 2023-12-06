@@ -13,7 +13,7 @@
  *                   │ │  │ │  │ │
  *     0. Ordered  ┌─┴─▼──┴─▼──▼─┴────┐ 3. Commit Vote  ┌─────────┐
  *        Blocks   │                  ├─────────────────►         │
- *       ┌─────────►  Buffer Manager  │                 │ Network │
+ *       ┌─────────►  pipeline manager  │                 │ Network │
  *       │         │                  ◄─────────────────┤         │
  *  ┌────┴─────┐   └─────────▲────────┘    Commit Vote  └─────────┘
  *  │ Ordering │             │
@@ -22,9 +22,6 @@
  *  └──────────┘
  */
 
-pub mod buffer;
-pub mod buffer_item;
-pub mod buffer_manager;
 pub mod commit_reliable_broadcast;
 pub mod decoupled_execution_utils;
 pub mod errors;
@@ -33,7 +30,10 @@ pub mod execution_wait_phase;
 pub mod hashable;
 pub mod ordering_state_computer;
 pub mod persisting_phase;
+pub mod pipeline_item;
+pub mod pipeline_manager;
 pub mod pipeline_phase;
+pub mod pipeline_queue;
 pub mod signing_phase;
 
 #[cfg(test)]

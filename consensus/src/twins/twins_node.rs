@@ -9,7 +9,7 @@ use crate::{
     network_interface::{ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::PayloadManager,
-    pipeline::buffer_manager::OrderedBlocks,
+    pipeline::pipeline_manager::OrderedBlocks,
     quorum_store::quorum_store_db::MockQuorumStoreDB,
     test_utils::{MockStateComputer, MockStorage},
     util::time_service::ClockTimeService,

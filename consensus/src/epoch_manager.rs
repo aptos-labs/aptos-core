@@ -38,9 +38,9 @@ use crate::{
     payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
     pipeline::{
-        buffer_manager::{OrderedBlocks, ResetRequest},
-        decoupled_execution_utils::prepare_phases_and_buffer_manager,
+        decoupled_execution_utils::prepare_phases_and_pipeline_manager,
         ordering_state_computer::{DagStateSyncComputer, OrderingStateComputer},
+        pipeline_manager::{OrderedBlocks, ResetRequest},
         signing_phase::CommitSignerProvider,
     },
     quorum_store::{
@@ -136,9 +136,9 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     safety_rules_manager: SafetyRulesManager,
     validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
     reconfig_events: ReconfigNotificationListener<P>,
-    // channels to buffer manager
-    buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingCommitRequest>>,
-    buffer_manager_reset_tx: Option<UnboundedSender<ResetRequest>>,
+    // channels to pipeline manager
+    pipeline_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingCommitRequest>>,
+    pipeline_manager_reset_tx: Option<UnboundedSender<ResetRequest>>,
     // channels to round manager
     round_manager_tx: Option<
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
@@ -201,8 +201,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             safety_rules_manager,
             validator_txn_pool_client,
             reconfig_events,
-            buffer_manager_msg_tx: None,
-            buffer_manager_reset_tx: None,
+            pipeline_manager_msg_tx: None,
+            pipeline_manager_reset_tx: None,
             round_manager_tx: None,
             round_manager_close_tx: None,
             buffered_proposal_tx: None,
@@ -553,7 +553,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         tokio::spawn(task);
     }
 
-    /// this function spawns the phases and a buffer manager
+    /// this function spawns the phases and a pipeline manager
     /// it sets `self.commit_msg_tx` to a new aptos_channel::Sender and returns an OrderingStateComputer
     fn spawn_decoupled_execution(
         &mut self,
@@ -577,19 +577,19 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             aptos_channel::new::<AccountAddress, IncomingCommitRequest>(
                 QueueStyle::FIFO,
                 100,
-                Some(&counters::BUFFER_MANAGER_MSGS),
+                Some(&counters::PIPELINE_MANAGER_MSGS),
             );
 
-        self.buffer_manager_msg_tx = Some(commit_msg_tx);
-        self.buffer_manager_reset_tx = Some(reset_tx.clone());
+        self.pipeline_manager_msg_tx = Some(commit_msg_tx);
+        self.pipeline_manager_reset_tx = Some(reset_tx.clone());
 
         let (
             execution_schedule_phase,
             execution_wait_phase,
             signing_phase,
             persisting_phase,
-            buffer_manager,
-        ) = prepare_phases_and_buffer_manager(
+            pipeline_manager,
+        ) = prepare_phases_and_pipeline_manager(
             self.author,
             self.commit_state_computer.clone(),
             commit_signer_provider,
@@ -606,7 +606,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         tokio::spawn(execution_wait_phase.start());
         tokio::spawn(signing_phase.start());
         tokio::spawn(persisting_phase.start());
-        tokio::spawn(buffer_manager.start(bounded_executor));
+        tokio::spawn(pipeline_manager.start(bounded_executor));
 
         (block_tx, reset_tx)
     }
@@ -636,19 +636,19 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
         self.dag_shutdown_tx = None;
 
-        // Shutdown the previous buffer manager, to release the SafetyRule client
-        self.buffer_manager_msg_tx = None;
-        if let Some(mut tx) = self.buffer_manager_reset_tx.take() {
+        // Shutdown the previous pipeline manager, to release the SafetyRule client
+        self.pipeline_manager_msg_tx = None;
+        if let Some(mut tx) = self.pipeline_manager_reset_tx.take() {
             let (ack_tx, ack_rx) = oneshot::channel();
             tx.send(ResetRequest {
                 tx: ack_tx,
                 stop: true,
             })
             .await
-            .expect("[EpochManager] Fail to drop buffer manager");
+            .expect("[EpochManager] Fail to drop pipeline manager");
             ack_rx
                 .await
-                .expect("[EpochManager] Fail to drop buffer manager");
+                .expect("[EpochManager] Fail to drop pipeline manager");
         }
 
         // Shutdown the block retrieval task by dropping the sender
@@ -1383,10 +1383,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 }
             },
             IncomingRpcRequest::CommitRequest(request) => {
-                if let Some(tx) = &self.buffer_manager_msg_tx {
+                if let Some(tx) = &self.pipeline_manager_msg_tx {
                     tx.push(peer_id, request)
                 } else {
-                    Err(anyhow::anyhow!("Buffer manager not started"))
+                    Err(anyhow::anyhow!("pipeline manager not started"))
                 }
             },
         }

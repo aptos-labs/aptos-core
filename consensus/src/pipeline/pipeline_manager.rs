@@ -8,13 +8,13 @@ use crate::{
     network::{IncomingCommitRequest, NetworkSender},
     network_interface::ConsensusMsg,
     pipeline::{
-        buffer::{Buffer, Cursor},
-        buffer_item::BufferItem,
         commit_reliable_broadcast::{AckState, CommitMessage, DropGuard},
         execution_schedule_phase::ExecutionRequest,
         execution_wait_phase::{ExecutionResponse, ExecutionWaitRequest},
         persisting_phase::PersistingRequest,
+        pipeline_item::QueueItem,
         pipeline_phase::CountedRequest,
+        pipeline_queue::{Cursor, PipelineQueue},
         signing_phase::{SigningRequest, SigningResponse},
     },
     state_replication::StateComputerCommitCallBackType,
@@ -65,7 +65,7 @@ pub struct OrderedBlocks {
     pub callback: StateComputerCommitCallBackType,
 }
 
-pub type BufferItemRootType = Cursor;
+pub type QueueItemRootType = Cursor;
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
 
@@ -73,23 +73,23 @@ pub fn create_channel<T>() -> (Sender<T>, Receiver<T>) {
     unbounded::<T>()
 }
 
-/// BufferManager handles the states of ordered blocks and
+/// PipelineManager handles the states of ordered blocks and
 /// interacts with the execution phase, the signing phase, and
 /// the persisting phase.
-pub struct BufferManager {
+pub struct PipelineManager {
     author: Author,
 
-    buffer: Buffer<BufferItem>,
+    queue: PipelineQueue<QueueItem>,
 
     // the roots point to the first *unprocessed* item.
     // None means no items ready to be processed (either all processed or no item finishes previous stage)
-    execution_root: BufferItemRootType,
+    execution_root: QueueItemRootType,
     execution_schedule_phase_tx: Sender<CountedRequest<ExecutionRequest>>,
     execution_schedule_phase_rx: Receiver<ExecutionWaitRequest>,
     execution_wait_phase_tx: Sender<CountedRequest<ExecutionWaitRequest>>,
     execution_wait_phase_rx: Receiver<ExecutionResponse>,
 
-    signing_root: BufferItemRootType,
+    signing_root: QueueItemRootType,
     signing_phase_tx: Sender<CountedRequest<SigningRequest>>,
     signing_phase_rx: Receiver<SigningResponse>,
 
@@ -123,7 +123,7 @@ pub struct BufferManager {
     reset_flag: Arc<AtomicBool>,
 }
 
-impl BufferManager {
+impl PipelineManager {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         author: Author,
@@ -145,7 +145,7 @@ impl BufferManager {
         ongoing_tasks: Arc<AtomicU64>,
         reset_flag: Arc<AtomicBool>,
     ) -> Self {
-        let buffer = Buffer::<BufferItem>::new();
+        let queue = PipelineQueue::<QueueItem>::new();
 
         let rb_backoff_policy = ExponentialBackoff::from_millis(2)
             .factor(50)
@@ -153,7 +153,7 @@ impl BufferManager {
         Self {
             author,
 
-            buffer,
+            queue,
 
             execution_root: None,
             execution_schedule_phase_tx,
@@ -213,7 +213,7 @@ impl BufferManager {
         request: T,
         duration: Duration,
     ) {
-        counters::BUFFER_MANAGER_RETRY_COUNT.inc();
+        counters::PIPELINE_MANAGER_RETRY_COUNT.inc();
         spawn_named!("retry request", async move {
             tokio::time::sleep(duration).await;
             sender
@@ -224,7 +224,7 @@ impl BufferManager {
     }
 
     /// process incoming ordered blocks
-    /// push them into the buffer and update the roots if they are none.
+    /// push them into the queue and update the roots if they are none.
     async fn process_ordered_blocks(&mut self, ordered_blocks: OrderedBlocks) {
         let OrderedBlocks {
             ordered_blocks,
@@ -235,7 +235,7 @@ impl BufferManager {
         info!(
             "Receive ordered block {}, the queue size is {}",
             ordered_proof.commit_info(),
-            self.buffer.len() + 1,
+            self.queue.len() + 1,
         );
 
         let request = self.create_new_request(ExecutionRequest {
@@ -247,8 +247,8 @@ impl BufferManager {
             .await
             .expect("Failed to send execution schedule request");
 
-        let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback);
-        self.buffer.push_back(item);
+        let item = QueueItem::new_ordered(ordered_blocks, ordered_proof, callback);
+        self.queue.push_back(item);
     }
 
     /// Set the execution root to the first not executed item (Ordered) and send execution request
@@ -256,8 +256,8 @@ impl BufferManager {
     async fn advance_execution_root(&mut self) {
         let cursor = self.execution_root;
         self.execution_root = self
-            .buffer
-            .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
+            .queue
+            .find_elem_from(cursor.or_else(|| *self.queue.head_cursor()), |item| {
                 item.is_ordered()
             });
         info!(
@@ -269,7 +269,7 @@ impl BufferManager {
             // NOTE: probably should schedule retry for all ordered blocks, but since execution error
             // is not expected nor retryable in reality, I'd rather remove retrying or do it more
             // properly than complicating it here.
-            let ordered_blocks = self.buffer.get(&self.execution_root).get_blocks().clone();
+            let ordered_blocks = self.queue.get(&self.execution_root).get_blocks().clone();
             let request = self.create_new_request(ExecutionRequest {
                 ordered_blocks,
                 lifetime_guard: self.create_new_request(()),
@@ -287,8 +287,8 @@ impl BufferManager {
     async fn advance_signing_root(&mut self) {
         let cursor = self.signing_root;
         self.signing_root = self
-            .buffer
-            .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
+            .queue
+            .find_elem_from(cursor.or_else(|| *self.queue.head_cursor()), |item| {
                 item.is_executed()
             });
         info!(
@@ -296,7 +296,7 @@ impl BufferManager {
             cursor, self.signing_root
         );
         if self.signing_root.is_some() {
-            let item = self.buffer.get(&self.signing_root);
+            let item = self.queue.get(&self.signing_root);
             let executed_item = item.unwrap_executed_ref();
             let request = self.create_new_request(SigningRequest {
                 ordered_ledger_info: executed_item.ordered_proof.clone(),
@@ -314,12 +314,12 @@ impl BufferManager {
         }
     }
 
-    /// Pop the prefix of buffer items until (including) target_block_id
+    /// Pop the prefix of queue items until (including) target_block_id
     /// Send persist request.
     async fn advance_head(&mut self, target_block_id: HashValue) {
         let mut blocks_to_persist: Vec<Arc<ExecutedBlock>> = vec![];
 
-        while let Some(item) = self.buffer.pop_front() {
+        while let Some(item) = self.queue.pop_front() {
             blocks_to_persist.extend(
                 item.get_blocks()
                     .iter()
@@ -369,7 +369,7 @@ impl BufferManager {
                     }))
                     .await
                     .expect("Failed to send persist request");
-                info!("Advance head to {:?}", self.buffer.head_cursor());
+                info!("Advance head to {:?}", self.queue.head_cursor());
                 self.previous_commit_time = Instant::now();
                 return;
             }
@@ -377,11 +377,11 @@ impl BufferManager {
         unreachable!("Aggregated item not found in the list");
     }
 
-    /// Reset any request in buffer manager, this is important to avoid race condition with state sync.
+    /// Reset any request in pipeline manager, this is important to avoid race condition with state sync.
     /// Internal requests are managed with ongoing_tasks.
     /// Incoming ordered blocks are pulled, it should only have existing blocks but no new blocks until reset finishes.
     async fn reset(&mut self) {
-        self.buffer = Buffer::new();
+        self.queue = PipelineQueue::new();
         self.execution_root = None;
         self.signing_root = None;
         self.previous_commit_time = Instant::now();
@@ -394,7 +394,7 @@ impl BufferManager {
         }
     }
 
-    /// It pops everything in the buffer and if reconfig flag is set, it stops the main loop
+    /// It pops everything in the queue and if reconfig flag is set, it stops the main loop
     async fn process_reset_request(&mut self, request: ResetRequest) {
         let ResetRequest { tx, stop } = request;
         info!("Receive reset");
@@ -420,7 +420,7 @@ impl BufferManager {
     async fn process_execution_response(&mut self, response: ExecutionResponse) {
         let ExecutionResponse { block_id, inner } = response;
         // find the corresponding item, may not exist if a reset or aggregated happened
-        let current_cursor = self.buffer.find_elem_by_key(self.execution_root, block_id);
+        let current_cursor = self.queue.find_elem_by_key(self.execution_root, block_id);
         if current_cursor.is_none() {
             return;
         }
@@ -436,7 +436,7 @@ impl BufferManager {
             "Receive executed response {}",
             executed_blocks.last().unwrap().block_info()
         );
-        let current_item = self.buffer.get(&current_cursor);
+        let current_item = self.queue.get(&current_cursor);
 
         if current_item.block_id() != block_id {
             error!(
@@ -463,14 +463,14 @@ impl BufferManager {
             }
         }
 
-        let item = self.buffer.take(&current_cursor);
+        let item = self.queue.take(&current_cursor);
         let new_item = item.advance_to_executed_or_aggregated(
             executed_blocks,
             &self.epoch_state.verifier,
             self.end_epoch_timestamp.get().cloned(),
         );
         let aggregated = new_item.is_aggregated();
-        self.buffer.set(&current_cursor, new_item);
+        self.queue.set(&current_cursor, new_item);
         if aggregated {
             self.advance_head(block_id).await;
         }
@@ -495,13 +495,13 @@ impl BufferManager {
         );
         // find the corresponding item, may not exist if a reset or aggregated happened
         let current_cursor = self
-            .buffer
+            .queue
             .find_elem_by_key(self.signing_root, commit_ledger_info.commit_info().id());
         if current_cursor.is_some() {
-            let item = self.buffer.take(&current_cursor);
-            // it is possible that we already signed this buffer item (double check after the final integration)
+            let item = self.queue.take(&current_cursor);
+            // it is possible that we already signed this queue item (double check after the final integration)
             if item.is_executed() {
-                // we have found the buffer item
+                // we have found the queue item
                 let mut signed_item = item.advance_to_signed(self.author, signature);
                 let signed_item_mut = signed_item.unwrap_signed_mut();
                 let maybe_proposer = signed_item_mut
@@ -525,15 +525,15 @@ impl BufferManager {
                         .rb_handle
                         .replace((Instant::now(), self.do_reliable_broadcast(commit_vote)));
                 }
-                self.buffer.set(&current_cursor, signed_item);
+                self.queue.set(&current_cursor, signed_item);
             } else {
-                self.buffer.set(&current_cursor, item);
+                self.queue.set(&current_cursor, item);
             }
         }
     }
 
     /// process the commit vote messages
-    /// it scans the whole buffer for a matching blockinfo
+    /// it scans the whole queue for a matching blockinfo
     /// if found, try advancing the item to be aggregated
     fn process_commit_message(&mut self, commit_msg: IncomingCommitRequest) -> Option<HashValue> {
         let IncomingCommitRequest {
@@ -549,10 +549,10 @@ impl BufferManager {
                 info!("Receive commit vote {} from {}", commit_info, author);
                 let target_block_id = vote.commit_info().id();
                 let current_cursor = self
-                    .buffer
-                    .find_elem_by_key(*self.buffer.head_cursor(), target_block_id);
+                    .queue
+                    .find_elem_by_key(*self.queue.head_cursor(), target_block_id);
                 if current_cursor.is_some() {
-                    let mut item = self.buffer.take(&current_cursor);
+                    let mut item = self.queue.take(&current_cursor);
                     let new_item = match item.add_signature_if_matched(vote) {
                         Ok(()) => {
                             let response =
@@ -572,8 +572,8 @@ impl BufferManager {
                             item
                         },
                     };
-                    self.buffer.set(&current_cursor, new_item);
-                    if self.buffer.get(&current_cursor).is_aggregated() {
+                    self.queue.set(&current_cursor, new_item);
+                    if self.queue.get(&current_cursor).is_aggregated() {
                         return Some(target_block_id);
                     }
                 }
@@ -585,15 +585,15 @@ impl BufferManager {
                     commit_proof.ledger_info().commit_info()
                 );
                 let cursor = self
-                    .buffer
-                    .find_elem_by_key(*self.buffer.head_cursor(), target_block_id);
+                    .queue
+                    .find_elem_by_key(*self.queue.head_cursor(), target_block_id);
                 if cursor.is_some() {
-                    let item = self.buffer.take(&cursor);
+                    let item = self.queue.take(&cursor);
                     let new_item = item.try_advance_to_aggregated_with_ledger_info(
                         commit_proof.ledger_info().clone(),
                     );
                     let aggregated = new_item.is_aggregated();
-                    self.buffer.set(&cursor, new_item);
+                    self.queue.set(&cursor, new_item);
                     if aggregated {
                         let response =
                             ConsensusMsg::CommitMessage(Box::new(CommitMessage::Ack(())));
@@ -620,13 +620,13 @@ impl BufferManager {
         {
             return;
         }
-        let mut cursor = *self.buffer.head_cursor();
+        let mut cursor = *self.queue.head_cursor();
         let mut count = 0;
         while cursor.is_some() {
             {
-                let mut item = self.buffer.take(&cursor);
+                let mut item = self.queue.take(&cursor);
                 if !item.is_signed() {
-                    self.buffer.set(&cursor, item);
+                    self.queue.set(&cursor, item);
                     break;
                 }
                 let signed_item = item.unwrap_signed_mut();
@@ -646,38 +646,38 @@ impl BufferManager {
                         .replace((Instant::now(), self.do_reliable_broadcast(commit_vote)));
                     count += 1;
                 }
-                self.buffer.set(&cursor, item);
+                self.queue.set(&cursor, item);
             }
-            cursor = self.buffer.get_next(&cursor);
+            cursor = self.queue.get_next(&cursor);
         }
         if count > 0 {
             info!("Start reliable broadcast {} commit votes", count);
         }
     }
 
-    fn update_buffer_manager_metrics(&self) {
-        let mut cursor = *self.buffer.head_cursor();
+    fn update_pipeline_manager_metrics(&self) {
+        let mut cursor = *self.queue.head_cursor();
         let mut pending_ordered = 0;
         let mut pending_executed = 0;
         let mut pending_signed = 0;
         let mut pending_aggregated = 0;
 
         while cursor.is_some() {
-            match self.buffer.get(&cursor) {
-                BufferItem::Ordered(_) => {
+            match self.queue.get(&cursor) {
+                QueueItem::Ordered(_) => {
                     pending_ordered += 1;
                 },
-                BufferItem::Executed(_) => {
+                QueueItem::Executed(_) => {
                     pending_executed += 1;
                 },
-                BufferItem::Signed(_) => {
+                QueueItem::Signed(_) => {
                     pending_signed += 1;
                 },
-                BufferItem::Aggregated(_) => {
+                QueueItem::Aggregated(_) => {
                     pending_aggregated += 1;
                 },
             }
-            cursor = self.buffer.get_next(&cursor);
+            cursor = self.queue.get_next(&cursor);
         }
 
         counters::NUM_BLOCKS_IN_PIPELINE
@@ -695,12 +695,12 @@ impl BufferManager {
     }
 
     pub async fn start(mut self, bounded_executor: BoundedExecutor) {
-        info!("Buffer manager starts.");
+        info!("Pipeline manager starts.");
         let (verified_commit_msg_tx, mut verified_commit_msg_rx) = create_channel();
         let mut interval = tokio::time::interval(Duration::from_millis(LOOP_INTERVAL_MS));
         let mut commit_msg_rx = self.commit_msg_rx.take().expect("commit msg rx must exist");
         let epoch_state = self.epoch_state.clone();
-        spawn_named!("buffer manager verification", async move {
+        spawn_named!("pipeline manager verification", async move {
             while let Some(commit_msg) = commit_msg_rx.next().await {
                 let tx = verified_commit_msg_tx.clone();
                 let epoch_state_clone = epoch_state.clone();
@@ -720,22 +720,22 @@ impl BufferManager {
             // advancing the root will trigger sending requests to the pipeline
             ::futures::select! {
                 blocks = self.block_rx.select_next_some() => {
-                    monitor!("buffer_manager_process_ordered", {
+                    monitor!("pipeline_manager_process_ordered", {
                     self.process_ordered_blocks(blocks).await;
                     if self.execution_root.is_none() {
                         self.advance_execution_root().await;
                     }});
                 },
                 reset_event = self.reset_rx.select_next_some() => {
-                    monitor!("buffer_manager_process_reset",
+                    monitor!("pipeline_manager_process_reset",
                     self.process_reset_request(reset_event).await);
                 },
                 response = self.execution_schedule_phase_rx.select_next_some() => {
-                    monitor!("buffer_manager_process_execution_schedule_response", {
+                    monitor!("pipeline_manager_process_execution_schedule_response", {
                     self.process_execution_schedule_response(response).await;
                 })},
                 response = self.execution_wait_phase_rx.select_next_some() => {
-                    monitor!("buffer_manager_process_execution_wait_response", {
+                    monitor!("pipeline_manager_process_execution_wait_response", {
                     self.process_execution_response(response).await;
                     self.advance_execution_root().await;
                     if self.signing_root.is_none() {
@@ -743,13 +743,13 @@ impl BufferManager {
                     }});
                 },
                 response = self.signing_phase_rx.select_next_some() => {
-                    monitor!("buffer_manager_process_signing_response", {
+                    monitor!("pipeline_manager_process_signing_response", {
                     self.process_signing_response(response).await;
                     self.advance_signing_root().await
                     })
                 },
                 rpc_request = verified_commit_msg_rx.select_next_some() => {
-                    monitor!("buffer_manager_process_commit_message",
+                    monitor!("pipeline_manager_process_commit_message",
                     if let Some(aggregated_block_id) = self.process_commit_message(rpc_request) {
                         self.advance_head(aggregated_block_id).await;
                         if self.execution_root.is_none() {
@@ -761,14 +761,14 @@ impl BufferManager {
                     });
                 }
                 _ = interval.tick().fuse() => {
-                    monitor!("buffer_manager_process_interval_tick", {
-                    self.update_buffer_manager_metrics();
+                    monitor!("pipeline_manager_process_interval_tick", {
+                    self.update_pipeline_manager_metrics();
                     self.rebroadcast_commit_votes_if_needed().await
                     });
                 },
                 // no else branch here because interval.tick will always be available
             }
         }
-        info!("Buffer manager stops.");
+        info!("Pipeline manager stops.");
     }
 }

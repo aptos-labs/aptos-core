@@ -16,16 +16,16 @@ pub struct LinkedItem<T: Hashable> {
 
 pub type Cursor = Option<HashValue>;
 
-/// Buffer implementes an ordered dictionary
+/// PipelineQueue implementes an ordered dictionary
 /// It supports push_back, pop_front, and lookup by HashValue
-pub struct Buffer<T: Hashable> {
+pub struct PipelineQueue<T: Hashable> {
     map: HashMap<HashValue, LinkedItem<T>>,
     count: u64,
     head: Cursor,
     tail: Cursor,
 }
 
-impl<T: Hashable> Buffer<T> {
+impl<T: Hashable> PipelineQueue<T> {
     pub fn new() -> Self {
         Self {
             map: HashMap::new(),
@@ -143,7 +143,7 @@ impl<T: Hashable> Buffer<T> {
 // tests
 #[cfg(test)]
 mod test {
-    use super::Buffer;
+    use super::PipelineQueue;
     use crate::pipeline::hashable::Hashable;
     use aptos_crypto::HashValue;
     use std::fmt::{Debug, Formatter};
@@ -175,7 +175,7 @@ mod test {
 
     #[test]
     fn basics() {
-        let mut buffer = Buffer::<HashWrapper>::new();
+        let mut buffer = PipelineQueue::<HashWrapper>::new();
 
         // Check empty list behaves right
         assert_eq!(buffer.pop_front(), None);
@@ -204,7 +204,7 @@ mod test {
 
     #[test]
     fn find() {
-        let mut buffer = Buffer::<HashWrapper>::new();
+        let mut buffer = PipelineQueue::<HashWrapper>::new();
         buffer.push_back(HashWrapper::from(1));
         buffer.push_back(HashWrapper::from(2));
         buffer.push_back(HashWrapper::from(3));
@@ -235,7 +235,7 @@ mod test {
 
     #[test]
     fn get_set_take() {
-        let mut buffer = Buffer::<HashWrapper>::new();
+        let mut buffer = PipelineQueue::<HashWrapper>::new();
         buffer.push_back(HashWrapper::from(1));
         buffer.push_back(HashWrapper::from(2));
         buffer.push_back(HashWrapper::from(3));

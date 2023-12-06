@@ -60,13 +60,13 @@ fn generate_executed_item_from_ordered(
     verified_signatures: PartialSignatures,
     callback: StateComputerCommitCallBackType,
     ordered_proof: LedgerInfoWithSignatures,
-) -> BufferItem {
+) -> QueueItem {
     debug!("{} advance to executed from ordered", commit_info);
     let partial_commit_proof = LedgerInfoWithPartialSignatures::new(
         generate_commit_ledger_info(&commit_info, &ordered_proof),
         verified_signatures,
     );
-    BufferItem::Executed(Box::new(ExecutedItem {
+    QueueItem::Executed(Box::new(ExecutedItem {
         executed_blocks,
         partial_commit_proof,
         callback,
@@ -86,7 +86,7 @@ fn aggregate_commit_proof(
     LedgerInfoWithSignatures::new(commit_ledger_info.clone(), aggregated_sig)
 }
 
-// we differentiate buffer items at different stages
+// we differentiate queue items at different stages
 // for better code readability
 pub struct OrderedItem {
     pub unverified_signatures: PartialSignatures,
@@ -120,14 +120,14 @@ pub struct AggregatedItem {
     pub callback: StateComputerCommitCallBackType,
 }
 
-pub enum BufferItem {
+pub enum QueueItem {
     Ordered(Box<OrderedItem>),
     Executed(Box<ExecutedItem>),
     Signed(Box<SignedItem>),
     Aggregated(Box<AggregatedItem>),
 }
 
-impl Hashable for BufferItem {
+impl Hashable for QueueItem {
     fn hash(&self) -> HashValue {
         self.block_id()
     }
@@ -135,7 +135,7 @@ impl Hashable for BufferItem {
 
 pub type ExecutionFut = BoxFuture<'static, ExecutorResult<Vec<ExecutedBlock>>>;
 
-impl BufferItem {
+impl QueueItem {
     pub fn new_ordered(
         ordered_blocks: Vec<ExecutedBlock>,
         ordered_proof: LedgerInfoWithSignatures,
@@ -257,7 +257,7 @@ impl BufferItem {
                 }))
             },
             _ => {
-                panic!("Only executed buffer items can advance to signed blocks.")
+                panic!("Only executed queue items can advance to signed blocks.")
             },
         }
     }
@@ -322,7 +322,7 @@ impl BufferItem {
                 }))
             },
             Self::Aggregated(_) => {
-                unreachable!("Found aggregated buffer item but any aggregated buffer item should get dequeued right away.");
+                unreachable!("Found aggregated queue item but any aggregated queue item should get dequeued right away.");
             },
         }
     }
@@ -450,21 +450,21 @@ impl BufferItem {
 
     pub fn unwrap_signed_mut(&mut self) -> &mut SignedItem {
         match self {
-            BufferItem::Signed(item) => item.as_mut(),
+            QueueItem::Signed(item) => item.as_mut(),
             _ => panic!("Not signed item"),
         }
     }
 
     pub fn unwrap_executed_ref(&self) -> &ExecutedItem {
         match self {
-            BufferItem::Executed(item) => item.as_ref(),
+            QueueItem::Executed(item) => item.as_ref(),
             _ => panic!("Not executed item"),
         }
     }
 
     pub fn unwrap_aggregated(self) -> AggregatedItem {
         match self {
-            BufferItem::Aggregated(item) => *item,
+            QueueItem::Aggregated(item) => *item,
             _ => panic!("Not aggregated item"),
         }
     }

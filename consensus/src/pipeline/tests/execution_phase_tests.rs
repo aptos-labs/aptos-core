@@ -4,9 +4,9 @@
 
 use crate::{
     pipeline::{
-        buffer_manager::create_channel,
         execution_schedule_phase::{ExecutionRequest, ExecutionSchedulePhase},
         execution_wait_phase::{ExecutionResponse, ExecutionWaitPhase},
+        pipeline_manager::create_channel,
         pipeline_phase::{CountedRequest, PipelinePhase, StatelessPipeline},
         tests::phase_tester::PhaseTester,
     },

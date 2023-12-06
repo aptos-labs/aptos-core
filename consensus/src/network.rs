@@ -373,7 +373,7 @@ impl NetworkSender {
         self.send(msg, vec![self.author]).await
     }
 
-    /// Sends the ledger info to self buffer manager
+    /// Sends the ledger info to self pipeline manager
     pub async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures) {
         fail_point!("consensus::send::commit_decision", |_| ());
         let msg = ConsensusMsg::CommitMessage(Box::new(CommitMessage::Decision(

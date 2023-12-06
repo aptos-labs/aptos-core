@@ -31,7 +31,7 @@ use crate::{
     network::IncomingDAGRequest,
     payload_client::PayloadClient,
     payload_manager::PayloadManager,
-    pipeline::buffer_manager::OrderedBlocks,
+    pipeline::pipeline_manager::OrderedBlocks,
     state_replication::StateComputer,
 };
 use aptos_channels::{

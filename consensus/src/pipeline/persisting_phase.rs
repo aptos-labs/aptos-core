@@ -17,7 +17,7 @@ use std::{
 
 /// [ This class is used when consensus.decoupled = true ]
 /// PersistingPhase is a singleton that receives aggregated blocks from
-/// the buffer manager and persists them. Upon success, it returns
+/// the pipeline manager and persists them. Upon success, it returns
 /// a response.
 
 pub struct PersistingRequest {

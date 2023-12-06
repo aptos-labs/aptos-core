@@ -22,7 +22,7 @@ use std::{
 
 /// [ This class is used when consensus.decoupled = true ]
 /// ExecutionSchedulePhase is a singleton that receives ordered blocks from
-/// the buffer manager and send them to the ExecutionPipeline.
+/// the pipeline manager and send them to the ExecutionPipeline.
 
 pub struct ExecutionRequest {
     pub ordered_blocks: Vec<ExecutedBlock>,
