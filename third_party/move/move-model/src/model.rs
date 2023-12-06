@@ -1237,13 +1237,13 @@ impl GlobalEnv {
             Type::Struct(mid, sid, inst) => {
                 let struct_env = self.get_struct(mid.qualified(*sid));
                 let struct_abilities = struct_env.get_abilities();
-                let field_abilities = inst.iter().fold(AbilitySet::ALL, |acc, ty| {
+                let ty_args_abilities_meet = inst.iter().fold(AbilitySet::ALL, |acc, ty| {
                     acc.intersect(self.type_abilities(ty, ty_params))
                 });
-                if struct_abilities.has_ability(Ability::Key) && field_abilities.has_ability(Ability::Store) {
-                    struct_abilities.intersect(field_abilities).add(Ability::Key)
+                if struct_abilities.has_ability(Ability::Key) && ty_args_abilities_meet.has_ability(Ability::Store) {
+                    struct_abilities.intersect(ty_args_abilities_meet).add(Ability::Key)
                 } else {
-                    struct_abilities.intersect(field_abilities).remove(Ability::Key)
+                    struct_abilities.intersect(ty_args_abilities_meet).remove(Ability::Key)
                 }
             },
             Type::TypeParameter(i) => {
