@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    experimental::pipeline_phase::StatelessPipeline,
+    pipeline::pipeline_phase::StatelessPipeline,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
 };
 use aptos_consensus_types::executed_block::ExecutedBlock;

@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::experimental::hashable::Hashable;
+use crate::pipeline::hashable::Hashable;
 use aptos_crypto::HashValue;
 use std::collections::HashMap;
 
@@ -144,7 +144,7 @@ impl<T: Hashable> Buffer<T> {
 #[cfg(test)]
 mod test {
     use super::Buffer;
-    use crate::experimental::hashable::Hashable;
+    use crate::pipeline::hashable::Hashable;
     use aptos_crypto::HashValue;
     use std::fmt::{Debug, Formatter};
 

@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    experimental::{
+    network::{IncomingCommitRequest, NetworkSender},
+    pipeline::{
         buffer_manager::{create_channel, BufferManager, OrderedBlocks, ResetRequest},
         execution_schedule_phase::{ExecutionRequest, ExecutionSchedulePhase},
         execution_wait_phase::{ExecutionResponse, ExecutionWaitPhase, ExecutionWaitRequest},
@@ -11,7 +12,6 @@ use crate::{
         pipeline_phase::{CountedRequest, PipelinePhase},
         signing_phase::{CommitSignerProvider, SigningPhase, SigningRequest, SigningResponse},
     },
-    network::{IncomingCommitRequest, NetworkSender},
     state_replication::StateComputer,
 };
 use aptos_channels::aptos_channel::Receiver;

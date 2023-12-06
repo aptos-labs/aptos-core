@@ -10,7 +10,7 @@ use crate::{
         storage::{CommitEvent, DAGStorage},
         CertifiedNode, Node, NodeId, Vote,
     },
-    experimental::buffer_manager::OrderedBlocks,
+    pipeline::buffer_manager::OrderedBlocks,
 };
 use anyhow::{anyhow, bail};
 use aptos_bitvec::BitVec;
