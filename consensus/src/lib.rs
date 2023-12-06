@@ -33,6 +33,7 @@ mod payload_client;
 mod pending_votes;
 pub mod persistent_liveness_storage;
 pub mod quorum_store;
+mod rand;
 mod recovery_manager;
 mod round_manager;
 mod state_computer;
@@ -46,6 +47,7 @@ mod twins;
 mod txn_notifier;
 pub mod util;
 
+mod block_preparer;
 /// AptosBFT implementation
 pub mod consensus_provider;
 /// Required by the telemetry service

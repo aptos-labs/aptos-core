@@ -32,7 +32,6 @@ pub mod serde_helper;
 pub mod stake_pool;
 pub mod staking_contract;
 pub mod state_proof;
-pub mod system_txn;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test_helpers;
 pub mod timestamp;
@@ -43,6 +42,7 @@ pub mod validator_config;
 pub mod validator_info;
 pub mod validator_performances;
 pub mod validator_signer;
+pub mod validator_txn;
 pub mod validator_verifier;
 pub mod vesting;
 pub mod vm_status;

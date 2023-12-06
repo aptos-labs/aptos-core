@@ -6,6 +6,7 @@ use crate::{
     block::Block,
     common::{Payload, Round},
     quorum_cert::QuorumCert,
+    randomness::Randomness,
     vote_proposal::VoteProposal,
 };
 use aptos_crypto::hash::HashValue;
@@ -14,9 +15,10 @@ use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     contract_event::ContractEvent,
-    system_txn::SystemTransaction,
     transaction::{SignedTransaction, Transaction, TransactionStatus},
+    validator_txn::ValidatorTransaction,
 };
+use once_cell::sync::OnceCell;
 use std::fmt::{Debug, Display, Formatter};
 
 /// ExecutedBlocks are managed in a speculative tree, the committed blocks form a chain. Besides
@@ -26,16 +28,28 @@ use std::fmt::{Debug, Display, Formatter};
 pub struct ExecutedBlock {
     /// Block data that cannot be regenerated.
     block: Block,
+    /// Input transactions in the order of execution
+    input_transactions: Vec<SignedTransaction>,
     /// The state_compute_result is calculated for all the pending blocks prior to insertion to
     /// the tree. The execution results are not persisted: they're recalculated again for the
     /// pending blocks upon restart.
     state_compute_result: StateComputeResult,
+    randomness: OnceCell<Randomness>,
 }
 
 impl ExecutedBlock {
-    pub fn replace_result(mut self, result: StateComputeResult) -> Self {
+    pub fn replace_result(
+        mut self,
+        input_transactions: Vec<SignedTransaction>,
+        result: StateComputeResult,
+    ) -> Self {
         self.state_compute_result = result;
+        self.input_transactions = input_transactions;
         self
+    }
+
+    pub fn set_randomness(&mut self, randomness: Randomness) {
+        assert!(self.randomness.set(randomness).is_ok());
     }
 }
 
@@ -52,10 +66,16 @@ impl Display for ExecutedBlock {
 }
 
 impl ExecutedBlock {
-    pub fn new(block: Block, state_compute_result: StateComputeResult) -> Self {
+    pub fn new(
+        block: Block,
+        input_transactions: Vec<SignedTransaction>,
+        state_compute_result: StateComputeResult,
+    ) -> Self {
         Self {
             block,
+            input_transactions,
             state_compute_result,
+            randomness: OnceCell::new(),
         }
     }
 
@@ -65,6 +85,10 @@ impl ExecutedBlock {
 
     pub fn id(&self) -> HashValue {
         self.block().id()
+    }
+
+    pub fn input_transactions(&self) -> &Vec<SignedTransaction> {
+        &self.input_transactions
     }
 
     pub fn epoch(&self) -> u64 {
@@ -87,8 +111,8 @@ impl ExecutedBlock {
         self.block().round()
     }
 
-    pub fn sys_txns(&self) -> Option<&Vec<SystemTransaction>> {
-        self.block().sys_txns()
+    pub fn validator_txns(&self) -> Option<&Vec<ValidatorTransaction>> {
+        self.block().validator_txns()
     }
 
     pub fn timestamp_usecs(&self) -> u64 {
@@ -97,6 +121,14 @@ impl ExecutedBlock {
 
     pub fn compute_result(&self) -> &StateComputeResult {
         &self.state_compute_result
+    }
+
+    pub fn randomness(&self) -> Option<&Randomness> {
+        self.randomness.get()
+    }
+
+    pub fn has_randomness(&self) -> bool {
+        self.randomness.get().is_some()
     }
 
     pub fn block_info(&self) -> BlockInfo {
@@ -119,7 +151,7 @@ impl ExecutedBlock {
     pub fn transactions_to_commit(
         &self,
         validators: &[AccountAddress],
-        sys_txns: Vec<SystemTransaction>,
+        validator_txns: Vec<ValidatorTransaction>,
         txns: Vec<SignedTransaction>,
         is_block_gas_limit: bool,
     ) -> Vec<Transaction> {
@@ -129,9 +161,12 @@ impl ExecutedBlock {
             return vec![];
         }
 
-        let mut txns_with_state_checkpoint =
-            self.block
-                .transactions_to_execute(validators, sys_txns, txns, is_block_gas_limit);
+        let mut txns_with_state_checkpoint = self.block.transactions_to_execute(
+            validators,
+            validator_txns,
+            txns,
+            is_block_gas_limit,
+        );
         if is_block_gas_limit && !self.state_compute_result.has_reconfiguration() {
             // After the per-block gas limit change,
             // insert state checkpoint at the position

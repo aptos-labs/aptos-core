@@ -67,6 +67,7 @@ async fn test_node_broadcast_receiver_succeed() {
         storage.clone(),
         Arc::new(MockFetchRequester {}),
         DagPayloadConfig::default(),
+        false,
     );
 
     let expected_result = Vote::new(
@@ -112,6 +113,7 @@ async fn test_node_broadcast_receiver_failure() {
                 storage,
                 Arc::new(MockFetchRequester {}),
                 DagPayloadConfig::default(),
+                false,
             )
         })
         .collect();
@@ -194,6 +196,7 @@ async fn test_node_broadcast_receiver_storage() {
         storage.clone(),
         Arc::new(MockFetchRequester {}),
         DagPayloadConfig::default(),
+        false,
     );
     let sig = rb_receiver.process(node).await.expect("must succeed");
 
@@ -209,6 +212,7 @@ async fn test_node_broadcast_receiver_storage() {
         storage.clone(),
         Arc::new(MockFetchRequester {}),
         DagPayloadConfig::default(),
+        false,
     );
     assert_ok!(rb_receiver.gc_before_round(2));
     assert_eq!(storage.get_votes().unwrap().len(), 0);

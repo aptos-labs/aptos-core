@@ -17,9 +17,9 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
-    system_txn::SystemTransaction,
     transaction::{SignedTransaction, Transaction, Version},
     validator_signer::ValidatorSigner,
+    validator_txn::ValidatorTransaction,
     validator_verifier::ValidatorVerifier,
 };
 use mirai_annotations::debug_checked_verify_eq;
@@ -209,6 +209,7 @@ impl Block {
         epoch: u64,
         round: Round,
         timestamp: u64,
+        validator_txns: Vec<ValidatorTransaction>,
         payload: Payload,
         author: Author,
         failed_authors: Vec<(Round, Author)>,
@@ -220,6 +221,7 @@ impl Block {
             epoch,
             round,
             timestamp,
+            validator_txns,
             payload,
             author,
             failed_authors,
@@ -255,7 +257,7 @@ impl Block {
     }
 
     pub fn new_proposal_ext(
-        sys_txns: Vec<SystemTransaction>,
+        validator_txns: Vec<ValidatorTransaction>,
         payload: Payload,
         round: Round,
         timestamp_usecs: u64,
@@ -264,7 +266,7 @@ impl Block {
         failed_authors: Vec<(Round, Author)>,
     ) -> anyhow::Result<Self> {
         let block_data = BlockData::new_proposal_ext(
-            sys_txns,
+            validator_txns,
             payload,
             validator_signer.author(),
             failed_authors,
@@ -297,8 +299,8 @@ impl Block {
         }
     }
 
-    pub fn sys_txns(&self) -> Option<&Vec<SystemTransaction>> {
-        self.block_data.sys_txns()
+    pub fn validator_txns(&self) -> Option<&Vec<ValidatorTransaction>> {
+        self.block_data.validator_txns()
     }
 
     /// Verifies that the proposal and the QC are correctly signed.
@@ -408,18 +410,20 @@ impl Block {
         Ok(())
     }
 
-    pub fn transactions_to_execute(
-        &self,
-        validators: &[AccountAddress],
-        sys_txns: Vec<SystemTransaction>,
+    pub fn transactions_to_execute_for_metadata(
+        block_id: HashValue,
+        validator_txns: Vec<ValidatorTransaction>,
         txns: Vec<SignedTransaction>,
+        metadata: BlockMetadata,
         is_block_gas_limit: bool,
     ) -> Vec<Transaction> {
-        let txns = once(Transaction::BlockMetadata(
-            self.new_block_metadata(validators),
-        ))
-        .chain(sys_txns.into_iter().map(Transaction::SystemTransaction))
-        .chain(txns.into_iter().map(Transaction::UserTransaction));
+        let txns = once(Transaction::BlockMetadata(metadata))
+            .chain(
+                validator_txns
+                    .into_iter()
+                    .map(Transaction::ValidatorTransaction),
+            )
+            .chain(txns.into_iter().map(Transaction::UserTransaction));
 
         if is_block_gas_limit {
             // After the per-block gas limit change, StateCheckpoint txn
@@ -428,9 +432,26 @@ impl Block {
         } else {
             // Before the per-block gas limit change, StateCheckpoint txn
             // is inserted here for compatibility.
-            txns.chain(once(Transaction::StateCheckpoint(self.id)))
+            txns.chain(once(Transaction::StateCheckpoint(block_id)))
                 .collect()
         }
+    }
+
+    pub fn transactions_to_execute(
+        &self,
+        validators: &[AccountAddress],
+        validator_txns: Vec<ValidatorTransaction>,
+        txns: Vec<SignedTransaction>,
+        is_block_gas_limit: bool,
+    ) -> Vec<Transaction> {
+        let metadata = self.new_block_metadata(validators);
+        Self::transactions_to_execute_for_metadata(
+            self.id,
+            validator_txns,
+            txns,
+            metadata,
+            is_block_gas_limit,
+        )
     }
 
     fn previous_bitvec(&self) -> BitVec {
@@ -441,7 +462,7 @@ impl Block {
         }
     }
 
-    fn new_block_metadata(&self, validators: &[AccountAddress]) -> BlockMetadata {
+    pub fn new_block_metadata(&self, validators: &[AccountAddress]) -> BlockMetadata {
         BlockMetadata::new(
             self.id(),
             self.epoch(),

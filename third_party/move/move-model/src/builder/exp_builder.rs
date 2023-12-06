@@ -1447,15 +1447,21 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         locals
     }
 
-    /// Post processes any placeholders which have been generated while translating expressions
+    /// This method:
+    /// 1) Post processes any placeholders which have been generated while translating expressions
     /// with this builder. This rewrites the given result expression and fills in placeholders
     /// with the final expressions.
-    pub fn post_process_placeholders(&mut self, result_exp: Exp) -> Exp {
-        if self.placeholder_map.is_empty() {
-            // Shortcut case of no placeholders
-            result_exp
-        } else {
-            ExpData::rewrite(result_exp, &mut |e| {
+    /// 2) Instantiates types for all all struct patterns in the block expression
+    /// This step is necessary because struct pattern may contain uninstantiated variable types
+    pub fn post_process_body(&mut self, result_exp: Exp) -> Exp {
+        let subs = self.subs.clone();
+        ExpData::rewrite_exp_and_pattern(
+            result_exp,
+            &mut |e| {
+                if self.placeholder_map.is_empty() {
+                    // Shortcut case of no placeholders
+                    return Err(e);
+                }
                 let exp_data: ExpData = e.into();
                 if let ExpData::Call(id, Operation::NoOp, args) = exp_data {
                     if let Some(info) = self.placeholder_map.get(&id) {
@@ -1511,8 +1517,22 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 } else {
                     Err(exp_data.into_exp())
                 }
-            })
-        }
+            },
+            &mut |pat, _entering_scope| match pat {
+                Pattern::Struct(sid, std, patterns) => {
+                    let mut new_inst = vec![];
+                    for ty in &std.inst {
+                        let nty = subs.specialize(ty);
+                        new_inst.push(nty);
+                    }
+                    let mut new_std = std.clone();
+                    new_std.inst = new_inst;
+                    let new_pat = Pattern::Struct(*sid, new_std.clone(), patterns.clone());
+                    Some(new_pat)
+                },
+                _ => None,
+            },
+        )
     }
 
     /// Translates a specification block embedded in an expression context, represented by

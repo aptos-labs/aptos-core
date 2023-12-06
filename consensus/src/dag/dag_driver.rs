@@ -22,23 +22,26 @@ use crate::{
         },
         DAGRpcResult, RpcHandler,
     },
-    state_replication::PayloadClient,
+    payload_client::PayloadClient,
 };
 use anyhow::bail;
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Payload, PayloadFilter};
+use aptos_crypto::hash::CryptoHash;
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_time_service::{TimeService, TimeServiceTrait};
-use aptos_types::{block_info::Round, epoch_state::EpochState};
+use aptos_types::{
+    block_info::Round, epoch_state::EpochState, validator_txn::pool::ValidatorTransactionFilter,
+};
 use async_trait::async_trait;
 use futures::{
     executor::block_on,
     future::{AbortHandle, Abortable},
     FutureExt,
 };
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub(crate) struct DagDriver {
@@ -170,35 +173,49 @@ impl DagDriver {
                 assert_eq!(new_round, 1, "Only expect empty strong links for round 1");
                 vec![]
             });
-        let payload_filter = {
+
+        let (sys_payload_filter, payload_filter) = if strong_links.is_empty() {
+            (
+                ValidatorTransactionFilter::PendingTxnHashSet(HashSet::new()),
+                PayloadFilter::Empty,
+            )
+        } else {
             let dag_reader = self.dag.read();
             let highest_commit_round = self
                 .ledger_info_provider
                 .get_highest_committed_anchor_round();
-            if strong_links.is_empty() {
-                PayloadFilter::Empty
-            } else {
-                PayloadFilter::from(
-                    &dag_reader
-                        .reachable(
-                            strong_links.iter().map(|node| node.metadata()),
-                            Some(highest_commit_round.saturating_sub(self.window_size_config)),
-                            |_| true,
-                        )
-                        .map(|node_status| node_status.as_node().payload())
-                        .collect(),
+
+            let nodes = dag_reader
+                .reachable(
+                    strong_links.iter().map(|node| node.metadata()),
+                    Some(highest_commit_round.saturating_sub(self.window_size_config)),
+                    |_| true,
                 )
-            }
+                .map(|node_status| node_status.as_node())
+                .collect::<Vec<_>>();
+
+            let payload_filter =
+                PayloadFilter::from(&nodes.iter().map(|node| node.payload()).collect());
+            let validator_txn_hashes = nodes
+                .iter()
+                .flat_map(|node| node.validator_txns())
+                .map(|txn| txn.hash());
+            let validator_payload_filter = ValidatorTransactionFilter::PendingTxnHashSet(
+                HashSet::from_iter(validator_txn_hashes),
+            );
+
+            (validator_payload_filter, payload_filter)
         };
 
         let (max_txns, max_size_bytes) = self.calculate_payload_limits(new_round);
 
-        let payload = match self
+        let (validator_txns, payload) = match self
             .payload_client
             .pull_payload(
                 Duration::from_millis(self.payload_config.payload_pull_max_poll_time_ms),
                 max_txns,
                 max_size_bytes,
+                sys_payload_filter,
                 payload_filter,
                 Box::pin(async {}),
                 false,
@@ -210,9 +227,10 @@ impl DagDriver {
             Ok(payload) => payload,
             Err(e) => {
                 error!("error pulling payload: {}", e);
-                Payload::empty(self.quorum_store_enabled)
+                (vec![], Payload::empty(self.quorum_store_enabled))
             },
         };
+
         // TODO: need to wait to pass median of parents timestamp
         let highest_parent_timestamp = strong_links
             .iter()
@@ -228,6 +246,7 @@ impl DagDriver {
             new_round,
             self.author,
             timestamp,
+            validator_txns,
             payload,
             strong_links,
             Extensions::empty(),

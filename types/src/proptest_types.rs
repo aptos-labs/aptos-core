@@ -20,7 +20,6 @@ use crate::{
     on_chain_config::ValidatorSet,
     proof::TransactionInfoListWithProof,
     state_store::{state_key::StateKey, state_value::StateValue},
-    system_txn::{DummySystemTransaction, SystemTransaction},
     transaction::{
         ChangeSet, ExecutionStatus, Module, ModuleBundle, RawTransaction, Script,
         SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
@@ -29,6 +28,7 @@ use crate::{
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
+    validator_txn::{DummyValidatorTransaction, ValidatorTransaction},
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -1216,14 +1216,14 @@ impl Arbitrary for ValidatorVerifier {
 }
 
 #[cfg(any(test, feature = "fuzzing"))]
-impl Arbitrary for SystemTransaction {
+impl Arbitrary for ValidatorTransaction {
     type Parameters = SizeRange;
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         Just(Value::Null)
             .prop_map(|_| {
-                SystemTransaction::DummyTopic(DummySystemTransaction {
+                ValidatorTransaction::DummyTopic(DummyValidatorTransaction {
                     payload: vec![0xFF; 16],
                 })
             })

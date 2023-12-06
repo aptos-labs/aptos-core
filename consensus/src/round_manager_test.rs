@@ -64,9 +64,9 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
     on_chain_config::{ConsensusConfigV1Ext, ConsensusExtraFeature, OnChainConsensusConfig},
-    system_txn::{pool::SystemTransactionPool, SystemTransaction},
     transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
+    validator_txn::ValidatorTransaction,
     validator_verifier::{generate_validator_verifier, random_validator_verifier},
     waypoint::Waypoint,
 };
@@ -206,10 +206,10 @@ impl NodeSetup {
         local_consensus_config: ConsensusConfig,
     ) -> Self {
         let _entered_runtime = executor.enter();
-        let epoch_state = EpochState {
+        let epoch_state = Arc::new(EpochState {
             epoch: 1,
             verifier: storage.get_validator_set().into(),
-        };
+        });
         let validators = epoch_state.verifier.clone();
         let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
@@ -272,8 +272,7 @@ impl NodeSetup {
             PipelineBackpressureConfig::new_no_backoff(),
             ChainHealthBackoffConfig::new_no_backoff(),
             false,
-            Arc::new(SystemTransactionPool::new()),
-            onchain_consensus_config.should_propose_system_txns(),
+            onchain_consensus_config.validator_txn_enabled(),
         );
 
         let round_state = Self::create_round_state(time_service);
@@ -2007,7 +2006,7 @@ fn no_vote_on_proposal_ext_when_feature_disabled() {
     let genesis_qc = certificate_for_genesis();
 
     let invalid_block = Block::new_proposal_ext(
-        vec![SystemTransaction::dummy(vec![0xFF]); 5],
+        vec![ValidatorTransaction::dummy(vec![0xFF]); 5],
         Payload::empty(false),
         1,
         1,
@@ -2052,10 +2051,9 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
 
     let mut onchain_config_inner = ConsensusConfigV1Ext::default_if_missing();
-    onchain_config_inner.update_extra_features(
-        vec![ConsensusExtraFeature::ProposalWithSystemTransactions],
-        vec![],
-    );
+    onchain_config_inner
+        .extra_features
+        .update_extra_features(vec![ConsensusExtraFeature::ValidatorTransaction], vec![]);
 
     let local_config = ConsensusConfig {
         max_receiving_block_txns_quorum_store_override: 10,
@@ -2075,7 +2073,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     let genesis_qc = certificate_for_genesis();
 
     let block_too_many_txns = Block::new_proposal_ext(
-        vec![SystemTransaction::dummy(vec![0xFF; 20]); 11],
+        vec![ValidatorTransaction::dummy(vec![0xFF; 20]); 11],
         Payload::empty(false),
         1,
         1,
@@ -2086,7 +2084,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     .unwrap();
 
     let block_too_large = Block::new_proposal_ext(
-        vec![SystemTransaction::dummy(vec![0xFF; 30]); 10],
+        vec![ValidatorTransaction::dummy(vec![0xFF; 30]); 10],
         Payload::empty(false),
         1,
         1,
@@ -2097,7 +2095,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     .unwrap();
 
     let valid_block = Block::new_proposal_ext(
-        vec![SystemTransaction::dummy(vec![0xFF; 25]); 10], // 64 bytes in total
+        vec![ValidatorTransaction::dummy(vec![0xFF; 25]); 10], // 64 bytes in total
         Payload::empty(false),
         1,
         1,

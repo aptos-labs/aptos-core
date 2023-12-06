@@ -6,10 +6,9 @@ use crate::{
     quorum_store::{
         batch_store::BatchReader,
         proof_coordinator::{ProofCoordinator, ProofCoordinatorCommand},
-        tests::utils::create_vec_signed_transactions,
         types::Batch,
     },
-    test_utils::mock_quorum_store_sender::MockQuorumStoreSender,
+    test_utils::{create_vec_signed_transactions, mock_quorum_store_sender::MockQuorumStoreSender},
 };
 use aptos_consensus_types::proof_of_store::{
     BatchId, ProofOfStore, SignedBatchInfo, SignedBatchInfoMsg,

@@ -950,6 +950,24 @@ impl ExpData {
         ExpRewriter {
             exp_rewriter,
             node_rewriter: &mut |_| None,
+            pattern_rewriter: &mut |_, _| None,
+        }
+        .rewrite_exp(exp)
+    }
+
+    pub fn rewrite_exp_and_pattern<F, G>(
+        exp: Exp,
+        exp_rewriter: &mut F,
+        pattern_rewriter: &mut G,
+    ) -> Exp
+    where
+        F: FnMut(Exp) -> Result<Exp, Exp>,
+        G: FnMut(&Pattern, bool) -> Option<Pattern>,
+    {
+        ExpRewriter {
+            exp_rewriter,
+            node_rewriter: &mut |_| None,
+            pattern_rewriter,
         }
         .rewrite_exp(exp)
     }
@@ -963,6 +981,7 @@ impl ExpData {
         ExpRewriter {
             exp_rewriter: &mut Err,
             node_rewriter,
+            pattern_rewriter: &mut |_, _| None,
         }
         .rewrite_exp(exp)
     }
@@ -980,6 +999,7 @@ impl ExpData {
         ExpRewriter {
             exp_rewriter,
             node_rewriter,
+            pattern_rewriter: &mut |_, _| None,
         }
         .rewrite_exp(exp)
     }
@@ -1111,6 +1131,7 @@ impl ExpData {
 struct ExpRewriter<'a> {
     exp_rewriter: &'a mut dyn FnMut(Exp) -> Result<Exp, Exp>,
     node_rewriter: &'a mut dyn FnMut(NodeId) -> Option<NodeId>,
+    pattern_rewriter: &'a mut dyn FnMut(&Pattern, bool) -> Option<Pattern>,
 }
 
 impl<'a> ExpRewriterFunctions for ExpRewriter<'a> {
@@ -1123,6 +1144,10 @@ impl<'a> ExpRewriterFunctions for ExpRewriter<'a> {
 
     fn rewrite_node_id(&mut self, id: NodeId) -> Option<NodeId> {
         (*self.node_rewriter)(id)
+    }
+
+    fn rewrite_pattern(&mut self, pat: &Pattern, entering_scope: bool) -> Option<Pattern> {
+        (*self.pattern_rewriter)(pat, entering_scope)
     }
 }
 

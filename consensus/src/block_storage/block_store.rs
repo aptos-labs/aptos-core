@@ -13,6 +13,7 @@ use crate::{
     persistent_liveness_storage::{
         PersistentLivenessStorage, RecoveryData, RootInfo, RootMetadata,
     },
+    state_computer::PipelineExecutionResult,
     state_replication::StateComputer,
     util::time_service::TimeService,
 };
@@ -176,6 +177,7 @@ impl BlockStore {
 
         let executed_root_block = ExecutedBlock::new(
             *root_block,
+            vec![],
             // Create a dummy state_compute_result with necessary fields filled in.
             result,
         );
@@ -365,12 +367,12 @@ impl BlockStore {
     async fn execute_block(&self, block: Block) -> ExecutorResult<ExecutedBlock> {
         // Although NIL blocks don't have a payload, we still send a T::default() to compute
         // because we may inject a block prologue transaction.
-        let state_compute_result = self
+        let pipeline_result = self
             .state_computer
             .compute(&block, block.parent_id())
             .await?;
-
-        Ok(ExecutedBlock::new(block, state_compute_result))
+        let PipelineExecutionResult { input_txns, result } = pipeline_result;
+        Ok(ExecutedBlock::new(block, input_txns, result))
     }
 
     /// Validates quorum certificates and inserts it into block tree assuming dependencies exist.

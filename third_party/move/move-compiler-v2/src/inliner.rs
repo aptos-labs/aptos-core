@@ -966,32 +966,6 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         }
     }
 
-    /// If one or more elements of a vector of `Pattern` can be rewritten, then do so
-    /// and also copy the others so the whole thing can be replaced.
-    /// (Helper function for `rewrite_pattern` in trait `ExpRewriterFunctions` below.)
-    fn rewrite_pattern_vector(
-        &mut self,
-        pat_vec: &[Pattern],
-        entering_scope: bool,
-    ) -> Option<Vec<Pattern>> {
-        let rewritten_part: Vec<_> = pat_vec
-            .iter()
-            .map(|pat| self.rewrite_pattern(pat, entering_scope))
-            .collect();
-        if rewritten_part.iter().any(|opt_pat| opt_pat.is_some()) {
-            // if any subpattern was simplified, then rebuild the vector
-            // with a combination of original and new patterns.
-            let rewritten_vec: Vec<_> = pat_vec
-                .iter()
-                .zip(rewritten_part)
-                .map(|(org_pat, opt_new_pat)| opt_new_pat.unwrap_or(org_pat.clone()))
-                .collect();
-            Some(rewritten_vec)
-        } else {
-            None
-        }
-    }
-
     /// Convert a single-variable pattern into a `Pattern::Tuple` if needed.
     fn make_lambda_pattern_a_tuple(&mut self, pat: &Pattern) -> Pattern {
         if let Pattern::Var(id, _) = pat {
