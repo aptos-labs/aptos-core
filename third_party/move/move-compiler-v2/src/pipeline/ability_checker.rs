@@ -1,7 +1,11 @@
 //! Checks for ability violations.
 
 use move_binary_format::file_format::{Ability, AbilitySet};
-use move_model::{model::{FunctionEnv, Loc, QualifiedId, ModuleId, StructId, FunId}, ty::{Type, PrimitiveType}, ast::TempIndex};
+use move_model::{
+    ast::TempIndex,
+    model::{FunId, FunctionEnv, Loc, ModuleId, QualifiedId, StructId},
+    ty::{PrimitiveType, Type},
+};
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
@@ -22,15 +26,20 @@ fn has_copy(func_target: &FunctionTarget, ty: &Type) -> bool {
 
 // Checks if the given type has constraint copy, and add diagnostics if not.
 fn check_copy(func_target: &FunctionTarget, ty: &Type, loc: &Loc, err_msg: &str) {
-	if !has_copy(func_target, ty) {
-		func_target.global_env().error(loc, err_msg)
-	}
+    if !has_copy(func_target, ty) {
+        func_target.global_env().error(loc, err_msg)
+    }
 }
 
 // Checks if the given temporary variable has constraint copy, and add diagnostics if not.
-fn check_copy_for_temp_with_msg(func_target: &FunctionTarget, t: TempIndex, loc: &Loc, err_msg: &str) {
-	let ty = func_target.get_local_type(t);
-	check_copy(func_target, ty, loc, err_msg)
+fn check_copy_for_temp_with_msg(
+    func_target: &FunctionTarget,
+    t: TempIndex,
+    loc: &Loc,
+    err_msg: &str,
+) {
+    let ty = func_target.get_local_type(t);
+    check_copy(func_target, ty, loc, err_msg)
 }
 
 fn check_read_ref(target: &FunctionTarget, t: TempIndex, loc: &Loc) {
@@ -48,15 +57,20 @@ fn has_drop(func_target: &FunctionTarget, ty: &Type) -> bool {
 
 // Checks if the given type has constraint drop, and add diagnostics if not.
 fn check_drop(func_target: &FunctionTarget, ty: &Type, loc: &Loc, err_msg: &str) {
-	if !has_drop(func_target, ty) {
-		func_target.global_env().error(loc, err_msg)
-	}
+    if !has_drop(func_target, ty) {
+        func_target.global_env().error(loc, err_msg)
+    }
 }
 
 // Checks if the given temporary variable has constraint drop, and add diagnostics if not.
-fn check_drop_for_temp_with_msg(func_target: &FunctionTarget, t: TempIndex, loc: &Loc, err_msg: &str) {
-	let ty = func_target.get_local_type(t);
-	check_drop(func_target, ty, loc, err_msg)
+fn check_drop_for_temp_with_msg(
+    func_target: &FunctionTarget,
+    t: TempIndex,
+    loc: &Loc,
+    err_msg: &str,
+) {
+    let ty = func_target.get_local_type(t);
+    check_drop(func_target, ty, loc, err_msg)
 }
 
 // `t` is the local containing the reference being written to
@@ -69,22 +83,32 @@ fn check_write_ref(target: &FunctionTarget, t: TempIndex, loc: &Loc) {
     }
 }
 
-/// Determines if the given type has the key constraint.
-fn has_key(func_target: &FunctionTarget, ty: &Type) -> bool {
-    type_abilities(func_target, ty).has_ability(Ability::Key)
-}
-
-// Checks if the given type has constraint key, and add diagnostics if not.
-fn check_key(func_target: &FunctionTarget, ty: &Type, loc: &Loc, err_msg: &str) {
-	if !has_key(func_target, ty) {
-		func_target.global_env().error(loc, err_msg)
-	}
+fn check_key_for_struct(
+    target: &FunctionTarget,
+    mod_id: ModuleId,
+    struct_id: StructId,
+    insts: &[Type],
+    loc: &Loc,
+    err_msg: &str,
+) {
+    if !check_struct_inst(target, mod_id, struct_id, insts, &loc).has_ability(Ability::Key) {
+        target.global_env().error(loc, err_msg)
+    }
 }
 
 // checks that the given type is instantiated with types satisfying their ability constraints
 // on the type parameter
-fn check_struct_inst(target: &FunctionTarget, mid: ModuleId, sid: StructId, inst: &[Type], loc: &Loc) -> AbilitySet {
-    let qid = QualifiedId{ module_id: mid, id: sid };
+fn check_struct_inst(
+    target: &FunctionTarget,
+    mid: ModuleId,
+    sid: StructId,
+    inst: &[Type],
+    loc: &Loc,
+) -> AbilitySet {
+    let qid = QualifiedId {
+        module_id: mid,
+        id: sid,
+    };
     let struct_env = target.global_env().get_struct(qid);
     let struct_abilities = struct_env.get_abilities();
     let mut ty_args_abilities_meet = AbilitySet::ALL;
@@ -97,15 +121,24 @@ fn check_struct_inst(target: &FunctionTarget, mid: ModuleId, sid: StructId, inst
         }
         ty_args_abilities_meet = ty_args_abilities_meet.intersect(given_abilities);
     }
-    if struct_abilities.has_ability(Ability::Key) && ty_args_abilities_meet.has_ability(Ability::Store) {
-        struct_abilities.intersect(ty_args_abilities_meet).add(Ability::Key)
+    if struct_abilities.has_ability(Ability::Key)
+        && ty_args_abilities_meet.has_ability(Ability::Store)
+    {
+        struct_abilities
+            .intersect(ty_args_abilities_meet)
+            .add(Ability::Key)
     } else {
-        struct_abilities.intersect(ty_args_abilities_meet).remove(Ability::Key)
+        struct_abilities
+            .intersect(ty_args_abilities_meet)
+            .remove(Ability::Key)
     }
 }
 
 fn check_fun_inst(target: &FunctionTarget, mid: ModuleId, fid: FunId, inst: &[Type], loc: &Loc) {
-    let qid = QualifiedId{ module_id: mid, id: fid };
+    let qid = QualifiedId {
+        module_id: mid,
+        id: fid,
+    };
     let fun_env = target.global_env().get_function(qid);
     for (param, ty) in fun_env.get_type_parameters().iter().zip(inst.iter()) {
         let required_abilities = param.1.abilities;
@@ -123,11 +156,7 @@ fn check_fun_inst(target: &FunctionTarget, mid: ModuleId, fid: FunId, inst: &[Ty
 // - the type arguments satisfy the ability constraints defined on the struct generics
 // and returns the abilities of the given type
 // `ty_params` specify the abilities held by type params
-pub fn check_instantiation(
-    target: &FunctionTarget,
-    ty: &Type,
-    loc: &Loc,
-) -> AbilitySet {
+pub fn check_instantiation(target: &FunctionTarget, ty: &Type, loc: &Loc) -> AbilitySet {
     match ty {
         Type::Primitive(p) => match p {
             PrimitiveType::Bool
@@ -143,12 +172,8 @@ pub fn check_instantiation(
             | PrimitiveType::Address => AbilitySet::PRIMITIVES,
             PrimitiveType::Signer => AbilitySet::SIGNER,
         },
-        Type::Vector(et) => {
-            AbilitySet::VECTOR.intersect(check_instantiation(target, et, loc))
-        },
-        Type::Struct(mid, sid, insts) => {
-            check_struct_inst(target, *mid, *sid, insts, loc)
-        },
+        Type::Vector(et) => AbilitySet::VECTOR.intersect(check_instantiation(target, et, loc)),
+        Type::Struct(mid, sid, insts) => check_struct_inst(target, *mid, *sid, insts, loc),
         Type::TypeParameter(i) => {
             if let Some(tp) = target.get_type_parameters().get(*i as usize) {
                 tp.1.abilities
@@ -203,49 +228,35 @@ fn check_bytecode(target: &FunctionTarget, bytecode: &Bytecode) {
         },
         Bytecode::Call(attr_id, _, op, srcs, _) => {
             use Operation::*;
-			let loc = target.get_bytecode_loc(*attr_id);
+            let loc = target.get_bytecode_loc(*attr_id);
             match op {
-                Function(mod_id, fun_id, type_params) => {
-                    check_fun_inst(target, *mod_id, *fun_id, type_params, &loc);
-                }
-                Pack(mod_id, struct_id, type_params) => {
-                    check_struct_inst(target, *mod_id, *struct_id, type_params, &loc);
-                }
-                Unpack(mod_id, struct_id, type_params) => {
-                    check_struct_inst(target, *mod_id, *struct_id, type_params, &loc);
-                }
-                MoveTo(mod_id, struct_id, type_params) => {
-                    check_struct_inst(target, *mod_id, *struct_id, type_params, &loc);
-                    let ty = Type::Struct(*mod_id, *struct_id, type_params.clone());
-                    check_key(target, &ty, &loc, "cannot be used as key");
-                }
-                MoveFrom(mod_id, struct_id, type_params) => {
-                    check_struct_inst(target, *mod_id, *struct_id, type_params, &loc);
-                    let ty = Type::Struct(*mod_id, *struct_id, type_params.clone());
-                    check_key(target, &ty, &loc, "cannot be used as key")
-                }
-                Exists(mod_id, struct_id, type_params) => {
-                    check_struct_inst(target, *mod_id, *struct_id, type_params, &loc);
-                    let ty = Type::Struct(*mod_id, *struct_id, type_params.clone());
-                    check_key(target, &ty, &loc, "cannot be used as key")
-                }
-                BorrowField(mod_id, struct_id, type_params, _) => {
-                    check_struct_inst(target, *mod_id, *struct_id, type_params, &loc);
-                }
-                BorrowGlobal(mod_id, struct_id, type_params) => {
-                    check_struct_inst(target, *mod_id, *struct_id, type_params, &loc);
-                    let ty = Type::Struct(*mod_id, *struct_id, type_params.clone());
-                    check_key(target, &ty, &loc, "cannot be used as key")
+                Function(mod_id, fun_id, insts) => {
+                    check_fun_inst(target, *mod_id, *fun_id, insts, &loc);
                 },
-                Destroy => {
-                    check_drop_for_temp_with_msg(target, srcs[0], &loc, "cannot drop")
-                }
-                ReadRef => {
-                    check_read_ref(target, srcs[0], &loc)
-				}
-                WriteRef => {
-                    check_write_ref(target, srcs[0], &loc)
+                Pack(mod_id, struct_id, insts) => {
+                    check_struct_inst(target, *mod_id, *struct_id, insts, &loc);
                 },
+                Unpack(mod_id, struct_id, insts) => {
+                    check_struct_inst(target, *mod_id, *struct_id, insts, &loc);
+                },
+                MoveTo(mod_id, struct_id, insts) => {
+                    check_key_for_struct(target, *mod_id, *struct_id, insts, &loc, "no key ability")
+                },
+                MoveFrom(mod_id, struct_id, insts) => {
+                    check_key_for_struct(target, *mod_id, *struct_id, insts, &loc, "no key ability")
+                },
+                Exists(mod_id, struct_id, insts) => {
+                    check_key_for_struct(target, *mod_id, *struct_id, insts, &loc, "no key ability")
+                },
+                BorrowGlobal(mod_id, struct_id, insts) => {
+                    check_key_for_struct(target, *mod_id, *struct_id, insts, &loc, "no key ability")
+                },
+                BorrowField(mod_id, struct_id, insts, _) => {
+                    check_struct_inst(target, *mod_id, *struct_id, insts, &loc);
+                },
+                Destroy => check_drop_for_temp_with_msg(target, srcs[0], &loc, "cannot drop"),
+                ReadRef => check_read_ref(target, srcs[0], &loc),
+                WriteRef => check_write_ref(target, srcs[0], &loc),
                 _ => (),
             }
         },
