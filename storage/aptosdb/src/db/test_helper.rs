@@ -3,23 +3,43 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module provides reusable helpers in tests.
-use super::*;
+#[cfg(test)]
+use crate::state_store::StateStore;
+#[cfg(test)]
+use crate::utils::new_sharded_kv_schema_batch;
 use crate::{
-    jellyfish_merkle_node::JellyfishMerkleNodeSchema, schema::state_value::StateValueSchema,
+    schema::{jellyfish_merkle_node::JellyfishMerkleNodeSchema, state_value::StateValueSchema},
+    AptosDB,
 };
+use anyhow::Result;
 use aptos_crypto::hash::CryptoHash;
+#[cfg(test)]
+use aptos_crypto::HashValue;
 use aptos_executor_types::ProofReader;
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
+use aptos_schemadb::SchemaBatch;
+use aptos_storage_interface::{state_delta::StateDelta, DbReader, DbWriter, Order};
 use aptos_temppath::TempPath;
+#[cfg(test)]
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
+    account_address::AccountAddress,
     contract_event::ContractEvent,
+    event::EventKey,
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     proof::accumulator::{InMemoryEventAccumulator, InMemoryTransactionAccumulator},
     proptest_types::{AccountInfoUniverse, BlockGen},
-    state_store::create_empty_sharded_state_updates,
+    state_store::{
+        create_empty_sharded_state_updates, state_key::StateKey, state_value::StateValue,
+        ShardedStateUpdates,
+    },
+    transaction::{Transaction, TransactionInfo, TransactionToCommit, Version},
 };
+#[cfg(test)]
+use arr_macro::arr;
 use proptest::{collection::vec, prelude::*, sample::Index};
-use std::fmt::Debug;
+use rayon::prelude::*;
+use std::{collections::HashMap, fmt::Debug};
 
 prop_compose! {
     pub fn arb_state_kv_sets(

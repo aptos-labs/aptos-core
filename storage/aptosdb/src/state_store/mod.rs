@@ -5,27 +5,35 @@
 //! This file defines state store APIs that are related account state Merkle tree.
 
 use crate::{
-    db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-    epoch_by_version::EpochByVersionSchema,
+    common::NUM_STATE_SHARDS,
+    errors::AptosDbError,
     ledger_db::LedgerDb,
-    metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
-    new_sharded_kv_schema_batch,
-    schema::{state_value::StateValueSchema, state_value_index::StateValueIndexSchema},
-    stale_state_value_index::StaleStateValueIndexSchema,
+    ledger_store::LedgerStore,
+    metrics::{OTHER_TIMERS_SECONDS, STATE_ITEMS, TOTAL_STATE_BYTES},
+    pruner::{StateKvPrunerManager, StateMerklePrunerManager},
+    schema::{
+        db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        epoch_by_version::EpochByVersionSchema,
+        stale_node_index::StaleNodeIndexSchema,
+        stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
+        stale_state_value_index::StaleStateValueIndexSchema,
+        state_value::StateValueSchema,
+        state_value_index::StateValueIndexSchema,
+        version_data::VersionDataSchema,
+    },
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
     state_restore::{
         StateSnapshotProgress, StateSnapshotRestore, StateSnapshotRestoreMode, StateValueWriter,
     },
     state_store::buffered_state::BufferedState,
+    transaction_store::TransactionStore,
     utils::{
         iterators::PrefixedStateValueIterator,
+        new_sharded_kv_schema_batch,
         truncation_helper::{truncate_ledger_db, truncate_state_kv_db},
+        ShardedStateKvSchemaBatch,
     },
-    version_data::VersionDataSchema,
-    AptosDbError, LedgerStore, ShardedStateKvSchemaBatch, StaleNodeIndexCrossEpochSchema,
-    StaleNodeIndexSchema, StateKvPrunerManager, StateMerklePrunerManager, TransactionStore,
-    NUM_STATE_SHARDS, OTHER_TIMERS_SECONDS,
 };
 use anyhow::{ensure, format_err, Context, Result};
 use aptos_crypto::{
@@ -1089,7 +1097,7 @@ impl StateStore {
             .state_db
             .state_merkle_db
             .metadata_db()
-            .iter::<crate::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
+            .iter::<crate::schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
             Default::default(),
         )?;
         iter.seek_to_first();
@@ -1103,7 +1111,7 @@ impl StateStore {
                 let mut iter = self
                     .state_merkle_db
                     .db_shard(i)
-                    .iter::<crate::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
+                    .iter::<crate::schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
                     Default::default(),
                 )?;
                 iter.seek_to_first();

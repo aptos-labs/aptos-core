@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    get_first_seq_num_and_limit,
-    pruner::{LedgerPrunerManager, StateMerklePrunerManager},
-    test_helper,
-    test_helper::{arb_blocks_to_commit, put_as_state_root, put_transaction_info},
-    AptosDB, PrunerManager, StaleNodeIndexSchema,
+    db::{
+        get_first_seq_num_and_limit, test_helper,
+        test_helper::{arb_blocks_to_commit, put_as_state_root, put_transaction_info},
+        AptosDB,
+    },
+    pruner::{LedgerPrunerManager, PrunerManager, StateMerklePrunerManager},
+    schema::stale_node_index::StaleNodeIndexSchema,
 };
 use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, RocksdbConfigs,
