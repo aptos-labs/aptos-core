@@ -7,7 +7,7 @@ use move_model::{ast::TempIndex, model::FunctionEnv};
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{AttrId, Bytecode, Label, Operation},
+    stackless_bytecode::{AttrId, Bytecode, Label, Operation, AssignKind},
     stackless_control_flow_graph::StacklessControlFlowGraph,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -181,8 +181,14 @@ fn released_temps(
             released_temps.insert(t);
         }
     }
-    // this is needed because dead vars are not ever used
-    // and thus never released by live var info
+    // if a temp is moved, then no need to drop
+    // this should come before the calculation
+    // of unused vars; because of, for instance,
+    // x = move(x)
+    for moved_src in moved_srcs(bytecode) {
+        released_temps.remove(&moved_src);
+    }
+    // this is needed because unused vars are not released by live var info
     for dst in bytecode.dests() {
         if !live_var_info.after.contains_key(&dst) {
             debug_assert!(
@@ -193,4 +199,15 @@ fn released_temps(
         }
     }
     released_temps
+}
+
+fn moved_srcs(bytecode: &Bytecode) -> Vec<TempIndex> {
+    match bytecode {
+        Bytecode::Assign(_, _, src, AssignKind::Move) => vec![*src],
+        Bytecode::Call(_, _, _, srcs, _) => srcs.clone(),
+        Bytecode::Branch(_, _, _, src) => vec![*src],
+        Bytecode::Ret(_, srcs) => srcs.clone(),
+        Bytecode::Abort(_, src) => vec![*src],
+        _ => Vec::new(),
+    }
 }
