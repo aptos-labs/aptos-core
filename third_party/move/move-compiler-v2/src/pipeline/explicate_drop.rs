@@ -7,10 +7,9 @@ use move_model::{ast::TempIndex, model::FunctionEnv};
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{AssignKind, AttrId, Bytecode, Label, Operation},
-    stackless_control_flow_graph::StacklessControlFlowGraph,
+    stackless_bytecode::{AssignKind, AttrId, Bytecode, Operation},
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 pub struct ExplicateDrop {}
 
@@ -45,8 +44,6 @@ struct ExplicateDropTransformer<'a> {
     transformed: Vec<Bytecode>,
     live_var_annot: &'a LiveVarAnnotation,
     lifetime_annot: &'a LifetimeAnnotation,
-    label_offsets: BTreeMap<Label, CodeOffset>,
-    cfg: StacklessControlFlowGraph,
 }
 
 impl<'a> ExplicateDropTransformer<'a> {
@@ -59,15 +56,11 @@ impl<'a> ExplicateDropTransformer<'a> {
             .get_annotations()
             .get::<LifetimeAnnotation>()
             .expect("lifetime annotation");
-        let label_offsets = Bytecode::label_offsets(target.get_bytecode());
-        let cfg = StacklessControlFlowGraph::new_backward(target.get_bytecode(), true);
         ExplicateDropTransformer {
             target,
             transformed: Vec::new(),
             live_var_annot,
             lifetime_annot,
-            label_offsets,
-            cfg,
         }
     }
 
@@ -87,33 +80,11 @@ impl<'a> ExplicateDropTransformer<'a> {
             Bytecode::Ret(..) | Bytecode::Jump(..) | Bytecode::Abort(..) | Bytecode::Branch(..) => {
                 ()
             },
-            Bytecode::Label(_, label) => {
-                // all locals released by (immediate) preceding instructions
-                let released_temps_join: BTreeSet<_> = self
-                    .pred_instr_offsets(label)
-                    .flat_map(|pred_instr_offset| self.released_temps_at(pred_instr_offset))
-                    .collect();
-                self.drop_temps(&released_temps_join, bytecode.get_attr_id())
-            },
             _ => {
                 let released_temps = self.released_temps_at(code_offset);
                 self.drop_temps(&released_temps, bytecode.get_attr_id())
             },
         }
-    }
-
-    // return the offsets of the instructions which jump to the given label
-    fn pred_instr_offsets(&self, label: &Label) -> impl Iterator<Item = CodeOffset> + '_ {
-        let offset = self.label_offsets.get(label).expect("label offset");
-        let block_id = self.cfg.offset_to_key().get(offset).expect("block id");
-        self.cfg.successors(*block_id).iter().map(|pred_block| {
-            // last instr of the pred block
-            self.cfg
-                .instr_indexes(*pred_block)
-                .expect("basic block")
-                .last()
-                .expect("code offset")
-        })
     }
 
     fn drop_unused_args(&mut self) {
@@ -122,7 +93,6 @@ impl<'a> ExplicateDropTransformer<'a> {
         let lifetime_info = self.get_lifetime_info(code_offset);
         for arg in self.target.get_parameters() {
             if !live_var_info.before.contains_key(&arg) && !lifetime_info.before.is_borrowed(arg) {
-                // todo
                 let attr_id = self.target.get_bytecode()[0].get_attr_id();
                 self.drop_temp(arg, attr_id)
             }
@@ -202,6 +172,7 @@ fn released_temps(
     released_temps
 }
 
+// returns locals that may be read and moved by the bytecode
 fn moved_srcs(bytecode: &Bytecode) -> Vec<TempIndex> {
     match bytecode {
         Bytecode::Assign(_, _, src, AssignKind::Move) => vec![*src],
