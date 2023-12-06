@@ -89,13 +89,13 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// aggregator_v1.
     fn resource_write_set(
         &self,
-    ) -> BTreeMap<
+    ) -> Vec<(
         <Self::Txn as Transaction>::Key,
         (
             <Self::Txn as Transaction>::Value,
             Option<Arc<MoveTypeLayout>>,
         ),
-    >;
+    )>;
 
     fn module_write_set(
         &self,
@@ -118,14 +118,14 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     fn reads_needing_delayed_field_exchange(
         &self,
-    ) -> BTreeMap<
-        <Self::Txn as Transaction>::Key,
-        (<Self::Txn as Transaction>::Value, Arc<MoveTypeLayout>),
-    >;
+    ) -> Vec<(<Self::Txn as Transaction>::Key, Arc<MoveTypeLayout>)>;
 
     fn group_reads_needing_delayed_field_exchange(
         &self,
-    ) -> BTreeMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+    ) -> Vec<(
+        <Self::Txn as Transaction>::Key,
+        <Self::Txn as Transaction>::Value,
+    )>;
 
     /// Get the events of a transaction from its output.
     fn get_events(&self) -> Vec<(<Self::Txn as Transaction>::Event, Option<MoveTypeLayout>)>;
@@ -165,15 +165,11 @@ pub trait TransactionOutput: Send + Sync + Debug {
     fn incorporate_materialized_txn_output(
         &self,
         aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
-        patched_resource_write_set: BTreeMap<
-            <Self::Txn as Transaction>::Key,
-            <Self::Txn as Transaction>::Value,
-        >,
-        patched_events: Vec<<Self::Txn as Transaction>::Event>,
-        combined_groups: Vec<(
+        patched_resource_write_set: Vec<(
             <Self::Txn as Transaction>::Key,
             <Self::Txn as Transaction>::Value,
         )>,
+        patched_events: Vec<<Self::Txn as Transaction>::Event>,
     );
 
     fn set_txn_output_for_non_dynamic_change_set(&self);
