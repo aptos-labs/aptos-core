@@ -83,6 +83,10 @@ impl StateComputer for OrderingStateComputer {
     ) -> ExecutorResult<()> {
         assert!(!blocks.is_empty());
 
+        for block in blocks {
+            block.set_insertion_time();
+        }
+
         if self
             .executor_channel
             .clone()
