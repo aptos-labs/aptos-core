@@ -1,6 +1,6 @@
 # Use Case Specification
 ## Rules through Test-Driven Development:
-1. Ensure appropriate width of 90 characters, reasonable indentation of 2 spaces, and elegant layout.
+1. Ensure appropriate width of 90 characters, reasonable indentation of 4 spaces, and elegant layout.
 
 2. Provide minimal configuration, such as choice of indentation with 2 or 4 spaces.
 
