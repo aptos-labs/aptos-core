@@ -34,7 +34,7 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
       - mainnet
       - aptos-node-v*
       - aptos-release-v*
-      # experimental branches
+      # pipeline branches
       - performance_benchmark
       - quorum-store
       - preview

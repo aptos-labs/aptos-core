@@ -6,7 +6,7 @@
 
 use crate::{
     dag::DAGNetworkMessage,
-    experimental,
+    pipeline,
     quorum_store::types::{Batch, BatchMsg, BatchRequest},
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
@@ -24,7 +24,7 @@ use aptos_network::{
     ProtocolId,
 };
 use aptos_types::{epoch_change::EpochChangeProof, PeerId};
-pub use experimental::commit_reliable_broadcast::CommitMessage;
+pub use pipeline::commit_reliable_broadcast::CommitMessage;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 

@@ -4,11 +4,11 @@
 
 use crate::{
     error::StateSyncError,
-    experimental::{
+    payload_manager::PayloadManager,
+    pipeline::{
         buffer_manager::{OrderedBlocks, ResetAck, ResetRequest},
         errors::Error,
     },
-    payload_manager::PayloadManager,
     state_computer::PipelineExecutionResult,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,

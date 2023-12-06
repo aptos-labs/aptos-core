@@ -384,7 +384,7 @@ pub struct Function_ {
     /// This list of acquires grants the borrow checker the ability to statically verify the safety
     /// of references into global storage
     pub acquires: Vec<StructName>,
-    /// List of specifications for the Move prover (experimental)
+    /// List of specifications for the Move prover (pipeline)
     pub specifications: Vec<Condition>,
     /// The code for the procedure
     pub body: FunctionBody,

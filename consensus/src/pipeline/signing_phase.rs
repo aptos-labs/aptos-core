@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::experimental::pipeline_phase::StatelessPipeline;
+use crate::pipeline::pipeline_phase::StatelessPipeline;
 use aptos_crypto::bls12381;
 use aptos_safety_rules::Error;
 use aptos_types::ledger_info::{LedgerInfo, LedgerInfoWithSignatures};

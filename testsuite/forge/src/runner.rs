@@ -68,7 +68,7 @@ pub struct Options {
     #[clap(short = 'Z')]
     /// NO-OP: unsupported option, exists for compatibility with the default test harness
     /// -Z unstable-options Enable nightly-only flags:
-    ///                     unstable-options = Allow use of experimental features
+    ///                     unstable-options = Allow use of pipeline features
     z_unstable_options: Option<String>,
     #[allow(dead_code)]
     #[clap(long)]
@@ -379,7 +379,7 @@ impl ForgeConfig {
 }
 
 // Workaround way to implement all_tests, for:
-// error[E0658]: cannot cast `dyn interface::admin::AdminTest` to `dyn interface::test::Test`, trait upcasting coercion is experimental
+// error[E0658]: cannot cast `dyn interface::admin::AdminTest` to `dyn interface::test::Test`, trait upcasting coercion is pipeline
 pub enum AnyTestRef<'a> {
     Aptos(&'a dyn AptosTest),
     Admin(&'a dyn AdminTest),

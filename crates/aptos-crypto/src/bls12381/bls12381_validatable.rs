@@ -8,7 +8,7 @@
 //! NOTE: For public keys used to verify multisignatures, aggregate signatures and signature shares,
 //! library users need NOT rely on this `Validatable<PublicKey>` wrapper and should instead verify
 //! the proof-of-possession (PoP) of a public key, which implicitly guarantees the PK lies in the
-//! prime-order subgroup. (See `bls12381_pop.rs` and `mod.rs` for details.)
+//! prime-order subgroup. (See `bls12381_pop.rs` and `pipeline` for details.)
 
 use crate::{bls12381::PublicKey, validatable::Validate, CryptoMaterialError, ValidCryptoMaterial};
 use anyhow::{anyhow, Result};

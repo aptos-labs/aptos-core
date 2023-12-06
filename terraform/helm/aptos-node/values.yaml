@@ -14,7 +14,7 @@ numValidators: 1
 # -- Total number of fullnode groups to deploy
 numFullnodeGroups: 1
 
-# -- Options for multicluster mode. This is *experimental only*.
+# -- Options for multicluster mode. This is *pipeline only*.
 multicluster:
   enabled: false
   targetClusters: ["forge-multiregion-1", "forge-multiregion-2", "forge-multiregion-3"]

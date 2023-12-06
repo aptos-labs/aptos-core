@@ -146,7 +146,7 @@ storage:
       block_cache_size: 8388608
       block_size: 4096
       cache_index_and_filter_blocks: false
-  # The internal indexer is experimental, and should be kept disabled.
+  # The internal indexer is pipeline, and should be kept disabled.
   enable_indexer: false
 ```
 

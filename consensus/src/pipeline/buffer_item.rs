@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    experimental::{commit_reliable_broadcast::DropGuard, hashable::Hashable},
+    pipeline::{commit_reliable_broadcast::DropGuard, hashable::Hashable},
     state_replication::StateComputerCommitCallBackType,
 };
 use anyhow::anyhow;

@@ -242,7 +242,7 @@ impl StateApi {
     /// The Aptos nodes prune account state history, via a configurable time window.
     /// If the requested ledger version has been pruned, the server responds with a 410.
     #[oai(
-        path = "/experimental/state_values/raw",
+        path = "/pipeline/state_values/raw",
         method = "post",
         operation_id = "get_raw_state_value",
         tag = "ApiTags::Experimental",

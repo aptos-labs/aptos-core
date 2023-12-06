@@ -471,7 +471,7 @@ pub const VERSION_DEFAULT: u32 = VERSION_6;
 /// Mark which version is the latest version
 pub const VERSION_MAX: u32 = VERSION_7;
 
-/// A version value which is used for experimental code which is not allowed in
+/// A version value which is used for pipeline code which is not allowed in
 /// production. The bytecode deserializer accepts modules with this version only when the
 /// cargo feature `testing` is enabled.
 ///

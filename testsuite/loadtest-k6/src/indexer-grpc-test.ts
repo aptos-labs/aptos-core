@@ -1,7 +1,7 @@
 import { sleep } from "k6";
 
 // see https://k6.io/docs/javascript-api/k6-experimental/grpc/stream/
-import grpc from "k6/experimental/grpc";
+import grpc from "k6/pipeline/grpc";
 
 const GRPC_ADDR = __ENV.GRPC_ADDR || "127.0.0.1:50052";
 const GRPC_METHOD = "aptos.indexer.v1.RawData/GetTransactions";

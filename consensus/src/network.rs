@@ -9,10 +9,10 @@ use crate::{
         DAGMessage, DAGNetworkMessage, DAGRpcResult, ProofNotifier, RpcWithFallback,
         TDAGNetworkSender,
     },
-    experimental::commit_reliable_broadcast::CommitMessage,
     logging::{LogEvent, LogSchema},
     monitor,
     network_interface::{ConsensusMsg, ConsensusNetworkClient, RPC},
+    pipeline::commit_reliable_broadcast::CommitMessage,
     quorum_store::types::{Batch, BatchMsg, BatchRequest},
 };
 use anyhow::{anyhow, bail, ensure};

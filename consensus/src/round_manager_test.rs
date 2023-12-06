@@ -4,7 +4,6 @@
 
 use crate::{
     block_storage::{BlockReader, BlockStore},
-    experimental::buffer_manager::OrderedBlocks,
     liveness::{
         proposal_generator::{
             ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
@@ -19,6 +18,7 @@ use crate::{
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::PayloadManager,
     persistent_liveness_storage::RecoveryData,
+    pipeline::buffer_manager::OrderedBlocks,
     round_manager::RoundManager,
     test_utils::{
         consensus_runtime, timed_block_on, MockPayloadManager, MockStateComputer, MockStorage,

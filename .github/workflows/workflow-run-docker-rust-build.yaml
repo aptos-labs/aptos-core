@@ -74,7 +74,7 @@ permissions:
 
 jobs:
   rust-all:
-    runs-on: experimental-docker
+    runs-on: pipeline-docker
     steps:
       - uses: actions/checkout@v3
         with:

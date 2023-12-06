@@ -10,12 +10,6 @@ use crate::{
     counters,
     dag::{DagBootstrapper, DagCommitSigner, StorageAdapter},
     error::{error_kind, DbError},
-    experimental::{
-        buffer_manager::{OrderedBlocks, ResetRequest},
-        decoupled_execution_utils::prepare_phases_and_buffer_manager,
-        ordering_state_computer::{DagStateSyncComputer, OrderingStateComputer},
-        signing_phase::CommitSignerProvider,
-    },
     liveness::{
         cached_proposer_election::CachedProposerElection,
         leader_reputation::{
@@ -43,6 +37,12 @@ use crate::{
     },
     payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
+    pipeline::{
+        buffer_manager::{OrderedBlocks, ResetRequest},
+        decoupled_execution_utils::prepare_phases_and_buffer_manager,
+        ordering_state_computer::{DagStateSyncComputer, OrderingStateComputer},
+        signing_phase::CommitSignerProvider,
+    },
     quorum_store::{
         quorum_store_builder::{DirectMempoolInnerBuilder, InnerBuilder, QuorumStoreBuilder},
         quorum_store_coordinator::CoordinatorCommand,

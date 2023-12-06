@@ -61,7 +61,7 @@ pub struct Options {
     pub move_deps: Vec<String>,
     /// The values assigned to named addresses in the Move code being verified.
     pub move_named_address_values: Vec<String>,
-    /// Whether to run experimental pipeline
+    /// Whether to run pipeline pipeline
     pub experimental_pipeline: bool,
     /// Whether to skip checking for unknown attributes
     pub skip_attribute_checks: bool,
@@ -456,7 +456,7 @@ impl Options {
                 Arg::new("use-exp-boogie")
                     .long("use-exp-boogie")
                     .action(SetTrue)
-                    .help("uses experimental boogie expected in EXP_BOOGIE_EXE")
+                    .help("uses pipeline boogie expected in EXP_BOOGIE_EXE")
             )
             .arg(
                 Arg::new("generate-smt")
@@ -465,11 +465,11 @@ impl Options {
                     .help("instructs boogie to log smtlib files for verified functions")
             )
             .arg(
-                Arg::new("experimental-pipeline")
-                    .long("experimental-pipeline")
+                Arg::new("pipeline-pipeline")
+                    .long("pipeline-pipeline")
                     .short('e')
                     .action(SetTrue)
-                    .help("whether to run experimental pipeline")
+                    .help("whether to run pipeline pipeline")
             )
             .arg(
                 Arg::new(SKIP_ATTRIBUTE_CHECKS)
@@ -709,7 +709,7 @@ impl Options {
         if matches.contains_id("seed") {
             options.backend.random_seed = *matches.try_get_one("seed")?.unwrap();
         }
-        if matches.get_flag("experimental-pipeline") {
+        if matches.get_flag("pipeline-pipeline") {
             options.experimental_pipeline = true;
         }
         if matches.contains_id(SKIP_ATTRIBUTE_CHECKS) {

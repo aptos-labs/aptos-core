@@ -1367,7 +1367,7 @@ impl Client {
         version: u64,
     ) -> AptosResult<Response<Vec<u8>>> {
         let url = self.build_path(&format!(
-            "experimental/state_values/raw?ledger_version={}",
+            "pipeline/state_values/raw?ledger_version={}",
             version
         ))?;
         let data = json!({

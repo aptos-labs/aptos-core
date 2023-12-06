@@ -60,7 +60,7 @@ build/
 *.mvcov
 
 # Do not ignore the Move build output under the releases for DPN, core, and
-# experimental -- these are the release code.
+# pipeline -- these are the release code.
 !aptos-move/framework/DPN/releases/artifacts/**
 !aptos-move/framework/experimental/releases/artifacts/**
 !aptos-move/framework/aptos-framework/releases/artifacts/**

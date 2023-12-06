@@ -4,8 +4,10 @@
 
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
-    counters,
-    experimental::{
+    counters, monitor,
+    network::{IncomingCommitRequest, NetworkSender},
+    network_interface::ConsensusMsg,
+    pipeline::{
         buffer::{Buffer, Cursor},
         buffer_item::BufferItem,
         commit_reliable_broadcast::{AckState, CommitMessage, DropGuard},
@@ -15,9 +17,6 @@ use crate::{
         pipeline_phase::CountedRequest,
         signing_phase::{SigningRequest, SigningResponse},
     },
-    monitor,
-    network::{IncomingCommitRequest, NetworkSender},
-    network_interface::ConsensusMsg,
     state_replication::StateComputerCommitCallBackType,
 };
 use aptos_bounded_executor::BoundedExecutor;

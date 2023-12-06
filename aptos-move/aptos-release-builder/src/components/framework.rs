@@ -87,7 +87,7 @@ pub fn generate_upgrade_proposals(
         // For example, let's say we are going to generate these files:
         // 0-move-stdlib.move	2-aptos-framework.move	4-gas-schedule.move	6-features.move
         // 1-aptos-stdlib.move	3-aptos-token.move	5-version.move		7-consensus-config.move
-        // The first framework file being generated is 3-aptos-token.move. It's using the next_execution_hash being passed in (so in this case, the hash of 4-gas-schedule.move being passed in mod.rs).
+        // The first framework file being generated is 3-aptos-token.move. It's using the next_execution_hash being passed in (so in this case, the hash of 4-gas-schedule.move being passed in pipeline).
         // The second framework file being generated would be 2-aptos-framework.move, and it's using the hash of 3-aptos-token.move (which would be result.last()).
 
         let options = BuildOptions {

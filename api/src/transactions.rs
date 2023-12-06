@@ -291,7 +291,7 @@ impl TransactionsApi {
     ///   3. Submit the request. Make sure to use the "application/json" Content-Type.
     ///
     /// To submit a transaction as BCS, you must submit a SignedTransaction
-    /// encoded as BCS. See SignedTransaction in types/src/transaction/mod.rs.
+    /// encoded as BCS. See SignedTransaction in types/src/transaction/pipeline.
     /// Make sure to use the `application/x.aptos.signed_transaction+bcs` Content-Type.
     // TODO: Point to examples of both of these flows, in multiple languages.
     #[oai(
@@ -345,7 +345,7 @@ impl TransactionsApi {
     ///   3. Submit the request. Make sure to use the "application/json" Content-Type.
     ///
     /// To submit a transaction as BCS, you must submit a SignedTransaction
-    /// encoded as BCS. See SignedTransaction in types/src/transaction/mod.rs.
+    /// encoded as BCS. See SignedTransaction in types/src/transaction/pipeline.
     /// Make sure to use the `application/x.aptos.signed_transaction+bcs` Content-Type.
     #[oai(
         path = "/transactions/batch",
@@ -401,7 +401,7 @@ impl TransactionsApi {
     /// - Submit a SubmitTransactionRequest containing a UserTransactionRequest containing that signature.
     ///
     /// To use this endpoint with BCS, you must submit a SignedTransaction
-    /// encoded as BCS. See SignedTransaction in types/src/transaction/mod.rs.
+    /// encoded as BCS. See SignedTransaction in types/src/transaction/pipeline.
     #[oai(
         path = "/transactions/simulate",
         method = "post",

@@ -144,7 +144,7 @@ if [ ! -z "$GEN_ARTIFACTS" ]; then
         echo "Building additional experimental artifact in $dir"
         (
             cd $dir
-            cargo run -- --package experimental
+            cargo run -- --package pipeline
         )
     fi
   done

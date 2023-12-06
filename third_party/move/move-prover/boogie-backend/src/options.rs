@@ -87,7 +87,7 @@ impl BorrowAggregate {
 pub struct BoogieOptions {
     /// Path to the boogie executable.
     pub boogie_exe: String,
-    /// Use experimental boogie exe found via env var EXP_BOOGIE_EXE.
+    /// Use pipeline boogie exe found via env var EXP_BOOGIE_EXE.
     pub use_exp_boogie: bool,
     /// Path to the z3 executable.
     pub z3_exe: String,

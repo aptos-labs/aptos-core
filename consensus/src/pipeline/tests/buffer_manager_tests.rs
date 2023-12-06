@@ -3,7 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    experimental::{
+    metrics_safety_rules::MetricsSafetyRules,
+    network::{IncomingCommitRequest, NetworkSender},
+    network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
+    pipeline::{
         buffer_manager::{
             create_channel, BufferManager, OrderedBlocks, Receiver, ResetAck, ResetRequest, Sender,
         },
@@ -16,9 +19,6 @@ use crate::{
         signing_phase::SigningPhase,
         tests::test_utils::prepare_executed_blocks_with_ledger_info,
     },
-    metrics_safety_rules::MetricsSafetyRules,
-    network::{IncomingCommitRequest, NetworkSender},
-    network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     test_utils::{
         consensus_runtime, timed_block_on, EmptyStateComputer, MockStorage,
         RandomComputeResultStateComputer,

@@ -50,5 +50,5 @@ serde_json = { workspace = true }
 smallvec = { workspace = true }
 tracing = { workspace = true }
 
-# experimental
+# pipeline
 hashbrown = "0.14.0"
