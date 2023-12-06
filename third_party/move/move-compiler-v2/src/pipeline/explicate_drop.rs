@@ -161,7 +161,7 @@ fn released_temps(
     }
     // this is needed because unused vars are not released by live var info
     for dst in bytecode.dests() {
-        if !live_var_info.after.contains_key(&dst) {
+        if !live_var_info.before.contains_key(&dst) && !live_var_info.after.contains_key(&dst) {
             debug_assert!(
                 !life_time_info.after.is_borrowed(dst),
                 "dead assignment borrowed later"
