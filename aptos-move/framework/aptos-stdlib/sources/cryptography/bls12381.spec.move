@@ -11,7 +11,7 @@ spec aptos_std::bls12381 {
         aborts_if false;
         ensures spec_verify_proof_of_possession_internal(pk_bytes, pop.bytes) ==> (std::option::spec_is_some(result) && std::option::spec_borrow(result).bytes == pk_bytes);
         ensures !spec_verify_proof_of_possession_internal(pk_bytes, pop.bytes) ==> std::option::spec_is_none(result);
-        ensures result == spec_public_key_from_bytes_with_pop(pk_bytes, pop);
+        ensures [abstract] result == spec_public_key_from_bytes_with_pop(pk_bytes, pop);
     }
 
     spec aggregate_pubkeys {
