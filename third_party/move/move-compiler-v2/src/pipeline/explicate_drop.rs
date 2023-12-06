@@ -1,5 +1,5 @@
 use super::{
-    livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset, LiveVarAnalysisProcessor},
+    livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
     reference_safety_processor::{LifetimeAnnotation, LifetimeInfoAtCodeOffset},
 };
 use move_binary_format::file_format::CodeOffset;
@@ -7,7 +7,7 @@ use move_model::{ast::TempIndex, model::FunctionEnv};
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{AttrId, Bytecode, Label, Operation, AssignKind},
+    stackless_bytecode::{AssignKind, AttrId, Bytecode, Label, Operation},
     stackless_control_flow_graph::StacklessControlFlowGraph,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -138,8 +138,7 @@ impl<'a> ExplicateDropTransformer<'a> {
     }
 
     fn get_live_var_info(&self, code_offset: CodeOffset) -> &'a LiveVarInfoAtCodeOffset {
-        self
-            .live_var_annot
+        self.live_var_annot
             .get_live_var_info_at(code_offset)
             .expect("live var info")
     }
