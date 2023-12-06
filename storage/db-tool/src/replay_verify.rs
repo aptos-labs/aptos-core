@@ -92,6 +92,7 @@ impl Opt {
                     process::exit(2);
                 },
                 _ => {
+                    info!("ReplayVerify coordinator exiting with error: {:?}", e);
                     process::exit(1);
                 },
             },
