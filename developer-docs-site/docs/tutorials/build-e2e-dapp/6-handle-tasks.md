@@ -277,7 +277,7 @@ When someones adds a new task we:
     // check for connected account
     if (!account) return;
     setTransactionInProgress(true);
-    // build a transaction payload to be submited
+    // build a transaction payload to be submitted
     const payload = {
       type: "entry_function_payload",
       function: `${moduleAddress}::todolist::create_task`,
