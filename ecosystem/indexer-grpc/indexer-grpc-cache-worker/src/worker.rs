@@ -306,7 +306,8 @@ async fn process_streaming_response(
         }
     }
     let mut current_version = starting_version;
-    let mut last_file_update_check_timestamp = std::time::Instant::now();    let mut starting_time = std::time::Instant::now();
+    let mut starting_time = std::time::Instant::now();
+    let mut last_file_update_check_timestamp = std::time::Instant::now();
 
     // 4. Process the streaming response.
     while let Some(received) = resp_stream.next().await {
