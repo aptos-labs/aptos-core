@@ -10,7 +10,10 @@ use crate::{
     symbol::Symbol,
 };
 use itertools::Itertools;
-use move_binary_format::{file_format::{TypeParameterIndex, AbilitySet, Ability}, normalized::Type as MType};
+use move_binary_format::{
+    file_format::{Ability, AbilitySet, TypeParameterIndex},
+    normalized::Type as MType,
+};
 use move_core_types::{
     language_storage::{StructTag, TypeTag},
     u256::U256,
@@ -2114,16 +2117,83 @@ impl fmt::Display for PrimitiveType {
 }
 
 /// Infers the (conditional) abilities of a struct
-pub fn inst_abilities(declared_abilities: AbilitySet, insts_abilities_meet: AbilitySet) -> AbilitySet {
-    if declared_abilities.has_ability(Ability::Key)
+pub fn inst_abilities(
+    struct_abilities: AbilitySet,
+    insts_abilities_meet: AbilitySet,
+) -> AbilitySet {
+    if struct_abilities.has_ability(Ability::Key)
         && insts_abilities_meet.has_ability(Ability::Store)
     {
-        declared_abilities
+        struct_abilities
             .intersect(insts_abilities_meet)
             .add(Ability::Key)
     } else {
-        declared_abilities
+        struct_abilities
             .intersect(insts_abilities_meet)
             .remove(Ability::Key)
+    }
+}
+
+
+/// checks for type instantiations if `check` is set
+/// - the type arguments given to the struct are instantiated properly
+/// - the type arguments satisfy the ability constraints defined on the struct generics
+/// and returns the abilities of the type
+/// `ty_param_abilities` specify the abilities of type parameters
+/// `get_abilities` returns the abilities for the geneircs, and the abilities of the struct
+pub fn check_instantiation<F, G, H>(ty: &Type, loc: Option<&Loc>, ty_param_abilities: F, get_abilities: G, on_err: H, check: bool) -> AbilitySet
+where
+    F: Fn(u16) -> AbilitySet + Copy,
+    G: Fn(ModuleId, StructId) -> (Vec<AbilitySet>, AbilitySet) + Copy,
+    H: Fn(&Loc, &str) -> () + Copy
+{
+    match ty {
+        Type::Primitive(p) => match p {
+            PrimitiveType::Bool
+            | PrimitiveType::U8
+            | PrimitiveType::U16
+            | PrimitiveType::U32
+            | PrimitiveType::U64
+            | PrimitiveType::U128
+            | PrimitiveType::U256
+            | PrimitiveType::Num
+            | PrimitiveType::Range
+            | PrimitiveType::EventStore
+            | PrimitiveType::Address => AbilitySet::PRIMITIVES,
+            PrimitiveType::Signer => AbilitySet::SIGNER,
+        },
+        Type::Vector(et) => AbilitySet::VECTOR.intersect(check_instantiation(et, loc, ty_param_abilities, get_abilities, on_err, check)),
+        Type::Struct(mid, sid, insts) => {
+            let (generic_constraints, struct_abilities) = get_abilities(*mid, *sid);
+            let insts_abilities_meet = insts
+                .iter()
+                .zip(generic_constraints)
+                .map(|(inst_ty, constraints)| {
+                    let inst_abilities = check_instantiation(inst_ty, loc, ty_param_abilities, get_abilities, on_err, check);
+                    if check {
+                        if !constraints.is_subset(inst_abilities) {
+                            on_err(
+                                loc.expect("loc"),
+                                &format!(
+                                    "Invalid instantiation"
+                                )
+                            )
+                        }
+                    }
+                    inst_abilities
+                })
+                .fold(AbilitySet::ALL, AbilitySet::intersect);
+            inst_abilities(struct_abilities, insts_abilities_meet)
+        },
+        Type::TypeParameter(i) => {
+            ty_param_abilities(*i)
+        },
+        Type::Reference(_, _) => AbilitySet::REFERENCES,
+        Type::Fun(_, _)
+        | Type::Tuple(_)
+        | Type::TypeDomain(_)
+        | Type::ResourceDomain(_, _, _)
+        | Type::Error
+        | Type::Var(_) => AbilitySet::EMPTY,
     }
 }

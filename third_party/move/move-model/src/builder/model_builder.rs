@@ -16,12 +16,11 @@ use crate::{
         SpecFunId, SpecVarId, StructId, TypeParameter,
     },
     symbol::Symbol,
-    ty::{Constraint, PrimitiveType, Type, inst_abilities},
+    ty::{check_instantiation, Constraint, Type},
 };
 use codespan_reporting::diagnostic::Severity;
-#[allow(unused_imports)]
-use log::{debug, info, warn};
-use move_binary_format::file_format::{Ability, AbilitySet, Visibility};
+use itertools::Itertools;
+use move_binary_format::file_format::{AbilitySet, Visibility};
 use move_compiler::{
     expansion::ast::{self as EA},
     parser::ast as PA,
@@ -403,118 +402,51 @@ impl<'env> ModelBuilder<'env> {
         ty_params: &[TypeParameter],
         loc: &Loc,
     ) -> AbilitySet {
-        match ty {
-            Type::Primitive(p) => match p {
-                PrimitiveType::Bool
-                | PrimitiveType::U8
-                | PrimitiveType::U16
-                | PrimitiveType::U32
-                | PrimitiveType::U64
-                | PrimitiveType::U128
-                | PrimitiveType::U256
-                | PrimitiveType::Num
-                | PrimitiveType::Range
-                | PrimitiveType::EventStore
-                | PrimitiveType::Address => AbilitySet::PRIMITIVES,
-                PrimitiveType::Signer => AbilitySet::SIGNER,
-            },
-            Type::Vector(et) => {
-                AbilitySet::VECTOR.intersect(self.check_instantiation(et, ty_params, loc))
-            },
-            Type::Struct(mid, sid, insts) => {
-                let struct_entry = self.lookup_struct_entry(mid.qualified(*sid));
-                let struct_abilities = &struct_entry.abilities;
-                let params_ability_constraints =
-                    struct_entry.type_params.iter().map(|tp| tp.1.abilities);
-                let fields_abilities_meet = insts
-                    .iter()
-                    .zip(params_ability_constraints)
-                    .map(|(inst_ty, constraints)| {
-                        let inst_abilities = self.check_instantiation(inst_ty, ty_params, loc);
-                        if !constraints.is_subset(inst_abilities) {
-                            self.error(loc, &format!("Invalid instantiation"))
-                        }
-                        inst_abilities
-                    })
-                    .fold(AbilitySet::ALL, |acc, abilities| acc.intersect(abilities));
-                if struct_abilities.has_ability(Ability::Key)
-                    && fields_abilities_meet.has_ability(Ability::Store)
-                {
-                    struct_abilities
-                        .intersect(fields_abilities_meet)
-                        .add(Ability::Key)
-                } else {
-                    struct_abilities
-                        .intersect(fields_abilities_meet)
-                        .remove(Ability::Key)
-                }
-            },
-            Type::TypeParameter(i) => {
-                if let Some(tp) = ty_params.get(*i as usize) {
+        check_instantiation(
+            ty,
+            Some(loc),
+            |i| {
+                if let Some(tp) = ty_params.get(i as usize) {
                     tp.1.abilities
                 } else {
                     panic!("ICE unbound type parameter")
                 }
             },
-            Type::Reference(_, _) => AbilitySet::REFERENCES,
-            Type::Fun(_, _)
-            | Type::Tuple(_)
-            | Type::TypeDomain(_)
-            | Type::ResourceDomain(_, _, _)
-            | Type::Error
-            | Type::Var(_) => AbilitySet::EMPTY,
-        }
+            |mid, sid| {
+                let struct_entry = self.lookup_struct_entry(mid.qualified(sid));
+                let struct_abilities = struct_entry.abilities;
+                let params_ability_constraints = struct_entry
+                    .type_params
+                    .iter()
+                    .map(|tp| tp.1.abilities)
+                    .collect_vec();
+                (params_ability_constraints, struct_abilities)
+            },
+            |loc, err| self.error(loc, err),
+            true,
+        )
     }
 
     /// Infers the abilities the given type may have,
     // if all type params have all abilities.
-    pub fn infer_abilities_may_have(
-        &self,
-        ty: &Type,
-    ) -> AbilitySet {
-        match ty {
-            Type::Primitive(p) => match p {
-                PrimitiveType::Bool
-                | PrimitiveType::U8
-                | PrimitiveType::U16
-                | PrimitiveType::U32
-                | PrimitiveType::U64
-                | PrimitiveType::U128
-                | PrimitiveType::U256
-                | PrimitiveType::Num
-                | PrimitiveType::Range
-                | PrimitiveType::EventStore
-                | PrimitiveType::Address => AbilitySet::PRIMITIVES,
-                PrimitiveType::Signer => AbilitySet::SIGNER,
-            },
-            Type::Vector(et) => {
-                AbilitySet::VECTOR.intersect(self.infer_abilities_may_have(et))
-            },
-            Type::Struct(mid, sid, insts) => {
-                let struct_entry = self.lookup_struct_entry(mid.qualified(*sid));
-                let struct_abilities = &struct_entry.abilities;
-                let insts_abilities_meet = insts
+    pub fn infer_abilities_may_have(&self, ty: &Type) -> AbilitySet {
+        check_instantiation(
+            ty,
+            None,
+            |_| AbilitySet::ALL,
+            |mid, sid| {
+                let struct_entry = self.lookup_struct_entry(mid.qualified(sid));
+                let struct_abilities = struct_entry.abilities;
+                let params_ability_constraints = struct_entry
+                    .type_params
                     .iter()
-                    .map(|ty_inst| {
-                        self.infer_abilities_may_have(ty_inst)
-                    })
-                    .fold(
-                        AbilitySet::ALL,
-                        |acc, abilities| acc.intersect(abilities)
-                    );
-                inst_abilities(*struct_abilities, insts_abilities_meet)
+                    .map(|tp| tp.1.abilities)
+                    .collect_vec();
+                (params_ability_constraints, struct_abilities)
             },
-            Type::TypeParameter(_) => {
-                AbilitySet::ALL
-            },
-            Type::Reference(_, _) => AbilitySet::REFERENCES,
-            Type::Fun(_, _)
-            | Type::Tuple(_)
-            | Type::TypeDomain(_)
-            | Type::ResourceDomain(_, _, _)
-            | Type::Error
-            | Type::Var(_) => AbilitySet::EMPTY,
-        }
+            |loc, err| self.error(loc, err),
+            false,
+        )
     }
 
     /// Checks whether a struct is well defined.
