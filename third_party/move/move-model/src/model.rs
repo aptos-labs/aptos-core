@@ -75,6 +75,7 @@ use std::{
     any::{Any, TypeId},
     backtrace::{Backtrace, BacktraceStatus},
     cell::{Ref, RefCell, RefMut},
+    cmp::Ordering,
     collections::{BTreeMap, BTreeSet, VecDeque},
     ffi::OsStr,
     fmt::{self, Formatter, Write},
@@ -1036,6 +1037,20 @@ impl GlobalEnv {
         mut filter: F,
     ) {
         let mut shown = BTreeSet::new();
+        self.diags.borrow_mut().sort_by(|a, b| match a.1.cmp(&b.1) {
+            Ordering::Less => Ordering::Less,
+            Ordering::Greater => Ordering::Greater,
+            Ordering::Equal => match a.0.severity.partial_cmp(&b.0.severity) {
+                Some(Ordering::Less) => Ordering::Less,
+                Some(Ordering::Greater) => Ordering::Greater,
+                None | Some(Ordering::Equal) => match (&a.0.code, &b.0.code) {
+                    (None, None) => Ordering::Equal,
+                    (None, Some(_)) => Ordering::Less,
+                    (Some(_), None) => Ordering::Greater,
+                    (Some(acode), Some(bcode)) => acode.cmp(bcode),
+                },
+            },
+        });
         for (diag, reported) in self
             .diags
             .borrow_mut()
