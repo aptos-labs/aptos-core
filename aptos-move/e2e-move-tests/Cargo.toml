@@ -26,6 +26,7 @@ aptos-language-e2e-tests = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-package-builder = { workspace = true }
 aptos-state-view = { workspace = true }
+aptos-transaction-generator-lib = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
 aptos-vm-genesis = { workspace = true }
