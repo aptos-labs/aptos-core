@@ -1,24 +1,3 @@
-comparison between v1 and v2 failed:
-= processed 2 tasks
-= 
-+ task 0 'publish'. lines 1-29:
-+ Error: compilation errors:
-+  error: implicit copy of mutable reference in local `v` which is used later
-+   ┌─ TEMPFILE:9:29
-+   │
-+ 8 │         while (i < V::length(v)) {
-+   │                              - used here
-+ 9 │             f(V::borrow_mut(v, i));
-+   │                             ^ implicitly copied here
-+ 
-+ 
-+ 
-+ task 1 'run'. lines 31-31:
-+ Error: Function execution failed with VMError: {
-+     major_status: LINKER_ERROR,
-+     sub_status: None,
-+     location: undefined,
-+     indices: redacted,
-+     offsets: redacted,
-+ }
-+ 
+processed 2 tasks
+
+==> Compiler v2 delivered same results!
