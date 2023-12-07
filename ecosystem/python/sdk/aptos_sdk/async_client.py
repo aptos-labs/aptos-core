@@ -77,14 +77,17 @@ class RestClient:
     async def account(
         self, account_address: AccountAddress, ledger_version: Optional[int] = None
     ) -> Dict[str, str]:
-        """Returns the sequence number and authentication key for an account"""
+        """
+        Fetch the authentication key and the sequence number for an account address.
 
-        if not ledger_version:
-            request = f"{self.base_url}/accounts/{account_address}"
-        else:
-            request = f"{self.base_url}/accounts/{account_address}?ledger_version={ledger_version}"
-
-        response = await self.client.get(request)
+        :param account_address: Address of the account, with or without a '0x' prefix.
+        :param ledger_version: Ledger version to get state of account. If not provided, it will be the latest version.
+        :return: The authentication key and sequence number for the specified address.
+        """
+        response = await self._get(
+            endpoint=f"accounts/{account_address}",
+            params={"ledger_version": ledger_version},
+        )
         if response.status_code >= 400:
             raise ApiError(f"{response.text} - {account_address}", response.status_code)
         return response.json()
@@ -92,7 +95,13 @@ class RestClient:
     async def account_balance(
         self, account_address: AccountAddress, ledger_version: Optional[int] = None
     ) -> int:
-        """Returns the test coin balance associated with the account"""
+        """
+        Fetch the Aptos coin balance associated with the account.
+
+        :param account_address: Address of the account, with or without a '0x' prefix.
+        :param ledger_version: Ledger version to get state of account. If not provided, it will be the latest version.
+        :return: The Aptos coin balance associated with the account
+        """
         resource = await self.account_resource(
             account_address,
             "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
@@ -103,6 +112,13 @@ class RestClient:
     async def account_sequence_number(
         self, account_address: AccountAddress, ledger_version: Optional[int] = None
     ) -> int:
+        """
+        Fetch the current sequence number for an account address.
+
+        :param account_address: Address of the account, with or without a '0x' prefix.
+        :param ledger_version: Ledger version to get state of account. If not provided, it will be the latest version.
+        :return: The current sequence number for the specified address.
+        """
         account_res = await self.account(account_address, ledger_version)
         return int(account_res["sequence_number"])
 
@@ -112,14 +128,21 @@ class RestClient:
         resource_type: str,
         ledger_version: Optional[int] = None,
     ) -> Dict[str, Any]:
-        if not ledger_version:
-            request = (
-                f"{self.base_url}/accounts/{account_address}/resource/{resource_type}"
-            )
-        else:
-            request = f"{self.base_url}/accounts/{account_address}/resource/{resource_type}?ledger_version={ledger_version}"
+        """
+        Retrieves an individual resource from a given account and at a specific ledger version.
 
-        response = await self.client.get(request)
+        The Aptos nodes prune account state history, via a configurable time window. If the requested ledger version
+        has been pruned, the server responds with a 410.
+
+        :param account_address: Address of the account, with or without a '0x' prefix.
+        :param resource_type: Name of struct to retrieve e.g. 0x1::account::Account.
+        :param ledger_version: Ledger version to get state of account. If not provided, it will be the latest version.
+        :return: An individual resource from a given account and at a specific ledger version.
+        """
+        response = await self._get(
+            endpoint=f"accounts/{account_address}/resource/{resource_type}",
+            params={"ledger_version": ledger_version},
+        )
         if response.status_code == 404:
             raise ResourceNotFound(resource_type, resource_type)
         if response.status_code >= 400:
@@ -131,16 +154,208 @@ class RestClient:
         account_address: AccountAddress,
         ledger_version: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
-        if not ledger_version:
-            request = f"{self.base_url}/accounts/{account_address}/resources"
-        else:
-            request = f"{self.base_url}/accounts/{account_address}/resources?ledger_version={ledger_version}"
+        """
+        Retrieves all account resources for a given account and a specific ledger version.
 
-        response = await self.client.get(request)
+        The Aptos nodes prune account state history, via a configurable time window. If the requested ledger version
+        has been pruned, the server responds with a 410.
+
+        :param account_address: Address of the account, with or without a '0x' prefix.
+        :param ledger_version: Ledger version to get state of account. If not provided, it will be the latest version.
+        :return: All account resources for a given account and a specific ledger version.
+        """
+        response = await self._get(
+            endpoint=f"accounts/{account_address}/resources",
+            params={"ledger_version": ledger_version},
+        )
         if response.status_code == 404:
             raise AccountNotFound(f"{account_address}", account_address)
         if response.status_code >= 400:
             raise ApiError(f"{response.text} - {account_address}", response.status_code)
+        return response.json()
+
+    async def account_module(
+        self,
+        account_address: AccountAddress,
+        module_name: str,
+        ledger_version: Optional[int] = None,
+    ) -> dict:
+        """
+        Retrieves an individual module from a given account and at a specific ledger version.
+
+        The Aptos nodes prune account state history, via a configurable time window. If the requested ledger version
+        has been pruned, the server responds with a 410.
+
+        :param account_address: Address of the account, with or without a '0x' prefix.
+        :param module_name: Name of module to retrieve e.g. 'coin'
+        :param ledger_version: Ledger version to get state of account. If not provided, it will be the latest version.
+        :return: An individual module from a given account and at a specific ledger version
+        """
+        response = await self._get(
+            endpoint=f"accounts/{account_address}/module/{module_name}",
+            params={"ledger_version": ledger_version}
+        )
+        if response.status_code >= 400:
+            raise ApiError(f"{response.text} - {account_address}", response.status_code)
+
+        return response.json()
+
+    async def account_modules(
+        self,
+        account_address: AccountAddress,
+        ledger_version: Optional[int] = None,
+        limit: Optional[int] = None,
+        start: Optional[str] = None,
+    ) -> dict:
+        """
+        Retrieves all account modules' bytecode for a given account at a specific ledger version.
+
+        The Aptos nodes prune account state history, via a configurable time window. If the requested ledger version
+        has been pruned, the server responds with a 410.
+
+        :param account_address: Address of the account, with or without a '0x' prefix.
+        :param ledger_version: Ledger version to get state of account. If not provided, it will be the latest version.
+        :param limit: Max number of account modules to retrieve. If not provided, defaults to default page size.
+        :param start: Cursor specifying where to start for pagination.
+        :return: All account modules' bytecode for a given account at a specific ledger version.
+        """
+        response = await self._get(
+            endpoint=f"accounts/{account_address}/modules",
+            params={
+                "ledger_version": ledger_version,
+                "limit": limit,
+                "start": start,
+            }
+        )
+        if response.status_code == 404:
+            raise AccountNotFound(f"{account_address}", account_address)
+        if response.status_code >= 400:
+            raise ApiError(f"{response.text} - {account_address}", response.status_code)
+
+        return response.json()
+
+    #
+    # Blocks
+    #
+
+    async def blocks_by_height(
+        self,
+        block_height: int,
+        with_transactions: bool = False,
+    ) -> dict:
+        """
+        Fetch the transactions in a block and the corresponding block information.
+
+        Transactions are limited by max default transactions size. If not all transactions are present, the user will
+        need to query for the rest of the transactions via the get transactions API. If the block is pruned, it will
+        return a 410.
+
+        :param block_height: Block height to lookup. Starts at 0.
+        :param with_transactions: If set to true, include all transactions in the block.
+        :returns: Block information.
+        """
+        response = await self._get(
+            endpoint=f"blocks/by_height/{block_height}",
+            params={
+                "with_transactions": with_transactions,
+            }
+        )
+        if response.status_code >= 400:
+            raise ApiError(f"{response.text}", response.status_code)
+
+        return response.json()
+
+    async def blocks_by_version(
+        self,
+        version: int,
+        with_transactions: bool = False,
+    ) -> dict:
+        """
+        Fetch the transactions in a block and the corresponding block information, given a version in the block.
+
+        Transactions are limited by max default transactions size. If not all transactions are present, the user will
+        need to query for the rest of the transactions via the get transactions API. If the block is pruned, it will
+        return a 410.
+
+        :param version: Ledger version to lookup block information for.
+        :param with_transactions: If set to true, include all transactions in the block.
+        :returns: Block information.
+        """
+        response = await self._get(
+            endpoint=f"blocks/by_version/{version}",
+            params={
+                "with_transactions": with_transactions,
+            }
+        )
+        if response.status_code >= 400:
+            raise ApiError(f"{response.text}", response.status_code)
+
+        return response.json()
+
+    #
+    # Events
+    #
+
+    async def event_by_creation_number(
+        self,
+        account_address: AccountAddress,
+        creation_number: int,
+        limit: Optional[int] = None,
+        start: Optional[int] = None,
+    ) -> List[dict]:
+        """
+        Retrieve events corresponding to an account address and creation number indicating the event type emitted
+        to that account.
+
+        Creation numbers are monotonically increasing for each account address.
+
+        :param account_address: Address of the account, with or without a '0x' prefix.
+        :param creation_number: Creation number corresponding to the event stream originating from the given account.
+        :param limit: Max number of events to retrieve. If not provided, defaults to default page size.
+        :param start: Starting sequence number of events.If unspecified, by default will retrieve the most recent.
+        :returns: Events corresponding to an account address and creation number indicating the event type emitted
+        to that account.
+        """
+        response = await self._get(
+            endpoint=f"accounts/{account_address}/events/{creation_number}",
+            params={
+                "limit": limit,
+                "start": start,
+            }
+        )
+        if response.status_code >= 400:
+            raise ApiError(f"{response.text} - {account_address}", response.status_code)
+
+        return response.json()
+
+    async def events_by_event_handle(
+        self,
+        account_address: AccountAddress,
+        event_handle: str,
+        field_name: str,
+        limit: Optional[int] = None,
+        start: Optional[int] = None,
+    ) -> List[dict]:
+        """
+        Retrieve events corresponding to an account address, event handle (struct name) and field name.
+
+        :param account_address: Address of the account, with or without a '0x' prefix.
+        :param event_handle: Name of struct to lookup event handle e.g., '0x1::account::Account'.
+        :param field_name: Name of field to lookup event handle e.g., 'withdraw_events'
+        :param limit: Max number of events to retrieve. If not provided, defaults to default page size.
+        :param start: Starting sequence number of events.If unspecified, by default will retrieve the most recent.
+        :returns: Events corresponding to the provided account address, event handle and field name.
+        """
+        response = await self._get(
+            endpoint=f"accounts/{account_address}/events/{event_handle}/{field_name}",
+            params={
+                "limit": limit,
+                "start": start,
+            }
+        )
+        if response.status_code >= 400:
+            raise ApiError(f"{response.text} - {account_address}", response.status_code)
+
         return response.json()
 
     async def current_timestamp(self) -> float:
@@ -259,26 +474,10 @@ class RestClient:
     ) -> Dict[str, Any]:
         # Note that simulated transactions are not signed and have all 0 signatures!
         authenticator = sender.sign_simulated_transaction(transaction)
-        signed_transaction = SignedTransaction(transaction, authenticator)
-
-        headers = {"Content-Type": "application/x.aptos.signed_transaction+bcs"}
-        params = {}
-        if estimate_gas_usage:
-            params = {
-                "estimate_gas_unit_price": "true",
-                "estimate_max_gas_amount": "true",
-            }
-
-        response = await self.client.post(
-            f"{self.base_url}/transactions/simulate",
-            params=params,
-            headers=headers,
-            content=signed_transaction.bytes(),
+        return await self.simulate_bcs_transaction(
+            signed_transaction=SignedTransaction(transaction, authenticator),
+            estimate_gas_usage=estimate_gas_usage,
         )
-        if response.status_code >= 400:
-            raise ApiError(response.text, response.status_code)
-
-        return response.json()
 
     async def submit_bcs_transaction(
         self, signed_transaction: SignedTransaction
@@ -337,8 +536,8 @@ class RestClient:
         return response.json()["hash"]
 
     async def transaction_pending(self, txn_hash: str) -> bool:
-        response = await self.client.get(
-            f"{self.base_url}/transactions/by_hash/{txn_hash}"
+        response = await self._get(
+            endpoint=f"transactions/by_hash/{txn_hash}"
         )
         # TODO(@davidiw): consider raising a different error here, since this is an ambiguous state
         if response.status_code == 404:
@@ -360,9 +559,8 @@ class RestClient:
             ), f"transaction {txn_hash} timed out"
             await asyncio.sleep(1)
             count += 1
-        response = await self.client.get(
-            f"{self.base_url}/transactions/by_hash/{txn_hash}"
-        )
+
+        response = await self._get(endpoint=f"transactions/by_hash/{txn_hash}")
         assert (
             "success" in response.json() and response.json()["success"]
         ), f"{response.text} - {txn_hash}"
@@ -371,9 +569,12 @@ class RestClient:
         self, address: AccountAddress, sequence_number: int
     ) -> bool:
         """Retrieve the state of a transaction by account and sequence number."""
-
-        response = await self.client.get(
-            f"{self.base_url}/accounts/{address}/transactions?limit=1&start={sequence_number}"
+        response = await self._get(
+            endpoint=f"accounts/{address}/transactions",
+            params={
+                "limit": 1,
+                "start": sequence_number,
+            },
         )
         if response.status_code >= 400:
             logging.info(f"k {response}")
@@ -382,11 +583,67 @@ class RestClient:
         return len(data) == 1 and data[0]["type"] != "pending_transaction"
 
     async def transaction_by_hash(self, txn_hash: str) -> Dict[str, Any]:
-        response = await self.client.get(
-            f"{self.base_url}/transactions/by_hash/{txn_hash}"
+        response = await self._get(endpoint=f"transactions/by_hash/{txn_hash}")
+        if response.status_code >= 400:
+            raise ApiError(response.text, response.status_code)
+        return response.json()
+
+    async def transactions_by_account(
+        self,
+        account_address: AccountAddress,
+        limit: Optional[int] = None,
+        start: Optional[int] = None,
+    ) -> List[dict]:
+        """
+        Retrieves on-chain committed transactions from an account.
+
+        If the start version is too far in the past, a 410 will be returned. If no start version is given, it will
+        start at version 0.
+
+        To retrieve a pending transaction, use /transactions/by_hash.
+
+        :param account_address: Address of account with or without a 0x prefix.
+        :param limit: Max number of transactions to retrieve. If not provided, defaults to default page size.
+        :param start: Account sequence number to start list of transactions. Defaults to latest transactions.
+        :returns: List of on-chain committed transactions from the specified account.
+        """
+        response = await self._get(
+            endpoint=f"accounts/{account_address}/transactions",
+            params={
+                "limit": limit,
+                "start": start,
+            }
         )
         if response.status_code >= 400:
             raise ApiError(response.text, response.status_code)
+
+        return response.json()
+
+    async def transactions(
+        self,
+        limit: Optional[int] = None,
+        start: Optional[int] = None,
+    ) -> List[dict]:
+        """
+        Retrieve on-chain committed transactions.
+
+        The page size and start ledger version can be provided to get a specific sequence of transactions. If the
+        version has been pruned, then a 410 will be returned. To retrieve a pending transaction,
+        use /transactions/by_hash.
+
+        :param limit: Max number of transactions to retrieve. If not provided, defaults to default page size.
+        :param start: Ledger version to start list of transactions. Defaults to showing the latest transactions.
+        """
+        response = await self._get(
+            endpoint="transactions",
+            params={
+                "limit": limit,
+                "start": start,
+            }
+        )
+        if response.status_code >= 400:
+            raise ApiError(response.text, response.status_code)
+
         return response.json()
 
     #
@@ -526,6 +783,15 @@ class RestClient:
             TransactionPayload(payload),
         )
         return await self.submit_bcs_transaction(signed_transaction)
+
+    async def _get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> httpx.Response:
+        # format params:
+        params = {} if params is None else params
+        params = {key: val for key, val in params.items() if val is not None}
+        return await self.client.get(
+            url=f"{self.base_url}/{endpoint}",
+            params=params,
+        )
 
 
 class FaucetClient:
