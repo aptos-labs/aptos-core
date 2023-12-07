@@ -187,7 +187,7 @@ impl RandManager {
     }
 
     async fn process_decision(&mut self, decision: RandDecision) {
-        match self.rand_store.add_decision(decision.clone()) {
+        match self.rand_store.add_decision(decision.clone(), false) {
             Ok(AddDecisionResult::NewRandReadyBlock) => self.try_dequeue().await,
             Ok(AddDecisionResult::None) => (),
             Err(e) => {

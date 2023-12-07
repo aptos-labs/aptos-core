@@ -254,7 +254,7 @@ impl RandStore {
             let maybe_decision = self.try_aggregate_shares(metadata.round(), Some(metadata)).unwrap();
             if maybe_decision.is_none() { return AddDecisionResult::None; }
             let decision = maybe_decision.unwrap();
-            self.add_decision(decision).unwrap()
+            self.add_decision(decision, true).unwrap()
         }).collect();
 
         Ok(add_decision_results)
@@ -322,7 +322,7 @@ impl RandStore {
         match self.try_aggregate_shares(share.round(), None)? {
             Some(decision) => {
                 let ack = ShareAck::new(Some(decision.clone()));
-                let add_decision_result = self.add_decision(decision)?;
+                let add_decision_result = self.add_decision(decision, true)?;
                 Ok((ack, add_decision_result))
             },
             None => {
@@ -331,7 +331,7 @@ impl RandStore {
         }
     }
 
-    pub fn add_decision(&mut self, decision: RandDecision) -> anyhow::Result<AddDecisionResult> {
+    pub fn add_decision(&mut self, decision: RandDecision, local: bool) -> anyhow::Result<AddDecisionResult> {
         let rand_config = self.rand_config.as_ref().unwrap();
         self.check_rounds(decision.round())?;
 
@@ -341,7 +341,9 @@ impl RandStore {
             return Ok(AddDecisionResult::None);
         }
 
-        decision.verify(rand_config)?;
+        if !local {
+            decision.verify(rand_config)?;
+        }
 
         rand_item.add_decision(decision.clone())?;
 
