@@ -6,6 +6,9 @@
 //!
 //! All schemas are `pub(crate)` so not shown in rustdoc, refer to the source code to see details.
 
+/// This file is a copy of the file storage/indexer/src/schema/mod.rs.
+/// At the end of the migration to migrate table info mapping
+/// from storage critical path to indexer, the other file will be removed.
 pub(crate) mod indexer_metadata;
 pub(crate) mod table_info;
 use aptos_schemadb::ColumnFamilyName;

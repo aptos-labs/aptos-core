@@ -74,7 +74,7 @@ pub fn bootstrap_api_and_indexer(
     let indexer_grpc = bootstrap_indexer_grpc(
         node_config,
         chain_id,
-        db_rw.clone(),
+        db_rw.reader.clone(),
         mempool_client_sender.clone(),
     );
 

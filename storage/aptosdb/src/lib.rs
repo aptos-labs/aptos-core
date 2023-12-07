@@ -132,6 +132,7 @@ use aptos_types::{
 };
 use aptos_vm::data_cache::AsMoveResolver;
 use arr_macro::arr;
+use dashmap::DashMap;
 use move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
@@ -141,7 +142,7 @@ use std::{
     collections::HashMap,
     fmt::{Debug, Formatter},
     iter::Iterator,
-    path::{Path, PathBuf},
+    path::Path,
     sync::{mpsc, Arc},
     thread,
     thread::JoinHandle,
@@ -540,15 +541,12 @@ impl AptosDB {
         db_root_path: impl AsRef<Path>,
         rocksdb_config: RocksdbConfig,
     ) -> Result<()> {
-        let ledger_info = self.ledger_store.get_latest_ledger_info_option();
-        let latest_epoch = ledger_info
-            .map(|info| info.ledger_info().epoch())
-            .unwrap_or(0);
-        let indexer_async_v2 = IndexerAsyncV2::open(db_root_path, rocksdb_config, latest_epoch)?;
+        let indexer_async_v2 = IndexerAsyncV2::open(db_root_path, rocksdb_config, DashMap::new())?;
         self.indexer_async_v2 = Some(indexer_async_v2);
         Ok(())
     }
 
+    /// To be deprecated after table info migration
     fn open_indexer(
         &mut self,
         db_root_path: impl AsRef<Path>,
@@ -620,8 +618,8 @@ impl AptosDB {
             false,
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-            false,
-            false,
+            false, /* indexer */
+            false, /* indexer async v2 */
         )
     }
 
@@ -669,8 +667,8 @@ impl AptosDB {
             false,
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-            true,
-            true,
+            true, /* indexer */
+            true, /* indexer async v2 */
         )
     }
 
@@ -685,8 +683,8 @@ impl AptosDB {
             false,
             buffered_state_target_items,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-            false,
-            false,
+            false, /* indexer */
+            false, /* indexer async v2 */
         )
     }
 
@@ -698,8 +696,8 @@ impl AptosDB {
             true,
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-            false,
-            false,
+            false, /* indexer */
+            false, /* indexer async v2 */
         )
     }
 
@@ -918,22 +916,6 @@ impl AptosDB {
     }
 
     fn get_table_info_option(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
-        if self.indexer_async_v2_enabled() && self.indexer_enabled() {
-            let async_v2_result = self.get_table_info_from_indexer_async_v2(handle)?;
-            let indexer_result = self.get_table_info_from_indexer(handle)?;
-
-            if async_v2_result != indexer_result {
-                panic!(
-                    "Getting different TableInfo for TableHandle: {:?}. Indexer Async V2 Result: {:?}. Indexer Result: {:?}",
-                    handle,
-                    async_v2_result,
-                    indexer_result
-                );
-            }
-
-            return Ok(indexer_result);
-        }
-
         if self.indexer_async_v2_enabled() {
             return self.get_table_info_from_indexer_async_v2(handle);
         }
@@ -2208,6 +2190,7 @@ impl DbReader for AptosDB {
         })
     }
 
+    /// To be deprecated after table info migration
     /// Returns whether the indexer DB has been enabled or not
     fn indexer_enabled(&self) -> bool {
         self.indexer.is_some()
@@ -2227,6 +2210,8 @@ impl DbReader for AptosDB {
         })
     }
 
+    /// Returns the next version for indexer async v2 to be processed
+    /// It is mainly used by table info service to decide the start version
     fn get_indexer_async_v2_next_version(&self) -> Result<Version> {
         gauged_api("get_indexer_async_v2_next_version", || {
             Ok(self
@@ -2239,28 +2224,17 @@ impl DbReader for AptosDB {
 }
 
 impl DbWriter for AptosDB {
-    fn create_checkpoint(&self, path: PathBuf) -> Result<()> {
-        gauged_api("create_checkpoint", || {
-            self.indexer_async_v2
-                .as_ref()
-                .map(|indexer| indexer.create_checkpoint(path))
-                .unwrap_or(Ok(()))
-        })
-    }
-
+    /// Open up dbwriter for table info indexing on indexer async v2 rocksdb
     fn index(
         &self,
         db_reader: Arc<dyn DbReader>,
         first_version: Version,
         write_sets: &[&WriteSet],
-        block_event_epoch: u64,
     ) -> Result<()> {
         gauged_api("index", || {
             self.indexer_async_v2
                 .as_ref()
-                .map(|indexer| {
-                    indexer.index(db_reader, first_version, write_sets, block_event_epoch)
-                })
+                .map(|indexer| indexer.index(db_reader, first_version, write_sets))
                 .unwrap_or(Ok(()))
         })
     }

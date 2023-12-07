@@ -1,11 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod counters;
+/// This file is a copy of the file storage/indexer/src/lib.rs.
+/// At the end of the migration to migrate table info mapping
+/// from storage critical path to indexer, the other file will be removed.
 pub mod db;
 mod metadata;
 mod schema;
-pub mod counters;
 use crate::{
+    counters::{IndexerTableInfoStep, DURATION_IN_SECS, SERVICE_TYPE},
     db::INDEX_ASYNC_V2_DB_NAME,
     metadata::{MetadataKey, MetadataValue},
     schema::{column_families, table_info::TableInfoSchema},
@@ -27,6 +31,7 @@ use aptos_types::{
 };
 use aptos_vm::data_cache::AsMoveResolver;
 use bytes::Bytes;
+use dashmap::{DashMap, DashSet};
 use move_core_types::{
     ident_str,
     language_storage::{StructTag, TypeTag},
@@ -36,28 +41,28 @@ use move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
 use schema::indexer_metadata::IndexerMetadataSchema;
 use std::{
     collections::{BTreeMap, HashMap},
-    fs,
-    path::PathBuf,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
     },
+    time::Duration,
 };
 use tracing::info;
+
+const TABLE_INFO_RETRY_TIME_MILLIS: u64 = 10;
 
 #[derive(Debug)]
 pub struct IndexerAsyncV2 {
     db: DB,
-    latest_epoch: AtomicU64,
     next_version: AtomicU64,
-    pending_on: HashMap<TableHandle, Vec<Bytes>>,
+    pending_on: DashMap<TableHandle, DashSet<Bytes>>,
 }
 
 impl IndexerAsyncV2 {
     pub fn open(
         db_root_path: impl AsRef<std::path::Path>,
         rocksdb_config: RocksdbConfig,
-        latest_epoch: u64,
+        pending_on: DashMap<TableHandle, DashSet<Bytes>>,
     ) -> Result<Self> {
         let db_path = db_root_path.as_ref().join(INDEX_ASYNC_V2_DB_NAME);
 
@@ -74,9 +79,8 @@ impl IndexerAsyncV2 {
 
         Ok(Self {
             db,
-            latest_epoch: AtomicU64::new(latest_epoch),
             next_version: AtomicU64::new(next_version),
-            pending_on: HashMap::new(),
+            pending_on,
         })
     }
 
@@ -85,7 +89,6 @@ impl IndexerAsyncV2 {
         db_reader: Arc<dyn DbReader>,
         first_version: Version,
         write_sets: &[&WriteSet],
-        latest_epoch: u64,
     ) -> Result<()> {
         let last_version = first_version + write_sets.len() as Version;
         let state_view = DbStateView {
@@ -94,12 +97,7 @@ impl IndexerAsyncV2 {
         };
         let resolver = state_view.as_move_resolver();
         let annotator = MoveValueAnnotator::new(&resolver);
-        let _ = self.index_with_annotator(&annotator, first_version, write_sets);
-        if latest_epoch > self.latest_epoch() {
-            self.latest_epoch.store(latest_epoch, Ordering::Relaxed);
-        }
-
-        Ok(())
+        self.index_with_annotator(&annotator, first_version, write_sets)
     }
 
     pub fn index_with_annotator<R: MoveResolver>(
@@ -108,15 +106,24 @@ impl IndexerAsyncV2 {
         first_version: Version,
         write_sets: &[&WriteSet],
     ) -> Result<()> {
+        let mut start_time = std::time::Instant::now();
         let end_version = first_version + write_sets.len() as Version;
-
-        let mut table_info_parser = TableInfoParser::new(self, annotator, self.pending_on.clone());
+        let mut table_info_parser = TableInfoParser::new(self, annotator, &self.pending_on);
         for write_set in write_sets {
             for (state_key, write_op) in write_set.iter() {
                 table_info_parser.parse_write_op(state_key, write_op)?;
             }
         }
 
+        DURATION_IN_SECS
+            .with_label_values(&[
+                SERVICE_TYPE,
+                IndexerTableInfoStep::TableInfoParsedBatch.get_step(),
+                IndexerTableInfoStep::TableInfoParsedBatch.get_label(),
+            ])
+            .set(start_time.elapsed().as_secs_f64());
+
+        start_time = std::time::Instant::now();
         let mut batch = SchemaBatch::new();
         match table_info_parser.finish(&mut batch) {
             Ok(_) => {},
@@ -138,6 +145,13 @@ impl IndexerAsyncV2 {
         self.db.write_schemas(batch)?;
         self.next_version.store(end_version, Ordering::Relaxed);
 
+        DURATION_IN_SECS
+            .with_label_values(&[
+                SERVICE_TYPE,
+                IndexerTableInfoStep::TableInfoWrittenBatch.get_step(),
+                IndexerTableInfoStep::TableInfoWrittenBatch.get_label(),
+            ])
+            .set(start_time.elapsed().as_secs_f64());
         Ok(())
     }
 
@@ -157,24 +171,11 @@ impl IndexerAsyncV2 {
             }
             retried += 1;
             info!(
-                "Retried {} times when getting table info with the handle: {:?}",
-                retried, handle
+                "Retried {} times when getting table info with the handle: {:?}, and the next version: {:?}",
+                retried, handle, self.next_version
             );
+            std::thread::sleep(Duration::from_millis(TABLE_INFO_RETRY_TIME_MILLIS));
         }
-    }
-
-    pub fn create_checkpoint(&self, path: PathBuf) -> Result<()> {
-        if path.exists() {
-            fs::remove_dir_all(&path)?;
-        }
-        if !path.exists() {
-            fs::create_dir_all(&path)?;
-        }
-        self.db.create_checkpoint(path.as_path())
-    }
-
-    fn latest_epoch(&self) -> u64 {
-        self.latest_epoch.load(Ordering::Relaxed)
     }
 }
 
@@ -182,18 +183,14 @@ struct TableInfoParser<'a, R> {
     indexer_async_v2: &'a IndexerAsyncV2,
     annotator: &'a MoveValueAnnotator<'a, R>,
     result: HashMap<TableHandle, TableInfo>,
-    pending_on: HashMap<TableHandle, Vec<Bytes>>,
+    pending_on: &'a DashMap<TableHandle, DashSet<Bytes>>,
 }
 
-/// This module contains the implementation of the `TableInfoParser` struct, which is responsible for parsing
-/// write operations and extracting table information from them. It provides methods for parsing different types
-/// of write operations, such as structs, resource groups, and table items. The parsed table information is stored
-/// in a HashMap and can be saved to a schema batch for further processing.
 impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
     pub fn new(
         indexer_async_v2: &'a IndexerAsyncV2,
         annotator: &'a MoveValueAnnotator<R>,
-        pending_on: HashMap<TableHandle, Vec<Bytes>>,
+        pending_on: &'a DashMap<TableHandle, DashSet<Bytes>>,
     ) -> Self {
         Self {
             indexer_async_v2,
@@ -203,6 +200,16 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
         }
     }
 
+    /// Parses a write operation and extracts table information from it.
+    ///
+    /// # Arguments
+    ///
+    /// * `state_key` - The state key associated with the write operation.
+    /// * `write_op` - The write operation to parse.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the parsing is successful, or an error if an error occurs during parsing.
     pub fn parse_write_op(&mut self, state_key: &'a StateKey, write_op: &'a WriteOp) -> Result<()> {
         if let Some(bytes) = write_op.bytes() {
             match state_key.inner() {
@@ -246,13 +253,27 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
             None => {
                 self.pending_on
                     .entry(handle)
-                    .or_insert_with(Vec::new)
-                    .push(bytes.clone());
+                    .or_insert_with(|| DashSet::new())
+                    .insert(bytes.clone());
             },
         }
         Ok(())
     }
 
+    /// Parses a write operation and extracts table information from it.
+    ///
+    /// The `parse_move_value` function is a recursive method that traverses
+    /// through the `AnnotatedMoveValue` structure. Depending on the type of
+    /// `AnnotatedMoveValue` (e.g., Vector, Struct, or primitive types), it
+    /// performs different parsing actions. For Vector and Struct, it recursively
+    /// calls itself to parse each element or field. This recursive approach allows
+    /// the function to handle nested data structures in Move values.
+    ///
+    /// # Arguments
+    /// * `move_value` - A reference to an `AnnotatedMoveValue` that needs to be parsed.
+    ///
+    /// # Returns
+    /// Returns `Result<()>` indicating the success or failure of the operation.
     fn parse_move_value(&mut self, move_value: &AnnotatedMoveValue) -> Result<()> {
         match move_value {
             AnnotatedMoveValue::Vector(_type_tag, items) => {
@@ -301,7 +322,7 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
         if self.get_table_info(handle)?.is_none() {
             self.result.insert(handle, info);
             if let Some(pending_items) = self.pending_on.remove(&handle) {
-                for bytes in pending_items {
+                for bytes in pending_items.1 {
                     self.parse_table_item(handle, &bytes)?;
                 }
             }
@@ -315,6 +336,19 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
             && struct_tag.name.as_ident_str() == ident_str!("Table")
     }
 
+    /// Retrieves table information either from the in-memory results or from the database.
+    ///
+    /// This method first checks if the table information for the given handle exists in the
+    /// in-memory `result` Dashmap. If it is found, it returns the information directly from
+    /// there. If not, it fetches the table information from the database using the `IndexerAsyncV2`
+    /// instance. This approach of checking in-memory cache first improves performance by avoiding
+    /// unnecessary database reads.
+    ///
+    /// # Arguments
+    /// * `handle` - The table handle for which information is needed.
+    ///
+    /// # Returns
+    /// Returns `Result<Option<TableInfo>>`, which is the table information if available, or `None` if not.
     fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
         match self.result.get(&handle) {
             Some(table_info) => Ok(Some(table_info.clone())),
@@ -322,11 +356,30 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
         }
     }
 
+    /// Finishes the parsing process and writes the parsed table information to a SchemaBatch.
+    ///
+    /// # Arguments
+    ///
+    /// * `batch` - A mutable reference to the SchemaBatch.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(true)` if the parsed table information is written to the SchemaBatch,
+    /// `Ok(false)` if there is no table information to write,
+    /// or an error if an error occurs during the writing process.
     fn finish(self, batch: &mut SchemaBatch) -> Result<bool> {
+        let pending_keys: Vec<TableHandle> =
+            self.pending_on.iter().map(|entry| *entry.key()).collect();
+
+        for handle in pending_keys.iter() {
+            if self.get_table_info(*handle)?.is_some() {
+                self.pending_on.remove(handle);
+            }
+        }
         if !self.pending_on.is_empty() {
             aptos_logger::warn!(
-                "There is still pending table items to parse due to unknown table info for table handles: {:?}",
-                self.pending_on.keys(),
+                "There are still pending table items to parse due to unknown table info for table handles: {:?}",
+                pending_keys
             );
         }
 

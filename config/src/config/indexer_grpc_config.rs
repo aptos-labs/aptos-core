@@ -18,8 +18,6 @@ const DEFAULT_PROCESSOR_TASK_COUNT: u16 = 20;
 const DEFAULT_PROCESSOR_BATCH_SIZE: u16 = 1000;
 const DEFAULT_OUTPUT_BATCH_SIZE: u16 = 100;
 pub const DEFAULT_GRPC_STREAM_PORT: u16 = 50051;
-pub const DEFAULT_PARSER_TASK_COUNT: u16 = 20;
-pub const DEFAULT_PARSER_BATCH_SIZE: u16 = 1000;
 
 #[derive(Clone, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -96,10 +94,10 @@ impl ConfigSanitizer for IndexerGrpcConfig {
             return Ok(());
         }
 
-        if !node_config.storage.enable_indexer && !node_config.storage.enable_indexer_async_v2 {
+        if !node_config.storage.enable_indexer && !node_config.indexer_table_info.enabled {
             return Err(Error::ConfigSanitizerFailed(
                 sanitizer_name,
-                "storage.enable_indexer or storage.enable_indexer_async_v2 must be true if indexer_grpc.enabled is true".to_string(),
+                "storage.enable_indexer or indexer_table_info.enabled must be true if indexer_grpc.enabled is true".to_string(),
             ));
         }
         Ok(())

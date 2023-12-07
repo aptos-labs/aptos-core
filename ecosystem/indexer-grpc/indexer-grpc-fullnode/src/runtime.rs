@@ -17,9 +17,9 @@ use aptos_protos::{
     transaction::v1::FILE_DESCRIPTOR_SET as TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
     util::timestamp::FILE_DESCRIPTOR_SET as UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
 };
-use aptos_storage_interface::DbReaderWriter;
+use aptos_storage_interface::DbReader;
 use aptos_types::chain_id::ChainId;
-use std::{env, net::ToSocketAddrs, sync::Arc};
+use std::{net::ToSocketAddrs, sync::Arc};
 use tokio::runtime::Runtime;
 use tonic::{codec::CompressionEncoding, transport::Server};
 
@@ -32,7 +32,7 @@ pub const RETRY_TIME_MILLIS: u64 = 100;
 pub fn bootstrap(
     config: &NodeConfig,
     chain_id: ChainId,
-    db: DbReaderWriter,
+    db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
 ) -> Option<Runtime> {
     if !config.indexer_grpc.enabled {
@@ -51,8 +51,7 @@ pub fn bootstrap(
     let enable_expensive_logging = node_config.indexer_grpc.enable_expensive_logging;
 
     runtime.spawn(async move {
-        let context =
-            Arc::new(Context::new(chain_id, db.reader.clone(), mp_sender, node_config));
+        let context = Arc::new(Context::new(chain_id, db, mp_sender, node_config));
 
         let service_context = ServiceContext {
             context: context.clone(),
