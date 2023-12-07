@@ -273,6 +273,7 @@ impl CertifiedAugDataAck {
     }
 }
 
+#[derive(Clone)]
 pub struct RandConfig {
     author: Author,
     threshold: u64,

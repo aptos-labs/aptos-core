@@ -34,7 +34,7 @@ use aptos_network::{
     protocols::{network::Event, rpc::error::RpcError},
     ProtocolId,
 };
-use aptos_reliable_broadcast::RBNetworkSender;
+use aptos_reliable_broadcast::{RBMessage, RBNetworkSender};
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
@@ -497,13 +497,15 @@ impl TDAGNetworkSender for NetworkSender {
 }
 
 #[async_trait]
-impl RBNetworkSender<DAGMessage, DAGRpcResult> for NetworkSender {
+impl<Req: TConsensusMsg + RBMessage + 'static, Res: TConsensusMsg + RBMessage + 'static>
+    RBNetworkSender<Req, Res> for NetworkSender
+{
     async fn send_rb_rpc(
         &self,
         receiver: Author,
-        message: DAGMessage,
+        message: Req,
         timeout: Duration,
-    ) -> anyhow::Result<DAGRpcResult> {
+    ) -> anyhow::Result<Res> {
         self.send_rpc(receiver, message.into_network_message(), timeout)
             .await
             .map_err(|e| anyhow!("invalid rpc response: {}", e))
