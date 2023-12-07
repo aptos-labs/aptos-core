@@ -66,7 +66,7 @@ const TRANSIENT_DATA_ERROR_RETRY_SLEEP_DURATION_MS: u64 = 1000;
 
 // The server will retry to send the response to the client and give up after RESPONSE_CHANNEL_SEND_TIMEOUT.
 // This is to prevent the server from being occupied by a slow client.
-const RESPONSE_CHANNEL_SEND_TIMEOUT: Duration = Duration::from_secs(120);
+const RESPONSE_CHANNEL_SEND_TIMEOUT: Duration = Duration::from_secs(600);
 
 const SHORT_CONNECTION_DURATION_IN_SECS: u64 = 10;
 
