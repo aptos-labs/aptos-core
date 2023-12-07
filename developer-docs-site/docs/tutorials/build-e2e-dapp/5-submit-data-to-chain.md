@@ -28,7 +28,7 @@ const { account, signAndSubmitTransaction } = useWallet();
 ```js
 const addNewList = async () => {
   if (!account) return [];
-  // build a transaction payload to be submited
+  // build a transaction payload to be submitted
   const payload = {
     type: "entry_function_payload",
     function: `${moduleAddress}::todolist::create_list`,
@@ -99,7 +99,7 @@ const [transactionInProgress, setTransactionInProgress] = useState<boolean>(fals
 const addNewList = async () => {
   if (!account) return [];
   setTransactionInProgress(true);
-  // build a transaction payload to be submited
+  // build a transaction payload to be submitted
   const payload = {
     type: "entry_function_payload",
     function: `${moduleAddress}::todolist::create_list`,
