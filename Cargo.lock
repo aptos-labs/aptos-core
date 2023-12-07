@@ -6746,6 +6746,7 @@ dependencies = [
  "aptos-logger",
  "aptos-package-builder",
  "aptos-state-view",
+ "aptos-transaction-generator-lib",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
