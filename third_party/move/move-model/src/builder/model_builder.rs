@@ -466,9 +466,9 @@ impl<'env> ModelBuilder<'env> {
         }
     }
 
-    // infers the abilities that the given type may have
-    // assuming that type params have all abilities
-    pub fn type_abilities_may_have(
+    /// Infers the abilities the given type may have,
+    // if all type params have all abilities.
+    pub fn infer_abilities_may_have(
         &self,
         ty: &Type,
     ) -> AbilitySet {
@@ -488,7 +488,7 @@ impl<'env> ModelBuilder<'env> {
                 PrimitiveType::Signer => AbilitySet::SIGNER,
             },
             Type::Vector(et) => {
-                AbilitySet::VECTOR.intersect(self.type_abilities_may_have(et))
+                AbilitySet::VECTOR.intersect(self.infer_abilities_may_have(et))
             },
             Type::Struct(mid, sid, insts) => {
                 let struct_entry = self.lookup_struct_entry(mid.qualified(*sid));
@@ -498,7 +498,7 @@ impl<'env> ModelBuilder<'env> {
                         .iter()
                         .map(|(_field_name, (_loc, _field_idx, field_ty))| {
                             let field_ty = &field_ty.instantiate(insts);
-                            self.type_abilities_may_have(field_ty)
+                            self.infer_abilities_may_have(field_ty)
                         })
                         .fold(AbilitySet::ALL, |acc, abilities| acc.intersect(abilities))
                 } else {
@@ -529,6 +529,7 @@ impl<'env> ModelBuilder<'env> {
         }
     }
 
+    /// Checks whether a struct is well defined.
     pub fn ability_check_struct_def(&self, struct_entry: &StructEntry) {
         if let Some(fields) = &struct_entry.fields {
             let struct_abilities = struct_entry.abilities;
@@ -537,7 +538,7 @@ impl<'env> ModelBuilder<'env> {
                 // check fields are properly instantiated
                 self.check_instantiation(field_ty, ty_params, loc);
                 // check fields may have the declared abilities on the struct
-                let may_have_abilities = self.type_abilities_may_have(field_ty);
+                let may_have_abilities = self.infer_abilities_may_have(field_ty);
                 if struct_abilities.has_copy() && !may_have_abilities.has_copy() {
                     self.error(
                         loc,
