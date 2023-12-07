@@ -6,7 +6,6 @@ use aptos_dkg::constants::{
     BEST_CASE_N, BEST_CASE_THRESHOLD, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, WORST_CASE_N,
     WORST_CASE_THRESHOLD,
 };
-use aptos_dkg::pvss;
 use aptos_dkg::pvss::test_utils::NoAux;
 use aptos_dkg::pvss::traits::transcript::Transcript;
 use aptos_dkg::pvss::traits::{Reconstructable, SecretSharingConfig};
@@ -31,10 +30,10 @@ fn all_unweighted_pvss_bvt() {
         let seed = random_scalar(&mut rng);
 
         // Das
-        pvss_deal_verify_and_reconstruct::<pvss::das::Transcript>(&tc, seed.to_bytes_le());
+        pvss_deal_verify_and_reconstruct::<das::Transcript>(&tc, seed.to_bytes_le());
 
         // SCRAPE
-        pvss_deal_verify_and_reconstruct::<pvss::scrape::Transcript>(&tc, seed.to_bytes_le());
+        pvss_deal_verify_and_reconstruct::<scrape::Transcript>(&tc, seed.to_bytes_le());
     }
 }
 
@@ -48,19 +47,22 @@ fn all_weighted_pvss_bvt() {
     let wcs = test_utils::get_weighted_configs_for_testing();
     for wc in wcs {
         println!("\nTesting {wc} PVSS");
+        let seed = random_scalar(&mut rng);
 
         // SCRAPE
-        let seed = random_scalar(&mut rng);
-        pvss_deal_verify_and_reconstruct::<WeightedTranscript<pvss::scrape::Transcript>>(
+        pvss_deal_verify_and_reconstruct::<WeightedTranscript<scrape::Transcript>>(
             &wc,
             seed.to_bytes_le(),
         );
 
-        // Das
-        pvss_deal_verify_and_reconstruct::<WeightedTranscript<pvss::das::Transcript>>(
+        // Das (insecurely-weighted)
+        pvss_deal_verify_and_reconstruct::<WeightedTranscript<das::Transcript>>(
             &wc,
             seed.to_bytes_le(),
         );
+
+        // Das (securely-weighted)
+        pvss_deal_verify_and_reconstruct::<das::WeightedTranscript>(&wc, seed.to_bytes_le());
     }
 }
 
@@ -70,8 +72,8 @@ fn all_unweighted_dkg_bvt() {
     let tcs = test_utils::get_threshold_configs_for_testing();
     let seed = random_scalar(&mut rng);
 
-    aggregatable_dkg::<pvss::das::Transcript>(tcs.last().unwrap(), seed.to_bytes_le());
-    aggregatable_dkg::<pvss::scrape::Transcript>(tcs.last().unwrap(), seed.to_bytes_le());
+    aggregatable_dkg::<das::Transcript>(tcs.last().unwrap(), seed.to_bytes_le());
+    aggregatable_dkg::<scrape::Transcript>(tcs.last().unwrap(), seed.to_bytes_le());
 }
 
 #[test]
@@ -80,11 +82,11 @@ fn all_weighted_dkg_bvt() {
     let wcs = test_utils::get_weighted_configs_for_testing();
     let seed = random_scalar(&mut rng);
 
-    aggregatable_dkg::<WeightedTranscript<pvss::das::Transcript>>(
+    aggregatable_dkg::<WeightedTranscript<das::Transcript>>(
         wcs.last().unwrap(),
         seed.to_bytes_le(),
     );
-    aggregatable_dkg::<WeightedTranscript<pvss::scrape::Transcript>>(
+    aggregatable_dkg::<WeightedTranscript<scrape::Transcript>>(
         wcs.last().unwrap(),
         seed.to_bytes_le(),
     );
@@ -112,7 +114,7 @@ fn weighted_fail_due_to_blst_bug() {
         attempt += 1;
 
         let seed = random_scalar(&mut rng);
-        pvss_deal_verify_and_reconstruct::<WeightedTranscript<pvss::scrape::Transcript>>(
+        pvss_deal_verify_and_reconstruct::<WeightedTranscript<scrape::Transcript>>(
             &wc,
             seed.to_bytes_le(),
         );
@@ -126,9 +128,9 @@ fn transcript_size() {
         (WORST_CASE_THRESHOLD, WORST_CASE_N),
     ] {
         println!();
-        print_transcript_size::<pvss::scrape::Transcript>(t, n);
+        print_transcript_size::<scrape::Transcript>(t, n);
         println!();
-        print_transcript_size::<pvss::das::Transcript>(t, n);
+        print_transcript_size::<das::Transcript>(t, n);
     }
 }
 

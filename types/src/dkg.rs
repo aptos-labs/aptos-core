@@ -2,14 +2,13 @@
 
 use crate::validator_verifier::ValidatorVerifier;
 use anyhow::Result;
-use aptos_dkg::pvss::{self, traits::Transcript, WeightedTranscript};
+use aptos_dkg::pvss::{self, traits::Transcript};
 use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
 use serde::{Deserialize, Serialize};
 use aptos_crypto::ValidCryptoMaterial;
 use crate::on_chain_config::ValidatorSet;
 
-pub type Trx = pvss::das::Transcript;
-pub type WTrx = WeightedTranscript<Trx>;
+pub type WTrx = pvss::das::WeightedTranscript;
 pub type DkgPP = <WTrx as Transcript>::PublicParameters;
 pub type SSConfig = <WTrx as Transcript>::SecretSharingConfig;
 pub type EncPK = <WTrx as Transcript>::EncryptPubKey;

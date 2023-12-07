@@ -47,6 +47,14 @@ pub fn hash_to_scalar(msg: &[u8], dst: &[u8]) -> Scalar {
 
 /// Works around the `blst_hell` bug (see README.md).
 pub fn g1_multi_exp(bases: &[G1Projective], scalars: &[Scalar]) -> G1Projective {
+    if bases.len() != scalars.len() {
+        panic!(
+            "blstrs's multiexp has heisenbugs when the # of bases != # of scalars ({} != {})",
+            bases.len(),
+            scalars.len()
+        );
+    }
+
     if bases.len() == 1 {
         bases[0].mul(scalars[0])
     } else {
@@ -56,6 +64,14 @@ pub fn g1_multi_exp(bases: &[G1Projective], scalars: &[Scalar]) -> G1Projective 
 
 /// Works around the `blst_hell` bug (see README.md).
 pub fn g2_multi_exp(bases: &[G2Projective], scalars: &[Scalar]) -> G2Projective {
+    if bases.len() != scalars.len() {
+        panic!(
+            "blstrs's multiexp has heisenbugs when the # of bases != # of scalars ({} != {})",
+            bases.len(),
+            scalars.len()
+        );
+    }
+
     if bases.len() == 1 {
         bases[0].mul(scalars[0])
     } else {
@@ -115,12 +131,12 @@ pub trait HasMultiExp: Sized {
 
 impl HasMultiExp for G2Projective {
     fn multi_exp(points: &[Self], scalars: &[Scalar]) -> Self {
-        G2Projective::multi_exp(points, scalars)
+        g2_multi_exp(points, scalars)
     }
 }
 
 impl HasMultiExp for G1Projective {
     fn multi_exp(points: &[Self], scalars: &[Scalar]) -> Self {
-        G1Projective::multi_exp(points, scalars)
+        g1_multi_exp(points, scalars)
     }
 }

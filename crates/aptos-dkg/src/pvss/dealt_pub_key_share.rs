@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+// TODO: Do we even need this Dealt[Secret/Pub][Key/KeyShare] anymore?
 macro_rules! dealt_pub_key_share_impl {
     (
         $GTProjective:ident,

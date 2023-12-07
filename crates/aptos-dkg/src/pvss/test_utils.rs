@@ -127,7 +127,7 @@ pub fn get_weighted_configs_for_testing() -> Vec<WeightedConfig> {
     // 1-out-of-1 weighted
     wcs.push(WeightedConfig::new(1, vec![1]).unwrap());
 
-    // 1-out-of-2, weights 2
+    // 1-out-of-2, weights 2 0
     wcs.push(WeightedConfig::new(1, vec![2]).unwrap());
     // 1-out-of-2, weights 1 1
     wcs.push(WeightedConfig::new(1, vec![1, 1]).unwrap());
@@ -139,7 +139,13 @@ pub fn get_weighted_configs_for_testing() -> Vec<WeightedConfig> {
     // 2-out-of-3, weights 1 1 1
     wcs.push(WeightedConfig::new(2, vec![1, 1, 1]).unwrap());
     // 3-out-of-3, weights 1 1 1
-    wcs.push(WeightedConfig::new(2, vec![1, 1, 1]).unwrap());
+    wcs.push(WeightedConfig::new(3, vec![1, 1, 1]).unwrap());
+
+    // 3-out-of-5, weights 2 1 2
+    wcs.push(WeightedConfig::new(3, vec![2, 1, 2]).unwrap());
+
+    // 3-out-of-7, weights 2 3 2
+    wcs.push(WeightedConfig::new(3, vec![2, 3, 2]).unwrap());
 
     // 50-out-of-100, weights [11, 13, 9, 10, 12, 8, 7, 14, 10, 6]
     wcs.push(WeightedConfig::new(50, vec![11, 13, 9, 10, 12, 8, 7, 14, 10, 6]).unwrap());
@@ -156,8 +162,6 @@ pub fn get_threshold_configs_for_benchmarking() -> Vec<ThresholdConfig> {
 
 pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfig> {
     let mut wcs = vec![];
-
-    // TODO: uncomment
 
     // Total weight is 9230
     let weights = vec![

@@ -7,12 +7,12 @@
 //! define all the things that are appended to the transcript.
 
 use crate::pvss::threshold_config::ThresholdConfig;
-use crate::pvss::traits;
 use crate::pvss::traits::Transcript;
 use crate::utils::random::random_scalar_from_uniform_bytes;
 use crate::SCALAR_NUM_BYTES;
 use aptos_crypto::ValidCryptoMaterial;
 use blstrs::Scalar;
+use ff::PrimeField;
 
 pub const PVSS_DOM_SEP: &[u8; 21] = b"APTOS_SCRAPE_PVSS_DST";
 
@@ -36,7 +36,8 @@ pub trait FiatShamirProtocol<T: Transcript> {
 
     /// Returns one or more scalars `r` useful for doing linear combinations (e.g., combining
     /// pairings in the SCRAPE multipairing check using coefficients $1, r, r^2, r^3, \ldots$
-    fn challenge_linear_combination(&mut self, num_scalars: usize) -> Vec<Scalar>;
+    fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<Scalar>;
+    fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<Scalar>;
 }
 
 #[allow(non_snake_case)]
@@ -89,18 +90,40 @@ impl<T: Transcript> FiatShamirProtocol<T> for merlin::Transcript {
         f
     }
 
-    fn challenge_linear_combination(&mut self, num_scalars: usize) -> Vec<Scalar> {
+    fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<Scalar> {
         let mut buf = vec![0u8; num_scalars * 2 * SCALAR_NUM_BYTES];
         self.challenge_bytes(b"challenge_linear_combination", &mut buf);
 
         let mut v = Vec::with_capacity(num_scalars);
 
+        // To ensure we pick a uniform Scalar, we sample twice the number of bytes in a scalar and
+        // reduce those bytes modulo the order of the scalar field.
         for chunk in buf.chunks(2 * SCALAR_NUM_BYTES) {
             match chunk.try_into() {
                 Ok(chunk) => {
                     v.push(random_scalar_from_uniform_bytes(chunk));
                 },
-                Err(_) => panic!("Expected a slice of size 64, but got a different size"),
+                Err(_) => panic!("Expected a 64-byte slice, but got a different size"),
+            }
+        }
+
+        assert_eq!(v.len(), num_scalars);
+
+        v
+    }
+
+    fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<Scalar> {
+        let mut buf = vec![0u8; num_scalars * 16];
+        self.challenge_bytes(b"challenge_linear_combination", &mut buf);
+
+        let mut v = Vec::with_capacity(num_scalars);
+
+        for chunk in buf.chunks(16) {
+            match chunk.try_into() {
+                Ok(chunk) => {
+                    v.push(Scalar::from_u128(u128::from_le_bytes(chunk)));
+                },
+                Err(_) => panic!("Expected a 16-byte slice, but got a different size"),
             }
         }
 
@@ -111,7 +134,9 @@ impl<T: Transcript> FiatShamirProtocol<T> for merlin::Transcript {
 }
 
 /// Securely derives a Fiat-Shamir challenge via Merlin.
-pub(crate) fn fiat_shamir<T: traits::Transcript>(
+/// Returns (n+1-t) random scalars for the SCRAPE LDT test (i.e., the random polynomial itself).
+/// Additionally returns `num_scalars` random scalars for some linear combinations.
+pub(crate) fn fiat_shamir<T: Transcript>(
     trx: &T,
     sc: &ThresholdConfig,
     pp: &T::PublicParameters,
@@ -132,7 +157,7 @@ pub(crate) fn fiat_shamir<T: traits::Transcript>(
             sc.t,
             sc.n + 1,
         ),
-        <merlin::Transcript as FiatShamirProtocol<T>>::challenge_linear_combination(
+        <merlin::Transcript as FiatShamirProtocol<T>>::challenge_linear_combination_scalars(
             &mut fs_t,
             num_scalars,
         ),

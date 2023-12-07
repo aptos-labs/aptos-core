@@ -6,7 +6,7 @@ use aptos_dkg::pvss::{
     das::PublicParameters,
     encryption_dlog::g1::DecryptPrivKey,
     traits::{Convert, Reconstructable, Transcript},
-    Player, WeightedConfig, WeightedTranscript,
+    Player, WeightedConfig, self,
 };
 use aptos_forge::LocalSwarm;
 use aptos_rest_client::Client;
@@ -23,7 +23,7 @@ use tokio::time::Instant;
 use aptos_dkg::pvss::dealt_secret_key::g1::DealtSecretKey;
 use aptos_dkg::pvss::input_secret::InputSecret;
 
-type WT = WeightedTranscript<aptos_dkg::pvss::das::Transcript>;
+type WT = pvss::das::WeightedTranscript;
 
 async fn get_latest_dkg_state(rest_client: &Client) -> DKGState {
     let maybe_response = rest_client

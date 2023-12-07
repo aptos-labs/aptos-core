@@ -3,7 +3,7 @@
 use aptos_crypto::Uniform;
 use aptos_dkg::pvss;
 use aptos_dkg::pvss::test_utils;
-use aptos_dkg::pvss::test_utils::{get_threshold_configs_for_benchmarking, NoAux};
+use aptos_dkg::pvss::test_utils::{get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking, NoAux};
 use aptos_dkg::pvss::traits::transcript::Transcript;
 use aptos_dkg::pvss::traits::SecretSharingConfig;
 use criterion::measurement::WallTime;
@@ -20,6 +20,10 @@ pub fn all_groups(c: &mut Criterion) {
         pvss_group::<pvss::scrape::Transcript>(&tc, c);
         pvss_group::<pvss::das::Transcript>(&tc, c);
     }
+
+    for wc in get_weighted_configs_for_benchmarking() {
+        pvss_group::<pvss::das::WeightedTranscript>(&wc, c);
+    }
 }
 
 pub fn pvss_group<T: Transcript>(sc: &T::SecretSharingConfig, c: &mut Criterion) {
@@ -30,14 +34,14 @@ pub fn pvss_group<T: Transcript>(sc: &T::SecretSharingConfig, c: &mut Criterion)
     let (pp, ssks, spks, dks, eks, iss, s, _) =
         test_utils::setup_dealing::<T, ThreadRng>(sc, &mut rng);
 
-    pvss_transcript_random::<T, WallTime>(sc, &mut group);
+    // pvss_transcript_random::<T, WallTime>(sc, &mut group);
     pvss_deal::<T, WallTime>(sc, &pp, &ssks, &eks, &mut group);
     pvss_aggregate::<T, WallTime>(sc, &mut group);
     pvss_verify::<T, WallTime>(sc, &pp, &ssks, &spks, &eks, &mut group);
     // pvss_aggregate_verify::<T, WallTime>(sc, 2, &mut group);
-    pvss_aggregate_verify::<T, WallTime>(sc, &pp, &ssks, &spks, &eks, &iss, 50, &mut group);
+    // pvss_aggregate_verify::<T, WallTime>(sc, &pp, &ssks, &spks, &eks, &iss, 50, &mut group);
     pvss_aggregate_verify::<T, WallTime>(sc, &pp, &ssks, &spks, &eks, &iss, 100, &mut group);
-    pvss_aggregate_verify::<T, WallTime>(sc, &pp, &ssks, &spks, &eks, &iss, 200, &mut group);
+    // pvss_aggregate_verify::<T, WallTime>(sc, &pp, &ssks, &spks, &eks, &iss, 200, &mut group);
     pvss_decrypt_own_share::<T, WallTime>(sc, &pp, &ssks, &dks, &eks, &s, &mut group);
 
     group.finish();

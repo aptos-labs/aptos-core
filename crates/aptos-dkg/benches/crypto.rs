@@ -13,11 +13,11 @@ use aptos_dkg::algebra::evaluation_domain::{BatchEvaluationDomain, EvaluationDom
 use aptos_dkg::algebra::fft::fft_assign;
 use aptos_dkg::algebra::polynomials;
 use aptos_dkg::constants::{LARGE_SIZES, OUR_THRESHOLD, SMALL_SIZES};
-use aptos_dkg::utils::hash_to_scalar;
 use aptos_dkg::utils::random::{
     random_g1_point, random_g1_points, random_g2_point, random_g2_points, random_gt_point_insecure,
     random_gt_points_insecure, random_scalar, random_scalars,
 };
+use aptos_dkg::utils::{g1_multi_exp, g2_multi_exp, hash_to_scalar};
 
 /// FFT sizes for the benchmarks.
 pub const FFT_SIZES: [usize; 6] = [32, 64, 128, 256, 512, 1024];
@@ -385,7 +385,7 @@ fn g1_multiexp<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
                 (points, scalars)
             },
             |(points, scalars)| {
-                G1Projective::multi_exp(points.as_slice(), scalars.as_ref());
+                g1_multi_exp(points.as_slice(), scalars.as_ref());
             },
         )
     });
@@ -406,7 +406,7 @@ fn g2_multiexp<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
                 (points, scalars)
             },
             |(points, scalars)| {
-                G2Projective::multi_exp(points.as_slice(), scalars.as_ref());
+                g2_multi_exp(points.as_slice(), scalars.as_ref());
             },
         )
     });

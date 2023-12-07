@@ -208,7 +208,9 @@ impl WeightedVUF for PinkasWUF {
             //     "Flattening {} share(s) for player {player}",
             //     sub_shares.len()
             // );
-            let apk = apks[player.id].as_ref().ok_or(anyhow!("Missing APK for player {}", player))?;
+            let apk = apks[player.id]
+                .as_ref()
+                .ok_or(anyhow!("Missing APK for player {}", player))?;
             let rks = &apk.0.rks;
             let num_shares = rks.len();
 
@@ -234,7 +236,9 @@ impl WeightedVUF for PinkasWUF {
         }
 
         for (player, proof) in proof {
-            let apk = &apks[player.id].as_ref().ok_or(anyhow!("Missing APK for player {}", player))?;
+            let apk = &apks[player.id]
+                .as_ref()
+                .ok_or(anyhow!("Missing APK for player {}", player))?;
             Self::verify_share(pp, apk, msg, proof)?;
         }
 

@@ -29,6 +29,7 @@ pub struct LowDegreeTest<'a> {
 
 impl<'a> LowDegreeTest<'a> {
     /// Creates a new LDT given a pre-generated random polynomial `f` of expected degree `n-t-1`.
+    /// TODO: Eh... n should be the # of roots of unity evals. Otherwise, weird...
     pub fn new(
         f: Vec<Scalar>,
         t: usize,
@@ -90,8 +91,9 @@ impl<'a> LowDegreeTest<'a> {
     /// When `include_zero` is false, checks if the evaluations $p(\omega^i)$, \forall \in [0, n)$ stored
     /// in `evals[i]` encode a degree $\le t-1$ polynomial.
     ///
-    /// When `include_zero` is true, checks if $p(0)$ in `evals[n-1]` and $p(\omega^i)$ in `evals[i]`.
-    /// do so (i.e., there are only $n-1$ evaluations at the roots of unity).
+    /// When `include_zero` is true, checks if the evaluations $p(0)$ in `evals[n-1]` and
+    /// $p(\omega^i)$ in `evals[i]` encpde a degree $\le t-1$ polynomial (i.e., there are only $n-1$
+    /// evaluations at the roots of unity).
     pub fn low_degree_test(self, evals: &Vec<Scalar>) -> anyhow::Result<()> {
         // This includes the extra evaluation at zero when `includes_zero` is true.
         if evals.len() != self.n {

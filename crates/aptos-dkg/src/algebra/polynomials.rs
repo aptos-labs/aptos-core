@@ -17,7 +17,20 @@ pub fn get_powers_of_tau(tau: &Scalar, n: usize) -> Vec<Scalar> {
 
     taus.push(Scalar::ONE);
 
-    // Compute \tau^i, for all i \in [0, n]
+    for _ in 0..n - 1 {
+        taus.push(taus.last().unwrap().mul(tau));
+    }
+    debug_assert_eq!(taus.len(), n);
+
+    taus
+}
+
+/// Returns $\[\tau, \tau^2, \tau^3, \ldots, \tau^n\]$.
+pub fn get_nonzero_powers_of_tau(tau: &Scalar, n: usize) -> Vec<Scalar> {
+    let mut taus = Vec::with_capacity(n);
+
+    taus.push(*tau);
+
     for _ in 0..n - 1 {
         taus.push(taus.last().unwrap().mul(tau));
     }
@@ -491,6 +504,8 @@ fn accumulator_poly_scheduled_inner(
 /// Deals a secret `s` in a `t`-out-of-`n` fashion (as per `sc`) returning (1) the degree `t-1`
 /// polynomial encoding the secret and (2) its evaluations at all the `n` $N$th roots-of-unity where
 /// $N$ is the smallest power of two $\ge n$.
+///
+/// Any `t` evaluations are sufficient to reconstruct the secret `s`.
 pub fn shamir_secret_share<
     R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
 >(

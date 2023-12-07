@@ -69,6 +69,7 @@ impl<T: Transcript> WeightedTranscript<T> {
         // proportional to their weight.
         let mut duplicated_eks = Vec::with_capacity(sc.get_total_weight());
 
+        // TODO(Security): This transformation will not be secure for all PVSS encryption schemes
         for (player_id, ek) in eks.iter().enumerate() {
             let player = sc.get_player(player_id);
             let num_shares = sc.get_player_weight(&player);

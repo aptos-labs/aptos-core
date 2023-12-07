@@ -26,6 +26,8 @@ pub struct WeightedConfig {
     /// Player's starting index `a` in a vector of all `W` shares, such that this player owns shares
     /// `W[a, a + weight[player])`. Useful during weighted secret reconstruction.
     starting_index: Vec<usize>,
+    /// The maximum weight of any player.
+    max_player_weight: usize,
 }
 
 impl WeightedConfig {
@@ -42,6 +44,7 @@ impl WeightedConfig {
         if weights.is_empty() {
             return Err(anyhow!("expected a non-empty vector of player weights"));
         }
+        let max_player_weight = *weights.iter().max().unwrap();
 
         for (idx, w) in weights.iter().enumerate() {
             if *w == 0 {
@@ -60,6 +63,7 @@ impl WeightedConfig {
         //  - Player 2 will own the shares at indices [6, 6 + 3) = [6..9), i.e., starting index 6
         let mut starting_index = Vec::with_capacity(weights.len());
         starting_index.push(0);
+
         for w in weights.iter().take(n - 1) {
             starting_index.push(starting_index.last().unwrap() + w);
         }
@@ -70,7 +74,12 @@ impl WeightedConfig {
             num_players: n,
             weight: weights,
             starting_index,
+            max_player_weight,
         })
+    }
+
+    pub fn get_max_player_weight(&self) -> usize {
+        self.max_player_weight
     }
 
     pub fn get_threshold_config(&self) -> &ThresholdConfig {
@@ -94,11 +103,11 @@ impl WeightedConfig {
     /// share per "virtual player."
     ///
     /// This function returns the "virtual" player associated with the $i$th sub-share of this player.
-    pub fn get_virtual_player(&self, player: &Player, i: usize) -> Player {
+    pub fn get_virtual_player(&self, player: &Player, j: usize) -> Player {
         // println!("WeightedConfig::get_virtual_player({player}, {i})");
+        assert_lt!(j, self.weight[player.id]);
 
-        let id = self.starting_index[player.id] + i;
-        assert_lt!(id, self.tc.n);
+        let id = self.get_share_index(player.id, j).unwrap();
 
         Player { id }
     }
@@ -106,7 +115,22 @@ impl WeightedConfig {
     pub fn get_all_virtual_players(&self, player: &Player) -> Vec<Player> {
         let w = self.get_player_weight(player);
 
-        (0..w).map(|i| self.get_virtual_player(player, i)).collect::<Vec<Player>>()
+        (0..w)
+            .map(|i| self.get_virtual_player(player, i))
+            .collect::<Vec<Player>>()
+    }
+
+    /// `i` is the player's index, from 0 to `self.tc.n`
+    /// `j` is the player's share #, from 0 to `self.weight[i]`
+    ///
+    /// Returns the index of this player's share in the vector of shares, or None if out of bounds.
+    pub fn get_share_index(&self, i: usize, j: usize) -> Option<usize> {
+        assert_lt!(i, self.tc.n);
+        if j < self.weight[i] {
+            Some(self.starting_index[i] + j)
+        } else {
+            None
+        }
     }
 
     pub fn get_batch_evaluation_domain(&self) -> &BatchEvaluationDomain {

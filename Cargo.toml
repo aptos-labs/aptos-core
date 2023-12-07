@@ -460,8 +460,7 @@ blake2 = "0.10.4"
 blake2-rfc = "0.2.18"
 blst = "0.3.7"
 bollard = "0.15"
-# TODO: Upgrade to 0.7.1 and check the bug disappeared.
-blstrs = { version = "0.7.0", features = ["serde"] }
+blstrs = { version = "0.7.1", features = ["serde"] }
 bulletproofs = { version = "4.0.0" }
 byteorder = "1.4.3"
 bytes = { version = "1.4.0", features = ["serde"] }

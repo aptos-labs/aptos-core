@@ -107,6 +107,7 @@ impl traits::Transcript for Transcript {
         }
     }
 
+    #[allow(non_snake_case)]
     fn verify<A: Serialize>(
         &self,
         sc: &Self::SecretSharingConfig,
@@ -175,6 +176,7 @@ impl traits::Transcript for Transcript {
             r_i.push(r_i.last().unwrap().mul(&r));
             r_i_negated.push(-*r_i.last().unwrap());
         }
+        debug_assert_eq!(r_i.len(), sc.n + 1);
 
         // The vector of left-hand-side inputs to each pairing in the multi-pairing.
         let lhs = (0..sc.n)
@@ -190,11 +192,12 @@ impl traits::Transcript for Transcript {
             .collect::<Vec<G1Projective>>();
 
         // The vector of right-hand-side inputs to each pairing in the multi-pairing.
-        let mexp = g2_multi_exp(self.Y_hat.as_slice(), r_i_negated.as_slice());
+        let (exps, _) = r_i_negated.split_at(sc.n);
+        let Y_hat = g2_multi_exp(self.Y_hat.as_slice(), exps);
         let rhs = eks
             .iter()
             .map(|ek| Into::<G2Projective>::into(ek))
-            .chain([mexp, *pp.get_public_key_base(), self.u2_hat].into_iter())
+            .chain([Y_hat, *pp.get_public_key_base(), self.u2_hat].into_iter())
             .collect::<Vec<G2Projective>>();
 
         let res = multi_pairing(lhs.iter(), rhs.iter());

@@ -86,7 +86,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
 
     type DealtSecretKeyShare: PartialEq + Clone;
     type DealtPubKeyShare: Debug + PartialEq + Clone;
-    type DealtSecretKey: Debug // TODO(Security): Kind of unsafe to have this...
+    type DealtSecretKey: Debug // TODO(Security): Kind of unsafe to have Debug here...
         + PartialEq
         + Reconstructable<Self::SecretSharingConfig, Share = Self::DealtSecretKeyShare>;
     type DealtPubKey;
