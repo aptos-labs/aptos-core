@@ -35,7 +35,9 @@ use aptos_types::{
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::{
     output::VMOutput,
-    storage::{ChangeSetConfigs, StorageGasParameters, StoragePricing},
+    storage::{
+        change_set_configs::ChangeSetConfigs, pricing::StoragePricing, StorageGasParameters,
+    },
 };
 use fail::fail_point;
 use move_binary_format::errors::VMResult;
