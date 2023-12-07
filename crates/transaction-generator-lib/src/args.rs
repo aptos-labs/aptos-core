@@ -56,8 +56,9 @@ pub enum TransactionTypeArg {
     VectorPicture40,
     VectorPictureRead40,
     SmartTablePicture30KWith200Change,
-    SmartTablePicture1MWith1KChange,
-    SmartTablePicture1BWith1KChange,
+    SmartTablePicture1MWith300Change,
+    SmartTablePicture1BWith300Change,
+    SmartTablePicture1MWith1KChangeExceedsLimit,
 }
 
 impl TransactionTypeArg {
@@ -357,20 +358,30 @@ impl TransactionTypeArg {
                     use_account_pool: sender_use_account_pool,
                 }
             },
-            TransactionTypeArg::SmartTablePicture1MWith1KChange => {
+            TransactionTypeArg::SmartTablePicture1MWith300Change => {
                 TransactionType::CallCustomModules {
                     entry_point: EntryPoints::SmartTablePicture {
                         length: 1024 * 1024,
-                        num_points_per_txn: 1024,
+                        num_points_per_txn: 300,
                     },
                     num_modules: module_working_set_size,
                     use_account_pool: sender_use_account_pool,
                 }
             },
-            TransactionTypeArg::SmartTablePicture1BWith1KChange => {
+            TransactionTypeArg::SmartTablePicture1BWith300Change => {
                 TransactionType::CallCustomModules {
                     entry_point: EntryPoints::SmartTablePicture {
                         length: 1024 * 1024 * 1024,
+                        num_points_per_txn: 300,
+                    },
+                    num_modules: module_working_set_size,
+                    use_account_pool: sender_use_account_pool,
+                }
+            },
+            TransactionTypeArg::SmartTablePicture1MWith1KChangeExceedsLimit => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::SmartTablePicture {
+                        length: 1024 * 1024,
                         num_points_per_txn: 1024,
                     },
                     num_modules: module_working_set_size,
