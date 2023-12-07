@@ -52,6 +52,18 @@ pub struct LiveVarInfoAtCodeOffset {
     pub after: BTreeMap<TempIndex, LiveVarInfo>,
 }
 
+impl LiveVarInfoAtCodeOffset {
+    /// Creates a set of the temporaries alive before this program point.
+    pub fn before_set(&self) -> BTreeSet<TempIndex> {
+        self.before.keys().cloned().collect()
+    }
+
+    /// Creates a set of the temporaries alive after this program point.
+    pub fn after_set(&self) -> BTreeSet<TempIndex> {
+        self.after.keys().cloned().collect()
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
 pub struct LiveVarInfo {
     /// The usage of a given temporary after this program point, inclusive of locations where
