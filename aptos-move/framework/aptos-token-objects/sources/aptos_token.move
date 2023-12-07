@@ -8,7 +8,6 @@
 /// * Metadata property type
 module aptos_token_objects::aptos_token {
     use std::error;
-    use std::features;
     use std::option::{Self, Option};
     use std::string::String;
     use std::signer;
