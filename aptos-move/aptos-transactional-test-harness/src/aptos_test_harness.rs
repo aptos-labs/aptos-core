@@ -15,11 +15,14 @@ use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
     account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
+    block_executor::config::BlockExecutorConfigFromOnchain,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
+    on_chain_config::BlockGasLimitType,
     state_store::{state_key::StateKey, table::TableHandle},
     transaction::{
+        signature_verified_transaction::into_signature_verified_block,
         EntryFunction as TransactionEntryFunction, ExecutionStatus, Module as TransactionModule,
         RawTransaction, Script as TransactionScript, Transaction, TransactionOutput,
         TransactionStatus,
@@ -473,7 +476,14 @@ impl<'a> AptosTestAdapter<'a> {
     /// Should error if the transaction ends up being discarded, or having a status other than
     /// EXECUTED.
     fn run_transaction(&mut self, txn: Transaction) -> Result<TransactionOutput> {
-        let mut outputs = AptosVM::execute_block(vec![txn], &self.storage.clone(), None)?;
+        let txn_block = vec![txn];
+        let sig_verified_block = into_signature_verified_block(txn_block);
+        let onchain_config = BlockExecutorConfigFromOnchain {
+            // TODO fetch values from state?
+            block_gas_limit_type: BlockGasLimitType::Limit(30000),
+        };
+        let mut outputs =
+            AptosVM::execute_block(&sig_verified_block, &self.storage.clone(), onchain_config)?;
 
         assert_eq!(outputs.len(), 1);
 
