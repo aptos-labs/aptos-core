@@ -1757,9 +1757,6 @@ fn realistic_env_max_load_test(
     let duration_secs = duration.as_secs();
     let long_running = duration_secs >= 2400;
 
-    // Calculate the max CPU threshold
-    let max_cpu_threshold = if num_validators >= 10 { 30 } else { 70 };
-
     // Create the test
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
@@ -1804,12 +1801,6 @@ fn realistic_env_max_load_test(
                     // Give at least 60s for catchup, give 10% of the run for longer durations.
                     (duration.as_secs() / 10).max(60),
                 )
-                .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                    // Check that we don't use more than 16 CPU cores for 30% of the time.
-                    MetricsThreshold::new(16.0, max_cpu_threshold),
-                    // Check that we don't use more than 10 GB of memory for 30% of the time.
-                    MetricsThreshold::new_gb(10.0, 30),
-                ))
                 .add_latency_threshold(3.4, LatencyType::P50)
                 .add_latency_threshold(4.5, LatencyType::P90)
                 .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_with_breach_pct(

@@ -16,9 +16,8 @@ use anyhow::{bail, Context};
 use aptos_consensus_types::{
     block::Block,
     block_retrieval::{
-        BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus,
-        MAX_BLOCKS_PER_REQUEST, NUM_PEERS_PER_RETRY, NUM_RETRIES, RETRY_INTERVAL_MSEC,
-        RPC_TIMEOUT_MSEC,
+        BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus, NUM_PEERS_PER_RETRY,
+        NUM_RETRIES, RETRY_INTERVAL_MSEC, RPC_TIMEOUT_MSEC,
     },
     common::Author,
     quorum_cert::QuorumCert,
@@ -401,6 +400,7 @@ pub struct BlockRetriever {
     network: NetworkSender,
     preferred_peer: Author,
     validator_addresses: Vec<AccountAddress>,
+    max_blocks_to_request: u64,
 }
 
 impl BlockRetriever {
@@ -408,11 +408,13 @@ impl BlockRetriever {
         network: NetworkSender,
         preferred_peer: Author,
         validator_addresses: Vec<AccountAddress>,
+        max_blocks_to_request: u64,
     ) -> Self {
         Self {
             network,
             preferred_peer,
             validator_addresses,
+            max_blocks_to_request,
         }
     }
 
@@ -519,7 +521,7 @@ impl BlockRetriever {
         let mut progress = 0;
         let mut last_block_id = block_id;
         let mut result_blocks: Vec<Block> = vec![];
-        let mut retrieve_batch_size = MAX_BLOCKS_PER_REQUEST;
+        let mut retrieve_batch_size = self.max_blocks_to_request;
         if peers.is_empty() {
             bail!("Failed to fetch block {}: no peers available", block_id);
         }

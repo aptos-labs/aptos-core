@@ -81,6 +81,7 @@ pub struct MoveHarness {
     txn_seq_no: BTreeMap<AccountAddress, u64>,
 
     default_gas_unit_price: u64,
+    max_gas_per_txn: u64,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -91,6 +92,8 @@ pub enum BlockSplit {
 }
 
 impl MoveHarness {
+    const DEFAULT_MAX_GAS_PER_TXN: u64 = 2_000_000;
+
     /// Creates a new harness.
     pub fn new() -> Self {
         register_package_hooks(Box::new(AptosPackageHooks {}));
@@ -98,6 +101,7 @@ impl MoveHarness {
             executor: FakeExecutor::from_head_genesis(),
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
+            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
         }
     }
 
@@ -107,6 +111,7 @@ impl MoveHarness {
             executor,
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
+            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
         }
     }
 
@@ -116,6 +121,7 @@ impl MoveHarness {
             executor: FakeExecutor::from_head_genesis_with_count(count),
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
+            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
         }
     }
 
@@ -125,6 +131,7 @@ impl MoveHarness {
             executor: FakeExecutor::from_testnet_genesis(),
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
+            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
         }
     }
 
@@ -143,6 +150,7 @@ impl MoveHarness {
             executor: FakeExecutor::from_mainnet_genesis(),
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
+            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
         }
     }
 
@@ -244,7 +252,7 @@ impl MoveHarness {
         account
             .transaction()
             .sequence_number(seq_no)
-            .max_gas_amount(2_000_000)
+            .max_gas_amount(self.max_gas_per_txn)
             .gas_unit_price(self.default_gas_unit_price)
             .payload(payload)
             .sign()
@@ -789,6 +797,10 @@ impl MoveHarness {
             },
         }
     }
+
+    pub fn set_max_gas_per_txn(&mut self, max_gas_per_txn: u64) {
+        self.max_gas_per_txn = max_gas_per_txn
+    }
 }
 
 impl BlockSplit {
@@ -864,6 +876,23 @@ macro_rules! assert_success {
             $s,
             aptos_types::transaction::TransactionStatus::Keep(
                 aptos_types::transaction::ExecutionStatus::Success),
+            $($arg)+
+        )
+    }};
+}
+
+/// Helper to assert transaction resulted in OUT_OF_GAS error
+#[macro_export]
+macro_rules! assert_out_of_gas {
+    ($s:expr $(,)?) => {{
+        assert_eq!($s, aptos_types::transaction::TransactionStatus::Keep(
+            aptos_types::transaction::ExecutionStatus::OutOfGas))
+    }};
+    ($s:expr, $($arg:tt)+) => {{
+        assert_eq!(
+            $s,
+            aptos_types::transaction::TransactionStatus::Keep(
+                aptos_types::transaction::ExecutionStatus::OutOfGas),
             $($arg)+
         )
     }};

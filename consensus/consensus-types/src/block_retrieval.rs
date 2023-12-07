@@ -10,12 +10,6 @@ use aptos_types::validator_verifier::ValidatorVerifier;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-// this number is recommended to be greater than backpressure limit
-// (so block retrievals can be done in a single request)
-// but it should not be too large as the response size is bounded.
-// TODO: add a test
-pub const MAX_BLOCKS_PER_REQUEST: u64 = 10;
-
 pub const NUM_RETRIES: usize = 5;
 pub const NUM_PEERS_PER_RETRY: usize = 3;
 pub const RETRY_INTERVAL_MSEC: u64 = 500;

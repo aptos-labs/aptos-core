@@ -744,6 +744,54 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-comparison-testing"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos",
+ "aptos-crypto",
+ "aptos-framework",
+ "aptos-gas-meter",
+ "aptos-gas-profiling",
+ "aptos-gas-schedule",
+ "aptos-language-e2e-tests",
+ "aptos-logger",
+ "aptos-memory-usage-tracker",
+ "aptos-resource-viewer",
+ "aptos-rest-client",
+ "aptos-state-view",
+ "aptos-table-natives",
+ "aptos-types",
+ "aptos-validator-interface",
+ "aptos-vm",
+ "aptos-vm-logging",
+ "aptos-vm-types",
+ "bcs 0.1.4",
+ "clap 4.3.21",
+ "futures",
+ "itertools 0.10.5",
+ "move-binary-format",
+ "move-cli",
+ "move-compiler",
+ "move-core-types",
+ "move-package",
+ "move-resource-viewer",
+ "move-vm-runtime",
+ "move-vm-test-utils",
+ "move-vm-types",
+ "num_cpus",
+ "once_cell",
+ "rayon",
+ "regex",
+ "rocksdb",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "aptos-compression"
 version = "0.1.0"
 dependencies = [
@@ -900,6 +948,7 @@ dependencies = [
  "futures",
  "itertools 0.10.5",
  "mirai-annotations",
+ "once_cell",
  "proptest",
  "rand 0.7.3",
  "rayon",
@@ -2068,12 +2117,15 @@ dependencies = [
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
  "aptos-moving-average 0.1.0",
+ "aptos-protos 1.1.2",
  "aptos-runtimes",
  "async-trait",
+ "base64 0.13.0",
  "clap 4.3.21",
  "cloud-storage",
  "futures-util",
  "once_cell",
+ "prost 0.12.1",
  "redis",
  "serde",
  "serde_json",
@@ -2241,6 +2293,7 @@ dependencies = [
  "backoff",
  "backtrace",
  "base64 0.13.0",
+ "chrono",
  "clap 4.3.21",
  "cloud-storage",
  "futures",
@@ -3982,16 +4035,20 @@ dependencies = [
  "aptos-api-types",
  "aptos-config",
  "aptos-db",
+ "aptos-framework",
+ "aptos-language-e2e-tests",
  "aptos-rest-client",
  "aptos-state-view",
  "aptos-storage-interface",
  "aptos-types",
+ "async-recursion",
  "async-trait",
  "bcs 0.1.4",
  "itertools 0.10.5",
  "log",
  "lru 0.7.8",
  "move-binary-format",
+ "move-core-types",
  "tokio",
 ]
 
@@ -4571,6 +4628,17 @@ dependencies = [
  "once_cell",
  "signal-hook",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "async-recursion"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fd55a5ba1179988837d24ab4c7cc8ed6efdeff578ede0416b4225a5fca35bd0"
+dependencies = [
+ "proc-macro2 1.0.64",
+ "quote 1.0.29",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -8921,6 +8989,7 @@ dependencies = [
  "aptos-vm-logging",
  "aptos-vm-types",
  "bcs 0.1.4",
+ "claims",
  "fail 0.5.0",
  "itertools 0.10.5",
  "move-binary-format",
@@ -10055,6 +10124,7 @@ dependencies = [
  "move-prover-test-utils",
  "move-symbol-pool",
  "num 0.4.0",
+ "num-traits",
  "once_cell",
  "regex",
  "serde",
@@ -14360,6 +14430,17 @@ dependencies = [
  "rand 0.8.5",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "testdiff"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap 4.3.21",
+ "itertools 0.10.5",
+ "once_cell",
+ "walkdir",
 ]
 
 [[package]]

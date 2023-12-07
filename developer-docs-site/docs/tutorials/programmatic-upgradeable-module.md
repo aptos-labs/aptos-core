@@ -72,7 +72,7 @@ check the [**Aptos explorer**](https://explorer.aptoslabs.com/) and search for y
 Click on `Modules` tab and you should see the code/module published onto the account.
 **[Example](https://explorer.aptoslabs.com/account/0x090ad1536fe5cfcb5632b3026f99f8415c55b69ce54b6f17ed8cd7edbcb5edfa/modules/code/user_info?network=devnet)**
 
-## 2. Upgrade module in resource account
+## 2. How to upgrade modules in a resource account
 
 Now that we have published a module onto a resource account, the next step would be attempting to upgrade the module.
 
@@ -82,9 +82,9 @@ More information: https://aptos.dev/move/book/package-upgrades/
 
 ### Note that we need to redeploy the module to make it upgradeable, we’ll go over the steps again below.
 
-### Publish the upgradeable module
+#### Publish the upgradeable module
 
-Change `Move.toml` to include the `upgrade_policy`, we’ll set this to `compatible`.
+1. Change `Move.toml` to include the `upgrade_policy`, we’ll set this to `compatible`.
 
 ```json
 [package]
@@ -132,7 +132,7 @@ module resource_account::user_info {
 - We then create a `Config` resource, store the `signer_cap` and the original owner of the module. In this case, your original address. We’ll use this information to configure access permissions when upgrading the module.
 - `Config` is then moved to the `resource_account` signer in global storage.
 
-#### Code Changes - `upgrade`
+#### 2.1.1. Code Changes - `upgrade`
 
    The second function is to define the `upgrade` function. This must be a `entry` function as it’s being called from a transaction. Here’s an example of the function with access control configured.
 
@@ -151,7 +151,7 @@ module resource_account::user_info {
 	        let config = borrow_global<Config>(RESOURCE_ACCOUNT);
 	        assert!(config.owner == signer::address_of(owner), 1);
 	
-	        // The resourec account `signer` is needed to publish/upgrade the contract
+	        // The resource account `signer` is needed to publish/upgrade the contract
 	        let signer = account::create_signer_with_capability(&config.signer_cap);
 	        code::publish_package_txn(&signer, metadata_serialized, code);
 	    }

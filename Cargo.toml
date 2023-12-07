@@ -9,6 +9,7 @@ members = [
     "aptos-move/aptos-abstract-gas-usage",
     "aptos-move/aptos-aggregator",
     "aptos-move/aptos-debugger",
+    "aptos-move/aptos-e2e-comparison-testing",
     "aptos-move/aptos-gas-algebra",
     "aptos-move/aptos-gas-calibration",
     "aptos-move/aptos-gas-meter",
@@ -191,6 +192,7 @@ members = [
     "third_party/move/move-command-line-common",
     "third_party/move/move-compiler",
     "third_party/move/move-compiler-v2",
+    "third_party/move/move-compiler-v2/tools/testdiff",
     "third_party/move/move-compiler-v2/transactional-tests",
     "third_party/move/move-compiler/transactional-tests",
     "third_party/move/move-core/types",
@@ -443,6 +445,7 @@ assert_approx_eq = "1.1.0"
 assert_unordered = "0.3.5"
 async-channel = "1.7.1"
 async-mutex = "1.4.0"
+async-recursion = "1.0.5"
 async-stream = "0.3"
 async-trait = "0.1.53"
 axum = "0.5.16"

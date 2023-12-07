@@ -1,41 +1,24 @@
 // ---- Model Dump
-module 0xc0ffee::dummy1 {
-    private fun bar(b: bool) {
+module 0x42::tuple_invalid {
+    struct S {
+        f: u64,
+    }
+    private fun tuple(x: u64): (u64, tuple_invalid::S) {
+        Tuple(x, pack tuple_invalid::S(Add<u64>(x, 1)))
+    }
+    private fun use_tuple1(x: u64): u64 {
         {
-          let () = if b {
-            dummy1::baz()
-          } else {
-            Tuple()
-          };
-          Tuple()
+          let x: (u64, tuple_invalid::S) = tuple_invalid::tuple(x);
+          1
         }
     }
-    private fun baz() {
-        Tuple()
+    spec fun $tuple(x: u64): (u64, tuple_invalid::S) {
+        Tuple(x, pack tuple_invalid::S(Add(x, 1)))
     }
-    spec fun $bar(b: bool) {
+    spec fun $use_tuple1(x: u64): u64 {
         {
-          let () = if b {
-            dummy1::$baz()
-          } else {
-            Tuple()
-          };
-          Tuple()
+          let x: (u64, tuple_invalid::S) = tuple_invalid::$tuple(x);
+          1
         }
     }
-    spec fun $baz() {
-        Tuple()
-    }
-} // end 0xc0ffee::dummy1
-module 0xc0ffee::dummy2 {
-    struct State {
-        value: u64,
-    }
-    private fun tuple_assignments(s: &signer,state: dummy2::State) {
-        {
-          let () = MoveTo<dummy2::State>(s, state);
-          Tuple()
-        }
-    }
-    spec fun $tuple_assignments(s: &signer,state: dummy2::State);
-} // end 0xc0ffee::dummy2
+} // end 0x42::tuple_invalid
