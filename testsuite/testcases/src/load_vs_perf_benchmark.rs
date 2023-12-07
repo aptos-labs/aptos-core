@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::NetworkLoadTest;
+use crate::{NetworkLoadTest, create_emitter_and_request, LoadDestination};
 use aptos_forge::{
     args::TransactionTypeArg,
     prometheus_metrics::{LatencyBreakdown, LatencyBreakdownSlice},
@@ -12,6 +12,7 @@ use aptos_logger::info;
 use rand::SeedableRng;
 use std::{fmt::Debug, time::Duration};
 use tokio::runtime::Runtime;
+use anyhow::Context;
 
 // add larger warmup, as when we are exceeding the max load,
 // it takes more time to fill mempool.
@@ -151,10 +152,17 @@ impl TransactionWorkload {
     }
 }
 
+pub struct ContinuousTraffic {
+    pub traffic: EmitJobRequest,
+    pub criteria: Option<SuccessCriteria>,
+}
+
 pub struct LoadVsPerfBenchmark {
     pub test: Box<dyn NetworkLoadTest>,
     pub workloads: Workloads,
     pub criteria: Vec<SuccessCriteria>,
+
+    pub continuous_traffic: Option<ContinuousTraffic>,
 }
 
 impl Test for LoadVsPerfBenchmark {
@@ -206,7 +214,27 @@ impl NetworkTest for LoadVsPerfBenchmark {
             self.workloads.len(),
         );
 
-        let _runtime = Runtime::new().unwrap();
+        let rt = Runtime::new().unwrap();
+
+        let mut continous_job = if let Some(continuous_traffic) = &self.continuous_traffic {
+            let nodes_to_send_load_to =
+                LoadDestination::FullnodesOtherwiseValidators.get_destination_nodes(ctx.swarm());
+            let rng = SeedableRng::from_rng(ctx.core().rng())?;
+            let (mut emitter, emit_job_request) =
+                create_emitter_and_request(ctx.swarm(), continuous_traffic.traffic.clone(), &nodes_to_send_load_to, rng)
+                    .context("create emitter")?;
+
+            let job = rt
+                .block_on(emitter.start_job(
+                    ctx.swarm().chain_info().root_account,
+                    emit_job_request,
+                    1 + 2 * self.workloads.len(),
+                ))
+                .context("start emitter job")?;
+            Some(job)
+        } else {
+            None
+        };
 
         let (phase_duration, buffer) = self.workloads.split_duration(ctx.global_duration);
 
@@ -216,6 +244,8 @@ impl NetworkTest for LoadVsPerfBenchmark {
                 info!("Sleeping in between loadtests, for {}s", buffer.as_secs());
                 std::thread::sleep(buffer);
             }
+
+            continous_job.as_mut().map(|job| job.start_next_phase());
 
             info!("Starting for {:?}", self.workloads);
             results.push(
@@ -228,6 +258,8 @@ impl NetworkTest for LoadVsPerfBenchmark {
                         .unwrap(),
                 )?,
             );
+
+            continous_job.as_mut().map(|job| job.start_next_phase());
 
             // Note: uncomment below to perform reconfig during a test
             // let mut aptos_info = ctx.swarm().aptos_public_info();
@@ -243,6 +275,32 @@ impl NetworkTest for LoadVsPerfBenchmark {
         for line in table {
             ctx.report.report_text(line);
         }
+
+        let continuous_results = continous_job.map(|job| {
+            let stats_by_phase = rt.block_on(job.stop_job());
+
+            let mut result = vec![];
+            for (phase, phase_stats) in stats_by_phase.into_iter().enumerate() {
+                result.push(
+                    (
+                        if phase % 2 == 0 {
+                            "continuous idle".to_string()
+                        } else {
+                            format!("continuous with traffic {}", phase / 2)
+                        },
+                        phase_stats,
+                    ),
+                );
+            }
+
+            let table = to_table_continuous("continuous traffic".to_string(), &result);
+            for line in table {
+                ctx.report.report_text(line);
+            }
+
+            result
+        });
+
         for (index, result) in results.iter().enumerate() {
             // always take last phase for success criteria
             let target_result = &result[result.len() - 1];
@@ -257,6 +315,22 @@ impl NetworkTest for LoadVsPerfBenchmark {
                 )?;
             }
         }
+
+        if let Some(results) = continuous_results {
+            for (name, stats) in results {
+                let rate = stats.rate();
+                if let Some(criteria) = &self.continuous_traffic.as_ref().unwrap().criteria {
+                    SuccessCriteriaChecker::check_core_for_success(
+                        criteria,
+                        ctx.report,
+                        &rate,
+                        None,
+                        Some(name),
+                    )?;
+                }
+            }
+        }
+
         Ok(())
     }
 }
@@ -308,6 +382,42 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
 
     table
 }
+
+
+fn to_table_continuous(type_name: String, results: &[(String, TxnStats)]) -> Vec<String> {
+    let mut table = Vec::new();
+    table.push(format!(
+        "{: <40} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
+        type_name,
+        "submitted/s",
+        "committed/s",
+        "expired/s",
+        "rejected/s",
+        "latency",
+        "p50 lat",
+        "p90 lat",
+        "p99 lat",
+    ));
+
+    for (name, stats) in results {
+        let rate = stats.rate();
+        table.push(format!(
+            "{: <40} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
+            name,
+            rate.submitted,
+            rate.committed,
+            rate.expired,
+            rate.failed_submission,
+            rate.latency,
+            rate.p50_latency,
+            rate.p90_latency,
+            rate.p99_latency,
+        ));
+    }
+
+    table
+}
+
 
 #[test]
 fn test_phases_duration() {
