@@ -2297,18 +2297,18 @@ Return true if the provided address has indirect or direct ownership of the prov
 <b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr);
 <b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr);
 <b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr) == <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
-        guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
-        owner: creator_address,
-        allow_ungated_transfer: <b>true</b>,
-        transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
-            counter: 0,
-            <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
-                id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
-                    creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
-                    addr: obj_addr,
-                }
+    guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
+    owner: creator_address,
+    allow_ungated_transfer: <b>true</b>,
+    transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
+        counter: 0,
+        <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
+            id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
+                creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
+                addr: obj_addr,
             }
         }
+    }
 };
 <b>ensures</b> result == <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: obj_addr, can_delete: <b>false</b> };
 </code></pre>
@@ -2330,18 +2330,18 @@ Return true if the provided address has indirect or direct ownership of the prov
 <b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr);
 <b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr);
 <b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr) == <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
-        guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
-        owner: creator_address,
-        allow_ungated_transfer: <b>true</b>,
-        transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
-            counter: 0,
-            <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
-                id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
-                    creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
-                    addr: obj_addr,
-                }
+    guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
+    owner: creator_address,
+    allow_ungated_transfer: <b>true</b>,
+    transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
+        counter: 0,
+        <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
+            id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
+                creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
+                addr: obj_addr,
             }
         }
+    }
 };
 <b>ensures</b> result == <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: obj_addr, can_delete: <b>false</b> };
 </code></pre>
@@ -2361,22 +2361,21 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
 <b>let</b> unique_address = <a href="transaction_context.md#0x1_transaction_context_spec_generate_unique_address">transaction_context::spec_generate_unique_address</a>();
-<b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_APTOS_UNIQUE_IDENTIFIERS">features::APTOS_UNIQUE_IDENTIFIERS</a>);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(unique_address);
 <b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(unique_address);
 <b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(unique_address) == <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
-        guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
-        owner: owner_address,
-        allow_ungated_transfer: <b>true</b>,
-        transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
-            counter: 0,
-            <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
-                id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
-                    creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
-                    addr: unique_address,
-                }
+    guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
+    owner: owner_address,
+    allow_ungated_transfer: <b>true</b>,
+    transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
+        counter: 0,
+        <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
+            id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
+                creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
+                addr: unique_address,
             }
         }
+    }
 };
 <b>ensures</b> result == <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: unique_address, can_delete: <b>true</b> };
 </code></pre>
@@ -2396,22 +2395,21 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
 <b>let</b> unique_address = <a href="transaction_context.md#0x1_transaction_context_spec_generate_unique_address">transaction_context::spec_generate_unique_address</a>();
-<b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_APTOS_UNIQUE_IDENTIFIERS">features::APTOS_UNIQUE_IDENTIFIERS</a>);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(unique_address);
 <b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(unique_address);
 <b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(unique_address) == <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
-        guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
-        owner: owner_address,
-        allow_ungated_transfer: <b>true</b>,
-        transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
-            counter: 0,
-            <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
-                id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
-                    creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
-                    addr: unique_address,
-                }
+    guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
+    owner: owner_address,
+    allow_ungated_transfer: <b>true</b>,
+    transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
+        counter: 0,
+        <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
+            id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
+                creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
+                addr: unique_address,
             }
         }
+    }
 };
 <b>ensures</b> result == <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: unique_address, can_delete: <b>false</b> };
 </code></pre>
@@ -2448,21 +2446,23 @@ Return true if the provided address has indirect or direct ownership of the prov
 <b>let</b> obj_addr = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>&lt;<b>address</b>&gt;(hash_bytes);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr);
 <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;<b>address</b>&gt;(hash_bytes);
-<b>ensures</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr).guid_creation_num == <b>old</b>(<b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr)).guid_creation_num + 1;
+<b>ensures</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr).guid_creation_num == <b>old</b>(
+    <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr)
+).guid_creation_num + 1;
 <b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr);
 <b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr) == <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
-        guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
-        owner: addr,
-        allow_ungated_transfer: <b>true</b>,
-        transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
-            counter: 0,
-            <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
-                id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
-                    creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
-                    addr: obj_addr,
-                }
+    guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
+    owner: addr,
+    allow_ungated_transfer: <b>true</b>,
+    transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
+        counter: 0,
+        <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
+            id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
+                creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
+                addr: obj_addr,
             }
         }
+    }
 };
 <b>ensures</b> result == <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: obj_addr, can_delete: <b>true</b> };
 </code></pre>
@@ -2501,18 +2501,18 @@ Return true if the provided address has indirect or direct ownership of the prov
 <b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(addr).guid_creation_num == <b>old</b>(<b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(addr)).guid_creation_num + 1;
 <b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr);
 <b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr) == <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
-        guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
-        owner: addr,
-        allow_ungated_transfer: <b>true</b>,
-        transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
-            counter: 0,
-            <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
-                id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
-                    creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
-                    addr: obj_addr,
-                }
+    guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
+    owner: addr,
+    allow_ungated_transfer: <b>true</b>,
+    transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
+        counter: 0,
+        <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
+            id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
+                creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
+                addr: obj_addr,
             }
         }
+    }
 };
 <b>ensures</b> result == <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: obj_addr, can_delete: <b>true</b> };
 </code></pre>
@@ -2538,18 +2538,18 @@ Return true if the provided address has indirect or direct ownership of the prov
 <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;<b>address</b>&gt;(hash_bytes);
 <b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr);
 <b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_addr) == <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
-        guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
-        owner: creator_address,
-        allow_ungated_transfer: <b>true</b>,
-        transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
-            counter: 0,
-            <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
-                id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
-                    creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
-                    addr: obj_addr,
-                }
+    guid_creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1,
+    owner: creator_address,
+    allow_ungated_transfer: <b>true</b>,
+    transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a> {
+        counter: 0,
+        <a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
+            id: <a href="guid.md#0x1_guid_ID">guid::ID</a> {
+                creation_num: <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a>,
+                addr: obj_addr,
             }
         }
+    }
 };
 <b>ensures</b> result == <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: obj_addr, can_delete: <b>true</b> };
 </code></pre>
@@ -2569,7 +2569,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 <pre><code><b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>);
 <b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>);
-<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>).guid_creation_num ==  <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1;
+<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>).guid_creation_num == <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1;
 <b>ensures</b> result == <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: <a href="object.md#0x1_object">object</a>, can_delete };
 </code></pre>
 

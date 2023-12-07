@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    experimental::{
+    pipeline::{
         execution_wait_phase::ExecutionWaitRequest,
         pipeline_phase::{CountedRequest, StatelessPipeline},
     },

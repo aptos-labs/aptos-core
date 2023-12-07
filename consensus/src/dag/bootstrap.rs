@@ -23,7 +23,6 @@ use crate::{
         observability::logging::{LogEvent, LogSchema},
         round_state::{AdaptiveResponsive, RoundState},
     },
-    experimental::buffer_manager::OrderedBlocks,
     liveness::{
         leader_reputation::{ProposerAndVoterHeuristic, ReputationHeuristic},
         proposal_generator::ChainHealthBackoffConfig,
@@ -32,6 +31,7 @@ use crate::{
     network::IncomingDAGRequest,
     payload_client::PayloadClient,
     payload_manager::PayloadManager,
+    pipeline::buffer_manager::OrderedBlocks,
     state_replication::StateComputer,
 };
 use aptos_channels::{

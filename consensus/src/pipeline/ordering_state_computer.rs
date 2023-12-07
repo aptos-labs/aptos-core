@@ -4,11 +4,11 @@
 
 use crate::{
     error::StateSyncError,
-    experimental::{
+    payload_manager::PayloadManager,
+    pipeline::{
         buffer_manager::{OrderedBlocks, ResetAck, ResetRequest},
         errors::Error,
     },
-    payload_manager::PayloadManager,
     state_computer::PipelineExecutionResult,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
@@ -82,6 +82,10 @@ impl StateComputer for OrderingStateComputer {
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
         assert!(!blocks.is_empty());
+
+        for block in blocks {
+            block.set_insertion_time();
+        }
 
         if self
             .executor_channel

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    experimental::buffer_manager::OrderedBlocks,
+    pipeline::buffer_manager::OrderedBlocks,
     rand::rand_gen::{
         block_queue::{BlockQueue, QueueItem},
         types::{Proof, RandConfig, RandDecision, RandShare, Share},

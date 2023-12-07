@@ -108,7 +108,7 @@ where
 
         // VM execution.
         let sync_view = LatestView::new(base_view, ViewState::Sync(latest_view), idx_to_execute);
-        let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute, false);
+        let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
 
         let mut prev_modified_keys = last_input_output
             .modified_keys(idx_to_execute)
@@ -1251,11 +1251,12 @@ where
                 )),
                 idx as TxnIndex,
             );
-            let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex, true);
+            let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex);
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
+                    output.materialize_agg_v1(&latest_view);
                     assert_eq!(
                         output.aggregator_v1_delta_set().len(),
                         0,

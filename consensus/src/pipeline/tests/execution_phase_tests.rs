@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    experimental::{
+    pipeline::{
         buffer_manager::create_channel,
         execution_schedule_phase::{ExecutionRequest, ExecutionSchedulePhase},
         execution_wait_phase::{ExecutionResponse, ExecutionWaitPhase},
