@@ -1,28 +1,38 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{EntryPoints, TransactionType};
+use crate::{EntryPoints, TransactionType, publishing::module_simple::LoopType};
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 
 /// Utility class for specifying transaction type with predefined configurations through CLI
 #[derive(Debug, Copy, Clone, ValueEnum, Default, Deserialize, Parser, Serialize)]
 pub enum TransactionTypeArg {
-    NoOp,
-    NoOp2Signers,
-    NoOp5Signers,
+    // custom
     #[default]
     CoinTransfer,
     CoinTransferWithInvalid,
     NonConflictingCoinTransfer,
     AccountGeneration,
     AccountGenerationLargePool,
+    Batch100Transfer,
     PublishPackage,
+    // Simple EntryPoints
+    NoOp,
+    NoOp2Signers,
+    NoOp5Signers,
     AccountResource32B,
     AccountResource1KB,
     AccountResource10KB,
     ModifyGlobalResource,
-    Batch100Transfer,
+    Loop100k,
+    Loop10kArithmetic,
+    Loop1kBcs1k,
+    // Complex EntryPoints
+    CreateObjects10,
+    CreateObjects10WithPayload10k,
+    CreateObjects100,
+    CreateObjects100WithPayload10k,
     TokenV1NFTMintAndStoreSequential,
     TokenV1NFTMintAndTransferSequential,
     TokenV1NFTMintAndStoreParallel,
@@ -30,8 +40,12 @@ pub enum TransactionTypeArg {
     TokenV1FTMintAndStore,
     TokenV1FTMintAndTransfer,
     TokenV2AmbassadorMint,
+    VectorPictureCreate30k,
     VectorPicture30k,
+    VectorPictureRead30k,
+    VectorPictureCreate40,
     VectorPicture40,
+    VectorPictureRead40,
     SmartTablePicture30KWith200Change,
     SmartTablePicture1MWith1KChange,
     SmartTablePicture1BWith1KChange,
@@ -75,6 +89,9 @@ impl TransactionTypeArg {
             TransactionTypeArg::PublishPackage => TransactionType::PublishPackage {
                 use_account_pool: sender_use_account_pool,
             },
+            TransactionTypeArg::Batch100Transfer => {
+                TransactionType::BatchTransfer { batch_size: 100 }
+            },
             TransactionTypeArg::AccountResource32B => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::BytesMakeOrChange {
                     data_length: Some(32),
@@ -116,8 +133,40 @@ impl TransactionTypeArg {
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
-            TransactionTypeArg::Batch100Transfer => {
-                TransactionType::BatchTransfer { batch_size: 100 }
+            TransactionTypeArg::Loop100k => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::Loop { loop_count: Some(100000), loop_type: LoopType::NoOp },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::Loop10kArithmetic => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::Loop { loop_count: Some(10000), loop_type: LoopType::Arithmetic },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::Loop1kBcs1k => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::Loop { loop_count: Some(1000), loop_type: LoopType::BCS { len: 1024 } },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::CreateObjects10 => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::CreateObjects { num_objects: 10, extra_size: 0 },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::CreateObjects10WithPayload10k => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::CreateObjects { num_objects: 10, extra_size: 10 * 1024 },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::CreateObjects100 => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::CreateObjects { num_objects: 100, extra_size: 0 },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::CreateObjects100WithPayload10k => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::CreateObjects { num_objects: 10, extra_size: 10 * 1024 },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::TokenV1NFTMintAndStoreSequential => {
                 TransactionType::CallCustomModules {
@@ -162,13 +211,33 @@ impl TransactionTypeArg {
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
+            TransactionTypeArg::VectorPictureCreate30k => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::InitializeVectorPicture { length: 30 * 1024 },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
             TransactionTypeArg::VectorPicture30k => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::VectorPicture { length: 30 * 1024 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
+            TransactionTypeArg::VectorPictureRead30k => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::VectorPictureRead { length: 30 * 1024 },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::VectorPictureCreate40 => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::InitializeVectorPicture { length: 40 },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
             TransactionTypeArg::VectorPicture40 => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::VectorPicture { length: 40 },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::VectorPictureRead40 => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::VectorPictureRead { length: 40 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },

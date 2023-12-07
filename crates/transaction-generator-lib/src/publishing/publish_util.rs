@@ -7,7 +7,7 @@ use aptos_sdk::{
     bcs,
     move_types::{identifier::Identifier, language_storage::ModuleId},
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{account_address::AccountAddress, transaction::SignedTransaction, LocalAccount},
+    types::{account_address::AccountAddress, transaction::{SignedTransaction, TransactionPayload}, LocalAccount},
 };
 use move_binary_format::{access::ModuleAccess, CompiledModule};
 use rand::{rngs::StdRng, Rng};
@@ -69,13 +69,12 @@ impl PackageHandler {
     // Return a `Package` to be published. Packages are tracked by publisher so if
     // the same `LocalAccount` is used, the package will be an upgrade of the existing one
     // otherwise a "new" package will be generated (new suffix)
-    pub fn pick_package(&mut self, rng: &mut StdRng, publisher: &LocalAccount) -> Package {
+    pub fn pick_package(&mut self, rng: &mut StdRng, publisher_address: AccountAddress) -> Package {
         let idx = rng.gen_range(0usize, self.packages.len());
         let tracker = self
             .packages
             .get_mut(idx)
             .expect("PackageTracker must exisit");
-        let publisher_address = publisher.address();
         let (idx, version) = match tracker.find_info(&publisher_address) {
             Some(idx) => (idx, true),
             None => {
@@ -158,15 +157,13 @@ impl Package {
         module_simple::scramble(self.get_mut_module("simple"), fn_count, rng)
     }
 
-    // Return a transaction to publish the current package
-    pub fn publish_transaction(
+    // Return a transaction payload to publish the current package
+    pub fn publish_transaction_payload(
         &self,
-        publisher: &LocalAccount,
-        txn_factory: &TransactionFactory,
-    ) -> SignedTransaction {
+    ) -> TransactionPayload {
         match self {
             Self::Simple(modules, metadata) => {
-                publish_transaction(txn_factory, publisher, modules, metadata)
+                publish_transaction_payload(modules, metadata)
             },
         }
     }
@@ -257,12 +254,10 @@ fn update(
     (new_modules, metadata)
 }
 
-fn publish_transaction(
-    txn_factory: &TransactionFactory,
-    publisher: &LocalAccount,
+fn publish_transaction_payload(
     modules: &[(String, CompiledModule)],
     metadata: &PackageMetadata,
-) -> SignedTransaction {
+) -> TransactionPayload {
     let metadata = bcs::to_bytes(metadata).expect("PackageMetadata must serialize");
     let mut code: Vec<Vec<u8>> = vec![];
     for (_, module) in modules {
@@ -272,6 +267,5 @@ fn publish_transaction(
             .expect("Module must serialize");
         code.push(module_code);
     }
-    let payload = aptos_stdlib::code_publish_package_txn(metadata, code);
-    publisher.sign_with_transaction_builder(txn_factory.payload(payload))
+    aptos_stdlib::code_publish_package_txn(metadata, code)
 }
