@@ -10,3 +10,4 @@ mod rand_store;
 mod types;
 
 mod reliable_broadcast_state;
+mod storage;
