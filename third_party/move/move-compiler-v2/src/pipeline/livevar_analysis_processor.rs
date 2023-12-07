@@ -310,7 +310,7 @@ impl<'a> CopyTransformation<'a> {
         temp: TempIndex,
     ) -> bool {
         // TODO(#10723): insert ability check here
-        // Notice we do allow copy of &mut. Those copies are checked for validness in
+        // Notice we do allow copy of &mut. Those copies are checked for validity in
         // reference safety.
         alive.after.contains_key(&temp)
     }
