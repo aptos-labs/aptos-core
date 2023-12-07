@@ -16,7 +16,7 @@ use crate::{
         SpecFunId, SpecVarId, StructId, TypeParameter,
     },
     symbol::Symbol,
-    ty::{Constraint, PrimitiveType, Type},
+    ty::{Constraint, PrimitiveType, Type, inst_abilities},
 };
 use codespan_reporting::diagnostic::Severity;
 #[allow(unused_imports)]
@@ -493,28 +493,16 @@ impl<'env> ModelBuilder<'env> {
             Type::Struct(mid, sid, insts) => {
                 let struct_entry = self.lookup_struct_entry(mid.qualified(*sid));
                 let struct_abilities = &struct_entry.abilities;
-                let fields_abilities_meet = if let Some(fields) = &struct_entry.fields {
-                    fields
-                        .iter()
-                        .map(|(_field_name, (_loc, _field_idx, field_ty))| {
-                            let field_ty = &field_ty.instantiate(insts);
-                            self.infer_abilities_may_have(field_ty)
-                        })
-                        .fold(AbilitySet::ALL, |acc, abilities| acc.intersect(abilities))
-                } else {
-                    AbilitySet::ALL
-                };
-                if struct_abilities.has_ability(Ability::Key)
-                    && fields_abilities_meet.has_ability(Ability::Store)
-                {
-                    struct_abilities
-                        .intersect(fields_abilities_meet)
-                        .add(Ability::Key)
-                } else {
-                    struct_abilities
-                        .intersect(fields_abilities_meet)
-                        .remove(Ability::Key)
-                }
+                let insts_abilities_meet = insts
+                    .iter()
+                    .map(|ty_inst| {
+                        self.infer_abilities_may_have(ty_inst)
+                    })
+                    .fold(
+                        AbilitySet::ALL,
+                        |acc, abilities| acc.intersect(abilities)
+                    );
+                inst_abilities(*struct_abilities, insts_abilities_meet)
             },
             Type::TypeParameter(_) => {
                 AbilitySet::ALL

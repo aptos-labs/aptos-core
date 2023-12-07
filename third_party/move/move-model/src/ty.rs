@@ -10,7 +10,7 @@ use crate::{
     symbol::Symbol,
 };
 use itertools::Itertools;
-use move_binary_format::{file_format::TypeParameterIndex, normalized::Type as MType};
+use move_binary_format::{file_format::{TypeParameterIndex, AbilitySet, Ability}, normalized::Type as MType};
 use move_core_types::{
     language_storage::{StructTag, TypeTag},
     u256::U256,
@@ -2110,5 +2110,20 @@ impl fmt::Display for PrimitiveType {
             Num => f.write_str("num"),
             EventStore => f.write_str("estore"),
         }
+    }
+}
+
+/// Infers the (conditional) abilities of a struct
+pub fn inst_abilities(declared_abilities: AbilitySet, insts_abilities_meet: AbilitySet) -> AbilitySet {
+    if declared_abilities.has_ability(Ability::Key)
+        && insts_abilities_meet.has_ability(Ability::Store)
+    {
+        declared_abilities
+            .intersect(insts_abilities_meet)
+            .add(Ability::Key)
+    } else {
+        declared_abilities
+            .intersect(insts_abilities_meet)
+            .remove(Ability::Key)
     }
 }

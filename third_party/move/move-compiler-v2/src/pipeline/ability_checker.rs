@@ -4,7 +4,7 @@ use move_binary_format::file_format::{Ability, AbilitySet};
 use move_model::{
     ast::TempIndex,
     model::{FunId, FunctionEnv, Loc, ModuleId, QualifiedId, StructId},
-    ty::{PrimitiveType, Type},
+    ty::{PrimitiveType, Type, inst_abilities},
 };
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
@@ -111,8 +111,9 @@ fn check_struct_inst(
     };
     let struct_env = target.global_env().get_struct(qid);
     let struct_abilities = struct_env.get_abilities();
+    let ty_params = struct_env.get_type_parameters();
     let mut ty_args_abilities_meet = AbilitySet::ALL;
-    for (param, ty) in struct_env.get_type_parameters().iter().zip(inst.iter()) {
+    for (param, ty) in ty_params.iter().zip(inst.iter()) {
         let required_abilities = param.1.abilities;
         let given_abilities = check_instantiation(target, ty, loc);
         // todo: which field, why
@@ -121,17 +122,7 @@ fn check_struct_inst(
         }
         ty_args_abilities_meet = ty_args_abilities_meet.intersect(given_abilities);
     }
-    if struct_abilities.has_ability(Ability::Key)
-        && ty_args_abilities_meet.has_ability(Ability::Store)
-    {
-        struct_abilities
-            .intersect(ty_args_abilities_meet)
-            .add(Ability::Key)
-    } else {
-        struct_abilities
-            .intersect(ty_args_abilities_meet)
-            .remove(Ability::Key)
-    }
+    inst_abilities(struct_abilities, ty_args_abilities_meet)
 }
 
 fn check_fun_inst(target: &FunctionTarget, mid: ModuleId, fid: FunId, inst: &[Type], loc: &Loc) {
