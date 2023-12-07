@@ -12,26 +12,8 @@ error: Invalid instantiation
 6 │     struct Baz<T> { x: Foo<T> }
   │                     ^
 
-error: must have drop ability
-   ┌─ tests/ability-checker/invalid_struct_def.move:28:3
-   │
-28 │         y: Impotent,
-   │         ^
-
-error: must have drop ability
-   ┌─ tests/ability-checker/invalid_struct_def.move:19:3
-   │
-19 │         x: Impotent
-   │         ^
-
-error: must have store ability
-   ┌─ tests/ability-checker/invalid_struct_def.move:15:3
+error: field must have store ability because InValidHasKey is declared with key
+   ┌─ tests/ability-checker/invalid_struct_def.move:15:6
    │
 15 │         x: HasKey
-   │         ^
-
-error: must have drop ability
-   ┌─ tests/ability-checker/invalid_struct_def.move:33:3
-   │
-33 │         x: ConditionalDrop<Impotent>
-   │         ^
+   │            ^^^^^^
