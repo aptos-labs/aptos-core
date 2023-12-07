@@ -4,9 +4,9 @@ use itertools::Itertools;
 use move_binary_format::file_format::{Ability, AbilitySet};
 use move_model::{
     ast::TempIndex,
-    model::{FunId, FunctionEnv, Loc, ModuleId, QualifiedId, StructId},
+    model::{FunId, FunctionEnv, Loc, ModuleId, QualifiedId, StructId, TypeParameter},
     ty,
-    ty::{Type, inst_abilities},
+    ty::Type,
 };
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
@@ -98,33 +98,55 @@ fn check_key_for_struct(
     }
 }
 
+fn ty_param_abilities(ty_params: &[TypeParameter]) -> impl Fn(u16) -> AbilitySet + Copy + '_ {
+    |i| {
+        if let Some(tp) = ty_params.get(i as usize) {
+            tp.1.abilities
+        } else {
+            panic!("ICE unbound type parameter")
+        }
+    }
+}
+
+fn get_abilities<'a>(
+    target: &'a FunctionTarget,
+) -> impl Fn(ModuleId, StructId) -> (Vec<AbilitySet>, AbilitySet) + Copy + 'a {
+    |mid, sid| {
+        let qid = QualifiedId {
+            module_id: mid,
+            id: sid,
+        };
+        let struct_env = target.global_env().get_struct(qid);
+        let struct_abilities = struct_env.get_abilities();
+        let params_ability_constraints = struct_env
+            .get_type_parameters()
+            .iter()
+            .map(|tp| tp.1.abilities)
+            .collect_vec();
+        (params_ability_constraints, struct_abilities)
+    }
+}
+
 // checks that the given type is instantiated with types satisfying their ability constraints
 // on the type parameter
 fn check_struct_inst(
     target: &FunctionTarget,
     mid: ModuleId,
     sid: StructId,
-    inst: &[Type],
+    insts: &[Type],
     loc: &Loc,
 ) -> AbilitySet {
-    let qid = QualifiedId {
-        module_id: mid,
-        id: sid,
-    };
-    let struct_env = target.global_env().get_struct(qid);
-    let struct_abilities = struct_env.get_abilities();
-    let ty_params = struct_env.get_type_parameters();
-    let mut ty_args_abilities_meet = AbilitySet::ALL;
-    for (param, ty) in ty_params.iter().zip(inst.iter()) {
-        let required_abilities = param.1.abilities;
-        let given_abilities = check_instantiation(target, ty, loc);
-        // todo: which field, why
-        if !required_abilities.is_subset(given_abilities) {
-            target.global_env().error(loc, "invalid instantiation")
-        }
-        ty_args_abilities_meet = ty_args_abilities_meet.intersect(given_abilities);
-    }
-    inst_abilities(struct_abilities, ty_args_abilities_meet)
+    let ty_params = target.get_type_parameters();
+    ty::check_struct_inst(
+        mid,
+        sid,
+        insts,
+        Some(loc),
+        ty_param_abilities(&ty_params),
+        get_abilities(target),
+        |loc, msg| target.global_env().error(loc, msg),
+        true,
+    )
 }
 
 fn check_fun_inst(target: &FunctionTarget, mid: ModuleId, fid: FunId, inst: &[Type], loc: &Loc) {
@@ -143,7 +165,6 @@ fn check_fun_inst(target: &FunctionTarget, mid: ModuleId, fid: FunId, inst: &[Ty
     }
 }
 
-// assuming all structs are well defined
 // checks whether the type is instantiated properly, i.e.,
 // - the type arguments given to the struct are instantiated properly
 // - the type arguments satisfy the ability constraints defined on the struct generics
@@ -154,29 +175,10 @@ pub fn check_instantiation(target: &FunctionTarget, ty: &Type, loc: &Loc) -> Abi
     ty::check_instantiation(
         ty,
         Some(loc),
-        |i| {
-            if let Some(tp) = ty_params.get(i as usize) {
-                tp.1.abilities
-            } else {
-                panic!("ICE unbound type parameter")
-            }
-        },
-        |mid, sid| {
-            let qid = QualifiedId {
-                module_id: mid,
-                id: sid,
-            };
-            let struct_env = target.global_env().get_struct(qid);
-            let struct_abilities = struct_env.get_abilities();
-            let params_ability_constraints = struct_env
-                .get_type_parameters()
-                .iter()
-                .map(|tp| tp.1.abilities)
-                .collect_vec();
-            (params_ability_constraints, struct_abilities)
-        },
+        ty_param_abilities(&ty_params),
+        get_abilities(target),
         |loc, msg| target.global_env().error(loc, msg),
-        true
+        true,
     )
 }
 
