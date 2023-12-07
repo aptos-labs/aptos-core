@@ -1,10 +1,12 @@
 //! Checks for ability violations.
 
+use itertools::Itertools;
 use move_binary_format::file_format::{Ability, AbilitySet};
 use move_model::{
     ast::TempIndex,
     model::{FunId, FunctionEnv, Loc, ModuleId, QualifiedId, StructId},
-    ty::{PrimitiveType, Type, inst_abilities},
+    ty,
+    ty::{Type, inst_abilities},
 };
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
@@ -148,38 +150,34 @@ fn check_fun_inst(target: &FunctionTarget, mid: ModuleId, fid: FunId, inst: &[Ty
 // and returns the abilities of the given type
 // `ty_params` specify the abilities held by type params
 pub fn check_instantiation(target: &FunctionTarget, ty: &Type, loc: &Loc) -> AbilitySet {
-    match ty {
-        Type::Primitive(p) => match p {
-            PrimitiveType::Bool
-            | PrimitiveType::U8
-            | PrimitiveType::U16
-            | PrimitiveType::U32
-            | PrimitiveType::U64
-            | PrimitiveType::U128
-            | PrimitiveType::U256
-            | PrimitiveType::Num
-            | PrimitiveType::Range
-            | PrimitiveType::EventStore
-            | PrimitiveType::Address => AbilitySet::PRIMITIVES,
-            PrimitiveType::Signer => AbilitySet::SIGNER,
-        },
-        Type::Vector(et) => AbilitySet::VECTOR.intersect(check_instantiation(target, et, loc)),
-        Type::Struct(mid, sid, insts) => check_struct_inst(target, *mid, *sid, insts, loc),
-        Type::TypeParameter(i) => {
-            if let Some(tp) = target.get_type_parameters().get(*i as usize) {
+    let ty_params = target.get_type_parameters();
+    ty::check_instantiation(
+        ty,
+        Some(loc),
+        |i| {
+            if let Some(tp) = ty_params.get(i as usize) {
                 tp.1.abilities
             } else {
                 panic!("ICE unbound type parameter")
             }
         },
-        Type::Reference(_, _) => AbilitySet::REFERENCES,
-        Type::Fun(_, _)
-        | Type::Tuple(_)
-        | Type::TypeDomain(_)
-        | Type::ResourceDomain(_, _, _)
-        | Type::Error
-        | Type::Var(_) => AbilitySet::EMPTY,
-    }
+        |mid, sid| {
+            let qid = QualifiedId {
+                module_id: mid,
+                id: sid,
+            };
+            let struct_env = target.global_env().get_struct(qid);
+            let struct_abilities = struct_env.get_abilities();
+            let params_ability_constraints = struct_env
+                .get_type_parameters()
+                .iter()
+                .map(|tp| tp.1.abilities)
+                .collect_vec();
+            (params_ability_constraints, struct_abilities)
+        },
+        |loc, msg| target.global_env().error(loc, msg),
+        true
+    )
 }
 
 pub struct AbilityChecker();
