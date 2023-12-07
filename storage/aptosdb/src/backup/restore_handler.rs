@@ -4,9 +4,9 @@
 
 use crate::{
     backup::restore_utils,
-    db_metadata::{DbMetadataKey, DbMetadataSchema},
     event_store::EventStore,
     ledger_store::LedgerStore,
+    schema::db_metadata::{DbMetadataKey, DbMetadataSchema},
     state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode},
     state_store::StateStore,
     transaction_store::TransactionStore,

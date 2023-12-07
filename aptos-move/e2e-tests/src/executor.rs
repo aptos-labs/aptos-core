@@ -643,7 +643,7 @@ impl FakeExecutor {
         )?;
 
         Ok((
-            output.try_into_transaction_output(&resolver)?,
+            output.try_materialize_into_transaction_output(&resolver)?,
             gas_profiler.finish(),
         ))
     }

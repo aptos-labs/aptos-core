@@ -19,7 +19,10 @@ use aptos_types::{
     validator_txn::ValidatorTransaction,
 };
 use once_cell::sync::OnceCell;
-use std::fmt::{Debug, Display, Formatter};
+use std::{
+    fmt::{Debug, Display, Formatter},
+    time::{Duration, Instant},
+};
 
 /// ExecutedBlocks are managed in a speculative tree, the committed blocks form a chain. Besides
 /// block data, each executed block also has other derived meta data which could be regenerated from
@@ -35,6 +38,7 @@ pub struct ExecutedBlock {
     /// pending blocks upon restart.
     state_compute_result: StateComputeResult,
     randomness: OnceCell<Randomness>,
+    pipeline_insertion_time: OnceCell<Instant>,
 }
 
 impl ExecutedBlock {
@@ -48,8 +52,12 @@ impl ExecutedBlock {
         self
     }
 
-    pub fn set_randomness(&mut self, randomness: Randomness) {
+    pub fn set_randomness(&self, randomness: Randomness) {
         assert!(self.randomness.set(randomness).is_ok());
+    }
+
+    pub fn set_insertion_time(&self) {
+        assert!(self.pipeline_insertion_time.set(Instant::now()).is_ok());
     }
 }
 
@@ -76,6 +84,7 @@ impl ExecutedBlock {
             input_transactions,
             state_compute_result,
             randomness: OnceCell::new(),
+            pipeline_insertion_time: OnceCell::new(),
         }
     }
 
@@ -208,5 +217,9 @@ impl ExecutedBlock {
     pub fn is_reconfiguration_suffix(&self) -> bool {
         self.state_compute_result.has_reconfiguration()
             && self.state_compute_result.compute_status().is_empty()
+    }
+
+    pub fn elapsed_in_pipeline(&self) -> Option<Duration> {
+        self.pipeline_insertion_time.get().map(|t| t.elapsed())
     }
 }

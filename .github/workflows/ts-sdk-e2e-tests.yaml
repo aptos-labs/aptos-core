@@ -20,7 +20,7 @@ permissions:
 # cancel redundant builds
 concurrency:
   # cancel redundant builds on PRs (only on PR, not on branches)
-  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request_target' && github.ref) || github.sha }}
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request_target' && github.event.pull_request.head.sha) || github.sha }}
   cancel-in-progress: true
 
 jobs:

@@ -8,14 +8,13 @@ use crate::{
     event_store::EventStore,
     ledger_db::LedgerDbSchemaBatches,
     ledger_store::LedgerStore,
-    new_sharded_kv_schema_batch,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         transaction_accumulator::TransactionAccumulatorSchema,
     },
     state_store::StateStore,
     transaction_store::TransactionStore,
-    ShardedStateKvSchemaBatch,
+    utils::{new_sharded_kv_schema_batch, ShardedStateKvSchemaBatch},
 };
 use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
