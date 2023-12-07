@@ -161,8 +161,7 @@ where
             return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message("in legacy versions, number of bytes loaded must be zero when the resource does not exist ".to_string()));
         }
         let cost = self
-            .storage_gas_params()
-            .pricing
+            .io_pricing()
             .calculate_read_gas(val.is_some(), bytes_loaded);
         self.algebra.charge_io(cost)
     }
@@ -489,10 +488,7 @@ where
     }
 
     fn charge_io_gas_for_write(&mut self, key: &StateKey, op_size: &WriteOpSize) -> VMResult<()> {
-        let cost = self
-            .storage_gas_params()
-            .pricing
-            .io_gas_per_write(key, op_size);
+        let cost = self.io_pricing().io_gas_per_write(key, op_size);
 
         self.algebra
             .charge_io(cost)

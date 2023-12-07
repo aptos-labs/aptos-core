@@ -35,7 +35,7 @@ use aptos_types::{
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::{
     output::VMOutput,
-    storage::{ChangeSetConfigs, StorageGasParameters, StoragePricing},
+    storage::{change_set_configs::ChangeSetConfigs, io_pricing::IoPricing, StorageGasParameters},
 };
 use fail::fail_point;
 use move_binary_format::errors::VMResult;
@@ -98,7 +98,7 @@ impl AptosVMImpl {
                 match gas_feature_version {
                     0..=1 => (),
                     2..=6 => {
-                        if let StoragePricing::V2(pricing) = &storage_gas_params.pricing {
+                        if let IoPricing::V2(pricing) = &storage_gas_params.io_pricing {
                             g.common_load_base_legacy = pricing.per_item_read * NumArgs::new(1);
                             g.common_load_base_new = 0.into();
                             g.common_load_per_byte = pricing.per_byte_read;
@@ -106,7 +106,7 @@ impl AptosVMImpl {
                         }
                     }
                     7..=9 => {
-                        if let StoragePricing::V2(pricing) = &storage_gas_params.pricing {
+                        if let IoPricing::V2(pricing) = &storage_gas_params.io_pricing {
                             g.common_load_base_legacy = 0.into();
                             g.common_load_base_new = pricing.per_item_read * NumArgs::new(1);
                             g.common_load_per_byte = pricing.per_byte_read;

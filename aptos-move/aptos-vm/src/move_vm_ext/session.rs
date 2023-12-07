@@ -18,7 +18,7 @@ use aptos_types::{
     access_path::AccessPath, block_metadata::BlockMetadata, contract_event::ContractEvent,
     on_chain_config::Features, state_store::state_key::StateKey,
 };
-use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
+use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
 use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{

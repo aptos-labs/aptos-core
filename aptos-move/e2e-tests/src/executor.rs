@@ -62,7 +62,7 @@ use aptos_vm::{
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::storage::{ChangeSetConfigs, StorageGasParameters};
+use aptos_vm_types::storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters};
 use bytes::Bytes;
 use move_core_types::{
     account_address::AccountAddress,

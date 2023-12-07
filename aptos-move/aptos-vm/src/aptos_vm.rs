@@ -57,7 +57,7 @@ use aptos_vm_types::{
     change_set::VMChangeSet,
     output::VMOutput,
     resolver::{ExecutorView, ResourceGroupView},
-    storage::{ChangeSetConfigs, StorageGasParameters},
+    storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters},
 };
 use claims::assert_err;
 use fail::fail_point;
