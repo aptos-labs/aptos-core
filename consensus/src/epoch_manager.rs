@@ -1389,6 +1389,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     Err(anyhow::anyhow!("Buffer manager not started"))
                 }
             },
+            IncomingRpcRequest::RandGenRequest(_) => Ok(()),
         }
     }
 
