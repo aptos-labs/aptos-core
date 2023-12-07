@@ -28,4 +28,11 @@ module aptos_framework::reconfiguration_v2 {
         config_for_next_epoch::enable_upserts(account);
         reconfiguration::reconfigure();
     }
+
+    fun finish_with_dkg_transcript(account: &signer, dkg_transcript: vector<u8>) {
+        let should_finish = dkg::update(true, dkg_transcript);
+        if (should_finish) {
+            finish(account);
+        }
+    }
 }

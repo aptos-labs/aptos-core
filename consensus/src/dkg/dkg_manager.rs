@@ -2,31 +2,33 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
-    dkg_store::DKGStore,
-    types::{DKGAggNode, DKGAggNodeAckState, DKGMessage, DKGNodeAckState}, dkg_handler::DKGRpcHandleError,
+    dkg_handler::DKGRpcHandleError,
+    dkg_store::DKGStore, types::{DKGAggNodeAckState, DKGMessage, DKGNodeAckState},
 };
-use crate::{dkg::{types::DKGNode, tracing::{observe_dkg, DKGStage}}, util::time_service::TimeService};
+use crate::{dkg::{tracing::{DKGStage, observe_dkg}, types::DKGNode}, util::time_service::TimeService};
 use aptos_config::config::SecureBackend;
 use aptos_consensus_types::common::Author;
 use aptos_dkg::{
-    pvss::{traits::Transcript, Player},
+    pvss::{Player, traits::Transcript},
     utils::random::random_scalar,
 };
 use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::Mutex;
-use aptos_logger::{error, debug};
+use aptos_logger::{debug, error};
 use aptos_reliable_broadcast::ReliableBroadcast;
-use aptos_secure_storage::{Storage, KVStorage};
+use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::{
     contract_event::ContractEvent,
     dkg::{DKGPvssConfig, DKGTranscriptWrapper, StartDKGEvent, WTrx},
     epoch_state::EpochState,
 };
-use futures::future::{AbortHandle, Abortable};
-use rand::{rngs::StdRng, thread_rng, SeedableRng};
+use futures::future::{Abortable, AbortHandle};
+use rand::{rngs::StdRng, SeedableRng, thread_rng};
 use std::sync::Arc;
 use tokio_retry::strategy::ExponentialBackoff;
-use aptos_crypto::{Uniform, bls12381};
+use aptos_crypto::{bls12381, Uniform};
+use aptos_types::dkg::DKGAggNode;
+use aptos_types::validator_txn::pool::ValidatorTransactionPoolWriter;
 use crate::dkg::build_dkg_pvss_config;
 
 pub enum DKGManagerWrapper {
@@ -63,20 +65,6 @@ impl DKGManagerWrapper {
         }
     }
 
-    pub fn ready(&self) -> bool {
-        match self {
-            DKGManagerWrapper::NoDKG => false,
-            DKGManagerWrapper::WithDKG(dkg_manager) => dkg_manager.ready(),
-        }
-    }
-
-    pub fn take_agg_node(&self) -> Option<DKGAggNode> {
-        match self {
-            DKGManagerWrapper::NoDKG => None,
-            DKGManagerWrapper::WithDKG(dkg_manager) => dkg_manager.take_agg_node(),
-        }
-    }
-
     pub fn get_pvss_config(&self) -> Option<DKGPvssConfig> {
         match self {
             DKGManagerWrapper::NoDKG => None,
@@ -93,6 +81,7 @@ pub struct DKGManager {
     dkg_store: Arc<Mutex<Option<DKGStore>>>,   // dkg store is shared across threads
     backend: SecureBackend, // for private signing keys
     time_service: Arc<dyn TimeService>, // for metrics
+    validator_txn_pool_writer_for_dkg: Arc<dyn ValidatorTransactionPoolWriter>,
 }
 
 impl DKGManager {
@@ -102,6 +91,7 @@ impl DKGManager {
         reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
         backend: SecureBackend,
         time_service: Arc<dyn TimeService>, // for metrics
+        validator_txn_pool_writer_for_dkg: Arc<dyn ValidatorTransactionPoolWriter>,
     ) -> Self {
         Self {
             author,
@@ -110,6 +100,7 @@ impl DKGManager {
             dkg_store: Arc::new(Mutex::new(None)),
             backend,
             time_service,
+            validator_txn_pool_writer_for_dkg,
         }
     }
 
@@ -132,6 +123,7 @@ impl DKGManager {
             self.epoch_state.verifier.clone(),
             dkg_pvss_config.clone(),
             self.time_service.get_current_timestamp().as_micros() as u64,
+            self.validator_txn_pool_writer_for_dkg.clone(),
         ));
 
         let my_index = *self.epoch_state.verifier.address_to_validator_index().get(&self.author).unwrap();
@@ -263,24 +255,6 @@ impl DKGManager {
             Err(e) => {
                 anyhow::bail!("[DKG] Failed to add DKGAggNode: {:?}", e);
             },
-        }
-    }
-
-    pub fn ready(&self) -> bool {
-        if let Some(dkg_store) = self.dkg_store.lock().as_ref() {
-            dkg_store.ready()
-        } else {
-            false
-        }
-    }
-
-    // Will be called by the proposal generator
-    pub fn take_agg_node(&self) -> Option<DKGAggNode> {
-        observe_dkg(self.get_start_time(), DKGStage::DKG_AGG_NODE_PROPOSED);
-        if let Some(dkg_store) = self.dkg_store.lock().as_mut() {
-            dkg_store.take_agg_node()
-        } else {
-            unreachable!("[DKG] DKGStore is not initialized!")
         }
     }
 

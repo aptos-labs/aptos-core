@@ -117,7 +117,7 @@ impl TransactionAnalysis {
             | BlockMetadata(_)
             | BlockMetadataExt(_)
             | StateCheckpoint(_)
-            | SystemTransaction(_) => bcs::to_bytes(txn).expect("Txn should serialize").len(),
+            | ValidatorTransaction(_) => bcs::to_bytes(txn).expect("Txn should serialize").len(),
         }
     }
 }

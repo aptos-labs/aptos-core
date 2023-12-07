@@ -966,32 +966,6 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         }
     }
 
-    /// If one or more elements of a vector of `Pattern` can be rewritten, then do so
-    /// and also copy the others so the whole thing can be replaced.
-    /// (Helper function for `rewrite_pattern` in trait `ExpRewriterFunctions` below.)
-    fn rewrite_pattern_vector(
-        &mut self,
-        pat_vec: &[Pattern],
-        entering_scope: bool,
-    ) -> Option<Vec<Pattern>> {
-        let rewritten_part: Vec<_> = pat_vec
-            .iter()
-            .map(|pat| self.rewrite_pattern(pat, entering_scope))
-            .collect();
-        if rewritten_part.iter().any(|opt_pat| opt_pat.is_some()) {
-            // if any subpattern was simplified, then rebuild the vector
-            // with a combination of original and new patterns.
-            let rewritten_vec: Vec<_> = pat_vec
-                .iter()
-                .zip(rewritten_part)
-                .map(|(org_pat, opt_new_pat)| opt_new_pat.unwrap_or(org_pat.clone()))
-                .collect();
-            Some(rewritten_vec)
-        } else {
-            None
-        }
-    }
-
     /// Convert a single-variable pattern into a `Pattern::Tuple` if needed.
     fn make_lambda_pattern_a_tuple(&mut self, pat: &Pattern) -> Pattern {
         if let Pattern::Var(id, _) = pat {
@@ -1167,17 +1141,32 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
     }
 
     fn rewrite_pattern(&mut self, pat: &Pattern, entering_scope: bool) -> Option<Pattern> {
+        // Rewrite type instantiation in pattern node id
+        let old_id = pat.node_id();
+        let new_id_opt = ExpData::instantiate_node(self.env, old_id, self.type_args);
+        let new_id = new_id_opt.unwrap_or(old_id);
         match pat {
-            Pattern::Var(node_id, sym) => self
+            Pattern::Var(_, sym) => self
                 .shadow_stack
                 .get_shadow_symbol(*sym, entering_scope)
-                .map(|new_sym| Pattern::Var(*node_id, new_sym)),
-            Pattern::Tuple(node_id, pattern_vec) => self
+                .map(|new_sym| Pattern::Var(new_id, new_sym))
+                .or_else(|| new_id_opt.map(|id| Pattern::Var(id, *sym))),
+            Pattern::Tuple(_, pattern_vec) => self
                 .rewrite_pattern_vector(pattern_vec, entering_scope)
-                .map(|rewritten_vec| Pattern::Tuple(*node_id, rewritten_vec)),
-            Pattern::Struct(node_id, struct_id, pattern_vec) => self
-                .rewrite_pattern_vector(pattern_vec, entering_scope)
-                .map(|rewritten_vec| Pattern::Struct(*node_id, struct_id.clone(), rewritten_vec)),
+                .map(|rewritten_vec| Pattern::Tuple(new_id, rewritten_vec))
+                .or_else(|| new_id_opt.map(|id| Pattern::Tuple(id, pattern_vec.clone()))),
+            Pattern::Struct(_, struct_id, pattern_vec) => {
+                let new_struct_id = struct_id.clone().instantiate(self.type_args);
+                self.rewrite_pattern_vector(pattern_vec, entering_scope)
+                    .map(|rewritten_vec| {
+                        Pattern::Struct(new_id, new_struct_id.clone(), rewritten_vec)
+                    })
+                    .or_else(|| {
+                        // Always create a new struct, both the node id and the struct id may
+                        // have changed
+                        Some(Pattern::Struct(new_id, new_struct_id, pattern_vec.clone()))
+                    })
+            },
             Pattern::Wildcard(_) => None,
             Pattern::Error(_) => None,
         }

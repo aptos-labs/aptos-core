@@ -7,6 +7,7 @@
 
 -  [Function `start`](#0x1_reconfiguration_v2_start)
 -  [Function `finish`](#0x1_reconfiguration_v2_finish)
+-  [Function `finish_with_dkg_transcript`](#0x1_reconfiguration_v2_finish_with_dkg_transcript)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch">0x1::config_for_next_epoch</a>;
@@ -74,6 +75,33 @@ Trigger the default reconfiguration.
     <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_on_new_epoch">features::on_new_epoch</a>(<a href="account.md#0x1_account">account</a>);
     <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_enable_upserts">config_for_next_epoch::enable_upserts</a>(<a href="account.md#0x1_account">account</a>);
     <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_reconfiguration_v2_finish_with_dkg_transcript"></a>
+
+## Function `finish_with_dkg_transcript`
+
+
+
+<pre><code><b>fun</b> <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_finish_with_dkg_transcript">finish_with_dkg_transcript</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, dkg_transcript: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_finish_with_dkg_transcript">finish_with_dkg_transcript</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, dkg_transcript: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
+    <b>let</b> should_finish = <a href="dkg.md#0x1_dkg_update">dkg::update</a>(<b>true</b>, dkg_transcript);
+    <b>if</b> (should_finish) {
+        <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_finish">finish</a>(<a href="account.md#0x1_account">account</a>);
+    }
 }
 </code></pre>
 

@@ -2,10 +2,11 @@
 title: "Learn about Indexing"
 ---
 
+import BetaNotice from '../../src/components/_indexer_beta_notice.mdx';
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Learn about Indexing
+<BetaNotice />
 
 ## Quick Start
 

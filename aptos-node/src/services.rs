@@ -25,10 +25,11 @@ use aptos_peer_monitoring_service_server::{
 use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
 use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_time_service::TimeService;
-use aptos_types::{chain_id::ChainId, system_txn::pool::SystemTransactionPoolClient};
+use aptos_types::{chain_id::ChainId, validator_txn::pool::ValidatorTransactionPoolClient};
 use futures::channel::{mpsc, mpsc::Sender};
 use std::{sync::Arc, time::Instant};
 use tokio::runtime::{Handle, Runtime};
+use aptos_types::validator_txn::pool::ValidatorTransactionPoolWriter;
 
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
@@ -90,7 +91,8 @@ pub fn start_consensus_runtime(
     consensus_network_interfaces: ApplicationNetworkInterfaces<ConsensusMsg>,
     consensus_notifier: ConsensusNotifier,
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
-    sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
+    validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
+    validator_txn_pool_writer_for_dkg: Arc<dyn ValidatorTransactionPoolWriter>,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let instant = Instant::now();
     let consensus = aptos_consensus::consensus_provider::start_consensus(
@@ -102,7 +104,8 @@ pub fn start_consensus_runtime(
         db_rw,
         consensus_reconfig_subscription
             .expect("Consensus requires a reconfiguration subscription!"),
-        sys_txn_pool_client,
+        validator_txn_pool_client,
+        validator_txn_pool_writer_for_dkg,
         consensus_dkg_subscription
             .expect("Consensus requires a DKG subscription!"),
 

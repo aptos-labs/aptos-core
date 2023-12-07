@@ -129,8 +129,8 @@ impl BlockQueue {
     pub fn update_randomness(&mut self, round: Round, randomness: Randomness) -> anyhow::Result<()> {
         if let Some(item) = self.item_mut(round) {
             let offset = item.offset(round);
-            assert!(item.ordered_blocks[offset].randomness.is_none());
-            item.ordered_blocks[offset].randomness = Some(randomness);
+            assert!(item.ordered_blocks[offset].randomness().is_none());
+            item.ordered_blocks[offset].set_randomness(randomness);
             item.num_undecided_blocks -= 1;
             Ok(())
         } else {

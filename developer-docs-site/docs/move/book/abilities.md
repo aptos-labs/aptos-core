@@ -186,7 +186,7 @@ fun invalid_unused() {
 }
 
 fun invalid_left_in_local(): u64 {
-    let n = Cup<NoAbilities> { item: NoAbilities {}};
+    let c_n = Cup<NoAbilities> { item: NoAbilities {}};
     // Invalid return: 'c_n' has a value
     // and 'Cup<NoAbilities>' does not have 'drop'
     0

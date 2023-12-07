@@ -4,6 +4,10 @@ title: "End-to-End Tutorial"
 
 # Creating a Custom Indexer Processor
 
+import BetaNotice from '../../../src/components/_indexer_beta_notice.mdx';
+
+<BetaNotice />
+
 In this tutorial, we're going to walk you through all the steps involved with creating a very basic custom indexer processor to track events and data on the Aptos blockchain.
 
 We use a very simple smart contract called **Coin Flip** that has already emitted events for us.

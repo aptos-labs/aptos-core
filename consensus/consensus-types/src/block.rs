@@ -19,9 +19,9 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
     randomness::Randomness,
-    system_txn::SystemTransaction,
     transaction::{SignedTransaction, Transaction, Version},
     validator_signer::ValidatorSigner,
+    validator_txn::ValidatorTransaction,
     validator_verifier::ValidatorVerifier,
 };
 use mirai_annotations::debug_checked_verify_eq;
@@ -30,7 +30,8 @@ use std::{
     convert::TryFrom,
     fmt::{self, Display, Formatter},
 };
-use aptos_types::block_metadata_ext::BlockMetadataExt;
+use std::iter::once;
+use aptos_types::block_metadata_ext::{BlockMetadataExt, BlockMetadataWrapper};
 
 #[path = "block_test_utils.rs"]
 #[cfg(any(test, feature = "fuzzing"))]
@@ -218,6 +219,7 @@ impl Block {
         epoch: u64,
         round: Round,
         timestamp: u64,
+        validator_txns: Vec<ValidatorTransaction>,
         payload: Payload,
         author: Author,
         failed_authors: Vec<(Round, Author)>,
@@ -229,6 +231,7 @@ impl Block {
             epoch,
             round,
             timestamp,
+            validator_txns,
             payload,
             author,
             failed_authors,
@@ -264,7 +267,7 @@ impl Block {
     }
 
     pub fn new_proposal_ext(
-        sys_txns: Vec<SystemTransaction>,
+        validator_txns: Vec<ValidatorTransaction>,
         payload: Payload,
         round: Round,
         timestamp_usecs: u64,
@@ -273,7 +276,7 @@ impl Block {
         failed_authors: Vec<(Round, Author)>,
     ) -> anyhow::Result<Self> {
         let block_data = BlockData::new_proposal_ext(
-            sys_txns,
+            validator_txns,
             payload,
             validator_signer.author(),
             failed_authors,
@@ -306,8 +309,8 @@ impl Block {
         }
     }
 
-    pub fn sys_txns(&self) -> Option<&Vec<SystemTransaction>> {
-        self.block_data.sys_txns()
+    pub fn validator_txns(&self) -> Option<&Vec<ValidatorTransaction>> {
+        self.block_data.validator_txns()
     }
 
     /// Verifies that the proposal and the QC are correctly signed.
@@ -417,38 +420,60 @@ impl Block {
         Ok(())
     }
 
+    pub fn transactions_to_execute_for_metadata(
+        block_id: HashValue,
+        validator_txns: Vec<ValidatorTransaction>,
+        txns: Vec<SignedTransaction>,
+        metadata: BlockMetadataWrapper,
+        is_block_gas_limit: bool,
+    ) -> Vec<Transaction> {
+        let first_txn = match metadata {
+            BlockMetadataWrapper::Default(metadata) => Transaction::BlockMetadata(metadata),
+            BlockMetadataWrapper::Ext(metadata_ext) => Transaction::BlockMetadataExt(metadata_ext),
+        };
+        let txns = once(first_txn)
+            .chain(
+                validator_txns
+                    .into_iter()
+                    .map(Transaction::ValidatorTransaction),
+            )
+            .chain(txns.into_iter().map(Transaction::UserTransaction));
+
+        if is_block_gas_limit {
+            // After the per-block gas limit change, StateCheckpoint txn
+            // is inserted after block execution
+            txns.collect()
+        } else {
+            // Before the per-block gas limit change, StateCheckpoint txn
+            // is inserted here for compatibility.
+            txns.chain(once(Transaction::StateCheckpoint(block_id)))
+                .collect()
+        }
+    }
+
     pub fn transactions_to_execute(
         &self,
         validators: &[AccountAddress],
+        validator_txns: Vec<ValidatorTransaction>,
         txns: Vec<SignedTransaction>,
         is_block_gas_limit: bool,
-        randomness_data: Option<RandomnessData>,
+        metadata_ext_enabled: bool,
+        randomness: Option<Randomness>,
     ) -> Vec<Transaction> {
-        let mut ret = vec![];
-
-        let first_txn = if let Some(data) = randomness_data {
-            let RandomnessData{dkg_transcript, randomness} = data;
-            Transaction::BlockMetadataExt(self.new_block_metadata_ext(
-                validators,
-                dkg_transcript,
-                randomness,
-            ))
+        let metadata_wrapper = if metadata_ext_enabled {
+            BlockMetadataWrapper::Ext(self.new_block_metadata_ext(validators, randomness))
         } else {
-            Transaction::BlockMetadata(self.new_block_metadata(
-                validators,
-            ))
+            BlockMetadataWrapper::Default(self.new_block_metadata(validators))
+
         };
-        ret.push(first_txn);
-
-        ret.extend(txns.into_iter().map(Transaction::UserTransaction));
-
-        if !is_block_gas_limit {
-            ret.push(Transaction::StateCheckpoint(self.id));
-        }
-
-        ret
+        Self::transactions_to_execute_for_metadata(
+            self.id,
+            validator_txns,
+            txns,
+            metadata_wrapper,
+            is_block_gas_limit,
+        )
     }
-
 
     fn previous_bitvec(&self) -> BitVec {
         if let BlockType::DAGBlock { parents_bitvec, .. } = self.block_data.block_type() {
@@ -458,10 +483,7 @@ impl Block {
         }
     }
 
-    fn new_block_metadata(
-        &self,
-        validators: &[AccountAddress],
-    ) -> BlockMetadata {
+    pub fn new_block_metadata(&self, validators: &[AccountAddress]) -> BlockMetadata {
         BlockMetadata::new(
             self.id(),
             self.epoch(),
@@ -478,10 +500,9 @@ impl Block {
         )
     }
 
-    fn new_block_metadata_ext(
+    pub fn new_block_metadata_ext(
         &self,
         validators: &[AccountAddress],
-        dkg_transcript: Option<DKGTranscriptWrapper>,
         randomness: Option<Randomness>,
     ) -> BlockMetadataExt {
         BlockMetadataExt::new_v2(
@@ -497,7 +518,6 @@ impl Block {
                     Self::failed_authors_to_indices(validators, failed_authors)
                 }),
             self.timestamp_usecs(),
-            dkg_transcript,
             randomness,
         )
     }

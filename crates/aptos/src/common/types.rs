@@ -1057,7 +1057,9 @@ pub struct MovePackageDir {
     pub bytecode_version: Option<u32>,
 
     /// Specify the version of the compiler.
-    #[clap(long)]
+    ///
+    /// Currently hidden until the official launch of Compiler V2
+    #[clap(long, hide = true)]
     pub compiler_version: Option<CompilerVersion>,
 
     /// Do not complain about unknown attributes in Move code.

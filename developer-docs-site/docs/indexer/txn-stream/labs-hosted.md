@@ -2,7 +2,9 @@
 title: "Labs-Hosted Transaction Stream Service"
 ---
 
-# Labs-Hosted Transaction Stream Service
+import BetaNotice from '../../../src/components/_indexer_beta_notice.mdx';
+
+<BetaNotice />
 
 If you are running your own instance of the [Indexer API](/indexer/api), or a [custom processor](/indexer/custom-processors), you must have access to an instance of the Transaction Stream Service. This page contains information about how to use the Labs-Hosted Transaction Stream Service.
 

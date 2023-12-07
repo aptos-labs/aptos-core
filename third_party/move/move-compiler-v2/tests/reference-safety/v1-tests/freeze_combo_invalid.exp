@@ -1,0 +1,29 @@
+
+Diagnostics:
+error: implicit copy of mutable reference in local `s` which is used later
+   ┌─ tests/reference-safety/v1-tests/freeze_combo_invalid.move:26:19
+   │
+26 │         if (cond) x = s else x = other; // error in v2
+   │                   ^^^^^ implicitly copied here
+27 │         freeze(s);
+   │         --------- used here
+
+
+Diagnostics:
+error: cannot pass mutable reference in local `s`, which is still borrowed, as function argument
+   ┌─ tests/reference-safety/v1-tests/freeze_combo_invalid.move:20:9
+   │
+19 │         if (cond) f = &mut s.f else f = &mut s.g;
+   │                       --------          -------- previous mutable field borrow
+   │                       │
+   │                       previous mutable field borrow
+20 │         freeze(s);
+   │         ^^^^^^^^^ passed here
+
+error: cannot pass mutable reference in local `s`, which is still borrowed, as function argument
+   ┌─ tests/reference-safety/v1-tests/freeze_combo_invalid.move:13:9
+   │
+12 │         if (cond) f = &mut s.f else f = &mut other.f;
+   │                       -------- previous mutable field borrow
+13 │         freeze(s);
+   │         ^^^^^^^^^ passed here

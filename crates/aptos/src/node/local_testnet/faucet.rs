@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use clap::Parser;
 use maplit::hashset;
 use reqwest::Url;
-use std::{collections::HashSet, path::PathBuf};
+use std::{collections::HashSet, net::Ipv4Addr, path::PathBuf};
 
 /// Args related to running a faucet in the local testnet.
 #[derive(Debug, Parser)]
@@ -48,12 +48,14 @@ impl FaucetManager {
     pub fn new(
         args: &RunLocalTestnet,
         prerequisite_health_checkers: HashSet<HealthChecker>,
+        bind_to: Ipv4Addr,
         test_dir: PathBuf,
         node_api_url: Url,
     ) -> Result<Self> {
         Ok(Self {
             config: RunConfig::build_for_cli(
                 node_api_url.clone(),
+                bind_to.to_string(),
                 args.faucet_args.faucet_port,
                 FunderKeyEnum::KeyFile(test_dir.join("mint.key")),
                 args.faucet_args.do_not_delegate,

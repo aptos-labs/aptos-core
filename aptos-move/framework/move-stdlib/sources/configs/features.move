@@ -320,7 +320,7 @@ module std::features {
     public fun commission_change_delegation_pool_enabled(): bool acquires Features {
         is_enabled(COMMISSION_CHANGE_DELEGATION_POOL)
     }
-    
+
     const RECONFIGURE_WITH_DKG: u64 = 43;
     public fun get_reconfigure_with_dkg_feature(): u64 { RECONFIGURE_WITH_DKG }
     public fun reconfigure_with_dkg_enabled(): bool acquires Features {
@@ -374,8 +374,9 @@ module std::features {
         }
     }
 
+    #[view]
     /// Check whether the feature is enabled.
-    fun is_enabled(feature: u64): bool acquires Features {
+    public fun is_enabled(feature: u64): bool acquires Features {
         exists<Features>(@std) &&
             contains(&borrow_global<Features>(@std).features, feature)
     }

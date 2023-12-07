@@ -329,10 +329,10 @@ impl RandManager {
             observe_block(block.timestamp_usecs(), BlockStage::RAND_ENTER);
             let round = block.round();
             let fallback_rand = self.rand_store.get_randomness(&round).map(|r|r.clone());
-            assert!(block.randomness.is_none());
+            assert!(!block.has_randomness());
             if let Some(r) = optimistic_rand.or(fallback_rand) {
                 num_undecided_blocks -= 1;
-                block.update_randomness(r);
+                block.set_randomness(r);
             } else if let Some(rand_config) = self.rand_store.rand_config.as_ref() {
                 let ask = &rand_config.keys.ask;
                 let metadata = RandMetadata::new(block.epoch(), block.round(), block.id(), block.timestamp_usecs());

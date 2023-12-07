@@ -16,6 +16,8 @@ spec aptos_framework::aptos_governance {
         aborts_if exists<GovernanceResponsbility>(@aptos_framework) &&
             simple_map::spec_contains_key(signer_caps, signer_address);
         ensures exists<GovernanceResponsbility>(@aptos_framework);
+        let post post_signer_caps = global<GovernanceResponsbility>(@aptos_framework).signer_caps;
+        ensures simple_map::spec_contains_key(post_signer_caps, signer_address);
     }
 
     /// Signer address must be @aptos_framework.
@@ -56,6 +58,7 @@ spec aptos_framework::aptos_governance {
         let addr = signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
         aborts_if exists<VotingRecordsV2>(@aptos_framework);
+        ensures exists<VotingRecordsV2>(@aptos_framework);
     }
 
     spec schema InitializeAbortIf {
@@ -534,6 +537,8 @@ spec aptos_framework::aptos_governance {
         aborts_if !exists<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
         let proposal = table::spec_get(voting_forum.proposals, proposal_id);
         aborts_if !proposal.is_resolved;
+        let post approved_hashes = global<ApprovedExecutionHashes>(@aptos_framework).hashes;
+        ensures !simple_map::spec_contains_key(approved_hashes, proposal_id);
     }
 
     spec reconfigure(aptos_framework: &signer) {

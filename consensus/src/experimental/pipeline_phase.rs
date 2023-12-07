@@ -10,7 +10,7 @@ use aptos_logger::debug;
 use async_trait::async_trait;
 use futures::{SinkExt, StreamExt};
 use std::sync::{
-    atomic::{AtomicU64, Ordering},
+    atomic::{AtomicBool, AtomicU64, Ordering},
     Arc,
 };
 
@@ -57,6 +57,7 @@ pub struct PipelinePhase<T: StatelessPipeline> {
     rx: Receiver<CountedRequest<T::Request>>,
     maybe_tx: Option<Sender<T::Response>>,
     processor: Box<T>,
+    reset_flag: Arc<AtomicBool>,
 }
 
 impl<T: StatelessPipeline> PipelinePhase<T> {
@@ -64,11 +65,13 @@ impl<T: StatelessPipeline> PipelinePhase<T> {
         rx: Receiver<CountedRequest<T::Request>>,
         maybe_tx: Option<Sender<T::Response>>,
         processor: Box<T>,
+        reset_flag: Arc<AtomicBool>,
     ) -> Self {
         Self {
             rx,
             maybe_tx,
             processor,
+            reset_flag,
         }
     }
 
@@ -76,6 +79,9 @@ impl<T: StatelessPipeline> PipelinePhase<T> {
         // main loop
         while let Some(counted_req) = self.rx.next().await {
             let CountedRequest { req, guard: _guard } = counted_req;
+            if self.reset_flag.load(Ordering::SeqCst) {
+                continue;
+            }
             let response = {
                 let _timer = BUFFER_MANAGER_PHASE_PROCESS_SECONDS
                     .with_label_values(&[T::NAME])

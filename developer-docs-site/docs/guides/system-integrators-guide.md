@@ -80,7 +80,7 @@ Either of these methods will expose a [REST API service](../apis/fullnode-rest-a
 ### SDKs and tools
 
 Aptos currently provides three SDKs:
-1. [Typescript](../sdks/ts-sdk/index.md)
+1. [Typescript](../sdks/new-ts-sdk/index.md)
 2. [Python](../sdks/python-sdk.md)
 3. [Rust](../sdks/rust-sdk.md)
 
@@ -152,7 +152,7 @@ To facilitate evaluation of transactions as well as gas estimation, Aptos suppor
 
 The simulation API is a synchronous API that executes a transaction and returns the output inclusive of gas usage. The simulation API can be accessed by submitting a transaction to [`/transactions/simulate`](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/simulate_transaction).
 
-Both the [Typescript SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_client.ts#L413) and [Python SDK](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simulate_transfer_coin.py) support the simulation API. Note the output and gas used may change based upon the state of the account. For gas estimations, we recommend that the maximum gas amount be larger than the amount quoted by this API.
+Both the [Typescript SDK](https://github.com/aptos-labs/aptos-ts-sdk/blob/main/src/api/transactionSubmission/simulate.ts) and [Python SDK](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simulate_transfer_coin.py) support the simulation API. Note the output and gas used may change based upon the state of the account. For gas estimations, we recommend that the maximum gas amount be larger than the amount quoted by this API.
 
 ## Viewing current and historical state
 

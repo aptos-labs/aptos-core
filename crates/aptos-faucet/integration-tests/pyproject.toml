@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "aptos-cli-e2e-tests"
+name = "aptos-faucet-e2e-tests"
 version = "0.1.0"
-description = "Aptos CLI E2E tests"
+description = "Aptos Faucet E2E tests"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 license = "Apache-2.0"
 

@@ -4,6 +4,7 @@
 pub mod cache_operator;
 pub mod config;
 pub mod constants;
+pub mod counters;
 pub mod file_store_operator;
 pub mod types;
 
@@ -104,6 +105,22 @@ pub fn time_diff_since_pb_timestamp_in_secs(timestamp: &Timestamp) -> f64 {
         .as_secs_f64();
     let transaction_time = timestamp.seconds as f64 + timestamp.nanos as f64 * 1e-9;
     current_timestamp - transaction_time
+}
+
+/// Convert the protobuf timestamp to ISO format
+pub fn timestamp_to_iso(timestamp: &Timestamp) -> String {
+    let dt = parse_timestamp(timestamp, 0);
+    dt.format("%Y-%m-%dT%H:%M:%S%.9fZ").to_string()
+}
+
+/// Convert the protobuf timestamp to unixtime
+pub fn timestamp_to_unixtime(timestamp: &Timestamp) -> f64 {
+    timestamp.seconds as f64 + timestamp.nanos as f64 * 1e-9
+}
+
+pub fn parse_timestamp(ts: &Timestamp, version: i64) -> chrono::NaiveDateTime {
+    chrono::NaiveDateTime::from_timestamp_opt(ts.seconds, ts.nanos as u32)
+        .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
 }
 
 /// Chunk transactions into chunks with chunk size less than or equal to chunk_size.

@@ -133,7 +133,7 @@ We are aware of the confusion this might create, and plan to present these as se
 
 If a transaction deletes state items, a refund is issued to the transaction payer for the released storage slots. Currently, a full refund is issued for the slot's fee, excluding any fees for excess bytes beyond a set quota (e.g., 1KB). However, fees for event emissions are not refundable.
 
-The refund amount is denominated in APT and is not converted to gas units or included in the total `gas_used`. Instead, this refund amount is specifically detailed in the `storage_fee_refund_octas` field of the [`FeeStatement`](#the-fee-statement). As a result, the transaction's net effect on the payer's APT balance is determined by `gas_used * gas_unit_price - storage_refund`. If the result is positive, there is a deduction from the account balance; if negative, there is a deposit. 
+The refund amount is denominated in APT and is not converted to gas units or included in the total `gas_used`. Instead, this refund amount is specifically detailed in the `storage_fee_refund_octas` field of the [`FeeStatement`](#the-fee-statement). As a result, the transaction's net effect on the payer's APT balance is determined by `gas_used * gas_unit_price - storage_refund`. If the result is positive, there is a deduction from the account balance; if negative, there is a deposit.
 
 ## Examples
 
@@ -151,9 +151,13 @@ In a transaction, for example, transaction A, you are transferring 1000 coins fr
 
 ## Estimating gas consumption via simulation
 
-The gas used for a transaction can be estimated by simulating the transaction on chain as described here or locally via the [gas profiling](../move/move-on-aptos/cli/#profiling-gas-usage) feature of the Aptos CLI. The results of the simulated transaction represent the **exact** amount that is needed at the **exact** state of the blockchain at the time of the simulation. These gas units used may change based on the state of the chain.  For this reason, any amount coming out of the simulation is only an estimate, and when setting the max gas amount, it should include an appropriate amount of headroom based upon your comfort-level and historical behaviors. Setting the max gas amount too low will result in the transaction aborting and the account being charged for whatever gas was consumed.
+The gas used for a transaction can be estimated by simulating the transaction on chain as described here or locally via the gas profiling feature of the Aptos CLI. The results of the simulated transaction represent the **exact** amount that is needed at the **exact** state of the blockchain at the time of the simulation. These gas units used may change based on the state of the chain.  For this reason, any amount coming out of the simulation is only an estimate, and when setting the max gas amount, it should include an appropriate amount of headroom based upon your comfort-level and historical behaviors. Setting the max gas amount too low will result in the transaction aborting and the account being charged for whatever gas was consumed.
 
-Transactions can be simulated with the [`SimulateTransaction`](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/simulate_transaction) API. This API will run the exact transaction that you plan to run.
+To simulate transactions on chain, used the [`SimulateTransaction`](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/simulate_transaction) API. This API will run the exact transaction that you plan to run.
+
+To simulate the transaction locally, use the gas profiler, which is integrated into the Aptos CLI. 
+This will generate a web-based report to help you understand the precise gas usage of your transaction.
+See [Gas Profiling](../move/move-on-aptos/gas-profiling) for more details.
 
 :::tip
 Note that the `Signature` provided on the transaction must be all zeros. This is to prevent someone from using the valid signature.
@@ -182,5 +186,5 @@ Prioritization is based upon buckets of `gas_unit_price`. The buckets are define
 :::
 
 :::tip
-Note that the `safety factor` only takes into consideration changes related to execution and IO. Unexpected creation of storage slots may not be sufficiently coverred.
+Note that the `safety factor` only takes into consideration changes related to execution and IO. Unexpected creation of storage slots may not be sufficiently covered.
 :::

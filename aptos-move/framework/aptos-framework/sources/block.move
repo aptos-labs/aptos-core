@@ -185,8 +185,6 @@ module aptos_framework::block {
         failed_proposer_indices: vector<u64>,
         previous_block_votes_bitvec: vector<u8>,
         timestamp: u64,
-        dkg_result_available: bool,
-        dkg_result: vector<u8>,
         randomness_available: bool,
         randomness: vector<u8>,
     ) acquires BlockResource {
@@ -196,12 +194,7 @@ module aptos_framework::block {
 
         randomness::on_new_block(&vm, randomness_available, randomness);
 
-        if (dkg::in_progress()) {
-            let should_proceed = dkg::update(dkg_result_available, dkg_result);
-            if (should_proceed) {
-                reconfiguration_v2::finish(&vm);
-            }
-        } else if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
+        if (!dkg::in_progress() && timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
             reconfiguration_v2::start(&vm);
         };
     }

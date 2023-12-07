@@ -3,13 +3,14 @@
 
 use crate::{network::TConsensusMsg, network_interface::ConsensusMsg};
 use anyhow::bail;
-pub use aptos_consensus_types::{common::Author, dkg_types::DKGAggNode};
+pub use aptos_consensus_types::common::Author;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_enum_conversion_derive::EnumConversion;
 use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
 use aptos_types::{dkg::{DKGPvssConfig, DKGTranscriptWrapper}, validator_verifier::ValidatorVerifier};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+pub use aptos_types::dkg::DKGAggNode;
 
 pub trait TDKGMessage: Into<DKGMessage> + TryFrom<DKGMessage> {
     fn verify(&self, dkg_pvss_config: &DKGPvssConfig, verifier: &ValidatorVerifier) -> anyhow::Result<()>;
@@ -139,7 +140,7 @@ impl TDKGMessage for DKGAggNode {
         let dealers_addresses = dealers.iter().filter_map(|&pos| addresses.get(pos)).cloned().collect::<Vec<_>>();
         // Ensure aggregated transcript has enough stakes
         verifier.check_voting_power(dealers_addresses.iter(), false)?;
-        
+
         self.agg_trx.verify(dkg_pvss_config, verifier)?;
 
         Ok(())

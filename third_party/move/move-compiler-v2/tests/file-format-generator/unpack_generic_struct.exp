@@ -22,6 +22,23 @@ public fun m::destroy_none<#0>($t0: m::Option<#0>) {
 
 
 [variant baseline]
+public fun m::foo<#0>($t0: m::E<#0>, $t1: &mut #0) {
+     var $t2: m::E<#0>
+     var $t3: m::E<#0>
+     var $t4: #0
+     var $t5: u64
+     var $t6: u64
+  0: $t2 := infer($t0)
+  1: $t3 := infer($t2)
+  2: $t4 := unpack m::E<#0>($t3)
+  3: $t6 := 3
+  4: $t5 := infer($t6)
+  5: write_ref($t1, $t4)
+  6: return ()
+}
+
+
+[variant baseline]
 public fun m::is_none<#0>($t0: &m::Option<#0>): bool {
      var $t1: bool
      var $t2: &vector<#0>
@@ -66,6 +83,30 @@ public fun m::destroy_none<#0>($t0: m::Option<#0>) {
 
 
 [variant baseline]
+public fun m::foo<#0>($t0: m::E<#0>, $t1: &mut #0) {
+     var $t2: m::E<#0>
+     var $t3: m::E<#0>
+     var $t4: #0
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t2 := move($t0)
+     # live vars: $t1, $t2
+  1: $t3 := move($t2)
+     # live vars: $t1, $t3
+  2: $t4 := unpack m::E<#0>($t3)
+     # live vars: $t1, $t4
+  3: $t6 := 3
+     # live vars: $t1, $t4
+  4: $t5 := move($t6)
+     # live vars: $t1, $t4
+  5: write_ref($t1, $t4)
+     # live vars:
+  6: return ()
+}
+
+
+[variant baseline]
 public fun m::is_none<#0>($t0: &m::Option<#0>): bool {
      var $t1: bool
      var $t2: &vector<#0>
@@ -84,6 +125,9 @@ module 42.m {
 use 0000000000000000000000000000000000000000000000000000000000000001::vector;
 
 
+struct E<Ty0> has copy, drop, store {
+	key: Ty0
+}
 struct Option<Ty0> has copy, drop, store {
 	vec: vector<Ty0>
 }
@@ -103,6 +147,21 @@ B3:
 	7: UnpackGeneric[0](Option<Ty0>)
 	8: VecUnpack(2, 0)
 	9: Ret
+}
+public foo<Ty0: drop + store>(Arg0: E<Ty0>, Arg1: &mut Ty0) {
+L0:	loc2: u64
+B0:
+	0: MoveLoc[0](Arg0: E<Ty0>)
+	1: StLoc[2](loc0: E<Ty0>)
+	2: MoveLoc[2](loc0: E<Ty0>)
+	3: StLoc[3](loc1: E<Ty0>)
+	4: MoveLoc[3](loc1: E<Ty0>)
+	5: UnpackGeneric[1](E<Ty0>)
+	6: LdU64(3)
+	7: StLoc[4](loc2: u64)
+	8: MoveLoc[1](Arg1: &mut Ty0)
+	9: WriteRef
+	10: Ret
 }
 public is_none<Ty0>(Arg0: &Option<Ty0>): bool {
 B0:

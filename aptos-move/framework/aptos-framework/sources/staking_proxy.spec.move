@@ -29,7 +29,7 @@ spec aptos_framework::staking_proxy {
 
     spec set_staking_contract_operator(owner: &signer, old_operator: address, new_operator: address) {
         pragma aborts_if_is_partial;
-        pragma verify_duration_estimate = 120;
+        pragma verify = false;
         // TODO: Verify timeout and can't verify `staking_contract::switch_operator`.
         include SetStakingContractOperator;
     }

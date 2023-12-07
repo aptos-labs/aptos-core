@@ -359,11 +359,10 @@ impl Dag {
             .map(|(_, round_nodes)| round_nodes.iter().map(|node| node.is_some()).collect())
             .collect();
 
-        bitmask.resize((target_round - lowest_round + 1) as usize, vec![
-            false;
-            self.author_to_index
-                .len()
-        ]);
+        bitmask.resize(
+            (target_round - lowest_round + 1) as usize,
+            vec![false; self.author_to_index.len()],
+        );
 
         DagSnapshotBitmask::new(lowest_round, bitmask)
     }

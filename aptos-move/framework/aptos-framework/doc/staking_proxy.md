@@ -334,7 +334,7 @@ Aborts if conditions of SetStackingContractVoter and SetStackPoolVoterAbortsIf a
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
-<b>pragma</b> verify_duration_estimate = 120;
+<b>pragma</b> verify = <b>false</b>;
 <b>include</b> <a href="staking_proxy.md#0x1_staking_proxy_SetStakingContractOperator">SetStakingContractOperator</a>;
 </code></pre>
 

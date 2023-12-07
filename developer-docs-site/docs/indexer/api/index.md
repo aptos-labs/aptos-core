@@ -2,7 +2,9 @@
 title: "Indexer API"
 ---
 
-# Indexer API
+import BetaNotice from '../../../src/components/\_indexer_beta_notice.mdx';
+
+<BetaNotice />
 
 This section contains documentation for the Aptos Indexer API, the API built upon the standard set of processors provided in the [aptos-labs/aptos-indexer-processors](https://github.com/aptos-labs/aptos-indexer-processors) repo.
 
@@ -14,4 +16,4 @@ When making a query where one of the query params is an account address (e.g. ow
 
 ### TypeScript Client
 
-The Aptos TypeScript SDK provides an IndexerClient for making queries to the Aptos Indexer API. Learn more [here](/sdks/ts-sdk/typescript-sdk-indexer-client-class).
+The Aptos TypeScript SDK provides an API functions for making queries to the Aptos Indexer API. Learn more [here](../../sdks/new-ts-sdk/fetch-data-from-chain.md).

@@ -15,9 +15,10 @@ use aptos_types::{
     block_info::BlockInfo,
     contract_event::ContractEvent,
     randomness::Randomness,
-    system_txn::SystemTransaction,
     transaction::{SignedTransaction, Transaction, TransactionStatus},
+    validator_txn::ValidatorTransaction,
 };
+use once_cell::sync::OnceCell;
 use std::fmt::{Debug, Display, Formatter};
 use crate::block::RandomnessData;
 
@@ -28,21 +29,28 @@ use crate::block::RandomnessData;
 pub struct ExecutedBlock {
     /// Block data that cannot be regenerated.
     block: Block,
+    /// Input transactions in the order of execution
+    input_transactions: Vec<SignedTransaction>,
     /// The state_compute_result is calculated for all the pending blocks prior to insertion to
     /// the tree. The execution results are not persisted: they're recalculated again for the
     /// pending blocks upon restart.
     state_compute_result: StateComputeResult,
-    pub randomness: Option<Randomness>,
+    randomness: OnceCell<Randomness>,
 }
 
 impl ExecutedBlock {
-    pub fn replace_result(mut self, result: StateComputeResult) -> Self {
+    pub fn replace_result(
+        mut self,
+        input_transactions: Vec<SignedTransaction>,
+        result: StateComputeResult,
+    ) -> Self {
         self.state_compute_result = result;
+        self.input_transactions = input_transactions;
         self
     }
 
-    pub fn update_randomness(&mut self, randomness: Randomness) {
-        self.randomness = Some(randomness);
+    pub fn set_randomness(&mut self, randomness: Randomness) {
+        assert!(self.randomness.set(randomness).is_ok());
     }
 }
 
@@ -61,13 +69,14 @@ impl Display for ExecutedBlock {
 impl ExecutedBlock {
     pub fn new(
         block: Block,
+        input_transactions: Vec<SignedTransaction>,
         state_compute_result: StateComputeResult,
-        randomness: Option<Randomness>,
     ) -> Self {
         Self {
             block,
+            input_transactions,
             state_compute_result,
-            randomness,
+            randomness: OnceCell::new(),
         }
     }
 
@@ -77,6 +86,10 @@ impl ExecutedBlock {
 
     pub fn id(&self) -> HashValue {
         self.block().id()
+    }
+
+    pub fn input_transactions(&self) -> &Vec<SignedTransaction> {
+        &self.input_transactions
     }
 
     pub fn epoch(&self) -> u64 {
@@ -99,8 +112,8 @@ impl ExecutedBlock {
         self.block().round()
     }
 
-    pub fn sys_txns(&self) -> Option<&Vec<SystemTransaction>> {
-        self.block().sys_txns()
+    pub fn validator_txns(&self) -> Option<&Vec<ValidatorTransaction>> {
+        self.block().validator_txns()
     }
 
     pub fn timestamp_usecs(&self) -> u64 {
@@ -111,12 +124,12 @@ impl ExecutedBlock {
         &self.state_compute_result
     }
 
-    pub fn randomness(&self) -> Option<Randomness> {
-        self.randomness.clone()
+    pub fn randomness(&self) -> Option<&Randomness> {
+        self.randomness.get()
     }
 
     pub fn has_randomness(&self) -> bool {
-        self.randomness.is_some()
+        self.randomness.get().is_some()
     }
 
     pub fn block_info(&self) -> BlockInfo {
@@ -139,9 +152,11 @@ impl ExecutedBlock {
     pub fn transactions_to_commit(
         &self,
         validators: &[AccountAddress],
+        validator_txns: Vec<ValidatorTransaction>,
         txns: Vec<SignedTransaction>,
         is_block_gas_limit: bool,
-        randomness_data: Option<RandomnessData>,
+        metadata_ext_enabled: bool,
+        randomness: Option<Randomness>,
     ) -> Vec<Transaction> {
         // reconfiguration suffix don't execute
 
@@ -149,9 +164,14 @@ impl ExecutedBlock {
             return vec![];
         }
 
-        let mut txns_with_state_checkpoint =
-            self.block
-                .transactions_to_execute(validators, txns, is_block_gas_limit, randomness_data);
+        let mut txns_with_state_checkpoint = self.block.transactions_to_execute(
+            validators,
+            validator_txns,
+            txns,
+            is_block_gas_limit,
+            metadata_ext_enabled,
+            randomness,
+        );
         if is_block_gas_limit && !self.state_compute_result.has_reconfiguration() {
             // After the per-block gas limit change,
             // insert state checkpoint at the position

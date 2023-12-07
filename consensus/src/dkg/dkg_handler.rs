@@ -2,12 +2,12 @@
 
 use super::{
     dkg_manager::DKGManager,
-    types::{DKGMessage, DKGNodeAck, DKGAggNodeAck}, DKGNode,
+    DKGNode, types::{DKGAggNodeAck, DKGMessage, DKGNodeAck},
 };
 use crate::{network::{IncomingDKGRequest, TConsensusMsg}, network_interface::ConsensusMsg};
 use aptos_channels::aptos_channel;
-use aptos_consensus_types::{common::Author, dkg_types::DKGAggNode};
-use aptos_logger::{error, info, warn, debug};
+use aptos_consensus_types::common::Author;
+use aptos_logger::{debug, error, info, warn};
 use aptos_network::protocols::network::RpcError;
 use aptos_types::epoch_state::EpochState;
 use async_trait::async_trait;
@@ -15,6 +15,7 @@ use bytes::Bytes;
 use futures::StreamExt;
 use thiserror::Error as ThisError;
 use std::{sync::Arc, time::Duration};
+use aptos_types::dkg::DKGAggNode;
 
 #[derive(ThisError, Debug)]
 pub enum DKGRpcHandleError {
@@ -82,7 +83,7 @@ impl DKGNetworkHandler {
         while let Some(msg) = dkg_rpc_rx.next().await {
             let sender = msg.sender;
             let mut handler = self.clone();
-            
+
             tokio::task::spawn(async move {
                 if let Err(e) = handler.process_rpc(msg).await {
                     warn!("[DKG] error processing rpc from peer {:?}: {}", sender, e);

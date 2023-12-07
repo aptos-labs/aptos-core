@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: implicit copy of mutable reference in local `inner` which is used later
+   ┌─ tests/reference-safety/v1-tests/borrow_field_full.move:49:13
+   │
+49 │         let c = inner; // error in v2
+   │             ^ implicitly copied here
+   ·
+53 │         *inner;
+   │         ------ used here

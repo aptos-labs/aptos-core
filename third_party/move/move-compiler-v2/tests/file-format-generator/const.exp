@@ -28,30 +28,30 @@ fun constant::test_constans() {
      var $t23: vector<u8>
      var $t24: vector<u8>
   0: $t1 := true
-  1: $t0 := move($t1)
+  1: $t0 := infer($t1)
   2: $t3 := false
-  3: $t2 := move($t3)
+  3: $t2 := infer($t3)
   4: $t5 := 1
-  5: $t4 := move($t5)
+  5: $t4 := infer($t5)
   6: $t7 := 7086
-  7: $t6 := move($t7)
+  7: $t6 := infer($t7)
   8: $t9 := 14593408
-  9: $t8 := move($t9)
+  9: $t8 := infer($t9)
  10: $t11 := 51966
- 11: $t10 := move($t11)
+ 11: $t10 := infer($t11)
  12: $t13 := 3735928559
- 13: $t12 := move($t13)
+ 13: $t12 := infer($t13)
  14: $t15 := 301490978409967
- 15: $t14 := move($t15)
+ 15: $t14 := infer($t15)
  16: $t17 := 0x42
- 17: $t16 := move($t17)
+ 17: $t16 := infer($t17)
  18: $t20 := 1
  19: $t21 := 2
  20: $t22 := 3
  21: $t19 := vector($t20, $t21, $t22)
- 22: $t18 := move($t19)
+ 22: $t18 := infer($t19)
  23: $t24 := [72, 101, 108, 108, 111, 33, 10]
- 24: $t23 := move($t24)
+ 24: $t23 := infer($t24)
  25: return ()
 }
 

@@ -85,7 +85,7 @@ impl OnChainConfig for Features {
 }
 
 impl Features {
-    fn enable(&mut self, flag: FeatureFlag) {
+    pub fn enable(&mut self, flag: FeatureFlag) {
         let byte_index = (flag as u64 / 8) as usize;
         let bit_mask = 1 << (flag as u64 % 8);
         while self.features.len() <= byte_index {

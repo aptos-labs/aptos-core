@@ -1,11 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::{
-    batch_coordinator::BatchCoordinatorCommand,
-    batch_generator::BatchGenerator,
-    quorum_store_db::MockQuorumStoreDB,
-    tests::utils::{
+use crate::{
+    quorum_store::{
+        batch_coordinator::BatchCoordinatorCommand, batch_generator::BatchGenerator,
+        quorum_store_db::MockQuorumStoreDB,
+    },
+    test_utils::{
         create_signed_transaction, create_vec_signed_transactions,
         create_vec_signed_transactions_with_gas,
     },

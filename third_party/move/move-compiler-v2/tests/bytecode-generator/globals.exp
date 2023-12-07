@@ -64,7 +64,7 @@ fun globals::read($t0: address): u64 {
      var $t3: &globals::R
      var $t4: &u64
   0: $t3 := borrow_global<globals::R>($t0)
-  1: $t2 := move($t3)
+  1: $t2 := infer($t3)
   2: $t4 := borrow_field<globals::R>.f($t2)
   3: $t1 := read_ref($t4)
   4: return $t1
@@ -79,7 +79,7 @@ fun globals::write($t0: address, $t1: u64): u64 {
      var $t5: u64
      var $t6: &mut u64
   0: $t4 := borrow_global<globals::R>($t0)
-  1: $t3 := move($t4)
+  1: $t3 := infer($t4)
   2: $t5 := 2
   3: $t6 := borrow_field<globals::R>.f($t3)
   4: write_ref($t6, $t5)

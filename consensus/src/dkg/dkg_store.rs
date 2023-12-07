@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::collections::HashMap;
-use super::{types::{DKGAggNode, TDKGMessage}, DKGNode};
+use std::sync::Arc;
+use super::{DKGNode, types::TDKGMessage};
 use aptos_consensus_types::common::Author;
 use aptos_logger::debug;
 use aptos_types::{
@@ -10,6 +11,9 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use futures::stream::AbortHandle;
+use aptos_types::dkg::DKGAggNode;
+use aptos_types::validator_txn::pool::ValidatorTransactionPoolWriter;
+use aptos_types::validator_txn::ValidatorTransaction;
 
 #[derive(Clone)]
 pub struct DKGStore {
@@ -28,12 +32,11 @@ pub struct DKGStore {
     // store the aggregated node containing the final aggregated transcript
     // will be proposed as payload by proposal generator
     agg_node: Option<DKGAggNode>,
-    // true if the aggregated node is already pulled by the proposal generator
-    agg_node_proposed: bool,
+    dkg_txn_writer: Arc<dyn ValidatorTransactionPoolWriter>,
 }
 
 impl DKGStore {
-    pub fn new(author: Author, validator_verifier: ValidatorVerifier, dkg_pvss_config: DKGPvssConfig, start_time: u64) -> Self {
+    pub fn new(author: Author, validator_verifier: ValidatorVerifier, dkg_pvss_config: DKGPvssConfig, start_time: u64, dkg_txn_writer: Arc<dyn ValidatorTransactionPoolWriter>) -> Self {
         Self {
             author,
             validator_verifier,
@@ -43,7 +46,7 @@ impl DKGStore {
             nodes: HashMap::new(),
             agg_trx: None,
             agg_node: None,
-            agg_node_proposed: false,
+            dkg_txn_writer,
         }
     }
 
@@ -129,6 +132,12 @@ impl DKGStore {
         {
             Ok(_) => {
                 self.agg_node = Some(agg_node.clone());
+                let txn = ValidatorTransaction::DKGAggregatedTranscript {
+                    agg_node: agg_node.clone(),
+                    pvss_config: self.dkg_pvss_config.clone(),
+                    validator_verifier: self.validator_verifier.clone(),
+                };
+                self.dkg_txn_writer.put(Some(txn));
                 debug!("[DKG] Added DKGAggNode: {:?}, at validator {:?}", agg_node.metadata(), self.author);
 
                 return Ok(Some(agg_node));
@@ -139,16 +148,7 @@ impl DKGStore {
         }
     }
 
-    pub fn ready(&self) -> bool {
-        self.agg_node.is_some() && !self.agg_node_proposed
-    }
-
     pub fn get_agg_node(&mut self) -> &Option<DKGAggNode> {
         &self.agg_node
-    }
-
-    pub fn take_agg_node(&mut self) -> Option<DKGAggNode> {
-        self.agg_node_proposed = true;
-        self.agg_node.clone()
     }
 }

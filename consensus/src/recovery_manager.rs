@@ -25,20 +25,22 @@ use std::{mem::Discriminant, process, sync::Arc};
 /// If the node can't recover corresponding blocks from local storage, RecoveryManager is responsible
 /// for processing the events carrying sync info and use the info to retrieve blocks from peers
 pub struct RecoveryManager {
-    epoch_state: EpochState,
+    epoch_state: Arc<EpochState>,
     network: NetworkSender,
     storage: Arc<dyn PersistentLivenessStorage>,
     state_computer: Arc<dyn StateComputer>,
     last_committed_round: Round,
+    max_blocks_to_request: u64,
 }
 
 impl RecoveryManager {
     pub fn new(
-        epoch_state: EpochState,
+        epoch_state: Arc<EpochState>,
         network: NetworkSender,
         storage: Arc<dyn PersistentLivenessStorage>,
         state_computer: Arc<dyn StateComputer>,
         last_committed_round: Round,
+        max_blocks_to_request: u64,
     ) -> Self {
         RecoveryManager {
             epoch_state,
@@ -46,6 +48,7 @@ impl RecoveryManager {
             storage,
             state_computer,
             last_committed_round,
+            max_blocks_to_request,
         }
     }
 
@@ -81,6 +84,7 @@ impl RecoveryManager {
                 .verifier
                 .get_ordered_account_addresses_iter()
                 .collect(),
+            self.max_blocks_to_request,
         );
         let recovery_data = BlockStore::fast_forward_sync(
             sync_info.highest_ordered_cert(),

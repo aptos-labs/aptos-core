@@ -129,7 +129,7 @@ ContractEventV2:
 DepositEvent:
   STRUCT:
     - amount: U64
-DummySystemTransaction:
+DummyValidatorTransaction:
   STRUCT:
     - payload: BYTES
 Ed25519PublicKey:
@@ -323,12 +323,12 @@ StructTag:
     - type_args:
         SEQ:
           TYPENAME: TypeTag
-SystemTransaction:
+ValidatorTransaction:
   ENUM:
     0:
       DummyTopic:
         NEWTYPE:
-          TYPENAME: DummySystemTransaction
+          TYPENAME: DummyValidatorTransaction
 TableHandle:
   NEWTYPESTRUCT:
     TYPENAME: AccountAddress
@@ -351,9 +351,9 @@ Transaction:
         NEWTYPE:
           TYPENAME: HashValue
     4:
-      SystemTransaction:
+      ValidatorTransaction:
         NEWTYPE:
-          TYPENAME: SystemTransaction
+          TYPENAME: ValidatorTransaction
 TransactionArgument:
   ENUM:
     0:

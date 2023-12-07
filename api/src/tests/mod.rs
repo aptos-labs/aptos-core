@@ -13,6 +13,7 @@ mod multisig_transactions_test;
 mod objects;
 mod resource_groups;
 mod secp256k1_ecdsa;
+mod simulation_test;
 mod state_test;
 mod string_resource_test;
 mod transaction_vector_test;

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: cannot copy mutable reference in local `s`
+   ┌─ tests/reference-safety/v1-tests/dereference_combo.move:28:23
+   │
+28 │         if (cond) x = copy s else x = other; // error in v2 because of copy of mut ref
+   │                       ^^^^^^ copied here

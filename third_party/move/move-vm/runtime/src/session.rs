@@ -22,10 +22,10 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::runtime_types::Type,
+    loaded_data::runtime_types::{StructNameIndex, StructType, Type},
     values::{GlobalValue, Value},
 };
-use std::borrow::Borrow;
+use std::{borrow::Borrow, sync::Arc};
 
 pub struct Session<'r, 'l> {
     pub(crate) move_vm: &'l MoveVM,
@@ -416,6 +416,14 @@ impl<'r, 'l> Session<'r, 'l> {
 
     pub fn get_vm_config(&self) -> &'l VMConfig {
         self.move_vm.runtime.loader().vm_config()
+    }
+
+    pub fn get_struct_type(&self, index: StructNameIndex) -> Option<Arc<StructType>> {
+        self.move_vm
+            .runtime
+            .loader()
+            .get_struct_type_by_idx(index)
+            .ok()
     }
 }
 

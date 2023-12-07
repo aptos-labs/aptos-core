@@ -36,6 +36,11 @@ anyhow = "1.0.52"
 datatest-stable = "0.1.1"
 move-stackless-bytecode-test-utils = { path = "../bytecode-test-utils" }
 
+[features]
+default = []
+# If set, more information is printed when debug printing, e.g. for baseline files
+verbose-debug-print = []
+
 [[test]]
 name = "testsuite"
 harness = false

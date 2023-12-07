@@ -156,14 +156,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
         let name_to_index = (0..func_env
             .get_local_count()
             .expect("compiled module available"))
-            .map(|idx| {
-                (
-                    func_env
-                        .get_local_name(idx)
-                        .expect("compiled module available"),
-                    idx,
-                )
-            })
+            .map(|idx| (func_env.get_local_name(idx), idx))
             .collect();
 
         FunctionData::new(
@@ -178,6 +171,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                 .expect(COMPILED_MODULE_AVAILABLE),
             loop_unrolling,
             loop_invariants,
+            BTreeMap::new(),
         )
     }
 

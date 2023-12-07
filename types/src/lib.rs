@@ -27,6 +27,7 @@ pub mod move_utils;
 pub mod network_address;
 pub mod nibble;
 pub mod on_chain_config;
+pub mod oracle;
 pub mod proof;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod proptest_types;
@@ -35,7 +36,6 @@ pub mod serde_helper;
 pub mod stake_pool;
 pub mod staking_contract;
 pub mod state_proof;
-pub mod system_txn;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test_helpers;
 pub mod timestamp;
@@ -46,6 +46,7 @@ pub mod validator_config;
 pub mod validator_info;
 pub mod validator_performances;
 pub mod validator_signer;
+pub mod validator_txn;
 pub mod validator_verifier;
 pub mod vesting;
 pub mod vm_status;

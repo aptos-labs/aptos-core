@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use aptos_crypto::HashValue;
 use move_core_types::account_address::AccountAddress;
 use move_core_types::value::MoveValue;
+use crate::block_metadata::BlockMetadata;
 use crate::dkg::DKGTranscriptWrapper;
 use crate::randomness::Randomness;
 
@@ -22,7 +23,6 @@ pub struct BlockMetadataExtV2 {
     previous_block_votes_bitvec: Vec<u8>,
     failed_proposer_indices: Vec<u32>,
     timestamp_usecs: u64,
-    dkg_transcript: Option<DKGTranscriptWrapper>,
     randomness: Option<Randomness>,
 }
 
@@ -35,7 +35,6 @@ impl BlockMetadataExt {
         previous_block_votes_bitvec: Vec<u8>,
         failed_proposer_indices: Vec<u32>,
         timestamp_usecs: u64,
-        dkg_transcript: Option<DKGTranscriptWrapper>,
         randomness: Option<Randomness>,
     ) -> Self {
         Self::V2(BlockMetadataExtV2 {
@@ -46,7 +45,6 @@ impl BlockMetadataExt {
             previous_block_votes_bitvec,
             failed_proposer_indices,
             timestamp_usecs,
-            dkg_transcript,
             randomness,
         })
     }
@@ -78,21 +76,6 @@ impl BlockMetadataExt {
             ),
             MoveValue::U64(self.timestamp_usecs()),
         ];
-
-        match self.dkg_transcript() {
-            None => {
-                ret.push(MoveValue::Bool(false));
-                ret.push(MoveValue::Vector(vec![]));
-            }
-            Some(trx) => {
-                let move_bytes = bcs::to_bytes(trx).unwrap()
-                    .into_iter()
-                    .map(MoveValue::U8)
-                    .collect();
-                ret.push(MoveValue::Bool(true));
-                ret.push(MoveValue::Vector(move_bytes));
-            }
-        }
 
         match self.randomness() {
             None => {
@@ -144,15 +127,14 @@ impl BlockMetadataExt {
         }
     }
 
-    pub fn dkg_transcript(&self) -> &Option<DKGTranscriptWrapper> {
-        match self {
-            BlockMetadataExt::V2(obj) => &obj.dkg_transcript
-        }
-    }
-
     pub fn randomness(&self) -> &Option<Randomness> {
         match self {
             BlockMetadataExt::V2(obj) => &obj.randomness
         }
     }
+}
+
+pub enum BlockMetadataWrapper {
+    Default(BlockMetadata),
+    Ext(BlockMetadataExt),
 }

@@ -1,7 +1,10 @@
 ---
-title: "[Beta] Aptos Labs Developer Portal"
-slug: "aptos-labs-developer-portal"
+title: "Aptos Labs Developer Portal"
 ---
+
+import BetaNotice from '../../src/components/_dev_portal_beta_notice.mdx';
+
+<BetaNotice />
 
 The [Aptos Labs Developer Portal](https://developers.aptoslabs.com) is a your gateway to access Aptos Labs provided APIs in a quick and easy fashion to power your dApp.
 It consists of a Portal (UI) and a set of API Gateways operated by Aptos Labs.

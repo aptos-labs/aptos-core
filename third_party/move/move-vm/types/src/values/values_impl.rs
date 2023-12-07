@@ -2175,9 +2175,7 @@ impl Vector {
             | Type::Vector(_)
             | Type::Struct { .. }
             | Type::StructInstantiation {
-                name: _,
-                ty_args: _,
-                ..
+                idx: _, ty_args: _, ..
             } => Value(ValueImpl::Container(Container::Vec(Rc::new(RefCell::new(
                 elements.into_iter().map(|v| v.0).collect(),
             ))))),

@@ -144,6 +144,9 @@ impl ReplayVerifyCoordinator {
             );
         }
 
+        // Once it begins replay, we want to directly start from the version that failed
+        let save_start_version = (next_txn_version > 0).then_some(next_txn_version);
+
         next_txn_version = std::cmp::max(next_txn_version, snapshot_version.map_or(0, |v| v + 1));
 
         let transactions = metadata_view.select_transaction_backups(
@@ -185,7 +188,7 @@ impl ReplayVerifyCoordinator {
                 .into_iter()
                 .map(|t| t.manifest)
                 .collect::<Vec<_>>(),
-            None,
+            save_start_version,
             Some((next_txn_version, false)), /* replay_from_version */
             None,                            /* epoch_history */
             self.verify_execution_mode.clone(),

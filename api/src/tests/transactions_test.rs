@@ -1377,7 +1377,7 @@ async fn test_gas_estimation_static_override() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn simulation_failure_error_message() {
+async fn test_simulation_failure_error_message() {
     let mut context = new_test_context(current_function_name!());
     let admin0 = context.root_account().await;
 
@@ -1395,8 +1395,10 @@ async fn simulation_failure_error_message() {
         "type_arguments": [],
         "arguments": [],
     }), 200).await;
+    let resp = &output.as_array().unwrap()[0];
 
-    assert!(output.as_array().unwrap()[0]["vm_status"]
+    assert!(!resp["success"].as_bool().unwrap());
+    assert!(resp["vm_status"]
         .as_str()
         .unwrap()
         .contains("Division by zero"));

@@ -2,7 +2,9 @@
 title: "Self-Hosted Indexer API"
 ---
 
-# Self-Hosted Indexer API
+import BetaNotice from '../../../src/components/_indexer_beta_notice.mdx';
+
+<BetaNotice />
 
 This guide will walk you through setting up a self-hosted Indexer API.
 

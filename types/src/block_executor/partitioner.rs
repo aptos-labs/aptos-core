@@ -545,6 +545,7 @@ impl PartitionedTransactions {
 }
 
 // Represents the transactions in a block that are ready to be executed.
+#[derive(Clone)]
 pub enum ExecutableTransactions {
     Unsharded(Vec<SignatureVerifiedTransaction>),
     Sharded(PartitionedTransactions),
@@ -555,6 +556,18 @@ impl ExecutableTransactions {
         match self {
             ExecutableTransactions::Unsharded(transactions) => transactions.len(),
             ExecutableTransactions::Sharded(partitioned_txns) => partitioned_txns.num_txns(),
+        }
+    }
+
+    pub fn into_txns(self) -> Vec<SignatureVerifiedTransaction> {
+        match self {
+            ExecutableTransactions::Unsharded(txns) => txns,
+            ExecutableTransactions::Sharded(partitioned) => {
+                PartitionedTransactions::flatten(partitioned)
+                    .into_iter()
+                    .map(|t| t.into_txn())
+                    .collect()
+            },
         }
     }
 }

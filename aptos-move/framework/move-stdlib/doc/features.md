@@ -1903,7 +1903,8 @@ who have permission to set the flag that's checked in <code>extract()</code>.
 Check whether the feature is enabled.
 
 
-<pre><code><b>fun</b> <a href="features.md#0x1_features_is_enabled">is_enabled</a>(feature: u64): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_enabled">is_enabled</a>(feature: u64): bool
 </code></pre>
 
 
@@ -1912,7 +1913,7 @@ Check whether the feature is enabled.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="features.md#0x1_features_is_enabled">is_enabled</a>(feature: u64): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_enabled">is_enabled</a>(feature: u64): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std) &&
         <a href="features.md#0x1_features_contains">contains</a>(&<b>borrow_global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>, feature)
 }
@@ -2131,7 +2132,8 @@ Helper to check whether a feature flag is enabled.
 ### Function `is_enabled`
 
 
-<pre><code><b>fun</b> <a href="features.md#0x1_features_is_enabled">is_enabled</a>(feature: u64): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_enabled">is_enabled</a>(feature: u64): bool
 </code></pre>
 
 

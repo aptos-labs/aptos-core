@@ -141,7 +141,7 @@ impl TransactionsWithParsedOutput {
             Transaction::BlockMetadata(_)
             | Transaction::BlockMetadataExt(_)
             | Transaction::UserTransaction(_)
-            | Transaction::SystemTransaction(_) => false,
+            | Transaction::ValidatorTransaction(_) => false,
             Transaction::GenesisTransaction(_) | Transaction::StateCheckpoint(_) => true,
         }
     }

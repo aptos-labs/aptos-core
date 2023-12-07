@@ -517,10 +517,10 @@ module circle {
     }
 
     public fun overlaps(c1: &Circle, c2: &Circle): bool {
-        let d = point::dist_squared(&c1.center, &c2.center);
+        let dist_squared_value = point::dist_squared(&c1.center, &c2.center);
         let r1 = c1.radius;
         let r2 = c2.radius;
-        d*d <= r1*r1 + 2*r1*r2 + r2*r2
+        dist_squared_value <= r1*r1 + 2*r1*r2 + r2*r2
     }
 }
 }

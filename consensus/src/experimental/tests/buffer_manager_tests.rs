@@ -24,6 +24,7 @@ use crate::{
         RandomComputeResultStateComputer,
     },
 };
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
@@ -44,6 +45,7 @@ use aptos_safety_rules::{PersistentSafetyStorage, SafetyRulesManager};
 use aptos_secure_storage::Storage;
 use aptos_types::{
     account_address::AccountAddress,
+    epoch_state::EpochState,
     ledger_info::LedgerInfo,
     validator_signer::ValidatorSigner,
     validator_verifier::{random_validator_verifier, ValidatorVerifier},
@@ -153,7 +155,10 @@ pub fn prepare_buffer_manager() -> (
         persisting_proxy,
         block_rx,
         buffer_reset_rx,
-        validators.clone(),
+        Arc::new(EpochState {
+            epoch: 1,
+            verifier: validators.clone(),
+        }),
     );
 
     (
@@ -201,12 +206,13 @@ pub fn launch_buffer_manager() -> (
         result_rx,
         validators,
     ) = prepare_buffer_manager();
+    let bounded_executor = BoundedExecutor::new(1, runtime.handle().clone());
 
     runtime.spawn(execution_schedule_phase_pipeline.start());
     runtime.spawn(execution_wait_phase_pipeline.start());
     runtime.spawn(signing_phase_pipeline.start());
     runtime.spawn(persisting_phase_pipeline.start());
-    runtime.spawn(buffer_manager.start());
+    runtime.spawn(buffer_manager.start(bounded_executor));
 
     (
         block_tx,
@@ -222,12 +228,12 @@ pub fn launch_buffer_manager() -> (
 }
 
 async fn loopback_commit_vote(
-    self_loop_rx: &mut aptos_channels::Receiver<Event<ConsensusMsg>>,
+    msg: Event<ConsensusMsg>,
     msg_tx: &aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
     verifier: &ValidatorVerifier,
 ) {
-    match self_loop_rx.next().await {
-        Some(Event::RpcRequest(author, msg, protocol, callback)) => {
+    match msg {
+        Event::RpcRequest(author, msg, protocol, callback) => {
             if let ConsensusMsg::CommitMessage(msg) = msg {
                 msg.verify(verifier).unwrap();
                 let request = IncomingCommitRequest {
@@ -313,7 +319,9 @@ fn buffer_manager_happy_path_test() {
 
         // commit decision will be sent too, so 3 * 2
         for _ in 0..6 {
-            loopback_commit_vote(&mut self_loop_rx, &msg_tx, &verifier).await;
+            if let Some(msg) = self_loop_rx.next().await {
+                loopback_commit_vote(msg, &msg_tx, &verifier).await;
+            }
         }
 
         // make sure the order is correct
@@ -383,8 +391,8 @@ fn buffer_manager_sync_test() {
 
         // start sending back commit vote after reset, to avoid [0..dropped_batches] being sent to result_rx
         tokio::spawn(async move {
-            loop {
-                loopback_commit_vote(&mut self_loop_rx, &msg_tx, &verifier).await;
+            while let Some(msg) = self_loop_rx.next().await {
+                loopback_commit_vote(msg, &msg_tx, &verifier).await;
             }
         });
 

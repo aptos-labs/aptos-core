@@ -7,7 +7,7 @@ slug: "delegation-pool-operations"
 
 > Beta: This documentation is in experimental, beta mode. Supply feedback by [requesting document changes](../../../community/site-updates.md#request-docs-changes). See also the related [Staking Pool Operations](./staking-pool-operations.md) instructions.
 
-Validator operators should follow these instructions to carry out delegation pool operations for [staking](../../../concepts/staking.md). You may delegate as little as 10 APT plus a small add stake fee that will be mostly refunded as rewards at the end of the current 2-hour epoch. You might notice that some UIs might use 11 APT as the minimum for a round number. Note that your validator will become part of the *Active Validator Set* only when the delegation pool satisfies the minimum cumulative [staking requirement of 1 million APT](./staking-pool-operations.md).
+Validator operators should follow these instructions to carry out delegation pool operations for [delegated staking](../../../concepts/delegated-staking.md). You may delegate as little as 10 APT plus a small add stake fee that will be mostly refunded as rewards at the end of the current 2-hour epoch. You might notice that some UIs might use 11 APT as the minimum for a round number. Note that your validator will become part of the *Active Validator Set* only when the delegation pool satisfies the minimum cumulative [staking requirement of 1 million APT](./staking-pool-operations.md).
 
 The delegation pool owner should set an operator for the pool via the `set_operator` function described in the [Perform pool owner operations](#perform-pool-owner-operations) section. The operator should then start their own Aptos node, as it is a best practice to have a different account for owner and operator. Once the delegation pool attains 1 million APT, the operator can join the validator set.
 
@@ -127,19 +127,19 @@ Until the delegation pool has received 1 million APT and the validator has been 
 
 In the [Aptos TypeScript SDK](../../../sdks/ts-sdk/index.md), a View function request would resemble:
 
-```bash
-import {AptosClient, ViewRequest} from "aptos";
+```ts
+import {Aptos, AptosConfig} from "@aptos-labs/ts-sdk";
 
 const NODE_URL = "https://aptos-testnet.public.blastapi.io";
 
 (async () => {
-    const client = new AptosClient(NODE_URL);
-    const payload: ViewRequest = {
+    const aptosConfig = new AptosConfig({fullnode:NODE_URL})
+    const aptos = new Aptos(aptosConfig);
+    const payload: InputViewRequestData = {
         function: "0x1::delagation_pool::get_stake",
-        type_arguments: [],
-        arguments: ["pool_address", "delegator_address"],
+        functionArguments: ["pool_address", "delegator_address"],
     };
-    console.log(await client.view(payload));
+    console.log(await aptos.view({payload}));
 })();
 
 ```

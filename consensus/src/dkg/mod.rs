@@ -10,10 +10,11 @@ mod tracing;
 
 use crate::dkg::dkg_rounding::DKGRounding;
 use aptos_crypto::bls12381;
-use aptos_dkg::{constants::SEED_PVSS_PUBLIC_PARAMS};
+use aptos_dkg::constants::SEED_PVSS_PUBLIC_PARAMS;
 use aptos_logger::debug;
-use aptos_types::{dkg::{DKGPvssConfig, EncPK, DkgPP}, on_chain_config::ValidatorSet};
-pub use types::{DKGAggNode, DKGMessage, DKGNetworkMessage, DKGNode};
+use aptos_types::{dkg::{DkgPP, DKGPvssConfig, EncPK}, on_chain_config::ValidatorSet};
+pub use aptos_types::dkg::DKGAggNode;
+pub use types::{DKGMessage, DKGNetworkMessage, DKGNode};
 
 pub fn build_dkg_pvss_config(
     cur_epoch: u64,
@@ -57,7 +58,7 @@ pub fn build_dkg_pvss_config(
         .iter()
         .map(|k| k.to_bytes().as_slice().try_into().unwrap())
         .collect::<Vec<_>>();
-    
+
     let wconfig = dkg_rounding.wconfig.clone();
 
     let pp = DkgPP::new_from_seed_with_bls_base(SEED_PVSS_PUBLIC_PARAMS);

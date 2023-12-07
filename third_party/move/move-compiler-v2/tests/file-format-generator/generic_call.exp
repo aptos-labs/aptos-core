@@ -11,7 +11,7 @@ fun Test::foo($t0: u64): u64 {
 [variant baseline]
 fun Test::identity<#0>($t0: #0): #0 {
      var $t1: #0
-  0: $t1 := move($t0)
+  0: $t1 := infer($t0)
   1: return $t1
 }
 

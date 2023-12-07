@@ -39,10 +39,16 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
+use rand::Rng;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
+
+fn unwrap_or_invariant_violation<T>(value: Option<T>, msg: &str) -> Result<T, VMStatus> {
+    value
+        .ok_or_else(|| VMStatus::error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, err_msg(msg)))
+}
 
 /// We finish the session after the user transaction is done running to get the change set and
 /// charge gas and storage fee based on it before running storage refunds and the transaction
@@ -83,8 +89,16 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         .build())
     }
 
-    pub fn execute<R>(&mut self, fun: impl FnOnce(&mut SessionExt) -> R) -> R {
-        self.with_session_mut(|session| fun(session.as_mut().unwrap()))
+    pub fn execute<T>(
+        &mut self,
+        fun: impl FnOnce(&mut SessionExt) -> Result<T, VMStatus>,
+    ) -> Result<T, VMStatus> {
+        self.with_session_mut(|session| {
+            fun(unwrap_or_invariant_violation(
+                session.as_mut(),
+                "VM respawned session has to be set for execution.",
+            )?)
+        })
     }
 
     pub fn finish(
@@ -92,7 +106,12 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<VMChangeSet, VMStatus> {
         let additional_change_set = self.with_session_mut(|session| {
-            session.take().unwrap().finish(&mut (), change_set_configs)
+            unwrap_or_invariant_violation(
+                session.take(),
+                "VM session cannot be finished more than once.",
+            )?
+            .finish(change_set_configs)
+            .map_err(|e| e.into_vm_status())
         })?;
         if additional_change_set.has_creation() {
             // After respawning, for example, in the epilogue, there shouldn't be new slots
@@ -125,16 +144,29 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
 }
 
 // Sporadically checks if the given two input type layouts match
-pub fn assert_layout_matches(
+pub fn randomly_check_layout_matches(
     layout_1: Option<&MoveTypeLayout>,
     layout_2: Option<&MoveTypeLayout>,
 ) -> Result<(), PanicError> {
-    //TODO[agg_v2](optimize): Don't compare the layouts everytime. Do this operation sporadically
-    if layout_1 != layout_2 {
+    if layout_1.is_some() != layout_2.is_some() {
         return Err(code_invariant_error(format!(
             "Layouts don't match when they are expected to: {:?} and {:?}",
             layout_1, layout_2
         )));
+    }
+    if layout_1.is_some() {
+        // Checking if 2 layouts are equal is a recursive operation and is expensive.
+        // We generally call this `randomly_check_layout_matches` function when we know
+        // that the layouts are supposed to match. As an optimization, we only randomly
+        // check if the layouts are matching.
+        let mut rng = rand::thread_rng();
+        let random_number: u32 = rng.gen_range(0, 100);
+        if random_number == 1 && layout_1 != layout_2 {
+            return Err(code_invariant_error(format!(
+                "Layouts don't match when they are expected to: {:?} and {:?}",
+                layout_1, layout_2
+            )));
+        }
     }
     Ok(())
 }
@@ -327,7 +359,7 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
             .get(group_key)
             .and_then(|g| g.inner_ops().get(resource_tag))
         {
-            assert_layout_matches(maybe_layout, layout.as_deref())
+            randomly_check_layout_matches(maybe_layout, layout.as_deref())
                 .map_err(|e| anyhow::anyhow!("get_resource_from_group layout check: {:?}", e))?;
 
             Ok(write_op.extract_raw_bytes())

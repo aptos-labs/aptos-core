@@ -7,8 +7,8 @@ module 0x8675309::M {
         Not(true);
         Not(false);
         Not(x);
-        Not(x);
-        Not(x);
+        Not(Copy(x));
+        Not(Move(x));
         Not(select M::R.f(r));
         {
           let M::R{ f: _ } = r;

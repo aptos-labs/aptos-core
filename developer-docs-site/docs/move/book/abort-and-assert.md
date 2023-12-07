@@ -13,7 +13,7 @@ More information on [`return` can be found in the linked section](./functions.md
 abort 42
 ```
 
-The `abort` expression halts execution the current function and reverts all changes made to global
+The `abort` expression halts execution of the current function and reverts all changes made to global
 state by the current transaction. There is no mechanism for "catching" or otherwise handling an
 `abort`.
 

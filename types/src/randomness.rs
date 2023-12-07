@@ -38,7 +38,7 @@ impl RandMetadata {
     pub fn new(epoch: u64, round: Round, block_id: HashValue, timestamp: u64) -> Self {
         Self { metadata_to_sign: RandMetadataToSign { epoch, round}, block_id, timestamp }
     }
-    
+
     pub fn to_bytes(&self) -> Vec<u8> {
         // only sign (epoch, round) to produce randomness
         bcs::to_bytes(&self.metadata_to_sign).expect("[RandMessage] RandMetadata serialization failed!")

@@ -3,20 +3,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    dkg_types::DKGAggNode,
     proof_of_store::{BatchInfo, ProofOfStore},
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
 use aptos_types::{
-    account_address::AccountAddress, transaction::SignedTransaction,
-    validator_verifier::ValidatorVerifier, vm_status::DiscardedVMStatus, dkg::DKGPvssConfig,
+    account_address::AccountAddress, dkg::DKGPvssConfig,
+    transaction::SignedTransaction, validator_verifier::ValidatorVerifier, vm_status::DiscardedVMStatus,
 };
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fmt, fmt::Write, sync::Arc};
 use tokio::sync::oneshot;
+use aptos_types::dkg::DKGAggNode;
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases
 /// monotonically. It is used for the protocol safety and liveness (please see the detailed

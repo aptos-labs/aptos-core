@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{
-    BYTES_READY_TO_TRANSFER_FROM_SERVER, CONNECTION_COUNT, ERROR_COUNT, LATEST_PROCESSED_VERSION,
-    PROCESSED_BATCH_SIZE, PROCESSED_LATENCY_IN_SECS, PROCESSED_LATENCY_IN_SECS_ALL,
-    PROCESSED_VERSIONS_COUNT, SHORT_CONNECTION_COUNT,
+    BYTES_READY_TO_TRANSFER_FROM_SERVER, CONNECTION_COUNT, ERROR_COUNT,
+    LATEST_PROCESSED_VERSION as LATEST_PROCESSED_VERSION_OLD, PROCESSED_BATCH_SIZE,
+    PROCESSED_LATENCY_IN_SECS, PROCESSED_LATENCY_IN_SECS_ALL, PROCESSED_VERSIONS_COUNT,
+    SHORT_CONNECTION_COUNT,
 };
 use anyhow::Context;
 use aptos_indexer_grpc_utils::{
@@ -15,8 +16,12 @@ use aptos_indexer_grpc_utils::{
     constants::{
         BLOB_STORAGE_SIZE, GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER, MESSAGE_SIZE_LIMIT,
     },
+    counters::{
+        IndexerGrpcStep, DURATION_IN_SECS, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_COUNT,
+        TOTAL_SIZE_IN_BYTES, TRANSACTION_UNIX_TIMESTAMP,
+    },
     file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
-    time_diff_since_pb_timestamp_in_secs,
+    time_diff_since_pb_timestamp_in_secs, timestamp_to_unixtime,
     types::RedisUrl,
     EncodedTransactionWithVersion,
 };
@@ -29,7 +34,12 @@ use aptos_protos::{
 use futures::Stream;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, pin::Pin, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    pin::Pin,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::sync::mpsc::{channel, error::SendTimeoutError};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -63,6 +73,7 @@ const SHORT_CONNECTION_DURATION_IN_SECS: u64 = 10;
 const REQUEST_HEADER_APTOS_EMAIL_HEADER: &str = "x-aptos-email";
 const REQUEST_HEADER_APTOS_USER_CLASSIFICATION_HEADER: &str = "x-aptos-user-classification";
 const REQUEST_HEADER_APTOS_API_KEY_NAME: &str = "x-aptos-api-key-name";
+const SERVICE_TYPE: &str = "data_service";
 
 pub struct RawDataServerWrapper {
     pub redis_client: Arc<redis::Client>,
@@ -236,6 +247,7 @@ impl RawData for RawDataServerWrapper {
 
                 loop {
                     // 1. Fetch data from cache and file store.
+                    let current_batch_start_time = std::time::Instant::now();
                     let mut transaction_data = match data_fetch(
                         current_version,
                         &mut cache_operator,
@@ -304,7 +316,13 @@ impl RawData for RawDataServerWrapper {
                         .as_ref()
                         .map(time_diff_since_pb_timestamp_in_secs);
 
-                    match channel_send_multiple_with_timeout(resp_items, tx.clone()).await {
+                    match channel_send_multiple_with_timeout(
+                        resp_items,
+                        tx.clone(),
+                        current_batch_start_time,
+                    )
+                    .await
+                    {
                         Ok(_) => {
                             PROCESSED_BATCH_SIZE
                                 .with_label_values(&[
@@ -313,7 +331,8 @@ impl RawData for RawDataServerWrapper {
                                     request_metadata.processor_name.as_str(),
                                 ])
                                 .set(current_batch_size as i64);
-                            LATEST_PROCESSED_VERSION
+                            // TODO: Reasses whether this metric useful
+                            LATEST_PROCESSED_VERSION_OLD
                                 .with_label_values(&[
                                     request_metadata.request_api_key_name.as_str(),
                                     request_metadata.request_email.as_str(),
@@ -422,6 +441,7 @@ async fn data_fetch(
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
     file_store_operator: &dyn FileStoreOperator,
 ) -> anyhow::Result<TransactionsDataStatus> {
+    let start_time = std::time::Instant::now();
     let batch_get_result = cache_operator
         .batch_get_encoded_proto_data(starting_version)
         .await;
@@ -429,17 +449,91 @@ async fn data_fetch(
     match batch_get_result {
         // Data is not ready yet in the cache.
         Ok(CacheBatchGetStatus::NotReady) => Ok(TransactionsDataStatus::AheadOfCache),
-        Ok(CacheBatchGetStatus::Ok(transactions)) => Ok(TransactionsDataStatus::Success(
-            build_protobuf_encoded_transaction_wrappers(transactions, starting_version),
-        )),
+        Ok(CacheBatchGetStatus::Ok(transactions)) => {
+            let size_in_bytes = transactions
+                .iter()
+                .map(|transaction| transaction.len())
+                .sum::<usize>();
+            let num_of_transactions = transactions.len();
+            let duration_in_secs = start_time.elapsed().as_secs_f64();
+
+            LATEST_PROCESSED_VERSION
+                .with_label_values(&[
+                    SERVICE_TYPE,
+                    IndexerGrpcStep::DataServiceDataFetchedCache.get_step(),
+                    IndexerGrpcStep::DataServiceDataFetchedCache.get_label(),
+                ])
+                .set((starting_version + num_of_transactions as u64 - 1) as i64);
+            NUM_TRANSACTIONS_COUNT
+                .with_label_values(&[
+                    SERVICE_TYPE,
+                    IndexerGrpcStep::DataServiceDataFetchedCache.get_step(),
+                    IndexerGrpcStep::DataServiceDataFetchedCache.get_label(),
+                ])
+                .set(num_of_transactions as i64);
+            TOTAL_SIZE_IN_BYTES
+                .with_label_values(&[
+                    SERVICE_TYPE,
+                    IndexerGrpcStep::DataServiceDataFetchedCache.get_step(),
+                    IndexerGrpcStep::DataServiceDataFetchedCache.get_label(),
+                ])
+                .set(size_in_bytes as i64);
+            DURATION_IN_SECS
+                .with_label_values(&[
+                    SERVICE_TYPE,
+                    IndexerGrpcStep::DataServiceDataFetchedCache.get_step(),
+                    IndexerGrpcStep::DataServiceDataFetchedCache.get_label(),
+                ])
+                .set(duration_in_secs);
+
+            Ok(TransactionsDataStatus::Success(
+                build_protobuf_encoded_transaction_wrappers(transactions, starting_version),
+            ))
+        },
         Ok(CacheBatchGetStatus::EvictedFromCache) => {
             // Data is evicted from the cache. Fetch from file store.
             let file_store_batch_get_result =
                 file_store_operator.get_transactions(starting_version).await;
             match file_store_batch_get_result {
-                Ok(transactions) => Ok(TransactionsDataStatus::Success(
-                    build_protobuf_encoded_transaction_wrappers(transactions, starting_version),
-                )),
+                Ok(transactions) => {
+                    let size_in_bytes = transactions
+                        .iter()
+                        .map(|transaction| transaction.len())
+                        .sum::<usize>();
+                    let num_of_transactions = transactions.len();
+                    let duration_in_secs = start_time.elapsed().as_secs_f64();
+                    LATEST_PROCESSED_VERSION
+                        .with_label_values(&[
+                            SERVICE_TYPE,
+                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_step(),
+                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_label(),
+                        ])
+                        .set((starting_version + num_of_transactions as u64 - 1) as i64);
+                    NUM_TRANSACTIONS_COUNT
+                        .with_label_values(&[
+                            SERVICE_TYPE,
+                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_step(),
+                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_label(),
+                        ])
+                        .set(num_of_transactions as i64);
+                    TOTAL_SIZE_IN_BYTES
+                        .with_label_values(&[
+                            SERVICE_TYPE,
+                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_step(),
+                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_label(),
+                        ])
+                        .set(size_in_bytes as i64);
+                    DURATION_IN_SECS
+                        .with_label_values(&[
+                            SERVICE_TYPE,
+                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_step(),
+                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_label(),
+                        ])
+                        .set(duration_in_secs);
+                    Ok(TransactionsDataStatus::Success(
+                        build_protobuf_encoded_transaction_wrappers(transactions, starting_version),
+                    ))
+                },
                 Err(e) => {
                     if e.to_string().contains("Transactions file not found") {
                         Ok(TransactionsDataStatus::DataGap)
@@ -519,21 +613,113 @@ fn get_request_metadata(req: &Request<GetTransactionsRequest>) -> tonic::Result<
 async fn channel_send_multiple_with_timeout(
     resp_items: Vec<TransactionsResponse>,
     tx: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
+    current_batch_start_time: Instant,
 ) -> Result<(), SendTimeoutError<Result<TransactionsResponse, Status>>> {
+    let overall_size_in_bytes = resp_items
+        .iter()
+        .map(|resp_item| resp_item.encoded_len())
+        .sum::<usize>();
+    let overall_start_txn = resp_items.first().unwrap().transactions.first().unwrap();
+    let overall_end_txn = resp_items.last().unwrap().transactions.last().unwrap();
+    let overall_start_version = overall_start_txn.version;
+    let overall_end_version = overall_end_txn.version;
+    let overall_end_txn_timestamp = overall_end_txn.clone().timestamp;
+
     for resp_item in resp_items {
         let current_instant = std::time::Instant::now();
+        let response_size = resp_item.encoded_len();
+        let num_of_transactions = resp_item.transactions.len();
+        let end_version = resp_item.transactions.last().unwrap().version;
+        let end_version_txn_timestamp = resp_item
+            .transactions
+            .last()
+            .unwrap()
+            .timestamp
+            .as_ref()
+            .unwrap();
+
         tx.send_timeout(
-            Result::<TransactionsResponse, Status>::Ok(resp_item),
+            Result::<TransactionsResponse, Status>::Ok(resp_item.clone()),
             RESPONSE_CHANNEL_SEND_TIMEOUT,
         )
         .await?;
-        sample!(
-            SampleRate::Duration(Duration::from_secs(60)),
-            info!(
-                "[data service] response waiting time in seconds: {}",
-                current_instant.elapsed().as_secs_f64()
-            );
-        );
+
+        LATEST_PROCESSED_VERSION
+            .with_label_values(&[
+                SERVICE_TYPE,
+                IndexerGrpcStep::DataServiceChunkSent.get_step(),
+                IndexerGrpcStep::DataServiceChunkSent.get_label(),
+            ])
+            .set(end_version as i64);
+        TRANSACTION_UNIX_TIMESTAMP
+            .with_label_values(&[
+                SERVICE_TYPE,
+                IndexerGrpcStep::DataServiceChunkSent.get_step(),
+                IndexerGrpcStep::DataServiceChunkSent.get_label(),
+            ])
+            .set(timestamp_to_unixtime(end_version_txn_timestamp));
+        NUM_TRANSACTIONS_COUNT
+            .with_label_values(&[
+                SERVICE_TYPE,
+                IndexerGrpcStep::DataServiceChunkSent.get_step(),
+                IndexerGrpcStep::DataServiceChunkSent.get_label(),
+            ])
+            .set(num_of_transactions as i64);
+        TOTAL_SIZE_IN_BYTES
+            .with_label_values(&[
+                SERVICE_TYPE,
+                IndexerGrpcStep::DataServiceChunkSent.get_step(),
+                IndexerGrpcStep::DataServiceChunkSent.get_label(),
+            ])
+            .set(response_size as i64);
+        DURATION_IN_SECS
+            .with_label_values(&[
+                SERVICE_TYPE,
+                IndexerGrpcStep::DataServiceChunkSent.get_step(),
+                IndexerGrpcStep::DataServiceChunkSent.get_label(),
+            ])
+            .set(current_instant.elapsed().as_secs_f64());
     }
+
+    LATEST_PROCESSED_VERSION
+        .with_label_values(&[
+            SERVICE_TYPE,
+            IndexerGrpcStep::DataServiceAllChunksSent.get_step(),
+            IndexerGrpcStep::DataServiceAllChunksSent.get_label(),
+        ])
+        .set(overall_end_version as i64);
+    TRANSACTION_UNIX_TIMESTAMP
+        .with_label_values(&[
+            SERVICE_TYPE,
+            IndexerGrpcStep::DataServiceAllChunksSent.get_step(),
+            IndexerGrpcStep::DataServiceAllChunksSent.get_label(),
+        ])
+        .set(
+            overall_end_txn_timestamp
+                .map(|t| timestamp_to_unixtime(&t))
+                .unwrap_or_default(),
+        );
+    NUM_TRANSACTIONS_COUNT
+        .with_label_values(&[
+            SERVICE_TYPE,
+            IndexerGrpcStep::DataServiceAllChunksSent.get_step(),
+            IndexerGrpcStep::DataServiceAllChunksSent.get_label(),
+        ])
+        .set((overall_end_version - overall_start_version + 1) as i64);
+    TOTAL_SIZE_IN_BYTES
+        .with_label_values(&[
+            SERVICE_TYPE,
+            IndexerGrpcStep::DataServiceAllChunksSent.get_step(),
+            IndexerGrpcStep::DataServiceAllChunksSent.get_label(),
+        ])
+        .set(overall_size_in_bytes as i64);
+    DURATION_IN_SECS
+        .with_label_values(&[
+            SERVICE_TYPE,
+            IndexerGrpcStep::DataServiceAllChunksSent.get_step(),
+            IndexerGrpcStep::DataServiceAllChunksSent.get_label(),
+        ])
+        .set(current_batch_start_time.elapsed().as_secs_f64());
+
     Ok(())
 }
