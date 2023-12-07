@@ -93,7 +93,7 @@ Processor::CoinProcessor => {
 
 Even though the new processors have the same Postgres schemas as the old ones, we recommend you do a complete backfill (ideally writing to a new DB altogether) because some fields are a bit different as a result of the protobuf conversion.
 
-These instructions asusme you are familar with using [Diesel migrations](https://docs.rs/diesel_migrations/latest/diesel_migrations/). Run the full database migration with the following command:
+These instructions assume you are familar with using [Diesel migrations](https://docs.rs/diesel_migrations/latest/diesel_migrations/). Run the full database migration with the following command:
 
 ```
 DATABASE_URL=postgres://postgres@localhost:5432/postgres diesel migration run
