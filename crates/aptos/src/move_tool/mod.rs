@@ -8,6 +8,7 @@ mod manifest;
 pub mod package_hooks;
 mod show;
 pub mod stored_package;
+mod transactional_tests_runner;
 
 use crate::{
     account::derive_resource_account::ResourceAccountSeed,
@@ -40,6 +41,7 @@ use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
 use aptos_rest_client::aptos_api_types::{
     EntryFunctionId, HexEncodedBytes, IdentifierWrapper, MoveModuleId,
 };
+use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     transaction::{TransactionArgument, TransactionPayload},
@@ -65,6 +67,7 @@ use std::{
 };
 pub use stored_package::*;
 use tokio::task;
+use transactional_tests_runner::TransactionalTestOpts;
 
 /// Tool for Move related operations
 ///
@@ -92,6 +95,7 @@ pub enum MoveTool {
     #[clap(subcommand, hide = true)]
     Show(show::ShowTool),
     Test(TestPackage),
+    TransactionalTest(TransactionalTestOpts),
     VerifyPackage(VerifyPackage),
     View(ViewFunction),
 }
@@ -118,6 +122,7 @@ impl MoveTool {
             MoveTool::RunScript(tool) => tool.execute_serialized().await,
             MoveTool::Show(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
+            MoveTool::TransactionalTest(tool) => tool.execute_serialized_success().await,
             MoveTool::VerifyPackage(tool) => tool.execute_serialized().await,
             MoveTool::View(tool) => tool.execute_serialized().await,
         }
@@ -506,6 +511,26 @@ impl CliCommand<&'static str> for TestPackage {
             UnitTestResult::Success => Ok("Success"),
             UnitTestResult::Failure => Err(CliError::MoveTestError),
         }
+    }
+}
+
+#[async_trait]
+impl CliCommand<()> for TransactionalTestOpts {
+    fn command_name(&self) -> &'static str {
+        "TransactionalTest"
+    }
+
+    async fn execute(self) -> CliTypedResult<()> {
+        let root_path = self.root_path.display().to_string();
+
+        let requirements = vec![transactional_tests_runner::Requirements::new(
+            run_aptos_test,
+            "tests".to_string(),
+            root_path,
+            self.pattern.clone(),
+        )];
+
+        transactional_tests_runner::runner(&self, &requirements)
     }
 }
 

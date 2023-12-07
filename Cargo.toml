@@ -22,6 +22,7 @@ members = [
     "aptos-move/aptos-resource-viewer",
     "aptos-move/aptos-sdk-builder",
     "aptos-move/aptos-transaction-benchmarks",
+    "aptos-move/aptos-transactional-test-harness",
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
     "aptos-move/aptos-vm-benchmarks",
@@ -417,6 +418,7 @@ aptos-time-service = { path = "crates/aptos-time-service", features = [
 ] }
 aptos-transaction-emitter-lib = { path = "crates/transaction-emitter-lib" }
 aptos-transaction-generator-lib = { path = "crates/transaction-generator-lib" }
+aptos-transactional-test-harness = { path = "aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "types" }
 aptos-utils = { path = "aptos-utils" }
 aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }

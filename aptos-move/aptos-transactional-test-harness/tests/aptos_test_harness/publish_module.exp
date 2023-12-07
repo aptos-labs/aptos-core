@@ -1,0 +1,4 @@
+processed 2 tasks
+
+task 1 'publish'. lines 4-9:
+Error: Failed to execute transaction. ExecutionStatus: OutOfGas
