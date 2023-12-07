@@ -163,6 +163,10 @@ impl<P> ShareAck<P> {
         }
     }
 
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
     pub fn into_maybe_decision(self) -> Option<RandDecision<P>> {
         self.maybe_decision
     }
@@ -190,6 +194,10 @@ impl<D> AugData<D> {
         }
     }
 
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
     pub fn id(&self) -> AugDataId {
         AugDataId {
             epoch: self.epoch,
@@ -200,12 +208,17 @@ impl<D> AugData<D> {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct AugDataSignature {
+    epoch: u64,
     signature: Signature,
 }
 
 impl AugDataSignature {
-    pub fn new(signature: Signature) -> Self {
-        Self { signature }
+    pub fn new(epoch: u64, signature: Signature) -> Self {
+        Self { epoch, signature }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
     }
 
     pub fn verify<D: AugmentedData>(
@@ -236,6 +249,10 @@ impl<D> CertifiedAugData<D> {
         }
     }
 
+    pub fn epoch(&self) -> u64 {
+        self.aug_data.epoch()
+    }
+
     pub fn id(&self) -> AugDataId {
         self.aug_data.id()
     }
@@ -244,6 +261,16 @@ impl<D> CertifiedAugData<D> {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CertifiedAugDataAck {
     epoch: u64,
+}
+
+impl CertifiedAugDataAck {
+    pub fn new(epoch: u64) -> Self {
+        Self { epoch }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
 }
 
 pub struct RandConfig {
