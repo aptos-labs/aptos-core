@@ -2134,6 +2134,44 @@ pub fn inst_abilities(
     }
 }
 
+pub fn check_struct_inst<F, G, H>(
+    mid: ModuleId,
+    sid: StructId,
+    insts: &[Type],
+    loc: Option<&Loc>,
+    ty_param_abilities: F,
+    get_abilities: G,
+    on_err: H,
+    check: bool,
+) -> AbilitySet
+where
+    F: Fn(u16) -> AbilitySet + Copy,
+    G: Fn(ModuleId, StructId) -> (Vec<AbilitySet>, AbilitySet) + Copy,
+    H: Fn(&Loc, &str) -> () + Copy,
+{
+    let (generic_constraints, struct_abilities) = get_abilities(mid, sid);
+    let insts_abilities_meet = insts
+        .iter()
+        .zip(generic_constraints)
+        .map(|(inst_ty, constraints)| {
+            let inst_abilities = check_instantiation(
+                inst_ty,
+                loc,
+                ty_param_abilities,
+                get_abilities,
+                on_err,
+                check,
+            );
+            if check {
+                if !constraints.is_subset(inst_abilities) {
+                    on_err(loc.expect("loc"), &format!("Invalid instantiation"))
+                }
+            }
+            inst_abilities
+        })
+        .fold(AbilitySet::ALL, AbilitySet::intersect);
+    inst_abilities(struct_abilities, insts_abilities_meet)
+}
 
 /// checks for type instantiations if `check` is set
 /// - the type arguments given to the struct are instantiated properly
@@ -2141,11 +2179,18 @@ pub fn inst_abilities(
 /// and returns the abilities of the type
 /// `ty_param_abilities` specify the abilities of type parameters
 /// `get_abilities` returns the abilities for the geneircs, and the abilities of the struct
-pub fn check_instantiation<F, G, H>(ty: &Type, loc: Option<&Loc>, ty_param_abilities: F, get_abilities: G, on_err: H, check: bool) -> AbilitySet
+pub fn check_instantiation<F, G, H>(
+    ty: &Type,
+    loc: Option<&Loc>,
+    ty_param_abilities: F,
+    get_abilities: G,
+    on_err: H,
+    check: bool,
+) -> AbilitySet
 where
     F: Fn(u16) -> AbilitySet + Copy,
     G: Fn(ModuleId, StructId) -> (Vec<AbilitySet>, AbilitySet) + Copy,
-    H: Fn(&Loc, &str) -> () + Copy
+    H: Fn(&Loc, &str) -> () + Copy,
 {
     match ty {
         Type::Primitive(p) => match p {
@@ -2162,32 +2207,25 @@ where
             | PrimitiveType::Address => AbilitySet::PRIMITIVES,
             PrimitiveType::Signer => AbilitySet::SIGNER,
         },
-        Type::Vector(et) => AbilitySet::VECTOR.intersect(check_instantiation(et, loc, ty_param_abilities, get_abilities, on_err, check)),
-        Type::Struct(mid, sid, insts) => {
-            let (generic_constraints, struct_abilities) = get_abilities(*mid, *sid);
-            let insts_abilities_meet = insts
-                .iter()
-                .zip(generic_constraints)
-                .map(|(inst_ty, constraints)| {
-                    let inst_abilities = check_instantiation(inst_ty, loc, ty_param_abilities, get_abilities, on_err, check);
-                    if check {
-                        if !constraints.is_subset(inst_abilities) {
-                            on_err(
-                                loc.expect("loc"),
-                                &format!(
-                                    "Invalid instantiation"
-                                )
-                            )
-                        }
-                    }
-                    inst_abilities
-                })
-                .fold(AbilitySet::ALL, AbilitySet::intersect);
-            inst_abilities(struct_abilities, insts_abilities_meet)
-        },
-        Type::TypeParameter(i) => {
-            ty_param_abilities(*i)
-        },
+        Type::Vector(et) => AbilitySet::VECTOR.intersect(check_instantiation(
+            et,
+            loc,
+            ty_param_abilities,
+            get_abilities,
+            on_err,
+            check,
+        )),
+        Type::Struct(mid, sid, insts) => check_struct_inst(
+            *mid,
+            *sid,
+            insts,
+            loc,
+            ty_param_abilities,
+            get_abilities,
+            on_err,
+            check,
+        ),
+        Type::TypeParameter(i) => ty_param_abilities(*i),
         Type::Reference(_, _) => AbilitySet::REFERENCES,
         Type::Fun(_, _)
         | Type::Tuple(_)
