@@ -7298,6 +7298,7 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-language-e2e-tests",
  "aptos-package-builder",
+ "aptos-transaction-generator-lib",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-types",
