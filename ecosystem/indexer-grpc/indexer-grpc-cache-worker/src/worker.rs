@@ -29,11 +29,11 @@ use url::Url;
 type ChainID = u32;
 type StartingVersion = u64;
 
-const GCS_LOOKUP_FREQUENCY_IN_SECS: u64 = 60;
 const FILE_STORE_VERSIONS_RESERVED: u64 = 30_000;
 // Cache worker will wait if filestore is behind by
 // `FILE_STORE_VERSIONS_RESERVED` versions
-const CACHE_WORKER_WAIT_FOR_FILE_STORE_IN_SECS: u64 = 1;
+// Reducing this could spam the gcs metadata file so keeping it to once every 5 seconds for now (per cache worker)
+const CACHE_WORKER_WAIT_FOR_FILE_STORE_IN_SECS: u64 = 5;
 
 const SERVICE_TYPE: &str = "cache_worker";
 
@@ -250,7 +250,7 @@ async fn process_transactions_from_node_response(
     }
 }
 
-/// Setup the cache operator with init signal, includeing chain id and starting version from fullnode.
+//// Setup the cache operator with init signal, includeing chain id and starting version from fullnode.
 async fn setup_cache_with_init_signal(
     conn: redis::aio::ConnectionManager,
     init_signal: TransactionsFromNodeResponse,
@@ -288,7 +288,7 @@ async fn setup_cache_with_init_signal(
     Ok((cache_operator, fullnode_chain_id, starting_version))
 }
 
-// Infinite streaming processing. Retry if error happens; crash if fatal.
+/// Infinite streaming processing. Retry if error happens; crash if fatal.
 async fn process_streaming_response(
     conn: redis::aio::ConnectionManager,
     file_store_metadata: Option<FileStoreMetadata>,
@@ -321,7 +321,6 @@ async fn process_streaming_response(
     }
     let mut current_version = starting_version;
     let mut starting_time = std::time::Instant::now();
-    let mut last_file_update_check_timestamp = std::time::Instant::now();
 
     // 4. Process the streaming response.
     while let Some(received) = resp_stream.next().await {
@@ -433,22 +432,19 @@ async fn process_streaming_response(
         }
 
         // Check if the file store has been updated.
-        if last_file_update_check_timestamp.elapsed().as_secs() >= GCS_LOOKUP_FREQUENCY_IN_SECS {
-            let file_store_metadata = file_store_operator.get_file_store_metadata().await;
-            if let Some(file_store_metadata) = file_store_metadata {
-                if file_store_metadata.version + FILE_STORE_VERSIONS_RESERVED < current_version {
-                    tokio::time::sleep(std::time::Duration::from_secs(
-                        CACHE_WORKER_WAIT_FOR_FILE_STORE_IN_SECS,
-                    ))
-                    .await;
-                    tracing::warn!(
-                        current_version = current_version,
-                        file_store_version = file_store_metadata.version,
-                        "[Indexer Cache] File store version is behind current version too much."
-                    );
-                }
+        let file_store_metadata = file_store_operator.get_file_store_metadata().await;
+        if let Some(file_store_metadata) = file_store_metadata {
+            if file_store_metadata.version + FILE_STORE_VERSIONS_RESERVED < current_version {
+                tokio::time::sleep(std::time::Duration::from_secs(
+                    CACHE_WORKER_WAIT_FOR_FILE_STORE_IN_SECS,
+                ))
+                .await;
+                tracing::warn!(
+                    current_version = current_version,
+                    file_store_version = file_store_metadata.version,
+                    "[Indexer Cache] File store version is behind current version too much."
+                );
             }
-            last_file_update_check_timestamp = std::time::Instant::now();
         }
     }
 
