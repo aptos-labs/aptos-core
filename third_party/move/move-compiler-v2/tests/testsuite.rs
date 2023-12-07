@@ -84,12 +84,13 @@ impl TestConfig {
         if path.contains("/folding/") || path.contains("/inlining/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
             pipeline.add_processor(Box::new(VisibilityChecker {}));
+            pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             Self {
                 type_check_only: false,
                 dump_ast: true,
                 pipeline,
                 generate_file_format: false,
-                dump_annotated_targets: false,
+                dump_annotated_targets: verbose,
             }
         } else if path.contains("/unit_test/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));

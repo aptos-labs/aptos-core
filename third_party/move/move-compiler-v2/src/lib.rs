@@ -66,7 +66,7 @@ pub fn run_move_compiler(
     check_errors(&env, error_writer, "code generation errors")?;
     // Run transformation pipeline
     let pipeline = bytecode_pipeline(&env);
-    if options.dump_bytecode {
+    if options.debug || options.dump_bytecode {
         // Dump bytecode to files, using a basename for the individual sources derived
         // from the first input file.
         let dump_base_name = options
@@ -78,7 +78,7 @@ pub fn run_move_compiler(
                     .map(|f| f.to_string_lossy().as_ref().to_owned())
             })
             .unwrap_or_else(|| "dump".to_owned());
-        pipeline.run_with_dump(&env, &mut targets, &dump_base_name, false)
+        pipeline.run_with_dump(&env, &mut targets, &dump_base_name, options.debug)
     } else {
         pipeline.run(&env, &mut targets)
     }
