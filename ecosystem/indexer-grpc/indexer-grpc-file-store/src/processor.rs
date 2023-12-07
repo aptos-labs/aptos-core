@@ -27,6 +27,7 @@ use tracing::info;
 
 // If the version is ahead of the cache head, retry after a short sleep.
 const AHEAD_OF_CACHE_SLEEP_DURATION_IN_MILLIS: u64 = 100;
+const LARGE_FILE_BYTES_COUNT: usize = 100_000_000;
 const SERVICE_TYPE: &str = "file_worker";
 
 /// Processor tails the data in cache and stores the data in file store.
@@ -143,13 +144,24 @@ impl Processor {
 
             // If not hit the head, we want to collect more transactions.
             if !hit_head && transactions_buffer.len() < 10 * BLOB_STORAGE_SIZE {
-                // If we haven't hit the head, we want to collect more transactions.
-                continue;
+                let total_size = transactions_buffer.iter().map(|t| t.0.len()).sum::<usize>();
+                // If we haven't hit the head and transactions are small,
+                // we want to collect more transactions.
+                if total_size < LARGE_FILE_BYTES_COUNT {
+                    // Skip only when current transactions are small.
+                    continue;
+                }
             }
             // If hit the head, we want to collect at least one batch of transactions.
             if hit_head && transactions_buffer.len() < BLOB_STORAGE_SIZE {
                 continue;
             }
+
+            // Final check to make sure the transactions buffer contains enough transactions.
+            if transactions_buffer.len() < BLOB_STORAGE_SIZE {
+                continue;
+            }
+
             // Drain the transactions buffer and upload to file store in size of multiple of BLOB_STORAGE_SIZE.
             let process_size = transactions_buffer.len() / BLOB_STORAGE_SIZE * BLOB_STORAGE_SIZE;
             let current_batch: Vec<EncodedTransactionWithVersion> =
