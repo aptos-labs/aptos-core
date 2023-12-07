@@ -29,8 +29,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet},
 };
 use bytes::Bytes;
-use move_binary_format::CompiledModule;
-use move_bytecode_utils::viewer::ModuleViewer;
+use move_bytecode_utils::viewer::CompiledModuleViewer;
 use move_core_types::{
     ident_str,
     language_storage::{StructTag, TypeTag},
@@ -87,7 +86,7 @@ impl Indexer {
         self.index_with_annotator(&annotator, first_version, write_sets)
     }
 
-    pub fn index_with_annotator<R: ModuleViewer<Error = anyhow::Error, Item = CompiledModule>>(
+    pub fn index_with_annotator<R: CompiledModuleViewer>(
         &self,
         annotator: &MoveValueAnnotator<R>,
         first_version: Version,
@@ -158,7 +157,7 @@ struct TableInfoParser<'a, R> {
     pending_on: HashMap<TableHandle, Vec<Bytes>>,
 }
 
-impl<'a, R: ModuleViewer<Error = anyhow::Error, Item = CompiledModule>> TableInfoParser<'a, R> {
+impl<'a, R: CompiledModuleViewer> TableInfoParser<'a, R> {
     pub fn new(indexer: &'a Indexer, annotator: &'a MoveValueAnnotator<R>) -> Self {
         Self {
             indexer,
