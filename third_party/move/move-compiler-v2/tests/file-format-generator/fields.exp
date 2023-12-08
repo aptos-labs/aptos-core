@@ -169,7 +169,7 @@ fun fields::write_local_direct(): fields::S {
      # live vars: $t3, $t4
   3: $t2 := pack fields::S($t3, $t4)
      # live vars: $t2
-  4: $t1 := move($t2)
+  4: $t1 := copy($t2)
      # live vars: $t1
   5: $t6 := 42
      # live vars: $t1, $t6
@@ -181,7 +181,7 @@ fun fields::write_local_direct(): fields::S {
      # live vars: $t1, $t6, $t7
   9: write_ref($t7, $t6)
      # live vars: $t1
- 10: $t0 := move($t1)
+ 10: $t0 := copy($t1)
      # live vars: $t0
  11: return $t0
 }
@@ -209,7 +209,7 @@ fun fields::write_local_via_ref(): fields::S {
      # live vars: $t3, $t4
   3: $t2 := pack fields::S($t3, $t4)
      # live vars: $t2
-  4: $t1 := move($t2)
+  4: $t1 := copy($t2)
      # live vars: $t1
   5: $t7 := borrow_local($t1)
      # live vars: $t1, $t7
@@ -223,7 +223,7 @@ fun fields::write_local_via_ref(): fields::S {
      # live vars: $t1, $t8, $t9
  10: write_ref($t9, $t8)
      # live vars: $t1
- 11: $t0 := move($t1)
+ 11: $t0 := copy($t1)
      # live vars: $t0
  12: return $t0
 }
@@ -265,7 +265,7 @@ fun fields::write_val($t0: fields::S): fields::S {
      # live vars: $t0, $t2, $t3
   4: write_ref($t3, $t2)
      # live vars: $t0
-  5: $t1 := move($t0)
+  5: $t1 := copy($t0)
      # live vars: $t1
   6: return $t1
 }
@@ -312,7 +312,7 @@ B0:
 	7: MutBorrowField[0](S.g: T)
 	8: MutBorrowField[1](T.h: u64)
 	9: WriteRef
-	10: MoveLoc[0](loc0: S)
+	10: CopyLoc[0](loc0: S)
 	11: StLoc[1](loc1: S)
 	12: MoveLoc[1](loc1: S)
 	13: Ret
@@ -334,7 +334,7 @@ B0:
 	9: MutBorrowField[0](S.g: T)
 	10: MutBorrowField[1](T.h: u64)
 	11: WriteRef
-	12: MoveLoc[0](loc0: S)
+	12: CopyLoc[0](loc0: S)
 	13: StLoc[2](loc2: S)
 	14: MoveLoc[2](loc2: S)
 	15: Ret
@@ -355,7 +355,7 @@ B0:
 	2: MutBorrowField[0](S.g: T)
 	3: MutBorrowField[1](T.h: u64)
 	4: WriteRef
-	5: MoveLoc[0](Arg0: S)
+	5: CopyLoc[0](Arg0: S)
 	6: StLoc[1](loc0: S)
 	7: MoveLoc[1](loc0: S)
 	8: Ret
