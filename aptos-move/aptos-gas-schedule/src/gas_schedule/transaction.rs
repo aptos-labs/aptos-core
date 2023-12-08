@@ -9,9 +9,6 @@ use aptos_gas_algebra::{
     AbstractValueSize, Fee, FeePerByte, FeePerGasUnit, FeePerSlot, Gas, GasExpression,
     GasScalingFactor, GasUnit, NumSlots,
 };
-use aptos_types::{
-    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
-};
 use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumBytes, ToUnitWithParams,
 };
@@ -192,51 +189,6 @@ impl TransactionGasParameters {
             0 => 1.into(),
             x => x.into(),
         }
-    }
-
-    pub fn storage_fee_for_slot(&self, op_size: &WriteOpSize) -> Fee {
-        use WriteOpSize::*;
-
-        match op_size {
-            Creation { .. } => self.storage_fee_per_state_slot_create * NumSlots::new(1),
-            Modification { .. } | Deletion | DeletionWithDeposit { .. } => 0.into(),
-        }
-    }
-
-    pub fn storage_fee_refund_for_slot(&self, op_size: &WriteOpSize) -> Fee {
-        op_size.deletion_deposit().map_or(0.into(), Fee::new)
-    }
-
-    /// Maybe value size is None for deletion Ops.
-    pub fn storage_fee_for_bytes(&self, key: &StateKey, op_size: &WriteOpSize) -> Fee {
-        if let Some(value_size) = op_size.write_len() {
-            let size = NumBytes::new(key.size() as u64) + NumBytes::new(value_size);
-            if let Some(excess) = size.checked_sub(self.free_write_bytes_quota) {
-                return excess * self.storage_fee_per_excess_state_byte;
-            }
-        }
-
-        0.into()
-    }
-
-    /// New formula to charge storage fee for an event, measured in APT.
-    pub fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee {
-        NumBytes::new(event.size() as u64) * self.storage_fee_per_event_byte
-    }
-
-    pub fn storage_discount_for_events(&self, total_cost: Fee) -> Fee {
-        std::cmp::min(
-            total_cost,
-            self.free_event_bytes_quota * self.storage_fee_per_event_byte,
-        )
-    }
-
-    /// New formula to charge storage fee for transaction, measured in APT.
-    pub fn storage_fee_for_transaction_storage(&self, txn_size: NumBytes) -> Fee {
-        txn_size
-            .checked_sub(self.large_transaction_cutoff)
-            .unwrap_or(NumBytes::zero())
-            * self.storage_fee_per_transaction_byte
     }
 
     /// Calculate the intrinsic gas for the transaction based upon its size in bytes.
