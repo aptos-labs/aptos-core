@@ -33,7 +33,7 @@ impl<D, Storage: AugDataStorage<D>> AugDataStore<D, Storage> {
         (to_remove, to_keep)
     }
 
-    pub fn new(epoch: u64, db: Arc<Storage>, config: RandConfig) -> Self {
+    pub fn new(epoch: u64, config: RandConfig, db: Arc<Storage>) -> Self {
         let all_data = db.get_all_aug_data().unwrap_or_default();
         let (to_remove, aug_data) = Self::filter_by_epoch(epoch, all_data.into_iter());
         if let Err(e) = db.remove_aug_data(to_remove.into_iter()) {
