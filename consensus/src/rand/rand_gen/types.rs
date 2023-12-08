@@ -18,6 +18,9 @@ pub(super) struct MockShare;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub(super) struct MockProof;
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub(super) struct MockAugData;
+
 impl Share for MockShare {
     fn verify(
         &self,
@@ -48,6 +51,8 @@ impl Proof for MockProof {
     }
 }
 
+impl AugmentedData for MockAugData {}
+
 pub trait Share:
     Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned + 'static
 {
@@ -74,7 +79,7 @@ pub trait AugmentedData:
 {
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct ShareId {
     epoch: u64,
     round: Round,
@@ -173,7 +178,7 @@ impl<P> ShareAck<P> {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Hash, Eq)]
 pub struct AugDataId {
     epoch: u64,
     author: Author,
