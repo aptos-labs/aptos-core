@@ -8,10 +8,12 @@ use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey};
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::StructTag,
-    resolver::ResourceResolver,
     value::{IdentifierMappingKind, LayoutTag, MoveStructLayout, MoveTypeLayout},
 };
-use move_vm_types::values::{Struct, Value};
+use move_vm_types::{
+    resolver::ResourceResolver,
+    values::{Struct, Value},
+};
 use once_cell::sync::Lazy;
 use std::{clone::Clone, str::FromStr};
 

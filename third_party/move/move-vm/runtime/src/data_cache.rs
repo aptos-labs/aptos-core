@@ -12,12 +12,12 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
-    resolver::MoveResolver,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::{
     loaded_data::runtime_types::Type,
+    resolver::MoveResolver,
     values::{GlobalValue, Value},
 };
 use std::collections::btree_map::BTreeMap;
@@ -190,7 +190,7 @@ impl<'r> TransactionDataCache<'r> {
             // If we need to process aggregator lifting, we pass type layout to remote.
             // Remote, in turn ensures that all aggregator values are lifted if the resolved
             // resource comes from storage.
-            let resolved_result = self.remote.get_resource_bytes_with_metadata_and_layout(
+            let (data, bytes_loaded) = self.remote.get_resource_bytes_with_metadata_and_layout(
                 &addr,
                 &ty_tag,
                 metadata,
@@ -199,14 +199,7 @@ impl<'r> TransactionDataCache<'r> {
                 } else {
                     None
                 },
-            );
-
-            // TODO[agg_v2](fix) We need to propagate errors better, and handle them differently based on:
-            // - DELAYED_FIELDS_CODE_INVARIANT_ERROR, SPECULATIVE_EXECUTION_ABORT_ERROR or other.
-            let (data, bytes_loaded) = resolved_result.map_err(|err| {
-                let msg = format!("Unexpected storage error: {:?}", err);
-                PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(msg)
-            })?;
+            )?;
             load_res = Some(NumBytes::new(bytes_loaded as u64));
 
             let gv = match data {

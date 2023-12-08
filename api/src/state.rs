@@ -24,10 +24,8 @@ use aptos_types::{
     state_store::{state_key::StateKey, table::TableHandle},
 };
 use aptos_vm::data_cache::AsMoveResolver;
-use move_core_types::{
-    language_storage::{ModuleId, StructTag},
-    resolver::MoveResolver,
-};
+use move_core_types::language_storage::{ModuleId, StructTag};
+use move_vm_types::resolver::MoveResolver;
 use poem_openapi::{
     param::{Path, Query},
     payload::Json,

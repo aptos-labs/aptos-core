@@ -5,7 +5,7 @@
 use crate::move_vm::MoveVM;
 use bytes::Bytes;
 use move_binary_format::{
-    errors::VMResult,
+    errors::{PartialVMResult, VMResult},
     file_format::{
         empty_module, AbilitySet, AddressIdentifierIndex, Bytecode, CodeUnit, CompiledModule,
         CompiledScript, FieldDefinition, FunctionDefinition, FunctionHandle, FunctionHandleIndex,
@@ -20,12 +20,14 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     metadata::Metadata,
-    resolver::{ModuleResolver, ResourceResolver},
     u256::U256,
     value::{serialize_values, MoveTypeLayout, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
-use move_vm_types::gas::UnmeteredGasMeter;
+use move_vm_types::{
+    gas::UnmeteredGasMeter,
+    resolver::{ModuleResolver, ResourceResolver},
+};
 use std::collections::HashMap;
 
 // make a script with a given signature for main.
@@ -257,7 +259,7 @@ impl ModuleResolver for RemoteStore {
         vec![]
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, anyhow::Error> {
+    fn get_module(&self, module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
         Ok(self.modules.get(module_id).cloned())
     }
 }
@@ -269,7 +271,7 @@ impl ResourceResolver for RemoteStore {
         _tag: &StructTag,
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> anyhow::Result<(Option<Bytes>, usize)> {
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
         Ok((None, 0))
     }
 }

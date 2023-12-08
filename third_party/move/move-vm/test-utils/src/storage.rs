@@ -2,9 +2,12 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, bail, Error, Result};
+use anyhow::anyhow;
 use bytes::Bytes;
-use move_binary_format::CompiledModule;
+use move_binary_format::{
+    errors::{PartialVMError, PartialVMResult},
+    CompiledModule,
+};
 use move_bytecode_utils::viewer::ModuleViewer;
 use move_core_types::{
     account_address::AccountAddress,
@@ -12,11 +15,12 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::{resource_size, ModuleResolver, MoveResolver, ResourceResolver},
     value::MoveTypeLayout,
+    vm_status::StatusCode,
 };
 #[cfg(feature = "table-extension")]
 use move_table_extension::{TableChangeSet, TableHandle, TableResolver};
+use move_vm_types::resolver::{resource_size, ModuleResolver, MoveResolver, ResourceResolver};
 use std::{
     collections::{btree_map, BTreeMap},
     fmt::Debug,
@@ -37,7 +41,7 @@ impl ModuleResolver for BlankStorage {
         vec![]
     }
 
-    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Bytes>> {
+    fn get_module(&self, _module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
         Ok(None)
     }
 }
@@ -49,7 +53,7 @@ impl ResourceResolver for BlankStorage {
         _tag: &StructTag,
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize)> {
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
         Ok((None, 0))
     }
 }
@@ -61,7 +65,7 @@ impl TableResolver for BlankStorage {
         _handle: &TableHandle,
         _key: &[u8],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, Error> {
+    ) -> anyhow::Result<Option<Bytes>> {
         Ok(None)
     }
 }
@@ -79,7 +83,7 @@ impl<'a, 'b, S: ModuleResolver> ModuleResolver for DeltaStorage<'a, 'b, S> {
         vec![]
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Error> {
+    fn get_module(&self, module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
         if let Some(account_storage) = self.change_set.accounts().get(module_id.address()) {
             if let Some(blob_opt) = account_storage.modules().get(module_id.name()) {
                 return Ok(blob_opt.clone().ok());
@@ -97,7 +101,7 @@ impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
         tag: &StructTag,
         metadata: &[Metadata],
         layout: Option<&MoveTypeLayout>,
-    ) -> anyhow::Result<(Option<Bytes>, usize), Error> {
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
         if let Some(account_storage) = self.change_set.accounts().get(address) {
             if let Some(blob_opt) = account_storage.resources().get(tag) {
                 let buf = blob_opt.clone().ok();
@@ -117,7 +121,7 @@ impl<'a, 'b, S: TableResolver> TableResolver for DeltaStorage<'a, 'b, S> {
         handle: &TableHandle,
         key: &[u8],
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, Error> {
+    ) -> anyhow::Result<Option<Bytes>> {
         // TODO: In addition to `change_set`, cache table outputs.
         self.base
             .resolve_table_entry_bytes_with_layout(handle, key, maybe_layout)
@@ -151,7 +155,7 @@ pub struct InMemoryStorage {
 fn apply_changes<K, V>(
     map: &mut BTreeMap<K, V>,
     changes: impl IntoIterator<Item = (K, Op<V>)>,
-) -> Result<()>
+) -> PartialVMResult<()>
 where
     K: Ord + Debug,
 {
@@ -161,9 +165,12 @@ where
     for (k, op) in changes.into_iter() {
         match (map.entry(k), op) {
             (Occupied(entry), New(_)) => {
-                bail!(
-                    "Failed to apply changes -- key {:?} already exists",
-                    entry.key()
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!(
+                            "Failed to apply changes -- key {:?} already exists",
+                            entry.key()
+                        )),
                 )
             },
             (Occupied(entry), Delete) => {
@@ -175,10 +182,15 @@ where
             (Vacant(entry), New(val)) => {
                 entry.insert(val);
             },
-            (Vacant(entry), Delete | Modify(_)) => bail!(
-                "Failed to apply changes -- key {:?} does not exist",
-                entry.key()
-            ),
+            (Vacant(entry), Delete | Modify(_)) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!(
+                            "Failed to apply changes -- key {:?} does not exist",
+                            entry.key()
+                        )),
+                )
+            },
         }
     }
     Ok(())
@@ -198,7 +210,7 @@ where
 }
 
 impl InMemoryAccountStorage {
-    fn apply(&mut self, account_changeset: AccountChangeSet) -> Result<()> {
+    fn apply(&mut self, account_changeset: AccountChangeSet) -> PartialVMResult<()> {
         let (modules, resources) = account_changeset.into_inner();
         apply_changes(&mut self.modules, modules)?;
         apply_changes(&mut self.resources, resources)?;
@@ -218,7 +230,7 @@ impl InMemoryStorage {
         &mut self,
         changeset: ChangeSet,
         #[cfg(feature = "table-extension")] table_changes: TableChangeSet,
-    ) -> Result<()> {
+    ) -> PartialVMResult<()> {
         for (addr, account_changeset) in changeset.into_inner() {
             match self.accounts.entry(addr) {
                 btree_map::Entry::Occupied(entry) => {
@@ -238,7 +250,7 @@ impl InMemoryStorage {
         Ok(())
     }
 
-    pub fn apply(&mut self, changeset: ChangeSet) -> Result<()> {
+    pub fn apply(&mut self, changeset: ChangeSet) -> PartialVMResult<()> {
         self.apply_extended(
             changeset,
             #[cfg(feature = "table-extension")]
@@ -247,7 +259,7 @@ impl InMemoryStorage {
     }
 
     #[cfg(feature = "table-extension")]
-    fn apply_table(&mut self, changes: TableChangeSet) -> Result<()> {
+    fn apply_table(&mut self, changes: TableChangeSet) -> PartialVMResult<()> {
         let TableChangeSet {
             new_tables,
             removed_tables,
@@ -300,7 +312,7 @@ impl ModuleResolver for InMemoryStorage {
         vec![]
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Error> {
+    fn get_module(&self, module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
         if let Some(account_storage) = self.accounts.get(module_id.address()) {
             return Ok(account_storage.modules.get(module_id.name()).cloned());
         }
@@ -315,7 +327,7 @@ impl ResourceResolver for InMemoryStorage {
         tag: &StructTag,
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize)> {
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
         if let Some(account_storage) = self.accounts.get(address) {
             let buf = account_storage.resources.get(tag).cloned();
             let buf_size = resource_size(&buf);
@@ -332,7 +344,7 @@ impl TableResolver for InMemoryStorage {
         handle: &TableHandle,
         key: &[u8],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, Error> {
+    ) -> anyhow::Result<Option<Bytes>> {
         Ok(self.tables.get(handle).and_then(|t| t.get(key).cloned()))
     }
 }

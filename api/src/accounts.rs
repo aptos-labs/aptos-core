@@ -27,8 +27,8 @@ use aptos_types::{
 use aptos_vm::data_cache::AsMoveResolver;
 use move_core_types::{
     identifier::Identifier, language_storage::StructTag, move_resource::MoveStructType,
-    resolver::MoveResolver,
 };
+use move_vm_types::resolver::MoveResolver;
 use poem_openapi::{
     param::{Path, Query},
     OpenApi,

@@ -48,8 +48,8 @@ use futures::{channel::oneshot, SinkExt};
 use move_core_types::{
     language_storage::{ModuleId, StructTag},
     move_resource::MoveResource,
-    resolver::ModuleResolver,
 };
+use move_vm_types::resolver::ModuleResolver;
 use std::{
     collections::{BTreeMap, HashMap},
     ops::{Bound::Included, Deref},

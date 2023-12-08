@@ -8,6 +8,7 @@ use bytes::Bytes;
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
+    errors::{PartialVMError, PartialVMResult},
     file_format::{CompiledModule, CompiledScript, FunctionDefinitionIndex},
 };
 use move_bytecode_utils::viewer::ModuleViewer;
@@ -18,12 +19,13 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag, TypeTag},
     metadata::Metadata,
     parser,
-    resolver::{resource_size, ModuleResolver, ResourceResolver},
     value::MoveTypeLayout,
+    vm_status::StatusCode,
 };
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location::Spanned;
 use move_resource_viewer::{AnnotatedMoveStruct, MoveValueAnnotator};
+use move_vm_types::resolver::{resource_size, ModuleResolver, ResourceResolver};
 use std::{
     fmt::Debug,
     fs,
@@ -335,8 +337,11 @@ impl ModuleResolver for OnDiskStateView {
         vec![]
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, anyhow::Error> {
-        self.get_module_bytes(module_id)
+    fn get_module(&self, module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
+        self.get_module_bytes(module_id).map_err(|e| {
+            PartialVMError::new(StatusCode::STORAGE_ERROR)
+                .with_message(format!("Unexpected storage error: {:?}", e))
+        })
     }
 }
 
@@ -347,8 +352,13 @@ impl ResourceResolver for OnDiskStateView {
         struct_tag: &StructTag,
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize)> {
-        let buf = self.get_resource_bytes(*address, struct_tag.clone())?;
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
+        let buf = self
+            .get_resource_bytes(*address, struct_tag.clone())
+            .map_err(|e| {
+                PartialVMError::new(StatusCode::STORAGE_ERROR)
+                    .with_message(format!("Unexpected storage error: {:?}", e))
+            })?;
         let buf_size = resource_size(&buf);
         Ok((buf, buf_size))
     }

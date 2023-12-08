@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{bail, Error};
+use anyhow::bail;
 use bytes::Bytes;
 use itertools::Itertools;
 use move_async_vm::{
@@ -11,7 +11,7 @@ use move_async_vm::{
     async_vm::{AsyncResult, AsyncSession, AsyncVM, Message},
     natives::GasParameters as ActorGasParameters,
 };
-use move_binary_format::access::ModuleAccess;
+use move_binary_format::{access::ModuleAccess, errors::PartialVMResult};
 use move_command_line_common::testing::EXP_EXT;
 use move_compiler::{
     attr_derivation, compiled_unit::CompiledUnit, diagnostics::report_diagnostics_to_buffer,
@@ -24,11 +24,11 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::{resource_size, ModuleResolver, ResourceResolver},
     value::MoveTypeLayout,
 };
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 use move_vm_test_utils::gas_schedule::GasStatus;
+use move_vm_types::resolver::{resource_size, ModuleResolver, ResourceResolver};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, VecDeque},
@@ -387,7 +387,7 @@ impl<'a> ModuleResolver for HarnessProxy<'a> {
         vec![]
     }
 
-    fn get_module(&self, id: &ModuleId) -> Result<Option<Bytes>, Error> {
+    fn get_module(&self, id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
         Ok(self
             .harness
             .module_cache
@@ -403,7 +403,7 @@ impl<'a> ResourceResolver for HarnessProxy<'a> {
         typ: &StructTag,
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> anyhow::Result<(Option<Bytes>, usize)> {
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
         let res = self
             .harness
             .resource_store
