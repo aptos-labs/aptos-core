@@ -42,7 +42,7 @@ We use postgresql as our database in this tutorial. You're free to use whatever 
     - We will use a database hosted on `localhost` on the port `5432`, which should be the default.
     - When you create your username, keep track of it and the password you use for it.
     - You can view a tutorial for installing postgresql and psql [here](https://www.digitalocean.com/community/tutorials/how-to-install-postgresql-on-ubuntu-22-04-quickstart) tool to set up your database more quickly.
-    - If you want to easily view your database data, consider using a GUI like [DBeaver](https://dbeaver.io/) *Recommanded*, or [pgAdmin](https://www.pgadmin.org/), or [Postico](https://eggerapps.at/postico2/).
+    - If you want to easily view your database data, consider using a GUI like [DBeaver](https://dbeaver.io/) *recommended*, or [pgAdmin](https://www.pgadmin.org/), or [Postico](https://eggerapps.at/postico2/).
 
 Explaining how to create a database is beyond the scope of this tutorial. If you are not sure how to do it, consider checking out tutorials on how to create a database with the `psql` tool.
 

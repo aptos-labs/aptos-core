@@ -563,8 +563,10 @@ propertymap
 prover
 proxied
 pseudocode
+psql
 pvc
 px
+pyenv
 quickstart
 quickstarts
 repo
