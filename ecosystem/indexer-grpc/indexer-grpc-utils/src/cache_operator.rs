@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::constants::BLOB_STORAGE_SIZE;
+use crate::{constants::BLOB_STORAGE_SIZE, EncodedTransactionWithVersion};
 use anyhow::Context;
 use redis::{AsyncCommands, RedisError, RedisResult};
 
@@ -161,17 +161,11 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
     }
 
     pub async fn get_latest_version(&mut self) -> anyhow::Result<u64> {
-        let chain_id: u64 = match self
-            .conn
+        self.conn
             .get::<&str, String>(CACHE_KEY_LATEST_VERSION)
-            .await
-        {
-            Ok(v) => v.parse::<u64>().with_context(|| {
-                format!("Redis key {} is not a number.", CACHE_KEY_LATEST_VERSION)
-            })?,
-            Err(err) => return Err(err.into()),
-        };
-        Ok(chain_id)
+            .await?
+            .parse::<u64>()
+            .context("Redis latest_version is not a number.")
     }
 
     // Internal function to get the latest version from cache.
@@ -195,6 +189,7 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
         } else if requested_version + CACHE_SIZE_ESTIMATION < latest_version {
             Ok(CacheCoverageStatus::CacheEvicted)
         } else {
+            // TODO: rewrite this logic to surface this max fetch size better
             Ok(CacheCoverageStatus::CacheHit(std::cmp::min(
                 latest_version - requested_version,
                 BLOB_STORAGE_SIZE as u64,
@@ -283,6 +278,26 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
             Ok(CacheCoverageStatus::CacheEvicted) => Ok(CacheBatchGetStatus::EvictedFromCache),
             Ok(CacheCoverageStatus::DataNotReady) => Ok(CacheBatchGetStatus::NotReady),
             Err(err) => Err(err),
+        }
+    }
+
+    /// Fail if not all transactions requested are returned
+    pub async fn batch_get_encoded_proto_data_x(
+        &mut self,
+        start_version: u64,
+        transaction_count: u64,
+    ) -> anyhow::Result<Vec<EncodedTransactionWithVersion>> {
+        let versions = (start_version..start_version + transaction_count)
+            .map(|e| e.to_string())
+            .collect::<Vec<String>>();
+        let encoded_transactions: Result<Vec<String>, RedisError> = self.conn.mget(versions).await;
+        match encoded_transactions {
+            Ok(txns) => Ok(txns
+                .into_iter()
+                .enumerate()
+                .map(|(i, txn)| (txn, start_version + i as u64))
+                .collect()),
+            Err(err) => Err(err.into()),
         }
     }
 }
