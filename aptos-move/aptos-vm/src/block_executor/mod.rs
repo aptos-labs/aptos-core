@@ -58,6 +58,13 @@ impl AptosTransactionOutput {
         }
     }
 
+    pub(crate) fn new_from_committed_output(output: TransactionOutput) -> Self {
+        Self {
+            vm_output: Mutex::new(None),
+            committed_output: OnceCell::from(output),
+        }
+    }
+
     pub(crate) fn committed_output(&self) -> &TransactionOutput {
         self.committed_output.get().unwrap()
     }
@@ -67,12 +74,13 @@ impl AptosTransactionOutput {
             Some(output) => output,
             // TODO: revisit whether we should always get it via committed, or o.w. create a
             // dedicated API without creating empty data structures.
+            // This is currently used because we do not commit skip_output() transactions.
             None => self
                 .vm_output
                 .lock()
                 .take()
                 .expect("Output must be set")
-                .into_transaction_output_with_materialized_write_set(vec![], vec![], vec![])
+                .into_transaction_output()
                 .expect("Transaction output is not alerady materialized"),
         }
     }

@@ -30,10 +30,6 @@ impl BlockExecutorConfigFromOnchain {
         }
     }
 
-    pub fn has_any_block_gas_limit(&self) -> bool {
-        self.block_gas_limit_type.block_gas_limit().is_some()
-    }
-
     pub const fn on_but_large_for_test() -> Self {
         Self {
             block_gas_limit_type:

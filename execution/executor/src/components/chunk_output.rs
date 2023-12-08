@@ -135,23 +135,16 @@ impl ChunkOutput {
         self,
         base_view: &ExecutedTrees,
         known_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
-        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
         fail_point!("executor::apply_to_ledger", |_| {
             Err(anyhow::anyhow!("Injected error in apply_to_ledger."))
         });
-        ApplyChunkOutput::apply_chunk(
-            self,
-            base_view,
-            known_state_checkpoint_hashes,
-            append_state_checkpoint_to_block,
-        )
+        ApplyChunkOutput::apply_chunk(self, base_view, known_state_checkpoint_hashes)
     }
 
     pub fn into_state_checkpoint_output(
         self,
         parent_state: &StateDelta,
-        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<(StateDelta, Option<EpochState>, StateCheckpointOutput)> {
         fail_point!("executor::into_state_checkpoint_output", |_| {
             Err(anyhow::anyhow!(
@@ -164,7 +157,6 @@ impl ChunkOutput {
         ApplyChunkOutput::calculate_state_checkpoint(
             self,
             parent_state,
-            append_state_checkpoint_to_block,
             None,
             /*is_block=*/ true,
         )

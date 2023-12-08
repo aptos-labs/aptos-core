@@ -248,12 +248,7 @@ pub fn get_test_txn_with_chain_id(
     SignedTransaction::new(raw_txn, public_key, signature)
 }
 
-pub fn block(
-    mut user_txns: Vec<Transaction>,
-    block_executor_onchain_config: BlockExecutorConfigFromOnchain,
-) -> Vec<SignatureVerifiedTransaction> {
-    if !block_executor_onchain_config.has_any_block_gas_limit() {
-        user_txns.push(Transaction::StateCheckpoint(HashValue::random()));
-    }
+pub fn block(mut user_txns: Vec<Transaction>) -> Vec<SignatureVerifiedTransaction> {
+    user_txns.push(Transaction::StateCheckpoint(HashValue::random()));
     into_signature_verified_block(user_txns)
 }

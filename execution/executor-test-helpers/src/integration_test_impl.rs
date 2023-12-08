@@ -173,7 +173,7 @@ pub fn test_execution_with_storage_impl_inner(
             txn_factory.transfer(account3.address(), 10 * B),
         )));
     }
-    let block3 = block(block3, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG); // append state checkpoint txn
+    let block3 = block(block3); // append state checkpoint txn
 
     let output1 = executor
         .execute_block(
@@ -449,16 +449,9 @@ pub fn test_execution_with_storage_impl_inner(
     })
     .unwrap();
 
-    // With block gas limit, StateCheckpoint txn is inserted to block after execution.
-    let diff = if TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG.has_any_block_gas_limit() {
-        0
-    } else {
-        1
-    };
-
     let transaction_list_with_proof = db
         .reader
-        .get_transactions(14, 15 + diff, current_version, false)
+        .get_transactions(14, 16, current_version, false)
         .unwrap();
     let expected_txns: Vec<Transaction> = block3.iter().map(|t| t.expect_valid().clone()).collect();
     verify_transactions(&transaction_list_with_proof, &expected_txns).unwrap();

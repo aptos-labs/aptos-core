@@ -64,7 +64,6 @@ impl TxnNotifier for DummyTxnNotifier {
         &self,
         _txns: Vec<SignedTransaction>,
         _compute_results: &StateComputeResult,
-        _block_gas_limit_enabled: bool,
     ) -> anyhow::Result<(), MempoolError> {
         Ok(())
     }

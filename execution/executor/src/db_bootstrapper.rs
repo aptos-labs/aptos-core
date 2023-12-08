@@ -152,7 +152,7 @@ pub fn calculate_genesis<V: VMExecutor>(
         base_state_view,
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
     )?
-    .apply_to_ledger(&executed_trees, None, None)?;
+    .apply_to_ledger(&executed_trees, None)?;
     ensure!(
         !output.transactions_to_commit().is_empty(),
         "Genesis txn execution failed."

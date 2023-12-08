@@ -1836,6 +1836,16 @@ impl Transaction {
             Transaction::ValidatorTransaction(_) => String::from("validator_transaction"),
         }
     }
+
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            Transaction::UserTransaction(_) => "user_transaction",
+            Transaction::GenesisTransaction(_) => "genesis_transaction",
+            Transaction::BlockMetadata(_) => "block_metadata",
+            Transaction::StateCheckpoint(_) => "state_checkpoint",
+            Transaction::ValidatorTransaction(_) => "validator_transaction",
+        }
+    }
 }
 
 impl TryFrom<Transaction> for SignedTransaction {

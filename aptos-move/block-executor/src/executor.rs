@@ -510,7 +510,7 @@ where
                     approx_output_size,
                 );
 
-                if accumulator.should_end_block_parallel() {
+                if txn_idx < scheduler.num_txns() - 1 && accumulator.should_end_block_parallel() {
                     // Set the execution output status to be SkipRest, to skip the rest of the txns.
                     last_input_output.update_to_skip_rest(txn_idx);
                 }
@@ -1123,7 +1123,16 @@ where
         drop(timer);
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
-        let (_, maybe_error) = shared_commit_state.into_inner();
+        let (accumulator, maybe_error) = shared_commit_state.into_inner();
+
+        Self::execute_checkpoint_on_block_limit_reached(
+            accumulator,
+            num_txns as usize,
+            signature_verified_block,
+            &mut final_results.acquire(),
+        )
+        .unwrap();
+
         match maybe_error {
             Some(err) => Err(err),
             None => Ok(final_results.into_inner()),
@@ -1419,7 +1428,7 @@ where
                 break;
             }
 
-            if accumulator.should_end_block_sequential() {
+            if idx < num_txns - 1 && accumulator.should_end_block_sequential() {
                 break;
             }
         }
@@ -1428,7 +1437,33 @@ where
             .finish_sequential_update_counters_and_log_info(ret.len() as u32, num_txns as u32);
 
         ret.resize_with(num_txns, E::Output::skip_output);
+
+        Self::execute_checkpoint_on_block_limit_reached(
+            accumulator,
+            num_txns,
+            signature_verified_block,
+            &mut ret,
+        )
+        .unwrap();
+
         Ok(ret)
+    }
+
+    fn execute_checkpoint_on_block_limit_reached(
+        accumulator: BlockGasLimitProcessor<T>,
+        num_txns: usize,
+        signature_verified_block: &[T],
+        ret: &mut [<E as ExecutorTask>::Output],
+    ) -> Result<(), PanicError> {
+        if accumulator.is_block_limit_reached() {
+            let idx = num_txns - 1;
+            let txn = &signature_verified_block[idx];
+            let txn_output = ret
+                .get_mut(idx)
+                .ok_or_else(|| code_invariant_error("Missing output for last transaction"))?;
+            E::execute_skipped_checkpoint(txn, txn_output)?;
+        }
+        Ok(())
     }
 
     pub fn execute_block(
