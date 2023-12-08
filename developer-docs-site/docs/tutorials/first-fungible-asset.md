@@ -17,7 +17,7 @@ Make sure you have understood FA before moving on to the tutorial. If not, it is
 
 Install your preferred SDK from the below list:
 
-* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [TypeScript SDK](../sdks/new-ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
 * [Rust SDK](../sdks/rust-sdk.md)
 
@@ -31,19 +31,19 @@ Install your preferred SDK from the below list:
 
 ## Step 3: Run the example
 
-Clone the `aptos-core` repo:
-
-```bash
-git clone https://github.com/aptos-labs/aptos-core.git
-```
-
 <Tabs groupId="examples">
   <TabItem value="typescript" label="Typescript">
+
+Clone the `aptos-ts-sdk` repo:
+
+```bash
+git clone https://github.com/aptos-labs/aptos-ts-sdk.git
+```
 
 Navigate to the TypeScript SDK directory:
 
 ```bash
-cd ~/aptos-core/ecosystem/typescript/sdk/examples/typescript
+cd ~/aptos-ts-sdk/examples/typescript
 ```
 
 Install the necessary dependencies:
@@ -52,65 +52,26 @@ Install the necessary dependencies:
 pnpm install
 ```
 
-Run the TypeScript [`your_fungible_asset`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/your_fungible_asset.ts) example:
+Run the TypeScript [`your_fungible_asset`](https://github.com/aptos-labs/aptos-ts-sdk/blob/main/examples/typescript/your_fungible_asset.ts) example:
 
 ```bash
-pnpm your_fungible_asset ~/aptos-core/aptos-move/move-examples/fungible_asset/fa_coin
+pnpm run your_fungible_asset
 ```
-
-  </TabItem>
-  <TabItem value="python" label="Python">
-
-    Coming soon.
-
-  </TabItem>
-  <TabItem value="rust" label="Rust">
-
-    Coming soon.
 
   </TabItem>
 </Tabs>
 
 ---
 
-### Step 3.1: Build the package
-
-The example run will pause with the following output:
-
-```bash
-=== Addresses ===
-Alice: 0xa816be8abfbcb2c61fd5032715a8ff4155fd19ad67b379c4482bf0a10d320ed9
-Bob: 0xcdbbbb3b6ad9902b49b9055fa907272a701c00abcaf1ea59a4b1ae1ba761bb69
-Charlie: 0xe664111a5e56f69128b72fcc30c1b41745b74d7a51e3528b5e110cad8203b3e6
-Update the package with Alice's address, compile, and press enter.
-```
-
-At this point, open another terminal and change directories to the FACoin package's directory:
-
-```bash
-cd ~/aptos-core/aptos-move/move-examples/fungible_asset/fa_coin
-```
-
-Next, build the package using the CLI with `FACoin=${Alice address}`:
-
-```bash
-aptos move compile --named-addresses FACoin=0xa816be8abfbcb2c61fd5032715a8ff4155fd19ad67b379c4482bf0a10d320ed9 --save-metadata
-```
-
-The `--named-addresses` is a list of address mappings that must be translated in order for the package to be compiled to be stored in Alice's account. Notice how `FACoin` is set to Alice's address printed above. Also `--save-metadata` is required to publish the package.
-
----
-
-### Step 3.2: Completing the example
-
-Returning to the previous prompt, press ENTER as the package is now ready to be published.
 
 The application will complete, printing:
 
 ```bash
-Publishing FACoin package.
+===Publishing FAcoin package===
 
-All the balances in this example refer to balance in primary fungible stores of each account.
+Transaction hash: 0x90fbe811171dde1ffad9157314ce0c4f6070fd5c1095a0e18a0b5634d10d7f48
+metadata address: 0x77503715cb75fcc276b4e7236210fb0bcac7b510f6428233b65468b1cd3d708b
+All the balances in this exmaple refer to balance in primary fungible stores of each account.
 Alice's initial FACoin balance: 0.
 Bob's initial FACoin balance: 0.
 Charlie's initial balance: 0.
@@ -143,19 +104,57 @@ These are read by the example and published to the Aptos blockchain:
 <Tabs groupId="examples">
   <TabItem value="typescript" label="Typescript">
 
-```typescript
-:!: static/sdks/typescript/examples/typescript/your_fungible_asset.ts publish
+In the TypeScript example, we use `aptos move build-publish-payload` command to compile and build the module. 
+That command builds the `build` folder that contains the `package-metadata.bcs` and the bytecode for the `moon_coin.mv` module. The command also builds a publication transaction payload and stores it in a JSON output file that we can later read from to get the `metadataBytes` and `byteCode` to publish the contract to chain with.
+
+Compile the package:
+```ts
+export function compilePackage(
+  packageDir: string,
+  outputFile: string,
+  namedAddresses: Array<{ name: string; address: AccountAddress }>,
+) {
+  const addressArg = namedAddresses.map(({ name, address }) => `${name}=${address}`).join(" ");
+  // Assume-yes automatically overwrites the previous compiled version, only do this if you are sure you want to overwrite the previous version.
+  const compileCommand = `aptos move build-publish-payload --json-output-file ${outputFile} --package-dir ${packageDir} --named-addresses ${addressArg} --assume-yes`;
+  execSync(compileCommand);
+}
+
+compilePackage("move/facoin", "move/facoin/facoin.json", [{ name: "FACoin", address: alice.accountAddress }]);
 ```
 
-  </TabItem>
-  <TabItem value="python" label="Python">
+Publish the package to chain:
+```ts
+export function getPackageBytesToPublish(filePath: string) {
+  // current working directory - the root folder of this repo
+  const cwd = process.cwd();
+  // target directory - current working directory + filePath (filePath json file is generated with the prevoius, compilePackage, cli command)
+  const modulePath = path.join(cwd, filePath);
 
-    Coming soon.
+  const jsonData = JSON.parse(fs.readFileSync(modulePath, "utf8"));
 
-  </TabItem>
-  <TabItem value="rust" label="Rust">
+  const metadataBytes = jsonData.args[0].value;
+  const byteCode = jsonData.args[1].value;
 
-    Coming soon.
+  return { metadataBytes, byteCode };
+}
+
+const { metadataBytes, byteCode } = getPackageBytesToPublish("move/facoin/facoin.json");
+
+// Publish FACoin package to chain
+const transaction = await aptos.publishPackageTransaction({
+  account: alice.accountAddress,
+  metadataBytes,
+  moduleBytecode: byteCode,
+});
+
+const pendingTransaction = await aptos.signAndSubmitTransaction({
+  signer: alice,
+  transaction,
+});
+
+await aptos.waitForTransaction({ transactionHash: pendingTransaction.hash });
+```
 
   </TabItem>
 </Tabs>
@@ -240,7 +239,7 @@ There are two separate withdraw and deposit events instead of a single transfer 
 
 * [Aptos CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md)
 * [Fungible Asset](../standards/fungible-asset.md)
-* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [TypeScript SDK](../sdks/new-ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
 * [Rust SDK](../sdks/rust-sdk.md)
 * [REST API specification](https://aptos.dev/nodes/aptos-api-spec#/)
