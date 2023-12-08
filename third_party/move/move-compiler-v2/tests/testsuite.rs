@@ -92,18 +92,7 @@ impl TestConfig {
                 generate_file_format: false,
                 dump_annotated_targets: true,
             }
-        } else if path.contains("/inlining/") {
-            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
-            pipeline.add_processor(Box::new(VisibilityChecker {}));
-            pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
-            Self {
-                type_check_only: false,
-                dump_ast: true,
-                pipeline,
-                generate_file_format: false,
-                dump_annotated_targets: verbose,
-            }
-        } else if path.contains("/folding/") {
+        } else if path.contains("/inlining/") || path.contains("/folding/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
             pipeline.add_processor(Box::new(VisibilityChecker {}));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));

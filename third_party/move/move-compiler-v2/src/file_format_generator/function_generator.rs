@@ -715,7 +715,11 @@ impl<'a> FunctionGenerator<'a> {
                 Some(AssignKind::Copy) => {
                     self.emit(FF::Bytecode::CopyLoc(local));
                 },
-                Some(AssignKind::Inferred) | Some(AssignKind::Store) | None => {
+                Some(AssignKind::Inferred) | Some(AssignKind::Store) => {
+                    fun_ctx
+                        .internal_error("Inferred and Store AssignKind should be not appear here.");
+                },
+                None => {
                     // Copy the temporary if it is copyable and still used after this code point.
                     if fun_ctx.is_copyable(*temp) && ctx.is_alive_after(*temp) {
                         self.emit(FF::Bytecode::CopyLoc(local))
