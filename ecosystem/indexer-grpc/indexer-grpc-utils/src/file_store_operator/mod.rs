@@ -12,7 +12,6 @@ pub use local::*;
 
 pub const FILE_FOLDER_NAME: &str = "files";
 const METADATA_FILE_NAME: &str = "metadata.json";
-const VERIFICATION_FILE_NAME: &str = "verification.json";
 const FILE_STORE_UPDATE_FREQUENCY_SECS: u64 = 5;
 
 #[inline]
@@ -87,6 +86,9 @@ pub trait FileStoreOperator: Send + Sync {
     }
     /// Gets the raw transaction file; mainly for verification purpose.
     async fn get_raw_transactions(&self, version: u64) -> Result<TransactionsFile>;
+
+    /// Get a clone for the file store operator.
+    fn clone_box(&self) -> Box<dyn FileStoreOperator>;
 }
 
 pub(crate) fn build_transactions_file(

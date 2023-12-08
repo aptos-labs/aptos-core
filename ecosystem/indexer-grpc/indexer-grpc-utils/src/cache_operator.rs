@@ -106,11 +106,12 @@ pub fn get_ttl_in_seconds(timestamp_in_seconds: u64) -> u64 {
 }
 
 // Cache operator directly interacts with redis conn.
+#[derive(Clone)]
 pub struct CacheOperator<T: redis::aio::ConnectionLike + Send> {
     conn: T,
 }
 
-impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
+impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
     pub fn new(conn: T) -> Self {
         Self { conn }
     }
