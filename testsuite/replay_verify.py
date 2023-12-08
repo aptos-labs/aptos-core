@@ -74,11 +74,12 @@ MAINNET_RANGES = [
 # retry the replay_verify_partition if it fails
 def retry_replay_verify_partition(func, *args, **kwargs) -> Tuple[int, int, bytes]:
     (partition_number, code, msg) = (0, 0, b"")
-    NUM_OF_RETRIES = 3
+    NUM_OF_RETRIES = 6
     for i in range(1, NUM_OF_RETRIES + 1):
         print(f"try {i}")
         (partition_number, code, msg) = func(*args, **kwargs)
-        if code != 1:
+        # let's only not retry on txn error and success case,
+        if code == 2 or code == 0:
             break
     return (partition_number, code, msg)
 

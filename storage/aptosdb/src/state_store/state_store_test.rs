@@ -4,10 +4,10 @@
 
 use super::*;
 use crate::{
-    jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    new_sharded_kv_schema_batch,
+    db::test_helper::{arb_state_kv_sets, update_store},
+    schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
     state_restore::StateSnapshotRestore,
-    test_helper::{arb_state_kv_sets, update_store},
+    utils::new_sharded_kv_schema_batch,
     AptosDB,
 };
 use aptos_jellyfish_merkle::{

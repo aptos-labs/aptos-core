@@ -636,7 +636,7 @@ impl RoundManager {
             .author()
             .expect("Proposal should be verified having an author");
 
-        if !self.onchain_config.should_propose_validator_txns()
+        if !self.onchain_config.validator_txn_enabled()
             && matches!(
                 proposal.block_data().block_type(),
                 BlockType::ProposalExt(_)

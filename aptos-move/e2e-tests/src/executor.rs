@@ -40,16 +40,16 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     on_chain_config::{
-        BlockGasLimitType, Features, OnChainConfig, TimedFeatureOverride, TimedFeaturesBuilder,
-        ValidatorSet, Version,
+        BlockGasLimitType, FeatureFlag, Features, OnChainConfig, TimedFeatureOverride,
+        TimedFeaturesBuilder, ValidatorSet, Version,
     },
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionPayload,
-        TransactionStatus, VMValidatorResult,
+        EntryFunction, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
+        TransactionPayload, TransactionStatus, VMValidatorResult,
     },
     vm_status::VMStatus,
     write_set::WriteSet,
@@ -58,7 +58,7 @@ use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionId},
-    AptosVM, VMExecutor, VMValidator,
+    verifier, AptosVM, VMExecutor, VMValidator,
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -211,6 +211,10 @@ impl FakeExecutor {
 
     pub fn data_store(&self) -> &FakeDataStore {
         &self.data_store
+    }
+
+    pub fn data_store_mut(&mut self) -> &mut FakeDataStore {
+        &mut self.data_store
     }
 
     /// Creates an executor in which no genesis state has been applied yet.
@@ -639,7 +643,7 @@ impl FakeExecutor {
         )?;
 
         Ok((
-            output.try_into_transaction_output(&resolver)?,
+            output.try_materialize_into_transaction_output(&resolver)?,
             gas_profiler.finish(),
         ))
     }
@@ -990,6 +994,62 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) {
         self.exec_module(&Self::module(module_name), function_name, type_params, args)
+    }
+
+    pub fn try_exec_entry_with_features(
+        &mut self,
+        senders: Vec<AccountAddress>,
+        entry_fn: &EntryFunction,
+        features: &Features,
+    ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
+        let resolver = self.data_store.as_move_resolver();
+
+        let timed_features = TimedFeaturesBuilder::enable_all()
+            .with_override_profile(TimedFeatureOverride::Testing)
+            .build();
+
+        let vm = MoveVmExt::new(
+            NativeGasParameters::zeros(),
+            MiscGasParameters::zeros(),
+            LATEST_GAS_FEATURE_VERSION,
+            self.chain_id,
+            features.clone(),
+            timed_features,
+            &resolver,
+        )
+        .unwrap();
+        let mut session = vm.new_session(&resolver, SessionId::void());
+
+        let function =
+            session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
+        let struct_constructors = self.features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
+        let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
+            &mut session,
+            senders,
+            entry_fn.args().to_vec(),
+            &function,
+            struct_constructors,
+        )?;
+        session
+            .execute_entry_function(
+                entry_fn.module(),
+                entry_fn.function(),
+                entry_fn.ty_args().to_vec(),
+                args,
+                &mut UnmeteredGasMeter,
+            )
+            .map_err(|e| e.into_vm_status())?;
+
+        let change_set = session
+            .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
+                LATEST_GAS_FEATURE_VERSION,
+            ))
+            .expect("Failed to generate txn effects");
+        let (write_set, events) = change_set
+            .try_into_storage_change_set()
+            .expect("Failed to convert to ChangeSet")
+            .into_inner();
+        Ok((write_set, events))
     }
 
     pub fn try_exec(

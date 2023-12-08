@@ -10,7 +10,7 @@ use aptos_consensus_types::{
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
 };
-use aptos_crypto::HashValue;
+use aptos_crypto::{HashValue, PrivateKey, Uniform};
 use aptos_logger::Level;
 use aptos_types::{ledger_info::LedgerInfo, validator_signer::ValidatorSigner};
 use std::{future::Future, sync::Arc, time::Duration};
@@ -24,12 +24,18 @@ mod mock_storage;
 
 use crate::{payload_manager::PayloadManager, util::mock_time_service::SimulatedTimeService};
 use aptos_consensus_types::{block::block_test_utils::gen_test_certificate, common::Payload};
-use aptos_types::block_info::BlockInfo;
+use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519Signature};
+use aptos_types::{
+    block_info::BlockInfo,
+    chain_id::ChainId,
+    transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
+};
 pub use mock_payload_manager::MockPayloadManager;
 pub use mock_state_computer::{
     EmptyStateComputer, MockStateComputer, RandomComputeResultStateComputer,
 };
 pub use mock_storage::{EmptyStorage, MockSharedStorage, MockStorage};
+use move_core_types::account_address::AccountAddress;
 
 pub const TEST_TIMEOUT: Duration = Duration::from_secs(60);
 
@@ -211,4 +217,39 @@ where
     runtime
         .block_on(async { timeout(TEST_TIMEOUT, f).await })
         .expect("test timed out")
+}
+
+// Creates a single test transaction for a random account
+pub(crate) fn create_signed_transaction(gas_unit_price: u64) -> SignedTransaction {
+    let private_key = Ed25519PrivateKey::generate_for_testing();
+    let public_key = private_key.public_key();
+
+    let transaction_payload = TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
+    let raw_transaction = RawTransaction::new(
+        AccountAddress::random(),
+        0,
+        transaction_payload,
+        0,
+        gas_unit_price,
+        0,
+        ChainId::new(10),
+    );
+    SignedTransaction::new(
+        raw_transaction,
+        public_key,
+        Ed25519Signature::dummy_signature(),
+    )
+}
+
+pub(crate) fn create_vec_signed_transactions(size: u64) -> Vec<SignedTransaction> {
+    (0..size).map(|_| create_signed_transaction(1)).collect()
+}
+
+pub(crate) fn create_vec_signed_transactions_with_gas(
+    size: u64,
+    gas_unit_price: u64,
+) -> Vec<SignedTransaction> {
+    (0..size)
+        .map(|_| create_signed_transaction(gas_unit_price))
+        .collect()
 }

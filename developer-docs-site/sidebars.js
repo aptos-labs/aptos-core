@@ -350,6 +350,23 @@ const sidebars = {
           items: [
             {
               type: "category",
+              label: "New TypeScript SDK",
+              link: { type: "doc", id: "sdks/new-ts-sdk/index" },
+              collapsible: true,
+              collapsed: true,
+              items: [
+                "sdks/new-ts-sdk/migration-guide",
+                "sdks/new-ts-sdk/account",
+                "sdks/new-ts-sdk/sdk-configuration",
+                "sdks/new-ts-sdk/fetch-data-from-chain",
+                "sdks/new-ts-sdk/transaction-builder",
+                "sdks/new-ts-sdk/http-client",
+                "sdks/new-ts-sdk/move-types",
+                "sdks/new-ts-sdk/typescript",
+              ],
+            },
+            {
+              type: "category",
               label: "TypeScript SDK",
               link: { type: "doc", id: "sdks/ts-sdk/index" },
               collapsible: true,
