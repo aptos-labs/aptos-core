@@ -616,15 +616,15 @@ impl Swarm for LocalSwarm {
         self.dir.display().to_string()
     }
 
-    fn inject_chaos(&mut self, _chaos: SwarmChaos) -> Result<()> {
+    async fn inject_chaos(&mut self, _chaos: SwarmChaos) -> Result<()> {
         todo!()
     }
 
-    fn remove_chaos(&mut self, _chaos: SwarmChaos) -> Result<()> {
+    async fn remove_chaos(&mut self, _chaos: SwarmChaos) -> Result<()> {
         todo!()
     }
 
-    fn remove_all_chaos(&mut self) -> Result<()> {
+    async fn remove_all_chaos(&mut self) -> Result<()> {
         todo!()
     }
 
