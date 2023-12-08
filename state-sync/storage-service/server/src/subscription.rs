@@ -608,66 +608,53 @@ async fn handle_ready_subscriptions<T: StorageReaderInterface>(
                     let subscription_start_time = subscription_request.request_start_time;
                     let subscription_data_request = subscription_request.request.clone();
 
-                    // Get the storage service request for the missing data
-                    let missing_data_request = match subscription_request
-                        .get_storage_request_for_missing_data(
-                            config,
-                            known_version,
-                            &target_ledger_info,
-                        ) {
-                        Ok(storage_service_request) => storage_service_request,
-                        Err(error) => {
-                            // Failed to get the storage service request
-                            warn!(LogSchema::new(LogEntry::OptimisticFetchResponse)
-                                .error(&Error::UnexpectedErrorEncountered(error.to_string())));
-                            return;
-                        },
+                    // Handle the subscription request and time the operation
+                    let handle_request = || {
+                        // Get the storage service request for the missing data
+                        let missing_data_request = subscription_request
+                            .get_storage_request_for_missing_data(
+                                config,
+                                known_version,
+                                &target_ledger_info,
+                            )?;
+
+                        // Notify the peer of the new data
+                        let data_response = utils::notify_peer_of_new_data(
+                            cached_storage_server_summary,
+                            optimistic_fetches,
+                            subscriptions.clone(),
+                            lru_response_cache,
+                            request_moderator,
+                            storage,
+                            time_service.clone(),
+                            &peer_network_id,
+                            missing_data_request,
+                            target_ledger_info,
+                            subscription_request.take_response_sender(),
+                        )?;
+
+                        // Update the stream's known version and epoch
+                        if let Some(mut subscription_stream_requests) =
+                            subscriptions.get_mut(&peer_network_id)
+                        {
+                            subscription_stream_requests
+                                .update_known_version_and_epoch(&data_response)?;
+                        }
+
+                        Ok(())
                     };
+                    let result = utils::execute_and_time_duration(
+                        &metrics::SUBSCRIPTION_LATENCIES,
+                        Some((&peer_network_id, &subscription_data_request)),
+                        None,
+                        handle_request,
+                        Some(subscription_start_time),
+                    );
 
-                    // Notify the peer of the new data
-                    match utils::notify_peer_of_new_data(
-                        cached_storage_server_summary,
-                        optimistic_fetches,
-                        subscriptions.clone(),
-                        lru_response_cache,
-                        request_moderator,
-                        storage,
-                        time_service.clone(),
-                        &peer_network_id,
-                        missing_data_request,
-                        target_ledger_info,
-                        subscription_request.take_response_sender(),
-                    ) {
-                        Ok(data_response) => {
-                            // Update the streams known version and epoch
-                            if let Some(mut subscription_stream_requests) =
-                                subscriptions.get_mut(&peer_network_id)
-                            {
-                                // Update the known version and epoch for the stream
-                                subscription_stream_requests
-                                    .update_known_version_and_epoch(&data_response)
-                                    .unwrap_or_else(|error| {
-                                        warn!(LogSchema::new(LogEntry::SubscriptionResponse)
-                                            .error(&Error::UnexpectedErrorEncountered(
-                                                error.to_string()
-                                            )));
-                                    });
-
-                                // Update the subscription latency metric
-                                let subscription_duration =
-                                    time_service.now().duration_since(subscription_start_time);
-                                metrics::observe_value_with_label(
-                                    &metrics::SUBSCRIPTION_LATENCIES,
-                                    peer_network_id.network_id(),
-                                    &subscription_data_request.get_label(),
-                                    subscription_duration.as_secs_f64(),
-                                );
-                            }
-                        },
-                        Err(error) => {
-                            warn!(LogSchema::new(LogEntry::SubscriptionResponse)
-                                .error(&Error::UnexpectedErrorEncountered(error.to_string())));
-                        },
+                    // Log an error if the handler failed
+                    if let Err(error) = result {
+                        warn!(LogSchema::new(LogEntry::SubscriptionResponse)
+                            .error(&Error::UnexpectedErrorEncountered(error.to_string())));
                     }
                 })
                 .await;
