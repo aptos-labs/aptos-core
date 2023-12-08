@@ -95,7 +95,13 @@ fn io_limit_reached_by_new_bytes() {
     });
 
     test_create_multiple_items(&mut h, &acc, |status| {
-        assert_vm_status!(status, StatusCode::IO_LIMIT_REACHED);
+        {
+            use aptos_types::transaction::*;
+            assert_eq!(
+                status,
+                TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(StatusCode::IO_LIMIT_REACHED)))
+            );
+        }
     });
 }
 

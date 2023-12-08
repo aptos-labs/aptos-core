@@ -6,17 +6,20 @@
 #[macro_use]
 extern crate criterion;
 
-use ark_bn254::{Fq, Fq2, Fq12, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
-use ark_ec::{
-    pairing::Pairing, short_weierstrass::Projective, AffineRepr, CurveGroup,
-    Group,
+use crate::bench_utils::{
+    bench_function_add, bench_function_clone, bench_function_deser_comp,
+    bench_function_deser_uncomp, bench_function_div, bench_function_double, bench_function_eq,
+    bench_function_from_u64, bench_function_inv, bench_function_mul, bench_function_neg,
+    bench_function_pow_u256, bench_function_serialize_uncomp, bench_function_square,
+    bench_function_sub,
 };
-use ark_ff::{Field, One, UniformRand, Zero};
+use ark_bn254::{Fq, Fq12, Fq2, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
+use ark_ec::{pairing::Pairing, short_weierstrass::Projective, AffineRepr, CurveGroup, Group};
+use ark_ff::{UniformRand, Zero};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::test_rng;
 use criterion::{BenchmarkId, Criterion};
-use std::ops::{Add, Div, Mul, Neg};
-use crate::bench_utils::{bench_function_add, bench_function_clone, bench_function_deser_comp, bench_function_deser_uncomp, bench_function_div, bench_function_double, bench_function_eq, bench_function_from_u64, bench_function_inv, bench_function_mul, bench_function_neg, bench_function_pow_u256, bench_function_serialize_uncomp, bench_function_square, bench_function_sub};
+use std::ops::{Mul, Neg};
 
 mod bench_utils;
 
@@ -92,7 +95,6 @@ fn bench_group(c: &mut Criterion) {
     group.bench_function("fq2_square", bench_function_square::<Fq2>);
     group.bench_function("fq2_sub", bench_function_sub::<Fq2>);
 
-
     group.bench_function("fq12_add", bench_function_add::<Fq12>);
     group.bench_function("fq12_clone", bench_function_clone::<Fq12>);
     group.bench_function("fq12_deser", bench_function_deser_uncomp::<Fq12>);
@@ -109,8 +111,14 @@ fn bench_group(c: &mut Criterion) {
     group.bench_function("fq12_sub", bench_function_sub::<Fq12>);
 
     group.bench_function("g1_affine_add", bench_function_add::<G1Affine>);
-    group.bench_function("g1_affine_deser_comp", bench_function_deser_comp::<G1Affine>);
-    group.bench_function("g1_affine_deser_uncomp", bench_function_deser_uncomp::<G1Affine>);
+    group.bench_function(
+        "g1_affine_deser_comp",
+        bench_function_deser_comp::<G1Affine>,
+    );
+    group.bench_function(
+        "g1_affine_deser_uncomp",
+        bench_function_deser_uncomp::<G1Affine>,
+    );
     group.bench_function("g1_affine_eq", bench_function_eq::<G1Affine>);
     group.bench_function("g1_affine_generator", move |b| {
         b.iter(|| {
@@ -477,8 +485,7 @@ fn bench_group(c: &mut Criterion) {
                     (g1_elements, g2_elements)
                 },
                 |(g1_elements, g2_elements)| {
-                    let _product =
-                        ark_bn254::Bn254::multi_pairing(g1_elements, g2_elements).0;
+                    let _product = ark_bn254::Bn254::multi_pairing(g1_elements, g2_elements).0;
                 },
             );
         });

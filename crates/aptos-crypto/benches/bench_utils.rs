@@ -1,9 +1,10 @@
-use std::ops::{Add, Div, Mul, Neg, Sub};
-use ark_ff::{BigInteger256, Field, One, Zero};
+// Copyright © Aptos Foundation
+
+use ark_ff::{BigInteger256, Field};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::test_rng;
-use ark_std::UniformRand;
+use ark_std::{test_rng, UniformRand};
 use criterion::Bencher;
+use std::ops::{Add, Div, Mul, Neg, Sub};
 
 fn rand<T: UniformRand>() -> T {
     T::rand(&mut test_rng())
@@ -27,7 +28,9 @@ pub fn bench_function_clone<T: Clone + UniformRand>(b: &mut Bencher) {
     )
 }
 
-pub fn bench_function_deser_comp<T: CanonicalSerialize + CanonicalDeserialize + UniformRand>(b: &mut Bencher) {
+pub fn bench_function_deser_comp<T: CanonicalSerialize + CanonicalDeserialize + UniformRand>(
+    b: &mut Bencher,
+) {
     b.iter_with_setup(
         || {
             let e = rand::<T>();
@@ -41,7 +44,9 @@ pub fn bench_function_deser_comp<T: CanonicalSerialize + CanonicalDeserialize + 
     )
 }
 
-pub fn bench_function_deser_uncomp<T: CanonicalSerialize + CanonicalDeserialize + UniformRand>(b: &mut Bencher) {
+pub fn bench_function_deser_uncomp<T: CanonicalSerialize + CanonicalDeserialize + UniformRand>(
+    b: &mut Bencher,
+) {
     b.iter_with_setup(
         || {
             let e = rand::<T>();
@@ -87,12 +92,9 @@ pub fn bench_function_eq<T: Clone + Eq + UniformRand>(b: &mut Bencher) {
 }
 
 pub fn bench_function_from_u64<T: From<u64> + UniformRand>(b: &mut Bencher) {
-    b.iter_with_setup(
-        || rand::<u64>(),
-        |i| {
-            let _res = T::from(i);
-        },
-    )
+    b.iter_with_setup(rand::<u64>, |i| {
+        let _res = T::from(i);
+    })
 }
 
 pub fn bench_function_inv<T: Field + UniformRand>(b: &mut Bencher) {
@@ -120,12 +122,6 @@ pub fn bench_function_neg<T: Neg + UniformRand>(b: &mut Bencher) {
             let _e_2 = e.neg();
         },
     )
-}
-
-pub fn bench_function_one<T: One>(b: &mut Bencher) {
-    b.iter(|| {
-        let _e = T::one();
-    })
 }
 
 pub fn bench_function_pow_u256<T: Field + UniformRand>(b: &mut Bencher) {
@@ -165,14 +161,6 @@ pub fn bench_function_sub<T: Sub + UniformRand>(b: &mut Bencher) {
         || (rand::<T>(), rand::<T>()),
         |(e, f)| {
             let _res = e - f;
-        },
-    )
-}
-
-pub fn bench_function_zero<T: Zero + UniformRand>(b: &mut Bencher) {
-    b.iter(
-        || {
-            let _res = T::zero();
         },
     )
 }
