@@ -4,13 +4,13 @@
 //! This file defines the state snapshot committer running in background thread within StateStore.
 
 use crate::{
+    metrics::OTHER_TIMERS_SECONDS,
     state_store::{
         buffered_state::CommitMessage,
         state_merkle_batch_committer::{StateMerkleBatch, StateMerkleBatchCommitter},
         StateDb,
     },
     versioned_node_cache::VersionedNodeCache,
-    OTHER_TIMERS_SECONDS,
 };
 use anyhow::Result;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;

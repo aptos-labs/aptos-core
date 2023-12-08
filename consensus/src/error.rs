@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::experimental;
+use crate::pipeline;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -19,8 +19,8 @@ pub struct StateSyncError {
     inner: anyhow::Error,
 }
 
-impl From<experimental::errors::Error> for StateSyncError {
-    fn from(e: experimental::errors::Error) -> Self {
+impl From<pipeline::errors::Error> for StateSyncError {
+    fn from(e: pipeline::errors::Error) -> Self {
         StateSyncError { inner: e.into() }
     }
 }

@@ -506,7 +506,7 @@ impl LifetimeState {
 // Lifetime Analysis
 
 /// Used to distinguish how a local is read
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum ReadMode {
     /// The local is moved
     Move,
@@ -754,14 +754,20 @@ impl<'env> LifeTimeAnalysis<'env> {
             if ty.is_reference() {
                 if ty.is_mutable_reference() {
                     match read_mode {
-                        ReadMode::Move => {
+                        ReadMode::Move | ReadMode::Copy => {
+                            let (op_str, verb_str) = if read_mode == ReadMode::Move {
+                                ("move", "moved")
+                            } else {
+                                ("copy", "copied")
+                            };
                             self.error_with_hints(
                                 &loc,
                                 format!(
-                                    "cannot move mutable reference in {} which is still borrowed",
+                                    "cannot {} mutable reference in {} which is still borrowed",
+                                    op_str,
                                     self.display(local)
                                 ),
-                                "moved here",
+                                format!("{} here", verb_str),
                                 self.borrow_info(state, label, false, alive).into_iter(),
                             );
                             false
@@ -777,11 +783,6 @@ impl<'env> LifeTimeAnalysis<'env> {
                                 self.borrow_info(state, label, false, alive).into_iter(),
                             );
                             false
-                        },
-                        ReadMode::Copy => {
-                            // This has been checked in live-var analysis (during copy
-                            // transformation)
-                            true
                         },
                     }
                 } else {

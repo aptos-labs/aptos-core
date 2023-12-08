@@ -5,11 +5,11 @@
 use crate::{
     counters,
     epoch_manager::EpochManager,
-    experimental::buffer_manager::OrderedBlocks,
     network::NetworkTask,
     network_interface::{ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::PayloadManager,
+    pipeline::buffer_manager::OrderedBlocks,
     quorum_store::quorum_store_db::MockQuorumStoreDB,
     test_utils::{MockStateComputer, MockStorage},
     util::time_service::ClockTimeService,

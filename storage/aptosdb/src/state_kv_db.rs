@@ -4,11 +4,11 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+    common::NUM_STATE_SHARDS,
     db_options::{gen_state_kv_cfds, state_kv_db_column_families},
     metrics::OTHER_TIMERS_SECONDS,
+    schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     utils::truncation_helper::{get_state_kv_commit_progress, truncate_state_kv_db_shards},
-    NUM_STATE_SHARDS,
 };
 use anyhow::Result;
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs, StorageDirPaths};

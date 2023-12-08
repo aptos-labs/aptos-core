@@ -8,7 +8,8 @@ use aptos_consensus_types::{executed_block::ExecutedBlock, common::Round};
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, randomness::{Randomness, RandMetadata}};
 use tokio::time::Instant;
 
-use crate::{state_replication::StateComputerCommitCallBackType, experimental::commit_reliable_broadcast::DropGuard};
+use crate::{state_replication::StateComputerCommitCallBackType};
+use crate::pipeline::commit_reliable_broadcast::DropGuard;
 
 /// Sent from consensus to RandManager.
 /// May contains a randomness if sent from DAG consensus.

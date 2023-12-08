@@ -14,12 +14,6 @@ use crate::{
         dkg_manager::{DKGManager, DKGManagerWrapper}, build_dkg_pvss_config,
     },
     error::{error_kind, DbError},
-    experimental::{
-        buffer_manager::ResetRequest,
-        decoupled_execution_utils::prepare_phases_and_buffer_manager,
-        ordering_state_computer::{DagStateSyncComputer, OrderingStateComputer},
-        signing_phase::CommitSignerProvider,
-    },
     liveness::{
         cached_proposer_election::CachedProposerElection,
         leader_reputation::{
@@ -47,6 +41,12 @@ use crate::{
     },
     payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
+    pipeline::{
+        buffer_manager::{ResetRequest},
+        decoupled_execution_utils::prepare_phases_and_buffer_manager,
+        ordering_state_computer::{DagStateSyncComputer, OrderingStateComputer},
+        signing_phase::CommitSignerProvider,
+    },
     quorum_store::{
         quorum_store_builder::{DirectMempoolInnerBuilder, InnerBuilder, QuorumStoreBuilder},
         quorum_store_coordinator::CoordinatorCommand,
@@ -665,7 +665,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             buffer_manager,
         ) = prepare_phases_and_buffer_manager(
             self.author,
-            self.epoch(),
             self.commit_state_computer.clone(),
             commit_signer_provider,
             network_sender,
@@ -1217,7 +1216,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let (payload_manager, quorum_store_client, quorum_store_builder) = self
             .init_payload_provider(epoch_state, network_sender.clone(), consensus_config)
             .await;
-
         let mixed_payload_client = MixedPayloadClient::new(
             consensus_config.validator_txn_enabled(),
             self.validator_txn_pool_client.clone(),

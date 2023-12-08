@@ -17,26 +17,24 @@ This tutorial describes how to create and transfer non-fungible assets on the Ap
 
 Install your preferred SDK from the below list:
 
-* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [TypeScript SDK](../sdks/new-ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
 
 ---
 
 ## Step 2: Run the example
 
-Each SDK provides an `examples` directory. This tutorial covers the `simple_aptos_token` example.
-
-Clone the `aptos-core` repo:
-```bash
-git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
-```
-
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
+Clone the `aptos-ts-sdk` repo:
+```bash
+git clone git@github.com:aptos-labs/aptos-ts-sdk.git 
+```
+
   Navigate to the Typescript SDK examples directory:
   ```bash
-  cd ~/aptos-core/ecosystem/typescript/sdk/examples/typescript
+  cd aptos-ts-sdk/examples/typescript-esm
   ```
 
   Install the necessary dependencies:
@@ -44,12 +42,17 @@ git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
   pnpm install
   ```
 
-  Run the Typescript [`simple_aptos_token`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/simple_aptos_token.ts) example:
+  Run the Typescript [`simple_digital_asset`](https://github.com/aptos-labs/aptos-ts-sdk/blob/main/examples/typescript-esm/simple_digital_asset.ts) example:
   ```bash
-  pnpm run simple_aptos_token
+  pnpm run simple_digital_asset
   ```
   </TabItem>
   <TabItem value="python" label="Python">
+
+  Clone the `aptos-core` repo:
+```bash
+git clone https://github.com/aptos-labs/aptos-core.git
+```
 
   Navigate to the Python SDK directory:
   ```bash
@@ -73,71 +76,103 @@ git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
 
 ## Step 3: Understand the output
 
-The following output should appear after executing the `simple_aptos_token` example, though some values will be different:
-
 <Tabs groupId="sdk-output">
 <TabItem value="typescript" label="Typescript">
 
+The following output should appear after executing the `simple_digital_asset` example, though some values will be different:
+
 ```yaml
 === Addresses ===
-Alice: 0x5acb91a64a2bbc5fc606a534709db5a1e60e439e15069d1e7bbaecddb4189b48
-Bob: 0x612febb35dabc40df3260f7dd6c012f955671eb99862ba12390d2182ee3ab5de
 
-=== Initial Coin Balances ===
-Alice: 100000000
-Bob: 100000000
+Alice's address is: 0x770dbeb6101056eac5a19de9a73ad72fac512e0de909e7bcb13a9d9241d1d162
 
-=== Creating Collection and Token ===
+=== Create the collection ===
+
 Alice's collection: {
-    "collection_id": "0x65b4000927646cae66251ed121f69ffa9acc2a6fb58a574fc66fd002b3d15d4f",
+    "collection_id": "0x23ece6c35415f5c5a720dc4de2820cabece0a6f1768095db479f657ad2c05753",
+    "collection_name": "Example Collection",
+    "creator_address": "0x770dbeb6101056eac5a19de9a73ad72fac512e0de909e7bcb13a9d9241d1d162",
+    "current_supply": 0,
+    "description": "Example description.",
+    "last_transaction_timestamp": "2023-11-29T21:26:03.204874",
+    "last_transaction_version": 8001101,
+    "max_supply": 18446744073709552000,
+    "mutable_description": true,
+    "mutable_uri": true,
+    "table_handle_v1": null,
     "token_standard": "v2",
-    "collection_name": "Alice's",
-    "creator_address": "0x5acb91a64a2bbc5fc606a534709db5a1e60e439e15069d1e7bbaecddb4189b48",
-    "current_supply": 1,
-    "description": "Alice's simple collection",
-    "uri": "https://alice.com"
+    "total_minted_v2": 0,
+    "uri": "aptos.dev"
 }
-Alice's token balance: 1
-Alice's token data: {
-    "token_data_id": "0xca2139c819fe03e2e268314c078948410dd14a64142ac270207a82cfddcc1fe7",
-    "token_name": "Alice's first token",
-    "token_uri": "https://aptos.dev/img/nyan.jpeg",
-    "token_properties": {},
+
+=== Alice Mints the digital asset ===
+
+Alice's digital assets balance: 1
+Alice's digital asset: {
     "token_standard": "v2",
-    "largest_property_version_v1": null,
-    "maximum": null,
+    "token_properties_mutated_v1": null,
+    "token_data_id": "0x9f4460e29a66b4e41cef1671767dc8a5e8c52a2291e36f84b8596e0d1205fd8c",
+    "table_type_v1": null,
+    "storage_id": "0x9f4460e29a66b4e41cef1671767dc8a5e8c52a2291e36f84b8596e0d1205fd8c",
+    "property_version_v1": 0,
+    "owner_address": "0x770dbeb6101056eac5a19de9a73ad72fac512e0de909e7bcb13a9d9241d1d162",
+    "last_transaction_version": 8001117,
+    "last_transaction_timestamp": "2023-11-29T21:26:04.521624",
+    "is_soulbound_v2": false,
     "is_fungible_v2": false,
-    "supply": 0,
-    "last_transaction_version": 77174329,
-    "last_transaction_timestamp": "2023-08-02T01:23:05.620127",
-    "current_collection": {
-        "collection_id": "0x65b4000927646cae66251ed121f69ffa9acc2a6fb58a574fc66fd002b3d15d4f",
-        "collection_name": "Alice's",
-        "creator_address": "0x5acb91a64a2bbc5fc606a534709db5a1e60e439e15069d1e7bbaecddb4189b48",
-        "uri": "https://alice.com",
-        "current_supply": 1
+    "amount": 1,
+    "current_token_data": {
+        "collection_id": "0x23ece6c35415f5c5a720dc4de2820cabece0a6f1768095db479f657ad2c05753",
+        "description": "Example asset description.",
+        "is_fungible_v2": false,
+        "largest_property_version_v1": null,
+        "last_transaction_timestamp": "2023-11-29T21:26:04.521624",
+        "last_transaction_version": 8001117,
+        "maximum": null,
+        "supply": 0,
+        "token_data_id": "0x9f4460e29a66b4e41cef1671767dc8a5e8c52a2291e36f84b8596e0d1205fd8c",
+        "token_name": "Example Asset",
+        "token_properties": {},
+        "token_standard": "v2",
+        "token_uri": "aptos.dev/asset",
+        "current_collection": {
+            "collection_id": "0x23ece6c35415f5c5a720dc4de2820cabece0a6f1768095db479f657ad2c05753",
+            "collection_name": "Example Collection",
+            "creator_address": "0x770dbeb6101056eac5a19de9a73ad72fac512e0de909e7bcb13a9d9241d1d162",
+            "current_supply": 1,
+            "description": "Example description.",
+            "last_transaction_timestamp": "2023-11-29T21:26:04.521624",
+            "last_transaction_version": 8001117,
+            "max_supply": 18446744073709552000,
+            "mutable_description": true,
+            "mutable_uri": true,
+            "table_handle_v1": null,
+            "token_standard": "v2",
+            "total_minted_v2": 1,
+            "uri": "aptos.dev"
+        }
     }
 }
 
-=== Transferring the token to Bob ===
-Alice's token balance: 0
-Bob's token balance: 1
+=== Transfer the digital asset to Bob ===
 
-=== Transferring the token back to Alice ===
-Alice's token balance: 1
-Bob's token balance: 0
-
-=== Checking if indexer devnet chainId same as fullnode chainId  ===
-Fullnode chain id is: 67, indexer chain id is: 67
-
-=== Getting Alices's NFTs ===
-Alice current token ownership: 1. Should be 1
-
-=== Getting Bob's NFTs ===
-Bob current token ownership: 0. Should be 0
+Alices's digital assets balance: 0
+Bob's digital assets balance: 1
 ```
+
+This example demonstrates:
+
+* Initializing the Aptos client.
+* The creation of two accounts: Alice and Bob.
+* The funding and creation of Alice and Bob's accounts.
+* The creation of a collection and a token using Alice's account.
+* Alice sending a token to Bob.
+
+
   </TabItem>
   <TabItem value="python" label="Python">
+
+The following output should appear after executing the `simple_aptos_token` example, though some values will be different:
 
 ```yaml
 === Addresses ===
@@ -175,8 +210,6 @@ Token owner: Bob
 === Transferring the token back to Alice ===
 Token owner: Alice
 ```
-  </TabItem>
-</Tabs>
 
 This example demonstrates:
 
@@ -187,6 +220,10 @@ This example demonstrates:
 * Alice sending a token to Bob.
 * Bob sending the token back to Alice.
 
+
+  </TabItem>
+</Tabs>
+
 ---
 
 ## Step 4: The SDK in depth
@@ -195,7 +232,7 @@ This example demonstrates:
   <TabItem value="typescript" label="Typescript">
 
 :::tip See the full code
-See [`simple_aptos_token`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/simple_aptos_token.ts) for the complete code as you follow the below steps.
+See [`simple_digital_asset`](https://github.com/aptos-labs/aptos-ts-sdk/blob/main/examples/typescript-esm/simple_digital_asset.ts) for the complete code as you follow the below steps.
 :::
   </TabItem>
   <TabItem value="python" label="Python">
@@ -210,29 +247,28 @@ See [`simple_aptos_token`](https://github.com/aptos-labs/aptos-core/blob/main/ec
 
 ### Step 4.1: Initializing the clients
 
+<Tabs groupId="sdk-examples">
+  <TabItem value="typescript" label="Typescript">
+
+In the first step, the `simple_digital_asset` example initializes the Aptos client:
+
+```ts
+const APTOS_NETWORK: Network = NetworkToNetworkName[process.env.APTOS_NETWORK] || Network.DEVNET;
+const config = new AptosConfig({ network: APTOS_NETWORK });
+const aptos = new Aptos(config);
+```
+
+:::tip
+By default, the Aptos client points to Aptos devnet services. However, it can be configured with the `network` input argument
+:::
+
+  </TabItem>
+  <TabItem value="python" label="Python">
+
 In the first step, the example initializes both the API and faucet clients.
 
 - The API client interacts with the REST API.
 - The faucet client interacts with the devnet Faucet service for creating and funding accounts.
-
-<Tabs groupId="sdk-examples">
-  <TabItem value="typescript" label="Typescript">
-
-```ts
-:!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_1a
-```
-
-Using the API client we can create a `TokenClient` that we use for common token operations such as creating collections and tokens, transferring them, claiming them, and so on.
-```ts
-:!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_1b
-```
-
-`common.ts` initializes the URL values as such:
-```ts
-:!: static/sdks/typescript/examples/typescript/common.ts section_1
-```
-  </TabItem>
-  <TabItem value="python" label="Python">
 
 ```python
 :!: static/sdks/python/examples/simple_aptos_token.py section_1a
@@ -249,9 +285,6 @@ Using the API client we can create a `TokenClient` that we use for common token 
 ```python
 :!: static/sdks/python/examples/common.py section_1
 ```
-  </TabItem>
-</Tabs>
-
 
 :::tip
 
@@ -259,6 +292,9 @@ By default, the URLs for both the services point to Aptos devnet services. Howev
   - `APTOS_NODE_URL`
   - `APTOS_FAUCET_URL`
 :::
+  </TabItem>
+</Tabs>
+
 
 ---
 
@@ -271,7 +307,8 @@ The next step is to create two accounts locally. [Accounts](../concepts/accounts
   <TabItem value="typescript" label="Typescript">
 
 ```ts
-:!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_2
+const alice = Account.generate();
+const bob = Account.generate();
 ```
   </TabItem>
   <TabItem value="python" label="Python">
@@ -296,7 +333,14 @@ In order to actually instantiate the Account on-chain, it must be explicitly cre
   <TabItem value="typescript" label="Typescript">
 
 ```ts
-:!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_3
+await aptos.fundAccount({
+    accountAddress: alice.accountAddress,
+    amount: 100_000_000,
+  });
+await aptos.faucet.fundAccount({
+  accountAddress: bob.accountAddress,
+  amount: 100_000_000,
+});
 ```
   </TabItem>
   <TabItem value="python" label="Python">
@@ -316,14 +360,29 @@ Now begins the process of creating the digital, non-fungible assets. First, as t
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
-Your application will call `createCollection`:
+Your application will call `createCollectionTransaction` and then `signAndSubmitTransaction` to chain:
 ```ts
-:!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_4
+const createCollectionTransaction = await aptos.createCollectionTransaction({
+    creator: alice,
+    description: collectionDescription,
+    name: collectionName,
+    uri: collectionURI,
+  });
+
+const committedTxn = await aptos.signAndSubmitTransaction({ signer: alice, transaction: createCollectionTransaction });
 ```
 
-This is the function signature of `createCollection`. It returns a transaction hash:
+This is the function signature of `createCollectionTransaction`. It returns a `SingleSignerTransaction` that can be simulated or submitted to chain:
 ```ts
-:!: static/sdks/typescript/src/plugins/aptos_token.ts createCollection
+export async function createCollectionTransaction(
+  args: {
+    creator: Account;
+    description: string;
+    name: string;
+    uri: string;
+    options?: InputGenerateTransactionOptions;
+  } & CreateCollectionOptions,
+): Promise<SingleSignerTransaction>
 ```
   </TabItem>
   <TabItem value="python" label="Python">
@@ -349,14 +408,29 @@ To create a token, the creator must specify an associated collection. A token mu
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
-Your application will call `mint`:
+Your application will call `mintTokenTransaction`:
 ```ts
-:!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_5
+const mintTokenTransaction = await aptos.mintTokenTransaction({
+  creator: alice,
+  collection: collectionName,
+  description: tokenDescription,
+  name: tokenName,
+  uri: tokenURI,
+});
+
+const committedTxn = await aptos.signAndSubmitTransaction({ signer: alice, transaction: mintTokenTransaction });
 ```
 
-This is the function signature of `mint`. It returns a transaction hash:
+This is the function signature of `mintTokenTransaction`. It returns a `SingleSignerTransaction` that can be simulated or submitted to chain:
 ```ts
-:!: static/sdks/typescript/src/plugins/aptos_token.ts mint
+async mintTokenTransaction(args: {
+    creator: Account;
+    collection: string;
+    description: string;
+    name: string;
+    uri: string;
+    options?: InputGenerateTransactionOptions;
+  }): Promise<SingleSignerTransaction>
 ```
   </TabItem>
   <TabItem value="python" label="Python">
@@ -384,17 +458,22 @@ Both the collection and token assets are [Objects](../standards/aptos-object) on
 
 To read a collection's metadata:
 ```ts
-:!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_6
+const alicesCollection = await aptos.getCollectionData({
+  creatorAddress: alice.accountAddress,
+  collectionName,
+  minimumLedgerVersion: BigInt(pendingTxn.version),
+});
+console.log(`Alice's collection: ${JSON.stringify(alicesCollection, null, 4)}`);
 ```
 
-To read a token's metadata:
+To read a owned token's metadata:
 ```ts
-:!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_8
-```
+const alicesDigitalAsset = await aptos.getOwnedTokens({
+  ownerAddress: alice.accountAddress,
+  minimumLedgerVersion: BigInt(pendingTxn.version),
+});
 
-Here's how `getTokenData` queries the token metadata using the [indexer client](../sdks/ts-sdk/typescript-sdk-indexer-client-class):
-```ts
-:!: static/sdks/typescript/src/providers/indexer.ts getTokenData
+console.log(`Alice's digital asset: ${JSON.stringify(alicesDigitalAsset[0], null, 4)}`);
 ```
 
   </TabItem>
@@ -422,12 +501,47 @@ Each object created from the `aptos_token.move` contract is a distinct asset. Th
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
-```ts title="Extracting the balance from the indexer query"
-:!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_7
+```ts
+const alicesDigitalAsset = await aptos.getOwnedTokens({
+  ownerAddress: alice.accountAddress,
+  minimumLedgerVersion: BigInt(pendingTxn.version),
+});
+
+console.log(`Alice's digital asset: ${JSON.stringify(alicesDigitalAsset[0], null, 4)}`);
 ```
 
 ```ts title="Making the query to get the data"
-:!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts getTokenInfo
+
+export async function getOwnedTokens(args: {
+  aptosConfig: AptosConfig;
+  ownerAddress: AccountAddressInput;
+  options?: PaginationArgs & OrderByArg<GetTokenActivityResponse[0]>;
+}): Promise<GetOwnedTokensResponse> {
+  const { aptosConfig, ownerAddress, options } = args;
+
+  const whereCondition: CurrentTokenOwnershipsV2BoolExp = {
+    owner_address: { _eq: AccountAddress.from(ownerAddress).toStringLong() },
+    amount: { _gt: 0 },
+  };
+
+  const graphqlQuery = {
+    query: GetCurrentTokenOwnership,
+    variables: {
+      where_condition: whereCondition,
+      offset: options?.offset,
+      limit: options?.limit,
+      order_by: options?.orderBy,
+    },
+  };
+
+  const data = await queryIndexer<GetCurrentTokenOwnershipQuery>({
+    aptosConfig,
+    query: graphqlQuery,
+    originMethod: "getOwnedTokens",
+  });
+
+  return data.current_token_ownerships_v2;
+}
 ```
   </TabItem>
   <TabItem value="python" label="Python">
@@ -452,28 +566,37 @@ Each object created from the `aptos_token.move` contract is a distinct asset. Th
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
-```ts title="Extracting the balance from the indexer query"
-:!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_7
-```
+```ts
+const alicesDigitalAsset = await aptos.getOwnedTokens({
+  ownerAddress: alice.accountAddress,
+  minimumLedgerVersion: BigInt(pendingTxn.version),
+});
 
-```ts title="Making the query to get the data"
-:!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts getTokenInfo
+console.log(`Alice's digital asset: ${JSON.stringify(alicesDigitalAsset[0], null, 4)}`);
 ```
 
 ```ts title="Transfer the token from Alice to Bob"
-:!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_9
+const transferTransaction = await aptos.transferDigitalAsset({
+  sender: alice,
+  digitalAssetAddress: alicesDigitalAsset[0].token_data_id,
+  recipient: bob.accountAddress,
+});
+const committedTxn = await aptos.signAndSubmitTransaction({ signer: alice, transaction: transferTransaction });
+const pendingTxn = await aptos.waitForTransaction({ transactionHash: committedTxn.hash });
 ```
 
 ```ts title="Print each user's queried token amount"
-:!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_10
-```
+const alicesDigitalAssetsAfter = await aptos.getOwnedTokens({
+  ownerAddress: alice.accountAddress,
+  minimumLedgerVersion: BigInt(pendingTxn.version),
+});
+console.log(`Alices's digital assets balance: ${alicesDigitalAssetsAfter.length}`);
 
-```ts title="Transfer the token back to Alice"
-:!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_11
-```
-
-```ts title="Print each user's queried token amount again"
-:!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_12
+const bobDigitalAssetsAfter = await aptos.getOwnedTokens({
+  ownerAddress: bob.accountAddress,
+  minimumLedgerVersion: BigInt(pendingTxn.version),
+});
+console.log(`Bob's digital assets balance: ${bobDigitalAssetsAfter.length}`);
 ```
 
   </TabItem>
@@ -509,6 +632,6 @@ Each object created from the `aptos_token.move` contract is a distinct asset. Th
 ## Supporting documentation
 
 * [Account basics](../concepts/accounts.md)
-* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [TypeScript SDK](../sdks/new-ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
 * [REST API specification](https://aptos.dev/nodes/aptos-api-spec#/)

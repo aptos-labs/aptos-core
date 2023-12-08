@@ -20,6 +20,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use aptos_logger::debug;
 
 pub struct MixedPayloadClient {
     validator_txn_enabled: bool,
@@ -58,6 +59,7 @@ impl PayloadClient for MixedPayloadClient {
         // Pull validator txns first.
         let validator_txn_pull_timer = Instant::now();
         let validator_txns = if self.validator_txn_enabled {
+            debug!("validator_txn_enabled=1");
             self.validator_txn_pool_client.pull(
                 max_poll_time,
                 max_items,
@@ -65,9 +67,10 @@ impl PayloadClient for MixedPayloadClient {
                 validator_txn_filter,
             )
         } else {
+            debug!("validator_txn_enabled=0");
             vec![]
         };
-
+        debug!("num_validator_txns={}", validator_txns.len());
         // Update constraints with validator txn pull results.
         max_items -= validator_txns.len() as u64;
         max_bytes -= validator_txns

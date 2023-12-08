@@ -1795,11 +1795,11 @@ pub enum Transaction {
     /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
     StateCheckpoint(HashValue),
 
-    /// `BlockMetadata` but also containing extra information. (E.g., on-chain randomness data).
-    BlockMetadataExt(BlockMetadataExt),
-
     /// Transaction that only proposed by a validator mainly to update on-chain configs.
     ValidatorTransaction(ValidatorTransaction),
+
+    /// `BlockMetadata` but also containing extra information. (E.g., on-chain randomness data).
+    BlockMetadataExt(BlockMetadataExt),
 }
 
 impl Transaction {

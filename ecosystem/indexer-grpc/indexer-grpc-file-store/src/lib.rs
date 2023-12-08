@@ -26,7 +26,10 @@ impl RunnableConfig for IndexerGrpcFileStoreWorkerConfig {
         )
         .await
         .context("Failed to create processor for file store worker")?;
-        processor.run().await?;
+        processor
+            .run()
+            .await
+            .expect("File store processor exited unexpectedly");
         Err(anyhow::anyhow!("File store processor exited unexpectedly"))
     }
 

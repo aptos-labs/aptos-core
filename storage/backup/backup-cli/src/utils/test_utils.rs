@@ -5,7 +5,7 @@
 use aptos_backup_service::start_backup_service;
 use aptos_config::utils::get_available_port;
 use aptos_db::{
-    test_helper::{arb_blocks_to_commit, update_in_memory_state},
+    db::test_helper::{arb_blocks_to_commit, update_in_memory_state},
     AptosDB,
 };
 use aptos_proptest_helpers::ValueGenerator;

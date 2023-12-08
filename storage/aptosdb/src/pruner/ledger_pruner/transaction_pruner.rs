@@ -7,7 +7,7 @@ use crate::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         transaction::TransactionSchema,
     },
-    TransactionStore,
+    transaction_store::TransactionStore,
 };
 use anyhow::{ensure, Result};
 use aptos_logger::info;

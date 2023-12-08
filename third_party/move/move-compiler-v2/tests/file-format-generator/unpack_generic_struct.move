@@ -19,13 +19,21 @@ module 0x42::m {
         key: Key,
     }
 
+    public inline fun h<Key: store + drop>(x: E<Key>, v: |Key| E<Key>): E<Key> {
+        let E { key } = x;
+        v(key)
+    }
+
     public inline fun g<Key: store + drop>(x: E<Key>, v: |E<Key>|) {
         v(x)
     }
 
     public fun foo<Key: store + drop>(
         data: E<Key>, v: &mut Key) {
-        g(data, |e| {
+        let f = h(data, |e| {
+            E {key: e}
+        });
+        g(f, |e| {
             let (E { key }, _x) = (e, 3);
             *v = key;
         });

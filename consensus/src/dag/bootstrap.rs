@@ -31,7 +31,8 @@ use crate::{
     network::IncomingDAGRequest,
     payload_client::PayloadClient,
     payload_manager::PayloadManager,
-    state_replication::StateComputer, randomness::block_queue::OrderedBlocks,
+    randomness::block_queue::OrderedBlocks,
+    state_replication::StateComputer,
 };
 use aptos_channels::{
     aptos_channel::{self, Receiver},

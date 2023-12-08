@@ -25,9 +25,13 @@ use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResul
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
-    contract_event::ContractEvent, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::OnChainExecutionConfig, randomness::Randomness,
+    account_address::AccountAddress,
+    block_executor::config::BlockExecutorConfigFromOnchain,
+    contract_event::ContractEvent,
+    epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
+    on_chain_config::OnChainExecutionConfig,
+    randomness::Randomness,
     transaction::{SignedTransaction, Transaction},
 };
 use fail::fail_point;
@@ -170,9 +174,12 @@ impl StateComputer for ExecutionProxy {
         let block_gas_limit_enabled = block_executor_onchain_config.has_any_block_gas_limit();
 
         let timestamp = block.timestamp_usecs();
+
         let metadata = if self.randomness_enabled.load(Ordering::SeqCst) {
+            debug!("randomness_enabled=1");
             BlockMetadataWrapper::Ext(block.new_block_metadata_ext(&self.validators.lock(), randomness))
         } else {
+            debug!("randomness_enabled=0");
             BlockMetadataWrapper::Default(block.new_block_metadata(&self.validators.lock()))
         };
 

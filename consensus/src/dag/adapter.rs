@@ -9,7 +9,8 @@ use crate::{
         dag_store::Dag,
         storage::{CommitEvent, DAGStorage},
         CertifiedNode, Node, NodeId, Vote,
-    }, randomness::block_queue::OrderedBlocks,
+    },
+    randomness::block_queue::OrderedBlocks,
 };
 use anyhow::{anyhow, bail};
 use aptos_bitvec::BitVec;

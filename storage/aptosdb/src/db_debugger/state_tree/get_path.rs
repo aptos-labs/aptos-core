@@ -3,7 +3,7 @@
 
 use crate::{
     db_debugger::common::{parse_nibble_path, DbDir},
-    jellyfish_merkle_node::JellyfishMerkleNodeSchema,
+    schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
     state_merkle_db::StateMerkleDb,
 };
 use anyhow::{ensure, Result};

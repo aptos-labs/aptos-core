@@ -165,7 +165,9 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         change_set.aggregator_v1_delta_set().is_empty(),
         "non-empty delta change set in genesis"
     );
-    assert!(!change_set.write_set_iter().any(|(_, op)| op.is_deletion()));
+    assert!(!change_set
+        .concrete_write_set_iter()
+        .any(|(_, op)| op.expect("expect only concrete write ops").is_deletion()));
     verify_genesis_write_set(change_set.events());
 
     let change_set = change_set
@@ -277,7 +279,9 @@ pub fn encode_genesis_change_set(
         "non-empty delta change set in genesis"
     );
 
-    assert!(!change_set.write_set_iter().any(|(_, op)| op.is_deletion()));
+    assert!(!change_set
+        .concrete_write_set_iter()
+        .any(|(_, op)| op.expect("expect only concrete write ops").is_deletion()));
     verify_genesis_write_set(change_set.events());
     change_set
         .try_into_storage_change_set()

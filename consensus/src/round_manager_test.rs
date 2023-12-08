@@ -19,6 +19,7 @@ use crate::{
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::PayloadManager,
     persistent_liveness_storage::RecoveryData,
+    pipeline::buffer_manager::OrderedBlocks,
     round_manager::RoundManager,
     test_utils::{
         consensus_runtime, timed_block_on, MockPayloadManager, MockStateComputer, MockStorage,
@@ -38,7 +39,7 @@ use aptos_consensus_types::{
     },
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalStatus},
     common::{Author, Payload, Round},
-    experimental::commit_decision::CommitDecision,
+    pipeline::commit_decision::CommitDecision,
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures},

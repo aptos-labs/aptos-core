@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    experimental::signing_phase::CommitSignerProvider, monitor,
-    persistent_liveness_storage::PersistentLivenessStorage,
+    monitor, persistent_liveness_storage::PersistentLivenessStorage,
+    pipeline::signing_phase::CommitSignerProvider,
 };
 use aptos_consensus_types::{
     block_data::BlockData,

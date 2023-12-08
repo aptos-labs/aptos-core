@@ -24,7 +24,7 @@ use aptos_aggregator::{
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_logger::{debug, error, info};
 use aptos_mvhashmap::{
-    types::{Incarnation, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
+    types::{Incarnation, MVDataOutput, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
     unsync_map::UnsyncMap,
     versioned_delayed_fields::CommitError,
     MVHashMap,
@@ -108,7 +108,7 @@ where
 
         // VM execution.
         let sync_view = LatestView::new(base_view, ViewState::Sync(latest_view), idx_to_execute);
-        let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute, false);
+        let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
 
         let mut prev_modified_keys = last_input_output
             .modified_keys(idx_to_execute)
@@ -656,24 +656,32 @@ where
 
     // For each delayed field in resource write set, replace the identifiers with values.
     fn map_id_to_values_in_write_set(
-        resource_write_set: Option<BTreeMap<T::Key, (T::Value, Option<Arc<MoveTypeLayout>>)>>,
+        resource_write_set: Option<Vec<(T::Key, (T::Value, Option<Arc<MoveTypeLayout>>))>>,
         latest_view: &LatestView<T, S, X>,
     ) -> BTreeMap<T::Key, T::Value> {
         let mut patched_resource_write_set = BTreeMap::new();
         if let Some(resource_write_set) = resource_write_set {
-            for (key, (write_op, layout)) in resource_write_set.iter() {
+            for (key, (write_op, layout)) in resource_write_set.into_iter() {
                 // layout is Some(_) if it contains a delayed field
                 if let Some(layout) = layout {
                     if !write_op.is_deletion() {
-                        let patched_bytes = match latest_view
-                            .replace_identifiers_with_values(write_op.bytes().unwrap(), layout)
-                        {
-                            Ok((bytes, _)) => bytes,
-                            Err(_) => unreachable!("Failed to replace identifiers with values"),
-                        };
-                        let mut patched_write_op = write_op.clone();
-                        patched_write_op.set_bytes(patched_bytes);
-                        patched_resource_write_set.insert(key.clone(), patched_write_op);
+                        match write_op.bytes() {
+                            // TODO[agg_v2](fix): propagate error
+                            None => unreachable!(),
+                            Some(write_op_bytes) => {
+                                let patched_bytes = match latest_view
+                                    .replace_identifiers_with_values(write_op_bytes, &layout)
+                                {
+                                    Ok((bytes, _)) => bytes,
+                                    Err(_) => {
+                                        unreachable!("Failed to replace identifiers with values")
+                                    },
+                                };
+                                let mut patched_write_op = write_op;
+                                patched_write_op.set_bytes(patched_bytes);
+                                patched_resource_write_set.insert(key, patched_write_op);
+                            },
+                        }
                     }
                 }
             }
@@ -861,11 +869,18 @@ where
         if let Some(reads_needing_delayed_field_exchange) =
             last_input_output.reads_needing_delayed_field_exchange(txn_idx)
         {
-            for (key, (value, layout)) in reads_needing_delayed_field_exchange.into_iter() {
-                patched_resource_write_set.insert(
-                    key,
-                    Self::replace_ids_with_values(&value, layout.as_ref(), &latest_view),
-                );
+            for (key, layout) in reads_needing_delayed_field_exchange.into_iter() {
+                if let Ok(MVDataOutput::Versioned(
+                    _,
+                    ValueWithLayout::Exchanged(value, _existing_layout),
+                )) = versioned_cache.data().fetch_data(&key, txn_idx)
+                {
+                    // TODO[agg_v2](fix) add randomly_check_layout_matches(Some(_existing_layout), layout);
+                    patched_resource_write_set.insert(
+                        key,
+                        Self::replace_ids_with_values(&value, layout.as_ref(), &latest_view),
+                    );
+                }
             }
         }
 
@@ -886,9 +901,11 @@ where
         last_input_output.record_materialized_txn_output(
             txn_idx,
             aggregator_v1_delta_writes,
-            patched_resource_write_set,
+            patched_resource_write_set
+                .into_iter()
+                .chain(serialized_groups)
+                .collect(),
             patched_events,
-            serialized_groups,
         );
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
             let txn_output = last_input_output.txn_output(txn_idx).unwrap();
@@ -1234,11 +1251,12 @@ where
                 )),
                 idx as TxnIndex,
             );
-            let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex, true);
+            let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex);
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
+                    output.materialize_agg_v1(&latest_view);
                     assert_eq!(
                         output.aggregator_v1_delta_set().len(),
                         0,
@@ -1290,23 +1308,27 @@ where
                         let mut patched_resource_write_set =
                             Self::map_id_to_values_in_write_set(resource_change_set, &latest_view);
 
-                        for (key, (value, layout)) in
+                        for (key, layout) in
                             output.reads_needing_delayed_field_exchange().into_iter()
                         {
-                            if patched_resource_write_set
-                                .insert(
-                                    key,
-                                    Self::replace_ids_with_values(
-                                        &value,
-                                        layout.as_ref(),
-                                        &latest_view,
-                                    ),
-                                )
-                                .is_some()
+                            if let Some(ValueWithLayout::Exchanged(value, _)) =
+                                unsync_map.fetch_data(&key)
                             {
-                                return Err(Error::FallbackToSequential(code_invariant_error(
-                                    "reads_needing_delayed_field_exchange already in the write set for key",
-                                ).into()));
+                                if patched_resource_write_set
+                                    .insert(
+                                        key,
+                                        Self::replace_ids_with_values(
+                                            &value,
+                                            layout.as_ref(),
+                                            &latest_view,
+                                        ),
+                                    )
+                                    .is_some()
+                                {
+                                    return Err(Error::FallbackToSequential(code_invariant_error(
+                                        "reads_needing_delayed_field_exchange already in the write set for key",
+                                    ).into()));
+                                }
                             }
                         }
 
@@ -1328,9 +1350,11 @@ where
                             // They are already handled because we passed materialize_deltas=true
                             // to execute_transaction.
                             vec![],
-                            patched_resource_write_set,
+                            patched_resource_write_set
+                                .into_iter()
+                                .chain(serialized_groups.into_iter())
+                                .collect(),
                             patched_events,
-                            serialized_groups,
                         );
                     } else {
                         output.set_txn_output_for_non_dynamic_change_set();

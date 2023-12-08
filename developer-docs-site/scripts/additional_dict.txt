@@ -681,3 +681,4 @@ MoveString
 MoveOption
 autocomplete
 AccountAddress
+keypair

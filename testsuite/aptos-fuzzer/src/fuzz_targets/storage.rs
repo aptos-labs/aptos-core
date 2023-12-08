@@ -10,8 +10,8 @@ use aptos_accumulator::test_helpers::{
 };
 use aptos_crypto::HashValue;
 use aptos_db::{
+    db::test_helper::{arb_blocks_to_commit, test_save_blocks_impl},
     schema::fuzzing::fuzz_decode,
-    test_helper::{arb_blocks_to_commit, test_save_blocks_impl},
 };
 use aptos_jellyfish_merkle::test_helper::{
     arb_existent_kvs_and_nonexistent_keys, arb_kv_pair_with_distinct_last_nibble,

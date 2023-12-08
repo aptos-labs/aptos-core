@@ -6,7 +6,6 @@
 
 use crate::{
     dag::DAGNetworkMessage,
-    experimental,
     dkg::DKGNetworkMessage,
     quorum_store::types::{Batch, BatchMsg, BatchRequest}, randomness::types::RandMessage,
 };
@@ -14,7 +13,7 @@ use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
-    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
@@ -25,9 +24,9 @@ use aptos_network::{
     ProtocolId,
 };
 use aptos_types::{epoch_change::EpochChangeProof, PeerId};
-pub use experimental::commit_reliable_broadcast::CommitMessage;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use crate::pipeline::commit_reliable_broadcast::CommitMessage;
 
 /// Network type for consensus
 #[derive(Clone, Debug, Deserialize, Serialize)]

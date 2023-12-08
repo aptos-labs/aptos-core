@@ -9,7 +9,6 @@ use crate::{
         DAGMessage, DAGNetworkMessage, DAGRpcResult, ProofNotifier, RpcWithFallback,
         TDAGNetworkSender,
     },
-    experimental::commit_reliable_broadcast::CommitMessage,
     dkg::DKGNetworkMessage,
     logging::{LogEvent, LogSchema},
     monitor,
@@ -22,7 +21,7 @@ use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     common::Author,
-    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
@@ -55,6 +54,7 @@ use std::{
 };
 use tokio::time::timeout;
 use crate::dkg::DKGMessage;
+use crate::pipeline::commit_reliable_broadcast::CommitMessage;
 
 pub trait TConsensusMsg: Sized + Serialize + DeserializeOwned {
     fn epoch(&self) -> u64;

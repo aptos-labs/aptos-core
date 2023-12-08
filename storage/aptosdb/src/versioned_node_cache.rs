@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{lru_node_cache::LruNodeCache, state_merkle_db::Node, OTHER_TIMERS_SECONDS};
+use crate::{lru_node_cache::LruNodeCache, metrics::OTHER_TIMERS_SECONDS, state_merkle_db::Node};
 use aptos_infallible::RwLock;
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_types::transaction::Version;

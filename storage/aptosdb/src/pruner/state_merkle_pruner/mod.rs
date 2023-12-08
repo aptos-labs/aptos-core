@@ -9,7 +9,7 @@ mod state_merkle_shard_pruner;
 mod test;
 
 use crate::{
-    metrics::PRUNER_VERSIONS,
+    metrics::{OTHER_TIMERS_SECONDS, PRUNER_VERSIONS},
     pruner::{
         db_pruner::DBPruner,
         state_merkle_pruner::{
@@ -19,7 +19,6 @@ use crate::{
         },
     },
     state_merkle_db::StateMerkleDb,
-    OTHER_TIMERS_SECONDS,
 };
 use anyhow::{anyhow, Result};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;

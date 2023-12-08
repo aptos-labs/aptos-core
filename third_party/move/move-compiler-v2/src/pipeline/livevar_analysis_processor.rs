@@ -305,37 +305,14 @@ impl<'a> CopyTransformation<'a> {
     fn check_implicit_copy(
         &self,
         alive: &LiveVarInfoAtCodeOffset,
-        id: AttrId,
-        is_updated: bool,
+        _id: AttrId,
+        _is_updated: bool,
         temp: TempIndex,
     ) -> bool {
-        if let Some(info) = alive.after.get(&temp) {
-            let target = self.target();
-            if target.get_local_type(temp).is_mutable_reference() {
-                if !is_updated {
-                    // If this is a &mut which is not updated (e.g. a function call argument)
-                    // produce an error. &mut arguments play a special role, they are used
-                    // and updated at the same time. Therefore subsequent usage without copy is
-                    // fine, as it conceptually refers to a new instance for the same variable.
-                    self.error_with_hints(
-                        &target.get_bytecode_loc(id),
-                        format!(
-                            "implicit copy of mutable reference in {} which is used later",
-                            target.get_local_name_for_error_message(temp)
-                        ),
-                        "implicitly copied here",
-                        self.make_hints_from_usage(info),
-                    );
-                }
-                // Don't copy &mut
-                false
-            } else {
-                // TODO(#10723): insert ability check here
-                true
-            }
-        } else {
-            false
-        }
+        // TODO(#10723): insert ability check here
+        // Notice we do allow copy of &mut. Those copies are checked for validity in
+        // reference safety.
+        alive.after.contains_key(&temp)
     }
 
     fn make_hints_from_usage(

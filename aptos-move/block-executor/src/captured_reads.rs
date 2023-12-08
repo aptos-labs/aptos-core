@@ -22,6 +22,7 @@ use aptos_types::{
     aggregator::PanicError, state_store::state_value::StateValueMetadataKind,
     transaction::BlockExecutableTransaction as Transaction, write_set::TransactionWrite,
 };
+use aptos_vm_types::resolver::ResourceGroupSize;
 use derivative::Derivative;
 use move_core_types::value::MoveTypeLayout;
 use std::{
@@ -166,7 +167,7 @@ impl<V: TransactionWrite> DataRead<V> {
 #[derivative(Default(bound = ""))]
 pub(crate) struct GroupRead<T: Transaction> {
     /// The size of the resource group can be read (used for gas charging).
-    pub(crate) collected_size: Option<u64>,
+    pub(crate) collected_size: Option<ResourceGroupSize>,
     /// Reads to individual resources in the group, keyed by a tag.
     pub(crate) inner_reads: HashMap<T::Tag, DataRead<T::Value>>,
 }
@@ -386,7 +387,7 @@ impl<T: Transaction> CapturedReads<T> {
     pub(crate) fn capture_group_size(
         &mut self,
         group_key: T::Key,
-        group_size: u64,
+        group_size: ResourceGroupSize,
     ) -> anyhow::Result<()> {
         let group = self.group_reads.entry(group_key).or_default();
 
@@ -400,7 +401,7 @@ impl<T: Transaction> CapturedReads<T> {
         Ok(())
     }
 
-    pub(crate) fn group_size(&self, group_key: &T::Key) -> Option<u64> {
+    pub(crate) fn group_size(&self, group_key: &T::Key) -> Option<ResourceGroupSize> {
         self.group_reads
             .get(group_key)
             .and_then(|group| group.collected_size)

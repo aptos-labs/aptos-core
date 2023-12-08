@@ -10,6 +10,7 @@ mod transaction_pruner;
 mod write_set_pruner;
 
 use crate::{
+    event_store::EventStore,
     ledger_db::LedgerDb,
     metrics::PRUNER_VERSIONS,
     pruner::{
@@ -22,7 +23,7 @@ use crate::{
             write_set_pruner::WriteSetPruner,
         },
     },
-    EventStore, TransactionStore,
+    transaction_store::TransactionStore,
 };
 use anyhow::{anyhow, Result};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;

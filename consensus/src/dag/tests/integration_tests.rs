@@ -3,12 +3,13 @@
 use super::dag_test;
 use crate::{
     dag::{bootstrap::bootstrap_dag_for_test, dag_state_sync::SyncOutcome},
-    experimental::buffer_manager::OrderedBlocks,
     network::{IncomingDAGRequest, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::PayloadManager,
-    test_utils::{consensus_runtime, EmptyStateComputer, MockPayloadManager, MockStorage}, randomness::rand_queue::OrderedBlocks,
+    randomness::rand_queue::OrderedBlocks,
+    pipeline::buffer_manager::OrderedBlocks,
+    test_utils::{consensus_runtime, EmptyStateComputer, MockPayloadManager, MockStorage},
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::{NetworkId, PeerNetworkId};

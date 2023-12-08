@@ -9,6 +9,7 @@ use crate::{
 use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
+    resolver::TAggregatorV1View,
     types::DelayedFieldID,
 };
 use aptos_mvhashmap::types::TxnIndex;
@@ -840,7 +841,6 @@ where
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
-        _materialize_deltas: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
         match txn {
             MockTransaction::Write {
@@ -886,9 +886,9 @@ where
                     .map(|group_key| {
                         (
                             group_key.clone(),
-                            view.resource_group_size(group_key).expect(
-                                "Group must exist and size computation should must succeed",
-                            ),
+                            view.resource_group_size(group_key)
+                                .expect("Group must exist and size computation must succeed")
+                                .get(),
                         )
                     })
                     .collect();
@@ -999,7 +999,7 @@ where
     // TODO[agg_v2](tests): Assigning MoveTypeLayout as None for all the writes for now.
     // That means, the resources do not have any DelayedFields embededded in them.
     // Change it to test resources with DelayedFields as well.
-    fn resource_write_set(&self) -> BTreeMap<K, (ValueType, Option<Arc<MoveTypeLayout>>)> {
+    fn resource_write_set(&self) -> Vec<(K, (ValueType, Option<Arc<MoveTypeLayout>>))> {
         self.writes
             .iter()
             .filter(|(k, _)| k.module_path().is_none())
@@ -1038,19 +1038,19 @@ where
 
     fn reads_needing_delayed_field_exchange(
         &self,
-    ) -> BTreeMap<
-        <Self::Txn as Transaction>::Key,
-        (<Self::Txn as Transaction>::Value, Arc<MoveTypeLayout>),
-    > {
+    ) -> Vec<(<Self::Txn as Transaction>::Key, Arc<MoveTypeLayout>)> {
         // TODO[agg_v2](tests): add aggregators V2 to the proptest?
-        BTreeMap::new()
+        Vec::new()
     }
 
     fn group_reads_needing_delayed_field_exchange(
         &self,
-    ) -> BTreeMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value> {
+    ) -> Vec<(
+        <Self::Txn as Transaction>::Key,
+        <Self::Txn as Transaction>::Value,
+    )> {
         // TODO[agg_v2](tests): add aggregators V2 to the proptest?
-        BTreeMap::new()
+        Vec::new()
     }
 
     // TODO[agg_v2](tests): Currently, appending None to all events, which means none of the
@@ -1093,18 +1093,22 @@ where
         }
     }
 
+    fn materialize_agg_v1(
+        &self,
+        _view: &impl TAggregatorV1View<Identifier = <Self::Txn as Transaction>::Key>,
+    ) {
+        // TODO[agg_v2](tests): implement this method and compare
+        // against sequential execution results v. aggregator v1.
+    }
+
     fn incorporate_materialized_txn_output(
         &self,
         aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
-        _patched_resource_write_set: BTreeMap<
-            <Self::Txn as Transaction>::Key,
-            <Self::Txn as Transaction>::Value,
-        >,
-        _patched_events: Vec<<Self::Txn as Transaction>::Event>,
-        _combined_groups: Vec<(
+        _patched_resource_write_set: Vec<(
             <Self::Txn as Transaction>::Key,
             <Self::Txn as Transaction>::Value,
         )>,
+        _patched_events: Vec<<Self::Txn as Transaction>::Event>,
     ) {
         assert_ok!(self.materialized_delta_writes.set(aggregator_v1_writes));
         // TODO[agg_v2](tests): Set the patched resource write set and events. But that requires the function

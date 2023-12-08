@@ -11,7 +11,8 @@ use aptos_types::randomness::{Randomness, RandConfig, RandDecision, RandMetadata
 use serde::{Serialize, Deserialize};
 use sha3::{Digest, Sha3_256};
 
-use crate::{logging::LogEvent, block_storage::tracing::{BlockStage, observe_block}, randomness::{rand_manager::log_rand_event, types::ShareAck}, experimental::commit_reliable_broadcast::DropGuard};
+use crate::{logging::LogEvent, block_storage::tracing::{BlockStage, observe_block}, randomness::{rand_manager::log_rand_event, types::ShareAck}};
+use crate::pipeline::commit_reliable_broadcast::DropGuard;
 
 use super::{block_queue::{BlockQueue, BlockQueueItem, RandReadyBlocks}, types::RandShare};
 

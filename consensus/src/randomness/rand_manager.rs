@@ -7,10 +7,6 @@ use std::sync::Arc;
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters,
-    experimental::{
-        commit_reliable_broadcast::DropGuard,
-        buffer_manager::{ResetRequest, ResetAck, create_channel},
-    },
     monitor,
     network::{NetworkSender, IncomingRandRequest},
     network_interface::ConsensusMsg,
@@ -34,6 +30,8 @@ use futures::{
 };
 use tokio::time::{Duration, Instant};
 use tokio_retry::strategy::ExponentialBackoff;
+use crate::pipeline::buffer_manager::{create_channel, ResetAck, ResetRequest};
+use crate::pipeline::commit_reliable_broadcast::DropGuard;
 
 use super::{block_queue::{OrderedBlocks, RandReadyBlocks}, types::{RandMessage, RandShare, ShareAckState, CertifiedDelta, DeltaAck, SignatureBuilder, CertifiedDeltaAckState}, rand_store::{RandStore, AddDecisionResult}};
 

@@ -38,14 +38,13 @@ pub async fn run_server_with_config<C>(config: GenericConfig<C>) -> Result<()>
 where
     C: RunnableConfig,
 {
-    let runtime = aptos_runtimes::spawn_named_runtime(config.get_server_name(), None);
     let health_port = config.health_check_port;
     // Start liveness and readiness probes.
-    let task_handler = runtime.spawn(async move {
+    let task_handler = tokio::spawn(async move {
         register_probes_and_metrics_handler(health_port).await;
         Ok(())
     });
-    let main_task_handler = runtime.spawn(async move { config.run().await });
+    let main_task_handler = tokio::spawn(async move { config.run().await });
     tokio::select! {
         res = task_handler => {
             if let Err(e) = res {

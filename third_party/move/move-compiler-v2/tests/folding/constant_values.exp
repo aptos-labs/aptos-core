@@ -1,0 +1,39 @@
+// ---- Model Dump
+module 0x8675309::M {
+    private fun int128(): u128 {
+        4
+    }
+    private fun int16(): u16 {
+        123
+    }
+    private fun int256(): u256 {
+        4
+    }
+    private fun int32(): u32 {
+        Add<u32>(84, 53)
+    }
+    private fun int64(): u64 {
+        Add<u64>(2, 3)
+    }
+    private fun int8(): u8 {
+        1
+    }
+    spec fun $int128(): u128 {
+        4
+    }
+    spec fun $int16(): u16 {
+        123
+    }
+    spec fun $int256(): u256 {
+        4
+    }
+    spec fun $int32(): u32 {
+        Add(84, 53)
+    }
+    spec fun $int64(): u64 {
+        Add(2, 3)
+    }
+    spec fun $int8(): u8 {
+        1
+    }
+} // end 0x8675309::M

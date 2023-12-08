@@ -6,7 +6,7 @@ pub(crate) mod state_kv_pruner_manager;
 mod state_kv_shard_pruner;
 
 use crate::{
-    metrics::PRUNER_VERSIONS,
+    metrics::{OTHER_TIMERS_SECONDS, PRUNER_VERSIONS},
     pruner::{
         db_pruner::DBPruner,
         state_kv_pruner::{
@@ -15,7 +15,6 @@ use crate::{
         },
     },
     state_kv_db::StateKvDb,
-    OTHER_TIMERS_SECONDS,
 };
 use anyhow::{anyhow, Result};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;

@@ -1,15 +1,5 @@
 
 Diagnostics:
-error: implicit copy of mutable reference in local `s1` which is used later
-   ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:32:10
-   │
-32 │         (s1, s1) // error in v1 since &mut cannot be copied
-   │          ^^  -- used here
-   │          │
-   │          implicitly copied here
-
-
-Diagnostics:
 error: cannot move mutable reference in local `s1` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:39:21
    │

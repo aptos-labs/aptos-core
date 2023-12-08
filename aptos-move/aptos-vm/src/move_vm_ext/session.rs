@@ -15,7 +15,6 @@ use aptos_framework::natives::{
 };
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
-    transaction::{SignatureCheckedTransaction, SignedTransaction},
     access_path::AccessPath, block_metadata::BlockMetadata, contract_event::ContractEvent,
     on_chain_config::Features, state_store::state_key::StateKey,
 };
@@ -486,7 +485,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             .filter(|(state_key, _)| !resource_group_write_set.contains_key(state_key))
             .collect();
 
-        VMChangeSet::new(
+        VMChangeSet::new_expanded(
             resource_write_set,
             resource_group_write_set,
             module_write_set,
