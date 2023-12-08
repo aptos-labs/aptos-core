@@ -841,7 +841,7 @@ impl<'env> Generator<'env> {
     /// thereby forcing its evaluation right away in the generated code.
     fn gen_arg(&mut self, exp: &Exp, with_forced_temp: bool) -> TempIndex {
         match exp.as_ref() {
-            ExpData::Temporary(_, temp) => *temp,
+            ExpData::Temporary(_, temp) if !with_forced_temp => *temp,
             ExpData::LocalVar(id, sym) if !with_forced_temp => self.find_local(*id, *sym),
             ExpData::Call(id, Operation::Select(..), _) if self.reference_mode() => {
                 // In reference mode, a selection is interpreted as selecting a reference to the

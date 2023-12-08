@@ -459,8 +459,8 @@ L4:	loc5: &mut vector<u64>
 L5:	loc6: u64
 L6:	loc7: &mut vector<u64>
 L7:	loc8: &mut vector<u64>
-L8:	loc9: u64
-L9:	loc10: &mut vector<u64>
+L8:	loc9: &mut vector<u64>
+L9:	loc10: u64
 L10:	loc11: u64
 L11:	loc12: u64
 B0:
@@ -513,12 +513,12 @@ B4:
 	42: Gt
 	43: BrFalse(53)
 B5:
-	44: CopyLoc[1](loc0: u64)
-	45: StLoc[10](loc9: u64)
-	46: CopyLoc[0](Arg0: &mut vector<u64>)
-	47: StLoc[11](loc10: &mut vector<u64>)
-	48: MoveLoc[11](loc10: &mut vector<u64>)
-	49: MoveLoc[10](loc9: u64)
+	44: CopyLoc[0](Arg0: &mut vector<u64>)
+	45: StLoc[10](loc9: &mut vector<u64>)
+	46: CopyLoc[1](loc0: u64)
+	47: StLoc[11](loc10: u64)
+	48: MoveLoc[10](loc9: &mut vector<u64>)
+	49: MoveLoc[11](loc10: u64)
 	50: CopyLoc[5](loc4: u64)
 	51: VecSwap(2)
 	52: Branch(53)

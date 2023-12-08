@@ -106,12 +106,10 @@ fun pack_unpack::pack2($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
      var $t3: pack_unpack::S
      var $t4: u8
      var $t5: u8
-     var $t6: u8
   0: $t4 := infer($t0)
   1: $t5 := infer($t1)
-  2: $t6 := infer($t4)
-  3: $t3 := pack pack_unpack::S($t6, $t2, $t5)
-  4: return $t3
+  2: $t3 := pack pack_unpack::S($t4, $t2, $t5)
+  3: return $t3
 }
 
 
@@ -119,11 +117,9 @@ fun pack_unpack::pack2($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
 fun pack_unpack::pack3($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
      var $t3: pack_unpack::S
      var $t4: u8
-     var $t5: u8
   0: $t4 := infer($t0)
-  1: $t5 := infer($t4)
-  2: $t3 := pack pack_unpack::S($t1, $t5, $t2)
-  3: return $t3
+  1: $t3 := pack pack_unpack::S($t1, $t4, $t2)
+  2: return $t3
 }
 
 
@@ -132,12 +128,10 @@ fun pack_unpack::pack4($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
      var $t3: pack_unpack::S
      var $t4: u8
      var $t5: u8
-     var $t6: u8
   0: $t4 := infer($t0)
   1: $t5 := infer($t1)
-  2: $t6 := infer($t4)
-  3: $t3 := pack pack_unpack::S($t2, $t6, $t5)
-  4: return $t3
+  2: $t3 := pack pack_unpack::S($t2, $t4, $t5)
+  3: return $t3
 }
 
 
@@ -156,10 +150,8 @@ fun pack_unpack::pack6($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
      var $t3: pack_unpack::S
      var $t4: u8
      var $t5: u8
-     var $t6: u8
   0: $t4 := infer($t0)
   1: $t5 := infer($t1)
-  2: $t6 := infer($t5)
-  3: $t3 := pack pack_unpack::S($t2, $t6, $t4)
-  4: return $t3
+  2: $t3 := pack pack_unpack::S($t2, $t5, $t4)
+  3: return $t3
 }

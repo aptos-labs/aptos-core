@@ -164,17 +164,6 @@ fun m::some2($t0: &mut m::R, $t1: &mut m::R) {
   0: return ()
 }
 
-
-Diagnostics:
-error: implicit copy of mutable reference in local `x` which is used later
-   ┌─ tests/live-var/mut_ref.move:41:15
-   │
-41 │         some2(x, x); // expected error because multiple use
-   │         ------^----
-   │         │     │
-   │         │     implicitly copied here
-   │         used here
-
 ============ after LiveVarAnalysisProcessor: ================
 
 [variant baseline]
@@ -295,7 +284,7 @@ fun m::f2_fail() {
      # live vars: $t4
   4: $t3 := move($t4)
      # live vars: $t3
-  5: $t5 := move($t3)
+  5: $t5 := copy($t3)
      # live vars: $t3, $t5
   6: m::some2($t5, $t3)
      # live vars:
