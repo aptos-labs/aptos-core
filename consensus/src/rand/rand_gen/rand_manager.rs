@@ -6,6 +6,7 @@ use crate::{
     pipeline::buffer_manager::{OrderedBlocks, ResetRequest},
     rand::rand_gen::{
         network_messages::{RandMessage, RpcRequest},
+        rand_store::RandStore,
         types::{AugmentedData, Proof, RandConfig, RandDecision, Share},
     },
 };
