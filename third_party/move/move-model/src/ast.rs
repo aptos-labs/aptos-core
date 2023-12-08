@@ -798,25 +798,34 @@ impl ExpData {
     }
 
     /// Returns true of the given expression is valid for a constant expression.
+    /// If not valid, then returns false and adds reasons why not to the argument reasons.
+    ///
     /// TODO: this mimics the current allowed expression forms the v1 compiler allows,
     /// but is not documented as such in the book
-    pub fn is_valid_for_constant(&self) -> bool {
+    pub fn is_valid_for_constant(&self, env: &GlobalEnv, reasons: &mut Vec<(Loc, String)>) -> bool {
         let mut valid = true;
         let mut visitor = |e: &ExpData| match e {
-            ExpData::Value(..) | ExpData::Invalid(_) => {},
-            ExpData::Call(_, oper, args) => {
-                if !oper.is_builtin_op() || !args.iter().all(|e| e.is_valid_for_constant()) {
+            ExpData::Value(..) | ExpData::Invalid(_) | ExpData::Sequence(_, _) => {},
+            ExpData::Call(id, oper, _args) => {
+                // Note that _args are visited separately.  No need to check them here.
+                if !oper.is_builtin_op() {
+                    reasons.push((
+                        env.get_node_loc(*id),
+                        "Invalid call or operation in constant".to_owned(),
+                    ));
                     valid = false;
                 }
             },
-            ExpData::Sequence(_, items) => {
-                if !items.iter().all(|e| e.is_valid_for_constant()) {
-                    valid = false
-                }
+            _ => {
+                let id = e.node_id();
+                reasons.push((
+                    env.get_node_loc(id),
+                    "Invalid statement or expression in constant".to_owned(),
+                ));
+                valid = false
             },
-            _ => valid = false,
         };
-        self.visit(&mut visitor);
+        self.visit_top_down(&mut visitor);
         valid
     }
 
@@ -827,6 +836,18 @@ impl ExpData {
     {
         self.visit_pre_post(&mut |up, e| {
             if up {
+                visitor(e);
+            }
+        });
+    }
+
+    /// Visits expression, calling visitor parent expression, then subexpressions, depth first.
+    pub fn visit_top_down<F>(&self, visitor: &mut F)
+    where
+        F: FnMut(&ExpData),
+    {
+        self.visit_pre_post(&mut |up, e| {
+            if !up {
                 visitor(e);
             }
         });
@@ -1004,8 +1025,8 @@ impl ExpData {
         .rewrite_exp(exp)
     }
 
-    /// A function which can be used for `Exp::rewrite_node_id` to instantiate types in
-    /// an expression based on a type parameter instantiation.
+    /// A function which can be used by a `node_rewriter` argument to `ExpData::rewrite_node_id` to
+    /// instantiate types in an expression based on a type parameter instantiation.
     pub fn instantiate_node(env: &GlobalEnv, id: NodeId, targs: &[Type]) -> Option<NodeId> {
         if targs.is_empty() {
             // shortcut
@@ -1024,6 +1045,31 @@ impl ExpData {
             Some(new_id)
         } else {
             None
+        }
+    }
+
+    /// A function which can be used by a `node_rewriter` argument to `ExpData::rewrite_node_id` to
+    /// update node location (`Loc`), in addition to instantiating types.  This is currently only
+    /// useful in inlining, but is cleaner to implement here.
+    pub fn instantiate_node_new_loc(
+        env: &GlobalEnv,
+        id: NodeId,
+        targs: &[Type],
+        new_loc: &Loc,
+    ) -> Option<NodeId> {
+        let loc = env.get_node_loc(id);
+        if loc != *new_loc {
+            let node_ty = env.get_node_type(id);
+            let new_node_ty = node_ty.instantiate(targs);
+            let node_inst = env.get_node_instantiation_opt(id);
+            let new_node_inst = node_inst.clone().map(|i| Type::instantiate_vec(i, targs));
+            let new_id = env.new_node(new_loc.clone(), new_node_ty);
+            if let Some(inst) = new_node_inst {
+                env.set_node_instantiation(new_id, inst);
+            }
+            Some(new_id)
+        } else {
+            ExpData::instantiate_node(env, id, targs)
         }
     }
 
@@ -1407,6 +1453,7 @@ impl Operation {
                 | Not
                 | Cast
                 | Len
+                | Vector
         )
     }
 
@@ -1666,6 +1713,7 @@ impl ExpData {
             env,
             exp: self,
             fun_env: None,
+            verbose: false,
         }
     }
 
@@ -1676,6 +1724,7 @@ impl ExpData {
             env: fun_env.module_env.env,
             exp: self,
             fun_env: Some(fun_env),
+            verbose: false,
         }
     }
 
@@ -1684,6 +1733,17 @@ impl ExpData {
             env: other.env,
             exp: self,
             fun_env: other.fun_env.clone(),
+            verbose: other.verbose,
+        }
+    }
+
+    #[allow(unused)]
+    pub fn display_verbose<'a>(&'a self, env: &'a GlobalEnv) -> ExpDisplay<'a> {
+        ExpDisplay {
+            env,
+            exp: self,
+            fun_env: None,
+            verbose: true,
         }
     }
 }
@@ -1693,11 +1753,15 @@ pub struct ExpDisplay<'a> {
     env: &'a GlobalEnv,
     exp: &'a ExpData,
     fun_env: Option<FunctionEnv<'a>>,
+    verbose: bool,
 }
 
 impl<'a> fmt::Display for ExpDisplay<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         use ExpData::*;
+        if self.verbose {
+            write!(f, "(")?;
+        }
         match self.exp {
             Invalid(_) => write!(f, "*invalid*"),
             Value(_, v) => write!(f, "{}", self.env.display(v)),
@@ -1796,6 +1860,14 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
             SpecBlock(_, spec) => {
                 write!(f, "{}", self.env.display(spec))
             },
+        }?;
+        if self.verbose {
+            let node_id = self.exp.node_id();
+            let node_type = self.env.get_node_type(node_id);
+            let type_ctx = self.type_ctx();
+            write!(f, ") : {}", node_type.display(&type_ctx))
+        } else {
+            Ok(())
         }
     }
 }

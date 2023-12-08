@@ -175,49 +175,199 @@ module 0x42::n {
 
 Diagnostics:
 error: friend function `0x42::m::bar` cannot be called here because `0x42::n` is not a friend of `0x42::m`
-  ┌─ tests/checking/inlining/private_call_3.move:5:9
-  │
-5 │         bar()
-  │         ^^^^^
+   ┌─ tests/checking/inlining/private_call_3.move:5:9
+   │
+ 5 │         bar()
+   │         ^^^^^
+   ·
+67 │         m::foo();
+   │         -------- in a call inlined at this callsite
+   ·
+98 │         assert!(o_nonfriend::foo() == 42, 1);
+   │                 ------------------ in a call inlined at this callsite
 
 error: friend function `0x42::m_nonfriend::bar` cannot be called here because `0x42::n` is not a friend of `0x42::m_nonfriend`
    ┌─ tests/checking/inlining/private_call_3.move:21:9
    │
 21 │         bar()
    │         ^^^^^
+   ·
+68 │         m_nonfriend::foo();
+   │         ------------------ in a call inlined at this callsite
+   ·
+98 │         assert!(o_nonfriend::foo() == 42, 1);
+   │                 ------------------ in a call inlined at this callsite
 
 error: function `0x42::o_nonfriend::bar` cannot be called here because it is private to module `0x42::o_nonfriend`
    ┌─ tests/checking/inlining/private_call_3.move:69:2
    │
 69 │     bar()
    │     ^^^^^
+   ·
+98 │         assert!(o_nonfriend::foo() == 42, 1);
+   │                 ------------------ in a call inlined at this callsite
+
+error: friend function `0x42::m::bar` cannot be called here because `0x42::n` is not a friend of `0x42::m`
+   ┌─ tests/checking/inlining/private_call_3.move:5:9
+   │
+ 5 │         bar()
+   │         ^^^^^
+   ·
+73 │         m::foo();
+   │         -------- in a call inlined at this callsite
+   ·
+99 │     assert!(o_nonfriend::inaccessible() == 42, 1);
+   │             --------------------------- in a call inlined at this callsite
+
+error: friend function `0x42::m_nonfriend::bar` cannot be called here because `0x42::n` is not a friend of `0x42::m_nonfriend`
+   ┌─ tests/checking/inlining/private_call_3.move:21:9
+   │
+21 │         bar()
+   │         ^^^^^
+   ·
+74 │         m_nonfriend::foo();
+   │         ------------------ in a call inlined at this callsite
+   ·
+99 │     assert!(o_nonfriend::inaccessible() == 42, 1);
+   │             --------------------------- in a call inlined at this callsite
 
 error: function `0x42::o_nonfriend::bar` cannot be called here because it is private to module `0x42::o_nonfriend`
    ┌─ tests/checking/inlining/private_call_3.move:75:2
    │
 75 │     bar()
    │     ^^^^^
+   ·
+99 │     assert!(o_nonfriend::inaccessible() == 42, 1);
+   │             --------------------------- in a call inlined at this callsite
+
+error: friend function `0x42::m::bar` cannot be called here because `0x42::n` is not a friend of `0x42::m`
+    ┌─ tests/checking/inlining/private_call_3.move:5:9
+    │
+  5 │         bar()
+    │         ^^^^^
+    ·
+ 79 │         m::foo();
+    │         -------- in a call inlined at this callsite
+    ·
+100 │     assert!(o_nonfriend::friend_accessible() == 42, 1);
+    │             -------------------------------- in a call inlined at this callsite
+
+error: friend function `0x42::m_nonfriend::bar` cannot be called here because `0x42::n` is not a friend of `0x42::m_nonfriend`
+    ┌─ tests/checking/inlining/private_call_3.move:21:9
+    │
+ 21 │         bar()
+    │         ^^^^^
+    ·
+ 80 │         m_nonfriend::foo();
+    │         ------------------ in a call inlined at this callsite
+    ·
+100 │     assert!(o_nonfriend::friend_accessible() == 42, 1);
+    │             -------------------------------- in a call inlined at this callsite
 
 error: function `0x42::o_nonfriend::bar` cannot be called here because it is private to module `0x42::o_nonfriend`
-   ┌─ tests/checking/inlining/private_call_3.move:81:2
+    ┌─ tests/checking/inlining/private_call_3.move:81:2
+    │
+ 81 │     bar()
+    │     ^^^^^
+    ·
+100 │     assert!(o_nonfriend::friend_accessible() == 42, 1);
+    │             -------------------------------- in a call inlined at this callsite
+
+error: friend function `0x42::m::bar` cannot be called here because `0x42::n` is not a friend of `0x42::m`
+   ┌─ tests/checking/inlining/private_call_3.move:5:9
    │
-81 │     bar()
-   │     ^^^^^
+ 5 │         bar()
+   │         ^^^^^
+   ·
+41 │         m::foo();
+   │         -------- in a call inlined at this callsite
+   ·
+92 │         assert!(o::foo() == 42, 1);
+   │                 -------- in a call inlined at this callsite
+
+error: friend function `0x42::m_nonfriend::bar` cannot be called here because `0x42::n` is not a friend of `0x42::m_nonfriend`
+   ┌─ tests/checking/inlining/private_call_3.move:21:9
+   │
+21 │         bar()
+   │         ^^^^^
+   ·
+42 │         m_nonfriend::foo();
+   │         ------------------ in a call inlined at this callsite
+   ·
+92 │         assert!(o::foo() == 42, 1);
+   │                 -------- in a call inlined at this callsite
 
 error: function `0x42::o::bar` cannot be called here because it is private to module `0x42::o`
    ┌─ tests/checking/inlining/private_call_3.move:43:2
    │
 43 │     bar()
    │     ^^^^^
+   ·
+92 │         assert!(o::foo() == 42, 1);
+   │                 -------- in a call inlined at this callsite
+
+error: friend function `0x42::m::bar` cannot be called here because `0x42::n` is not a friend of `0x42::m`
+   ┌─ tests/checking/inlining/private_call_3.move:5:9
+   │
+ 5 │         bar()
+   │         ^^^^^
+   ·
+47 │         m::foo();
+   │         -------- in a call inlined at this callsite
+   ·
+93 │     assert!(o::inaccessible() == 42, 1);
+   │             ----------------- in a call inlined at this callsite
+
+error: friend function `0x42::m_nonfriend::bar` cannot be called here because `0x42::n` is not a friend of `0x42::m_nonfriend`
+   ┌─ tests/checking/inlining/private_call_3.move:21:9
+   │
+21 │         bar()
+   │         ^^^^^
+   ·
+48 │         m_nonfriend::foo();
+   │         ------------------ in a call inlined at this callsite
+   ·
+93 │     assert!(o::inaccessible() == 42, 1);
+   │             ----------------- in a call inlined at this callsite
 
 error: function `0x42::o::bar` cannot be called here because it is private to module `0x42::o`
    ┌─ tests/checking/inlining/private_call_3.move:49:2
    │
 49 │     bar()
    │     ^^^^^
+   ·
+93 │     assert!(o::inaccessible() == 42, 1);
+   │             ----------------- in a call inlined at this callsite
+
+error: friend function `0x42::m::bar` cannot be called here because `0x42::n` is not a friend of `0x42::m`
+   ┌─ tests/checking/inlining/private_call_3.move:5:9
+   │
+ 5 │         bar()
+   │         ^^^^^
+   ·
+53 │         m::foo();
+   │         -------- in a call inlined at this callsite
+   ·
+94 │     assert!(o::friend_accessible() == 42, 1);
+   │             ---------------------- in a call inlined at this callsite
+
+error: friend function `0x42::m_nonfriend::bar` cannot be called here because `0x42::n` is not a friend of `0x42::m_nonfriend`
+   ┌─ tests/checking/inlining/private_call_3.move:21:9
+   │
+21 │         bar()
+   │         ^^^^^
+   ·
+54 │         m_nonfriend::foo();
+   │         ------------------ in a call inlined at this callsite
+   ·
+94 │     assert!(o::friend_accessible() == 42, 1);
+   │             ---------------------- in a call inlined at this callsite
 
 error: function `0x42::o::bar` cannot be called here because it is private to module `0x42::o`
    ┌─ tests/checking/inlining/private_call_3.move:55:2
    │
 55 │     bar()
    │     ^^^^^
+   ·
+94 │     assert!(o::friend_accessible() == 42, 1);
+   │             ---------------------- in a call inlined at this callsite

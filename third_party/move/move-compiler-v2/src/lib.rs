@@ -10,7 +10,8 @@ mod options;
 pub mod pipeline;
 
 use crate::pipeline::{
-    livevar_analysis_processor::LiveVarAnalysisProcessor, visibility_checker::VisibilityChecker,
+    livevar_analysis_processor::LiveVarAnalysisProcessor,
+    reference_safety_processor::ReferenceSafetyProcessor, visibility_checker::VisibilityChecker,
 };
 use anyhow::bail;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
@@ -157,10 +158,17 @@ pub fn run_file_format_gen(env: &GlobalEnv, targets: &FunctionTargetsHolder) -> 
 }
 
 /// Returns the bytecode processing pipeline.
-pub fn bytecode_pipeline(_env: &GlobalEnv) -> FunctionTargetPipeline {
+pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
+    let options = env.get_extension::<Options>().expect("options");
+    let safety_on = !options.experiment_on(Experiment::NO_SAFETY);
     let mut pipeline = FunctionTargetPipeline::default();
+    if safety_on {
+        pipeline.add_processor(Box::new(VisibilityChecker()));
+    }
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor()));
-    pipeline.add_processor(Box::new(VisibilityChecker()));
+    if safety_on {
+        pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+    }
     pipeline
 }
 

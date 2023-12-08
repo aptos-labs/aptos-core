@@ -8,7 +8,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
-use aptos_logger::{error, SecurityEvent};
+use aptos_logger::{error, warn, SecurityEvent};
 use std::{cmp::Ordering, sync::Arc};
 
 // Wrapper around ProposerElection.
@@ -47,7 +47,7 @@ impl UnequivocalProposerElection {
         block.author().map_or(false, |author| {
             let valid_author = self.is_valid_proposer(author, block.round());
             if !valid_author {
-                error!(
+                warn!(
                     SecurityEvent::InvalidConsensusProposal,
                     "Proposal is not from valid author {}, expected {} for round {} and id {}",
                     author,

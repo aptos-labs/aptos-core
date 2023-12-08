@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::experimental::buffer_manager::OrderedBlocks;
+use crate::pipeline::buffer_manager::OrderedBlocks;
 use aptos_consensus_types::{
     common::Round,
     executed_block::ExecutedBlock,

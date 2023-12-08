@@ -5,12 +5,16 @@ use aptos_consensus_types::{
     common::{Author, Round},
     randomness::{RandMetadata, Randomness},
 };
-use std::collections::HashMap;
+use aptos_crypto::bls12381::Signature;
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_types::{aggregate_signature::AggregateSignature, validator_verifier::ValidatorVerifier};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::{collections::HashMap, fmt::Debug};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub(super) struct MockShare;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub(super) struct MockProof;
 
 impl Share for MockShare {
@@ -43,12 +47,16 @@ impl Proof for MockProof {
     }
 }
 
-pub trait Share {
+pub trait Share:
+    Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned + 'static
+{
     fn verify(&self, rand_config: &RandConfig, rand_metadata: &RandMetadata) -> anyhow::Result<()>;
 }
 
-pub trait Proof {
-    type Share: 'static;
+pub trait Proof:
+    Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned + 'static
+{
+    type Share: Share;
     fn verify(&self, rand_config: &RandConfig, rand_metadata: &RandMetadata) -> anyhow::Result<()>;
 
     fn aggregate<'a>(
@@ -60,7 +68,19 @@ pub trait Proof {
         Self: Sized;
 }
 
-#[derive(Clone, Debug)]
+pub trait AugmentedData:
+    Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned + 'static
+{
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct ShareId {
+    epoch: u64,
+    round: Round,
+    author: Author,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct RandShare<S> {
     author: Author,
     metadata: RandMetadata,
@@ -95,8 +115,17 @@ impl<S: Share> RandShare<S> {
     pub fn verify(&self, rand_config: &RandConfig) -> anyhow::Result<()> {
         self.share.verify(rand_config, &self.metadata)
     }
+
+    pub fn share_id(&self) -> ShareId {
+        ShareId {
+            epoch: self.epoch(),
+            round: self.round(),
+            author: self.author,
+        }
+    }
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RandDecision<P> {
     randomness: Randomness,
     proof: P,
@@ -118,6 +147,103 @@ impl<P: Proof> RandDecision<P> {
     pub fn rand_metadata(&self) -> &RandMetadata {
         self.randomness.metadata()
     }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ShareAck<P> {
+    epoch: u64,
+    maybe_decision: Option<RandDecision<P>>,
+}
+
+impl<P> ShareAck<P> {
+    pub fn new(epoch: u64, maybe_decision: Option<RandDecision<P>>) -> Self {
+        Self {
+            epoch,
+            maybe_decision,
+        }
+    }
+
+    pub fn into_maybe_decision(self) -> Option<RandDecision<P>> {
+        self.maybe_decision
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct AugDataId {
+    epoch: u64,
+    author: Author,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+pub struct AugData<D> {
+    epoch: u64,
+    author: Author,
+    data: D,
+}
+
+impl<D> AugData<D> {
+    pub fn new(epoch: u64, author: Author, data: D) -> Self {
+        Self {
+            epoch,
+            author,
+            data,
+        }
+    }
+
+    pub fn id(&self) -> AugDataId {
+        AugDataId {
+            epoch: self.epoch,
+            author: self.author,
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct AugDataSignature {
+    signature: Signature,
+}
+
+impl AugDataSignature {
+    pub fn new(signature: Signature) -> Self {
+        Self { signature }
+    }
+
+    pub fn verify<D: AugmentedData>(
+        &self,
+        author: Author,
+        verifier: &ValidatorVerifier,
+        data: &AugData<D>,
+    ) -> anyhow::Result<()> {
+        Ok(verifier.verify(author, data, &self.signature)?)
+    }
+
+    pub fn into_signature(self) -> Signature {
+        self.signature
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CertifiedAugData<D> {
+    aug_data: AugData<D>,
+    signatures: AggregateSignature,
+}
+
+impl<D> CertifiedAugData<D> {
+    pub fn new(aug_data: AugData<D>, signatures: AggregateSignature) -> Self {
+        Self {
+            aug_data,
+            signatures,
+        }
+    }
+
+    pub fn id(&self) -> AugDataId {
+        self.aug_data.id()
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct CertifiedAugDataAck {
+    epoch: u64,
 }
 
 pub struct RandConfig {
