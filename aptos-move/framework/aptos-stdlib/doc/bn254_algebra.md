@@ -5,7 +5,7 @@
 
 This module defines marker types, constants and test cases for working with BN254 curves using the generic API defined in <code>algebra.<b>move</b></code>.
 BN254 was sampled as part of the [\[BCTV14\]](https://eprint.iacr.org/2013/879.pdf) paper .
-The name denotes that it is a Barreto--Naehrig curve of embedding degree 12, defined over a 254-bit (prime) field.
+The name denotes that it is a Barreto-Naehrig curve of embedding degree 12, defined over a 254-bit (prime) field.
 The scalar field is highly 2-adic which supports subgroups of roots of unity of size <= 2^28.
 (as (21888242871839275222246405745257275088548364400416034343698204186575808495617 - 1) mod 2^28 = 0)
 
