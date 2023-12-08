@@ -88,15 +88,15 @@ module std::bn254_algebra {
     /// NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
     struct FormatFqMsb {}
 
-    /// The finite field $F_q2$ that can be used as the base field of $G_2$
+    /// The finite field $F_{q^2}$ that can be used as the base field of $G_2$
     /// which is an extension field of `Fq`, constructed as $F_{q^2}=F_{q}[u]/(u^2+1)$.
     struct Fq2 {}
 
     /// A serialization scheme for `Fq2` elements,
-    /// where an element $(c_0+c_1\cdot w)$ is represented by a byte array `b[]` of size N=64,
+    /// where an element $(c_0+c_1\cdot u)$ is represented by a byte array `b[]` of size N=64,
     /// which is a concatenation of its coefficients serialized, with the least significant coefficient (LSC) coming first.
-    /// - `b[0..N]` is $c_0$ serialized using `FormatFqLscLsb`.
-    /// - `b[N..384]` is $c_1$ serialized using `FormatFqLscLsb`.
+    /// - `b[0..32]` is $c_0$ serialized using `FormatFqLsb`.
+    /// - `b[32..64]` is $c_1$ serialized using `FormatFqLsb`.
     ///
     /// NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
     struct FormatFq2LscLsb {}
@@ -121,12 +121,12 @@ module std::bn254_algebra {
 
     /// A serialization scheme for `G1` elements derived from arkworks.rs.
     ///
-    /// Below is the serialization procedure that takes a `G2` element `p` and outputs a byte array of size N=64.
+    /// Below is the serialization procedure that takes a `G1` element `p` and outputs a byte array of size N=64.
     /// 1. Let `(x,y)` be the coordinates of `p` if `p` is on the curve, or `(0,0)` otherwise.
     /// 1. Serialize `x` and `y` into `b_x[]` and `b_y[]` respectively using `FormatFqLsb` (defined in the module documentation).
     /// 1. Concatenate `b_x[]` and `b_y[]` into `b[]`.
     /// 1. If `p` is the point at infinity, set the infinity bit: `b[N-1]: = b[N-1] | 0b0100_0000`.
-    /// 1. If `y`is negative, set the negative bit:  `b[N-1]: = b[N-1] | 0b1000_0000`.
+    /// 1. If `y > -y`, set the lexicographical bit:  `b[N-1]: = b[N-1] | 0b1000_0000`.
     /// 1. Return `b[]`.
     ///
     /// Below is the deserialization procedure that takes a byte array `b[]` and outputs either a `G1` element or none.
@@ -175,18 +175,18 @@ module std::bn254_algebra {
     ///
     /// Below is the serialization procedure that takes a `G2` element `p` and outputs a byte array of size N=128.
     /// 1. Let `(x,y)` be the coordinates of `p` if `p` is on the curve, or `(0,0)` otherwise.
-    /// 1. Serialize `x` and `y` into `b_x[]` and `b_y[]` respectively using `FormatFq2Lsb` (defined in the module documentation).
+    /// 1. Serialize `x` and `y` into `b_x[]` and `b_y[]` respectively using `FormatFq2LscLsb`.
     /// 1. Concatenate `b_x[]` and `b_y[]` into `b[]`.
     /// 1. If `p` is the point at infinity, set the infinity bit: `b[N-1]: = b[N-1] | 0b0100_0000`.
-    /// 1. If `y`is negative, set the negative bit:  `b[N-1]: = b[N-1] | 0b1000_0000`.
+    /// 1. If `y > -y`, set the lexicographical bit:  `b[N-1]: = b[N-1] | 0b1000_0000`.
     /// 1. Return `b[]`.
     ///
     /// Below is the deserialization procedure that takes a byte array `b[]` and outputs either a `G1` element or none.
     /// 1. If the size of `b[]` is not N, return none.
     /// 1. Compute the infinity flag as `b[N-1] & 0b0100_0000 != 0`.
     /// 1. If the infinity flag is set, return the point at infinity.
-    /// 1. Deserialize `[b[0], b[1], ..., b[N/2-1]]` to `x` using `FormatFq2Lsb`. If `x` is none, return none.
-    /// 1. Deserialize `[b[N/2], ..., b[N] & 0b0011_1111]` to `y` using `FormatFq2Lsb`. If `y` is none, return none.
+    /// 1. Deserialize `[b[0], b[1], ..., b[N/2-1]]` to `x` using `FormatFq2LscLsb`. If `x` is none, return none.
+    /// 1. Deserialize `[b[N/2], ..., b[N] & 0b0011_1111]` to `y` using `FormatFq2LscLsb`. If `y` is none, return none.
     /// 1. Check if `(x,y)` is on curve `E`. If not, return none.
     /// 1. Check if `(x,y)` is in the subgroup of order `r`. If not, return none.
     /// 1. Return `(x,y)`.
@@ -198,7 +198,7 @@ module std::bn254_algebra {
     ///
     /// Below is the serialization procedure that takes a `G1` element `p` and outputs a byte array of size N=64.
     /// 1. Let `(x,y)` be the coordinates of `p` if `p` is on the curve, or `(0,0)` otherwise.
-    /// 1. Serialize `x` into `b[]` using `FormatFq2Lsb` (defined in the module documentation).
+    /// 1. Serialize `x` into `b[]` using `FormatFq2LscLsb` (defined in the module documentation).
     /// 1. If `p` is the point at infinity, set the infinity bit: `b[N-1]: = b[N-1] | 0b0100_0000`.
     /// 1. If `y > -y`, set the lexicographical flag: `b[N-1] := b[N-1] | 0x1000_0000`.
     /// 1. Return `b[]`.
@@ -208,7 +208,7 @@ module std::bn254_algebra {
     /// 1. Compute the infinity flag as `b[N-1] & 0b0100_0000 != 0`.
     /// 1. If the infinity flag is set, return the point at infinity.
     /// 1. Compute the lexicographical flag as `b[N-1] & 0b1000_0000 != 0`.
-    /// 1. Deserialize `[b[0], b[1], ..., b[N/2-1] & 0b0011_1111]` to `x` using `FormatFq2Lsb`. If `x` is none, return none.
+    /// 1. Deserialize `[b[0], b[1], ..., b[N/2-1] & 0b0011_1111]` to `x` using `FormatFq2LscLsb`. If `x` is none, return none.
     /// 1. Solve the curve equation with `x` for `y`. If no such `y` exists, return none.
     /// 1. Let `y'` be `max(y,-y)` if the lexicographical flag is set, or `min(y,-y)` otherwise.
     /// 1. Check if `(x,y')` is in the subgroup of order `r`. If not, return none.
@@ -741,7 +741,7 @@ module std::bn254_algebra {
     }
 
     #[test_only]
-    const FQ_R_SERIALIZED: vector<u8> = x"47fd7cd8168c203c8dca7168916a81975d588181b64550b829a031e1724e6430";
+    const Q_SERIALIZED: vector<u8> = x"47fd7cd8168c203c8dca7168916a81975d588181b64550b829a031e1724e6430";
     #[test_only]
     const FQ_VAL_0_SERIALIZED_LSB: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
     #[test_only]
@@ -758,7 +758,7 @@ module std::bn254_algebra {
         enable_cryptography_algebra_natives(&fx);
 
         // Constants.
-        assert!(FQ_R_SERIALIZED == order<Fq>(), 1);
+        assert!(Q_SERIALIZED == order<Fq>(), 1);
 
         // Serialization/deserialization.
         let val_0 = zero<Fq>();
@@ -774,12 +774,12 @@ module std::bn254_algebra {
         assert!(FQ_VAL_7_SERIALIZED_MSB == serialize<Fq, FormatFqMsb>(&val_7), 1);
 
         // Deserialization should fail if given a byte array of right size but the value is not a member.
-        assert!(std::option::is_none(&deserialize<Fq, FormatFqLsb>(&x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73")), 1);
-        assert!(std::option::is_none(&deserialize<Fq, FormatFqMsb>(&x"73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")), 1);
+        assert!(std::option::is_none(&deserialize<Fq, FormatFqLsb>(&x"47fd7cd8168c203c8dca7168916a81975d588181b64550b829a031e1724e6430")), 1);
+        assert!(std::option::is_none(&deserialize<Fq, FormatFqMsb>(&x"30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47")), 1);
 
         // Deserialization should fail if given a byte array of wrong size.
-        assert!(std::option::is_none(&deserialize<Fq, FormatFqLsb>(&x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed7300")), 1);
-        assert!(std::option::is_none(&deserialize<Fq, FormatFqMsb>(&x"0073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")), 1);
+        assert!(std::option::is_none(&deserialize<Fq, FormatFqLsb>(&x"46fd7cd8168c203c8dca7168916a81975d588181b64550b829a031e1724e643000")), 1);
+        assert!(std::option::is_none(&deserialize<Fq, FormatFqMsb>(&x"30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd4600")), 1);
         assert!(std::option::is_none(&deserialize<Fq, FormatFqLsb>(&x"ffff")), 1);
         assert!(std::option::is_none(&deserialize<Fq, FormatFqMsb>(&x"ffff")), 1);
 
@@ -885,16 +885,13 @@ module std::bn254_algebra {
 
     #[test_only]
     /// The maximum number of `G1` elements that can be created in a transaction,
-    /// calculated by the current memory limit (1MB) and the in-mem G1 representation size (32*3 bytes per element).
-    const G1_NUM_MAX_NUMERATOR: u64 = 1048576; // TODO(#9330)
-
-    #[test_only]
-    const G1_NUM_MAX_DENOMINATOR: u64 = 96; // TODO(#9330)
+    /// calculated by the current memory limit (1MB) and the in-mem G1 representation size (96 bytes per element).
+    const G1_NUM_MAX: u64 = 1048576 / 96;
 
     #[test(fx = @std)]
     fun test_memory_limit(fx: signer) {
         enable_cryptography_algebra_natives(&fx);
-        let remaining = G1_NUM_MAX_NUMERATOR / G1_NUM_MAX_DENOMINATOR;
+        let remaining = G1_NUM_MAX;
         while (remaining > 0) {
             zero<G1>();
             remaining = remaining - 1;
@@ -905,7 +902,7 @@ module std::bn254_algebra {
     #[expected_failure(abort_code = 0x090003, location = std::crypto_algebra)]
     fun test_memory_limit_exceeded_with_g1(fx: signer) {
         enable_cryptography_algebra_natives(&fx);
-        let remaining = G1_NUM_MAX_NUMERATOR / G1_NUM_MAX_DENOMINATOR + 1;
+        let remaining = G1_NUM_MAX + 1;
         while (remaining > 0) {
             zero<G1>();
             remaining = remaining - 1;

@@ -273,7 +273,7 @@ NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
 
 ## Struct `Fq2`
 
-The finite field $F_q2$ that can be used as the base field of $G_2$
+The finite field $F_{q^2}$ that can be used as the base field of $G_2$
 which is an extension field of <code><a href="bn254_algebra.md#0x1_bn254_algebra_Fq">Fq</a></code>, constructed as $F_{q^2}=F_{q}[u]/(u^2+1)$.
 
 
@@ -303,10 +303,10 @@ which is an extension field of <code><a href="bn254_algebra.md#0x1_bn254_algebra
 ## Struct `FormatFq2LscLsb`
 
 A serialization scheme for <code><a href="bn254_algebra.md#0x1_bn254_algebra_Fq2">Fq2</a></code> elements,
-where an element $(c_0+c_1\cdot w)$ is represented by a byte array <code>b[]</code> of size N=64,
+where an element $(c_0+c_1\cdot u)$ is represented by a byte array <code>b[]</code> of size N=64,
 which is a concatenation of its coefficients serialized, with the least significant coefficient (LSC) coming first.
-- <code>b[0..N]</code> is $c_0$ serialized using <code>FormatFqLscLsb</code>.
-- <code>b[N..384]</code> is $c_1$ serialized using <code>FormatFqLscLsb</code>.
+- <code>b[0..32]</code> is $c_0$ serialized using <code><a href="bn254_algebra.md#0x1_bn254_algebra_FormatFqLsb">FormatFqLsb</a></code>.
+- <code>b[32..64]</code> is $c_1$ serialized using <code><a href="bn254_algebra.md#0x1_bn254_algebra_FormatFqLsb">FormatFqLsb</a></code>.
 
 NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
 
@@ -432,12 +432,12 @@ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
 
 A serialization scheme for <code><a href="bn254_algebra.md#0x1_bn254_algebra_G1">G1</a></code> elements derived from arkworks.rs.
 
-Below is the serialization procedure that takes a <code><a href="bn254_algebra.md#0x1_bn254_algebra_G2">G2</a></code> element <code>p</code> and outputs a byte array of size N=64.
+Below is the serialization procedure that takes a <code><a href="bn254_algebra.md#0x1_bn254_algebra_G1">G1</a></code> element <code>p</code> and outputs a byte array of size N=64.
 1. Let <code>(x,y)</code> be the coordinates of <code>p</code> if <code>p</code> is on the curve, or <code>(0,0)</code> otherwise.
 1. Serialize <code>x</code> and <code>y</code> into <code>b_x[]</code> and <code>b_y[]</code> respectively using <code><a href="bn254_algebra.md#0x1_bn254_algebra_FormatFqLsb">FormatFqLsb</a></code> (defined in the module documentation).
 1. Concatenate <code>b_x[]</code> and <code>b_y[]</code> into <code>b[]</code>.
 1. If <code>p</code> is the point at infinity, set the infinity bit: <code>b[N-1]: = b[N-1] | 0b0100_0000</code>.
-1. If <code>y</code>is negative, set the negative bit:  <code>b[N-1]: = b[N-1] | 0b1000_0000</code>.
+1. If <code>y &gt; -y</code>, set the lexicographical bit:  <code>b[N-1]: = b[N-1] | 0b1000_0000</code>.
 1. Return <code>b[]</code>.
 
 Below is the deserialization procedure that takes a byte array <code>b[]</code> and outputs either a <code><a href="bn254_algebra.md#0x1_bn254_algebra_G1">G1</a></code> element or none.
@@ -561,18 +561,18 @@ A serialization scheme for <code><a href="bn254_algebra.md#0x1_bn254_algebra_G2"
 
 Below is the serialization procedure that takes a <code><a href="bn254_algebra.md#0x1_bn254_algebra_G2">G2</a></code> element <code>p</code> and outputs a byte array of size N=128.
 1. Let <code>(x,y)</code> be the coordinates of <code>p</code> if <code>p</code> is on the curve, or <code>(0,0)</code> otherwise.
-1. Serialize <code>x</code> and <code>y</code> into <code>b_x[]</code> and <code>b_y[]</code> respectively using <code>FormatFq2Lsb</code> (defined in the module documentation).
+1. Serialize <code>x</code> and <code>y</code> into <code>b_x[]</code> and <code>b_y[]</code> respectively using <code><a href="bn254_algebra.md#0x1_bn254_algebra_FormatFq2LscLsb">FormatFq2LscLsb</a></code>.
 1. Concatenate <code>b_x[]</code> and <code>b_y[]</code> into <code>b[]</code>.
 1. If <code>p</code> is the point at infinity, set the infinity bit: <code>b[N-1]: = b[N-1] | 0b0100_0000</code>.
-1. If <code>y</code>is negative, set the negative bit:  <code>b[N-1]: = b[N-1] | 0b1000_0000</code>.
+1. If <code>y &gt; -y</code>, set the lexicographical bit:  <code>b[N-1]: = b[N-1] | 0b1000_0000</code>.
 1. Return <code>b[]</code>.
 
 Below is the deserialization procedure that takes a byte array <code>b[]</code> and outputs either a <code><a href="bn254_algebra.md#0x1_bn254_algebra_G1">G1</a></code> element or none.
 1. If the size of <code>b[]</code> is not N, return none.
 1. Compute the infinity flag as <code>b[N-1] & 0b0100_0000 != 0</code>.
 1. If the infinity flag is set, return the point at infinity.
-1. Deserialize <code>[b[0], b[1], ..., b[N/2-1]]</code> to <code>x</code> using <code>FormatFq2Lsb</code>. If <code>x</code> is none, return none.
-1. Deserialize <code>[b[N/2], ..., b[N] & 0b0011_1111]</code> to <code>y</code> using <code>FormatFq2Lsb</code>. If <code>y</code> is none, return none.
+1. Deserialize <code>[b[0], b[1], ..., b[N/2-1]]</code> to <code>x</code> using <code><a href="bn254_algebra.md#0x1_bn254_algebra_FormatFq2LscLsb">FormatFq2LscLsb</a></code>. If <code>x</code> is none, return none.
+1. Deserialize <code>[b[N/2], ..., b[N] & 0b0011_1111]</code> to <code>y</code> using <code><a href="bn254_algebra.md#0x1_bn254_algebra_FormatFq2LscLsb">FormatFq2LscLsb</a></code>. If <code>y</code> is none, return none.
 1. Check if <code>(x,y)</code> is on curve <code>E</code>. If not, return none.
 1. Check if <code>(x,y)</code> is in the subgroup of order <code>r</code>. If not, return none.
 1. Return <code>(x,y)</code>.
@@ -609,7 +609,7 @@ A serialization scheme for <code><a href="bn254_algebra.md#0x1_bn254_algebra_G1"
 
 Below is the serialization procedure that takes a <code><a href="bn254_algebra.md#0x1_bn254_algebra_G1">G1</a></code> element <code>p</code> and outputs a byte array of size N=64.
 1. Let <code>(x,y)</code> be the coordinates of <code>p</code> if <code>p</code> is on the curve, or <code>(0,0)</code> otherwise.
-1. Serialize <code>x</code> into <code>b[]</code> using <code>FormatFq2Lsb</code> (defined in the module documentation).
+1. Serialize <code>x</code> into <code>b[]</code> using <code><a href="bn254_algebra.md#0x1_bn254_algebra_FormatFq2LscLsb">FormatFq2LscLsb</a></code> (defined in the module documentation).
 1. If <code>p</code> is the point at infinity, set the infinity bit: <code>b[N-1]: = b[N-1] | 0b0100_0000</code>.
 1. If <code>y &gt; -y</code>, set the lexicographical flag: <code>b[N-1] := b[N-1] | 0x1000_0000</code>.
 1. Return <code>b[]</code>.
@@ -619,7 +619,7 @@ Below is the deserialization procedure that takes a byte array <code>b[]</code> 
 1. Compute the infinity flag as <code>b[N-1] & 0b0100_0000 != 0</code>.
 1. If the infinity flag is set, return the point at infinity.
 1. Compute the lexicographical flag as <code>b[N-1] & 0b1000_0000 != 0</code>.
-1. Deserialize <code>[b[0], b[1], ..., b[N/2-1] & 0b0011_1111]</code> to <code>x</code> using <code>FormatFq2Lsb</code>. If <code>x</code> is none, return none.
+1. Deserialize <code>[b[0], b[1], ..., b[N/2-1] & 0b0011_1111]</code> to <code>x</code> using <code><a href="bn254_algebra.md#0x1_bn254_algebra_FormatFq2LscLsb">FormatFq2LscLsb</a></code>. If <code>x</code> is none, return none.
 1. Solve the curve equation with <code>x</code> for <code>y</code>. If no such <code>y</code> exists, return none.
 1. Let <code>y'</code> be <code>max(y,-y)</code> if the lexicographical flag is set, or <code><b>min</b>(y,-y)</code> otherwise.
 1. Check if <code>(x,y')</code> is in the subgroup of order <code>r</code>. If not, return none.
