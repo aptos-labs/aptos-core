@@ -29,7 +29,7 @@ use url::Url;
 type ChainID = u32;
 type StartingVersion = u64;
 
-const FILE_STORE_VERSIONS_RESERVED: u64 = 30_000;
+const FILE_STORE_VERSIONS_RESERVED: u64 = 150_000;
 // Cache worker will wait if filestore is behind by
 // `FILE_STORE_VERSIONS_RESERVED` versions
 // Reducing this could spam the gcs metadata file so keeping it to once every 5 seconds for now (per cache worker)
@@ -98,7 +98,8 @@ impl Worker {
     ///    * If metadata is not present and cache is not empty, crash.
     ///    * If metadata is present, start from file store version.
     /// 4. Process the streaming response.
-    // TODO: Use the ! return type when it is stable.
+    /// TODO: Use the ! return type when it is stable.
+    /// TODO: Rewrite logic to actually conform to this description
     pub async fn run(&mut self) -> Result<()> {
         // Re-connect if lost.
         loop {
@@ -432,18 +433,22 @@ async fn process_streaming_response(
         }
 
         // Check if the file store has been updated.
-        let file_store_metadata = file_store_operator.get_file_store_metadata().await;
-        if let Some(file_store_metadata) = file_store_metadata {
-            if file_store_metadata.version + FILE_STORE_VERSIONS_RESERVED < current_version {
-                tokio::time::sleep(std::time::Duration::from_secs(
-                    CACHE_WORKER_WAIT_FOR_FILE_STORE_IN_SECS,
-                ))
-                .await;
-                tracing::warn!(
-                    current_version = current_version,
-                    file_store_version = file_store_metadata.version,
-                    "[Indexer Cache] File store version is behind current version too much."
-                );
+        loop {
+            let file_store_metadata = file_store_operator.get_file_store_metadata().await;
+            if let Some(file_store_metadata) = file_store_metadata {
+                if file_store_metadata.version + FILE_STORE_VERSIONS_RESERVED < current_version {
+                    tokio::time::sleep(std::time::Duration::from_secs(
+                        CACHE_WORKER_WAIT_FOR_FILE_STORE_IN_SECS,
+                    ))
+                    .await;
+                    tracing::warn!(
+                        current_version = current_version,
+                        file_store_version = file_store_metadata.version,
+                        "[Indexer Cache] File store version is behind current version too much."
+                    );
+                } else {
+                    break;
+                }
             }
         }
     }
