@@ -63,7 +63,7 @@ pub struct Context {
     chain_id: ChainId,
     pub db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
-    pub node_config: NodeConfig,
+    pub node_config: Arc<NodeConfig>,
     gas_schedule_cache: Arc<RwLock<GasScheduleCache>>,
     gas_estimation_cache: Arc<RwLock<GasEstimationCache>>,
     gas_limit_cache: Arc<RwLock<GasLimitCache>>,
@@ -86,7 +86,7 @@ impl Context {
             chain_id,
             db,
             mp_sender,
-            node_config,
+            node_config: Arc::new(node_config),
             gas_schedule_cache: Arc::new(RwLock::new(GasScheduleCache {
                 last_updated_epoch: None,
                 gas_schedule_params: None,

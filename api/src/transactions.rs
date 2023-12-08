@@ -565,7 +565,7 @@ impl TransactionsApi {
         api_spawn_blocking(move || api.get_signing_message(&accept_type, data.0)).await
     }
 
-    fn log_gas_estimation(gas_estimation: &GasEstimation) {
+    pub fn log_gas_estimation(gas_estimation: &GasEstimation) {
         metrics::GAS_ESTIMATE
             .with_label_values(&[metrics::GAS_ESTIMATE_CURRENT])
             .observe(gas_estimation.gas_estimate as f64);
