@@ -447,8 +447,12 @@ async fn process_streaming_response(
                         "[Indexer Cache] File store version is behind current version too much."
                     );
                 } else {
+                    // File store is up to date, continue cache update.
                     break;
                 }
+            } else {
+                // If metadata doesn't exist, procceed and file store will be updated later.
+                break;
             }
         }
     }
