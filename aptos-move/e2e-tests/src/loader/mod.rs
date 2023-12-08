@@ -40,7 +40,12 @@ pub struct DependencyGraph {
 
 #[derive(Debug)]
 pub enum LoaderTransactionGen {
+    // Generate a transaction to mutate the module dependency graph such that:
+    // - If the edge exists, removes the edge from the graph.
+    // - If such edge doesn't exist, add the dependency edge to the graph.
+    // Then recompile the package based on the updated graph structure and publish updated package.
     UpdateEdge(Index, Index),
+    // Invoke the corresponing function at a given pacakge.
     Invoke(Index),
 }
 
@@ -89,14 +94,9 @@ pub enum LoaderTransactionGen {
 // }
 // }
 //
-// By using this strategy, we can generate a set of modules with complex depenency relationship and assert that the new loader is always
+// By using this strategy, we can generate a set of move packages with complex depenency relationship and assert that the new loader is always
 // linking the call to the right module. We can also invoke the entrypoint function to validate if the module dependencies have been
-// resolved properly.
-//
-// TODOs:
-// - randomly generate module upgrade request to mutate the structure of DAG to make sure the VM will be able to handle
-// invaldation properly.
-//
+// resolved properly. Using LoaderTransactionGen we can also mutate the structure of the graph and invoke the corresponding entry point function.
 impl DependencyGraph {
     /// Returns a [`Strategy`] that generates a universe of accounts with pre-populated initial
     /// balances.
