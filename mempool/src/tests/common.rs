@@ -3,13 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    core_mempool::{CoreMempool, TimelineState},
+    core_mempool::{CoreMempool, TimelineState, TxnPointer},
     network::MempoolSyncMsg,
 };
 use anyhow::{format_err, Result};
 use aptos_compression::metrics::CompressionClient;
 use aptos_config::config::{NodeConfig, MAX_APPLICATION_MESSAGE_SIZE};
-use aptos_consensus_types::common::{TransactionInProgress, TransactionSummary};
+use aptos_consensus_types::common::TransactionInProgress;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_types::{
     account_address::AccountAddress,
@@ -20,7 +20,7 @@ use aptos_types::{
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::HashSet;
 
 pub(crate) fn setup_mempool() -> (CoreMempool, ConsensusMock) {
     let mut config = NodeConfig::generate_random_config();
@@ -160,11 +160,11 @@ pub(crate) fn batch_add_signed_txn(
 }
 
 // Helper struct that keeps state between `.get_block` calls. Imitates work of Consensus.
-pub struct ConsensusMock(BTreeMap<TransactionSummary, TransactionInProgress>);
+pub struct ConsensusMock(HashSet<TxnPointer>);
 
 impl ConsensusMock {
     pub(crate) fn new() -> Self {
-        Self(BTreeMap::new())
+        Self(HashSet::new())
     }
 
     pub(crate) fn get_block(
@@ -173,12 +173,25 @@ impl ConsensusMock {
         max_txns: u64,
         max_bytes: u64,
     ) -> Vec<SignedTransaction> {
-        let block = mempool.get_batch(max_txns, max_bytes, true, true, self.0.clone());
-        block.iter().for_each(|t| {
-            let txn_summary = TransactionSummary::new(t.sender(), t.sequence_number());
-            let txn_info = TransactionInProgress::new(t.gas_unit_price());
-            self.0.insert(txn_summary, txn_info);
-        });
+        let exclude_transactions: Vec<_> = self
+            .0
+            .iter()
+            .map(|txn| TransactionInProgress {
+                summary: *txn,
+                gas_unit_price: 0,
+            })
+            .collect();
+        let block = mempool.get_batch(max_txns, max_bytes, true, false, exclude_transactions);
+        self.0 = self
+            .0
+            .union(
+                &block
+                    .iter()
+                    .map(|t| TxnPointer::new(t.sender(), t.sequence_number()))
+                    .collect(),
+            )
+            .cloned()
+            .collect();
         block
     }
 }

@@ -3,7 +3,7 @@
 
 use crate::{monitor, quorum_store::counters};
 use aptos_consensus_types::{
-    common::{TransactionInProgress, TransactionSummary},
+    common::TransactionInProgress,
     proof_of_store::{BatchId, BatchInfo, ProofOfStore},
 };
 use aptos_logger::prelude::*;
@@ -104,7 +104,7 @@ impl MempoolProxy {
         &self,
         max_items: u64,
         max_bytes: u64,
-        exclude_transactions: BTreeMap<TransactionSummary, TransactionInProgress>,
+        exclude_txns: Vec<TransactionInProgress>,
     ) -> Result<Vec<SignedTransaction>, anyhow::Error> {
         let (callback, callback_rcv) = oneshot::channel();
         let msg = QuorumStoreRequest::GetBatchRequest(
@@ -112,7 +112,7 @@ impl MempoolProxy {
             max_bytes,
             true,
             true,
-            exclude_transactions,
+            exclude_txns,
             callback,
         );
         self.mempool_tx
@@ -129,12 +129,12 @@ impl MempoolProxy {
             .await
         ) {
             Err(_) => Err(anyhow::anyhow!(
-                "[quorum_store] did not receive GetBatchResponse on time"
+                "[direct_mempool_quorum_store] did not receive GetBatchResponse on time"
             )),
             Ok(resp) => match resp.map_err(anyhow::Error::from)?? {
                 QuorumStoreResponse::GetBatchResponse(txns) => Ok(txns),
                 _ => Err(anyhow::anyhow!(
-                    "[quorum_store] did not receive expected GetBatchResponse"
+                    "[direct_mempool_quorum_store] did not receive expected GetBatchResponse"
                 )),
             },
         }

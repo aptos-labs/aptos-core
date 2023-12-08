@@ -50,7 +50,6 @@ use aptos_types::{
 };
 use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
 use futures::{channel::oneshot, SinkExt};
-use maplit::btreemap;
 use std::{collections::HashMap, hash::Hash, sync::Arc};
 use tokio::{runtime::Handle, time::Duration};
 use tokio_stream::StreamExt;
@@ -171,7 +170,7 @@ impl MempoolNode {
             let block = self
                 .mempool
                 .lock()
-                .get_batch(100, 102400, true, false, btreemap![]);
+                .get_batch(100, 102400, true, false, vec![]);
 
             if block_contains_all_transactions(&block, txns) {
                 break;
@@ -224,7 +223,7 @@ impl MempoolNode {
         let block = self
             .mempool
             .lock()
-            .get_batch(100, 102400, true, false, btreemap![]);
+            .get_batch(100, 102400, true, false, vec![]);
         if !condition(&block, txns) {
             let actual: Vec<_> = block
                 .iter()

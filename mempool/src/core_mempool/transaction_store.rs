@@ -311,10 +311,6 @@ impl TransactionStore {
             self.hash_index.len(),
         );
         counters::core_mempool_index_size(counters::SIZE_BYTES_LABEL, self.size_bytes);
-        counters::core_mempool_index_size(
-            counters::GAS_UPGRADED_INDEX_LABEL,
-            self.gas_upgraded_index.len(),
-        );
     }
 
     /// Checks if Mempool is full.

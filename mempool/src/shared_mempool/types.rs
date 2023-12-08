@@ -12,9 +12,7 @@ use aptos_config::{
     config::{MempoolConfig, RoleType},
     network_id::PeerNetworkId,
 };
-use aptos_consensus_types::common::{
-    RejectedTransactionSummary, TransactionInProgress, TransactionSummary,
-};
+use aptos_consensus_types::common::{RejectedTransactionSummary, TransactionInProgress};
 use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_network::{
@@ -172,7 +170,7 @@ pub enum QuorumStoreRequest {
         // include gas upgraded
         bool,
         // transactions to exclude from the requested batch
-        BTreeMap<TransactionSummary, TransactionInProgress>,
+        Vec<TransactionInProgress>,
         // callback to respond to
         oneshot::Sender<Result<QuorumStoreResponse>>,
     ),

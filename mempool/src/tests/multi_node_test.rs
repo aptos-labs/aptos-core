@@ -24,7 +24,6 @@ use aptos_network::{
     ProtocolId,
 };
 use aptos_types::{transaction::SignedTransaction, PeerId};
-use maplit::btreemap;
 use rand::{rngs::StdRng, SeedableRng};
 use std::collections::HashMap;
 use tokio::runtime::Runtime;
@@ -377,7 +376,7 @@ impl TestHarness {
                                 102400,
                                 true,
                                 false,
-                                btreemap![],
+                                vec![],
                             );
                             for txn in transactions.iter() {
                                 assert!(block.contains(txn));
