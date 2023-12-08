@@ -43,15 +43,6 @@ pub struct FileStoreMetadata {
     pub version: u64,
 }
 
-/// FileStoreMetadata is the metadata for the file store.
-/// It's a JSON file with name: metadata.json.
-#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
-pub struct VerificationMetadata {
-    pub chain_id: u64,
-    // The current version of the file store.
-    pub next_version_to_verify: u64,
-}
-
 impl FileStoreMetadata {
     pub fn new(chain_id: u64, version: u64) -> Self {
         Self {
@@ -71,23 +62,24 @@ pub trait FileStoreOperator: Send + Sync {
     /// Gets the metadata from the file store. Operator will panic if error happens when accessing the metadata file(except not found).
     async fn get_file_store_metadata(&self) -> Option<FileStoreMetadata>;
     /// If the file store is empty, the metadata will be created; otherwise, return the existing metadata.
-    async fn create_default_file_store_metadata_if_absent(
+    async fn update_file_store_metadata_with_timeout(
         &mut self,
         expected_chain_id: u64,
-    ) -> anyhow::Result<FileStoreMetadata>;
+        version: u64,
+    ) -> anyhow::Result<()>;
     /// Updates the file store metadata. This is only performed by the operator when new file transactions are uploaded.
-    async fn update_file_store_metadata(
+    async fn update_file_store_metadata_internal(
         &mut self,
         chain_id: u64,
         version: u64,
     ) -> anyhow::Result<()>;
-    /// Uploads the transactions to the file store. The transactions are grouped into batches of BLOB_STORAGE_SIZE.
-    /// Updates the file store metadata after the upload.
-    async fn upload_transactions(
+    /// Uploads the transactions to the file store. Single batch of 1000
+    /// Returns start and end version of the batch, inclusive
+    async fn upload_transaction_batch(
         &mut self,
         chain_id: u64,
-        transactions: Vec<EncodedTransactionWithVersion>,
-    ) -> anyhow::Result<()>;
+        batch: Vec<EncodedTransactionWithVersion>,
+    ) -> anyhow::Result<(u64, u64)>;
 
     async fn get_starting_version(&self) -> Option<u64> {
         let metadata = self.get_file_store_metadata().await;
@@ -95,19 +87,6 @@ pub trait FileStoreOperator: Send + Sync {
     }
     /// Gets the raw transaction file; mainly for verification purpose.
     async fn get_raw_transactions(&self, version: u64) -> Result<TransactionsFile>;
-
-    /// Fetch the verification metadata file; this is used for bootstrap of the verifier.
-    async fn get_or_create_verification_metadata(
-        &self,
-        chain_id: u64,
-    ) -> Result<VerificationMetadata>;
-
-    /// Updates the verification metadata file.
-    async fn update_verification_metadata(
-        &mut self,
-        chain_id: u64,
-        next_version_to_verify: u64,
-    ) -> Result<()>;
 }
 
 pub(crate) fn build_transactions_file(
