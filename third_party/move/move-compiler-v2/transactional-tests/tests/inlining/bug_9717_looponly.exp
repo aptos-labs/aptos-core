@@ -3,7 +3,7 @@ comparison between v1 and v2 failed:
 = 
 = task 0 'publish'. lines 1-130:
 + Error: Unable to publish module '000000000000000000000000000000000000000000000000000000000000cafe::vectors'. Got VMError: {
-+     major_status: MOVELOC_UNAVAILABLE_ERROR,
++     major_status: MOVELOC_EXISTS_BORROW_ERROR,
 +     sub_status: None,
 +     location: 0xcafe::vectors,
 +     indices: redacted,
