@@ -6,6 +6,7 @@ use itertools::{any, Itertools};
 use std::path::PathBuf;
 use tracing::info;
 
+#[derive(Clone)]
 pub struct LocalFileStoreOperator {
     path: PathBuf,
     /// The timestamp of the latest metadata update; this is to avoid too frequent metadata update.
@@ -217,5 +218,9 @@ impl FileStoreOperator for LocalFileStoreOperator {
 
     async fn get_raw_transactions(&self, _version: u64) -> anyhow::Result<TransactionsFile> {
         anyhow::bail!("Unimplemented");
+    }
+
+    fn clone_box(&self) -> Box<dyn FileStoreOperator> {
+        Box::new(self.clone())
     }
 }

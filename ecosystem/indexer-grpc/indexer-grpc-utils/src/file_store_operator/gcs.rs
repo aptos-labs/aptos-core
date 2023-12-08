@@ -3,13 +3,14 @@
 
 use crate::{constants::BLOB_STORAGE_SIZE, file_store_operator::*, EncodedTransactionWithVersion};
 use cloud_storage::{Bucket, Object};
-use itertools::{any, Itertools};
+use itertools::Itertools;
 use std::env;
 
 const JSON_FILE_TYPE: &str = "application/json";
 // The environment variable to set the service account path.
 const SERVICE_ACCOUNT_ENV_VAR: &str = "SERVICE_ACCOUNT";
 
+#[derive(Clone)]
 pub struct GcsFileStoreOperator {
     bucket_name: String,
 }
@@ -167,5 +168,9 @@ impl FileStoreOperator for GcsFileStoreOperator {
         )
         .await?;
         Ok((start_version, end_version))
+    }
+
+    fn clone_box(&self) -> Box<dyn FileStoreOperator> {
+        Box::new(self.clone())
     }
 }
