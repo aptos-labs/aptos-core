@@ -242,21 +242,17 @@ impl<'r> TransactionDataCache<'r> {
                 return Ok(blob.clone());
             }
         }
-        match self.remote.get_module(module_id) {
-            Ok(Some(bytes)) => Ok(bytes),
-            Ok(None) => Err(PartialVMError::new(StatusCode::LINKER_ERROR)
-                .with_message(format!(
-                    "Linker Error: Cannot find {:?} in data cache",
-                    module_id
-                ))
-                .finish(Location::Undefined)),
-            Err(err) => {
-                let msg = format!("Unexpected storage error: {:?}", err);
-                Err(PartialVMError::new(StatusCode::STORAGE_ERROR)
-                    .with_message(msg)
-                    .finish(Location::Undefined))
-            },
-        }
+        self.remote
+            .get_module(module_id)
+            .map_err(|e| e.finish(Location::Undefined))?
+            .ok_or_else(|| {
+                PartialVMError::new(StatusCode::LINKER_ERROR)
+                    .with_message(format!(
+                        "Linker Error: Cannot find {:?} in data cache",
+                        module_id
+                    ))
+                    .finish(Location::Undefined)
+            })
     }
 
     pub(crate) fn publish_module(
@@ -286,9 +282,7 @@ impl<'r> TransactionDataCache<'r> {
         Ok(self
             .remote
             .get_module(module_id)
-            .map_err(|_| {
-                PartialVMError::new(StatusCode::STORAGE_ERROR).finish(Location::Undefined)
-            })?
+            .map_err(|e| e.finish(Location::Undefined))?
             .is_some())
     }
 }
