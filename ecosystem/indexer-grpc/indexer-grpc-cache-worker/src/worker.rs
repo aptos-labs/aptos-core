@@ -3,7 +3,7 @@
 
 use crate::metrics::{
     ERROR_COUNT, LATEST_PROCESSED_VERSION as LATEST_PROCESSED_VERSION_OLD, PROCESSED_BATCH_SIZE,
-    PROCESSED_VERSIONS_COUNT,
+    PROCESSED_LATENCY_IN_SECS, PROCESSED_VERSIONS_COUNT, WAIT_FOR_FILE_STORE_COUNTER,
 };
 use anyhow::{bail, Context, Result};
 use aptos_indexer_grpc_utils::{
@@ -446,6 +446,7 @@ async fn process_streaming_response(
                         file_store_version = file_store_metadata.version,
                         "[Indexer Cache] File store version is behind current version too much."
                     );
+                    WAIT_FOR_FILE_STORE_COUNTER.inc();
                 } else {
                     // File store is up to date, continue cache update.
                     break;
