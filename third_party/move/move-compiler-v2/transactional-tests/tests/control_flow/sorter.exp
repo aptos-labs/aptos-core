@@ -294,12 +294,9 @@ array_equals(Arg0: &vector<u64>, Arg1: &vector<u64>): bool {
 L0:	loc2: &vector<u64>
 L1:	loc3: u64
 L2:	loc4: u64
-L3:	loc5: u64
-L4:	loc6: u64
-L5:	loc7: &vector<u64>
-L6:	loc8: &vector<u64>
-L7:	loc9: u64
-L8:	loc10: u64
+L3:	loc5: &vector<u64>
+L4:	loc6: &vector<u64>
+L5:	loc7: u64
 B0:
 	0: CopyLoc[0](Arg0: &vector<u64>)
 	1: StLoc[2](loc0: &vector<u64>)
@@ -312,63 +309,57 @@ B0:
 	8: VecLen(2)
 	9: StLoc[5](loc3: u64)
 	10: CopyLoc[3](loc1: u64)
-	11: StLoc[6](loc4: u64)
-	12: MoveLoc[6](loc4: u64)
-	13: MoveLoc[5](loc3: u64)
-	14: Neq
-	15: BrFalse(19)
+	11: MoveLoc[5](loc3: u64)
+	12: Neq
+	13: BrFalse(17)
 B1:
-	16: LdFalse
-	17: Ret
+	14: LdFalse
+	15: Ret
 B2:
-	18: Branch(19)
+	16: Branch(17)
 B3:
-	19: LdU64(0)
-	20: StLoc[7](loc5: u64)
+	17: LdU64(0)
+	18: StLoc[6](loc4: u64)
 B4:
-	21: CopyLoc[7](loc5: u64)
-	22: StLoc[8](loc6: u64)
-	23: MoveLoc[8](loc6: u64)
-	24: CopyLoc[3](loc1: u64)
-	25: Lt
-	26: BrFalse(53)
+	19: CopyLoc[6](loc4: u64)
+	20: CopyLoc[3](loc1: u64)
+	21: Lt
+	22: BrFalse(47)
 B5:
-	27: CopyLoc[0](Arg0: &vector<u64>)
-	28: StLoc[9](loc7: &vector<u64>)
-	29: MoveLoc[9](loc7: &vector<u64>)
-	30: CopyLoc[7](loc5: u64)
-	31: VecImmBorrow(2)
-	32: ReadRef
-	33: CopyLoc[1](Arg1: &vector<u64>)
-	34: StLoc[10](loc8: &vector<u64>)
-	35: MoveLoc[10](loc8: &vector<u64>)
-	36: CopyLoc[7](loc5: u64)
-	37: VecImmBorrow(2)
-	38: ReadRef
-	39: Neq
-	40: BrFalse(44)
+	23: CopyLoc[0](Arg0: &vector<u64>)
+	24: StLoc[7](loc5: &vector<u64>)
+	25: MoveLoc[7](loc5: &vector<u64>)
+	26: CopyLoc[6](loc4: u64)
+	27: VecImmBorrow(2)
+	28: ReadRef
+	29: CopyLoc[1](Arg1: &vector<u64>)
+	30: StLoc[8](loc6: &vector<u64>)
+	31: MoveLoc[8](loc6: &vector<u64>)
+	32: CopyLoc[6](loc4: u64)
+	33: VecImmBorrow(2)
+	34: ReadRef
+	35: Neq
+	36: BrFalse(40)
 B6:
-	41: LdFalse
-	42: Ret
+	37: LdFalse
+	38: Ret
 B7:
-	43: Branch(44)
+	39: Branch(40)
 B8:
-	44: MoveLoc[7](loc5: u64)
-	45: StLoc[11](loc9: u64)
-	46: LdU64(1)
-	47: StLoc[12](loc10: u64)
-	48: MoveLoc[11](loc9: u64)
-	49: MoveLoc[12](loc10: u64)
-	50: Add
-	51: StLoc[7](loc5: u64)
-	52: Branch(54)
+	40: LdU64(1)
+	41: StLoc[9](loc7: u64)
+	42: MoveLoc[6](loc4: u64)
+	43: MoveLoc[9](loc7: u64)
+	44: Add
+	45: StLoc[6](loc4: u64)
+	46: Branch(48)
 B9:
-	53: Branch(55)
+	47: Branch(49)
 B10:
-	54: Branch(21)
+	48: Branch(19)
 B11:
-	55: LdTrue
-	56: Ret
+	49: LdTrue
+	50: Ret
 }
 create1(): vector<u64> {
 B0:
@@ -460,128 +451,111 @@ B15:
 	45: Ret
 }
 sort(Arg0: &mut vector<u64>) {
-L0:	loc1: u64
-L1:	loc2: &mut vector<u64>
+L0:	loc1: &mut vector<u64>
+L1:	loc2: u64
 L2:	loc3: u64
 L3:	loc4: u64
-L4:	loc5: u64
+L4:	loc5: &mut vector<u64>
 L5:	loc6: u64
-L6:	loc7: u64
+L6:	loc7: &mut vector<u64>
 L7:	loc8: &mut vector<u64>
 L8:	loc9: u64
 L9:	loc10: &mut vector<u64>
-L10:	loc11: &mut vector<u64>
+L10:	loc11: u64
 L11:	loc12: u64
-L12:	loc13: &mut vector<u64>
-L13:	loc14: u64
-L14:	loc15: u64
-L15:	loc16: u64
-L16:	loc17: u64
 B0:
 	0: LdU64(0)
 	1: StLoc[1](loc0: u64)
 B1:
-	2: CopyLoc[1](loc0: u64)
-	3: StLoc[2](loc1: u64)
-	4: CopyLoc[0](Arg0: &mut vector<u64>)
-	5: StLoc[3](loc2: &mut vector<u64>)
-	6: MoveLoc[3](loc2: &mut vector<u64>)
-	7: FreezeRef
-	8: VecLen(2)
-	9: StLoc[4](loc3: u64)
-	10: MoveLoc[2](loc1: u64)
-	11: MoveLoc[4](loc3: u64)
-	12: Lt
-	13: BrFalse(79)
+	2: CopyLoc[0](Arg0: &mut vector<u64>)
+	3: StLoc[2](loc1: &mut vector<u64>)
+	4: MoveLoc[2](loc1: &mut vector<u64>)
+	5: FreezeRef
+	6: VecLen(2)
+	7: StLoc[3](loc2: u64)
+	8: CopyLoc[1](loc0: u64)
+	9: MoveLoc[3](loc2: u64)
+	10: Lt
+	11: BrFalse(69)
 B2:
+	12: LdU64(1)
+	13: StLoc[4](loc3: u64)
 	14: CopyLoc[1](loc0: u64)
-	15: StLoc[5](loc4: u64)
-	16: LdU64(1)
-	17: StLoc[6](loc5: u64)
-	18: MoveLoc[5](loc4: u64)
-	19: MoveLoc[6](loc5: u64)
-	20: Add
-	21: StLoc[7](loc6: u64)
+	15: MoveLoc[4](loc3: u64)
+	16: Add
+	17: StLoc[5](loc4: u64)
 B3:
-	22: CopyLoc[7](loc6: u64)
-	23: StLoc[8](loc7: u64)
-	24: CopyLoc[0](Arg0: &mut vector<u64>)
-	25: StLoc[9](loc8: &mut vector<u64>)
-	26: MoveLoc[9](loc8: &mut vector<u64>)
-	27: FreezeRef
-	28: VecLen(2)
-	29: StLoc[10](loc9: u64)
-	30: MoveLoc[8](loc7: u64)
-	31: MoveLoc[10](loc9: u64)
-	32: Lt
-	33: BrFalse(68)
+	18: CopyLoc[0](Arg0: &mut vector<u64>)
+	19: StLoc[6](loc5: &mut vector<u64>)
+	20: MoveLoc[6](loc5: &mut vector<u64>)
+	21: FreezeRef
+	22: VecLen(2)
+	23: StLoc[7](loc6: u64)
+	24: CopyLoc[5](loc4: u64)
+	25: MoveLoc[7](loc6: u64)
+	26: Lt
+	27: BrFalse(60)
 B4:
-	34: CopyLoc[0](Arg0: &mut vector<u64>)
-	35: StLoc[11](loc10: &mut vector<u64>)
-	36: MoveLoc[11](loc10: &mut vector<u64>)
-	37: FreezeRef
-	38: CopyLoc[1](loc0: u64)
-	39: VecImmBorrow(2)
-	40: ReadRef
-	41: CopyLoc[0](Arg0: &mut vector<u64>)
-	42: StLoc[12](loc11: &mut vector<u64>)
-	43: MoveLoc[12](loc11: &mut vector<u64>)
-	44: FreezeRef
-	45: CopyLoc[7](loc6: u64)
-	46: VecImmBorrow(2)
-	47: ReadRef
-	48: Gt
-	49: BrFalse(59)
+	28: CopyLoc[0](Arg0: &mut vector<u64>)
+	29: StLoc[8](loc7: &mut vector<u64>)
+	30: MoveLoc[8](loc7: &mut vector<u64>)
+	31: FreezeRef
+	32: CopyLoc[1](loc0: u64)
+	33: VecImmBorrow(2)
+	34: ReadRef
+	35: CopyLoc[0](Arg0: &mut vector<u64>)
+	36: StLoc[9](loc8: &mut vector<u64>)
+	37: MoveLoc[9](loc8: &mut vector<u64>)
+	38: FreezeRef
+	39: CopyLoc[5](loc4: u64)
+	40: VecImmBorrow(2)
+	41: ReadRef
+	42: Gt
+	43: BrFalse(53)
 B5:
-	50: CopyLoc[1](loc0: u64)
-	51: StLoc[13](loc12: u64)
-	52: CopyLoc[0](Arg0: &mut vector<u64>)
-	53: StLoc[14](loc13: &mut vector<u64>)
-	54: MoveLoc[14](loc13: &mut vector<u64>)
-	55: MoveLoc[13](loc12: u64)
-	56: CopyLoc[7](loc6: u64)
-	57: VecSwap(2)
-	58: Branch(59)
+	44: CopyLoc[1](loc0: u64)
+	45: StLoc[10](loc9: u64)
+	46: CopyLoc[0](Arg0: &mut vector<u64>)
+	47: StLoc[11](loc10: &mut vector<u64>)
+	48: MoveLoc[11](loc10: &mut vector<u64>)
+	49: MoveLoc[10](loc9: u64)
+	50: CopyLoc[5](loc4: u64)
+	51: VecSwap(2)
+	52: Branch(53)
 B6:
-	59: MoveLoc[7](loc6: u64)
-	60: StLoc[15](loc14: u64)
-	61: LdU64(1)
-	62: StLoc[16](loc15: u64)
-	63: MoveLoc[15](loc14: u64)
-	64: MoveLoc[16](loc15: u64)
-	65: Add
-	66: StLoc[7](loc6: u64)
-	67: Branch(69)
+	53: LdU64(1)
+	54: StLoc[12](loc11: u64)
+	55: MoveLoc[5](loc4: u64)
+	56: MoveLoc[12](loc11: u64)
+	57: Add
+	58: StLoc[5](loc4: u64)
+	59: Branch(61)
 B7:
-	68: Branch(70)
+	60: Branch(62)
 B8:
-	69: Branch(22)
+	61: Branch(18)
 B9:
-	70: MoveLoc[1](loc0: u64)
-	71: StLoc[17](loc16: u64)
-	72: LdU64(1)
-	73: StLoc[18](loc17: u64)
-	74: MoveLoc[17](loc16: u64)
-	75: MoveLoc[18](loc17: u64)
-	76: Add
-	77: StLoc[1](loc0: u64)
-	78: Branch(80)
+	62: LdU64(1)
+	63: StLoc[13](loc12: u64)
+	64: MoveLoc[1](loc0: u64)
+	65: MoveLoc[13](loc12: u64)
+	66: Add
+	67: StLoc[1](loc0: u64)
+	68: Branch(70)
 B10:
-	79: Branch(81)
+	69: Branch(71)
 B11:
-	80: Branch(2)
+	70: Branch(2)
 B12:
-	81: Ret
+	71: Ret
 }
 vcopy(Arg0: &vector<u64>): vector<u64> {
 L0:	loc1: u64
 L1:	loc2: &vector<u64>
 L2:	loc3: u64
-L3:	loc4: u64
-L4:	loc5: &vector<u64>
-L5:	loc6: u64
-L6:	loc7: u64
-L7:	loc8: vector<u64>
+L3:	loc4: &vector<u64>
+L4:	loc5: u64
+L5:	loc6: vector<u64>
 B0:
 	0: VecPack(2, 0)
 	1: StLoc[1](loc0: vector<u64>)
@@ -594,38 +568,34 @@ B0:
 	8: StLoc[4](loc3: u64)
 B1:
 	9: CopyLoc[2](loc1: u64)
-	10: StLoc[5](loc4: u64)
-	11: MoveLoc[5](loc4: u64)
-	12: CopyLoc[4](loc3: u64)
-	13: Lt
-	14: BrFalse(32)
+	10: CopyLoc[4](loc3: u64)
+	11: Lt
+	12: BrFalse(28)
 B2:
-	15: MutBorrowLoc[1](loc0: vector<u64>)
-	16: CopyLoc[0](Arg0: &vector<u64>)
-	17: StLoc[6](loc5: &vector<u64>)
-	18: MoveLoc[6](loc5: &vector<u64>)
-	19: CopyLoc[2](loc1: u64)
-	20: VecImmBorrow(2)
-	21: ReadRef
-	22: VecPushBack(2)
+	13: MutBorrowLoc[1](loc0: vector<u64>)
+	14: CopyLoc[0](Arg0: &vector<u64>)
+	15: StLoc[5](loc4: &vector<u64>)
+	16: MoveLoc[5](loc4: &vector<u64>)
+	17: CopyLoc[2](loc1: u64)
+	18: VecImmBorrow(2)
+	19: ReadRef
+	20: VecPushBack(2)
+	21: LdU64(1)
+	22: StLoc[6](loc5: u64)
 	23: MoveLoc[2](loc1: u64)
-	24: StLoc[7](loc6: u64)
-	25: LdU64(1)
-	26: StLoc[8](loc7: u64)
-	27: MoveLoc[7](loc6: u64)
-	28: MoveLoc[8](loc7: u64)
-	29: Add
-	30: StLoc[2](loc1: u64)
-	31: Branch(33)
+	24: MoveLoc[6](loc5: u64)
+	25: Add
+	26: StLoc[2](loc1: u64)
+	27: Branch(29)
 B3:
-	32: Branch(34)
+	28: Branch(30)
 B4:
-	33: Branch(9)
+	29: Branch(9)
 B5:
-	34: MoveLoc[1](loc0: vector<u64>)
-	35: StLoc[9](loc8: vector<u64>)
-	36: MoveLoc[9](loc8: vector<u64>)
-	37: Ret
+	30: MoveLoc[1](loc0: vector<u64>)
+	31: StLoc[7](loc6: vector<u64>)
+	32: MoveLoc[7](loc6: vector<u64>)
+	33: Ret
 }
 }
 == END Bytecode ==

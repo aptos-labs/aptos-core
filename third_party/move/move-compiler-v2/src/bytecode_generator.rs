@@ -717,7 +717,7 @@ impl<'env> Generator<'env> {
         op: BytecodeOperation,
         args: &[Exp],
     ) {
-        let arg_temps = self.gen_arg_list(args);
+        let arg_temps = self.gen_arg_list(args, false);
         self.emit_with(id, |attr| {
             Bytecode::Call(attr, targets, op, arg_temps, None)
         })
@@ -787,7 +787,7 @@ impl<'env> Generator<'env> {
             .zip(param_types)
             .map(|(e, t)| self.maybe_convert(e, &t))
             .collect::<Vec<_>>();
-        let args = self.gen_arg_list(&args);
+        let args = self.gen_arg_list(&args, true);
         self.emit_with(id, |attr| {
             Bytecode::Call(
                 attr,
@@ -821,13 +821,13 @@ impl<'env> Generator<'env> {
     }
 
     /// Generate the code for a list of arguments.
-    fn gen_arg_list(&mut self, exps: &[Exp]) -> Vec<TempIndex> {
+    fn gen_arg_list(&mut self, exps: &[Exp], force_temp: bool) -> Vec<TempIndex> {
         let len = exps.len();
         // Generate code with forced creation of temporaries for all except last arg.
         let mut args = exps
             .iter()
             .take(if len == 0 { 0 } else { len - 1 })
-            .map(|exp| self.gen_arg(exp, true))
+            .map(|exp| self.gen_arg(exp, force_temp))
             .collect::<Vec<_>>();
         // If there is a last arg, we don't need to force create a temporary for it.
         if let Some(last_arg) = exps.iter().last().map(|exp| self.gen_arg(exp, false)) {
