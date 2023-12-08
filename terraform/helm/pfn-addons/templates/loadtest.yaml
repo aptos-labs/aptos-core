@@ -2,9 +2,9 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: {{ include "testnet-addons.fullname" . }}-load-test
+  name: {{ include "pfn-addons.fullname" . }}-load-test
   labels:
-    {{- include "testnet-addons.labels" . | nindent 4 }}
+    {{- include "pfn-addons.labels" . | nindent 4 }}
     app.kubernetes.io/name: load-test
 spec:
   concurrencyPolicy: Replace
@@ -14,11 +14,11 @@ spec:
       template:
         metadata:
           labels:
-            {{- include "testnet-addons.selectorLabels" . | nindent 12 }}
+            {{- include "pfn-addons.selectorLabels" . | nindent 12 }}
             app.kubernetes.io/name: load-test
         spec:
           restartPolicy: Never
-          priorityClassName: {{ include "testnet-addons.fullname" . }}-high
+          priorityClassName: {{ include "pfn-addons.fullname" . }}-high
           containers:
           - name: load-test
             image: {{ .Values.load_test.image.repo }}:{{ .Values.load_test.image.tag | default .Values.imageTag }}
@@ -27,7 +27,7 @@ spec:
             - aptos-transaction-emitter
             - emit-tx
             - --mint-key={{ .Values.load_test.config.mint_key }}
-            - --chain-id={{ .Values.genesis.chain_id }}
+            - --chain-id={{ .Values.load_test.config.chain_id }}
             # Build targets args for internal cluster targets
             {{- $numTargets := 0 }}
             {{- $targetSuffix := "" }}
@@ -115,7 +115,7 @@ spec:
             # - name: net.ipv4.tcp_tw_reuse
             #   value: "1"
           {{- end }}
-          serviceAccountName: {{ include "testnet-addons.serviceAccountName" . }}
+          serviceAccountName: {{ include "pfn-addons.serviceAccountName" . }}
           {{- if .Values.imagePullSecret }}
           imagePullSecrets:
           - name: {{.Values.imagePullSecret}}
