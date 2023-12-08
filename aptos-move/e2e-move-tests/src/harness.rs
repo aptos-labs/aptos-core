@@ -4,7 +4,6 @@
 use crate::{assert_success, build_package, AptosPackageHooks};
 use anyhow::Error;
 use aptos_cached_packages::aptos_stdlib;
-use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_framework::{natives::code::PackageMetadata, BuildOptions, BuiltPackage};
 use aptos_gas_profiling::TransactionGasLog;
 use aptos_gas_schedule::{
@@ -41,10 +40,6 @@ use move_package::package_hooks::register_package_hooks;
 use once_cell::sync::Lazy;
 use project_root::get_project_root;
 use proptest::strategy::{BoxedStrategy, Just, Strategy};
-use rand::{
-    rngs::{OsRng, StdRng},
-    Rng, SeedableRng,
-};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -173,9 +168,8 @@ impl MoveHarness {
 
     // Creates an account with a randomly generated address and key pair
     pub fn new_account_with_key_pair(&mut self) -> Account {
-        let acc = create_random_key_pair();
         // Mint the account 10M Aptos coins (with 8 decimals).
-        self.store_and_fund_account(&acc, 1_000_000_000_000_000, 0)
+        self.store_and_fund_account(&Account::new(), 1_000_000_000_000_000, 0)
     }
 
     pub fn new_account_with_balance_and_sequence_number(
@@ -183,8 +177,7 @@ impl MoveHarness {
         balance: u64,
         sequence_number: u64,
     ) -> Account {
-        let acc = create_random_key_pair();
-        self.store_and_fund_account(&acc, balance, sequence_number)
+        self.store_and_fund_account(&Account::new(), balance, sequence_number)
     }
 
     /// Gets the account where the Aptos framework is installed (0x1).
@@ -629,7 +622,7 @@ impl MoveHarness {
             ]);
     }
 
-    fn change_one_gas_param_from_default(&mut self, param: &str, param_value: u64) {
+    fn override_one_gas_param(&mut self, param: &str, param_value: u64) {
         // TODO: The AptosGasParameters::zeros() schedule doesn't do what we want, so
         // explicitly manipulating gas entries. Wasn't obvious from the gas code how to
         // do this differently then below, so perhaps improve this...
@@ -662,12 +655,12 @@ impl MoveHarness {
     }
 
     pub fn modify_gas_scaling(&mut self, gas_scaling_factor: u64) {
-        self.change_one_gas_param_from_default("txn.gas_unit_scaling_factor", gas_scaling_factor);
+        self.override_one_gas_param("txn.gas_unit_scaling_factor", gas_scaling_factor);
     }
 
     /// Increase maximal transaction size.
     pub fn increase_transaction_size(&mut self) {
-        self.change_one_gas_param_from_default("txn.max_transaction_size_in_bytes", 1000 * 1024);
+        self.override_one_gas_param("txn.max_transaction_size_in_bytes", 1000 * 1024);
     }
 
     pub fn sequence_number(&self, addr: &AccountAddress) -> u64 {
@@ -812,13 +805,6 @@ impl MoveHarness {
     pub fn set_max_gas_per_txn(&mut self, max_gas_per_txn: u64) {
         self.max_gas_per_txn = max_gas_per_txn
     }
-}
-
-pub fn create_random_key_pair() -> Account {
-    let mut rng = StdRng::from_seed(OsRng.gen());
-    let privkey = Ed25519PrivateKey::generate(&mut rng);
-    let pubkey = privkey.public_key();
-    Account::with_keypair(privkey, pubkey)
 }
 
 impl BlockSplit {
