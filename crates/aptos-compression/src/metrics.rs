@@ -38,7 +38,7 @@ pub static BYTE_COUNTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_compression_byte_count",
         "Counters for tracking the data compression ratio",
-        &["data_type", "client"]
+        &["operation", "data_type", "client"]
     )
     .unwrap()
 });
@@ -65,12 +65,13 @@ pub static OPERATION_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
 
 /// Increments the compression byte count based on the given data type
 pub fn increment_compression_byte_count(
+    operation: &str,
     data_type: &str,
     client: CompressionClient,
     byte_count: u64,
 ) {
     BYTE_COUNTS
-        .with_label_values(&[data_type, client.get_label()])
+        .with_label_values(&[operation, data_type, client.get_label()])
         .inc_by(byte_count)
 }
 

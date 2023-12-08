@@ -14,7 +14,7 @@ use thiserror::Error;
 /// This crate provides a simple library interface for data compression.
 /// It is useful for compressing large data chunks that are
 /// sent across the network (e.g., by state sync and consensus).
-/// Internally, it uses LZ4 in fast mode to compress the data.
+/// Internally, it uses LZ4 to compress the data.
 /// See <https://github.com/10xGenomics/lz4-rs> for more information.
 ///
 /// Note: the crate also exposes some basic compression metrics
@@ -42,13 +42,15 @@ pub fn compress(
     client: CompressionClient,
     max_bytes: usize,
 ) -> Result<CompressedData, CompressionError> {
+    // Ensure that the raw data size is not greater than the max bytes limit
     if raw_data.len() > max_bytes {
         return Err(CompressionError(format!(
-            "Uncompressed size greater than max. size: {}, max: {}",
+            "Uncompressed data size greater than maximum size: {}, max: {}",
             raw_data.len(),
             max_bytes
         )));
     }
+
     // Start the compression timer
     let timer = start_compression_operation_timer(COMPRESS, client.clone());
 
@@ -66,11 +68,11 @@ pub fn compress(
     };
 
     // Ensure that the compressed data size is not greater than the max bytes limit. This can
-    // happen in case of uncompressible data, where the compression size will be more than the
+    // happen in case of incompressible data, where the compression size will be more than the
     // uncompressed size.
     if compressed_data.len() > max_bytes {
         return Err(CompressionError(format!(
-            "Compressed size greater than max. size: {}, max: {}",
+            "Compressed data size greater than maximum size: {}, max: {}",
             compressed_data.len(),
             max_bytes
         )));
@@ -78,8 +80,8 @@ pub fn compress(
 
     // Stop the timer and update the metrics
     let compression_duration = timer.stop_and_record();
-    increment_compression_byte_count(RAW_BYTES, client.clone(), raw_data.len() as u64);
-    increment_compression_byte_count(COMPRESSED_BYTES, client, compressed_data.len() as u64);
+    increment_compression_byte_count(COMPRESS, RAW_BYTES, client.clone(), raw_data.len() as u64);
+    increment_compression_byte_count(COMPRESS, COMPRESSED_BYTES, client, compressed_data.len() as u64);
 
     // Log the relative data compression statistics
     let relative_data_size = calculate_relative_size(&raw_data, &compressed_data);
@@ -103,7 +105,7 @@ pub fn decompress(
     // Start the decompression timer
     let timer = start_compression_operation_timer(DECOMPRESS, client.clone());
 
-    // Check size of the data and initialize raw_data
+    // Check the size of the data and initialize raw_data
     let size = match get_decompressed_size(compressed_data, max_size) {
         Ok(size) => size,
         Err(error) => {
@@ -125,8 +127,12 @@ pub fn decompress(
         )));
     };
 
-    // Stop the timer and log the relative data compression statistics
+    // Stop the timer and update the metrics
     let decompression_duration = timer.stop_and_record();
+    increment_compression_byte_count(DECOMPRESS, RAW_BYTES, client.clone(), raw_data.len() as u64);
+    increment_compression_byte_count(DECOMPRESS, COMPRESSED_BYTES, client, compressed_data.len() as u64);
+
+    // Log the relative data decompression statistics
     let relative_data_size = calculate_relative_size(compressed_data, &raw_data);
     trace!(
         "Decompressed {} bytes to {} bytes ({} %) in {} seconds.",
@@ -139,9 +145,11 @@ pub fn decompress(
     Ok(raw_data)
 }
 
-/// Derived from lz4-rs crate, which starts the compressed payload with the original data size as i32
-/// see: https://github.com/10XGenomics/lz4-rs/blob/0abc0a52af1f6010f9a57640b1dc8eb8d2d697aa/src/block/mod.rs#L162
+/// Derived from the lz4-rs crate, which prepends the compressed payload with the
+/// original data size as i32.
+/// See: https://github.com/10XGenomics/lz4-rs/blob/0abc0a52af1f6010f9a57640b1dc8eb8d2d697aa/src/block/mod.rs#L162
 fn get_decompressed_size(src: &CompressedData, max_size: usize) -> std::io::Result<usize> {
+    // Ensure that the source buffer is at least 4 bytes long
     if src.len() < 4 {
         return Err(Error::new(
             ErrorKind::InvalidInput,
@@ -149,9 +157,9 @@ fn get_decompressed_size(src: &CompressedData, max_size: usize) -> std::io::Resu
         ));
     }
 
+    // Parse the size prefix
     let size =
         (src[0] as i32) | (src[1] as i32) << 8 | (src[2] as i32) << 16 | (src[3] as i32) << 24;
-
     if size < 0 {
         return Err(Error::new(
             ErrorKind::InvalidInput,
@@ -159,8 +167,8 @@ fn get_decompressed_size(src: &CompressedData, max_size: usize) -> std::io::Resu
         ));
     }
 
+    // Ensure that the size is not greater than the max size limit
     let size = size as usize;
-
     if size > max_size {
         return Err(Error::new(
             ErrorKind::InvalidInput,
