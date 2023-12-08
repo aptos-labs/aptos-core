@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::PROCESSED_VERSIONS_COUNT;
+use crate::metrics::{METADATA_UPLOAD_FAILURE_COUNT, PROCESSED_VERSIONS_COUNT};
 use anyhow::{bail, Context, Result};
 use aptos_indexer_grpc_utils::{
     build_protobuf_encoded_transaction_wrappers,
@@ -202,6 +202,7 @@ impl Processor {
                     "Failed to update file store metadata. Retrying in 500ms."
                 );
                 std::thread::sleep(std::time::Duration::from_millis(500));
+                METADATA_UPLOAD_FAILURE_COUNT.inc();
             }
             let size = last_version - first_version + 1;
             PROCESSED_VERSIONS_COUNT.inc_by(size);
