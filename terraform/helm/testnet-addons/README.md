@@ -23,29 +23,10 @@ Additional components for aptos-nodes testnet
 | ingress.cookieDurationSeconds | int | `86400` | If stickiness is enabled, how long the session cookie should last |
 | ingress.enableStickyness | bool | `true` | Whether to enable session stickiness on the underlying load balancer |
 | ingress.gce_managed_certificate | string | `nil` | The GCE certificate to install on the ingress |
+| ingress.gce_security_policy | string | `nil` | Security policy to apply to the backend services behind the ingress |
 | ingress.gce_static_ip | string | `nil` | The GCE static IP to install on the ingress |
 | ingress.loadBalancerSourceRanges | string | `nil` | List of CIDRs to accept traffic from |
 | ingress.wafAclArn | string | `nil` | The ARN of the WAF ACL to install on the ingress |
-| load_test.affinity | object | `{}` |  |
-| load_test.config.duration | int | `300` | How long to emit transactions for |
-| load_test.config.mempool_backlog | int | `5000` | Number of transactions outstanding in mempool |
-| load_test.config.mint_key | string | `nil` | The private key used to mint to fund load test |
-| load_test.config.numFullnodeGroups | string | `nil` | The number of fullnode groups to run traffic against |
-| load_test.config.target_tps | int | `0` | Whether to target a constant TPS, or 0 if not used. Cannot be used with mempool_backlog. |
-| load_test.config.txn_expiration_time_secs | int | `30` | How long to wait for transactions to be expired |
-| load_test.config.use_validators | bool | `false` | Whether to submit transactions through validator REST API |
-| load_test.enabled | bool | `false` | Whether to enable the load test CronJob |
-| load_test.fullnode | object | `{"groups":[{"name":"fullnode"}]}` | The fullnode groups to target |
-| load_test.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy to use for tools image |
-| load_test.image.repo | string | `"aptoslabs/tools"` | Image repo to use for tools image for running load tests |
-| load_test.image.tag | string | `nil` | Image tag to use for tools image |
-| load_test.intervalMins | int | `15` | How many minutes between load test runs |
-| load_test.nodeSelector | object | `{}` |  |
-| load_test.resources.limits.cpu | int | `1` |  |
-| load_test.resources.limits.memory | string | `"512Mi"` |  |
-| load_test.resources.requests.cpu | int | `1` |  |
-| load_test.resources.requests.memory | string | `"512Mi"` |  |
-| load_test.tolerations | list | `[]` |  |
 | service.domain | string | `nil` | If set, the base domain name to use for External DNS |
 | serviceAccount.create | bool | `true` | Specifies whether a service account should be created |
 | serviceAccount.name | string | `nil` | The name of the service account to use. If not set and create is true, a name is generated using the fullname template |

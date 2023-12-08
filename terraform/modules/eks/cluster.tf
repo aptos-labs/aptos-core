@@ -12,7 +12,7 @@ resource "aws_eks_cluster" "aptos" {
   tags                      = local.default_tags
 
   vpc_config {
-    subnet_ids              = concat(aws_subnet.public.*.id, aws_subnet.private.*.id)
+    subnet_ids              = concat(aws_subnet.public[*].id, aws_subnet.private[*].id)
     public_access_cidrs     = var.k8s_api_sources
     endpoint_private_access = true
     security_group_ids      = [aws_security_group.cluster.id]

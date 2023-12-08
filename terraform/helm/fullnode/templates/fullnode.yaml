@@ -25,6 +25,80 @@ spec:
         prometheus.io/port: "9101"
     spec:
       terminationGracePeriodSeconds: 0
+      initContainers:
+      {{- with .Values.restore }}
+      {{- if .enabled }}
+      - name: restore
+        image: {{ .image.repo }}:{{ .image.tag | default $.Values.imageTag }}
+        imagePullPolicy: {{ .image.pullPolicy }}
+        resources:
+          {{- toYaml .resources | nindent 10 }}
+        command:
+        - /bin/bash
+        - -c
+        - |-
+          set -euxo pipefail
+          # cleanup aptosdb
+          if [ -f /opt/aptos/data/restore-failed ] || \
+              [ ! -f /opt/aptos/data/restore-uid ] || \
+              [ "$(cat /opt/aptos/data/restore-uid)" != "{{ .config.restore_epoch }}" ]; then
+            rm -rf /opt/aptos/data/db /opt/aptos/data/restore-{complete,failed}
+            echo "{{ .config.restore_epoch }}" > /opt/aptos/data/restore-uid
+          fi
+
+          [ -f /opt/aptos/data/restore-complete ] && exit 0
+          # start restore process
+          /usr/local/bin/aptos-debugger aptos-db restore bootstrap-db \
+            --concurrent-downloads {{ .config.concurrent_downloads }} \
+            {{ range .config.trusted_waypoints }} --trust-waypoint {{ . }}{{ end }} \
+            --target-db-dir /opt/aptos/data/db \
+            --metadata-cache-dir /opt/aptos/data/aptos-restore-metadata \
+            --ledger-history-start-version {{ .config.start_version }} \
+            {{- if .config.target_version }} --target-version {{- .config.target_version }}{{- end }}
+            --command-adapter-config /opt/aptos/etc/{{ .config.location }}.yaml
+
+          if [ $? -gt 0 ]; then
+            # mark restore as failed
+            touch /opt/aptos/data/restore-failed
+            exit 1
+          else
+            # success, remove the marker
+            rm -f /opt/aptos/data/restore-failed
+            touch /opt/aptos/data/restore-complete
+          fi
+        env:
+        - name: RUST_LOG
+          value: "debug"
+        - name: RUST_BACKTRACE
+          value: "full"
+        {{- if (include "backup.pushMetricsEndpoint" $) }}
+        - name: KUBERNETES_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: PUSH_METRICS_ENDPOINT
+          value: "{{- include "backup.pushMetricsEndpoint" $ }}/api/v1/import/prometheus?extra_label=role={{- .jobName | default "db_restore" }}&extra_label=kubernetes_pod_name=$(KUBERNETES_POD_NAME)"
+        {{- end }}
+        - name: CONTROLLER_UID
+          valueFrom:
+            fieldRef:
+              fieldPath: "metadata.labels['controller-uid']"
+        {{- include "backup.backupEnvironment" (dict "config" .config "era" (default $.Values.chain.era .config.restore_era)) | nindent 8 }}
+        volumeMounts:
+        - name: backup-config
+          mountPath: /opt/aptos/etc
+        - name: aptos-data
+          mountPath: /opt/aptos/data
+        - name: tmp
+          mountPath: /tmp
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      {{- end }} # if .enabled
+      {{- end }} # with .Values.restore
       containers:
       - name: fullnode
         {{- if and $fullnode_statefulset (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
@@ -34,10 +108,16 @@ spec:
         {{- end }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         command:
-        - /bin/sh
+        - /bin/bash
         - -c
         - |-
-          set -e
+          set -euxo pipefail
+          if [[ -f /opt/aptos/data/wipe-db ]]; then
+            # Wipe DB
+            rm -rf /opt/aptos/data/db
+            # Delete the command file so we only wipe the DB once
+            rm -vf /opt/aptos/data/wipe-db
+          fi
           {{- if and (not .Values.chain.genesisConfigmap) (not .Values.chain.genesisSecret) }}
           # Download genesis and waypoint if necessary
           curl -o /opt/aptos/genesis/waypoint.txt {{ (get .Values.aptos_chains .Values.chain.name).waypoint_txt_url }}
@@ -73,6 +153,8 @@ spec:
           name: api
         - containerPort: 9101
           name: metrics
+        - containerPort: 9102
+          name: admin
         # NOTE: these require the API to be enabled, which is not always the case
         livenessProbe: # restart the pod if the REST API is ever unresponsive
           httpGet:
@@ -123,6 +205,9 @@ spec:
       - name: aptos-data
         persistentVolumeClaim:
           claimName: {{ include "aptos-fullnode.fullname" . }}-e{{ .Values.chain.era }}
+      - name: backup-config
+        configMap:
+          name: {{ include "backup.fullname" . }}-backup
       - name: tmp
         emptyDir: {}
       serviceAccountName: {{ include "aptos-fullnode.serviceAccountName" . }}

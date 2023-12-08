@@ -5,16 +5,19 @@ variable "region" {
 
 variable "era" {
   description = "Chain era, used to start a clean chain"
+  type        = number
   default     = 1
 }
 
 variable "chain_id" {
   description = "Aptos chain ID"
+  type        = string
   default     = "TESTING"
 }
 
 variable "chain_name" {
   description = "Aptos chain name"
+  type        = string
   default     = "testnet"
 }
 
@@ -25,26 +28,31 @@ variable "validator_name" {
 
 variable "image_tag" {
   description = "Docker image tag for Aptos node"
+  type        = string
   default     = "devnet"
 }
 
 variable "zone_name" {
   description = "Zone name of Azure DNS domain to create records in"
+  type        = string
   default     = ""
 }
 
 variable "zone_resource_group" {
   description = "Azure resource group name of the DNS zone"
+  type        = string
   default     = ""
 }
 
 variable "record_name" {
   description = "DNS record name to use (<workspace> is replaced with the TF workspace name)"
+  type        = string
   default     = "<workspace>.aptos"
 }
 
 variable "helm_chart" {
   description = "Path to aptos-validator Helm chart file"
+  type        = string
   default     = ""
 }
 
@@ -56,11 +64,13 @@ variable "helm_values" {
 
 variable "helm_values_file" {
   description = "Path to file containing values for Helm chart"
+  type        = string
   default     = ""
 }
 
 variable "k8s_api_sources" {
   description = "List of CIDR subnets which can access the Kubernetes API endpoint"
+  type        = list(string)
   default     = ["0.0.0.0/0"]
 }
 
@@ -84,47 +94,30 @@ variable "k8s_debugger_groups" {
 
 variable "utility_instance_type" {
   description = "Instance type used for utilities"
+  type        = string
   default     = "Standard_B8ms"
 }
 
 variable "utility_instance_num" {
   description = "Number of instances for utilities"
+  type        = number
   default     = 1
 }
 
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
+  type        = string
   default     = "Standard_F4s_v2"
 }
 
 variable "validator_instance_num" {
   description = "Number of instances used for validator and fullnodes"
+  type        = string
   default     = 2
 }
 
 variable "validator_instance_enable_taint" {
   description = "Whether to taint the instances in the validator nodegroup"
+  type        = bool
   default     = false
-}
-
-variable "enable_logger" {
-  description = "Enable logger helm chart"
-  default     = false
-}
-
-variable "logger_helm_values" {
-  description = "Map of values to pass to logger Helm"
-  type        = any
-  default     = {}
-}
-
-variable "enable_monitoring" {
-  description = "Enable monitoring helm chart"
-  default     = false
-}
-
-variable "monitoring_helm_values" {
-  description = "Map of values to pass to monitoring Helm"
-  type        = any
-  default     = {}
 }
