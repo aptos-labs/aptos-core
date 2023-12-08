@@ -256,47 +256,40 @@ async fn handle_ready_optimistic_fetches<T: StorageReaderInterface>(
                     let optimistic_fetch_start_time = optimistic_fetch.fetch_start_time;
                     let optimistic_fetch_request = optimistic_fetch.request.clone();
 
-                    // Get the storage service request for the missing data
-                    let missing_data_request = match optimistic_fetch
-                        .get_storage_request_for_missing_data(config, &target_ledger_info)
-                    {
-                        Ok(storage_service_request) => storage_service_request,
-                        Err(error) => {
-                            // Failed to get the storage service request
-                            warn!(LogSchema::new(LogEntry::OptimisticFetchResponse)
-                                .error(&Error::UnexpectedErrorEncountered(error.to_string())));
-                            return;
-                        },
-                    };
+                    // Handle the optimistic fetch request and time the operation
+                    let handle_request = || {
+                        // Get the storage service request for the missing data
+                        let missing_data_request = optimistic_fetch
+                            .get_storage_request_for_missing_data(config, &target_ledger_info)?;
 
-                    // Notify the peer of the new data
-                    if let Err(error) = utils::notify_peer_of_new_data(
-                        cached_storage_server_summary.clone(),
-                        optimistic_fetches.clone(),
-                        subscriptions.clone(),
-                        lru_response_cache.clone(),
-                        request_moderator.clone(),
-                        storage.clone(),
-                        time_service.clone(),
-                        &peer_network_id,
-                        missing_data_request,
-                        target_ledger_info,
-                        optimistic_fetch.take_response_sender(),
-                    ) {
+                        // Notify the peer of the new data
+                        utils::notify_peer_of_new_data(
+                            cached_storage_server_summary.clone(),
+                            optimistic_fetches.clone(),
+                            subscriptions.clone(),
+                            lru_response_cache.clone(),
+                            request_moderator.clone(),
+                            storage.clone(),
+                            time_service.clone(),
+                            &peer_network_id,
+                            missing_data_request,
+                            target_ledger_info,
+                            optimistic_fetch.take_response_sender(),
+                        )
+                    };
+                    let result = utils::execute_and_time_duration(
+                        &metrics::OPTIMISTIC_FETCH_LATENCIES,
+                        Some((&peer_network_id, &optimistic_fetch_request)),
+                        None,
+                        handle_request,
+                        Some(optimistic_fetch_start_time),
+                    );
+
+                    // Log an error if the handler failed
+                    if let Err(error) = result {
                         warn!(LogSchema::new(LogEntry::OptimisticFetchResponse)
                             .error(&Error::UnexpectedErrorEncountered(error.to_string())));
                     }
-
-                    // Update the optimistic fetch latency metric
-                    let optimistic_fetch_duration = time_service
-                        .now()
-                        .duration_since(optimistic_fetch_start_time);
-                    metrics::observe_value_with_label(
-                        &metrics::OPTIMISTIC_FETCH_LATENCIES,
-                        peer_network_id.network_id(),
-                        &optimistic_fetch_request.get_label(),
-                        optimistic_fetch_duration.as_secs_f64(),
-                    );
                 })
                 .await;
         }
