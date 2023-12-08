@@ -123,7 +123,7 @@ pub fn run_benchmark<V>(
     config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
 
     let (db, executor) = init_db_and_executor::<V>(&config);
-    let transaction_generator_creator = transaction_mix.clone().map(|transaction_mix| {
+    let transaction_generators = transaction_mix.clone().map(|transaction_mix| {
         let num_existing_accounts = TransactionGenerator::read_meta(&source_dir);
         let num_accounts_to_be_loaded = std::cmp::min(
             num_existing_accounts,
@@ -148,7 +148,7 @@ pub fn run_benchmark<V>(
         let (main_signer_accounts, burner_accounts) =
             accounts_cache.split(num_main_signer_accounts);
 
-        init_workload::<V>(
+        let transaction_generator_creator = init_workload::<V>(
             transaction_mix,
             main_signer_accounts,
             burner_accounts,
@@ -156,7 +156,9 @@ pub fn run_benchmark<V>(
             // Initialization pipeline is temporary, so needs to be fully committed.
             // No discards/aborts allowed during initialization, even if they are allowed later.
             &PipelineConfig::default(),
-        )
+        );
+        // need to initialize all workers and finish with all transactions before we start the timer:
+        (0..pipeline_config.num_generator_workers).map(|_| transaction_generator_creator.create_transaction_generator()).collect::<Vec<_>>()
     });
 
     let version = db.reader.get_latest_version().unwrap();
@@ -222,11 +224,11 @@ pub fn run_benchmark<V>(
     let start_commit_total = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum();
 
     let start_vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
-    if let Some(transaction_generator_creator) = transaction_generator_creator {
+    if let Some(transaction_generators) = transaction_generators {
         generator.run_workload(
             block_size,
             num_blocks,
-            transaction_generator_creator,
+            transaction_generators,
             transactions_per_sender,
         );
     } else {
@@ -247,7 +249,7 @@ pub fn run_benchmark<V>(
     pipeline.join();
 
     let elapsed = start_time.elapsed().as_secs_f64();
-    let delta_v = (db.reader.get_latest_version().unwrap() - version) as f64;
+    let delta_v = (db.reader.get_latest_version().unwrap() - version - num_blocks as u64) as f64;
     let delta_gas = start_gas_measurement.end();
     let delta_output_size = APTOS_PROCESSED_TXNS_OUTPUT_SIZE.get_sample_sum() - start_output_size;
 
