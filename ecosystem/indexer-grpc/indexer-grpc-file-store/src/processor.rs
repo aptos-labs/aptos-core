@@ -21,7 +21,6 @@ use tracing::{debug, info};
 
 // If the version is ahead of the cache head, retry after a short sleep.
 const AHEAD_OF_CACHE_SLEEP_DURATION_IN_MILLIS: u64 = 100;
-const LARGE_FILE_BYTES_COUNT: usize = 100_000_000;
 const SERVICE_TYPE: &str = "file_worker";
 
 /// Processor tails the data in cache and stores the data in file store.
@@ -130,30 +129,36 @@ impl Processor {
             }
 
             // Create thread and fetch transactions
-            let tasks = vec![];
+            let mut tasks = vec![];
             for start_version in batches {
-                let cache_operator_clone = self.cache_operator.clone();
-                let file_store_operator_clone = self.file_store_operator.clone();
+                let mut cache_operator_clone = self.cache_operator.clone();
+                let mut file_store_operator_clone = self.file_store_operator.clone_box();
                 let task = tokio::spawn(async move {
                     let transactions = cache_operator_clone
                         .batch_get_encoded_proto_data_x(start_version, BLOB_STORAGE_SIZE as u64)
                         .await
                         .unwrap();
+                    let last_transaction = transactions.last().unwrap().0.clone();
                     let (start, end) = file_store_operator_clone
                         .upload_transaction_batch(cache_chain_id, transactions)
                         .await
                         .unwrap();
-                    (start, end, transactions.last().unwrap().0)
+                    (start, end, last_transaction)
                 });
                 tasks.push(task);
             }
             let (first_version, last_version, last_version_encoded) =
                 match futures::future::try_join_all(tasks).await {
-                    Ok(res) => {
+                    Ok(mut res) => {
                         // Check for gaps
                         res.sort_by(|a, b| a.0.cmp(&b.0));
                         let mut prev_start = None;
                         let mut prev_end = None;
+
+                        let first_version = res.first().unwrap().0;
+                        let last_version = res.last().unwrap().1;
+                        let last_version_encoded = res.last().unwrap().2.clone();
+                        let versoins: Vec<u64> = res.iter().map(|x| x.0).collect();
                         for result in res {
                             let start = result.0;
                             let end = result.1;
@@ -163,7 +168,7 @@ impl Processor {
                             } else {
                                 if prev_end.unwrap() + 1 != start {
                                     tracing::error!(
-                                        processed_versions = ?res,
+                                        processed_versions = ?versoins,
                                         "[Filestore] Gaps in processing data"
                                     );
                                     panic!("[Filestore] Gaps in processing data");
@@ -172,11 +177,8 @@ impl Processor {
                                 prev_end = Some(end);
                             }
                         }
-                        (
-                            res.first().unwrap().0,
-                            res.last().unwrap().1,
-                            res.last().unwrap().2.clone(),
-                        )
+
+                        (first_version, last_version, last_version_encoded)
                     },
                     Err(err) => panic!("Error processing transaction batches: {:?}", err),
                 };
@@ -261,7 +263,7 @@ impl Processor {
     }
 }
 
-fn handle_batch_from_cache(
+fn _handle_batch_from_cache(
     fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus>,
     batch_start_version: u64,
 ) -> Result<Option<Vec<EncodedTransactionWithVersion>>> {
@@ -278,56 +280,5 @@ fn handle_batch_from_cache(
         Err(err) => {
             bail!("Batch get encoded proto data failed: {}", err);
         },
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn verify_the_grpc_status_handling_ahead_of_cache() {
-        let fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus> =
-            Ok(CacheBatchGetStatus::NotReady);
-        let batch_start_version = 0;
-        assert!(
-            handle_batch_from_cache(fullnode_rpc_status, batch_start_version)
-                .unwrap()
-                .is_none()
-        );
-    }
-
-    #[test]
-    fn verify_the_grpc_status_handling_evicted_from_cache() {
-        let fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus> =
-            Ok(CacheBatchGetStatus::EvictedFromCache);
-        let batch_start_version = 0;
-        assert!(handle_batch_from_cache(fullnode_rpc_status, batch_start_version).is_err());
-    }
-
-    #[test]
-    fn verify_the_grpc_status_handling_error() {
-        let fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus> =
-            Err(anyhow::anyhow!("Error"));
-        let batch_start_version = 0;
-        assert!(handle_batch_from_cache(fullnode_rpc_status, batch_start_version).is_err());
-    }
-
-    #[test]
-    fn verify_the_grpc_status_handling_ok() {
-        let batch_start_version = 2000;
-        let transactions: Vec<String> = std::iter::repeat("txn".to_string()).take(1000).collect();
-        let transactions_with_version: Vec<EncodedTransactionWithVersion> = transactions
-            .iter()
-            .enumerate()
-            .map(|(index, txn)| (txn.clone(), batch_start_version + index as u64))
-            .collect();
-        let fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus> =
-            Ok(CacheBatchGetStatus::Ok(transactions));
-        let actual_transactions =
-            handle_batch_from_cache(fullnode_rpc_status, batch_start_version).unwrap();
-        assert!(actual_transactions.is_some());
-        let actual_transactions = actual_transactions.unwrap();
-        assert_eq!(actual_transactions, transactions_with_version);
     }
 }
