@@ -5,8 +5,10 @@ use crate::{
     network::{IncomingRandGenRequest, NetworkSender},
     pipeline::buffer_manager::{OrderedBlocks, ResetRequest},
     rand::rand_gen::{
+        aug_data_store::AugDataStore,
         network_messages::{RandMessage, RpcRequest},
         rand_store::RandStore,
+        storage::interface::{AugDataStorage, RandStorage},
         types::{AugmentedData, Proof, RandConfig, RandDecision, Share},
     },
 };
@@ -23,7 +25,7 @@ use tokio_retry::strategy::ExponentialBackoff;
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
 
-pub struct RandManager<S: Share, P: Proof<Share = S>, D: AugmentedData> {
+pub struct RandManager<S: Share, P: Proof<Share = S>, D: AugmentedData, Storage> {
     author: Author,
     epoch_state: Arc<EpochState>,
     stop: bool,
@@ -37,9 +39,18 @@ pub struct RandManager<S: Share, P: Proof<Share = S>, D: AugmentedData> {
 
     // downstream channels
     outgoing_blocks: Sender<OrderedBlocks>,
+    // local state
+    rand_store: RandStore<S, P, Storage>,
+    aug_data_store: AugDataStore<D, Storage>,
 }
 
-impl<S: Share, P: Proof<Share = S>, D: AugmentedData> RandManager<S, P, D> {
+impl<
+        S: Share,
+        P: Proof<Share = S>,
+        D: AugmentedData,
+        Storage: RandStorage<S, P> + AugDataStorage<D>,
+    > RandManager<S, P, D, Storage>
+{
     pub fn new(
         author: Author,
         epoch_state: Arc<EpochState>,
@@ -47,6 +58,7 @@ impl<S: Share, P: Proof<Share = S>, D: AugmentedData> RandManager<S, P, D> {
         config: RandConfig,
         outgoing_blocks: Sender<OrderedBlocks>,
         network_sender: Arc<NetworkSender>,
+        db: Arc<Storage>,
     ) -> Self {
         let (rand_decision_tx, rand_decision_rx) = tokio::sync::mpsc::unbounded_channel();
         let rb_backoff_policy = ExponentialBackoff::from_millis(2)
@@ -59,6 +71,8 @@ impl<S: Share, P: Proof<Share = S>, D: AugmentedData> RandManager<S, P, D> {
             TimeService::real(),
             Duration::from_secs(10),
         ));
+        let rand_store = RandStore::new(author, config.clone(), db.clone());
+        let aug_data_store = AugDataStore::new(epoch_state.epoch, config.clone(), db);
 
         Self {
             author,
@@ -71,6 +85,9 @@ impl<S: Share, P: Proof<Share = S>, D: AugmentedData> RandManager<S, P, D> {
             rand_decision_tx,
             rand_decision_rx,
             outgoing_blocks,
+
+            rand_store,
+            aug_data_store,
         }
     }
 
