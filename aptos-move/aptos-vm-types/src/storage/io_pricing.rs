@@ -75,7 +75,7 @@ impl IoPricingV1 {
             Modification { write_len } => {
                 cost += self.write_data_per_byte_in_val * NumBytes::new(*write_len);
             },
-            Deletion | DeletionWithDeposit { .. } => (),
+            Deletion => (),
         }
 
         cost
@@ -158,7 +158,7 @@ impl IoPricingV2 {
                 self.per_item_write * NumArgs::new(1)
                     + self.write_op_size(key, *write_len) * self.per_byte_write
             },
-            Deletion | DeletionWithDeposit { .. } => 0.into(),
+            Deletion => 0.into(),
         }
     }
 }

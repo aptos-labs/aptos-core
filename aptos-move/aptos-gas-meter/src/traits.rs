@@ -3,12 +3,14 @@
 
 use aptos_gas_algebra::{Fee, FeePerGasUnit, Gas, GasExpression, GasScalingFactor, Octa};
 use aptos_gas_schedule::VMGasParameters;
-use aptos_types::{
-    contract_event::ContractEvent,
-    state_store::{state_key::StateKey, state_value::StateValueMetadata},
-    write_set::WriteOpSize,
+use aptos_types::{state_store::state_key::StateKey, write_set::WriteOpSize};
+use aptos_vm_types::{
+    change_set::VMChangeSet,
+    storage::{
+        io_pricing::IoPricing,
+        space_pricing::{ChargeAndRefund, DiskSpacePricing},
+    },
 };
-use aptos_vm_types::{change_set::VMChangeSet, storage::io_pricing::IoPricing};
 use move_binary_format::errors::{Location, PartialVMResult, VMResult};
 use move_core_types::gas_algebra::{InternalGas, InternalGasUnit, NumBytes};
 use move_vm_types::gas::GasMeter as MoveGasMeter;
@@ -25,6 +27,9 @@ pub trait GasAlgebra {
 
     /// Returns the struct containing the storage-specific gas parameters.
     fn io_pricing(&self) -> &IoPricing;
+
+    /// Returns the disk space pricing strategy.
+    fn disk_space_pricing(&self) -> &DiskSpacePricing;
 
     /// Returns the current balance, measured in internal gas units.
     fn balance_internal(&self) -> InternalGas;
@@ -108,24 +113,6 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// storage costs.
     fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOpSize) -> VMResult<()>;
 
-    /// Calculates the storage fee for a state slot allocation.
-    fn storage_fee_for_state_slot(&self, op: &WriteOpSize) -> Fee;
-
-    /// Calculates the storage fee refund for a state slot deallocation.
-    fn storage_fee_refund_for_state_slot(&self, op: &WriteOpSize) -> Fee;
-
-    /// Calculates the storage fee for state byte.
-    fn storage_fee_for_state_bytes(&self, key: &StateKey, op: &WriteOpSize) -> Fee;
-
-    /// Calculates the storage fee for an event.
-    fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee;
-
-    /// Calculates the discount applied to the event storage fees, based on a free quota.
-    fn storage_discount_for_events(&self, total_cost: Fee) -> Fee;
-
-    /// Calculates the storage fee for the transaction.
-    fn storage_fee_for_transaction_storage(&self, txn_size: NumBytes) -> Fee;
-
     /// Charges the storage fees for writes, events & txn storage in a lump sum, minimizing the
     /// loss of precision. Refundable portion of the charge is recorded on the WriteOp itself,
     /// due to which mutable references are required on the parameter list wherever proper.
@@ -152,50 +139,37 @@ pub trait AptosGasMeter: MoveGasMeter {
             return Ok(0.into());
         }
 
+        let pricing = self.disk_space_pricing();
+        let params = &self.vm_gas_params().txn;
+
         // Calculate the storage fees.
         let mut write_fee = Fee::new(0);
         let mut total_refund = Fee::new(0);
-        for (key, op_size, op_creation_metadata) in change_set.write_set_iter_mut() {
-            let slot_fee = self.storage_fee_for_state_slot(&op_size);
-            let refund = self.storage_fee_refund_for_state_slot(&op_size);
-            let bytes_fee = self.storage_fee_for_state_bytes(key, &op_size);
-
-            Self::maybe_record_storage_deposit(op_creation_metadata, slot_fee);
+        for (key, op_size, metadata_opt) in change_set.write_set_iter_mut() {
+            let ChargeAndRefund { charge, refund } =
+                pricing.charge_refund_write_op(params, key, &op_size, metadata_opt);
             total_refund += refund;
 
-            write_fee += slot_fee + bytes_fee;
+            write_fee += charge;
         }
 
         let event_fee = change_set
             .events()
             .iter()
             .fold(Fee::new(0), |acc, (event, _)| {
-                acc + self.storage_fee_per_event(event)
+                acc + pricing.storage_fee_per_event(params, event)
             });
-        let event_discount = self.storage_discount_for_events(event_fee);
+        let event_discount = pricing.storage_discount_for_events(params, event_fee);
         let event_net_fee = event_fee
             .checked_sub(event_discount)
             .expect("discount should always be less than or equal to total amount");
-        let txn_fee = self.storage_fee_for_transaction_storage(txn_size);
+        let txn_fee = pricing.storage_fee_for_transaction_storage(params, txn_size);
         let fee = write_fee + event_net_fee + txn_fee;
 
         self.charge_storage_fee(fee, gas_unit_price)
             .map_err(|err| err.finish(Location::Undefined))?;
 
         Ok(total_refund)
-    }
-
-    // The slot fee is refundable, we record it on the WriteOp itself and it'll end up in
-    // the state DB.
-    fn maybe_record_storage_deposit(
-        creation_metadata: Option<&mut StateValueMetadata>,
-        slot_fee: Fee,
-    ) {
-        if !slot_fee.is_zero() {
-            if let Some(metadata) = creation_metadata {
-                metadata.set_deposit(slot_fee.into())
-            }
-        }
     }
 
     // Below are getters reexported from the gas algebra.
@@ -214,6 +188,11 @@ pub trait AptosGasMeter: MoveGasMeter {
     // Returns a reference to the struct containing all storage gas parameters.
     fn io_pricing(&self) -> &IoPricing {
         self.algebra().io_pricing()
+    }
+
+    /// Returns the disk space pricing strategy.
+    fn disk_space_pricing(&self) -> &DiskSpacePricing {
+        self.algebra().disk_space_pricing()
     }
 
     /// Returns the remaining balance, measured in (external) gas units.
