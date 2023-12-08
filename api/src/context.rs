@@ -1175,18 +1175,16 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            // TODO: change to config adapter or simply implement config for DB?
-            let resolver = state_view.as_move_resolver();
 
             let gas_schedule_params =
-                match GasScheduleV2::fetch_config(&resolver).and_then(|gas_schedule| {
+                match GasScheduleV2::fetch_config(&state_view).and_then(|gas_schedule| {
                     let feature_version = gas_schedule.feature_version;
                     let gas_schedule = gas_schedule.to_btree_map();
                     AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, feature_version)
                         .ok()
                 }) {
                     Some(gas_schedule) => Ok(gas_schedule),
-                    None => GasSchedule::fetch_config(&resolver)
+                    None => GasSchedule::fetch_config(&state_view)
                         .and_then(|gas_schedule| {
                             let gas_schedule = gas_schedule.to_btree_map();
                             AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, 0).ok()

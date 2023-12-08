@@ -4,8 +4,7 @@
 use super::new_test_context;
 use aptos_api_test_context::current_function_name;
 use aptos_api_types::{new_vm_utf8_string, AsConverter, HexEncodedBytes, MoveConverter, MoveType};
-use move_binary_format::CompiledModule;
-use move_bytecode_utils::viewer::ModuleViewer;
+use move_bytecode_utils::viewer::CompiledModuleViewer;
 use move_core_types::{
     account_address::AccountAddress,
     value::{MoveStruct, MoveValue as VmMoveValue},
@@ -57,10 +56,7 @@ async fn test_value_conversion() {
     );
 }
 
-fn assert_value_conversion<
-    R: ModuleViewer<Error = anyhow::Error, Item = CompiledModule>,
-    V: Serialize,
->(
+fn assert_value_conversion<R: CompiledModuleViewer, V: Serialize>(
     converter: &MoveConverter<'_, R>,
     json_move_type: &str,
     json_value: V,
@@ -79,7 +75,7 @@ fn assert_value_conversion<
     assert_eq!(json_value_back, json!(json_value));
 }
 
-fn assert_value_conversion_bytes<R: ModuleViewer<Error = anyhow::Error, Item = CompiledModule>>(
+fn assert_value_conversion_bytes<R: CompiledModuleViewer>(
     converter: &MoveConverter<'_, R>,
     json_move_type: &str,
     vm_bytes: &[u8],
