@@ -12,7 +12,6 @@ use aptos_logger::info;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
-use aptos_transaction_generator_lib::TransactionGeneratorCreator;
 use aptos_types::{
     account_address::AccountAddress, account_config::aptos_test_root_address,
     account_view::AccountView, chain_id::ChainId, transaction::Transaction,
@@ -36,7 +35,7 @@ use std::{
     fs::File,
     io::{Read, Write},
     path::Path,
-    sync::{mpsc, Arc},
+    sync::{mpsc, Arc, Mutex},
 };
 use thread_local::ThreadLocal;
 
@@ -293,9 +292,10 @@ impl TransactionGenerator {
         &mut self,
         block_size: usize,
         num_blocks: usize,
-        transaction_generator_creator: Box<dyn TransactionGeneratorCreator>,
+        transaction_generators: Vec<Box<dyn aptos_transaction_generator_lib::TransactionGenerator>>,
         transactions_per_sender: usize,
     ) {
+        let transaction_generators = Mutex::new(transaction_generators);
         assert!(self.block_sender.is_some());
         let num_senders_per_block =
             (block_size + transactions_per_sender - 1) / transactions_per_sender;
@@ -317,9 +317,7 @@ impl TransactionGenerator {
                     let sender = &self.main_signer_accounts.as_ref().unwrap().accounts[sender_idx];
                     let mut transaction_generator = transaction_generator
                         .get_or(|| {
-                            RefCell::new(
-                                transaction_generator_creator.create_transaction_generator(),
-                            )
+                            RefCell::new(transaction_generators.lock().unwrap().pop().unwrap())
                         })
                         .borrow_mut();
                     Transaction::UserTransaction(

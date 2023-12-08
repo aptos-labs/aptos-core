@@ -41,8 +41,6 @@ mod block_store_test;
 #[path = "sync_manager.rs"]
 pub mod sync_manager;
 
-const MAX_ORDERING_PIPELINE_LATENCY_REDUCTION: Duration = Duration::from_secs(1);
-
 fn update_counters_for_ordered_blocks(ordered_blocks: &[Arc<ExecutedBlock>]) {
     for block in ordered_blocks {
         observe_block(block.block().timestamp_usecs(), BlockStage::ORDERED);
