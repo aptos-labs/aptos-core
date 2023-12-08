@@ -1,5 +1,5 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-mod db;
-mod interface;
+pub mod db;
+pub mod interface;
 mod schema;
