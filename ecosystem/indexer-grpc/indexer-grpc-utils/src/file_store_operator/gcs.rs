@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{constants::BLOB_STORAGE_SIZE, file_store_operator::*, EncodedTransactionWithVersion};
+use anyhow::bail;
 use cloud_storage::{Bucket, Object};
 use itertools::Itertools;
 use std::env;
@@ -9,16 +10,21 @@ use std::env;
 const JSON_FILE_TYPE: &str = "application/json";
 // The environment variable to set the service account path.
 const SERVICE_ACCOUNT_ENV_VAR: &str = "SERVICE_ACCOUNT";
+const FILE_STORE_METADATA_TIMEOUT_MILLIS: u128 = 200;
 
 #[derive(Clone)]
 pub struct GcsFileStoreOperator {
     bucket_name: String,
+    file_store_metadata_last_updated: std::time::Instant,
 }
 
 impl GcsFileStoreOperator {
     pub fn new(bucket_name: String, service_account_path: String) -> Self {
         env::set_var(SERVICE_ACCOUNT_ENV_VAR, service_account_path);
-        Self { bucket_name }
+        Self {
+            bucket_name,
+            file_store_metadata_last_updated: std::time::Instant::now(),
+        }
     }
 }
 
@@ -115,6 +121,11 @@ impl FileStoreOperator for GcsFileStoreOperator {
         if let Some(metadata) = self.get_file_store_metadata().await {
             anyhow::ensure!(metadata.chain_id == expected_chain_id, "Chain ID mismatch.");
         }
+        if (self.file_store_metadata_last_updated.elapsed().as_millis()
+            < FILE_STORE_METADATA_TIMEOUT_MILLIS)
+        {
+            bail!("File store metadata is updated too frequently.")
+        }
         self.update_file_store_metadata_internal(expected_chain_id, version)
             .await?;
         Ok(())
@@ -135,6 +146,7 @@ impl FileStoreOperator for GcsFileStoreOperator {
             JSON_FILE_TYPE,
         )
         .await?;
+        self.file_store_metadata_last_updated = std::time::Instant::now();
         Ok(())
     }
 
