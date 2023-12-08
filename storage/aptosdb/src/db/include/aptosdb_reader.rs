@@ -540,15 +540,16 @@ impl DbReader for AptosDB {
             let mut iter = self
                 .ledger_db
                 .metadata_db()
-                .rev_iter::<BlockIndexSchema>(ReadOptions::default())?;
+                .rev_iter::<BlockInfoSchema>(ReadOptions::default())?;
             iter.seek_to_last();
 
             let mut events = Vec::with_capacity(num_events);
             for item in iter.take(num_events) {
-                let (block_height, version) = item?;
+                let (block_height, block_info) = item?;
+                let first_version = block_info.first_version();
                 let event = self
                     .event_store
-                    .get_events_by_version(version)?
+                    .get_events_by_version(first_version)?
                     .into_iter()
                     .find(|event| {
                         if let Some(key) = event.event_key() {
@@ -558,8 +559,8 @@ impl DbReader for AptosDB {
                         }
                         false
                     })
-                    .ok_or_else(|| anyhow!("Event for block_height {block_height} at version {version} is not found."))?;
-                events.push(EventWithVersion::new(version, event));
+                    .ok_or_else(|| anyhow!("Event for block_height {block_height} at version {first_version} is not found."))?;
+                events.push(EventWithVersion::new(first_version, event));
             }
 
             Ok(events)

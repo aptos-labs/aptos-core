@@ -9,10 +9,10 @@ proptest! {
     #[test]
     fn test_encode_decode(
         block_height in any::<u64>(),
-        start_version in any::<u64>(),
+        block_info in any::<BlockInfo>(),
     ) {
-        assert_encode_decode::<BlockIndexSchema>(&block_height, &start_version);
+        assert_encode_decode::<BlockInfoSchema>(&block_height, &block_info);
     }
 }
 
-test_no_panic_decoding!(BlockIndexSchema);
+test_no_panic_decoding!(BlockInfoSchema);

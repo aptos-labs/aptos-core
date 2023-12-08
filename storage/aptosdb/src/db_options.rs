@@ -81,7 +81,7 @@ pub(super) fn write_set_db_column_families() -> Vec<ColumnFamilyName> {
 pub(super) fn ledger_metadata_db_column_families() -> Vec<ColumnFamilyName> {
     vec![
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
-        BLOCK_INDEX_CF_NAME,
+        BLOCK_INFO_CF_NAME,
         DB_METADATA_CF_NAME,
         EPOCH_BY_VERSION_CF_NAME,
         LEDGER_INFO_CF_NAME,

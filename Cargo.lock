@@ -3652,6 +3652,8 @@ dependencies = [
  "move-core-types",
  "once_cell",
  "parking_lot 0.12.1",
+ "proptest",
+ "proptest-derive",
  "rayon",
  "serde",
  "thiserror",
