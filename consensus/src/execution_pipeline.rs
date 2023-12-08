@@ -122,14 +122,12 @@ impl ExecutionPipeline {
         }
         let validator_txns = block.validator_txns().cloned().unwrap_or_default();
         let input_txns = input_txns.unwrap();
-        let is_block_gas_limit = block_executor_onchain_config.has_any_block_gas_limit();
         tokio::task::spawn_blocking(move || {
             let txns_to_execute = Block::transactions_to_execute_for_metadata(
                 block.id(),
                 validator_txns,
                 input_txns.clone(),
                 metadata,
-                is_block_gas_limit,
             );
             let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
                 SIG_VERIFY_POOL.install(|| {

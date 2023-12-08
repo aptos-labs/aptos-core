@@ -415,26 +415,16 @@ impl Block {
         validator_txns: Vec<ValidatorTransaction>,
         txns: Vec<SignedTransaction>,
         metadata: BlockMetadata,
-        is_block_gas_limit: bool,
     ) -> Vec<Transaction> {
-        let txns = once(Transaction::BlockMetadata(metadata))
+        once(Transaction::BlockMetadata(metadata))
             .chain(
                 validator_txns
                     .into_iter()
                     .map(Transaction::ValidatorTransaction),
             )
-            .chain(txns.into_iter().map(Transaction::UserTransaction));
-
-        if is_block_gas_limit {
-            // After the per-block gas limit change, StateCheckpoint txn
-            // is inserted after block execution
-            txns.collect()
-        } else {
-            // Before the per-block gas limit change, StateCheckpoint txn
-            // is inserted here for compatibility.
-            txns.chain(once(Transaction::StateCheckpoint(block_id)))
-                .collect()
-        }
+            .chain(txns.into_iter().map(Transaction::UserTransaction))
+            .chain(once(Transaction::StateCheckpoint(block_id)))
+            .collect()
     }
 
     pub fn transactions_to_execute(
@@ -442,16 +432,9 @@ impl Block {
         validators: &[AccountAddress],
         validator_txns: Vec<ValidatorTransaction>,
         txns: Vec<SignedTransaction>,
-        is_block_gas_limit: bool,
     ) -> Vec<Transaction> {
         let metadata = self.new_block_metadata(validators);
-        Self::transactions_to_execute_for_metadata(
-            self.id,
-            validator_txns,
-            txns,
-            metadata,
-            is_block_gas_limit,
-        )
+        Self::transactions_to_execute_for_metadata(self.id, validator_txns, txns, metadata)
     }
 
     fn previous_bitvec(&self) -> BitVec {

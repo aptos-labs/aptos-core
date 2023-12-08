@@ -69,12 +69,7 @@ where
             )
             .unwrap();
 
-        let diff = if BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG.has_any_block_gas_limit() {
-            1
-        } else {
-            0
-        };
-        assert_eq!(output.txn_statuses().len(), num_txns + diff);
+        assert_eq!(output.txn_statuses().len(), num_txns);
 
         let msg = LedgerUpdateMessage {
             current_block_start_time,

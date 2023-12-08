@@ -20,13 +20,13 @@ pub struct TransactionsByStatus {
 
 impl TransactionsByStatus {
     pub fn new(
-        status: Vec<TransactionStatus>,
+        statuses: Vec<TransactionStatus>,
         to_keep: TransactionsWithParsedOutput,
         to_discard: TransactionsWithParsedOutput,
         to_retry: TransactionsWithParsedOutput,
     ) -> Self {
         Self {
-            statuses: status,
+            statuses,
             to_keep,
             to_discard,
             to_retry,
