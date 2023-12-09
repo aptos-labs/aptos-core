@@ -1,6 +1,6 @@
 ---
-title: "Use Aptos CLI with Ledger"
-id: "use-aptos-ledger"
+title: Use Aptos CLI with Ledger
+id: use-aptos-ledger
 ---
 
 # Use the Aptos CLI with Ledger
@@ -39,10 +39,17 @@ Aptos CLI is now set up for account 59836ba1dd0c845713bdab34346688d6f1dba290dbf6
   "Result": "Success"
 }
 ```
+
 In the above, we have created a new profile called `myprofile` and have chosen to use the first Ledger account (index 0) to sign transactions. If there is a certain index account you would like to use, you are welcome to use it.
 
+:::tip
+
+For more info on the derivation path ("index") schema, see [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki) and [SLIP-44](https://github.com/satoshilabs/slips/blob/master/slip-0044.md).
+
+:::
 
 After the above command, a new profile will be created in `~/.aptos/config.yml` and will look like the following:
+
 ```yaml
   myprofile:
     public_key: "0x05a8ace09d1136181029be3e817de3619562b0da2eedbff210e2b2f92c71be70"
@@ -51,11 +58,14 @@ After the above command, a new profile will be created in `~/.aptos/config.yml` 
     faucet_url: "https://faucet.devnet.aptoslabs.com"
     derivation_path: "m/44'/637'/0'/0'/0'"
 ```
+
 Notice that the above stores the derivation path instead of private key. This is because the private key is stored on your Ledger device, and is never exposed to the `aptos` tool.
 
 ## Publish a package with Ledger
+
 Once you have created a profile, you can use it to publish a package. The `aptos` tool will prompt you to confirm the transaction on your Ledger device.
 Note: Make sure that you are on the same directory as where your move module is located:
+
 ```bash
 $ aptos move publish --profile myprofile --named-addresses hello_blockchain=myprofile
 Compiling, may take a little while to download git dependencies...
@@ -84,10 +94,79 @@ yes
 After the above command, you will be prompted to confirm the transaction on your Ledger device. Once you confirm, the transaction will be submitted to the network. Note: Make sure you have `Blind Signing` enabled on your Ledger device. Otherwise you will not be able to sign transactions.
 `Blind Signing` - confirming a smart contract interaction you can’t verify through a human readable language.
 
+## Key rotation
+
+If you would like to use the Aptos ledger app with an existing account address, like one with a vanity prefix, you can rotate the account's authentication key.
+You can also rotate the authentication key of an account secured by a ledger hardware wallet, for example if you need to publish a transaction that is too large for your ledger to sign.
+
+```bash title="Generate a typical (not ledger) account with a vanity prefix"
+aptos key generate --vanity-prefix 0xaaa --output-file vanity-aaa
+```
+
+<details><summary>Output</summary>
+
+```bash
+{
+  "Result": {
+    "Account Address:": "0xaaa...",
+    "PublicKey Path": "vanity-aaa.pub",
+    "PrivateKey Path": "vanity-aaa"
+  }
+}
+```
+
+</details>
+
+```bash title="Initialize profile on testnet"
+aptos init \
+    --assume-yes \
+    --network testnet \
+    --private-key $(cat vanity-aaa) \
+    --profile aaa
+```
+
+<details><summary>Output</summary>
+
+```bash
+Configuring for profile aaa
+Configuring for network Testnet
+Using command line argument for private key
+Account 0xaaa... doesn't exist, creating it and funding it with 100000000 Octas
+Account 0xaaa... funded successfully
+
+---
+Aptos CLI is now set up for account 0xaaa... as profile aaa!  Run `aptos --help` for more information about commands
+{
+  "Result": "Success"
+}
+```
+
+</details>
+
+```bash title="Rotate the key to hardware wallet, derivation index 0"
+aptos account rotate-key \
+    --derivation-index 0 \
+    --profile aaa \
+    --save-to-profile aaa-ledger
+```
+
+:::tip
+You'll need to approve on your ledger.
+:::
+
+<details><summary>Output</summary>
+
+```bash
+```
+
+</details>
+
 ## Common Errors
 
 ### Error: Wrong raw transaction length
+
 Your raw transaction or package size is too big. Currently the Aptos ledger app can only support up to 20kb transaction. If you are using a `Ledger Nano S`, the supported transaction size will be even smaller.
+
 ```bash
 {
   "Error": "Unexpected error: Error - Wrong raw transaction length"
@@ -95,7 +174,9 @@ Your raw transaction or package size is too big. Currently the Aptos ledger app 
 ```
 
 ### Error: Ledger device is locked
+
 Make sure your Ledger device is unlocked and you have Aptos app opened
+
 ```bash
 {
   "Error": "Unexpected error: Error - Ledger device is locked"
