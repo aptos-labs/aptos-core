@@ -67,7 +67,7 @@ impl LiveVarInfoAtCodeOffset {
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
 pub struct LiveVarInfo {
     /// The usage of a given temporary after this program point, inclusive of locations where
-    /// the usage happens.
+    /// the usage happens. This set contains at least one element.
     pub usages: BTreeSet<Loc>,
 }
 
