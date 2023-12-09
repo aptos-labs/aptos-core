@@ -6,7 +6,7 @@ use crate::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     counters::*,
     data_cache::{AsMoveResolver, StorageAdapter},
-    errors::expect_only_successful_execution,
+    errors::{discarded_output, expect_only_successful_execution},
     gas::{check_gas, get_gas_parameters},
     move_vm_ext::{
         get_max_binary_format_version, AptosMoveResolver, MoveVmExt, RespawnedSession, SessionExt,
@@ -132,10 +132,6 @@ macro_rules! unwrap_or_discard {
             },
         }
     };
-}
-
-fn discarded_output(status_code: StatusCode) -> VMOutput {
-    VMOutput::empty_with_status(TransactionStatus::Discard(status_code))
 }
 
 fn get_transaction_output(
@@ -450,21 +446,20 @@ impl AptosVM {
                 // so even if the previous failure occurred while running the epilogue, it
                 // should not fail now. If it somehow fails here, there is no choice but to
                 // discard the transaction.
-                if let Err(e) = transaction_validation::run_failure_epilogue(
+                transaction_validation::run_failure_epilogue(
                     &mut session,
                     gas_meter.balance(),
                     fee_statement,
                     &self.features,
                     txn_data,
                     log_context,
-                ) {
-                    let discarded_output = discarded_output(e.status_code());
-                    return (e, discarded_output);
-                }
-                let txn_output =
-                    get_transaction_output(session, fee_statement, status, change_set_configs)
-                        .unwrap_or_else(|e| discarded_output(e.status_code()));
-                (error_code, txn_output)
+                )
+                .unwrap_or_else(|| {
+                    let txn_output =
+                        get_transaction_output(session, fee_statement, status, change_set_configs)
+                            .unwrap_or_else(|e| discarded_output(e.status_code()));
+                    (error_code, txn_output)
+                })
             },
             TransactionStatus::Discard(status_code) => (
                 VMStatus::error(status_code, None),
