@@ -10,7 +10,6 @@ use aptos_consensus_types::{
 use aptos_reliable_broadcast::{BroadcastStatus, RBMessage, RBNetworkSender};
 use aptos_types::validator_verifier::ValidatorVerifier;
 use async_trait::async_trait;
-use futures::future::AbortHandle;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, time::Duration};
 
@@ -83,21 +82,5 @@ impl RBNetworkSender<CommitMessage> for NetworkSender {
         };
 
         Ok(response)
-    }
-}
-
-pub struct DropGuard {
-    abort_handle: AbortHandle,
-}
-
-impl DropGuard {
-    pub fn new(abort_handle: AbortHandle) -> Self {
-        Self { abort_handle }
-    }
-}
-
-impl Drop for DropGuard {
-    fn drop(&mut self) {
-        self.abort_handle.abort();
     }
 }
