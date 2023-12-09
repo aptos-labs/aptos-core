@@ -7,7 +7,7 @@ use crate::{
     counters::*,
     data_cache::{AsMoveResolver, StorageAdapter},
     errors::expect_only_successful_execution,
-    gas::{check_gas, get_gas_config_from_storage},
+    gas::{check_gas, get_gas_parameters},
     move_vm_ext::{
         get_max_binary_format_version, AptosMoveResolver, MoveVmExt, RespawnedSession, SessionExt,
         SessionId,
@@ -23,9 +23,7 @@ use aptos_crypto::HashValue;
 use aptos_framework::{natives::code::PublishRequest, RuntimeModuleMetadataV1};
 use aptos_gas_algebra::Gas;
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
-use aptos_gas_schedule::{
-    AptosGasParameters, MiscGasParameters, NativeGasParameters, VMGasParameters,
-};
+use aptos_gas_schedule::{AptosGasParameters, VMGasParameters};
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_metrics_core::TimerHelper;
@@ -44,7 +42,6 @@ use aptos_types::{
         new_epoch_event_key, ConfigurationResource, FeatureFlag, Features, OnChainConfig,
         TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,
     },
-    system_txn::SystemTransaction,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction,
         EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
@@ -66,7 +63,7 @@ use aptos_vm_types::{
     change_set::VMChangeSet,
     output::VMOutput,
     resolver::{ExecutorView, ResourceGroupView},
-    storage::{ChangeSetConfigs, StorageGasParameters, StoragePricing},
+    storage::{ChangeSetConfigs, StorageGasParameters},
 };
 use claims::assert_err;
 use fail::fail_point;
@@ -80,7 +77,6 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    gas_algebra::NumArgs,
     ident_str,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
@@ -169,55 +165,14 @@ pub struct AptosVM {
 impl AptosVM {
     pub fn new(resolver: &impl AptosMoveResolver) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
-        // Get the gas parameters.
-        let (mut gas_params, gas_feature_version) = get_gas_config_from_storage(resolver);
 
-        let storage_gas_params = match &mut gas_params {
-            Ok(gas_params) => {
-                let storage_gas_params =
-                    StorageGasParameters::new(gas_feature_version, gas_params, resolver);
-
-                // Overwrite table io gas parameters with global io pricing.
-                let g = &mut gas_params.natives.table;
-                match gas_feature_version {
-                    0..=1 => (),
-                    2..=6 => {
-                        if let StoragePricing::V2(pricing) = &storage_gas_params.pricing {
-                            g.common_load_base_legacy = pricing.per_item_read * NumArgs::new(1);
-                            g.common_load_base_new = 0.into();
-                            g.common_load_per_byte = pricing.per_byte_read;
-                            g.common_load_failure = 0.into();
-                        }
-                    }
-                    7..=9 => {
-                        if let StoragePricing::V2(pricing) = &storage_gas_params.pricing {
-                            g.common_load_base_legacy = 0.into();
-                            g.common_load_base_new = pricing.per_item_read * NumArgs::new(1);
-                            g.common_load_per_byte = pricing.per_byte_read;
-                            g.common_load_failure = 0.into();
-                        }
-                    }
-                    10.. => {
-                        g.common_load_base_legacy = 0.into();
-                        g.common_load_base_new = gas_params.vm.txn.storage_io_per_state_slot_read * NumArgs::new(1);
-                        g.common_load_per_byte = gas_params.vm.txn.storage_io_per_state_byte_read;
-                        g.common_load_failure = 0.into();
-                    }
-                };
-                Ok(storage_gas_params)
-            },
-            Err(err) => Err(format!("Failed to initialize storage gas params due to failure to load main gas parameters: {}", err)),
-        };
-
-        // TODO(Gas): Right now, we have to use some dummy values for gas parameters if they are not found on-chain.
-        //            This only happens in a edge case that is probably related to write set transactions or genesis,
-        //            which logically speaking, shouldn't be handled by the VM at all.
-        //            We should clean up the logic here once we get that refactored.
-        let (native_gas_params, misc_gas_params) = match &gas_params {
-            Ok(gas_params) => (gas_params.natives.clone(), gas_params.vm.misc.clone()),
-            Err(_) => (NativeGasParameters::zeros(), MiscGasParameters::zeros()),
-        };
-
+        let (
+            gas_params,
+            storage_gas_params,
+            native_gas_params,
+            misc_gas_params,
+            gas_feature_version,
+        ) = get_gas_parameters(resolver);
         let features = Features::fetch_config(resolver).unwrap_or_default();
 
         // If no chain ID is in storage, we assume we are in a testing environment and use ChainId::TESTING

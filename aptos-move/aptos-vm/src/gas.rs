@@ -3,13 +3,17 @@
 
 use crate::{move_vm_ext::AptosMoveResolver, transaction_metadata::TransactionMetadata};
 use aptos_gas_algebra::GasExpression;
-use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
+use aptos_gas_schedule::{
+    AptosGasParameters, FromOnChainGasSchedule, MiscGasParameters, NativeGasParameters,
+};
 use aptos_logger::{enabled, Level};
 use aptos_types::on_chain_config::{
     ApprovedExecutionHashes, ConfigStorage, GasSchedule, GasScheduleV2, OnChainConfig,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_log, speculative_warn};
+use aptos_vm_types::storage::{StorageGasParameters, StoragePricing};
 use move_core_types::{
+    gas_algebra::NumArgs,
     language_storage::CORE_CODE_ADDRESS,
     vm_status::{StatusCode, VMStatus},
 };
@@ -36,6 +40,72 @@ pub(crate) fn get_gas_config_from_storage(
             None => (Err("Neither gas schedule v2 nor v1 exists.".to_string()), 0),
         },
     }
+}
+
+pub(crate) fn get_gas_parameters(
+    config_storage: &impl ConfigStorage,
+) -> (
+    Result<AptosGasParameters, String>,
+    Result<StorageGasParameters, String>,
+    NativeGasParameters,
+    MiscGasParameters,
+    u64,
+) {
+    let (mut gas_params, gas_feature_version) = get_gas_config_from_storage(config_storage);
+
+    let storage_gas_params = match &mut gas_params {
+        Ok(gas_params) => {
+            let storage_gas_params =
+                StorageGasParameters::new(gas_feature_version, gas_params, config_storage);
+
+            // Overwrite table io gas parameters with global io pricing.
+            let g = &mut gas_params.natives.table;
+            match gas_feature_version {
+                0..=1 => (),
+                2..=6 => {
+                    if let StoragePricing::V2(pricing) = &storage_gas_params.pricing {
+                        g.common_load_base_legacy = pricing.per_item_read * NumArgs::new(1);
+                        g.common_load_base_new = 0.into();
+                        g.common_load_per_byte = pricing.per_byte_read;
+                        g.common_load_failure = 0.into();
+                    }
+                }
+                7..=9 => {
+                    if let StoragePricing::V2(pricing) = &storage_gas_params.pricing {
+                        g.common_load_base_legacy = 0.into();
+                        g.common_load_base_new = pricing.per_item_read * NumArgs::new(1);
+                        g.common_load_per_byte = pricing.per_byte_read;
+                        g.common_load_failure = 0.into();
+                    }
+                }
+                10.. => {
+                    g.common_load_base_legacy = 0.into();
+                    g.common_load_base_new = gas_params.vm.txn.storage_io_per_state_slot_read * NumArgs::new(1);
+                    g.common_load_per_byte = gas_params.vm.txn.storage_io_per_state_byte_read;
+                    g.common_load_failure = 0.into();
+                }
+            };
+            Ok(storage_gas_params)
+        },
+        Err(err) => Err(format!("Failed to initialize storage gas params due to failure to load main gas parameters: {}", err)),
+    };
+
+    // TODO(Gas): Right now, we have to use some dummy values for gas parameters if they are not found on-chain.
+    //            This only happens in a edge case that is probably related to write set transactions or genesis,
+    //            which logically speaking, shouldn't be handled by the VM at all.
+    //            We should clean up the logic here once we get that refactored.
+    let (native_gas_params, misc_gas_params) = match &gas_params {
+        Ok(gas_params) => (gas_params.natives.clone(), gas_params.vm.misc.clone()),
+        Err(_) => (NativeGasParameters::zeros(), MiscGasParameters::zeros()),
+    };
+
+    (
+        gas_params,
+        storage_gas_params,
+        native_gas_params,
+        misc_gas_params,
+        gas_feature_version,
+    )
 }
 
 pub(crate) fn check_gas(
@@ -110,7 +180,7 @@ pub(crate) fn check_gas(
 
     // The submitted transactions max gas units needs to be at least enough to cover the
     // intrinsic cost of the transaction as calculated against the size of the
-    // underlying `RawTransaction`
+    // underlying `RawTransaction`.
     let intrinsic_gas = txn_gas_params
         .calculate_intrinsic_gas(raw_bytes_len)
         .evaluate(gas_feature_version, &gas_params.vm)
