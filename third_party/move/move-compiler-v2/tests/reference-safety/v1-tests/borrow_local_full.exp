@@ -1,25 +1,32 @@
 
 Diagnostics:
-error: cannot mutable borrow local `v` since other references exists
-   ┌─ tests/reference-safety/v1-tests/borrow_local_full.move:13:17
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_local_full.move:14:9
    │
 12 │         let x = &mut v;
-   │                 ------ previous mutable local borrow
+   │                 ------ mutable local borrow attempted here
 13 │         let y = &mut v; // error in v2
-   │                 ^^^^^^ mutable borrow attempted here
+   │                 ------ other mutable local borrow
+14 │         *x;
+   │         ^^ reference used here
 
-error: cannot mutable borrow local `v` since other references exists
-   ┌─ tests/reference-safety/v1-tests/borrow_local_full.move:18:17
-   │
-17 │         let x = id_mut(&mut v);
-   │                        ------ previous mutable local borrow
-18 │         let y = &mut v; // error in v2
-   │                 ^^^^^^ mutable borrow attempted here
-
-error: cannot mutable borrow local `v` since other references exists
-   ┌─ tests/reference-safety/v1-tests/borrow_local_full.move:23:17
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_local_full.move:24:9
    │
 22 │         let x = &v;
-   │                 -- previous local borrow
+   │                 -- other local borrow
 23 │         let y = &mut v;
-   │                 ^^^^^^ mutable borrow attempted here
+   │                 ------ mutable local borrow attempted here
+24 │         *y;
+   │         ^^ reference used here
+
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_local_full.move:25:9
+   │
+22 │         let x = &v;
+   │                 -- local borrow attempted here
+23 │         let y = &mut v;
+   │                 ------ other mutable local borrow
+24 │         *y;
+25 │         *x;
+   │         ^^ reference used here

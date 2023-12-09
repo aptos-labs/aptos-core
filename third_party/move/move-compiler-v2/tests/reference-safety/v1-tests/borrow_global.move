@@ -3,7 +3,7 @@ module 0x8675309::M {
 
     fun t0(addr: address): bool acquires R {
         let f = &borrow_global_mut<R>(addr).f;
-        let r1 = borrow_global<R>(addr); // error in v2
+        let r1 = borrow_global<R>(addr);
         f == &r1.f
     }
 

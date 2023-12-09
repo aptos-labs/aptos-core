@@ -352,6 +352,16 @@ impl LifetimeState {
         self.effective_children(label).iter().any(|(_, e)| e.is_mut)
     }
 
+    /// Returns true if the given edge is active w.r.t. the live-var info at a program point.
+    fn is_active_edge(&self, alive: &LiveVarInfoAtCodeOffset, e: &BorrowEdge) -> bool {
+        if let MemoryLocation::Local(temp) = &self.node(&e.target).location {
+            alive.before.contains_key(temp)
+        } else {
+            // assume true as a safe approximation
+            true
+        }
+    }
+
     /// Gets the label associated with a local.
     fn label_for_local(&self, temp: TempIndex) -> Option<&LifetimeLabel> {
         self.local_to_label_map.get(&temp)
@@ -546,12 +556,18 @@ impl<'env> LifeTimeAnalysis<'env> {
     fn check_mut_edge(
         &self,
         state: &LifetimeState,
+        alive: &LiveVarInfoAtCodeOffset,
         label: &LifetimeLabel,
         edge: &BorrowEdge,
     ) -> Vec<(Loc, String)> {
         let mut diags = vec![];
         // There must be no overlapping child.
         for (_, e) in state.effective_children(label) {
+            if !state.is_active_edge(alive, e) {
+                // Non-active edges are skipped and checked with `validate_borrow_path`. See
+                // discussion there.
+                continue;
+            }
             if e.kind.overlaps(&edge.kind) {
                 if let Some(diag) = self.borrow_edge_info("previous ", state, false, e) {
                     diags.push(diag)
@@ -566,12 +582,18 @@ impl<'env> LifeTimeAnalysis<'env> {
     fn check_immut_edge(
         &self,
         state: &LifetimeState,
+        alive: &LiveVarInfoAtCodeOffset,
         label: &LifetimeLabel,
         edge: &BorrowEdge,
     ) -> Vec<(Loc, String)> {
         let mut diags = vec![];
         // There must be no overlapping mutable child.
         for (_, e) in state.effective_children(label) {
+            if !state.is_active_edge(alive, e) {
+                // Non-active edges are skipped and checked with `validate_borrow_path`. See
+                // discussion there.
+                continue;
+            }
             if e.is_mut && e.kind.overlaps(&edge.kind) {
                 if let Some(diag) = self.borrow_edge_info("previous ", state, true, e) {
                     diags.push(diag)
@@ -588,7 +610,7 @@ impl<'env> LifeTimeAnalysis<'env> {
         state: &mut LifetimeState,
         label: &LifetimeLabel,
         edge: BorrowEdge,
-        _alive: &LiveVarInfoAtCodeOffset,
+        alive: &LiveVarInfoAtCodeOffset,
     ) {
         debug_assert_ne!(edge.kind, BorrowEdgeKind::Skip);
         let msg_for_source = || {
@@ -604,12 +626,12 @@ impl<'env> LifeTimeAnalysis<'env> {
             }
         };
         if edge.is_mut {
-            let diags = self.check_mut_edge(state, label, &edge);
+            let diags = self.check_mut_edge(state, alive, label, &edge);
             if !diags.is_empty() {
                 self.error_with_hints(
                     edge.loc.as_ref().expect("only Skip edge has no location"),
                     format!(
-                        "cannot mutable borrow {} since other references exists",
+                        "cannot mutable borrow {} since other references exist",
                         msg_for_source()
                     ),
                     "mutable borrow attempted here",
@@ -617,7 +639,7 @@ impl<'env> LifeTimeAnalysis<'env> {
                 )
             }
         } else {
-            let diags = self.check_immut_edge(state, label, &edge);
+            let diags = self.check_immut_edge(state, alive, label, &edge);
             if !diags.is_empty() {
                 self.error_with_hints(
                     edge.loc.as_ref().expect("only Skip edge has no location"),
@@ -631,6 +653,109 @@ impl<'env> LifeTimeAnalysis<'env> {
             }
         }
         state.add_edge(label, edge)
+    }
+
+    /// Validates that the given node in the borrow graph is derived via a valid path of
+    /// borrow operations. This handles checks postponed by `check_and_add_edge`, in the
+    /// case an edge is not active.
+    ///
+    /// Why do we need to postpone some checks?  Consider (with all borrows mut):
+    /// ```
+    /// 0: $t2 := borrow_local($t0)
+    /// 1: $t1 := borrow_field<m::S>.f($t2)
+    /// 2: $t4 := borrow_local($t0)
+    /// 3: $t3 := borrow_field<m::S>.l($t4)
+    /// 4: m::f($t1, $t3)
+    /// ```
+    /// If the edge being created  is at code offset 2, it is not known yet
+    /// that $t4 will be narrowed down to $t3, making the function call at offset
+    /// 4 valid, even with mutable borrows.
+    fn validate_borrow_path(
+        &self,
+        state: &LifetimeState,
+        alive: &LiveVarInfoAtCodeOffset,
+        loc: &Loc,
+        label: &LifetimeLabel,
+    ) {
+        if !self.is_alive_or_alias_for_alive(state, alive, label) {
+            // If we reach a node for a local which is not alive before this program
+            // point we can stop checking, since those locals cannot be used from
+            // somewhere else, and thus borrow operations for them do not conflict.
+            return;
+        }
+        for (parent, self_edge) in state
+            .parent_edges(label)
+            .map(|(p, e)| (p, e.clone()))
+            .collect::<Vec<_>>()
+        {
+            let mut had_error = false;
+
+            // For skip edges, do not perform checks but continue with the parent
+            if self_edge.kind != BorrowEdgeKind::Skip {
+                debug_assert!(self_edge.loc.is_some());
+                for (_, sibling_edge) in state.effective_children(&parent) {
+                    debug_assert!(sibling_edge.loc.is_some());
+                    if &sibling_edge.target == label {
+                        // self
+                        continue;
+                    }
+                    if (self_edge.is_mut || sibling_edge.is_mut)
+                        && self_edge.kind.overlaps(&sibling_edge.kind)
+                    {
+                        let (loc1, mut msg1) = self
+                            .borrow_edge_info("", state, false, &self_edge)
+                            .expect("loc");
+                        msg1 = format!("{} attempted here", msg1);
+                        let (loc2, msg2) = self
+                            .borrow_edge_info("other ", state, false, &sibling_edge)
+                            .expect("loc");
+                        self.error_with_hints(
+                            loc,
+                            "conflicting borrow operations",
+                            "reference used here",
+                            [(loc1, msg1), (loc2, msg2)].into_iter(),
+                        );
+                        had_error = true;
+                    }
+                }
+            }
+            if !had_error {
+                // Continue recursively, checking parent.
+                self.validate_borrow_path(state, alive, loc, &parent)
+            }
+        }
+    }
+
+    fn is_alive_or_alias_for_alive(
+        &self,
+        state: &LifetimeState,
+        alive: &LiveVarInfoAtCodeOffset,
+        label: &LifetimeLabel,
+    ) -> bool {
+        let node = state.node(label);
+        if let MemoryLocation::Local(temp) = &node.location {
+            if !alive.before.contains_key(temp) {
+                // Check whether a skip edge leads to an alive local, meaning that local is
+                // an alias for the given one.
+                return node.children.iter().any(|e| {
+                    e.kind == BorrowEdgeKind::Skip
+                        && self.is_alive_or_alias_for_alive(state, alive, &e.target)
+                });
+            }
+        }
+        true
+    }
+
+    fn validate_borrow_path_of_local(
+        &self,
+        state: &LifetimeState,
+        alive: &LiveVarInfoAtCodeOffset,
+        loc: &Loc,
+        temp: TempIndex,
+    ) {
+        if let Some(label) = state.label_for_local(temp) {
+            self.validate_borrow_path(state, alive, loc, label)
+        }
     }
 
     fn error_with_hints(
@@ -977,11 +1102,16 @@ impl<'env> LifeTimeAnalysis<'env> {
         srcs: &[TempIndex],
         alive: &LiveVarInfoAtCodeOffset,
     ) {
-        // Check validness of transferring arguments into function.
+        let loc = self.loc(id);
+
+        // Check validness of transferring arguments into function. This includes checking
+        // borrow paths.
         let mut src_check_failed = BTreeSet::new();
         for src in srcs {
             if !self.check_read_local(state, id, *src, ReadMode::Argument, alive) {
                 src_check_failed.insert(*src);
+            } else if let Some(label) = state.label_for_local(*src).cloned() {
+                self.validate_borrow_path(state, alive, &loc, &label)
             }
         }
         // Next check whether we can assign to the destinations.
@@ -1001,7 +1131,6 @@ impl<'env> LifeTimeAnalysis<'env> {
             })
             .collect::<BTreeMap<_, _>>();
         let src_qualifier_offset = dest_labels.len();
-        let loc = self.loc(id);
         for dest in dests {
             let dest_ty = self.ty(*dest);
             if dest_ty.is_reference() {
@@ -1114,10 +1243,12 @@ impl<'env> LifeTimeAnalysis<'env> {
         alive: &LiveVarInfoAtCodeOffset,
     ) {
         self.check_write_local(state, id, dest, alive);
+        let loc = self.loc(id);
+        self.validate_borrow_path_of_local(state, alive, &loc, src);
         if let Some(label) = state.label_for_local_with_children(src) {
             if state.has_mut_edges(label) {
                 self.error_with_hints(
-                    &self.loc(id),
+                    &loc,
                     format!(
                         "cannot dereference {} which is still mutable borrowed",
                         self.display(src)

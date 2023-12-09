@@ -1,33 +1,32 @@
 
 Diagnostics:
-error: cannot immutable borrow local `v` since other mutable references exist
-   ┌─ tests/reference-safety/v1-tests/borrow_local_full_invalid.move:33:17
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_local_full_invalid.move:34:9
    │
 32 │         let x = &mut v;
-   │                 ------ previous mutable local borrow
+   │                 ------ mutable local borrow attempted here
 33 │         let y = &v;
-   │                 ^^ immutable borrow attempted here
+   │                 -- other local borrow
+34 │         *x;
+   │         ^^ reference used here
 
-error: cannot mutable borrow local `v` since other references exists
-   ┌─ tests/reference-safety/v1-tests/borrow_local_full_invalid.move:13:17
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_local_full_invalid.move:14:9
    │
 12 │         let x = &mut v;
-   │                 ------ previous mutable local borrow
+   │                 ------ other mutable local borrow
 13 │         let y = &mut v;
-   │                 ^^^^^^ mutable borrow attempted here
+   │                 ------ mutable local borrow attempted here
+14 │         *y;
+   │         ^^ reference used here
 
-error: cannot mutable borrow local `v` since other references exists
-   ┌─ tests/reference-safety/v1-tests/borrow_local_full_invalid.move:18:24
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_local_full_invalid.move:18:17
    │
 17 │         let x = &mut v;
-   │                 ------ previous mutable local borrow
+   │                 ------ other mutable local borrow
 18 │         let y = id_mut(&mut v);
-   │                        ^^^^^^ mutable borrow attempted here
-
-error: cannot mutable borrow local `v` since other references exists
-   ┌─ tests/reference-safety/v1-tests/borrow_local_full_invalid.move:23:17
-   │
-22 │         let x = &v;
-   │                 -- previous local borrow
-23 │         let y = &mut v;
-   │                 ^^^^^^ mutable borrow attempted here
+   │                 ^^^^^^^^^^^^^^
+   │                 │      │
+   │                 │      mutable local borrow attempted here
+   │                 reference used here

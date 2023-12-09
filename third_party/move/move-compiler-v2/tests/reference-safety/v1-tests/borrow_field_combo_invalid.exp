@@ -36,21 +36,15 @@ error: cannot copy mutable reference in local `inner` which is still borrowed
 58 │         let f1 = &inner.f1;
    │                  ^^^^^^^^^ copied here
 
-error: cannot immutable borrow local since other mutable references exist
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:58:18
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:59:9
    │
 57 │         let c; if (cond) c = &mut inner.f1 else c = &mut inner.f2;
-   │                              ------------- previous mutable field borrow
+   │                              ------------- other mutable field borrow
 58 │         let f1 = &inner.f1;
-   │                  ^^^^^^^^^ immutable borrow attempted here
-
-error: cannot mutable borrow local `outer` since other references exists
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:35:50
-   │
-34 │         let inner = &mut outer.s1;
-   │                     ------------- previous mutable field borrow
-35 │         let c; if (cond) c = copy inner else c = &mut outer.s1;
-   │                                                  ^^^^^^^^^^^^^ mutable borrow attempted here
+   │                  --------- field borrow attempted here
+59 │         *f1;
+   │         ^^^ reference used here
 
 error: cannot copy mutable reference in local `c` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:37:9
@@ -59,6 +53,28 @@ error: cannot copy mutable reference in local `c` which is still borrowed
    │                  ------------- previous mutable field borrow
 37 │         *c;
    │         ^^ copied here
+
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:37:9
+   │
+34 │         let inner = &mut outer.s1;
+   │                     ------------- mutable field borrow attempted here
+35 │         let c; if (cond) c = copy inner else c = &mut outer.s1;
+   │                                                  ------------- other mutable field borrow
+36 │         let f1 = &mut inner.f1;
+37 │         *c;
+   │         ^^ reference used here
+
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:37:9
+   │
+34 │         let inner = &mut outer.s1;
+   │                     ------------- other mutable field borrow
+35 │         let c; if (cond) c = copy inner else c = &mut outer.s1;
+   │                                                  ------------- mutable field borrow attempted here
+36 │         let f1 = &mut inner.f1;
+37 │         *c;
+   │         ^^ reference used here
 
 error: cannot dereference local which is still mutable borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:37:9
@@ -77,6 +93,17 @@ error: cannot copy mutable reference in local `inner` which is still borrowed
 38 │         *inner;
    │         ^^^^^^ copied here
 
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:38:9
+   │
+34 │         let inner = &mut outer.s1;
+   │                     ------------- mutable field borrow attempted here
+35 │         let c; if (cond) c = copy inner else c = &mut outer.s1;
+   │                                                  ------------- other mutable field borrow
+   ·
+38 │         *inner;
+   │         ^^^^^^ reference used here
+
 error: cannot dereference local which is still mutable borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:38:9
    │
@@ -86,13 +113,38 @@ error: cannot dereference local which is still mutable borrowed
 38 │         *inner;
    │         ^^^^^^ dereferenced here
 
-error: cannot mutable borrow local `outer` since other references exists
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:13:50
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:40:9
    │
-12 │         let inner = &mut outer.s1;
-   │                     ------------- previous mutable field borrow
-13 │         let c; if (cond) c = copy inner else c = &mut outer.s1;
-   │                                                  ^^^^^^^^^^^^^ mutable borrow attempted here
+34 │         let inner = &mut outer.s1;
+   │                     ------------- mutable field borrow attempted here
+35 │         let c; if (cond) c = copy inner else c = &mut outer.s1;
+   │                                                  ------------- other mutable field borrow
+   ·
+40 │         *inner;
+   │         ^^^^^^ reference used here
+
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:41:9
+   │
+34 │         let inner = &mut outer.s1;
+   │                     ------------- mutable field borrow attempted here
+35 │         let c; if (cond) c = copy inner else c = &mut outer.s1;
+   │                                                  ------------- other mutable field borrow
+   ·
+41 │         *c;
+   │         ^^ reference used here
+
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:41:9
+   │
+34 │         let inner = &mut outer.s1;
+   │                     ------------- other mutable field borrow
+35 │         let c; if (cond) c = copy inner else c = &mut outer.s1;
+   │                                                  ------------- mutable field borrow attempted here
+   ·
+41 │         *c;
+   │         ^^ reference used here
 
 error: cannot copy mutable reference in local `c` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:15:9
@@ -102,6 +154,28 @@ error: cannot copy mutable reference in local `c` which is still borrowed
 15 │         *c;
    │         ^^ copied here
 
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:15:9
+   │
+12 │         let inner = &mut outer.s1;
+   │                     ------------- mutable field borrow attempted here
+13 │         let c; if (cond) c = copy inner else c = &mut outer.s1;
+   │                                                  ------------- other mutable field borrow
+14 │         let f1 = &inner.f1;
+15 │         *c;
+   │         ^^ reference used here
+
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:15:9
+   │
+12 │         let inner = &mut outer.s1;
+   │                     ------------- other mutable field borrow
+13 │         let c; if (cond) c = copy inner else c = &mut outer.s1;
+   │                                                  ------------- mutable field borrow attempted here
+14 │         let f1 = &inner.f1;
+15 │         *c;
+   │         ^^ reference used here
+
 error: cannot copy mutable reference in local `inner` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:16:9
    │
@@ -110,6 +184,50 @@ error: cannot copy mutable reference in local `inner` which is still borrowed
 15 │         *c;
 16 │         *inner;
    │         ^^^^^^ copied here
+
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:16:9
+   │
+12 │         let inner = &mut outer.s1;
+   │                     ------------- mutable field borrow attempted here
+13 │         let c; if (cond) c = copy inner else c = &mut outer.s1;
+   │                                                  ------------- other mutable field borrow
+   ·
+16 │         *inner;
+   │         ^^^^^^ reference used here
+
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:18:9
+   │
+12 │         let inner = &mut outer.s1;
+   │                     ------------- mutable field borrow attempted here
+13 │         let c; if (cond) c = copy inner else c = &mut outer.s1;
+   │                                                  ------------- other mutable field borrow
+   ·
+18 │         *inner;
+   │         ^^^^^^ reference used here
+
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:19:9
+   │
+12 │         let inner = &mut outer.s1;
+   │                     ------------- mutable field borrow attempted here
+13 │         let c; if (cond) c = copy inner else c = &mut outer.s1;
+   │                                                  ------------- other mutable field borrow
+   ·
+19 │         *c;
+   │         ^^ reference used here
+
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:19:9
+   │
+12 │         let inner = &mut outer.s1;
+   │                     ------------- other mutable field borrow
+13 │         let c; if (cond) c = copy inner else c = &mut outer.s1;
+   │                                                  ------------- mutable field borrow attempted here
+   ·
+19 │         *c;
+   │         ^^ reference used here
 
 error: cannot copy mutable reference in local `inner` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:67:18
@@ -122,23 +240,36 @@ error: cannot copy mutable reference in local `inner` which is still borrowed
 67 │         let f1 = &inner.f1;
    │                  ^^^^^^^^^ copied here
 
-error: cannot immutable borrow local since other mutable references exist
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:67:18
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:68:9
    │
 66 │         let c; if (cond) c = id_mut(&mut inner.f1) else c = &mut inner.f1;
-   │                                     -------------           ------------- previous mutable field borrow
-   │                                     │
-   │                                     previous mutable field borrow
+   │                                     ------------- other mutable field borrow
 67 │         let f1 = &inner.f1;
-   │                  ^^^^^^^^^ immutable borrow attempted here
+   │                  --------- field borrow attempted here
+68 │         *f1;
+   │         ^^^ reference used here
 
-error: cannot mutable borrow local `outer` since other references exists
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:46:58
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:68:9
    │
-45 │         let inner = &mut outer.s1;
-   │                     ------------- previous mutable field borrow
-46 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
-   │                                                          ^^^^^^^^^^^^^ mutable borrow attempted here
+66 │         let c; if (cond) c = id_mut(&mut inner.f1) else c = &mut inner.f1;
+   │                                                             ------------- other mutable field borrow
+67 │         let f1 = &inner.f1;
+   │                  --------- field borrow attempted here
+68 │         *f1;
+   │         ^^^ reference used here
+
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:69:9
+   │
+66 │         let c; if (cond) c = id_mut(&mut inner.f1) else c = &mut inner.f1;
+   │                                     -------------           ------------- mutable field borrow attempted here
+   │                                     │
+   │                                     other mutable field borrow
+   ·
+69 │         *c;
+   │         ^^ reference used here
 
 error: cannot copy mutable reference in local `inner` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:47:18
@@ -148,13 +279,26 @@ error: cannot copy mutable reference in local `inner` which is still borrowed
 47 │         let f1 = &mut inner.f1;
    │                  ^^^^^^^^^^^^^ copied here
 
-error: cannot mutable borrow local since other references exists
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:47:18
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:48:9
    │
 46 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
-   │                              ------------------ previous mutable call result
+   │                              ------------------ mutable call result attempted here
 47 │         let f1 = &mut inner.f1;
-   │                  ^^^^^^^^^^^^^ mutable borrow attempted here
+   │                  ------------- other mutable field borrow
+48 │         *c;
+   │         ^^ reference used here
+
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:48:9
+   │
+45 │         let inner = &mut outer.s1;
+   │                     ------------- other mutable field borrow
+46 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
+   │                                                          ------------- mutable field borrow attempted here
+47 │         let f1 = &mut inner.f1;
+48 │         *c;
+   │         ^^ reference used here
 
 error: cannot copy mutable reference in local `inner` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:49:9
@@ -167,6 +311,17 @@ error: cannot copy mutable reference in local `inner` which is still borrowed
 49 │         *inner;
    │         ^^^^^^ copied here
 
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:49:9
+   │
+45 │         let inner = &mut outer.s1;
+   │                     ------------- mutable field borrow attempted here
+46 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
+   │                                                          ------------- other mutable field borrow
+   ·
+49 │         *inner;
+   │         ^^^^^^ reference used here
+
 error: cannot dereference local which is still mutable borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:49:9
    │
@@ -178,6 +333,28 @@ error: cannot dereference local which is still mutable borrowed
 49 │         *inner;
    │         ^^^^^^ dereferenced here
 
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:50:9
+   │
+46 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
+   │                              ------------------ other mutable call result
+47 │         let f1 = &mut inner.f1;
+   │                  ------------- mutable field borrow attempted here
+   ·
+50 │         *f1;
+   │         ^^^ reference used here
+
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:51:9
+   │
+45 │         let inner = &mut outer.s1;
+   │                     ------------- mutable field borrow attempted here
+46 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
+   │                                                          ------------- other mutable field borrow
+   ·
+51 │         *inner;
+   │         ^^^^^^ reference used here
+
 error: cannot dereference local `inner` which is still mutable borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:51:9
    │
@@ -187,13 +364,16 @@ error: cannot dereference local `inner` which is still mutable borrowed
 51 │         *inner;
    │         ^^^^^^ dereferenced here
 
-error: cannot mutable borrow local `outer` since other references exists
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:24:58
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:52:9
    │
-23 │         let inner = &mut outer.s1;
-   │                     ------------- previous mutable field borrow
-24 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
-   │                                                          ^^^^^^^^^^^^^ mutable borrow attempted here
+45 │         let inner = &mut outer.s1;
+   │                     ------------- other mutable field borrow
+46 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
+   │                                                          ------------- mutable field borrow attempted here
+   ·
+52 │         *c;
+   │         ^^ reference used here
 
 error: cannot copy mutable reference in local `inner` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:25:18
@@ -203,13 +383,26 @@ error: cannot copy mutable reference in local `inner` which is still borrowed
 25 │         let f1 = &inner.f1;
    │                  ^^^^^^^^^ copied here
 
-error: cannot immutable borrow local since other mutable references exist
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:25:18
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:26:9
    │
 24 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
-   │                              ------------------ previous mutable call result
+   │                              ------------------ mutable call result attempted here
 25 │         let f1 = &inner.f1;
-   │                  ^^^^^^^^^ immutable borrow attempted here
+   │                  --------- other field borrow
+26 │         *c;
+   │         ^^ reference used here
+
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:26:9
+   │
+23 │         let inner = &mut outer.s1;
+   │                     ------------- other mutable field borrow
+24 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
+   │                                                          ------------- mutable field borrow attempted here
+25 │         let f1 = &inner.f1;
+26 │         *c;
+   │         ^^ reference used here
 
 error: cannot copy mutable reference in local `inner` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:27:9
@@ -222,6 +415,17 @@ error: cannot copy mutable reference in local `inner` which is still borrowed
 27 │         *inner;
    │         ^^^^^^ copied here
 
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:27:9
+   │
+23 │         let inner = &mut outer.s1;
+   │                     ------------- mutable field borrow attempted here
+24 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
+   │                                                          ------------- other mutable field borrow
+   ·
+27 │         *inner;
+   │         ^^^^^^ reference used here
+
 error: cannot dereference local which is still mutable borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:27:9
    │
@@ -231,6 +435,28 @@ error: cannot dereference local which is still mutable borrowed
 27 │         *inner;
    │         ^^^^^^ dereferenced here
 
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:28:9
+   │
+24 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
+   │                              ------------------ other mutable call result
+25 │         let f1 = &inner.f1;
+   │                  --------- field borrow attempted here
+   ·
+28 │         *f1;
+   │         ^^^ reference used here
+
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:29:9
+   │
+23 │         let inner = &mut outer.s1;
+   │                     ------------- mutable field borrow attempted here
+24 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
+   │                                                          ------------- other mutable field borrow
+   ·
+29 │         *inner;
+   │         ^^^^^^ reference used here
+
 error: cannot dereference local `inner` which is still mutable borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:29:9
    │
@@ -239,3 +465,14 @@ error: cannot dereference local `inner` which is still mutable borrowed
    ·
 29 │         *inner;
    │         ^^^^^^ dereferenced here
+
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:30:9
+   │
+23 │         let inner = &mut outer.s1;
+   │                     ------------- other mutable field borrow
+24 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
+   │                                                          ------------- mutable field borrow attempted here
+   ·
+30 │         *c;
+   │         ^^ reference used here

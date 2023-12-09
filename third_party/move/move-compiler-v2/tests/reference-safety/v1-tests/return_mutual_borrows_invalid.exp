@@ -16,14 +16,6 @@ error: cannot move mutable reference in local `s1` which is still borrowed
 36 │         (s1, f)
    │          ^^ moved here
 
-error: cannot mutable borrow local `s1` since other references exists
-   ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:24:10
-   │
-23 │         let f = &s1.f;
-   │                 ----- previous field borrow
-24 │         (&mut s1.f, f)
-   │          ^^^^^^^^^ mutable borrow attempted here
-
 error: cannot move mutable reference in local `s1` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:20:10
    │
@@ -67,11 +59,3 @@ error: cannot move mutable reference in local `s1` which is still borrowed
    │          ----------  ^^ moved here
    │          │
    │          previous mutable call result
-
-error: cannot mutable borrow local `s1` since other references exists
-   ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:28:10
-   │
-27 │         let f = id(&s1.f);
-   │                    ----- previous field borrow
-28 │         (&mut s1.f, f)
-   │          ^^^^^^^^^ mutable borrow attempted here

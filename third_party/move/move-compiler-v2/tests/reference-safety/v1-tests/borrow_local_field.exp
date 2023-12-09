@@ -1,9 +1,12 @@
 
 Diagnostics:
-error: cannot mutable borrow local `v` since other references exists
-   ┌─ tests/reference-safety/v1-tests/borrow_local_field.move:27:17
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_local_field.move:29:9
    │
 26 │         let f = &v.f;
-   │                  - previous local borrow
+   │                  - other local borrow
 27 │         let s = &mut v; // error in v2
-   │                 ^^^^^^ mutable borrow attempted here
+   │                 ------ mutable local borrow attempted here
+28 │         *f;
+29 │         *s;
+   │         ^^ reference used here

@@ -8,13 +8,15 @@ error: cannot copy mutable reference in local `inner` which is still borrowed
 14 │         let f1 = &inner.f1;
    │                  ^^^^^^^^^ copied here
 
-error: cannot immutable borrow local since other mutable references exist
-   ┌─ tests/reference-safety/v1-tests/borrow_field_field_invalid.move:14:18
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_field_invalid.move:15:9
    │
 13 │         let c = &mut inner.f1;
-   │                 ------------- previous mutable field borrow
+   │                 ------------- other mutable field borrow
 14 │         let f1 = &inner.f1;
-   │                  ^^^^^^^^^ immutable borrow attempted here
+   │                  --------- field borrow attempted here
+15 │         *f1;
+   │         ^^^ reference used here
 
 error: cannot copy mutable reference in local `inner` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_field_invalid.move:21:18
@@ -27,10 +29,12 @@ error: cannot copy mutable reference in local `inner` which is still borrowed
 21 │         let f1 = &inner.f1;
    │                  ^^^^^^^^^ copied here
 
-error: cannot immutable borrow local since other mutable references exist
-   ┌─ tests/reference-safety/v1-tests/borrow_field_field_invalid.move:21:18
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/borrow_field_field_invalid.move:22:9
    │
 20 │         let c = id_mut(&mut inner.f1);
-   │                        ------------- previous mutable field borrow
+   │                        ------------- other mutable field borrow
 21 │         let f1 = &inner.f1;
-   │                  ^^^^^^^^^ immutable borrow attempted here
+   │                  --------- field borrow attempted here
+22 │         *f1;
+   │         ^^^ reference used here

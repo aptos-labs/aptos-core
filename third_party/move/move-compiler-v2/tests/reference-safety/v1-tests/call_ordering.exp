@@ -8,7 +8,7 @@ error: cannot pass mutable reference in local `s`, which is still borrowed, as f
 7 │         foo(freeze(s), { *f = 0; 1 })
   │             ^^^^^^^^^ passed here
 
-error: cannot mutable borrow local `s` since other references exists
+error: cannot mutable borrow local `s` since other references exist
    ┌─ tests/reference-safety/v1-tests/call_ordering.move:12:25
    │
 12 │         bar(&mut s.f, { s.f = 0; 1 })

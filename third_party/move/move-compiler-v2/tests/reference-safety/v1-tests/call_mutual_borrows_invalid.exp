@@ -40,13 +40,27 @@ error: cannot copy mutable reference in local `s1` which is still borrowed
 19 │         mut_imm(&mut s1.f, f);
    │                 ^^^^^^^^^ copied here
 
-error: cannot mutable borrow local since other references exists
-   ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:19:17
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:19:9
    │
 18 │         let f = &s1.f;
-   │                 ----- previous field borrow
+   │                 ----- other field borrow
 19 │         mut_imm(&mut s1.f, f);
-   │                 ^^^^^^^^^ mutable borrow attempted here
+   │         ^^^^^^^^^^^^^^^^^^^^^
+   │         │       │
+   │         │       mutable field borrow attempted here
+   │         reference used here
+
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:19:9
+   │
+18 │         let f = &s1.f;
+   │                 ----- field borrow attempted here
+19 │         mut_imm(&mut s1.f, f);
+   │         ^^^^^^^^^^^^^^^^^^^^^
+   │         │       │
+   │         │       other mutable field borrow
+   │         reference used here
 
 error: cannot copy mutable reference in local `s1` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:21:16
@@ -59,13 +73,16 @@ error: cannot copy mutable reference in local `s1` which is still borrowed
 21 │         id_mut(&mut s1.f); *f;
    │                ^^^^^^^^^ copied here
 
-error: cannot mutable borrow local since other references exists
-   ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:21:16
+error: conflicting borrow operations
+   ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:21:9
    │
 20 │         let f = id(&s1.f);
-   │                    ----- previous field borrow
+   │                    ----- other field borrow
 21 │         id_mut(&mut s1.f); *f;
-   │                ^^^^^^^^^ mutable borrow attempted here
+   │         ^^^^^^^^^^^^^^^^^
+   │         │      │
+   │         │      mutable field borrow attempted here
+   │         reference used here
 
 error: cannot copy mutable reference in local `s1` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:25:9

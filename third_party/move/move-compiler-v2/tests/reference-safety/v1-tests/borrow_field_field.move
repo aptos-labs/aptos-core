@@ -54,7 +54,7 @@ module 0x8675309::M {
 
         let inner = &mut outer.s1;
         let c = id_mut(&mut inner.f1);
-        let f1 = &mut inner.f1; // error in v2
+        let f1 = &mut inner.f1;
         *c;
         *f1;
         *inner;
