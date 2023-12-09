@@ -2,13 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_language_e2e_tests::{
-    executor::FakeExecutor, loader::{DependencyGraph, LoaderTransactionGen},
+    executor::FakeExecutor,
+    loader::{DependencyGraph, LoaderTransactionGen},
 };
-use proptest::prelude::*;
-use proptest::collection::vec;
+use proptest::{collection::vec, prelude::*};
 
 /// Run these transactions and verify the expected output.
-pub fn run_and_assert_universe(mut universe: DependencyGraph, additional_txns: Vec<LoaderTransactionGen>) {
+pub fn run_and_assert_universe(
+    mut universe: DependencyGraph,
+    additional_txns: Vec<LoaderTransactionGen>,
+) {
     let mut executor = FakeExecutor::from_head_genesis().set_parallel();
 
     universe.setup(&mut executor);
