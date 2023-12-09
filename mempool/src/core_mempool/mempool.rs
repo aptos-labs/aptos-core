@@ -16,7 +16,7 @@ use crate::{
     shared_mempool::types::MultiBucketTimelineIndexIds,
 };
 use aptos_config::config::NodeConfig;
-use aptos_consensus_types::common::TransactionInProgress;
+use aptos_consensus_types::common::{TransactionInProgress, TransactionSummary};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -26,8 +26,8 @@ use aptos_types::{
     vm_status::DiscardedVMStatus,
 };
 use std::{
-    collections::{HashMap, HashSet},
-    time::{Duration, SystemTime},
+    collections::{BTreeMap, HashMap, HashSet},
+    time::{Duration, Instant, SystemTime},
 };
 
 pub struct Mempool {
@@ -232,6 +232,16 @@ impl Mempool {
         status
     }
 
+    fn was_seen(
+        txn_pointer: &TransactionSummary,
+        seen: &HashMap<TransactionSummary, u64>,
+        upgraded: &HashSet<&TransactionSummary>,
+        exclude_transactions: &BTreeMap<TransactionSummary, TransactionInProgress>,
+    ) -> bool {
+        seen.contains_key(txn_pointer)
+            || (!upgraded.contains(txn_pointer) && exclude_transactions.get(txn_pointer).is_some())
+    }
+
     /// Fetches next block of transactions for consensus.
     /// `return_non_full` - if false, only return transactions when max_txns or max_bytes is reached
     ///                     Should always be true for Quorum Store.
@@ -246,30 +256,23 @@ impl Mempool {
         max_bytes: u64,
         return_non_full: bool,
         include_gas_upgraded: bool,
-        mut exclude_transactions: Vec<TransactionInProgress>,
+        exclude_transactions: BTreeMap<TransactionSummary, TransactionInProgress>,
     ) -> Vec<SignedTransaction> {
-        // Sort, so per TxnPointer the highest gas will be in the map
-        if include_gas_upgraded {
-            exclude_transactions.sort();
-        }
-        let mut seen: HashMap<TxnPointer, u64> = exclude_transactions
-            .iter()
-            .map(|txn| (txn.summary, txn.gas_unit_price))
-            .collect();
+        let start_time = Instant::now();
+        let exclude_size = exclude_transactions.len();
+        let mut seen = HashMap::new();
+        let mut upgraded = HashSet::new();
         // Do not exclude transactions that had a gas upgrade
         if include_gas_upgraded {
-            let mut seen_and_upgraded = vec![];
             for (txn_pointer, new_gas) in self.transactions.get_gas_upgraded_txns() {
-                if let Some(gas) = seen.get(txn_pointer) {
-                    if *new_gas > *gas {
-                        seen_and_upgraded.push(txn_pointer);
+                if let Some(txn_info) = exclude_transactions.get(txn_pointer) {
+                    if *new_gas > txn_info.gas_unit_price() {
+                        upgraded.insert(txn_pointer);
                     }
                 }
             }
-            for txn_pointer in seen_and_upgraded {
-                seen.remove(txn_pointer);
-            }
         }
+        let gas_end_time = start_time.elapsed();
 
         let mut result = vec![];
         // Helper DS. Helps to mitigate scenarios where account submits several transactions
@@ -280,21 +283,30 @@ impl Mempool {
         // `skipped` DS and rechecked once it's ancestor becomes available
         let mut skipped = HashSet::new();
         let mut total_bytes = 0;
-        let seen_size = seen.len();
         let mut txn_walked = 0usize;
         // iterate over the queue of transactions based on gas price
         'main: for txn in self.transactions.iter_queue() {
             txn_walked += 1;
-            if seen.contains_key(&TxnPointer::from(txn)) {
+            if Self::was_seen(
+                &TxnPointer::from(txn),
+                &seen,
+                &upgraded,
+                &exclude_transactions,
+            ) {
                 continue;
             }
             let tx_seq = txn.sequence_number.transaction_sequence_number;
             let account_sequence_number = self.transactions.get_sequence_number(&txn.address);
-            let seen_previous =
-                tx_seq > 0 && seen.contains_key(&TxnPointer::new(txn.address, tx_seq - 1));
+            let previous_txn_was_seen = tx_seq > 0
+                && Self::was_seen(
+                    &TxnPointer::new(txn.address, tx_seq - 1),
+                    &seen,
+                    &upgraded,
+                    &exclude_transactions,
+                );
             // include transaction if it's "next" for given account or
             // we've already sent its ancestor to Consensus.
-            if seen_previous || account_sequence_number == Some(&tx_seq) {
+            if previous_txn_was_seen || account_sequence_number == Some(&tx_seq) {
                 let ptr = TxnPointer::from(txn);
                 seen.insert(ptr, txn.gas_ranking_score);
                 result.push(ptr);
@@ -318,6 +330,9 @@ impl Mempool {
             }
         }
         let result_size = result.len();
+        let result_end_time = start_time.elapsed();
+        let result_time = result_end_time.saturating_sub(gas_end_time);
+
         let mut block = Vec::with_capacity(result_size);
         let mut full_bytes = false;
         for txn_pointer in result {
@@ -340,11 +355,13 @@ impl Mempool {
                 );
             }
         }
+        let block_end_time = start_time.elapsed();
+        let block_time = block_end_time.saturating_sub(result_end_time);
 
         if result_size > 0 {
             debug!(
                 LogSchema::new(LogEntry::GetBlock),
-                seen_consensus = seen_size,
+                seen_consensus = exclude_size,
                 walked = txn_walked,
                 seen_after = seen.len(),
                 // before size and non full check
@@ -353,19 +370,28 @@ impl Mempool {
                 byte_size = total_bytes,
                 block_size = block.len(),
                 return_non_full = return_non_full,
+                gas_time_ms = gas_end_time.as_millis(),
+                result_time_ms = result_time.as_millis(),
+                block_time_ms = block_time.as_millis(),
             );
         } else {
-            debug!(
-                LogSchema::new(LogEntry::GetBlock),
-                seen_consensus = seen_size,
-                walked = txn_walked,
-                seen_after = seen.len(),
-                // before size and non full check
-                result_size = result_size,
-                // before non full check
-                byte_size = total_bytes,
-                block_size = block.len(),
-                return_non_full = return_non_full,
+            sample!(
+                SampleRate::Duration(Duration::from_secs(60)),
+                debug!(
+                    LogSchema::new(LogEntry::GetBlock),
+                    seen_consensus = exclude_size,
+                    walked = txn_walked,
+                    seen_after = seen.len(),
+                    // before size and non full check
+                    result_size = result_size,
+                    // before non full check
+                    byte_size = total_bytes,
+                    block_size = block.len(),
+                    return_non_full = return_non_full,
+                    gas_time_ms = gas_end_time.as_millis(),
+                    result_time_ms = result_time.as_millis(),
+                    block_time_ms = block_time.as_millis(),
+                )
             );
         }
 
