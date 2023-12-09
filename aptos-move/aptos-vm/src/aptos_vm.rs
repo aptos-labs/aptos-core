@@ -152,6 +152,17 @@ fn get_transaction_output(
     ))
 }
 
+pub(crate) fn get_or_vm_startup_failure<'a, T>(
+    gas_params: &'a Result<T, String>,
+    log_context: &AdapterLogSchema,
+) -> Result<&'a T, VMStatus> {
+    gas_params.as_ref().map_err(|err| {
+        let msg = format!("VM Startup Failed. {}", err);
+        speculative_error!(log_context, msg.clone());
+        VMStatus::error(StatusCode::VM_STARTUP_FAILURE, Some(msg))
+    })
+}
+
 pub struct AptosVM {
     is_simulation: bool,
     move_vm: MoveVmExt,
@@ -216,28 +227,6 @@ impl AptosVM {
         session_id: SessionId,
     ) -> SessionExt<'r, '_> {
         self.move_vm.new_session(resolver, session_id)
-    }
-
-    fn get_gas_parameters(
-        &self,
-        log_context: &AdapterLogSchema,
-    ) -> Result<&AptosGasParameters, VMStatus> {
-        self.gas_params.as_ref().map_err(|err| {
-            let msg = format!("VM Startup Failed. {}", err);
-            speculative_error!(log_context, msg.clone());
-            VMStatus::error(StatusCode::VM_STARTUP_FAILURE, Some(msg))
-        })
-    }
-
-    fn get_storage_gas_parameters(
-        &self,
-        log_context: &AdapterLogSchema,
-    ) -> Result<&StorageGasParameters, VMStatus> {
-        self.storage_gas_params.as_ref().map_err(|err| {
-            let msg = format!("VM Startup Failed. {}", err);
-            speculative_error!(log_context, msg.clone());
-            VMStatus::error(StatusCode::VM_STARTUP_FAILURE, Some(msg))
-        })
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -327,9 +316,9 @@ impl AptosVM {
 
     /// Returns the internal gas schedule if it has been loaded, or an error if it hasn't.
     #[cfg(any(test, feature = "testing"))]
-    pub fn gas_params(&self) -> Result<&aptos_gas_schedule::AptosGasParameters, VMStatus> {
+    pub fn gas_params(&self) -> Result<&AptosGasParameters, VMStatus> {
         let log_context = AdapterLogSchema::new(aptos_state_view::StateViewId::Miscellaneous, 0);
-        self.get_gas_parameters(&log_context)
+        get_or_vm_startup_failure(&self.gas_params, &log_context)
     }
 
     /// Generates a transaction output for a transaction that encountered errors during the
@@ -1249,8 +1238,10 @@ impl AptosVM {
         Ok(MemoryTrackedGasMeter::new(StandardGasMeter::new(
             StandardGasAlgebra::new(
                 self.gas_feature_version,
-                self.get_gas_parameters(log_context)?.vm.clone(),
-                self.get_storage_gas_parameters(log_context)?.clone(),
+                get_or_vm_startup_failure(&self.gas_params, log_context)?
+                    .vm
+                    .clone(),
+                get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.clone(),
                 balance,
             ),
         )))
@@ -1385,7 +1376,10 @@ impl AptosVM {
             }
         }
 
-        let storage_gas_params = unwrap_or_discard!(self.get_storage_gas_parameters(log_context));
+        let storage_gas_params = unwrap_or_discard!(get_or_vm_startup_failure(
+            &self.storage_gas_params,
+            log_context
+        ));
 
         // We keep track of whether any newly published modules are loaded into the Vm's loader
         // cache as part of executing transactions. This would allow us to decide whether the cache
@@ -1490,8 +1484,10 @@ impl AptosVM {
         let balance = TransactionMetadata::new(txn).max_gas_amount();
         let mut gas_meter = make_gas_meter(
             self.gas_feature_version,
-            self.get_gas_parameters(log_context)?.vm.clone(),
-            self.get_storage_gas_parameters(log_context)?.clone(),
+            get_or_vm_startup_failure(&self.gas_params, log_context)?
+                .vm
+                .clone(),
+            get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.clone(),
             balance,
         )?;
         let (status, output) =
@@ -1668,9 +1664,7 @@ impl AptosVM {
             session,
             FeeStatement::zero(),
             ExecutionStatus::Success,
-            &self
-                .get_storage_gas_parameters(log_context)?
-                .change_set_configs,
+            &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
         )?;
         Ok((VMStatus::Executed, output))
     }
@@ -1697,8 +1691,10 @@ impl AptosVM {
         let mut gas_meter =
             MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
                 vm.gas_feature_version,
-                vm.get_gas_parameters(&log_context)?.vm.clone(),
-                vm.get_storage_gas_parameters(&log_context)?.clone(),
+                get_or_vm_startup_failure(&vm.gas_params, &log_context)?
+                    .vm
+                    .clone(),
+                get_or_vm_startup_failure(&vm.storage_gas_params, &log_context)?.clone(),
                 gas_budget,
             )));
 
@@ -1741,7 +1737,7 @@ impl AptosVM {
         match payload {
             TransactionPayload::Script(_) => {
                 check_gas(
-                    self.get_gas_parameters(log_context)?,
+                    get_or_vm_startup_failure(&self.gas_params, log_context)?,
                     self.gas_feature_version,
                     resolver,
                     txn_data,
@@ -1752,7 +1748,7 @@ impl AptosVM {
             TransactionPayload::EntryFunction(_) => {
                 // NOTE: Script and EntryFunction shares the same prologue
                 check_gas(
-                    self.get_gas_parameters(log_context)?,
+                    get_or_vm_startup_failure(&self.gas_params, log_context)?,
                     self.gas_feature_version,
                     resolver,
                     txn_data,
@@ -1762,7 +1758,7 @@ impl AptosVM {
             },
             TransactionPayload::Multisig(multisig_payload) => {
                 check_gas(
-                    self.get_gas_parameters(log_context)?,
+                    get_or_vm_startup_failure(&self.gas_params, log_context)?,
                     self.gas_feature_version,
                     resolver,
                     txn_data,
@@ -1793,7 +1789,7 @@ impl AptosVM {
                     return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
                 }
                 check_gas(
-                    self.get_gas_parameters(log_context)?,
+                    get_or_vm_startup_failure(&self.gas_params, log_context)?,
                     self.gas_feature_version,
                     resolver,
                     txn_data,
