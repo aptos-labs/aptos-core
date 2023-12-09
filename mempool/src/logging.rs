@@ -173,6 +173,8 @@ pub enum LogEntry {
     DBError,
     UnexpectedNetworkMsg,
     MempoolSnapshot,
+    ConsensusReady,
+    ConsensusPulled,
 }
 
 #[derive(Clone, Copy, Serialize)]

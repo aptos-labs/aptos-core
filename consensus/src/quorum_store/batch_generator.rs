@@ -144,6 +144,7 @@ impl BatchGenerator {
         num_txns_in_bucket: usize,
         expiry_time: u64,
         bucket_start: u64,
+        bucket_end: Option<u64>,
     ) -> bool {
         let mut remaining_txns = num_txns_in_bucket;
         while remaining_txns > 0 {
@@ -152,6 +153,12 @@ impl BatchGenerator {
             }
             let num_batch_txns = std::cmp::min(self.config.sender_max_batch_txns, remaining_txns);
             let batch_txns: Vec<_> = txns.drain(0..num_batch_txns).collect();
+            for txn in &batch_txns {
+                assert!(txn.gas_unit_price() >= bucket_start);
+                if let Some(bucket_end) = bucket_end {
+                    assert!(txn.gas_unit_price() < bucket_end);
+                }
+            }
             let batch = self.create_new_batch(batch_txns, expiry_time, bucket_start);
             batches.push(batch);
             remaining_txns -= num_batch_txns;
@@ -177,6 +184,7 @@ impl BatchGenerator {
             .cloned()
             .collect();
         let mut batches = vec![];
+        let mut prev_bucket = None;
         for bucket_start in &reverse_buckets_excluding_zero {
             if pulled_txns.is_empty() {
                 break;
@@ -200,10 +208,12 @@ impl BatchGenerator {
                 num_txns_in_bucket,
                 expiry_time,
                 *bucket_start,
+                prev_bucket,
             );
             if !batches_space_remaining {
                 return batches;
             }
+            prev_bucket = Some(*bucket_start);
         }
         if !pulled_txns.is_empty() {
             self.push_bucket_to_batches(
@@ -212,6 +222,7 @@ impl BatchGenerator {
                 pulled_txns.len(),
                 expiry_time,
                 0,
+                prev_bucket,
             );
         }
         batches

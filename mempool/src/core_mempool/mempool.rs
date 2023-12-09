@@ -11,6 +11,7 @@ use crate::{
         transaction_store::TransactionStore,
     },
     counters,
+    counters::CONSENSUS_PULLED_LABEL,
     logging::{LogEntry, LogSchema, TxnsLog},
     shared_mempool::types::MultiBucketTimelineIndexIds,
 };
@@ -122,7 +123,7 @@ impl Mempool {
         insertion_info: InsertionInfo,
         bucket: &str,
         stage: &'static str,
-    ) {
+    ) -> Option<Duration> {
         if let Ok(time_delta) = SystemTime::now().duration_since(insertion_info.insertion_time) {
             counters::core_mempool_txn_commit_latency(
                 stage,
@@ -130,6 +131,9 @@ impl Mempool {
                 bucket,
                 time_delta,
             );
+            Some(time_delta)
+        } else {
+            None
         }
     }
 
@@ -138,7 +142,15 @@ impl Mempool {
             .transactions
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
-            Self::log_txn_latency(insertion_info, bucket, stage);
+            if let Some(delta) = Self::log_txn_latency(insertion_info, bucket, stage) {
+                if stage == CONSENSUS_PULLED_LABEL && bucket == "1000" {
+                    debug!(
+                        LogSchema::new(LogEntry::ConsensusPulled)
+                            .txns(TxnsLog::new_txn(account, sequence_number)),
+                        delta = delta.as_millis(),
+                    );
+                }
+            }
         }
     }
 
@@ -343,7 +355,7 @@ impl Mempool {
                 return_non_full = return_non_full,
             );
         } else {
-            trace!(
+            debug!(
                 LogSchema::new(LogEntry::GetBlock),
                 seen_consensus = seen_size,
                 walked = txn_walked,

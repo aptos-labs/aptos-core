@@ -438,12 +438,17 @@ impl TransactionStore {
                 }
 
                 if process_ready {
+                    let bucket = self.timeline_index.get_bucket(txn.ranking_score);
                     Self::log_ready_transaction(
                         txn.ranking_score,
-                        self.timeline_index.get_bucket(txn.ranking_score),
+                        bucket,
                         txn.insertion_info,
                         process_broadcast_ready,
                     );
+                    if bucket == "1000" {
+                        debug!(LogSchema::new(LogEntry::ConsensusReady)
+                            .txns(TxnsLog::new_txn(*address, sequence_num)),);
+                    }
                 }
 
                 // Remove txn from parking lot after it has been promoted to
