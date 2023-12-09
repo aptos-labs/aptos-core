@@ -328,7 +328,7 @@ impl Arbitrary for LoaderTransactionGen {
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         prop_oneof![
             9 => any::<Index>().prop_map(Self::Invoke),
-            1 => any::<(Index, Index)>().prop_map(Self::UpdateEdge),
+            1 => any::<(Index, Index)>().prop_map(|(i1, i2)| Self::UpdateEdge(i1, i2)),
         ]
         .boxed()
     }
