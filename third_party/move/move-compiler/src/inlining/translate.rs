@@ -25,8 +25,10 @@ use crate::{
 };
 use move_ir_types::location::{sp, Loc};
 use move_symbol_pool::Symbol;
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
-use std::fmt;
+use std::{
+    collections::{BTreeMap, BTreeSet, VecDeque},
+    fmt,
+};
 
 /// A globally unique function name
 type GlobalFunctionName = (ModuleIdent_, Symbol);
