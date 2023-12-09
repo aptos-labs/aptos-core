@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    command_line::compiler::FullyCompiledProgram,
     diag,
     expansion::ast::{AbilitySet, ModuleIdent, ModuleIdent_, SpecId, Visibility},
     inlining::visitor::{Dispatcher, Visitor, VisitorContinuation},
@@ -25,12 +26,12 @@ use crate::{
 use move_ir_types::location::{sp, Loc};
 use move_symbol_pool::Symbol;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::fmt;
 
 /// A globally unique function name
 type GlobalFunctionName = (ModuleIdent_, Symbol);
 type GlobalStructName = (ModuleIdent_, Symbol);
 
-#[derive(Debug)]
 struct Inliner<'l> {
     env: &'l mut CompilationEnv,
     current_module: Option<ModuleIdent_>,
@@ -42,12 +43,40 @@ struct Inliner<'l> {
     visibilities: BTreeMap<GlobalFunctionName, Visibility>,
     inline_stack: VecDeque<GlobalFunctionName>,
     rename_counter: usize,
+    pre_compiled_lib: Option<&'l FullyCompiledProgram>,
+    processing_library: bool,
+}
+
+// Manually implement Debug so we don't have to include field pre_compiled_lib,
+// which may be huge.
+impl<'l> fmt::Debug for Inliner<'l> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Inliner")
+            .field("env", &self.env)
+            .field("current_module", &self.current_module)
+            .field("current_function", &self.current_function)
+            .field("current_function_loc", &self.current_function_loc)
+            .field(
+                "current_spec_block_counter",
+                &self.current_spec_block_counter,
+            )
+            .field("struct_defs", &self.struct_defs)
+            .field("inline_defs", &self.inline_defs)
+            .field("visibilities", &self.visibilities)
+            .field("inline_stack", &self.inline_stack)
+            .field("rename_counter", &self.rename_counter)
+            .finish()
+    }
 }
 
 // ============================================================================================
 // Entry point
 
-pub fn run_inlining(env: &mut CompilationEnv, prog: &mut Program) {
+pub fn run_inlining(
+    env: &mut CompilationEnv,
+    pre_compiled_lib: Option<&FullyCompiledProgram>,
+    prog: &mut Program,
+) {
     Inliner {
         env,
         current_module: None,
@@ -59,6 +88,8 @@ pub fn run_inlining(env: &mut CompilationEnv, prog: &mut Program) {
         visibilities: BTreeMap::new(),
         inline_stack: Default::default(),
         rename_counter: 0,
+        pre_compiled_lib,
+        processing_library: false,
     }
     .run(prog)
 }
@@ -66,26 +97,38 @@ pub fn run_inlining(env: &mut CompilationEnv, prog: &mut Program) {
 impl<'l> Inliner<'l> {
     fn run(&mut self, prog: &mut Program) {
         // First collect all definitions of inlined functions so we can expand them later in the AST.
-        self.visit_functions(prog, VisitingMode::All, &mut |ctx, fname, fdef| {
+        let mut find_inline_functions = |ctx: &mut Inliner, fname: &str, fdef: &Function| {
             if let Some(mid) = ctx.current_module {
                 let global_name = (mid, ctx.current_function);
                 ctx.visibilities
                     .insert(global_name, fdef.visibility.clone());
                 if fdef.inline {
                     if !matches!(fdef.body.value, FunctionBody_::Defined(_)) {
-                        ctx.env.add_diag(diag!(
-                            Inlining::Unsupported,
-                            (
-                                fdef.body.loc,
-                                format!("inline function {} must not be native", fname)
-                            )
-                        ));
+                        if !ctx.processing_library {
+                            ctx.env.add_diag(diag!(
+                                Inlining::Unsupported,
+                                (
+                                    fdef.body.loc,
+                                    format!("inline function {} must not be native", fname)
+                                )
+                            ));
+                        }
                     } else {
                         ctx.inline_defs.insert(global_name, fdef.clone());
                     }
                 }
             }
-        });
+        };
+        self.processing_library = true;
+        if let Some(libs) = self.pre_compiled_lib {
+            self.visit_functions_readonly(
+                &libs.typing,
+                VisitingMode::SourceOnly,
+                &mut find_inline_functions,
+            );
+        }
+        self.processing_library = false;
+        self.visit_functions_readonly(prog, VisitingMode::All, &mut find_inline_functions);
         // Also collect all structs, we need them for ability computation
         for (_, mid, mdef) in prog.modules.iter() {
             for (_, name, sdef) in mdef.structs.iter() {
@@ -160,6 +203,35 @@ impl<'l> Inliner<'l> {
             self.current_function_loc = Some(sdef.loc);
             self.current_spec_block_counter = 0;
             (*visitor)(self, name.as_str(), &mut sdef.function)
+        }
+    }
+
+    /// A helper to visit all functions in the program, readonly.
+    fn visit_functions_readonly<V>(&mut self, prog: &Program, mode: VisitingMode, visitor: &mut V)
+    where
+        V: FnMut(&mut Inliner<'_>, &str, &Function),
+    {
+        for (_, mid_, mdef) in prog.modules.iter() {
+            self.current_module = Some(*mid_);
+            let visit_module = match mode {
+                VisitingMode::All => true,
+                VisitingMode::SourceOnly => mdef.is_source_module,
+            };
+            if visit_module {
+                for (loc, fname, fdef) in mdef.functions.iter() {
+                    self.current_function = *fname;
+                    self.current_function_loc = Some(loc);
+                    self.current_spec_block_counter = 0;
+                    (*visitor)(self, fname.as_str(), fdef)
+                }
+            }
+        }
+        for (name, sdef) in prog.scripts.iter() {
+            self.current_module = None;
+            self.current_function = *name;
+            self.current_function_loc = Some(sdef.loc);
+            self.current_spec_block_counter = 0;
+            (*visitor)(self, name.as_str(), &sdef.function)
         }
     }
 }
