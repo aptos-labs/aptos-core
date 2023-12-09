@@ -6,7 +6,7 @@ use crate::{
     rand::rand_gen::{
         block_queue::{BlockQueue, QueueItem},
         storage::interface::RandStorage,
-        types::{Proof, RandConfig, RandDecision, RandShare, Share},
+        types::{Proof, RandConfig, RandDecision, RandShare, Share, ShareAck},
     },
 };
 use anyhow::ensure;
@@ -14,7 +14,6 @@ use aptos_consensus_types::{
     common::{Author, Round},
     randomness::RandMetadata,
 };
-use aptos_logger::error;
 use std::{collections::HashMap, sync::Arc};
 
 struct ShareAggregator<S> {
@@ -161,6 +160,7 @@ impl<S: Share, P: Proof<Share = S>> RandItem<S, P> {
 }
 
 pub struct RandStore<S, P, Storage> {
+    epoch: u64,
     author: Author,
     rand_config: RandConfig,
     rand_map: HashMap<Round, RandItem<S, P>>,
@@ -169,8 +169,9 @@ pub struct RandStore<S, P, Storage> {
 }
 
 impl<S: Share, P: Proof<Share = S>, Storage: RandStorage<S, P>> RandStore<S, P, Storage> {
-    pub fn new(author: Author, rand_config: RandConfig, db: Arc<Storage>) -> Self {
+    pub fn new(epoch: u64, author: Author, rand_config: RandConfig, db: Arc<Storage>) -> Self {
         Self {
+            epoch,
             author,
             rand_config,
             rand_map: HashMap::new(),
@@ -179,24 +180,17 @@ impl<S: Share, P: Proof<Share = S>, Storage: RandStorage<S, P>> RandStore<S, P, 
         }
     }
 
-    fn try_dequeue_rand_ready_prefix(&mut self) -> Option<Vec<OrderedBlocks>> {
+    pub fn reset(&mut self) {
+        self.block_queue = BlockQueue::new();
+    }
+
+    pub fn try_dequeue_rand_ready_prefix(&mut self) -> Option<Vec<OrderedBlocks>> {
         let prefix = self.block_queue.dequeue_rand_ready_prefix();
         if prefix.is_empty() {
             None
         } else {
             Some(prefix)
         }
-    }
-
-    fn add_share_impl(&mut self, share: RandShare<S>) -> anyhow::Result<()> {
-        let rand_metadata = share.metadata().clone();
-        let rand_item = self
-            .rand_map
-            .entry(rand_metadata.round())
-            .or_insert_with(Default::default);
-        rand_item.add_share(share, &self.rand_config)?;
-        Self::try_aggregate(&self.rand_config, rand_item, &mut self.block_queue);
-        Ok(())
     }
 
     fn try_aggregate(
@@ -213,7 +207,7 @@ impl<S: Share, P: Proof<Share = S>, Storage: RandStorage<S, P>> RandStore<S, P, 
         }
     }
 
-    pub fn add_blocks(&mut self, block: QueueItem) -> Option<Vec<OrderedBlocks>> {
+    pub fn add_blocks(&mut self, block: QueueItem) {
         let all_rand_metadata = block.all_rand_metadata();
         self.block_queue.push_back(block);
         for rand_metadata in all_rand_metadata {
@@ -224,23 +218,34 @@ impl<S: Share, P: Proof<Share = S>, Storage: RandStorage<S, P>> RandStore<S, P, 
             rand_item.add_metadata(&self.rand_config, rand_metadata);
             Self::try_aggregate(&self.rand_config, rand_item, &mut self.block_queue);
         }
-        self.try_dequeue_rand_ready_prefix()
     }
 
-    pub fn add_share(&mut self, share: RandShare<S>) -> Option<Vec<OrderedBlocks>> {
-        if let Err(e) = self.add_share_impl(share) {
-            error!("[RandStore] error adding share {}", e);
-        }
-        self.try_dequeue_rand_ready_prefix()
+    pub fn add_share(&mut self, share: RandShare<S>) -> anyhow::Result<ShareAck<P>> {
+        self.db.save_share(&share)?;
+        let rand_metadata = share.metadata().clone();
+        let rand_item = self
+            .rand_map
+            .entry(rand_metadata.round())
+            .or_insert_with(Default::default);
+        rand_item.add_share(share, &self.rand_config)?;
+        Self::try_aggregate(&self.rand_config, rand_item, &mut self.block_queue);
+        Ok(ShareAck::new(self.epoch, rand_item.decision().cloned()))
     }
 
-    pub fn add_decision(&mut self, decision: RandDecision<P>) -> Option<Vec<OrderedBlocks>> {
+    pub fn add_decision(&mut self, decision: RandDecision<P>) -> anyhow::Result<()> {
         let rand_metadata = decision.rand_metadata();
-        self.block_queue
-            .set_randomness(rand_metadata.round(), decision.randomness().clone());
-        self.rand_map
-            .insert(rand_metadata.round(), RandItem::Decided(decision));
-        self.try_dequeue_rand_ready_prefix()
+        if !self
+            .rand_map
+            .get(&rand_metadata.round())
+            .map_or(false, |item| item.decision().is_some())
+        {
+            self.db.save_decision(&decision)?;
+            self.block_queue
+                .set_randomness(rand_metadata.round(), decision.randomness().clone());
+            self.rand_map
+                .insert(rand_metadata.round(), RandItem::Decided(decision));
+        }
+        Ok(())
     }
 }
 
@@ -318,15 +323,16 @@ mod tests {
         let authors: Vec<Author> = weights.keys().cloned().collect();
         let config = RandConfig::new(Author::ZERO, weights);
         let mut rand_store = RandStore::new(
+            1,
             Author::ZERO,
             config,
             Arc::new(InMemRandDb::<MockShare, MockProof, MockAugData>::new()),
         );
 
         let rounds = vec![vec![1], vec![2, 3], vec![5, 8, 13]];
-        let blocks_1 = QueueItem::new(create_ordered_blocks(rounds[0].clone()));
-        let blocks_2 = QueueItem::new(create_ordered_blocks(rounds[1].clone()));
-        let blocks_3 = QueueItem::new(create_ordered_blocks(rounds[2].clone()));
+        let blocks_1 = QueueItem::new(create_ordered_blocks(rounds[0].clone()), None);
+        let blocks_2 = QueueItem::new(create_ordered_blocks(rounds[1].clone()), None);
+        let blocks_3 = QueueItem::new(create_ordered_blocks(rounds[2].clone()), None);
         let metadata_1 = blocks_1.all_rand_metadata();
         let metadata_2 = blocks_2.all_rand_metadata();
         let metadata_3 = blocks_3.all_rand_metadata();
@@ -336,44 +342,49 @@ mod tests {
             .iter()
             .map(|author| create_share(metadata_1[0].clone(), *author))
         {
-            assert!(rand_store.add_share(share).is_none());
+            rand_store.add_share(share).unwrap();
         }
-        assert_eq!(rand_store.add_blocks(blocks_1).unwrap().len(), 1);
+        assert!(rand_store.try_dequeue_rand_ready_prefix().is_none());
+        rand_store.add_blocks(blocks_1);
+        assert_eq!(rand_store.try_dequeue_rand_ready_prefix().unwrap().len(), 1);
         // blocks come after shares
-        assert!(rand_store.add_blocks(blocks_2).is_none());
+        rand_store.add_blocks(blocks_2);
+        assert!(rand_store.try_dequeue_rand_ready_prefix().is_none());
 
         for share in authors[1..6]
             .iter()
             .map(|author| create_share(metadata_2[0].clone(), *author))
         {
-            assert!(rand_store.add_share(share).is_none());
+            rand_store.add_share(share).unwrap();
         }
+        assert!(rand_store.try_dequeue_rand_ready_prefix().is_none());
         // decisions comes before blocks
-        assert!(rand_store
+        rand_store
             .add_decision(create_decision(metadata_3[0].clone()))
-            .is_none());
-        assert!(rand_store
+            .unwrap();
+        assert!(rand_store.try_dequeue_rand_ready_prefix().is_none());
+        rand_store
             .add_decision(create_decision(metadata_3[2].clone()))
-            .is_none());
-        assert!(rand_store.add_blocks(blocks_3).is_none());
+            .unwrap();
+        assert!(rand_store.try_dequeue_rand_ready_prefix().is_none());
+        rand_store.add_blocks(blocks_3);
+        assert!(rand_store.try_dequeue_rand_ready_prefix().is_none());
         // decisions comes after blocks
-        assert!(rand_store
+        rand_store
             .add_decision(create_decision(metadata_3[1].clone()))
-            .is_none());
+            .unwrap();
+        assert!(rand_store.try_dequeue_rand_ready_prefix().is_none());
 
         // last aggregated decision dequeue all
         for share in authors[2..6]
             .iter()
             .map(|author| create_share(metadata_2[1].clone(), *author))
         {
-            assert!(rand_store.add_share(share).is_none());
+            rand_store.add_share(share).unwrap();
         }
-        assert_eq!(
-            rand_store
-                .add_share(create_share(metadata_2[1].clone(), authors[6]))
-                .unwrap()
-                .len(),
-            2
-        );
+        rand_store
+            .add_share(create_share(metadata_2[1].clone(), authors[6]))
+            .unwrap();
+        assert_eq!(rand_store.try_dequeue_rand_ready_prefix().unwrap().len(), 2);
     }
 }
