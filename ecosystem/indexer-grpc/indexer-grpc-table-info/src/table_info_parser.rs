@@ -205,7 +205,7 @@ impl TableInfoParser {
         let write_sets_slice: Vec<&WriteSet> = write_sets.iter().collect();
         db_writer
             .clone()
-            .index(context.db.clone(), first_version, &write_sets_slice)
+            .index_table_info(context.db.clone(), first_version, &write_sets_slice)
             .expect("Failed to process write sets and index to the table info rocksdb");
         let fetch_millis = (chrono::Utc::now().naive_utc() - start_millis).num_milliseconds();
 

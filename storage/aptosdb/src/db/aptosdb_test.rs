@@ -205,7 +205,7 @@ pub fn test_state_merkle_pruning_impl(
         false, /* enable_indexer */
         BUFFERED_STATE_TARGET_ITEMS,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-        false,
+        false, /* enable_indexer_async_v2 */
     )
     .unwrap();
 

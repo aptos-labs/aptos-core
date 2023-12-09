@@ -253,7 +253,7 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
             None => {
                 self.pending_on
                     .entry(handle)
-                    .or_insert_with(|| DashSet::new())
+                    .or_insert_with(DashSet::new)
                     .insert(bytes.clone());
             },
         }

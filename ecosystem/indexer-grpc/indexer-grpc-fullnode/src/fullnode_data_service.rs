@@ -65,14 +65,15 @@ impl FullnodeData for FullnodeDataService {
         // This is the main thread handling pushing to the stream
         tokio::spawn(async move {
             // Initialize the coordinator that tracks starting version and processes transactions
-            let mut coordinator = IndexerStreamCoordinator::new(
-                context,
-                starting_version,
-                processor_task_count,
-                processor_batch_size,
-                output_batch_size,
-                tx.clone(),
-            );
+            let mut coordinator =
+                IndexerStreamCoordinator::new(
+                    context,
+                    starting_version,
+                    processor_task_count,
+                    processor_batch_size,
+                    output_batch_size,
+                    tx.clone(),
+                );
             // Sends init message (one time per request) to the client in the with chain id and starting version. Basically a handshake
             let init_status = get_status(StatusType::Init, starting_version, None, ledger_chain_id);
             match tx.send(Result::<_, Status>::Ok(init_status)).await {
@@ -114,6 +115,10 @@ impl FullnodeData for FullnodeDataService {
                     Some(max_version),
                     ledger_chain_id,
                 );
+                let channel_size = TRANSACTION_CHANNEL_SIZE - tx.capacity();
+                CHANNEL_SIZE
+                    .with_label_values(&["2"])
+                    .set(channel_size as i64);
                 match tx.send(Result::<_, Status>::Ok(batch_end_status)).await {
                     Ok(_) => {
                         // tps logging
@@ -143,9 +148,8 @@ impl FullnodeData for FullnodeDataService {
             }
         });
         let output_stream = ReceiverStream::new(rx);
-        Ok(Response::new(
-            Box::pin(output_stream) as Self::GetTransactionsFromNodeStream
-        ))
+        Ok(Response::new(Box::pin(output_stream)
+            as Self::GetTransactionsFromNodeStream))
     }
 }
 

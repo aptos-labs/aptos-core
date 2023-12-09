@@ -46,12 +46,8 @@ pub fn bootstrap(
 
     // Spawn the runtime for table info parsing
     runtime.spawn(async move {
-        let context = Arc::new(Context::new(
-            chain_id,
-            db.reader.clone(),
-            mp_sender,
-            node_config,
-        ));
+        let context =
+            Arc::new(Context::new(chain_id, db.reader.clone(), mp_sender, node_config));
         let mut ma = MovingAverage::new(10_000);
         let mut base: u64 = 0;
         let db_writer = db.writer.clone();
@@ -65,16 +61,17 @@ pub fn bootstrap(
         loop {
             let start_time = std::time::Instant::now();
             let results = parser.process_next_batch(db_writer.clone()).await;
-            let max_version = match TableInfoParser::get_max_batch_version(results) {
-                Ok(max_version) => max_version,
-                Err(e) => {
-                    error!(
-                        "[table-info] Error getting the max batch version processed: {}",
-                        e
-                    );
-                    break;
-                },
-            };
+            let max_version =
+                match TableInfoParser::get_max_batch_version(results) {
+                    Ok(max_version) => max_version,
+                    Err(e) => {
+                        error!(
+                            "[table-info] Error getting the max batch version processed: {}",
+                            e
+                        );
+                        break;
+                    },
+                };
             let processed_versions = max_version - parser.current_version + 1;
             let duration = start_time.elapsed();
 

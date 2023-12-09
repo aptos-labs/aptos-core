@@ -450,10 +450,11 @@ pub trait DbReader: Send + Sync {
         /// Returns whether the internal indexer async v2 DB has been enabled or not
         fn indexer_async_v2_enabled(&self) -> bool;
 
+        /// Returns  the next version which internal indexer async v2 DB should parse
+        fn get_indexer_async_v2_next_version(&self) -> Result<Version>;
+
         /// Returns state storage usage at the end of an epoch.
         fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage>;
-
-        fn get_indexer_async_v2_next_version(&self) -> Result<Version>;
     ); // end delegated
 
     /// Returns the latest ledger info.
@@ -564,7 +565,7 @@ pub trait DbWriter: Send + Sync {
         unimplemented!()
     }
 
-    fn index(
+    fn index_table_info(
         &self,
         db_reader: Arc<dyn DbReader>,
         first_version: Version,

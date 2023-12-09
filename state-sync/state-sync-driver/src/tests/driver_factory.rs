@@ -37,10 +37,10 @@ fn test_new_initialized_configs() {
         false,
         NO_OP_STORAGE_PRUNER_CONFIG,
         RocksdbConfigs::default(),
-        false,
+        false, /* indexer */
         BUFFERED_STATE_TARGET_ITEMS,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-        false,
+        false, /* indexer async v2 */
     )
     .unwrap();
     let (_, db_rw) = DbReaderWriter::wrap(db);

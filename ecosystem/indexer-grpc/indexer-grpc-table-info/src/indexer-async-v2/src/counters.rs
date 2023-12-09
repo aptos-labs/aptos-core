@@ -72,14 +72,15 @@ pub static NUM_TRANSACTIONS_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 /// Generic duration metric
-pub static DURATION_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
-    register_gauge_vec!(
-        "indexer_table_info_duration_in_secs",
-        "Duration in seconds",
-        &["service_type", "step", "message"]
-    )
-    .unwrap()
-});
+pub static DURATION_IN_SECS: Lazy<GaugeVec> =
+    Lazy::new(|| {
+        register_gauge_vec!(
+            "indexer_table_info_duration_in_secs",
+            "Duration in seconds",
+            &["service_type", "step", "message"]
+        )
+        .unwrap()
+    });
 
 /// Transaction timestamp in unixtime
 pub static TRANSACTION_UNIX_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
