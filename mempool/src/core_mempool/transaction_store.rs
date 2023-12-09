@@ -447,7 +447,7 @@ impl TransactionStore {
                     );
                     if bucket == "1000" {
                         debug!(LogSchema::new(LogEntry::ConsensusReady)
-                            .txns(TxnsLog::new_txn(*address, sequence_num)),);
+                            .txns(TxnsLog::new_txn(*address, txn.txn.sequence_number())),);
                     }
                 }
 
@@ -465,6 +465,11 @@ impl TransactionStore {
                         self.parking_lot_index.insert(txn);
                         txn.was_parked = true;
                         parking_lot_txns += 1;
+                        let bucket = self.timeline_index.get_bucket(txn.ranking_score);
+                        if bucket == "1000" {
+                            debug!(LogSchema::new(LogEntry::ConsensusNotReady)
+                                .txns(TxnsLog::new_txn(*address, txn.txn.sequence_number())),);
+                        }
                     },
                 }
             }
