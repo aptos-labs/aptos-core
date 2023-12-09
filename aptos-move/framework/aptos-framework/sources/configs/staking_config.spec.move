@@ -1,7 +1,7 @@
 spec aptos_framework::staking_config {
     spec module {
         use aptos_framework::chain_status;
-        invariant chain_status::is_operating() ==> exists<StakingConfig>(@aptos_framework);
+        invariant [suspendable] chain_status::is_operating() ==> exists<StakingConfig>(@aptos_framework);
         pragma verify = true;
         pragma aborts_if_is_strict;
     }
