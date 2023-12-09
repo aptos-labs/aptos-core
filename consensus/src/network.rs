@@ -97,6 +97,7 @@ pub struct IncomingCommitRequest {
 #[derive(Debug)]
 pub struct IncomingRandGenRequest {
     pub req: RandGenMessage,
+    pub sender: Author,
     pub protocol: ProtocolId,
     pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
 }
@@ -726,6 +727,7 @@ impl NetworkTask {
                         ConsensusMsg::RandGenMessage(req) => {
                             IncomingRpcRequest::RandGenRequest(IncomingRandGenRequest {
                                 req,
+                                sender: peer_id,
                                 protocol,
                                 response_sender: callback,
                             })

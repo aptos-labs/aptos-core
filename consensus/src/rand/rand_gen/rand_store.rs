@@ -213,7 +213,7 @@ impl<S: Share, P: Proof<Share = S>, Storage: RandStorage<S, P>> RandStore<S, P, 
         }
     }
 
-    pub fn add_block(&mut self, block: QueueItem) -> Option<Vec<OrderedBlocks>> {
+    pub fn add_blocks(&mut self, block: QueueItem) -> Option<Vec<OrderedBlocks>> {
         let all_rand_metadata = block.all_rand_metadata();
         self.block_queue.push_back(block);
         for rand_metadata in all_rand_metadata {
@@ -338,9 +338,9 @@ mod tests {
         {
             assert!(rand_store.add_share(share).is_none());
         }
-        assert_eq!(rand_store.add_block(blocks_1).unwrap().len(), 1);
+        assert_eq!(rand_store.add_blocks(blocks_1).unwrap().len(), 1);
         // blocks come after shares
-        assert!(rand_store.add_block(blocks_2).is_none());
+        assert!(rand_store.add_blocks(blocks_2).is_none());
 
         for share in authors[1..6]
             .iter()
@@ -355,7 +355,7 @@ mod tests {
         assert!(rand_store
             .add_decision(create_decision(metadata_3[2].clone()))
             .is_none());
-        assert!(rand_store.add_block(blocks_3).is_none());
+        assert!(rand_store.add_blocks(blocks_3).is_none());
         // decisions comes after blocks
         assert!(rand_store
             .add_decision(create_decision(metadata_3[1].clone()))
