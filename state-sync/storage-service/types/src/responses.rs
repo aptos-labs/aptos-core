@@ -68,7 +68,7 @@ impl StorageServiceResponse {
             // Serialize and compress the raw data
             let raw_data = bcs::to_bytes(&data_response)
                 .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
-            let compressed_data = aptos_compression::compress(
+            let compressed_data = aptos_compression::compress_with_variable_compression(
                 raw_data,
                 CompressionClient::StateSync,
                 MAX_APPLICATION_MESSAGE_SIZE,

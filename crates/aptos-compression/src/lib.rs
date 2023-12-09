@@ -26,9 +26,20 @@ pub mod metrics;
 #[cfg(test)]
 mod tests;
 
-/// The acceleration parameter to use for FAST compression mode.
-/// This was determined anecdotally.
-const ACCELERATION_PARAMETER: i32 = 1;
+// Useful data size constants
+pub const KIB: usize = 1024;
+pub const MIB: usize = 1024 * 1024;
+
+// The acceleration parameter to use for FAST compression mode.
+// This was determined anecdotally.
+const FAST_ACCELERATION_PARAMETER: i32 = 1;
+
+// The acceleration parameters to use for various HIGH compression modes.
+// These were determined anecdotally.
+const LOW_VARIABLE_COMPRESSION_PARAMETER: i32 = 1;
+const MEDIUM_VARIABLE_COMPRESSION_PARAMETER: i32 = 4;
+const HIGH_VARIABLE_COMPRESSION_PARAMETER: i32 = 8;
+const MAX_VARIABLE_COMPRESSION_PARAMETER: i32 = 12;
 
 /// A useful wrapper for representing compressed data
 pub type CompressedData = Vec<u8>;
@@ -42,11 +53,49 @@ pub enum Error {
     DecompressionError(String),
 }
 
-/// Compresses the raw data stream
+/// Compresses the raw data stream using the default compression mode
 pub fn compress(
     raw_data: Vec<u8>,
     client: CompressionClient,
     max_bytes: usize,
+) -> Result<CompressedData, Error> {
+    // Use FAST compression mode (this seems to be good enough for most use cases)
+    let compression_mode = CompressionMode::FAST(FAST_ACCELERATION_PARAMETER);
+    compress_using_mode(raw_data, client, max_bytes, compression_mode)
+}
+
+/// Compresses the raw data stream using variable compression
+/// based on the raw data size. Note: the compression modes were
+/// calibrated using a max TPS workload.
+pub fn compress_with_variable_compression(
+    raw_data: Vec<u8>,
+    client: CompressionClient,
+    max_bytes: usize,
+) -> Result<CompressedData, Error> {
+    // Determine the compression mode
+    let data_length = raw_data.len();
+    let compression_mode = if data_length < 20 * KIB {
+        CompressionMode::FAST(FAST_ACCELERATION_PARAMETER)
+    } else if data_length < 100 * KIB {
+        CompressionMode::HIGHCOMPRESSION(LOW_VARIABLE_COMPRESSION_PARAMETER)
+    } else if data_length < 500 * KIB {
+        CompressionMode::HIGHCOMPRESSION(MEDIUM_VARIABLE_COMPRESSION_PARAMETER)
+    } else if data_length < MIB {
+        CompressionMode::HIGHCOMPRESSION(HIGH_VARIABLE_COMPRESSION_PARAMETER)
+    } else {
+        CompressionMode::HIGHCOMPRESSION(MAX_VARIABLE_COMPRESSION_PARAMETER)
+    };
+
+    // Compress the data
+    compress_using_mode(raw_data, client, max_bytes, compression_mode)
+}
+
+/// Compresses the raw data stream using the specified compression mode
+fn compress_using_mode(
+    raw_data: Vec<u8>,
+    client: CompressionClient,
+    max_bytes: usize,
+    compression_mode: CompressionMode,
 ) -> Result<CompressedData, Error> {
     // Ensure that the raw data size is not greater than the max byte limit
     if raw_data.len() > max_bytes {
@@ -62,7 +111,6 @@ pub fn compress(
     let timer = start_compression_operation_timer(COMPRESS, client.clone());
 
     // Compress the data
-    let compression_mode = CompressionMode::FAST(ACCELERATION_PARAMETER);
     let compressed_data = match lz4::block::compress(&raw_data, Some(compression_mode), true) {
         Ok(compressed_data) => compressed_data,
         Err(error) => {
