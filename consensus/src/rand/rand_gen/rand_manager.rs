@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    network::{IncomingRandGenRequest, NetworkSender},
+    network::{IncomingRandGenRequest, NetworkSender, TConsensusMsg},
     pipeline::buffer_manager::{OrderedBlocks, ResetRequest},
     rand::rand_gen::{
         aug_data_store::AugDataStore,
+        block_queue::QueueItem,
         network_messages::{RandMessage, RpcRequest},
         rand_store::RandStore,
         storage::interface::{AugDataStorage, RandStorage},
@@ -14,10 +15,13 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_consensus_types::common::Author;
-use aptos_logger::{info, spawn_named, warn};
+use aptos_logger::{error, info, spawn_named, warn};
+use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_time_service::TimeService;
 use aptos_types::{epoch_state::EpochState, validator_signer::ValidatorSigner};
+use bytes::Bytes;
+use futures_channel::oneshot;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio_retry::strategy::ExponentialBackoff;
@@ -29,7 +33,6 @@ pub struct RandManager<S: Share, P: Proof<Share = S>, D: AugmentedData, Storage>
     author: Author,
     epoch_state: Arc<EpochState>,
     stop: bool,
-    signer: Arc<ValidatorSigner>,
     config: RandConfig,
     reliable_broadcast: Arc<ReliableBroadcast<RandMessage<S, P, D>, ExponentialBackoff>>,
 
@@ -72,13 +75,12 @@ impl<
             Duration::from_secs(10),
         ));
         let rand_store = RandStore::new(author, config.clone(), db.clone());
-        let aug_data_store = AugDataStore::new(epoch_state.epoch, config.clone(), db);
+        let aug_data_store = AugDataStore::new(epoch_state.epoch, signer, config.clone(), db);
 
         Self {
             author,
             epoch_state,
             stop: false,
-            signer,
             config,
             reliable_broadcast,
 
@@ -89,6 +91,22 @@ impl<
             rand_store,
             aug_data_store,
         }
+    }
+
+    fn process_ready_blocks(&mut self, ready_blocks: Vec<OrderedBlocks>) {
+        for blocks in ready_blocks {
+            let _ = self.outgoing_blocks.send(blocks);
+        }
+    }
+
+    fn process_response(
+        &self,
+        protocol: ProtocolId,
+        sender: oneshot::Sender<Result<Bytes, RpcError>>,
+        message: RandMessage<S, P, D>,
+    ) {
+        let msg = message.into_network_message();
+        let _ = sender.send(Ok(protocol.to_bytes(&msg).unwrap().into()));
     }
 
     pub async fn start(
@@ -111,7 +129,10 @@ impl<
                     .spawn(async move {
                         match bcs::from_bytes::<RandMessage<S, P, D>>(rand_gen_msg.req.data()) {
                             Ok(msg) => {
-                                if msg.verify(&epoch_state_clone, &config_clone).is_ok() {
+                                if msg
+                                    .verify(&epoch_state_clone, &config_clone, rand_gen_msg.sender)
+                                    .is_ok()
+                                {
                                     let _ = tx.send(RpcRequest {
                                         req: msg,
                                         protocol: rand_gen_msg.protocol,
@@ -129,11 +150,43 @@ impl<
         });
         while !self.stop {
             tokio::select! {
-                Some(_blocks) = incoming_blocks.recv() => {
-
+                Some(blocks) = incoming_blocks.recv() => {
+                    let queue_item = QueueItem::new(blocks);
+                    if let Some(ready_blocks) = self.rand_store.add_blocks(queue_item) {
+                        self.process_ready_blocks(ready_blocks);
+                    }
                 }
-                Some(_request) = verified_msg_rx.recv() => {
-
+                Some(request) = verified_msg_rx.recv() => {
+                    let RpcRequest {
+                        req: rand_gen_msg,
+                        protocol,
+                        response_sender,
+                    } = request;
+                    match rand_gen_msg {
+                        RandMessage::Share(share) => {
+                            if let Some(ready_blocks) = self.rand_store.add_share(share) {
+                                self.process_ready_blocks(ready_blocks);
+                            }
+                        }
+                        RandMessage::AugData(aug_data) => {
+                            match self.aug_data_store.add_aug_data(aug_data) {
+                                Ok(sig) => self.process_response(protocol, response_sender, RandMessage::AugDataSignature(sig)),
+                                Err(e) => error!("[RandManager] Failed to add aug data: {}", e),
+                            }
+                        }
+                        RandMessage::CertifiedAugData(certified_aug_data) => {
+                            match self.aug_data_store.add_certified_aug_data(certified_aug_data) {
+                                Ok(ack) => self.process_response(protocol, response_sender, RandMessage::CertifiedAugDataAck(ack)),
+                                Err(e) => error!("[RandManager] Failed to add certified aug data: {}", e),
+                            }
+                        }
+                        _ => unreachable!("[RandManager] Unexpected message type after verification"),
+                    }
+                }
+                Some(decision) = self.rand_decision_rx.recv() => {
+                    if let Some(ready_blocks) = self.rand_store.add_decision(decision) {
+                        self.process_ready_blocks(ready_blocks);
+                    }
                 }
                 Some(_reset) = reset_rx.recv() => {
                     self.stop = true;
