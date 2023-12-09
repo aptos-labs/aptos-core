@@ -32,6 +32,7 @@ aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 async-trait = { workspace = true }
+async-compression = { workspace = true, features = ["gzip"] }
 bcs = { workspace = true }
 bytes = { workspace = true }
 clap = { workspace = true }

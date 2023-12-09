@@ -448,6 +448,7 @@ async-mutex = "1.4.0"
 async-recursion = "1.0.5"
 async-stream = "0.3"
 async-trait = "0.1.53"
+async-compression = { version = "0.4.5", features = ["tokio"] }
 axum = "0.5.16"
 base64 = "0.13.0"
 backoff = { version = "0.4.0", features = ["tokio"] }

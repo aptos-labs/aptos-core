@@ -33,7 +33,7 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 #[derive(Parser, Clone, Debug, Serialize, Deserialize)]
 pub struct CommandAdapterOpt {
     #[clap(
-        long = "config",
+        long = "command_adapter_config",
         help = "Config file for the command adapter backup store."
     )]
     config: PathBuf,

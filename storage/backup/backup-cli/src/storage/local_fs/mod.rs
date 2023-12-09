@@ -25,10 +25,13 @@ use tokio::{
     fs::{create_dir_all, read_dir, rename, OpenOptions},
     io::{AsyncRead, AsyncWrite, AsyncWriteExt},
 };
+use tokio_util::codec::{BytesCodec, FramedRead};
+use async_compression::tokio::bufread::GzipDecoder;
+use tokio::io::BufReader;
 
-#[derive(Parser, Clone, Debug, Serialize, Deserialize)]
+#[derive(Parser, Clone, Debug)]
 pub struct LocalFsOpt {
-    #[clap(long = "dir", value_parser, help = "Target local dir to hold backups.")]
+    #[clap(long = "local_fs_dir", value_parser, help = "Target local dir to hold backups.")]
     pub dir: PathBuf,
 }
 
@@ -46,18 +49,19 @@ impl FromStr for LocalFsOpt {
 pub struct LocalFs {
     /// The path where everything is stored.
     dir: PathBuf,
+    compressed: bool,
 }
 
 impl LocalFs {
     const METADATA_BACKUP_DIR: &'static str = "metadata_backup";
     const METADATA_DIR: &'static str = "metadata";
 
-    pub fn new(dir: PathBuf) -> Self {
-        Self { dir }
+    pub fn new(dir: PathBuf, compressed: bool) -> Self {
+        Self { dir, compressed }
     }
 
-    pub fn new_with_opt(opt: LocalFsOpt) -> Self {
-        Self::new(opt.dir)
+    pub fn new_with_opt(opt: LocalFsOpt, compressed: bool) -> Self {
+        Self::new(opt.dir, compressed)
     }
 
     pub fn metadata_dir(&self) -> PathBuf {
@@ -101,12 +105,18 @@ impl BackupStorage for LocalFs {
         file_handle: &FileHandleRef,
     ) -> Result<Box<dyn AsyncRead + Send + Unpin>> {
         let path = self.dir.join(file_handle);
+
         let file = OpenOptions::new()
             .read(true)
             .open(&path)
             .await
             .err_notes(&path)?;
-        Ok(Box::new(file))
+        if self.compressed {
+            let buf_reader = BufReader::new(file);
+            Ok(Box::new(GzipDecoder::new(buf_reader)))
+        } else {
+            Ok(Box::new(file))
+        }
     }
 
     async fn list_metadata_files(&self) -> Result<Vec<FileHandle>> {
@@ -167,8 +177,17 @@ impl BackupStorage for LocalFs {
             .await;
         match file {
             Ok(mut f) => {
-                f.write_all(content.as_bytes()).await.err_notes(&path)?;
-                f.shutdown().await.err_notes(&path)?;
+                if self.compressed {
+                    let mut encoder = async_compression::tokio::write::GzipEncoder::new(f);
+                    encoder
+                        .write_all(content.as_bytes())
+                        .await
+                        .err_notes(&path)?;
+                    encoder.shutdown().await.err_notes(&path)?;
+                } else {
+                    f.write_all(content.as_bytes()).await.err_notes(&path)?;
+                    f.shutdown().await.err_notes(&path)?;
+                }
             },
             Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
                 info!("File {} already exists, Skip", name.as_ref());

@@ -187,28 +187,6 @@ pub trait BackupStorage: Send + Sync {
     ) -> Result<FileHandle>;
 }
 
-#[derive(Parser)]
-pub enum StorageOpt {
-    #[clap(about = "Select the LocalFs backup storage type, which is used mainly for tests.")]
-    LocalFs(LocalFsOpt),
-    #[clap(
-        about = "Select the CommandAdapter backup storage type, which reads shell commands with which \
-    it communicates with either a local file system or a remote cloud storage. Compression or other \
-    fitlers can be added as part of the commands. See a sample config here: \
-    https://github.com/aptos-labs/aptos-core/tree/main/storage/backup/backup-cli/src/storage/command_adapter/sample_configs/"
-    )]
-    CommandAdapter(CommandAdapterOpt),
-}
-
-impl StorageOpt {
-    pub async fn init_storage(self) -> Result<Arc<dyn BackupStorage>> {
-        Ok(match self {
-            StorageOpt::LocalFs(opt) => Arc::new(LocalFs::new_with_opt(opt)),
-            StorageOpt::CommandAdapter(opt) => Arc::new(CommandAdapter::new_with_opt(opt).await?),
-        })
-    }
-}
-
 #[derive(Parser, Clone, Debug)]
 #[clap(group(
     ArgGroup::new("storage")
@@ -229,12 +207,18 @@ pub struct DBToolStorageOpt {
     https://github.com/aptos-labs/aptos-networks/tree/main/testnet/backups "
     )]
     command_adapter_config: Option<CommandAdapterOpt>,
+    #[clap(
+        long,
+        help = "Whether to compress the backup files. This is currently only apply to local file system. \
+        command adapter's compression decision is upto the adapter implementation "
+    )]
+    compressed: bool,
 }
 
 impl DBToolStorageOpt {
     pub async fn init_storage(self) -> Result<Arc<dyn BackupStorage>> {
         Ok(if self.local_fs_dir.is_some() {
-            Arc::new(LocalFs::new_with_opt(self.local_fs_dir.unwrap()))
+            Arc::new(LocalFs::new_with_opt(self.local_fs_dir.unwrap(), self.compressed))
         } else {
             Arc::new(CommandAdapter::new_with_opt(self.command_adapter_config.unwrap()).await?)
         })

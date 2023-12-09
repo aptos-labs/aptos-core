@@ -558,6 +558,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
+ "async-compression 0.4.5",
  "async-trait",
  "bcs 0.1.4",
  "bytes",
@@ -4530,6 +4531,19 @@ name = "async-compression"
 version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "942c7cd7ae39e91bde4820d74132e9862e62c2f386c3aa90ccf55949f5bad63a"
+dependencies = [
+ "flate2",
+ "futures-core",
+ "memchr",
+ "pin-project-lite",
+ "tokio",
+]
+
+[[package]]
+name = "async-compression"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc2d0cfb2a7388d34f590e76686704c494ed7aaceed62ee1ba35cbf363abc2a5"
 dependencies = [
  "flate2",
  "futures-core",
@@ -12708,7 +12722,7 @@ version = "0.11.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b75aa69a3f06bbcc66ede33af2af253c6f7a86b1ca0033f60c580a27074fbf92"
 dependencies = [
- "async-compression",
+ "async-compression 0.3.15",
  "base64 0.13.0",
  "bytes",
  "cookie 0.16.0",
