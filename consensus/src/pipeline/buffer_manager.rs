@@ -10,7 +10,7 @@ use crate::{
     pipeline::{
         buffer::{Buffer, Cursor},
         buffer_item::BufferItem,
-        commit_reliable_broadcast::{AckState, CommitMessage, DropGuard},
+        commit_reliable_broadcast::{AckState, CommitMessage},
         execution_schedule_phase::ExecutionRequest,
         execution_wait_phase::{ExecutionResponse, ExecutionWaitRequest},
         persisting_phase::PersistingRequest,
@@ -25,7 +25,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
-use aptos_reliable_broadcast::ReliableBroadcast;
+use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof, epoch_state::EpochState,

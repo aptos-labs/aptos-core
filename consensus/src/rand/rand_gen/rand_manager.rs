@@ -3,7 +3,7 @@
 
 use crate::{
     network::{IncomingRandGenRequest, NetworkSender, TConsensusMsg},
-    pipeline::buffer_manager::{OrderedBlocks, ResetRequest},
+    pipeline::buffer_manager::{OrderedBlocks, ResetAck, ResetRequest},
     rand::rand_gen::{
         aug_data_store::AugDataStore,
         block_queue::QueueItem,
@@ -74,7 +74,7 @@ impl<
             TimeService::real(),
             Duration::from_secs(10),
         ));
-        let rand_store = RandStore::new(author, config.clone(), db.clone());
+        let rand_store = RandStore::new(epoch_state.epoch, author, config.clone(), db.clone());
         let aug_data_store = AugDataStore::new(epoch_state.epoch, signer, config.clone(), db);
 
         Self {
@@ -93,10 +93,22 @@ impl<
         }
     }
 
+    fn process_incoming_blocks(&mut self, blocks: OrderedBlocks) {
+        let queue_item = QueueItem::new(blocks, None);
+        self.rand_store.add_blocks(queue_item);
+    }
+
     fn process_ready_blocks(&mut self, ready_blocks: Vec<OrderedBlocks>) {
         for blocks in ready_blocks {
             let _ = self.outgoing_blocks.send(blocks);
         }
+    }
+
+    fn process_reset(&mut self, request: ResetRequest) {
+        let ResetRequest { tx, stop } = request;
+        self.rand_store.reset();
+        self.stop = stop;
+        let _ = tx.send(ResetAck::default());
     }
 
     fn process_response(
@@ -151,10 +163,7 @@ impl<
         while !self.stop {
             tokio::select! {
                 Some(blocks) = incoming_blocks.recv() => {
-                    let queue_item = QueueItem::new(blocks);
-                    if let Some(ready_blocks) = self.rand_store.add_blocks(queue_item) {
-                        self.process_ready_blocks(ready_blocks);
-                    }
+                    self.process_incoming_blocks(blocks);
                 }
                 Some(request) = verified_msg_rx.recv() => {
                     let RpcRequest {
@@ -164,8 +173,9 @@ impl<
                     } = request;
                     match rand_gen_msg {
                         RandMessage::Share(share) => {
-                            if let Some(ready_blocks) = self.rand_store.add_share(share) {
-                                self.process_ready_blocks(ready_blocks);
+                            match self.rand_store.add_share(share) {
+                                Ok(share_ack) => self.process_response(protocol, response_sender, RandMessage::ShareAck(share_ack)),
+                                Err(e) => error!("[RandManager] Failed to add share: {}", e),
                             }
                         }
                         RandMessage::AugData(aug_data) => {
@@ -184,13 +194,17 @@ impl<
                     }
                 }
                 Some(decision) = self.rand_decision_rx.recv() => {
-                    if let Some(ready_blocks) = self.rand_store.add_decision(decision) {
-                        self.process_ready_blocks(ready_blocks);
+                    if let Err(e) = self.rand_store.add_decision(decision) {
+                        error!("[RandManager] Failed to add decision: {}", e);
                     }
                 }
-                Some(_reset) = reset_rx.recv() => {
-                    self.stop = true;
+                Some(reset) = reset_rx.recv() => {
+                    while let Ok(_) = incoming_blocks.try_recv() {}
+                    self.process_reset(reset);
                 }
+            }
+            if let Some(ready_blocks) = self.rand_store.try_dequeue_rand_ready_prefix() {
+                self.process_ready_blocks(ready_blocks);
             }
         }
         info!("RandManager stopped");
