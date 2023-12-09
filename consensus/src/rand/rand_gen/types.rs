@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use anyhow::ensure;
 use aptos_consensus_types::{
     common::{Author, Round},
     randomness::{RandMetadata, Randomness},
@@ -224,6 +225,15 @@ impl<D> AugData<D> {
             author: self.author,
         }
     }
+
+    pub fn author(&self) -> Author {
+        self.author
+    }
+
+    pub fn verify(&self, sender: Author) -> anyhow::Result<()> {
+        ensure!(self.author == sender, "Invalid author");
+        Ok(())
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -261,7 +271,7 @@ pub struct CertifiedAugData<D> {
     signatures: AggregateSignature,
 }
 
-impl<D> CertifiedAugData<D> {
+impl<D: AugmentedData> CertifiedAugData<D> {
     pub fn new(aug_data: AugData<D>, signatures: AggregateSignature) -> Self {
         Self {
             aug_data,
@@ -275,6 +285,15 @@ impl<D> CertifiedAugData<D> {
 
     pub fn id(&self) -> AugDataId {
         self.aug_data.id()
+    }
+
+    pub fn author(&self) -> Author {
+        self.aug_data.author()
+    }
+
+    pub fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        verifier.verify_multi_signatures(&self.aug_data, &self.signatures)?;
+        Ok(())
     }
 }
 
