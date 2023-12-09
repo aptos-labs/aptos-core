@@ -16,6 +16,7 @@ use move_core_types::{
     u256::U256,
 };
 use num::BigInt;
+use num_traits::identities::Zero;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     fmt,
@@ -286,6 +287,34 @@ impl PrimitiveType {
             _ => unreachable!("no num type"),
         }
     }
+
+    /// Gets the manimal value allowed for a numeric type, or none if it is unbounded.
+    pub fn get_min_value(self: &PrimitiveType) -> Option<BigInt> {
+        match self {
+            PrimitiveType::U8 => Some(BigInt::zero()),
+            PrimitiveType::U16 => Some(BigInt::zero()),
+            PrimitiveType::U32 => Some(BigInt::zero()),
+            PrimitiveType::U64 => Some(BigInt::zero()),
+            PrimitiveType::U128 => Some(BigInt::zero()),
+            PrimitiveType::U256 => Some(BigInt::zero()),
+            PrimitiveType::Num => None,
+            _ => unreachable!("no num type"),
+        }
+    }
+
+    /// Gets the number of bits in the type, or None if unbounded..
+    pub fn get_num_bits(self: &PrimitiveType) -> Option<usize> {
+        match self {
+            PrimitiveType::U8 => Some(8),
+            PrimitiveType::U16 => Some(16),
+            PrimitiveType::U32 => Some(32),
+            PrimitiveType::U64 => Some(64),
+            PrimitiveType::U128 => Some(128),
+            PrimitiveType::U256 => Some(256),
+            PrimitiveType::Num => None,
+            _ => unreachable!("no num type"),
+        }
+    }
 }
 
 impl Type {
@@ -358,6 +387,11 @@ impl Type {
             Vector(ety) => ety.is_valid_for_constant(),
             _ => false,
         }
+    }
+
+    pub fn describe_valid_for_constant() -> &'static str {
+        "Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, \
+         or `vector<_>` with valid element type."
     }
 
     /// Returns true if this type is a specification language only type or contains specification

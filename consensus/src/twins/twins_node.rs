@@ -5,11 +5,11 @@
 use crate::{
     counters,
     epoch_manager::EpochManager,
-    experimental::buffer_manager::OrderedBlocks,
     network::NetworkTask,
     network_interface::{ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::PayloadManager,
+    pipeline::buffer_manager::OrderedBlocks,
     quorum_store::quorum_store_db::MockQuorumStoreDB,
     test_utils::{MockStateComputer, MockStorage},
     util::time_service::ClockTimeService,
@@ -43,9 +43,9 @@ use aptos_types::{
         ProposerElectionType::{self, RoundProposer},
         ValidatorSet,
     },
-    system_txn::pool::{SystemTransactionPool, SystemTransactionPoolClient},
     transaction::SignedTransaction,
     validator_info::ValidatorInfo,
+    validator_txn::pool::{ValidatorTransactionPool, ValidatorTransactionPoolClient},
     waypoint::Waypoint,
 };
 use futures::{channel::mpsc, StreamExt};
@@ -74,7 +74,7 @@ impl SMRNode {
         consensus_config: OnChainConsensusConfig,
         storage: Arc<MockStorage>,
         twin_id: TwinId,
-        sys_txn_pool_client: Arc<dyn SystemTransactionPoolClient>,
+        validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
     ) -> Self {
         // Create a runtime for the twin
         let thread_name = format!("twin-{}", twin_id.id);
@@ -160,7 +160,7 @@ impl SMRNode {
             reconfig_listener,
             bounded_executor,
             aptos_time_service::TimeService::real(),
-            sys_txn_pool_client,
+            validator_txn_pool_client,
         );
         let (network_task, network_receiver) =
             NetworkTask::new(network_service_events, self_receiver);
@@ -286,14 +286,14 @@ impl SMRNode {
                 ..ConsensusConfigV1::default()
             });
 
-            let sys_txn_pool = Arc::new(SystemTransactionPool::new());
+            let validator_txn_pool = Arc::new(ValidatorTransactionPool::new());
             smr_nodes.push(Self::start(
                 playground,
                 config,
                 consensus_config,
                 storage,
                 twin_id,
-                sys_txn_pool,
+                validator_txn_pool,
             ));
         }
         smr_nodes

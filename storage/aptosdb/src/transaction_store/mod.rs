@@ -8,11 +8,11 @@ use crate::{
     errors::AptosDbError,
     ledger_db::LedgerDb,
     schema::{
-        transaction::TransactionSchema, transaction_by_account::TransactionByAccountSchema,
-        transaction_by_hash::TransactionByHashSchema, write_set::WriteSetSchema,
+        transaction::TransactionSchema, transaction_accumulator::TransactionAccumulatorSchema,
+        transaction_by_account::TransactionByAccountSchema,
+        transaction_by_hash::TransactionByHashSchema, transaction_info::TransactionInfoSchema,
+        write_set::WriteSetSchema,
     },
-    transaction_accumulator::TransactionAccumulatorSchema,
-    transaction_info::TransactionInfoSchema,
     utils::iterators::{AccountTransactionVersionIter, ExpectContinuousVersions},
 };
 use anyhow::{ensure, format_err, Result};

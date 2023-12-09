@@ -75,6 +75,7 @@ use std::{
     any::{Any, TypeId},
     backtrace::{Backtrace, BacktraceStatus},
     cell::{Ref, RefCell, RefMut},
+    cmp::Ordering,
     collections::{BTreeMap, BTreeSet, VecDeque},
     ffi::OsStr,
     fmt::{self, Formatter, Write},
@@ -101,6 +102,7 @@ pub const GHOST_MEMORY_PREFIX: &str = "Ghost$";
 pub struct Loc {
     file_id: FileId,
     span: Span,
+    inlined_from_loc: Option<Box<Loc>>,
 }
 
 impl AsRef<Loc> for Loc {
@@ -111,7 +113,33 @@ impl AsRef<Loc> for Loc {
 
 impl Loc {
     pub fn new(file_id: FileId, span: Span) -> Loc {
-        Loc { file_id, span }
+        Loc {
+            file_id,
+            span,
+            inlined_from_loc: None,
+        }
+    }
+
+    pub fn inlined_from(&self, inlined_from: &Loc) -> Loc {
+        Loc {
+            file_id: self.file_id,
+            span: self.span,
+            inlined_from_loc: Some(Box::new(match &self.inlined_from_loc {
+                None => inlined_from.clone(),
+                Some(locbox) => (*locbox.clone()).inlined_from(inlined_from),
+            })),
+        }
+    }
+
+    // If `self` is an inlined `Loc`, then add the same
+    // inlining info to the parameter `loc`.
+    fn inline_if_needed(&self, loc: Loc) -> Loc {
+        if let Some(locbox) = &self.inlined_from_loc {
+            let source_loc = locbox.as_ref();
+            loc.inlined_from(source_loc)
+        } else {
+            loc
+        }
     }
 
     pub fn span(&self) -> Span {
@@ -125,10 +153,10 @@ impl Loc {
     // Delivers a location pointing to the end of this one.
     pub fn at_end(&self) -> Loc {
         if self.span.end() > ByteIndex(0) {
-            Loc::new(
+            self.inline_if_needed(Loc::new(
                 self.file_id,
                 Span::new(self.span.end() - ByteOffset(1), self.span.end()),
-            )
+            ))
         } else {
             self.clone()
         }
@@ -136,10 +164,10 @@ impl Loc {
 
     // Delivers a location pointing to the start of this one.
     pub fn at_start(&self) -> Loc {
-        Loc::new(
+        self.inline_if_needed(Loc::new(
             self.file_id,
             Span::new(self.span.start(), self.span.start() + ByteOffset(1)),
-        )
+        ))
     }
 
     /// Creates a location which encloses all the locations in the provided slice,
@@ -155,12 +183,14 @@ impl Loc {
                 end = std::cmp::max(end, l.span().end());
             }
         }
-        Loc::new(loc.file_id(), Span::new(start, end))
+        loc.inline_if_needed(Loc::new(loc.file_id(), Span::new(start, end)))
     }
 
     /// Returns true if the other location is enclosed by this location.
     pub fn is_enclosing(&self, other: &Loc) -> bool {
-        self.file_id == other.file_id && GlobalEnv::enclosing_span(self.span, other.span)
+        self.file_id == other.file_id
+            && self.inlined_from_loc == other.inlined_from_loc
+            && GlobalEnv::enclosing_span(self.span, other.span)
     }
 }
 
@@ -797,21 +827,38 @@ impl GlobalEnv {
         self.diag_with_notes(Severity::Error, loc, msg, notes)
     }
 
+    /// Add a label to `labels` to specify "inlined from loc" for the `loc` in `inlined_from`,
+    /// and, if that is inlined from someplace, repeat as needed, etc.
+    fn add_inlined_from_labels(labels: &mut Vec<Label<FileId>>, inlined_from: &Option<Box<Loc>>) {
+        let mut inlined_from = inlined_from;
+        while let Some(boxed_loc) = inlined_from {
+            let loc = boxed_loc.as_ref();
+            let new_label = Label::secondary(loc.file_id, loc.span)
+                .with_message("in a call inlined at this callsite");
+            labels.push(new_label);
+            inlined_from = &loc.inlined_from_loc;
+        }
+    }
+
     /// Adds a diagnostic of given severity to this environment.
     pub fn diag(&self, severity: Severity, loc: &Loc, msg: &str) {
         let new_msg = Self::add_backtrace(msg, severity == Severity::Bug);
+        let mut labels = vec![Label::primary(loc.file_id, loc.span)];
+        GlobalEnv::add_inlined_from_labels(&mut labels, &loc.inlined_from_loc);
         let diag = Diagnostic::new(severity)
             .with_message(new_msg)
-            .with_labels(vec![Label::primary(loc.file_id, loc.span)]);
+            .with_labels(labels);
         self.add_diag(diag);
     }
 
     /// Adds a diagnostic of given severity to this environment, with notes.
     pub fn diag_with_notes(&self, severity: Severity, loc: &Loc, msg: &str, notes: Vec<String>) {
         let new_msg = Self::add_backtrace(msg, severity == Severity::Bug);
+        let mut labels = vec![Label::primary(loc.file_id, loc.span)];
+        GlobalEnv::add_inlined_from_labels(&mut labels, &loc.inlined_from_loc);
         let diag = Diagnostic::new(severity)
             .with_message(new_msg)
-            .with_labels(vec![Label::primary(loc.file_id, loc.span)]);
+            .with_labels(labels);
         let diag = diag.with_notes(notes);
         self.add_diag(diag);
     }
@@ -824,14 +871,29 @@ impl GlobalEnv {
         msg: &str,
         labels: Vec<(Loc, String)>,
     ) {
+        self.diag_with_primary_and_labels(severity, loc, msg, "", labels)
+    }
+
+    /// Adds a diagnostic of given severity to this environment, with primary and secondary labels.
+    pub fn diag_with_primary_and_labels(
+        &self,
+        severity: Severity,
+        loc: &Loc,
+        msg: &str,
+        primary: &str,
+        labels: Vec<(Loc, String)>,
+    ) {
         let new_msg = Self::add_backtrace(msg, severity == Severity::Bug);
         let diag = Diagnostic::new(severity)
             .with_message(new_msg)
-            .with_labels(vec![Label::primary(loc.file_id, loc.span)]);
-        let labels = labels
+            .with_labels(vec![
+                Label::primary(loc.file_id, loc.span).with_message(primary)
+            ]);
+        let mut labels = labels
             .into_iter()
             .map(|(l, m)| Label::secondary(l.file_id, l.span).with_message(m))
             .collect_vec();
+        GlobalEnv::add_inlined_from_labels(&mut labels, &loc.inlined_from_loc);
         let diag = diag.with_labels(labels);
         self.add_diag(diag);
     }
@@ -873,10 +935,8 @@ impl GlobalEnv {
                 loc.file_hash()
             )
         });
-        Loc {
-            file_id,
-            span: Span::new(loc.start(), loc.end()),
-        }
+        // Note that move-compiler doesn't use "inlined from"
+        Loc::new(file_id, Span::new(loc.start(), loc.end()))
     }
 
     /// Converts a location back into a MoveIrLoc. If the location is not convertible, unknown
@@ -1022,6 +1082,20 @@ impl GlobalEnv {
         mut filter: F,
     ) {
         let mut shown = BTreeSet::new();
+        self.diags.borrow_mut().sort_by(|a, b| match a.1.cmp(&b.1) {
+            Ordering::Less => Ordering::Less,
+            Ordering::Greater => Ordering::Greater,
+            Ordering::Equal => match a.0.severity.partial_cmp(&b.0.severity) {
+                Some(Ordering::Less) => Ordering::Less,
+                Some(Ordering::Greater) => Ordering::Greater,
+                None | Some(Ordering::Equal) => match (&a.0.code, &b.0.code) {
+                    (None, None) => Ordering::Equal,
+                    (None, Some(_)) => Ordering::Less,
+                    (Some(_), None) => Ordering::Greater,
+                    (Some(acode), Some(bcode)) => acode.cmp(bcode),
+                },
+            },
+        });
         for (diag, reported) in self
             .diags
             .borrow_mut()
@@ -3752,16 +3826,19 @@ impl<'env> FunctionEnv<'env> {
         self.data.access_specifiers.as_deref()
     }
 
-    /// Get the name to be used for a local by index, if a compiled module and source map
-    /// is attached. If the local is an argument, use that for naming, otherwise generate
-    /// a unique name.
-    pub fn get_local_name(&self, idx: usize) -> Option<Symbol> {
-        // Try to obtain user name
+    /// Get the name to be used for a local by index, if available.
+    /// Otherwise generate a unique name.
+    pub fn get_local_name(&self, idx: usize) -> Symbol {
         if let Some(source_map) = &self.module_env.data.source_map {
+            // Try to obtain user name from source map
             if idx < self.data.params.len() {
-                return Some(self.data.params[idx].0);
+                return self.data.params[idx].0;
             }
-            if let Ok(fmap) = source_map.get_function_source_map(self.data.def_idx?) {
+            if let Some(fmap) = self
+                .data
+                .def_idx
+                .and_then(|idx| source_map.get_function_source_map(idx).ok())
+            {
                 if let Some((ident, _)) = fmap.get_parameter_or_local_name(idx as u64) {
                     // The Move compiler produces temporary names of the form `<foo>%#<num>`,
                     // where <num> seems to be generated non-deterministically.
@@ -3771,11 +3848,11 @@ impl<'env> FunctionEnv<'env> {
                     } else {
                         ident
                     };
-                    return Some(self.module_env.env.symbol_pool.make(clean_ident.as_str()));
+                    return self.module_env.env.symbol_pool.make(clean_ident.as_str());
                 }
             }
         }
-        Some(self.module_env.env.symbol_pool.make(&format!("$t{}", idx)))
+        self.module_env.env.symbol_pool.make(&format!("$t{}", idx))
     }
 
     /// Returns true if the index is for a temporary, not user declared local. Requires an
@@ -3784,7 +3861,7 @@ impl<'env> FunctionEnv<'env> {
         if idx >= self.get_local_count()? {
             return Some(true);
         }
-        let name = self.get_local_name(idx)?;
+        let name = self.get_local_name(idx);
         Some(self.symbol_pool().string(name).contains("tmp#$"))
     }
 
@@ -4155,5 +4232,11 @@ where
             write!(f, ">")?;
         }
         Ok(())
+    }
+}
+
+impl<'a> fmt::Display for EnvDisplay<'a, Symbol> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.val.display(self.env.symbol_pool()))
     }
 }

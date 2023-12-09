@@ -258,7 +258,7 @@ pub fn update_counters_for_processed_chunk<T, O>(
     for (txn, output) in transactions.iter().zip(transaction_outputs.iter()) {
         if detailed_counters {
             if let Ok(size) = bcs::serialized_size(output.get_transaction_output()) {
-                metrics::APTOS_PROCESSED_TXNS_OUTPUT_SIZE.inc_by(size as u64);
+                metrics::APTOS_PROCESSED_TXNS_OUTPUT_SIZE.observe(size as f64);
             }
         }
 
@@ -322,7 +322,7 @@ pub fn update_counters_for_processed_chunk<T, O>(
             Some(Transaction::GenesisTransaction(_)) => "genesis",
             Some(Transaction::BlockMetadata(_)) => "block_metadata",
             Some(Transaction::StateCheckpoint(_)) => "state_checkpoint",
-            Some(Transaction::SystemTransaction(_)) => "system_transaction",
+            Some(Transaction::ValidatorTransaction(_)) => "validator_transaction",
             None => "unknown",
         };
 

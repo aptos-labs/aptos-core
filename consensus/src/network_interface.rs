@@ -6,14 +6,15 @@
 
 use crate::{
     dag::DAGNetworkMessage,
-    experimental,
+    pipeline,
     quorum_store::types::{Batch, BatchMsg, BatchRequest},
+    rand::rand_gen::RandGenMessage,
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
-    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
@@ -24,7 +25,7 @@ use aptos_network::{
     ProtocolId,
 };
 use aptos_types::{epoch_change::EpochChangeProof, PeerId};
-pub use experimental::commit_reliable_broadcast::CommitMessage;
+pub use pipeline::commit_reliable_broadcast::CommitMessage;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -70,6 +71,8 @@ pub enum ConsensusMsg {
     DAGMessage(DAGNetworkMessage),
     /// Commit message
     CommitMessage(Box<CommitMessage>),
+    /// Randomness generation message
+    RandGenMessage(RandGenMessage),
 }
 
 /// Network type for consensus
@@ -94,6 +97,7 @@ impl ConsensusMsg {
             ConsensusMsg::ProofOfStoreMsg(_) => "ProofOfStoreMsg",
             ConsensusMsg::DAGMessage(_) => "DAGMessage",
             ConsensusMsg::CommitMessage(_) => "CommitMessage",
+            ConsensusMsg::RandGenMessage(_) => "RandGenMessage",
         }
     }
 }

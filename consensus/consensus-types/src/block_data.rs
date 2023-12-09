@@ -15,7 +15,7 @@ use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    system_txn::SystemTransaction,
+    validator_txn::ValidatorTransaction,
 };
 use mirai_annotations::*;
 use serde::{Deserialize, Serialize};
@@ -55,6 +55,7 @@ pub enum BlockType {
     DAGBlock {
         author: Author,
         failed_authors: Vec<(Round, Author)>,
+        validator_txns: Vec<ValidatorTransaction>,
         payload: Payload,
         node_digests: Vec<HashValue>,
         parent_block_id: HashValue,
@@ -135,13 +136,11 @@ impl BlockData {
         }
     }
 
-    pub fn sys_txns(&self) -> Option<&Vec<SystemTransaction>> {
+    pub fn validator_txns(&self) -> Option<&Vec<ValidatorTransaction>> {
         match &self.block_type {
-            BlockType::ProposalExt(proposal_ext) => proposal_ext.sys_txns(),
-            BlockType::Proposal { .. }
-            | BlockType::NilBlock { .. }
-            | BlockType::Genesis
-            | BlockType::DAGBlock { .. } => None,
+            BlockType::ProposalExt(proposal_ext) => proposal_ext.validator_txns(),
+            BlockType::Proposal { .. } | BlockType::NilBlock { .. } | BlockType::Genesis => None,
+            BlockType::DAGBlock { validator_txns, .. } => Some(validator_txns),
         }
     }
 
@@ -232,6 +231,19 @@ impl BlockData {
         }
     }
 
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy_with_validator_txns(txns: Vec<ValidatorTransaction>) -> Self {
+        Self::new_proposal_ext(
+            txns,
+            Payload::empty(false),
+            Author::ONE,
+            vec![],
+            1,
+            1,
+            QuorumCert::dummy(),
+        )
+    }
+
     pub fn new_genesis(timestamp_usecs: u64, quorum_cert: QuorumCert) -> Self {
         assume!(quorum_cert.certified_block().epoch() < u64::max_value()); // unlikely to be false in this universe
         Self {
@@ -266,6 +278,7 @@ impl BlockData {
         epoch: u64,
         round: Round,
         timestamp_usecs: u64,
+        validator_txns: Vec<ValidatorTransaction>,
         payload: Payload,
         author: Author,
         failed_authors: Vec<(Round, Author)>,
@@ -286,6 +299,7 @@ impl BlockData {
             ),
             block_type: BlockType::DAGBlock {
                 author,
+                validator_txns,
                 payload,
                 failed_authors,
                 node_digests,
@@ -317,7 +331,7 @@ impl BlockData {
     }
 
     pub fn new_proposal_ext(
-        sys_txns: Vec<SystemTransaction>,
+        validator_txns: Vec<ValidatorTransaction>,
         payload: Payload,
         author: Author,
         failed_authors: Vec<(Round, Author)>,
@@ -331,7 +345,7 @@ impl BlockData {
             timestamp_usecs,
             quorum_cert,
             block_type: BlockType::ProposalExt(ProposalExt::V0 {
-                sys_txns,
+                validator_txns,
                 payload,
                 author,
                 failed_authors,

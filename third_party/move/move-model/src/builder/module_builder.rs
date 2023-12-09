@@ -16,6 +16,7 @@ use crate::{
             SpecOrBuiltinFunEntry,
         },
     },
+    constant_folder::ConstantFolder,
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     intrinsics::process_intrinsic_declaration,
     model::{
@@ -1136,8 +1137,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         };
         let name = qsym.symbol;
         let const_name = ConstantName(self.symbol_pool().string(name).to_string().into());
-        let mut et = ExpTranslator::new(self);
-        et.set_translate_move_fun();
         let value = if let Some(BytecodeModule {
             compiled_module,
             source_map,
@@ -1153,23 +1152,47 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 &compiled_module.constant_pool()[*const_idx as usize],
             )
             .unwrap();
+            let mut et = ExpTranslator::new(self);
+            et.set_translate_move_fun();
             et.translate_from_move_value(&loc, &ty, &move_value)
         } else {
             // Type check the constant.
-            let exp = et.translate_exp(&def.value, &ty);
-            if !exp.is_valid_for_constant() {
-                et.error(
-                    &et.get_node_loc(exp.node_id()),
-                    "not a valid constant expression",
+            let mut et = ExpTranslator::new(self);
+            et.set_translate_move_fun();
+            let exp = et.translate_exp(&def.value, &ty).into_exp();
+            et.finalize_types();
+            let mut reasons: Vec<(Loc, String)> = Vec::new();
+            let mut ok = true;
+            if !exp.is_valid_for_constant(self.parent.env, &mut reasons) {
+                self.parent.env.diag_with_labels(
+                    Severity::Error,
+                    &self.parent.env.get_node_loc(exp.node_id()),
+                    "Not a valid constant expression.",
+                    reasons,
                 );
-                Value::Bool(false)
-            } else if let ExpData::Value(_, value) = exp {
-                value
+                ok = false;
+            }
+            if !ty.is_valid_for_constant() {
+                let reasons = vec![(loc, Type::describe_valid_for_constant().to_owned())];
+                self.parent.env.diag_with_labels(
+                    Severity::Error,
+                    &self.parent.env.get_node_loc(exp.node_id()),
+                    "Invalid type for constant",
+                    reasons,
+                );
+                ok = false;
+            }
+            if ok {
+                let mut folder = ConstantFolder::new(self.parent.env);
+                let rewritten = folder.rewrite_exp(exp);
+                if let ExpData::Value(_, value) = rewritten.as_ref() {
+                    value.clone()
+                } else {
+                    // The constant folder failed, but it already
+                    // generated error diagnostics as needed.
+                    Value::Bool(false)
+                }
             } else {
-                et.error(
-                    &et.get_node_loc(exp.node_id()),
-                    "constant expression must be a literal",
-                );
                 Value::Bool(false)
             }
         };
@@ -1280,7 +1303,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 };
                 let mut result = et.translate_seq(&loc, seq, &result_type);
                 et.finalize_types();
-                result = et.post_process_placeholders(result.into_exp()).into();
+                result = et.post_process_body(result.into_exp()).into();
                 (result, access_specifiers)
             };
 
@@ -3412,11 +3435,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 ExpData::Call(node_id, Operation::Global(_), _)
                 | ExpData::Call(node_id, Operation::Exists(_), _) => {
                     if !self.parent.env.has_errors() {
-                        // We would crash if the type is not valid, so only do this if no errors
-                        // have been reported so far.
                         let ty = &self.parent.env.get_node_instantiation(*node_id)[0];
-                        let (mid, sid, inst) = ty.require_struct();
-                        used_memory.insert(mid.qualified_inst(sid, inst.to_owned()));
+                        if let Type::Struct(mid, sid, inst) = ty {
+                            used_memory.insert(mid.qualified_inst(*sid, inst.to_owned()));
+                        }
                     }
                 },
                 _ => {},

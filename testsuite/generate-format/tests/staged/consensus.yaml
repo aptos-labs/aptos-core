@@ -311,6 +311,10 @@ ConsensusMsg:
       CommitMessage:
         NEWTYPE:
           TYPENAME: CommitMessage
+    16:
+      RandGenMessage:
+        NEWTYPE:
+          TYPENAME: RandGenMessage
 ContractEvent:
   ENUM:
     0:
@@ -338,7 +342,7 @@ DAGNetworkMessage:
   STRUCT:
     - epoch: U64
     - data: BYTES
-DummySystemTransaction:
+DummyValidatorTransaction:
   STRUCT:
     - payload: BYTES
 Ed25519PublicKey:
@@ -480,9 +484,9 @@ ProposalExt:
     0:
       V0:
         STRUCT:
-          - sys_txns:
+          - validator_txns:
               SEQ:
-                TYPENAME: SystemTransaction
+                TYPENAME: ValidatorTransaction
           - payload:
               TYPENAME: Payload
           - author:
@@ -506,6 +510,10 @@ QuorumCert:
         TYPENAME: VoteData
     - signed_ledger_info:
         TYPENAME: LedgerInfoWithSignatures
+RandGenMessage:
+  STRUCT:
+    - epoch: U64
+    - data: BYTES
 RawTransaction:
   STRUCT:
     - sender:
@@ -605,12 +613,6 @@ SyncInfo:
     - highest_2chain_timeout_cert:
         OPTION:
           TYPENAME: TwoChainTimeoutCertificate
-SystemTransaction:
-  ENUM:
-    0:
-      DummyTopic:
-        NEWTYPE:
-          TYPENAME: DummySystemTransaction
 TableHandle:
   NEWTYPESTRUCT:
     TYPENAME: AccountAddress
@@ -633,9 +635,9 @@ Transaction:
         NEWTYPE:
           TYPENAME: HashValue
     4:
-      SystemTransaction:
+      ValidatorTransaction:
         NEWTYPE:
-          TYPENAME: SystemTransaction
+          TYPENAME: ValidatorTransaction
 TransactionArgument:
   ENUM:
     0:
@@ -781,6 +783,12 @@ ValidatorConsensusInfo:
     - public_key:
         TYPENAME: PublicKey
     - voting_power: U64
+ValidatorTransaction:
+  ENUM:
+    0:
+      DummyTopic:
+        NEWTYPE:
+          TYPENAME: DummyValidatorTransaction
 ValidatorVerifier:
   STRUCT:
     - validator_infos:

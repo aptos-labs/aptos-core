@@ -155,6 +155,9 @@ impl ModuleGenerator {
 
     /// Generate information for a struct.
     fn gen_struct(&mut self, ctx: &ModuleContext, struct_env: &StructEnv<'_>) {
+        if struct_env.is_ghost_memory() {
+            return;
+        }
         let loc = &struct_env.get_loc();
         let struct_handle = self.struct_index(ctx, loc, struct_env);
         let field_information = FF::StructFieldInformation::Declared(
