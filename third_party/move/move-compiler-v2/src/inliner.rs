@@ -1218,7 +1218,7 @@ mod tests {
             (9, BTreeSet::new()),
         ]);
         let result = postorder(&entries, &call_graph);
-        eprintln!("result is {:#?}", &result);
+        // eprintln!("result is {:#?}", &result);
         assert!(
             result == vec![8, 7, 5, 6, 4, 3, 2, 1]
                 || result == vec![8, 7, 6, 5, 4, 3, 2, 1]

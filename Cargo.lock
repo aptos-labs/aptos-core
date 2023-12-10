@@ -9912,7 +9912,9 @@ name = "move-compiler-v2-transactional-tests"
 version = "0.1.0"
 dependencies = [
  "datatest-stable",
+ "move-command-line-common",
  "move-transactional-test-runner",
+ "once_cell",
 ]
 
 [[package]]
