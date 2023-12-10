@@ -523,23 +523,26 @@ where
         let pricing = self.disk_space_pricing();
         let params = &self.vm_gas_params().txn;
 
-        // Writes
-        let mut write_fee = Fee::new(0);
+        // Write set
         let mut write_set_storage = vec![];
-        let mut total_refund = Fee::new(0);
+        let mut writeset_charge_and_refund = ChargeAndRefund::zero();
         for (key, op_size, metadata_opt) in change_set.write_set_iter_mut() {
-            let ChargeAndRefund { charge, refund } =
+            let charge_and_refund =
                 pricing.charge_refund_write_op(params, key, &op_size, metadata_opt);
-            write_fee += charge;
-            total_refund += refund;
 
             write_set_storage.push(WriteStorage {
                 key: key.clone(),
                 op_type: write_op_type(&op_size),
-                cost: charge,
-                refund,
+                cost: charge_and_refund.non_discountable + charge_and_refund.discountable,
+                refund: charge_and_refund.refund,
             });
+            writeset_charge_and_refund.combine(charge_and_refund);
         }
+        let ChargeAndRefund {
+            non_discountable,
+            discountable,
+            refund,
+        } = writeset_charge_and_refund;
 
         // Events
         let mut event_fee = Fee::new(0);
@@ -553,16 +556,24 @@ where
             event_fee += fee;
         }
         let event_discount = pricing.storage_discount_for_events(params, event_fee);
-        let event_fee_with_discount = event_fee
+        let net_event_fee = event_fee
             .checked_sub(event_discount)
             .expect("discount should always be less than or equal to total amount");
 
         // Txn
         let txn_fee = pricing.storage_fee_for_transaction_storage(params, txn_size);
 
+        // Ephemeral fee discount
+        let total_discountable = discountable + net_event_fee + txn_fee;
+        let discount = pricing.ephemeral_storage_fee_discount(params, total_discountable);
+        let net_ephemeral = total_discountable
+            .checked_sub(discount)
+            .expect("ephemeral fee discount should always be less than or equal to total amount");
+        let fee = non_discountable + net_ephemeral;
+
         self.storage_fees = Some(StorageFees {
-            total: write_fee + event_fee + txn_fee,
-            total_refund,
+            total: fee,
+            total_refund: refund,
 
             write_set_storage,
             events: event_fees,
@@ -570,13 +581,10 @@ where
             txn_storage: txn_fee,
         });
 
-        self.charge_storage_fee(
-            write_fee + event_fee_with_discount + txn_fee,
-            gas_unit_price,
-        )
-        .map_err(|err| err.finish(Location::Undefined))?;
+        self.charge_storage_fee(fee, gas_unit_price)
+            .map_err(|err| err.finish(Location::Undefined))?;
 
-        Ok(total_refund)
+        Ok(refund)
     }
 
     fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()> {

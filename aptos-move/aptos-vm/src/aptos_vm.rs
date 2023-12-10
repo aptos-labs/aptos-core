@@ -173,14 +173,14 @@ impl AptosVM {
     pub fn new(resolver: &impl AptosMoveResolver) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
 
+        let features = Features::fetch_config(resolver).unwrap_or_default();
         let (
             gas_params,
             storage_gas_params,
             native_gas_params,
             misc_gas_params,
             gas_feature_version,
-        ) = get_gas_parameters(resolver);
-        let features = Features::fetch_config(resolver).unwrap_or_default();
+        ) = get_gas_parameters(&features, resolver);
 
         // If no chain ID is in storage, we assume we are in a testing environment and use ChainId::TESTING
         let chain_id = ChainId::fetch_config(resolver).unwrap_or_else(ChainId::test);
@@ -521,7 +521,7 @@ impl AptosVM {
             let storage_refund = fee_statement.storage_fee_refund();
 
             let actual = gas_used * gas_unit_price + storage_fee - storage_refund;
-            let expected = u64::from(gas_params.vm.txn.storage_fee_per_state_slot_create);
+            let expected = u64::from(gas_params.vm.txn.legacy_storage_fee_per_state_slot_create);
             // With the current gas schedule actual is expected to be 50_000 or higher, the cost
             // for the account slot.
             if actual < expected {

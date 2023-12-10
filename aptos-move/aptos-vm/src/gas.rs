@@ -43,6 +43,7 @@ pub(crate) fn get_gas_config_from_storage(
 }
 
 pub(crate) fn get_gas_parameters(
+    features: &Features,
     config_storage: &impl ConfigStorage,
 ) -> (
     Result<AptosGasParameters, String>,
@@ -56,7 +57,7 @@ pub(crate) fn get_gas_parameters(
     let storage_gas_params = match &mut gas_params {
         Ok(gas_params) => {
             let storage_gas_params =
-                StorageGasParameters::new(gas_feature_version, gas_params, config_storage);
+                StorageGasParameters::new(gas_feature_version, features, gas_params, config_storage);
 
             // TODO(gas): Table extension utilizes IoPricing directly.
             // Overwrite table io gas parameters with global io pricing.
@@ -246,8 +247,9 @@ pub(crate) fn check_gas(
     if crate::aptos_vm::is_account_init_for_sponsored_transaction(txn_metadata, features) {
         let gas_unit_price: u64 = txn_metadata.gas_unit_price().into();
         let max_gas_amount: u64 = txn_metadata.max_gas_amount().into();
-        let storage_fee_per_state_slot_create: u64 =
-            txn_gas_params.storage_fee_per_state_slot_create.into();
+        let storage_fee_per_state_slot_create: u64 = txn_gas_params
+            .legacy_storage_fee_per_state_slot_create
+            .into();
 
         let expected = gas_unit_price * 10 + 2 * storage_fee_per_state_slot_create;
         let actual = gas_unit_price * max_gas_amount;

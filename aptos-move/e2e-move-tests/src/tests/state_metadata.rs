@@ -52,7 +52,7 @@ fn test_metadata_tracking() {
         .unwrap()
         .vm
         .txn
-        .storage_fee_per_state_slot_create
+        .legacy_storage_fee_per_state_slot_create
         .into();
     assert!(slot_fee > 0);
 

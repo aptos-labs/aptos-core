@@ -345,6 +345,17 @@ The provided signer has not a framework address.
 
 
 
+<a id="0x1_features_EPHEMERAL_STORAGE_FEE"></a>
+
+Whether use the new way of charging storage fees where the per write free quota is removed and all bytes are
+charged at a lower rate on modification.
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_EPHEMERAL_STORAGE_FEE">EPHEMERAL_STORAGE_FEE</a>: u64 = 44;
+</code></pre>
+
+
+
 <a id="0x1_features_FEE_PAYER_ACCOUNT_OPTIONAL"></a>
 
 
