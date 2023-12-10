@@ -38,7 +38,7 @@ use aptos_types::{
     contract_event::TransactionEvent,
     executable::Executable,
     on_chain_config::BlockGasLimitType,
-    transaction::BlockExecutableTransaction as Transaction,
+    transaction::{BlockExecutableTransaction as Transaction, BlockOutput},
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
@@ -1469,7 +1469,7 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: &[T],
         base_view: &S,
-    ) -> Result<Vec<E::Output>, E::Error> {
+    ) -> Result<BlockOutput<E::Txn, E::Output>, E::Error> {
         let dynamic_change_set_optimizations_enabled = signature_verified_block.len() != 1
             || E::is_transaction_dynamic_change_set_capable(&signature_verified_block[0]);
 
@@ -1533,7 +1533,7 @@ where
             panic!("Sequential execution failed with {:?}", e);
         }
 
-        ret
+        ret.map(|outputs| BlockOutput::new(outputs, None))
     }
 }
 

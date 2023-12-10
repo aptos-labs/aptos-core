@@ -26,8 +26,8 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, TransactionOutput,
-        TransactionStatus,
+        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
+        TransactionOutput, TransactionStatus,
     },
     write_set::WriteOp,
 };
@@ -396,7 +396,7 @@ impl BlockAptosVM {
         state_view: &S,
         config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,
-    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         let num_txns = signature_verified_block.len();
         if state_view.id() != StateViewId::Miscellaneous {
@@ -416,8 +416,9 @@ impl BlockAptosVM {
 
         let ret = executor.execute_block(state_view, signature_verified_block, state_view);
         match ret {
-            Ok(outputs) => {
-                let output_vec: Vec<TransactionOutput> = outputs
+            Ok(block_output) => {
+                let (transaction_outputs, block_limit_info_transaction) = block_output.into_inner();
+                let output_vec: Vec<_> = transaction_outputs
                     .into_iter()
                     .map(|output| output.take_output())
                     .collect();
@@ -431,7 +432,10 @@ impl BlockAptosVM {
                     flush_speculative_logs(pos);
                 }
 
-                Ok(output_vec)
+                Ok(BlockOutput::new(
+                    output_vec,
+                    block_limit_info_transaction.map(|(txn, output)| (txn, output.take_output())),
+                ))
             },
             Err(Error::FallbackToSequential(e)) => {
                 unreachable!(

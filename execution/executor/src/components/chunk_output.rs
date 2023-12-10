@@ -5,14 +5,14 @@
 #![forbid(unsafe_code)]
 
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
-use anyhow::Result;
+use anyhow::{bail, Result};
 use aptos_crypto::HashValue;
 use aptos_executor_service::{
     local_executor_helper::SHARDED_BLOCK_EXECUTOR,
     remote_executor_client::{get_remote_addresses, REMOTE_SHARDED_BLOCK_EXECUTOR},
 };
 use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, ExecutedChunk};
-use aptos_logger::{sample, sample::SampleRate, warn};
+use aptos_logger::{error, sample, sample::SampleRate, warn};
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
     state_delta::StateDelta,
@@ -28,7 +28,7 @@ use aptos_types::{
     epoch_state::EpochState,
     transaction::{
         signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
-        ExecutionStatus, Transaction, TransactionOutput, TransactionOutputProvider,
+        BlockOutput, ExecutionStatus, Transaction, TransactionOutput, TransactionOutputProvider,
         TransactionStatus,
     },
 };
@@ -65,12 +65,25 @@ impl ChunkOutput {
     }
 
     fn by_transaction_execution_unsharded<V: VMExecutor>(
-        transactions: Vec<SignatureVerifiedTransaction>,
+        mut transactions: Vec<SignatureVerifiedTransaction>,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Self> {
-        let transaction_outputs =
-            Self::execute_block::<V>(&transactions, &state_view, onchain_config)?;
+        let block_output = Self::execute_block::<V>(&transactions, &state_view, onchain_config)?;
+
+        let (mut transaction_outputs, block_limit_info_transaction) = block_output.into_inner();
+
+        if let Some((txn, output)) = block_limit_info_transaction {
+            if let Some(SignatureVerifiedTransaction::Valid(Transaction::StateCheckpoint(_))) =
+                transactions.last()
+            {
+                transactions.insert(transactions.len() - 1, txn);
+                transaction_outputs.insert(transaction_outputs.len() - 1, output);
+            } else {
+                error!("StateCheckpoint transaction is not the last transaction in the block that has block_limit_info_transaction.");
+                bail!("StateCheckpoint transaction is not the last transaction in the block that has block_limit_info_transaction.");
+            }
+        }
 
         Ok(Self {
             transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
@@ -191,7 +204,7 @@ impl ChunkOutput {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<Vec<TransactionOutput>> {
+    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>> {
         Ok(V::execute_block(transactions, state_view, onchain_config)?)
     }
 
@@ -204,7 +217,7 @@ impl ChunkOutput {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<Vec<TransactionOutput>> {
+    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>> {
         use aptos_state_view::{StateViewId, TStateView};
         use aptos_types::write_set::WriteSet;
 
@@ -213,17 +226,20 @@ impl ChunkOutput {
             StateViewId::Miscellaneous => {
                 V::execute_block(transactions, state_view, onchain_config)?
             },
-            _ => transactions
-                .iter()
-                .map(|_| {
-                    TransactionOutput::new(
-                        WriteSet::default(),
-                        Vec::new(),
-                        0, // Keep gas zero to match with StateCheckpoint txn output
-                        TransactionStatus::Keep(ExecutionStatus::Success),
-                    )
-                })
-                .collect::<Vec<_>>(),
+            _ => BlockOutput::new(
+                transactions
+                    .iter()
+                    .map(|_| {
+                        TransactionOutput::new(
+                            WriteSet::default(),
+                            Vec::new(),
+                            0, // Keep gas zero to match with StateCheckpoint txn output
+                            TransactionStatus::Keep(ExecutionStatus::Success),
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+                None,
+            ),
         };
         Ok(transaction_outputs)
     }
