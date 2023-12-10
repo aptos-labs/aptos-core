@@ -96,7 +96,7 @@ fn read_slot_fee_from_gas_schedule(h: &MoveHarness) -> u64 {
         .unwrap()
         .vm
         .txn
-        .storage_fee_per_state_slot_create
+        .legacy_storage_fee_per_state_slot_create
         .into();
     assert!(slot_fee > 0);
     assert!(slot_fee > LEEWAY * 10);

@@ -33,28 +33,87 @@ pub enum StateValueMetadata {
         deposit: u64,
         creation_time_usecs: u64,
     },
+    V1 {
+        slot_deposit: u64,
+        bytes_deposit: u64,
+        creation_time_usecs: u64,
+    },
 }
 
 // To avoid nested options when fetching a resource and its metadata.
 pub type StateValueMetadataKind = Option<StateValueMetadata>;
 
 impl StateValueMetadata {
-    pub fn new(deposit: u64, creation_time_usecs: &CurrentTimeMicroseconds) -> Self {
+    // FIXME(aldenhu): update tests and remove
+    pub fn new_v0(deposit: u64, creation_time_usecs: &CurrentTimeMicroseconds) -> Self {
         Self::V0 {
             deposit,
             creation_time_usecs: creation_time_usecs.microseconds,
         }
     }
 
-    pub fn deposit(&self) -> u64 {
+    pub fn new_placeholder(creation_time_usecs: &CurrentTimeMicroseconds) -> Self {
+        Self::new_v0(0, creation_time_usecs)
+    }
+
+    pub fn creation_time_usecs(&self) -> u64 {
         match self {
-            StateValueMetadata::V0 { deposit, .. } => *deposit,
+            StateValueMetadata::V0 {
+                creation_time_usecs,
+                ..
+            }
+            | StateValueMetadata::V1 {
+                creation_time_usecs,
+                ..
+            } => *creation_time_usecs,
         }
     }
 
-    pub fn set_deposit(&mut self, amount: u64) {
+    pub fn slot_deposit(&self) -> u64 {
+        match self {
+            StateValueMetadata::V0 { deposit, .. } => *deposit,
+            StateValueMetadata::V1 { slot_deposit, .. } => *slot_deposit,
+        }
+    }
+
+    pub fn bytes_deposit(&self) -> u64 {
+        match self {
+            StateValueMetadata::V0 { .. } => 0,
+            StateValueMetadata::V1 { bytes_deposit, .. } => *bytes_deposit,
+        }
+    }
+
+    pub fn total_deposit(&self) -> u64 {
+        self.slot_deposit() + self.bytes_deposit()
+    }
+
+    pub fn set_slot_deposit(&mut self, amount: u64) {
         match self {
             StateValueMetadata::V0 { deposit, .. } => *deposit = amount,
+            StateValueMetadata::V1 { slot_deposit, .. } => *slot_deposit = amount,
+        }
+    }
+
+    pub fn set_bytes_deposit(&mut self, amount: u64) {
+        let creation_time_usecs = self.creation_time_usecs();
+        let slot_deposit = match self {
+            StateValueMetadata::V0 { deposit, .. } => *deposit,
+            StateValueMetadata::V1 { slot_deposit, .. } => *slot_deposit,
+        };
+
+        *self = Self::V1 {
+            slot_deposit,
+            bytes_deposit: amount,
+            creation_time_usecs,
+        }
+    }
+
+    pub fn set_deposits(&mut self, slot_deposit: u64, bytes_deposit: u64) {
+        let creation_time_usecs = self.creation_time_usecs();
+        *self = Self::V1 {
+            slot_deposit,
+            bytes_deposit,
+            creation_time_usecs,
         }
     }
 }

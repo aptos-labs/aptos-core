@@ -154,7 +154,7 @@ impl<'r> WriteOpConverter<'r> {
             if let Some(current_time) = CurrentTimeMicroseconds::fetch_config(remote) {
                 // The deposit on the metadata is a placeholder (0), it will be updated later when
                 // storage fee is charged.
-                new_slot_metadata = Some(StateValueMetadata::new(0, &current_time));
+                new_slot_metadata = Some(StateValueMetadata::new_placeholder(&current_time));
             }
         }
 
@@ -396,7 +396,7 @@ mod tests {
     };
 
     fn raw_metadata(v: u64) -> StateValueMetadata {
-        StateValueMetadata::new(v, &CurrentTimeMicroseconds { microseconds: v })
+        StateValueMetadata::new_v0(v, &CurrentTimeMicroseconds { microseconds: v })
     }
 
     // TODO: Can re-use some of these testing definitions with aptos-vm-types.

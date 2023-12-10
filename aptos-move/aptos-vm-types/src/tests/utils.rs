@@ -59,7 +59,7 @@ macro_rules! as_bytes {
 pub(crate) use as_bytes;
 
 pub(crate) fn raw_metadata(v: u64) -> StateValueMetadata {
-    StateValueMetadata::new(v, &CurrentTimeMicroseconds { microseconds: v })
+    StateValueMetadata::new_v0(v, &CurrentTimeMicroseconds { microseconds: v })
 }
 
 pub(crate) fn mock_create(k: impl ToString, v: u128) -> (StateKey, WriteOp) {

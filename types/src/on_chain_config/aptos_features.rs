@@ -51,6 +51,7 @@ pub enum FeatureFlag {
     RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM = 41,
     COMMISSION_CHANGE_DELEGATION_POOL = 42,
     BN254_STRUCTURES = 43,
+    EPHEMERAL_STORAGE_FEE = 44,
 }
 
 /// Representation of features on chain as a bitset.
@@ -75,6 +76,8 @@ impl Default for Features {
         features.enable(SIGNATURE_CHECKER_V2_SCRIPT_FIX);
         features.enable(AGGREGATOR_V2_API);
         features.enable(BN254_STRUCTURES);
+        features.enable(EPHEMERAL_STORAGE_FEE);
+
         features
     }
 }
@@ -143,5 +146,9 @@ impl Features {
 
     pub fn is_resource_group_charge_as_size_sum_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM)
+    }
+
+    pub fn is_ephemeral_storage_fee_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::EPHEMERAL_STORAGE_FEE)
     }
 }

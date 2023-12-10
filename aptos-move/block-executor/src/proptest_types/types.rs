@@ -971,7 +971,7 @@ where
 }
 
 pub(crate) fn raw_metadata(v: u64) -> StateValueMetadataKind {
-    Some(StateValueMetadata::new(v, &CurrentTimeMicroseconds {
+    Some(StateValueMetadata::new_v0(v, &CurrentTimeMicroseconds {
         microseconds: v,
     }))
 }

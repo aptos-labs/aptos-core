@@ -94,6 +94,7 @@ pub enum FeatureFlag {
     ResourceGroupsChargeAsSizeSum,
     CommissionChangeDelegationPool,
     BN254Structures,
+    EphemeralStorageFee,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -246,6 +247,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL
             },
             FeatureFlag::BN254Structures => AptosFeatureFlag::BN254_STRUCTURES,
+            FeatureFlag::EphemeralStorageFee => AptosFeatureFlag::EPHEMERAL_STORAGE_FEE,
         }
     }
 }
@@ -321,6 +323,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::CommissionChangeDelegationPool
             },
             AptosFeatureFlag::BN254_STRUCTURES => FeatureFlag::BN254Structures,
+            AptosFeatureFlag::EPHEMERAL_STORAGE_FEE => FeatureFlag::EphemeralStorageFee,
         }
     }
 }

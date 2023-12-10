@@ -124,9 +124,15 @@ crate::gas_schedule::macros::define_gas_parameters!(
             1024, // 1KB free per state write
         ],
         [
-            free_event_bytes_quota: NumBytes,
-            { 7.. => "free_event_bytes_quota" },
+            legacy_free_event_bytes_quota: NumBytes,
+            { 7..=11 => "free_event_bytes_quota", 12.. => "legacy_free_event_bytes_quota" },
             1024, // 1KB free event bytes per transaction
+        ],
+        [
+            ephemeral_storage_fee_discount_per_transaction: Fee,
+            { 12.. => "ephemeral_storage_fee_discount_per_transaction" },
+            // roughly 1KB worth of ephemeral bytes per txn
+            5_000,
         ],
         [
             max_bytes_per_write_op: NumBytes,
@@ -154,24 +160,61 @@ crate::gas_schedule::macros::define_gas_parameters!(
             8192,
         ],
         [
-            storage_fee_per_state_slot_create: FeePerSlot,
-            { 7.. => "storage_fee_per_state_slot_create" },
+            legacy_storage_fee_per_state_slot_create: FeePerSlot,
+            { 7..=11 => "storage_fee_per_state_slot_create", 12 => "legacy_storage_fee_per_state_slot_create" },
             50000,
         ],
         [
-            storage_fee_per_excess_state_byte: FeePerByte,
-            { 7.. => "storage_fee_per_excess_state_byte" },
+            storage_fee_per_state_slot_refundable: FeePerSlot,
+            { 12.. => "storage_fee_per_state_slot_refundable" },
+            // 1 million APT for 2 billion state slots
+            50_000,
+        ],
+        [
+            legacy_storage_fee_per_excess_state_byte: FeePerByte,
+            { 7..=11 => "storage_fee_per_excess_state_byte", 12 => "legacy_storage_fee_per_excess_state_byte" },
             50,
         ],
         [
+            storage_fee_per_state_byte_refundable: FeePerByte,
+            { 12.. => "storage_fee_per_state_byte_refundable" },
+            // 1 million APT for 4 TB state bytes
+            25,
+        ],
+        [
+            storage_fee_per_write_op: FeePerSlot,
+            { 12.. => "storage_fee_per_write_op" },
+            // The cost of writing down the upper level new JMT nodes are shared between transactions
+            // because we write down the JMT in batches, however the bottom levels will be specific
+            // to each transactions assuming they don't touch exactly the same leaves. It's fair to
+            // target roughly 1-2 full internal JMT nodes (about 0.5-1 KB in total) worth of writes
+            // for each write op.
+            5_000,
+        ],
+        [
+            storage_fee_per_write_set_byte: FeePerByte,
+            { 12.. => "storage_fee_per_write_set_byte" },
+            5,
+        ],
+        [
+            legacy_storage_fee_per_event_byte: FeePerByte,
+            { 7..=11 => "storage_fee_per_event_byte", 12 => "legacy_storage_fee_per_event_byte" },
+            20,
+        ],
+        [
             storage_fee_per_event_byte: FeePerByte,
-            { 7.. => "storage_fee_per_event_byte" },
+            { 12 => "storage_fee_per_event_byte" },
+            5,
+        ],
+        [
+            legacy_storage_fee_per_transaction_byte: FeePerByte,
+            { 7..=11 => "storage_fee_per_transaction_byte", 12 => "legacy_storage_fee_per_transaction_byte" },
             20,
         ],
         [
             storage_fee_per_transaction_byte: FeePerByte,
-            { 7.. => "storage_fee_per_transaction_byte" },
-            20,
+            { 12 => "storage_fee_per_transaction_byte" },
+            5,
         ],
         [
             max_execution_gas: InternalGas,

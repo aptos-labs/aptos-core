@@ -142,17 +142,23 @@ pub trait AptosGasMeter: MoveGasMeter {
         let pricing = self.disk_space_pricing();
         let params = &self.vm_gas_params().txn;
 
-        // Calculate the storage fees.
-        let mut write_fee = Fee::new(0);
-        let mut total_refund = Fee::new(0);
+        // Write set
+        let mut writeset_charge_and_refund = ChargeAndRefund::zero();
         for (key, op_size, metadata_opt) in change_set.write_set_iter_mut() {
-            let ChargeAndRefund { charge, refund } =
-                pricing.charge_refund_write_op(params, key, &op_size, metadata_opt);
-            total_refund += refund;
-
-            write_fee += charge;
+            writeset_charge_and_refund.combine(pricing.charge_refund_write_op(
+                params,
+                key,
+                &op_size,
+                metadata_opt,
+            ));
         }
+        let ChargeAndRefund {
+            non_discountable,
+            discountable,
+            refund,
+        } = writeset_charge_and_refund;
 
+        // Events
         let event_fee = change_set
             .events()
             .iter()
@@ -160,16 +166,25 @@ pub trait AptosGasMeter: MoveGasMeter {
                 acc + pricing.storage_fee_per_event(params, event)
             });
         let event_discount = pricing.storage_discount_for_events(params, event_fee);
-        let event_net_fee = event_fee
+        let net_event_fee = event_fee
             .checked_sub(event_discount)
-            .expect("discount should always be less than or equal to total amount");
-        let txn_fee = pricing.storage_fee_for_transaction_storage(params, txn_size);
-        let fee = write_fee + event_net_fee + txn_fee;
+            .expect("event discount should always be less than or equal to total amount");
 
+        // Txn
+        let txn_fee = pricing.storage_fee_for_transaction_storage(params, txn_size);
+
+        // Ephemeral fee discount
+        let total_discountable = discountable + net_event_fee + txn_fee;
+        let discount = pricing.ephemeral_storage_fee_discount(params, total_discountable);
+        let net_ephemeral = total_discountable
+            .checked_sub(discount)
+            .expect("ephemeral fee discount should always be less than or equal to total amount");
+
+        let fee = non_discountable + net_ephemeral;
         self.charge_storage_fee(fee, gas_unit_price)
             .map_err(|err| err.finish(Location::Undefined))?;
 
-        Ok(total_refund)
+        Ok(refund)
     }
 
     // Below are getters reexported from the gas algebra.

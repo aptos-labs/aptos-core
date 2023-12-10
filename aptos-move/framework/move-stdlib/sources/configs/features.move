@@ -331,6 +331,9 @@ module std::features {
     public fun bn254_structures_enabled(): bool acquires Features {
         is_enabled(BN254_STRUCTURES)
     }
+    /// Whether use the new way of charging storage fees where the per write free quota is removed and all bytes are
+    /// charged at a lower rate on modification.
+    const EPHEMERAL_STORAGE_FEE: u64 = 44;
 
     // ============================================================================================
     // Feature Flag Implementation

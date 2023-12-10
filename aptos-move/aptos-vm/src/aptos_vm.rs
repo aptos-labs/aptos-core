@@ -173,14 +173,14 @@ impl AptosVM {
     pub fn new(resolver: &impl AptosMoveResolver) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
 
+        let features = Features::fetch_config(resolver).unwrap_or_default();
         let (
             gas_params,
             storage_gas_params,
             native_gas_params,
             misc_gas_params,
             gas_feature_version,
-        ) = get_gas_parameters(resolver);
-        let features = Features::fetch_config(resolver).unwrap_or_default();
+        ) = get_gas_parameters(&features, resolver);
 
         // If no chain ID is in storage, we assume we are in a testing environment and use ChainId::TESTING
         let chain_id = ChainId::fetch_config(resolver).unwrap_or_else(ChainId::test);
