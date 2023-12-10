@@ -60,33 +60,13 @@ pub enum Structure {
     BLS12381G2,
     BLS12381Gt,
     BLS12381Fr,
-    BN254(BN254Structure),
-}
-#[derive(Copy, Clone, Eq, Hash, PartialEq)]
-pub enum BN254Structure {
+
     BN254Fr,
     BN254Fq,
-    BN254Fq2,
     BN254Fq12,
     BN254G1,
     BN254G2,
     BN254Gt,
-}
-impl TryFrom<TypeTag> for BN254Structure {
-    type Error = ();
-
-    fn try_from(value: TypeTag) -> Result<Self, Self::Error> {
-        match value.to_string().as_str() {
-            "0x1::bn254_algebra::Fr" => Ok(Self::BN254Fr),
-            "0x1::bn254_algebra::Fq" => Ok(Self::BN254Fq),
-            "0x1::bn254_algebra::Fq2" => Ok(Self::BN254Fq2),
-            "0x1::bn254_algebra::Fq12" => Ok(Self::BN254Fq12),
-            "0x1::bn254_algebra::G1" => Ok(Self::BN254G1),
-            "0x1::bn254_algebra::G2" => Ok(Self::BN254G2),
-            "0x1::bn254_algebra::Gt" => Ok(Self::BN254Gt),
-            _ => Err(()),
-        }
-    }
 }
 
 impl TryFrom<TypeTag> for Structure {
@@ -100,7 +80,13 @@ impl TryFrom<TypeTag> for Structure {
             "0x1::bls12381_algebra::G2" => Ok(Structure::BLS12381G2),
             "0x1::bls12381_algebra::Gt" => Ok(Structure::BLS12381Gt),
 
-            _ => Ok(Structure::BN254(BN254Structure::try_from(value)?)),
+            "0x1::bn254_algebra::Fr" => Ok(Self::BN254Fr),
+            "0x1::bn254_algebra::Fq" => Ok(Self::BN254Fq),
+            "0x1::bn254_algebra::Fq12" => Ok(Self::BN254Fq12),
+            "0x1::bn254_algebra::G1" => Ok(Self::BN254G1),
+            "0x1::bn254_algebra::G2" => Ok(Self::BN254G2),
+            "0x1::bn254_algebra::Gt" => Ok(Self::BN254Gt),
+            _ => Err(()),
         }
     }
 }
@@ -125,11 +111,6 @@ pub enum SerializationFormat {
     BLS12381FrLsb,
     BLS12381FrMsb,
 
-    BN254(BN254SerializationFormat),
-}
-
-#[derive(Copy, Clone, Eq, Hash, PartialEq)]
-pub enum BN254SerializationFormat {
     BN254G1Compressed,
     BN254G1Uncompressed,
     BN254G2Compressed,
@@ -139,29 +120,7 @@ pub enum BN254SerializationFormat {
     BN254FrMsb,
     BN254FqLsb,
     BN254FqMsb,
-    BN254Fq2LscLsb,
     BN254Fq12LscLsb,
-}
-
-impl TryFrom<TypeTag> for BN254SerializationFormat {
-    type Error = ();
-
-    fn try_from(value: TypeTag) -> Result<Self, Self::Error> {
-        match value.to_string().as_str() {
-            "0x1::bn254_algebra::FormatG1Uncompr" => Ok(Self::BN254G1Uncompressed),
-            "0x1::bn254_algebra::FormatG1Compr" => Ok(Self::BN254G1Compressed),
-            "0x1::bn254_algebra::FormatG2Uncompr" => Ok(Self::BN254G2Uncompressed),
-            "0x1::bn254_algebra::FormatG2Compr" => Ok(Self::BN254G2Compressed),
-            "0x1::bn254_algebra::FormatGt" => Ok(Self::BN254Gt),
-            "0x1::bn254_algebra::FormatFrLsb" => Ok(Self::BN254FrLsb),
-            "0x1::bn254_algebra::FormatFrMsb" => Ok(Self::BN254FrMsb),
-            "0x1::bn254_algebra::FormatFqLsb" => Ok(Self::BN254FqLsb),
-            "0x1::bn254_algebra::FormatFqMsb" => Ok(Self::BN254FqMsb),
-            "0x1::bn254_algebra::FormatFq2LscLsb" => Ok(Self::BN254Fq2LscLsb),
-            "0x1::bn254_algebra::FormatFq12LscLsb" => Ok(Self::BN254Fq12LscLsb),
-            _ => Err(()),
-        }
-    }
 }
 
 impl TryFrom<TypeTag> for SerializationFormat {
@@ -184,9 +143,17 @@ impl TryFrom<TypeTag> for SerializationFormat {
             "0x1::bls12381_algebra::FormatFrLsb" => Ok(SerializationFormat::BLS12381FrLsb),
             "0x1::bls12381_algebra::FormatFrMsb" => Ok(SerializationFormat::BLS12381FrMsb),
 
-            _ => Ok(SerializationFormat::BN254(
-                BN254SerializationFormat::try_from(value)?,
-            )),
+            "0x1::bn254_algebra::FormatG1Uncompr" => Ok(Self::BN254G1Uncompressed),
+            "0x1::bn254_algebra::FormatG1Compr" => Ok(Self::BN254G1Compressed),
+            "0x1::bn254_algebra::FormatG2Uncompr" => Ok(Self::BN254G2Uncompressed),
+            "0x1::bn254_algebra::FormatG2Compr" => Ok(Self::BN254G2Compressed),
+            "0x1::bn254_algebra::FormatGt" => Ok(Self::BN254Gt),
+            "0x1::bn254_algebra::FormatFrLsb" => Ok(Self::BN254FrLsb),
+            "0x1::bn254_algebra::FormatFrMsb" => Ok(Self::BN254FrMsb),
+            "0x1::bn254_algebra::FormatFqLsb" => Ok(Self::BN254FqLsb),
+            "0x1::bn254_algebra::FormatFqMsb" => Ok(Self::BN254FqMsb),
+            "0x1::bn254_algebra::FormatFq12LscLsb" => Ok(Self::BN254Fq12LscLsb),
+            _ => Err(()),
         }
     }
 }
@@ -280,7 +247,12 @@ fn feature_flag_from_structure(structure_opt: Option<Structure>) -> Option<Featu
         | Some(Structure::BLS12381G1)
         | Some(Structure::BLS12381G2)
         | Some(Structure::BLS12381Gt) => Some(FeatureFlag::BLS12_381_STRUCTURES),
-        Some(Structure::BN254(_)) => Some(FeatureFlag::BN254_STRUCTURES),
+        Some(Structure::BN254Fr)
+        | Some(Structure::BN254Fq)
+        | Some(Structure::BN254Fq12)
+        | Some(Structure::BN254G1)
+        | Some(Structure::BN254G2)
+        | Some(Structure::BN254Gt) => Some(FeatureFlag::BN254_STRUCTURES),
         _ => None,
     }
 }
@@ -343,11 +315,6 @@ static BN254_R_LENDIAN: Lazy<Vec<u8>> = Lazy::new(|| BN254_R_SCALAR.to_bytes_le(
 const BN254_R_SCALAR: ark_ff::BigInteger256 = ark_bn254::Fr::MODULUS;
 static BN254_Q_LENDIAN: Lazy<Vec<u8>> = Lazy::new(|| BN254_Q_SCALAR.to_bytes_le());
 const BN254_Q_SCALAR: ark_ff::BigInteger256 = ark_bn254::Fq::MODULUS;
-
-/// generated by: ark_bn254::Fq::MODULUS.pow(2)
-static BN254_Q2_LENDIAN: Lazy<Vec<u8>> = Lazy::new(|| {
-    hex::decode("b1695d27a258543b01c1ea092d0702a6dcca966d9c18504ac842127a959e68048db3c6345cfaed260656371651850bb01cd248037c6f9a599cbf3c76b8c42509").unwrap()
-});
 
 /// generated by: ark_bn254::Fq::MODULUS.pow(12)
 static BN254_Q12_LENDIAN: Lazy<Vec<u8>> = Lazy::new(|| {

@@ -3,8 +3,8 @@
 use crate::{
     abort_unless_arithmetics_enabled_for_structure, abort_unless_feature_flag_enabled,
     natives::cryptography::algebra::{
-        feature_flag_from_structure, AlgebraContext, BN254Structure, Structure,
-        E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        feature_flag_from_structure, AlgebraContext, Structure, E_TOO_MUCH_MEMORY_USED,
+        MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
     },
     store_element, structure_from_ty_arg,
 };
@@ -47,32 +47,13 @@ pub fn from_u64_internal(
             ark_bls12_381::Fq12,
             ALGEBRA_ARK_BLS12_381_FQ12_FROM_U64
         ),
-        Some(Structure::BN254(s)) => from_u64_internal_bn254(context, args, s),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
-    }
-}
-
-fn from_u64_internal_bn254(
-    context: &mut SafeNativeContext,
-    mut args: VecDeque<Value>,
-    structure: BN254Structure,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    match structure {
-        BN254Structure::BN254Fr => {
+        Some(Structure::BN254Fr) => {
             from_u64_internal!(context, args, ark_bn254::Fr, ALGEBRA_ARK_BN254_FR_FROM_U64)
         },
-        BN254Structure::BN254Fq => {
+        Some(Structure::BN254Fq) => {
             from_u64_internal!(context, args, ark_bn254::Fq, ALGEBRA_ARK_BN254_FQ_FROM_U64)
         },
-        BN254Structure::BN254Fq2 => from_u64_internal!(
-            context,
-            args,
-            ark_bn254::Fq2,
-            ALGEBRA_ARK_BN254_FQ2_FROM_U64
-        ),
-        BN254Structure::BN254Fq12 => from_u64_internal!(
+        Some(Structure::BN254Fq12) => from_u64_internal!(
             context,
             args,
             ark_bn254::Fq12,

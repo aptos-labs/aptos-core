@@ -3,7 +3,7 @@
 #[cfg(feature = "testing")]
 use crate::{
     natives::cryptography::algebra::{
-        AlgebraContext, BN254Structure, Structure, BLS12381_GT_GENERATOR, BN254_GT_GENERATOR,
+        AlgebraContext, Structure, BLS12381_GT_GENERATOR, BN254_GT_GENERATOR,
         E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
     },
     structure_from_ty_arg,
@@ -77,36 +77,22 @@ pub fn rand_insecure_internal(
                 Err(abort_code) => Err(SafeNativeError::Abort { abort_code }),
             }
         },
-        Some(Structure::BN254(s)) => rand_insecure_internal_bn254(context, s),
-        _ => unreachable!(),
-    }
-}
-#[cfg(feature = "testing")]
-#[inline]
-fn rand_insecure_internal_bn254(
-    context: &mut SafeNativeContext,
-    structure: BN254Structure,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    match structure {
-        BN254Structure::BN254Fr => {
+        Some(Structure::BN254Fr) => {
             ark_rand_internal!(context, ark_bn254::Fr)
         },
-        BN254Structure::BN254Fq => {
+        Some(Structure::BN254Fq) => {
             ark_rand_internal!(context, ark_bn254::Fq)
         },
-        BN254Structure::BN254Fq2 => {
-            ark_rand_internal!(context, ark_bn254::Fq2)
-        },
-        BN254Structure::BN254Fq12 => {
+        Some(Structure::BN254Fq12) => {
             ark_rand_internal!(context, ark_bn254::Fq12)
         },
-        BN254Structure::BN254G1 => {
+        Some(Structure::BN254G1) => {
             ark_rand_internal!(context, ark_bn254::G1Projective)
         },
-        BN254Structure::BN254G2 => {
+        Some(Structure::BN254G2) => {
             ark_rand_internal!(context, ark_bn254::G2Projective)
         },
-        BN254Structure::BN254Gt => {
+        Some(Structure::BN254Gt) => {
             let k = ark_bn254::Fr::rand(&mut test_rng());
             let k_bigint: ark_ff::BigInteger256 = k.into();
             let element = BN254_GT_GENERATOR.pow(k_bigint);
@@ -115,5 +101,6 @@ fn rand_insecure_internal_bn254(
                 Err(abort_code) => Err(SafeNativeError::Abort { abort_code }),
             }
         },
+        _ => unreachable!(),
     }
 }

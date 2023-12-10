@@ -4,9 +4,9 @@ use crate::{
     abort_unless_feature_flag_enabled,
     natives::cryptography::{
         algebra::{
-            abort_invariant_violated, AlgebraContext, BN254Structure, Structure,
-            E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
-            MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+            abort_invariant_violated, AlgebraContext, Structure, E_TOO_MUCH_MEMORY_USED,
+            MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING,
+            MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         },
         helpers::log2_ceil,
     },
@@ -35,18 +35,11 @@ fn feature_flag_of_group_scalar_mul(
         | (Some(Structure::BLS12381Gt), Some(Structure::BLS12381Fr)) => {
             Some(FeatureFlag::BLS12_381_STRUCTURES)
         },
-        (
-            Some(Structure::BN254(BN254Structure::BN254G1)),
-            Some(Structure::BN254(BN254Structure::BN254Fr)),
-        )
-        | (
-            Some(Structure::BN254(BN254Structure::BN254G2)),
-            Some(Structure::BN254(BN254Structure::BN254Fr)),
-        )
-        | (
-            Some(Structure::BN254(BN254Structure::BN254Gt)),
-            Some(Structure::BN254(BN254Structure::BN254Fr)),
-        ) => Some(FeatureFlag::BN254_STRUCTURES),
+        (Some(Structure::BN254G1), Some(Structure::BN254Fr))
+        | (Some(Structure::BN254G2), Some(Structure::BN254Fr))
+        | (Some(Structure::BN254Gt), Some(Structure::BN254Fr)) => {
+            Some(FeatureFlag::BN254_STRUCTURES)
+        },
 
         _ => None,
     }
@@ -147,24 +140,7 @@ pub fn scalar_mul_internal(
             let new_handle = store_element!(context, new_element)?;
             Ok(smallvec![Value::u64(new_handle as u64)])
         },
-        (
-            Some(Structure::BN254(group_structure)),
-            Some(Structure::BN254(scalar_field_structure)),
-        ) => scalar_mul_internal_bn254(context, args, group_structure, scalar_field_structure),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
-    }
-}
-
-fn scalar_mul_internal_bn254(
-    context: &mut SafeNativeContext,
-    mut args: VecDeque<Value>,
-    group_structure: BN254Structure,
-    scalar_field_structure: BN254Structure,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    match (group_structure, scalar_field_structure) {
-        (BN254Structure::BN254G1, BN254Structure::BN254Fr) => {
+        (Some(Structure::BN254G1), Some(Structure::BN254Fr)) => {
             ark_scalar_mul_internal!(
                 context,
                 args,
@@ -174,7 +150,7 @@ fn scalar_mul_internal_bn254(
                 ALGEBRA_ARK_BN254_G1_PROJ_SCALAR_MUL
             )
         },
-        (BN254Structure::BN254G2, BN254Structure::BN254Fr) => {
+        (Some(Structure::BN254G2), Some(Structure::BN254Fr)) => {
             ark_scalar_mul_internal!(
                 context,
                 args,
@@ -184,7 +160,7 @@ fn scalar_mul_internal_bn254(
                 ALGEBRA_ARK_BN254_G2_PROJ_SCALAR_MUL
             )
         },
-        (BN254Structure::BN254Gt, BN254Structure::BN254Fr) => {
+        (Some(Structure::BN254Gt), Some(Structure::BN254Fr)) => {
             let scalar_handle = safely_pop_arg!(args, u64) as usize;
             let element_handle = safely_pop_arg!(args, u64) as usize;
             safe_borrow_element!(
@@ -287,26 +263,7 @@ pub fn multi_scalar_mul_internal(
                 ark_bls12_381::Fr
             )
         },
-        (
-            Some(Structure::BN254(group_structure)),
-            Some(Structure::BN254(scalar_field_structure)),
-        ) => {
-            multi_scalar_mul_internal_bn254(context, args, group_structure, scalar_field_structure)
-        },
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
-    }
-}
-
-fn multi_scalar_mul_internal_bn254(
-    context: &mut SafeNativeContext,
-    mut args: VecDeque<Value>,
-    group_structure: BN254Structure,
-    scalar_field_structure: BN254Structure,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    match (group_structure, scalar_field_structure) {
-        (BN254Structure::BN254G1, BN254Structure::BN254Fr) => {
+        (Some(Structure::BN254G1), Some(Structure::BN254Fr)) => {
             ark_msm_internal!(
                 context,
                 args,
@@ -317,7 +274,7 @@ fn multi_scalar_mul_internal_bn254(
                 ark_bn254::Fr
             )
         },
-        (BN254Structure::BN254G2, BN254Structure::BN254Fr) => {
+        (Some(Structure::BN254G2), Some(Structure::BN254Fr)) => {
             ark_msm_internal!(
                 context,
                 args,

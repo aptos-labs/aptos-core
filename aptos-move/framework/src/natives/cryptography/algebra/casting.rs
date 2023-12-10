@@ -3,8 +3,8 @@
 use crate::{
     abort_unless_feature_flag_enabled,
     natives::cryptography::algebra::{
-        abort_invariant_violated, AlgebraContext, BN254Structure, Structure, BLS12381_R_SCALAR,
-        BN254_R_SCALAR, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        abort_invariant_violated, AlgebraContext, Structure, BLS12381_R_SCALAR, BN254_R_SCALAR,
+        MOVE_ABORT_CODE_NOT_IMPLEMENTED,
     },
     safe_borrow_element, structure_from_ty_arg,
 };
@@ -27,10 +27,9 @@ fn feature_flag_of_casting(
         (Some(Structure::BLS12381Fq12), Some(Structure::BLS12381Gt)) => {
             Some(FeatureFlag::BLS12_381_STRUCTURES)
         },
-        (
-            Some(Structure::BN254(BN254Structure::BN254Fq12)),
-            Some(Structure::BN254(BN254Structure::BN254Gt)),
-        ) => Some(FeatureFlag::BN254_STRUCTURES),
+        (Some(Structure::BN254Fq12), Some(Structure::BN254Gt)) => {
+            Some(FeatureFlag::BN254_STRUCTURES)
+        },
         _ => None,
     }
 }
@@ -62,10 +61,7 @@ pub fn downcast_internal(
                 Ok(smallvec![Value::bool(false), Value::u64(handle as u64)])
             }
         },
-        (
-            Some(Structure::BN254(BN254Structure::BN254Fq12)),
-            Some(Structure::BN254(BN254Structure::BN254Gt)),
-        ) => {
+        (Some(Structure::BN254Fq12), Some(Structure::BN254Gt)) => {
             let handle = safely_pop_arg!(args, u64) as usize;
             safe_borrow_element!(context, handle, ark_bn254::Fq12, element_ptr, element);
             context.charge(ALGEBRA_ARK_BN254_FQ12_POW_U256)?;
@@ -95,10 +91,7 @@ pub fn upcast_internal(
             let handle = safely_pop_arg!(args, u64);
             Ok(smallvec![Value::u64(handle)])
         },
-        (
-            Some(Structure::BN254(BN254Structure::BN254Gt)),
-            Some(Structure::BN254(BN254Structure::BN254Fq12)),
-        ) => {
+        (Some(Structure::BN254Gt), Some(Structure::BN254Fq12)) => {
             let handle = safely_pop_arg!(args, u64);
             Ok(smallvec![Value::u64(handle)])
         },

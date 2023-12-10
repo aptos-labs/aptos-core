@@ -35,6 +35,15 @@
 /// as they help define some of the currently supported structures.
 /// Their implementation may also be added in the future.
 ///
+/// `Fq2`: The finite field $F_{q^2}$ that can be used as the base field of $G_2$
+/// which is an extension field of `Fq`, constructed as $F_{q^2}=F_{q}[u]/(u^2+1)$.
+///
+/// `FormatFq2LscLsb`: A serialization scheme for `Fq2` elements,
+/// where an element $(c_0+c_1\cdot u)$ is represented by a byte array `b[]` of size N=64,
+/// which is a concatenation of its coefficients serialized, with the least significant coefficient (LSC) coming first.
+/// - `b[0..32]` is $c_0$ serialized using `FormatFqLscLsb`.
+/// - `b[32..64]` is $c_1$ serialized using `FormatFqLscLsb`.
+///
 /// `Fq6`: the finite field $F_{q^6}$ used in BN254 curves,
 /// which is an extension field of `Fq2`, constructed as $F_{q^6}=F_{q^2}[v]/(v^3-u-9)$.
 ///
@@ -88,21 +97,10 @@ module std::bn254_algebra {
     /// NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
     struct FormatFqMsb {}
 
-    /// The finite field $F_{q^2}$ that can be used as the base field of $G_2$
-    /// which is an extension field of `Fq`, constructed as $F_{q^2}=F_{q}[u]/(u^2+1)$.
-    struct Fq2 {}
-
-    /// A serialization scheme for `Fq2` elements,
-    /// where an element $(c_0+c_1\cdot u)$ is represented by a byte array `b[]` of size N=64,
-    /// which is a concatenation of its coefficients serialized, with the least significant coefficient (LSC) coming first.
-    /// - `b[0..32]` is $c_0$ serialized using `FormatFqLsb`.
-    /// - `b[32..64]` is $c_1$ serialized using `FormatFqLsb`.
-    ///
-    /// NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
-    struct FormatFq2LscLsb {}
-
     /// The finite field $F_{q^12}$ used in BN254 curves,
     /// which is an extension field of `Fq6` (defined in the module documentation), constructed as $F_{q^12}=F_{q^6}[w]/(w^2-v)$.
+    /// The field can downcast to `Gt` if it's an element of the multiplicative subgroup `Gt` of `Fq12`
+    /// with a prime order $r$ = 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
     struct Fq12 {}
     /// A serialization scheme for `Fq12` elements,
     /// where an element $(c_0+c_1\cdot w)$ is represented by a byte array `b[]` of size 384,
@@ -175,7 +173,7 @@ module std::bn254_algebra {
     ///
     /// Below is the serialization procedure that takes a `G2` element `p` and outputs a byte array of size N=128.
     /// 1. Let `(x,y)` be the coordinates of `p` if `p` is on the curve, or `(0,0)` otherwise.
-    /// 1. Serialize `x` and `y` into `b_x[]` and `b_y[]` respectively using `FormatFq2LscLsb`.
+    /// 1. Serialize `x` and `y` into `b_x[]` and `b_y[]` respectively using `FormatFq2LscLsb` (defined in the module documentation).
     /// 1. Concatenate `b_x[]` and `b_y[]` into `b[]`.
     /// 1. If `p` is the point at infinity, set the infinity bit: `b[N-1]: = b[N-1] | 0b0100_0000`.
     /// 1. If `y > -y`, set the lexicographical bit:  `b[N-1]: = b[N-1] | 0b1000_0000`.
@@ -218,7 +216,7 @@ module std::bn254_algebra {
     struct FormatG2Compr {}
 
     /// The group $G_t$ in BN254-based pairing $G_1 \times G_2 \rightarrow G_t$.
-    /// It is a multiplicative subgroup of `Fq12`,
+    /// It is a multiplicative subgroup of `Fq12`, so it  can upcast to `Fq12`.
     /// with a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
     /// (so `Fr` is the scalar field).
     /// The identity of `Gt` is 1.
@@ -236,17 +234,6 @@ module std::bn254_algebra {
     // Tests begin.
 
     #[test_only]
-    const FQ2_VAL_0_SERIALIZED: vector<u8> = x"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-    #[test_only]
-    const FQ2_VAL_1_SERIALIZED: vector<u8> = x"01000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-    #[test_only]
-    const FQ2_VAL_7_SERIALIZED: vector<u8> = x"07000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-    #[test_only]
-    const FQ2_VAL_7_NEG_SERIALIZED: vector<u8> = x"40fd7cd8168c203c8dca7168916a81975d588181b64550b829a031e1724e64300000000000000000000000000000000000000000000000000000000000000000";
-    #[test_only]
-    const Q2_SERIALIZED: vector<u8> = x"b1695d27a258543b01c1ea092d0702a6dcca966d9c18504ac842127a959e68048db3c6345cfaed260656371651850bb01cd248037c6f9a599cbf3c76b8c42509";
-
-    #[test_only]
     fun rand_vector<S>(num: u64): vector<Element<S>> {
         let elements = vector[];
         while (num > 0) {
@@ -254,54 +241,6 @@ module std::bn254_algebra {
             num = num - 1;
         };
         elements
-    }
-
-    #[test(fx = @std)]
-    fun test_fq2(fx: signer) {
-        enable_cryptography_algebra_natives(&fx);
-
-        // Constants.
-        assert!(Q2_SERIALIZED == order<Fq2>(), 1);
-
-        // Serialization/deserialization.
-        let val_0 = zero<Fq2>();
-        let val_1 = one<Fq2>();
-        assert!(FQ2_VAL_0_SERIALIZED == serialize<Fq2, FormatFq2LscLsb>(&val_0), 1);
-        assert!(FQ2_VAL_1_SERIALIZED == serialize<Fq2, FormatFq2LscLsb>(&val_1), 1);
-        let val_7 = from_u64<Fq2>(7);
-        let val_7_another = std::option::extract(&mut deserialize<Fq2, FormatFq2LscLsb>(&FQ2_VAL_7_SERIALIZED));
-        assert!(eq(&val_7, &val_7_another), 1);
-        assert!(FQ2_VAL_7_SERIALIZED == serialize<Fq2, FormatFq2LscLsb>(&val_7), 1);
-        assert!(std::option::is_none(&deserialize<Fq2, FormatFq2LscLsb>(&x"ffff")), 1);
-
-        // Negation.
-        let val_minus_7 = neg(&val_7);
-        assert!(FQ2_VAL_7_NEG_SERIALIZED == serialize<Fq2, FormatFq2LscLsb>(&val_minus_7), 1);
-
-        // Addition.
-        let val_9 = from_u64<Fq2>(9);
-        let val_2 = from_u64<Fq2>(2);
-        assert!(eq(&val_2, &add(&val_minus_7, &val_9)), 1);
-
-        // Subtraction.
-        assert!(eq(&val_9, &sub(&val_2, &val_minus_7)), 1);
-
-        // Multiplication.
-        let val_63 = from_u64<Fq2>(63);
-        assert!(eq(&val_63, &mul(&val_7, &val_9)), 1);
-
-        // division.
-        let val_0 = from_u64<Fq2>(0);
-        assert!(eq(&val_7, &std::option::extract(&mut div(&val_63, &val_9))), 1);
-        assert!(std::option::is_none(&div(&val_63, &val_0)), 1);
-
-        // Inversion.
-        assert!(eq(&val_minus_7, &neg(&val_7)), 1);
-        assert!(std::option::is_none(&inv(&val_0)), 1);
-
-        // Squaring.
-        let val_x = rand_insecure<Fq2>();
-        assert!(eq(&mul(&val_x, &val_x), &sqr(&val_x)), 1);
     }
 
 

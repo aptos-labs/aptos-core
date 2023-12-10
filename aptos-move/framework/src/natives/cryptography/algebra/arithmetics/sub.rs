@@ -4,8 +4,8 @@ use crate::{
     abort_unless_arithmetics_enabled_for_structure, abort_unless_feature_flag_enabled,
     ark_binary_op_internal,
     natives::cryptography::algebra::{
-        abort_invariant_violated, feature_flag_from_structure, AlgebraContext, BN254Structure,
-        Structure, E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        abort_invariant_violated, feature_flag_from_structure, AlgebraContext, Structure,
+        E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
     },
     safe_borrow_element, store_element, structure_from_ty_arg,
 };
@@ -63,59 +63,43 @@ pub fn sub_internal(
             div,
             ALGEBRA_ARK_BLS12_381_FQ12_DIV
         ),
-        Some(Structure::BN254(s)) => sub_internal_bn254(context, args, s),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
-    }
-}
 
-fn sub_internal_bn254(
-    context: &mut SafeNativeContext,
-    mut args: VecDeque<Value>,
-    structure: BN254Structure,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    match structure {
-        BN254Structure::BN254Fr => {
+        Some(Structure::BN254Fr) => {
             ark_binary_op_internal!(context, args, ark_bn254::Fr, sub, ALGEBRA_ARK_BN254_FR_SUB)
         },
-        BN254Structure::BN254Fq => {
+        Some(Structure::BN254Fq) => {
             ark_binary_op_internal!(context, args, ark_bn254::Fq, sub, ALGEBRA_ARK_BN254_FQ_SUB)
         },
-        BN254Structure::BN254Fq2 => ark_binary_op_internal!(
-            context,
-            args,
-            ark_bn254::Fq2,
-            sub,
-            ALGEBRA_ARK_BN254_FQ2_SUB
-        ),
-        BN254Structure::BN254Fq12 => ark_binary_op_internal!(
+        Some(Structure::BN254Fq12) => ark_binary_op_internal!(
             context,
             args,
             ark_bn254::Fq12,
             sub,
             ALGEBRA_ARK_BN254_FQ12_SUB
         ),
-        BN254Structure::BN254G1 => ark_binary_op_internal!(
+        Some(Structure::BN254G1) => ark_binary_op_internal!(
             context,
             args,
             ark_bn254::G1Projective,
             sub,
             ALGEBRA_ARK_BN254_G1_PROJ_SUB
         ),
-        BN254Structure::BN254G2 => ark_binary_op_internal!(
+        Some(Structure::BN254G2) => ark_binary_op_internal!(
             context,
             args,
             ark_bn254::G2Projective,
             sub,
             ALGEBRA_ARK_BN254_G2_PROJ_SUB
         ),
-        BN254Structure::BN254Gt => ark_binary_op_internal!(
+        Some(Structure::BN254Gt) => ark_binary_op_internal!(
             context,
             args,
             ark_bn254::Fq12,
             div,
             ALGEBRA_ARK_BN254_FQ12_DIV
         ),
+        _ => Err(SafeNativeError::Abort {
+            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        }),
     }
 }

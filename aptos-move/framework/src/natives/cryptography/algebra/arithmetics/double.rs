@@ -4,8 +4,8 @@ use crate::{
     abort_unless_arithmetics_enabled_for_structure, abort_unless_feature_flag_enabled,
     ark_unary_op_internal,
     natives::cryptography::algebra::{
-        abort_invariant_violated, feature_flag_from_structure, AlgebraContext, BN254Structure,
-        Structure, E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        abort_invariant_violated, feature_flag_from_structure, AlgebraContext, Structure,
+        E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
     },
     safe_borrow_element, store_element, structure_from_ty_arg,
 };
@@ -47,34 +47,21 @@ pub fn double_internal(
             square,
             ALGEBRA_ARK_BLS12_381_FQ12_SQUARE
         ),
-        Some(Structure::BN254(s)) => double_internal_bn254(context, args, s),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
-    }
-}
-
-fn double_internal_bn254(
-    context: &mut SafeNativeContext,
-    mut args: VecDeque<Value>,
-    structure: BN254Structure,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    match structure {
-        BN254Structure::BN254G1 => ark_unary_op_internal!(
+        Some(Structure::BN254G1) => ark_unary_op_internal!(
             context,
             args,
             ark_bn254::G1Projective,
             double,
             ALGEBRA_ARK_BN254_G1_PROJ_DOUBLE
         ),
-        BN254Structure::BN254G2 => ark_unary_op_internal!(
+        Some(Structure::BN254G2) => ark_unary_op_internal!(
             context,
             args,
             ark_bn254::G2Projective,
             double,
             ALGEBRA_ARK_BN254_G2_PROJ_DOUBLE
         ),
-        BN254Structure::BN254Gt => ark_unary_op_internal!(
+        Some(Structure::BN254Gt) => ark_unary_op_internal!(
             context,
             args,
             ark_bn254::Fq12,

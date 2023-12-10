@@ -36,7 +36,7 @@ Fq2(1948587475175935477102423926102172050579061846930172106556463129645245747837
 266929791119991161246907387137283842545076965332900288569378510910307636690)
 
 
-Currently-supported BN254 structures include <code><a href="bn254_algebra.md#0x1_bn254_algebra_Fq12">Fq12</a></code>, <code><a href="bn254_algebra.md#0x1_bn254_algebra_Fr">Fr</a></code>, <code><a href="bn254_algebra.md#0x1_bn254_algebra_Fq">Fq</a></code>, <code><a href="bn254_algebra.md#0x1_bn254_algebra_Fq2">Fq2</a></code>, <code><a href="bn254_algebra.md#0x1_bn254_algebra_G1">G1</a></code>, <code><a href="bn254_algebra.md#0x1_bn254_algebra_G2">G2</a></code> and <code><a href="bn254_algebra.md#0x1_bn254_algebra_Gt">Gt</a></code>,
+Currently-supported BN254 structures include <code><a href="bn254_algebra.md#0x1_bn254_algebra_Fq12">Fq12</a></code>, <code><a href="bn254_algebra.md#0x1_bn254_algebra_Fr">Fr</a></code>, <code><a href="bn254_algebra.md#0x1_bn254_algebra_Fq">Fq</a></code>, <code>Fq2</code>, <code><a href="bn254_algebra.md#0x1_bn254_algebra_G1">G1</a></code>, <code><a href="bn254_algebra.md#0x1_bn254_algebra_G2">G2</a></code> and <code><a href="bn254_algebra.md#0x1_bn254_algebra_Gt">Gt</a></code>,
 along with their widely-used serialization formats,
 the pairing between <code><a href="bn254_algebra.md#0x1_bn254_algebra_G1">G1</a></code>, <code><a href="bn254_algebra.md#0x1_bn254_algebra_G2">G2</a></code> and <code><a href="bn254_algebra.md#0x1_bn254_algebra_Gt">Gt</a></code>.
 
@@ -44,15 +44,24 @@ Other unimplemented BN254 structures and serialization formats are also listed h
 as they help define some of the currently supported structures.
 Their implementation may also be added in the future.
 
+<code>Fq2</code>: The finite field $F_{q^2}$ that can be used as the base field of $G_2$
+which is an extension field of <code><a href="bn254_algebra.md#0x1_bn254_algebra_Fq">Fq</a></code>, constructed as $F_{q^2}=F_{q}[u]/(u^2+1)$.
+
+<code>FormatFq2LscLsb</code>: A serialization scheme for <code>Fq2</code> elements,
+where an element $(c_0+c_1\cdot u)$ is represented by a byte array <code>b[]</code> of size N=64,
+which is a concatenation of its coefficients serialized, with the least significant coefficient (LSC) coming first.
+- <code>b[0..32]</code> is $c_0$ serialized using <code>FormatFqLscLsb</code>.
+- <code>b[32..64]</code> is $c_1$ serialized using <code>FormatFqLscLsb</code>.
+
 <code>Fq6</code>: the finite field $F_{q^6}$ used in BN254 curves,
-which is an extension field of <code><a href="bn254_algebra.md#0x1_bn254_algebra_Fq2">Fq2</a></code>, constructed as $F_{q^6}=F_{q^2}[v]/(v^3-u-9)$.
+which is an extension field of <code>Fq2</code>, constructed as $F_{q^6}=F_{q^2}[v]/(v^3-u-9)$.
 
 <code>FormatFq6LscLsb</code>: a serialization scheme for <code>Fq6</code> elements,
 where an element in the form $(c_0+c_1\cdot v+c_2\cdot v^2)$ is represented by a byte array <code>b[]</code> of size 192,
 which is a concatenation of its coefficients serialized, with the least significant coefficient (LSC) coming first:
-- <code>b[0..64]</code> is $c_0$ serialized using <code><a href="bn254_algebra.md#0x1_bn254_algebra_FormatFq2LscLsb">FormatFq2LscLsb</a></code>.
-- <code>b[64..128]</code> is $c_1$ serialized using <code><a href="bn254_algebra.md#0x1_bn254_algebra_FormatFq2LscLsb">FormatFq2LscLsb</a></code>.
-- <code>b[128..192]</code> is $c_2$ serialized using <code><a href="bn254_algebra.md#0x1_bn254_algebra_FormatFq2LscLsb">FormatFq2LscLsb</a></code>.
+- <code>b[0..64]</code> is $c_0$ serialized using <code>FormatFq2LscLsb</code>.
+- <code>b[64..128]</code> is $c_1$ serialized using <code>FormatFq2LscLsb</code>.
+- <code>b[128..192]</code> is $c_2$ serialized using <code>FormatFq2LscLsb</code>.
 
 <code>G1Full</code>: a group constructed by the points on the BN254 curve $E(F_q): y^2=x^3+3$ and the point at infinity,
 under the elliptic curve point addition.
@@ -70,8 +79,6 @@ It contains the prime-order subgroup $G_2$ used in pairing.
 -  [Struct `Fq`](#0x1_bn254_algebra_Fq)
 -  [Struct `FormatFqLsb`](#0x1_bn254_algebra_FormatFqLsb)
 -  [Struct `FormatFqMsb`](#0x1_bn254_algebra_FormatFqMsb)
--  [Struct `Fq2`](#0x1_bn254_algebra_Fq2)
--  [Struct `FormatFq2LscLsb`](#0x1_bn254_algebra_FormatFq2LscLsb)
 -  [Struct `Fq12`](#0x1_bn254_algebra_Fq12)
 -  [Struct `FormatFq12LscLsb`](#0x1_bn254_algebra_FormatFq12LscLsb)
 -  [Struct `G1`](#0x1_bn254_algebra_G1)
@@ -269,75 +276,14 @@ NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
 
 </details>
 
-<a id="0x1_bn254_algebra_Fq2"></a>
-
-## Struct `Fq2`
-
-The finite field $F_{q^2}$ that can be used as the base field of $G_2$
-which is an extension field of <code><a href="bn254_algebra.md#0x1_bn254_algebra_Fq">Fq</a></code>, constructed as $F_{q^2}=F_{q}[u]/(u^2+1)$.
-
-
-<pre><code><b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_Fq2">Fq2</a>
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>dummy_field: bool</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a id="0x1_bn254_algebra_FormatFq2LscLsb"></a>
-
-## Struct `FormatFq2LscLsb`
-
-A serialization scheme for <code><a href="bn254_algebra.md#0x1_bn254_algebra_Fq2">Fq2</a></code> elements,
-where an element $(c_0+c_1\cdot u)$ is represented by a byte array <code>b[]</code> of size N=64,
-which is a concatenation of its coefficients serialized, with the least significant coefficient (LSC) coming first.
-- <code>b[0..32]</code> is $c_0$ serialized using <code><a href="bn254_algebra.md#0x1_bn254_algebra_FormatFqLsb">FormatFqLsb</a></code>.
-- <code>b[32..64]</code> is $c_1$ serialized using <code><a href="bn254_algebra.md#0x1_bn254_algebra_FormatFqLsb">FormatFqLsb</a></code>.
-
-NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
-
-
-<pre><code><b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_FormatFq2LscLsb">FormatFq2LscLsb</a>
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>dummy_field: bool</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
 <a id="0x1_bn254_algebra_Fq12"></a>
 
 ## Struct `Fq12`
 
 The finite field $F_{q^12}$ used in BN254 curves,
 which is an extension field of <code>Fq6</code> (defined in the module documentation), constructed as $F_{q^12}=F_{q^6}[w]/(w^2-v)$.
+The field can downcast to <code><a href="bn254_algebra.md#0x1_bn254_algebra_Gt">Gt</a></code> if it's an element of the multiplicative subgroup <code><a href="bn254_algebra.md#0x1_bn254_algebra_Gt">Gt</a></code> of <code><a href="bn254_algebra.md#0x1_bn254_algebra_Fq12">Fq12</a></code>
+with a prime order $r$ = 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
 
 
 <pre><code><b>struct</b> <a href="bn254_algebra.md#0x1_bn254_algebra_Fq12">Fq12</a>
@@ -561,7 +507,7 @@ A serialization scheme for <code><a href="bn254_algebra.md#0x1_bn254_algebra_G2"
 
 Below is the serialization procedure that takes a <code><a href="bn254_algebra.md#0x1_bn254_algebra_G2">G2</a></code> element <code>p</code> and outputs a byte array of size N=128.
 1. Let <code>(x,y)</code> be the coordinates of <code>p</code> if <code>p</code> is on the curve, or <code>(0,0)</code> otherwise.
-1. Serialize <code>x</code> and <code>y</code> into <code>b_x[]</code> and <code>b_y[]</code> respectively using <code><a href="bn254_algebra.md#0x1_bn254_algebra_FormatFq2LscLsb">FormatFq2LscLsb</a></code>.
+1. Serialize <code>x</code> and <code>y</code> into <code>b_x[]</code> and <code>b_y[]</code> respectively using <code>FormatFq2LscLsb</code> (defined in the module documentation).
 1. Concatenate <code>b_x[]</code> and <code>b_y[]</code> into <code>b[]</code>.
 1. If <code>p</code> is the point at infinity, set the infinity bit: <code>b[N-1]: = b[N-1] | 0b0100_0000</code>.
 1. If <code>y &gt; -y</code>, set the lexicographical bit:  <code>b[N-1]: = b[N-1] | 0b1000_0000</code>.
@@ -571,8 +517,8 @@ Below is the deserialization procedure that takes a byte array <code>b[]</code> 
 1. If the size of <code>b[]</code> is not N, return none.
 1. Compute the infinity flag as <code>b[N-1] & 0b0100_0000 != 0</code>.
 1. If the infinity flag is set, return the point at infinity.
-1. Deserialize <code>[b[0], b[1], ..., b[N/2-1]]</code> to <code>x</code> using <code><a href="bn254_algebra.md#0x1_bn254_algebra_FormatFq2LscLsb">FormatFq2LscLsb</a></code>. If <code>x</code> is none, return none.
-1. Deserialize <code>[b[N/2], ..., b[N] & 0b0011_1111]</code> to <code>y</code> using <code><a href="bn254_algebra.md#0x1_bn254_algebra_FormatFq2LscLsb">FormatFq2LscLsb</a></code>. If <code>y</code> is none, return none.
+1. Deserialize <code>[b[0], b[1], ..., b[N/2-1]]</code> to <code>x</code> using <code>FormatFq2LscLsb</code>. If <code>x</code> is none, return none.
+1. Deserialize <code>[b[N/2], ..., b[N] & 0b0011_1111]</code> to <code>y</code> using <code>FormatFq2LscLsb</code>. If <code>y</code> is none, return none.
 1. Check if <code>(x,y)</code> is on curve <code>E</code>. If not, return none.
 1. Check if <code>(x,y)</code> is in the subgroup of order <code>r</code>. If not, return none.
 1. Return <code>(x,y)</code>.
@@ -609,7 +555,7 @@ A serialization scheme for <code><a href="bn254_algebra.md#0x1_bn254_algebra_G1"
 
 Below is the serialization procedure that takes a <code><a href="bn254_algebra.md#0x1_bn254_algebra_G1">G1</a></code> element <code>p</code> and outputs a byte array of size N=64.
 1. Let <code>(x,y)</code> be the coordinates of <code>p</code> if <code>p</code> is on the curve, or <code>(0,0)</code> otherwise.
-1. Serialize <code>x</code> into <code>b[]</code> using <code><a href="bn254_algebra.md#0x1_bn254_algebra_FormatFq2LscLsb">FormatFq2LscLsb</a></code> (defined in the module documentation).
+1. Serialize <code>x</code> into <code>b[]</code> using <code>FormatFq2LscLsb</code> (defined in the module documentation).
 1. If <code>p</code> is the point at infinity, set the infinity bit: <code>b[N-1]: = b[N-1] | 0b0100_0000</code>.
 1. If <code>y &gt; -y</code>, set the lexicographical flag: <code>b[N-1] := b[N-1] | 0x1000_0000</code>.
 1. Return <code>b[]</code>.
@@ -619,7 +565,7 @@ Below is the deserialization procedure that takes a byte array <code>b[]</code> 
 1. Compute the infinity flag as <code>b[N-1] & 0b0100_0000 != 0</code>.
 1. If the infinity flag is set, return the point at infinity.
 1. Compute the lexicographical flag as <code>b[N-1] & 0b1000_0000 != 0</code>.
-1. Deserialize <code>[b[0], b[1], ..., b[N/2-1] & 0b0011_1111]</code> to <code>x</code> using <code><a href="bn254_algebra.md#0x1_bn254_algebra_FormatFq2LscLsb">FormatFq2LscLsb</a></code>. If <code>x</code> is none, return none.
+1. Deserialize <code>[b[0], b[1], ..., b[N/2-1] & 0b0011_1111]</code> to <code>x</code> using <code>FormatFq2LscLsb</code>. If <code>x</code> is none, return none.
 1. Solve the curve equation with <code>x</code> for <code>y</code>. If no such <code>y</code> exists, return none.
 1. Let <code>y'</code> be <code>max(y,-y)</code> if the lexicographical flag is set, or <code><b>min</b>(y,-y)</code> otherwise.
 1. Check if <code>(x,y')</code> is in the subgroup of order <code>r</code>. If not, return none.
@@ -654,7 +600,7 @@ NOTE: other implementation(s) using this format: ark-bn254-0.4.0.
 ## Struct `Gt`
 
 The group $G_t$ in BN254-based pairing $G_1 \times G_2 \rightarrow G_t$.
-It is a multiplicative subgroup of <code><a href="bn254_algebra.md#0x1_bn254_algebra_Fq12">Fq12</a></code>,
+It is a multiplicative subgroup of <code><a href="bn254_algebra.md#0x1_bn254_algebra_Fq12">Fq12</a></code>, so it  can upcast to <code><a href="bn254_algebra.md#0x1_bn254_algebra_Fq12">Fq12</a></code>.
 with a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
 (so <code><a href="bn254_algebra.md#0x1_bn254_algebra_Fr">Fr</a></code> is the scalar field).
 The identity of <code><a href="bn254_algebra.md#0x1_bn254_algebra_Gt">Gt</a></code> is 1.
