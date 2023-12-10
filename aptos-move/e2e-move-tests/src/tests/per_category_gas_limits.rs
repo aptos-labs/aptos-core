@@ -91,7 +91,7 @@ fn io_limit_reached_by_new_bytes() {
         // Allow 10 value bytes charged at most.
         gas_params.vm.txn.max_io_gas = 110_000_000.into();
         // Make the key bytes free, only play around value sizes.
-        gas_params.vm.txn.free_write_bytes_quota = state_key_size();
+        gas_params.vm.txn.legacy_free_write_bytes_quota = state_key_size();
     });
 
     test_create_multiple_items(&mut h, &acc, |status| {
@@ -112,7 +112,7 @@ fn storage_limit_reached_by_new_bytes() {
         // Allow 10 value bytes charged at most.
         gas_params.vm.txn.max_storage_fee = 11_000_000.into();
         // Make the key bytes free, only play around value sizes.
-        gas_params.vm.txn.free_write_bytes_quota = state_key_size();
+        gas_params.vm.txn.legacy_free_write_bytes_quota = state_key_size();
     });
 
     test_create_multiple_items(&mut h, &acc, |status| {
@@ -134,7 +134,7 @@ fn out_of_gas_while_charging_write_gas() {
         // Bump max gas allowed
         gas_params.vm.txn.maximum_number_of_gas_units = 1_000_000_000.into();
         // Make the key bytes free, only play around value sizes.
-        gas_params.vm.txn.free_write_bytes_quota = state_key_size();
+        gas_params.vm.txn.legacy_free_write_bytes_quota = state_key_size();
     });
     // Allow 10 value bytes charged at most. Notice this is in external units.
     h.set_max_gas_per_txn(110_000);
@@ -156,7 +156,7 @@ fn out_of_gas_while_charging_storage_fee() {
         // Bump max gas allowed
         gas_params.vm.txn.maximum_number_of_gas_units = 1_000_000_000.into();
         // Make the key bytes free, only play around value sizes.
-        gas_params.vm.txn.free_write_bytes_quota = state_key_size();
+        gas_params.vm.txn.legacy_free_write_bytes_quota = state_key_size();
     });
     // Allow 10 value bytes charged at most. Notice this is in external units,
     //   which is 1/100x octas or 1Mx internal units.

@@ -93,6 +93,7 @@ pub enum FeatureFlag {
     VMBinaryFormatV7,
     ResourceGroupsChargeAsSizeSum,
     CommissionChangeDelegationPool,
+    EphemeralBytesFee,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -244,6 +245,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::CommissionChangeDelegationPool => {
                 AptosFeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL
             },
+            FeatureFlag::EphemeralBytesFee => AptosFeatureFlag::EPHEMERAL_BYTES_FEE,
         }
     }
 }
@@ -318,6 +320,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL => {
                 FeatureFlag::CommissionChangeDelegationPool
             },
+            AptosFeatureFlag::EPHEMERAL_BYTES_FEE => FeatureFlag::EphemeralBytesFee,
         }
     }
 }

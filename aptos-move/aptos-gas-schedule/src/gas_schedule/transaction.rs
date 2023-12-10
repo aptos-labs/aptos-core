@@ -107,8 +107,8 @@ crate::gas_schedule::macros::define_gas_parameters!(
         ],
         [memory_quota: AbstractValueSize, { 1.. => "memory_quota" }, 10_000_000],
         [
-            free_write_bytes_quota: NumBytes,
-            { 5.. => "free_write_bytes_quota" },
+            legacy_free_write_bytes_quota: NumBytes,
+            { 5..=11 => "free_write_bytes_quota", 12.. => "legacy_free_write_bytes_quota" },
             1024, // 1KB free per state write
         ],
         [

@@ -50,6 +50,7 @@ pub enum FeatureFlag {
     VM_BINARY_FORMAT_V7 = 40,
     RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM = 41,
     COMMISSION_CHANGE_DELEGATION_POOL = 42,
+    EPHEMERAL_BYTES_FEE = 43,
 }
 
 /// Representation of features on chain as a bitset.
@@ -73,6 +74,7 @@ impl Default for Features {
         features.enable(APTOS_UNIQUE_IDENTIFIERS);
         features.enable(SIGNATURE_CHECKER_V2_SCRIPT_FIX);
         features.enable(AGGREGATOR_V2_API);
+        features.enable(EPHEMERAL_BYTES_FEE);
 
         features
     }
@@ -142,5 +144,9 @@ impl Features {
 
     pub fn is_resource_group_charge_as_size_sum_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM)
+    }
+
+    pub fn is_ephemeral_bytes_fee_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::EPHEMERAL_BYTES_FEE)
     }
 }

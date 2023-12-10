@@ -10,7 +10,7 @@ use aptos_gas_schedule::{
     AptosGasParameters, VMGasParameters,
 };
 use aptos_types::{
-    on_chain_config::{ConfigStorage, StorageGasSchedule},
+    on_chain_config::{ConfigStorage, Features, StorageGasSchedule},
     state_store::state_key::StateKey,
     write_set::WriteOpSize,
 };
@@ -84,7 +84,7 @@ impl IoPricingV1 {
 
 #[derive(Clone, Debug)]
 pub struct IoPricingV2 {
-    pub feature_version: u64,
+    pub gas_feature_version: u64,
     pub free_write_bytes_quota: NumBytes,
     pub per_item_read: InternalGasPerArg,
     pub per_item_create: InternalGasPerArg,
@@ -96,13 +96,16 @@ pub struct IoPricingV2 {
 
 impl IoPricingV2 {
     pub fn new_with_storage_curves(
-        feature_version: u64,
+        gas_feature_version: u64,
         storage_gas_schedule: &StorageGasSchedule,
         gas_params: &AptosGasParameters,
     ) -> Self {
         Self {
-            feature_version,
-            free_write_bytes_quota: Self::get_free_write_bytes_quota(feature_version, gas_params),
+            gas_feature_version,
+            free_write_bytes_quota: Self::get_free_write_bytes_quota(
+                gas_feature_version,
+                gas_params,
+            ),
             per_item_read: storage_gas_schedule.per_item_read.into(),
             per_item_create: storage_gas_schedule.per_item_create.into(),
             per_item_write: storage_gas_schedule.per_item_write.into(),
@@ -113,21 +116,21 @@ impl IoPricingV2 {
     }
 
     fn get_free_write_bytes_quota(
-        feature_version: u64,
+        gas_feature_version: u64,
         gas_params: &AptosGasParameters,
     ) -> NumBytes {
-        match feature_version {
+        match gas_feature_version {
             0 => unreachable!("PricingV2 not applicable for feature version 0"),
             1..=2 => 0.into(),
             3..=4 => 1024.into(),
-            5.. => gas_params.vm.txn.free_write_bytes_quota,
+            5.. => gas_params.vm.txn.legacy_free_write_bytes_quota,
         }
     }
 
     fn write_op_size(&self, key: &StateKey, value_size: u64) -> NumBytes {
         let value_size = NumBytes::new(value_size);
 
-        if self.feature_version >= 3 {
+        if self.gas_feature_version >= 3 {
             let key_size = NumBytes::new(key.size() as u64);
             (key_size + value_size)
                 .checked_sub(self.free_write_bytes_quota)
@@ -166,7 +169,7 @@ impl IoPricingV2 {
 // No storage curve. New gas parameter representation.
 #[derive(Debug, Clone)]
 pub struct IoPricingV3 {
-    pub feature_version: u64,
+    pub gas_feature_version: u64,
     pub free_write_bytes_quota: NumBytes,
 }
 
@@ -213,27 +216,35 @@ pub enum IoPricing {
 
 impl IoPricing {
     pub fn new(
-        feature_version: u64,
+        gas_feature_version: u64,
+        features: &Features,
         gas_params: &AptosGasParameters,
         config_storage: &impl ConfigStorage,
     ) -> IoPricing {
         use aptos_types::on_chain_config::OnChainConfig;
         use IoPricing::*;
 
-        match feature_version {
+        match gas_feature_version {
             0 => V1(IoPricingV1::new(gas_params)),
             1..=9 => match StorageGasSchedule::fetch_config(config_storage) {
                 None => V1(IoPricingV1::new(gas_params)),
                 Some(schedule) => V2(IoPricingV2::new_with_storage_curves(
-                    feature_version,
+                    gas_feature_version,
                     &schedule,
                     gas_params,
                 )),
             },
-            10.. => V3(IoPricingV3 {
-                feature_version,
-                free_write_bytes_quota: gas_params.vm.txn.free_write_bytes_quota,
-            }),
+            10.. => {
+                let free_write_bytes_quota = if features.is_ephemeral_bytes_fee_enabled() {
+                    NumBytes::zero()
+                } else {
+                    gas_params.vm.txn.legacy_free_write_bytes_quota
+                };
+                V3(IoPricingV3 {
+                    gas_feature_version,
+                    free_write_bytes_quota,
+                })
+            },
         }
     }
 
