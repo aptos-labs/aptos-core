@@ -13,7 +13,7 @@ use crate::bench_utils::{
     bench_function_pow_u256, bench_function_serialize_uncomp, bench_function_square,
     bench_function_sub,
 };
-use ark_bn254::{Fq, Fq12, Fq2, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
+use ark_bn254::{Fq, Fq12, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_ec::{pairing::Pairing, short_weierstrass::Projective, AffineRepr, CurveGroup, Group};
 use ark_ff::{UniformRand, Zero};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
