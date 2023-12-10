@@ -80,21 +80,6 @@ fn bench_group(c: &mut Criterion) {
     group.bench_function("fq_square", bench_function_square::<Fq>);
     group.bench_function("fq_sub", bench_function_sub::<Fq>);
 
-    group.bench_function("fq2_add", bench_function_add::<Fq2>);
-    group.bench_function("fq2_clone", bench_function_clone::<Fq2>);
-    group.bench_function("fq2_deser", bench_function_deser_uncomp::<Fq2>);
-    group.bench_function("fq2_div", bench_function_div::<Fq2>);
-    group.bench_function("fq2_double", bench_function_double::<Fq2>);
-    group.bench_function("fq2_eq", bench_function_eq::<Fq2>);
-    group.bench_function("fq2_from_u64", bench_function_from_u64::<Fq2>);
-    group.bench_function("fq2_inv", bench_function_inv::<Fq2>);
-    group.bench_function("fq2_mul", bench_function_mul::<Fq2>);
-    group.bench_function("fq2_neg", bench_function_neg::<Fq2>);
-    group.bench_function("fq2_pow_u256", bench_function_pow_u256::<Fq2>);
-    group.bench_function("fq2_serialize", bench_function_serialize_uncomp::<Fq2>);
-    group.bench_function("fq2_square", bench_function_square::<Fq2>);
-    group.bench_function("fq2_sub", bench_function_sub::<Fq2>);
-
     group.bench_function("fq12_add", bench_function_add::<Fq12>);
     group.bench_function("fq12_clone", bench_function_clone::<Fq12>);
     group.bench_function("fq12_deser", bench_function_deser_uncomp::<Fq12>);
