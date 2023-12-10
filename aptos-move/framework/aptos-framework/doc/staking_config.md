@@ -1032,6 +1032,8 @@ Can only be called as part of the Aptos governance proposal process established 
 <pre><code><b>invariant</b> rewards_rate &lt;= <a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">MAX_REWARDS_RATE</a>;
 <b>invariant</b> rewards_rate_denominator &gt; 0;
 <b>invariant</b> rewards_rate &lt;= rewards_rate_denominator;
+<b>invariant</b> recurring_lockup_duration_secs &gt; 0;
+<b>invariant</b> voting_power_increase_limit &gt; 0 && voting_power_increase_limit &lt;= 50;
 </code></pre>
 
 

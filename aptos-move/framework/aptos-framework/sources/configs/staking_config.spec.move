@@ -13,6 +13,8 @@ spec aptos_framework::staking_config {
         invariant rewards_rate <= MAX_REWARDS_RATE;
         invariant rewards_rate_denominator > 0;
         invariant rewards_rate <= rewards_rate_denominator;
+        invariant recurring_lockup_duration_secs > 0;
+        invariant voting_power_increase_limit > 0 && voting_power_increase_limit <= 50;
     }
 
     spec StakingRewardsConfig {
