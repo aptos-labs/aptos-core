@@ -124,8 +124,8 @@ crate::gas_schedule::macros::define_gas_parameters!(
             1024, // 1KB free per state write
         ],
         [
-            free_event_bytes_quota: NumBytes,
-            { 7.. => "free_event_bytes_quota" },
+            legacy_free_event_bytes_quota: NumBytes,
+            { 7..=12 => "free_event_bytes_quota", 13.. => "legacy_free_event_bytes_quota" },
             1024, // 1KB free event bytes per transaction
         ],
         [
@@ -154,23 +154,36 @@ crate::gas_schedule::macros::define_gas_parameters!(
             8192,
         ],
         [
-            storage_fee_per_state_slot_create: FeePerSlot,
-            { 7.. => "storage_fee_per_state_slot_create" },
+            legacy_storage_fee_per_state_slot_create: FeePerSlot,
+            { 7..=12 => "storage_fee_per_state_slot_create", 13 => "legacy_storage_fee_per_state_slot_create" },
             50000,
         ],
         [
-            storage_fee_per_excess_state_byte: FeePerByte,
-            { 7.. => "storage_fee_per_excess_state_byte" },
+            storage_fee_per_state_slot: FeePerSlot,
+            { 13.. => "storage_fee_per_state_slot" },
+            // 1 million APT for 2 billion state slots
+            // FIXME(aldenhu): maybe make it cheaper to compensate for bytes fee
+            50_000,
+        ],
+        [
+            legacy_storage_fee_per_excess_state_byte: FeePerByte,
+            { 7..=12 => "storage_fee_per_excess_state_byte", 13 => "legacy_storage_fee_per_excess_state_byte" },
             50,
         ],
         [
-            storage_fee_per_event_byte: FeePerByte,
-            { 7.. => "storage_fee_per_event_byte" },
+            storage_fee_per_state_byte: FeePerByte,
+            { 13.. => "storage_fee_per_state_byte" },
+            // 1 million APT for 4 TB state bytes
+            25,
+        ],
+        [
+            legacy_storage_fee_per_event_byte: FeePerByte,
+            { 7..=12 => "storage_fee_per_event_byte", 13 => "legacy_storage_fee_per_event_byte" },
             20,
         ],
         [
-            storage_fee_per_transaction_byte: FeePerByte,
-            { 7.. => "storage_fee_per_transaction_byte" },
+            legacy_storage_fee_per_transaction_byte: FeePerByte,
+            { 7..=12 => "storage_fee_per_transaction_byte", 13 => "legacy_storage_fee_per_transaction_byte" },
             20,
         ],
         [

@@ -101,6 +101,7 @@ pub enum FeatureFlag {
     RemoveDetailedError,
     JWKConsensus,
     ConcurrentFungibleAssets,
+    RefundableBytes,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -260,6 +261,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::RemoveDetailedError => AptosFeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH,
             FeatureFlag::JWKConsensus => AptosFeatureFlag::JWK_CONSENSUS,
             FeatureFlag::ConcurrentFungibleAssets => AptosFeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
+            FeatureFlag::RefundableBytes => AptosFeatureFlag::REFUNDABLE_BYTES,
         }
     }
 }
@@ -342,6 +344,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH => FeatureFlag::RemoveDetailedError,
             AptosFeatureFlag::JWK_CONSENSUS => FeatureFlag::JWKConsensus,
             AptosFeatureFlag::CONCURRENT_FUNGIBLE_ASSETS => FeatureFlag::ConcurrentFungibleAssets,
+            AptosFeatureFlag::REFUNDABLE_BYTES => FeatureFlag::RefundableBytes,
         }
     }
 }
