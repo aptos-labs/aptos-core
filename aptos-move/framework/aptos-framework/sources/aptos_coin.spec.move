@@ -15,6 +15,8 @@ spec aptos_framework::aptos_coin {
         aborts_if exists<coin::CoinInfo<AptosCoin>>(addr);
         aborts_if !exists<aggregator_factory::AggregatorFactory>(addr);
         ensures exists<MintCapStore>(addr);
+        // property 3: The abilities to mint Aptos tokens should be transferable, duplicatable, and destroyable.
+        ensures global<MintCapStore>(addr).mint_cap ==  MintCapability<AptosCoin> {};
         ensures exists<coin::CoinInfo<AptosCoin>>(addr);
         ensures result_1 == BurnCapability<AptosCoin> {};
         ensures result_2 == MintCapability<AptosCoin> {};
