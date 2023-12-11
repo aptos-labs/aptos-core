@@ -4,8 +4,9 @@ use crate::{
     abort_unless_arithmetics_enabled_for_structure, abort_unless_feature_flag_enabled,
     natives::cryptography::algebra::{
         feature_flag_from_structure, AlgebraContext, Structure, BLS12381_GT_GENERATOR,
-        BLS12381_Q12_LENDIAN, BLS12381_R_LENDIAN, BN254_GT_GENERATOR, BN254_Q12_LENDIAN, BN254_Q_LENDIAN, BN254_R_LENDIAN, E_TOO_MUCH_MEMORY_USED,
-        MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        BLS12381_Q12_LENDIAN, BLS12381_R_LENDIAN, BN254_GT_GENERATOR, BN254_Q12_LENDIAN,
+        BN254_Q_LENDIAN, BN254_R_LENDIAN, E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
+        MOVE_ABORT_CODE_NOT_IMPLEMENTED,
     },
     store_element, structure_from_ty_arg,
 };
