@@ -1,0 +1,38 @@
+# These are used for aggregation purposes in central logging
+chain:
+  name:
+logger:
+  name:
+
+logging:
+  vector:
+    verifyServer: # default is true
+    logToFile: false
+    image:
+      repo: timberio/vector
+      tag: 0.20.0-alpine@sha256:1b6a76585ccb0a764b6374fe448825f1f46d40c3a05473337dad7c2e1f7322b5
+      pullPolicy: IfNotPresent
+    resources:
+      limits:
+        cpu: 1.5
+        memory: 2Gi
+      requests:
+        cpu: 1
+        memory: 1.5Gi
+    outputs: []
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name:
+
+# please do not send to pre/mainnet central logging
+loggingClientCert: ""
+loggingClientKey: ""
+loggingCA: ""
+loggingCentralHost: ""

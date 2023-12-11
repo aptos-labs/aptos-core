@@ -1,0 +1,13 @@
+processed 1 task
+
+task 0 'run'. lines 1-12:
+Error: error[E01002]: unexpected token
+   ┌─ TEMPFILE:10:9
+   │
+10 │         assert!(move x == 5, 42);
+   │         ^^^^^^
+   │         │
+   │         Unexpected 'assert'
+   │         Expected ';'
+
+

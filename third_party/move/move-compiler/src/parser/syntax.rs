@@ -931,8 +931,10 @@ fn parse_sequence(context: &mut Context) -> Result<Sequence, Box<Diagnostic>> {
 //          | "return" <Exp>?
 //          | "abort" "{" <Exp> "}"
 //          | "abort" <Exp>
+//          | "for" "(" <Exp> "in" <Exp> ".." <Exp> ")" "{" <Exp> "}"
 fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     const VECTOR_IDENT: &str = "vector";
+    const FOR_IDENT: &str = "for";
 
     let start_loc = context.tokens.start_loc();
     let term = match context.tokens.peek() {
@@ -941,8 +943,17 @@ fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
             if !ends_in_block || at_end_of_exp(context) {
                 return Ok(control_exp);
             }
-
             return parse_binop_exp(context, control_exp, /* min_prec */ 1);
+        },
+        Tok::Identifier
+            if context.tokens.content() == FOR_IDENT
+                && matches!(context.tokens.lookahead_nth(1), Ok(Tok::LParen))
+                && matches!(context.tokens.lookahead_nth(3), Ok(Tok::Identifier)) =>
+        {
+            let (control_exp, _) = parse_for_loop(context)?;
+            // for loop isn't useful in an expression, so we ignore second result from
+            // `parse_for_loop` and never call `parse_binop_exp` (as might be done for some other
+            return Ok(control_exp);
         },
         Tok::Break => {
             context.tokens.advance()?;
@@ -1078,6 +1089,63 @@ fn is_control_exp(tok: Tok) -> bool {
     )
 }
 
+fn parse_exp_or_control_sequence(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>> {
+    if let Tok::LBrace = context.tokens.peek() {
+        let start_loc = context.tokens.start_loc();
+        consume_token(context.tokens, Tok::LBrace)?;
+
+        let block_ = Exp_::Block(parse_sequence(context)?);
+        let end_loc = context.tokens.previous_end_loc();
+
+        let exp = spanned(context.tokens.file_hash(), start_loc, end_loc, block_);
+
+        Ok((exp, true))
+    } else {
+        Ok((parse_exp(context)?, false))
+    }
+}
+
+fn parse_spec_while_loop(
+    context: &mut Context,
+    condition: Exp,
+    ends_in_block: bool,
+) -> Result<(Exp, bool), Box<Diagnostic>> {
+    if context.tokens.peek() == Tok::Spec {
+        let spec_seq = parse_spec_loop_invariant(context)?;
+        let loc = condition.loc;
+        let spec_block = Exp_::Block((vec![], vec![spec_seq], None, Box::new(Some(condition))));
+        Ok((sp(loc, spec_block), true))
+    } else {
+        Ok((condition, ends_in_block))
+    }
+}
+
+fn parse_spec_loop_invariant(context: &mut Context) -> Result<SequenceItem, Box<Diagnostic>> {
+    // Parse a loop invariant. Also validate that only `invariant`
+    // properties are contained in the spec block. This is
+    // transformed into `while ({spec { .. }; cond) body`.
+    let spec = parse_spec_block(vec![], context)?;
+    for member in &spec.value.members {
+        match member.value {
+            // Ok
+            SpecBlockMember_::Condition {
+                kind: sp!(_, SpecConditionKind_::Invariant(..)),
+                ..
+            } => (),
+            _ => {
+                return Err(Box::new(diag!(
+                    Syntax::InvalidSpecBlockMember,
+                    (member.loc, "only 'invariant' allowed here")
+                )))
+            },
+        }
+    }
+    Ok(sp(
+        spec.loc,
+        SequenceItem_::Seq(Box::new(sp(spec.loc, Exp_::Spec(spec)))),
+    ))
+}
+
 // if there is a block, only parse the block, not any subsequent tokens
 // e.g.           if (cond) e1 else { e2 } + 1
 // should be,    (if (cond) e1 else { e2 }) + 1
@@ -1085,24 +1153,6 @@ fn is_control_exp(tok: Tok) -> bool {
 // But otherwise, if (cond) e1 else e2 + 1
 // should be,     if (cond) e1 else (e2 + 1)
 fn parse_control_exp(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>> {
-    fn parse_exp_or_sequence(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>> {
-        match context.tokens.peek() {
-            Tok::LBrace => {
-                let block_start_loc = context.tokens.start_loc();
-                context.tokens.advance()?; // consume the LBrace
-                let block_ = Exp_::Block(parse_sequence(context)?);
-                let block_end_loc = context.tokens.previous_end_loc();
-                let exp = spanned(
-                    context.tokens.file_hash(),
-                    block_start_loc,
-                    block_end_loc,
-                    block_,
-                );
-                Ok((exp, true))
-            },
-            _ => Ok((parse_exp(context)?, false)),
-        }
-    }
     let start_loc = context.tokens.start_loc();
     let (exp_, ends_in_block) = match context.tokens.peek() {
         Tok::If => {
@@ -1110,9 +1160,9 @@ fn parse_control_exp(context: &mut Context) -> Result<(Exp, bool), Box<Diagnosti
             consume_token(context.tokens, Tok::LParen)?;
             let eb = Box::new(parse_exp(context)?);
             consume_token(context.tokens, Tok::RParen)?;
-            let (et, ends_in_block) = parse_exp_or_sequence(context)?;
+            let (et, ends_in_block) = parse_exp_or_control_sequence(context)?;
             let (ef, ends_in_block) = if match_token(context.tokens, Tok::Else)? {
-                let (ef, ends_in_block) = parse_exp_or_sequence(context)?;
+                let (ef, ends_in_block) = parse_exp_or_control_sequence(context)?;
                 (Some(Box::new(ef)), ends_in_block)
             } else {
                 (None, ends_in_block)
@@ -1124,42 +1174,13 @@ fn parse_control_exp(context: &mut Context) -> Result<(Exp, bool), Box<Diagnosti
             consume_token(context.tokens, Tok::LParen)?;
             let econd = parse_exp(context)?;
             consume_token(context.tokens, Tok::RParen)?;
-            let (eloop, ends_in_block) = parse_exp_or_sequence(context)?;
-            let (econd, ends_in_block) = if context.tokens.peek() == Tok::Spec {
-                // Parse a loop invariant. Also validate that only `invariant`
-                // properties are contained in the spec block. This is
-                // transformed into `while ({spec { .. }; cond) body`.
-                let spec = parse_spec_block(vec![], context)?;
-                for member in &spec.value.members {
-                    match member.value {
-                        // Ok
-                        SpecBlockMember_::Condition {
-                            kind: sp!(_, SpecConditionKind_::Invariant(..)),
-                            ..
-                        } => (),
-                        _ => {
-                            return Err(Box::new(diag!(
-                                Syntax::InvalidSpecBlockMember,
-                                (member.loc, "only 'invariant' allowed here")
-                            )))
-                        },
-                    }
-                }
-                let spec_seq = sp(
-                    spec.loc,
-                    SequenceItem_::Seq(Box::new(sp(spec.loc, Exp_::Spec(spec)))),
-                );
-                let loc = econd.loc;
-                let spec_block = Exp_::Block((vec![], vec![spec_seq], None, Box::new(Some(econd))));
-                (sp(loc, spec_block), true)
-            } else {
-                (econd, ends_in_block)
-            };
+            let (eloop, ends_in_block) = parse_exp_or_control_sequence(context)?;
+            let (econd, ends_in_block) = parse_spec_while_loop(context, econd, ends_in_block)?;
             (Exp_::While(Box::new(econd), Box::new(eloop)), ends_in_block)
         },
         Tok::Loop => {
             context.tokens.advance()?;
-            let (eloop, ends_in_block) = parse_exp_or_sequence(context)?;
+            let (eloop, ends_in_block) = parse_exp_or_control_sequence(context)?;
             (Exp_::Loop(Box::new(eloop)), ends_in_block)
         },
         Tok::Return => {
@@ -1167,14 +1188,14 @@ fn parse_control_exp(context: &mut Context) -> Result<(Exp, bool), Box<Diagnosti
             let (e, ends_in_block) = if !at_start_of_exp(context) {
                 (None, false)
             } else {
-                let (e, ends_in_block) = parse_exp_or_sequence(context)?;
+                let (e, ends_in_block) = parse_exp_or_control_sequence(context)?;
                 (Some(Box::new(e)), ends_in_block)
             };
             (Exp_::Return(e), ends_in_block)
         },
         Tok::Abort => {
             context.tokens.advance()?;
-            let (e, ends_in_block) = parse_exp_or_sequence(context)?;
+            let (e, ends_in_block) = parse_exp_or_control_sequence(context)?;
             (Exp_::Abort(Box::new(e)), ends_in_block)
         },
         _ => unreachable!(),
@@ -1182,6 +1203,186 @@ fn parse_control_exp(context: &mut Context) -> Result<(Exp, bool), Box<Diagnosti
     let end_loc = context.tokens.previous_end_loc();
     let exp = spanned(context.tokens.file_hash(), start_loc, end_loc, exp_);
     Ok((exp, ends_in_block))
+}
+
+// "for (iter in lower_bound..upper_bound) loop_body" transforms into
+// let iter = lower_bound;
+// let flag = false;
+// while (true) {
+//     if flag {
+//         iter = iter + 1;
+//     } else {
+//         flag = true;
+//     }
+//     if (i < upper_bound) {
+//         loop_body;
+//     } else {
+//         break
+//     }
+// }
+fn parse_for_loop(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>> {
+    const FOR_IDENT: &str = "for";
+    let start_loc = context.tokens.start_loc();
+
+    assert!(
+        matches!(context.tokens.peek(), Tok::Identifier)
+            && context.tokens.content() == FOR_IDENT
+            && matches!(context.tokens.lookahead(), Ok(Tok::LParen)),
+        "Syntax Error. Use syntax: for (iter in lower_bound..upper_bound) loop_body."
+    );
+    context.tokens.advance()?;
+
+    consume_token(context.tokens, Tok::LParen)?;
+    let iter = parse_identifier(context)?;
+    consume_identifier(context.tokens, "in")?;
+
+    let lb = parse_unary_exp(context)?;
+    consume_token(context.tokens, Tok::PeriodPeriod)?;
+    let ub = parse_unary_exp(context)?;
+
+    let spec_seq = if context.tokens.peek() == Tok::Spec {
+        Some(parse_spec_loop_invariant(context)?)
+    } else {
+        None
+    };
+
+    consume_token(context.tokens, Tok::RParen)?;
+    let (for_body, ends_in_block) = parse_exp_or_control_sequence(context)?;
+
+    let end_loc = context.tokens.previous_end_loc();
+
+    // Build corresponding expression:
+    // let iter = lower_bound;
+    // flag = false;
+    // loop {
+    //     if (flag) {
+    //         iter = iter + 1;
+    //     } else {
+    //         flag = true;
+    //     };
+    //     if (i < upper_bound) {
+    //         loop_body;
+    //     } else break;
+    // }
+    let for_loc = make_loc(context.tokens.file_hash(), start_loc, end_loc);
+
+    // Create assignment "let iter = lower_bound"
+    let iter_bind = sp(for_loc, Bind_::Var(Var(iter)));
+    let iter_bindlist = sp(for_loc, vec![iter_bind]);
+    let iter_init = sp(
+        iter.loc,
+        SequenceItem_::Bind(iter_bindlist, None, Box::new(lb)),
+    );
+
+    // To create the declaration "let flag = false", first create the variable flag, and then assign it to false
+    let flag_symb = Symbol::from("__update_iter_flag");
+    let flag = sp(for_loc, vec![sp(
+        for_loc,
+        Bind_::Var(Var(sp(for_loc, flag_symb))),
+    )]);
+    let false_exp = sp(for_loc, Exp_::Value(sp(for_loc, Value_::Bool(false))));
+    let decl_flag = sp(
+        for_loc,
+        SequenceItem_::Bind(flag, None, Box::new(false_exp)),
+    );
+
+    // Construct the increment "iter = iter + 1"
+    let one_exp = sp(
+        for_loc,
+        Exp_::Value(sp(for_loc, Value_::Num(Symbol::from("1")))),
+    );
+    let op_add = sp(for_loc, BinOp_::Add);
+    let iter_exp = sp(
+        for_loc,
+        Exp_::Name(sp(for_loc, NameAccessChain_::One(iter)), None),
+    );
+    let updated_exp = sp(
+        for_loc,
+        Exp_::BinopExp(Box::new(iter_exp.clone()), op_add, Box::new(one_exp)),
+    );
+    let update = sp(
+        for_loc,
+        Exp_::Assign(Box::new(iter_exp.clone()), Box::new(updated_exp)),
+    );
+
+    // Create the assignment "flag = true;"
+    let flag_exp = sp(
+        for_loc,
+        Exp_::Name(
+            sp(for_loc, NameAccessChain_::One(sp(for_loc, flag_symb))),
+            None,
+        ),
+    );
+    let true_exp = sp(for_loc, Exp_::Value(sp(for_loc, Value_::Bool(true))));
+    let assign_iter = sp(
+        for_loc,
+        Exp_::Assign(Box::new(flag_exp.clone()), Box::new(true_exp.clone())),
+    );
+
+    // construct flag conditional "if (flag) { update; } else { flag = true; }"
+    // let update = sp(
+    //     for_loc,
+    //     Exp_::Block((vec![], vec![update], None, Box::new(None))),
+    // );
+    let flag_conditional = sp(
+        for_loc,
+        Exp_::IfElse(
+            Box::new(flag_exp.clone()),
+            Box::new(update),
+            Some(Box::new(assign_iter)),
+        ),
+    );
+    let flag_conditional = sp(for_loc, SequenceItem_::Seq(Box::new(flag_conditional)));
+
+    // Create the condition "iter < upper_bound"
+    let op_le = sp(iter.loc, BinOp_::Lt);
+    let e = Exp_::BinopExp(Box::new(iter_exp.clone()), op_le, Box::new(ub));
+    let loop_condition = sp(iter.loc, e);
+
+    // Create the "if (loop_condition) { loop_body; } else break"
+    let loop_conditional = Exp_::IfElse(
+        Box::new(loop_condition),
+        Box::new(for_body),
+        Some(Box::new(sp(for_loc, Exp_::Break))),
+    );
+    let loop_conditional = sp(
+        for_loc,
+        SequenceItem_::Seq(Box::new(sp(for_loc, loop_conditional))),
+    );
+
+    let while_condition = match spec_seq {
+        None => true_exp.clone(),
+        Some(spec) => sp(
+            for_loc,
+            Exp_::Block((vec![], vec![spec], None, Box::new(Some(true_exp.clone())))),
+        ),
+    };
+    let body = sp(
+        for_loc,
+        Exp_::Block((
+            vec![],
+            vec![flag_conditional, loop_conditional],
+            None,
+            Box::new(None),
+        )),
+    );
+    let loop_body = sp(
+        for_loc,
+        Exp_::While(Box::new(while_condition), Box::new(body)),
+    );
+    let loop_body = sp(for_loc, SequenceItem_::Seq(Box::new(loop_body)));
+
+    // construct the parsed for loop
+    let parsed_for_loop = sp(
+        for_loc,
+        Exp_::Block((
+            vec![],
+            vec![iter_init, decl_flag, loop_body],
+            Some(for_loc),
+            Box::new(None),
+        )),
+    );
+    Ok((parsed_for_loop, ends_in_block))
 }
 
 // Parse a pack, call, or other reference to a name:

@@ -16,7 +16,7 @@ use crate::{
     pruner::{LedgerPrunerManager, PrunerManager, StateKvPrunerManager, StateMerklePrunerManager},
     rocksdb_property_reporter::RocksdbPropertyReporter,
     schema::{
-        block_index::BlockIndexSchema,
+        block_info::BlockInfoSchema,
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     },
     state_kv_db::StateKvDb,
@@ -37,7 +37,10 @@ use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{ReadOptions, SchemaBatch};
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
-    cached_state_view::ShardedStateCache, state_delta::StateDelta, state_view::DbStateView,
+    block_info::{BlockInfo, BlockInfoV0},
+    cached_state_view::ShardedStateCache,
+    state_delta::StateDelta,
+    state_view::DbStateView,
     DbReader, DbWriter, ExecutedTrees, Order, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{

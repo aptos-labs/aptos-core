@@ -406,7 +406,12 @@ impl LifetimeState {
 
     /// Drops a node. The parents are recursively dropped if their children go down to
     /// zero. Collects the locations of the removed nodes.
-    fn drop_node(&mut self, label: &LifetimeLabel, removed: &mut BTreeSet<MemoryLocation>) {
+    fn drop_node(
+        &mut self,
+        label: &LifetimeLabel,
+        alive: &BTreeSet<TempIndex>,
+        removed: &mut BTreeSet<MemoryLocation>,
+    ) {
         match self.graph.entry(label.clone()) {
             Entry::Occupied(entry) => {
                 let current: LifetimeNode = entry.remove();
@@ -414,13 +419,21 @@ impl LifetimeState {
                 removed.insert(current.location);
                 for parent in current.parents.iter() {
                     let node = self.node_mut(parent);
+                    // Remove the dropped node from the children list.
                     let children = std::mem::take(&mut node.children);
                     node.children = children
                         .into_iter()
                         .filter(|e| &e.target != label)
                         .collect();
+                    // Decide whether the parent node should be dropped as well
+                    if let MemoryLocation::Local(temp) = &node.location {
+                        if alive.contains(temp) {
+                            // Do not drop this node, since it is referenced from a temp
+                            continue;
+                        }
+                    }
                     if node.children.is_empty() {
-                        self.drop_node(parent, removed)
+                        self.drop_node(parent, alive, removed)
                     }
                 }
             },
@@ -432,11 +445,11 @@ impl LifetimeState {
 
     /// Releases graph resources related to the local, for example, since the local
     /// is overwritten or not longer used.
-    fn release_local(&mut self, temp: TempIndex) {
+    fn release_local(&mut self, temp: TempIndex, alive: &BTreeSet<TempIndex>) {
         if let Some(label) = self.label_for_local(temp).cloned() {
             if self.is_leaf(&label) {
                 let mut removed = BTreeSet::new();
-                self.drop_node(&label, &mut removed);
+                self.drop_node(&label, alive, &mut removed);
                 for location in removed {
                     use MemoryLocation::*;
                     match location {
@@ -459,10 +472,11 @@ impl LifetimeState {
     fn replace_local(
         &mut self,
         temp: TempIndex,
+        alive: &BTreeSet<TempIndex>,
         code_offset: CodeOffset,
         qualifier: u8,
     ) -> LifetimeLabel {
-        self.release_local(temp);
+        self.release_local(temp, alive);
         if let Some(label) = self.label_for_local(temp).cloned() {
             // Set the location to be 'replaced'. That means while the node logically still
             // exists, it is not longer associated with a specific temporary.
@@ -725,7 +739,7 @@ impl<'env> LifeTimeAnalysis<'env> {
             // Track reference in the graph as a Skip edge.
             let loc = self.loc(id);
             let label = state.make_local(src, code_offset, 0);
-            let child = state.replace_local(dest, code_offset, 1);
+            let child = state.replace_local(dest, &alive.after_set(), code_offset, 1);
             state.add_edge(
                 &label,
                 BorrowEdge::new(
@@ -881,7 +895,7 @@ impl<'env> LifeTimeAnalysis<'env> {
         alive: &LiveVarInfoAtCodeOffset,
     ) {
         let label = state.make_local(src, code_offset, 0);
-        let child = state.replace_local(dest, code_offset, 1);
+        let child = state.replace_local(dest, &alive.after_set(), code_offset, 1);
         let loc = self.loc(id);
         let is_mut = self.ty(dest).is_mutable_reference();
         self.check_and_add_edge(
@@ -904,7 +918,7 @@ impl<'env> LifeTimeAnalysis<'env> {
         alive: &LiveVarInfoAtCodeOffset,
     ) {
         let label = state.make_global(struct_.clone(), code_offset, 0);
-        let child = state.replace_local(dest, code_offset, 1);
+        let child = state.replace_local(dest, &alive.after_set(), code_offset, 1);
         let loc = self.loc(id);
         let is_mut = self.ty(dest).is_mutable_reference();
         self.check_and_add_edge(
@@ -929,7 +943,7 @@ impl<'env> LifeTimeAnalysis<'env> {
         alive: &LiveVarInfoAtCodeOffset,
     ) {
         let label = state.make_local(src, code_offset, 0);
-        let child = state.replace_local(dest, code_offset, 1);
+        let child = state.replace_local(dest, &alive.after_set(), code_offset, 1);
         let loc = self.loc(id);
         let is_mut = self.ty(dest).is_mutable_reference();
         let struct_env = self
@@ -979,7 +993,12 @@ impl<'env> LifeTimeAnalysis<'env> {
             .iter()
             .filter(|d| self.ty(**d).is_reference())
             .enumerate()
-            .map(|(i, t)| (*t, state.replace_local(*t, code_offset, i as u8)))
+            .map(|(i, t)| {
+                (
+                    *t,
+                    state.replace_local(*t, &alive.after_set(), code_offset, i as u8),
+                )
+            })
             .collect::<BTreeMap<_, _>>();
         let src_qualifier_offset = dest_labels.len();
         let loc = self.loc(id);
@@ -1164,9 +1183,10 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
             .expect("livevar annotation");
         // Before processing the instruction, release all temps in the label map
         // which are not longer alive at this point.
+        let alive_temps = alive.before_set();
         for temp in state.local_to_label_map.keys().cloned().collect::<Vec<_>>() {
-            if !alive.before.contains_key(&temp) {
-                state.release_local(temp)
+            if !alive_temps.contains(&temp) {
+                state.release_local(temp, &alive_temps)
             }
         }
         match instr {
@@ -1227,9 +1247,10 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
             _ => {},
         }
         // After processing, release any locals which are dying at this program point.
+        let after_set = alive.after_set();
         for released in alive.before.keys() {
-            if !alive.after.contains_key(released) {
-                state.release_local(*released)
+            if !after_set.contains(released) {
+                state.release_local(*released, &after_set)
             }
         }
     }

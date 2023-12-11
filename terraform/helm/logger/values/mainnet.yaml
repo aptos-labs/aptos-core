@@ -1,0 +1,9 @@
+# These are used for aggregation purposes in central logging
+chain:
+  name: mainnet
+
+# sync from validator helm chart
+loggingClientCert: 
+loggingClientKey: 
+loggingCA: 
+loggingCentralHost: 

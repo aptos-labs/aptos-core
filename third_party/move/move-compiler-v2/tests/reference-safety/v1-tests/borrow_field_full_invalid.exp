@@ -36,11 +36,31 @@ error: cannot immutable borrow local since other mutable references exist
 error: cannot copy mutable reference in local `inner` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:25:9
    │
+22 │         let c = id_mut(inner);
+   │                 ------------- previous mutable call result
 23 │         let f1 = &inner.f1;
    │                  --------- previous field borrow
 24 │         *c;
 25 │         *inner;
    │         ^^^^^^ copied here
+
+error: cannot dereference local which is still mutable borrowed
+   ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:25:9
+   │
+22 │         let c = id_mut(inner);
+   │                 ------------- previous mutable call result
+   ·
+25 │         *inner;
+   │         ^^^^^^ dereferenced here
+
+error: cannot dereference local `inner` which is still mutable borrowed
+   ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:27:9
+   │
+22 │         let c = id_mut(inner);
+   │                 ------------- previous mutable call result
+   ·
+27 │         *inner;
+   │         ^^^^^^ dereferenced here
 
 error: cannot copy mutable reference in local `c` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:33:9
@@ -95,6 +115,8 @@ error: cannot mutable borrow local since other references exists
 error: cannot copy mutable reference in local `inner` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:43:9
    │
+40 │         let c = id_mut(inner);
+   │                 ------------- previous mutable call result
 41 │         let f1 = &mut inner.f1;
    │                  ------------- previous mutable field borrow
 42 │         *c;
@@ -104,8 +126,19 @@ error: cannot copy mutable reference in local `inner` which is still borrowed
 error: cannot dereference local which is still mutable borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:43:9
    │
+40 │         let c = id_mut(inner);
+   │                 ------------- previous mutable call result
 41 │         let f1 = &mut inner.f1;
    │                  ------------- previous mutable field borrow
 42 │         *c;
 43 │         *inner;
+   │         ^^^^^^ dereferenced here
+
+error: cannot dereference local `inner` which is still mutable borrowed
+   ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:45:9
+   │
+40 │         let c = id_mut(inner);
+   │                 ------------- previous mutable call result
+   ·
+45 │         *inner;
    │         ^^^^^^ dereferenced here

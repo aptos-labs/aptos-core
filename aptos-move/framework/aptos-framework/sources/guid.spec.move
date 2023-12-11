@@ -4,6 +4,10 @@ spec aptos_framework::guid {
         pragma aborts_if_is_strict;
     }
 
+    spec create_id {
+        aborts_if false;
+    }
+
     spec id(guid: &GUID): ID {
         aborts_if false;
     }

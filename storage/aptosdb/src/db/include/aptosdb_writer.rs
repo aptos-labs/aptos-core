@@ -371,8 +371,21 @@ impl AptosDB {
                             let new_block_event =
                                 NewBlockEvent::try_from_bytes(event.event_data())?;
                             let block_height = new_block_event.height();
+                            let id = new_block_event.hash()?;
+                            let epoch = new_block_event.epoch();
+                            let round = new_block_event.round();
+                            let proposer = new_block_event.proposer();
+                            let block_timestamp_usecs = new_block_event.proposed_time();
+                            let block_info = BlockInfo::V0(BlockInfoV0::new(
+                                id,
+                                epoch,
+                                round,
+                                proposer,
+                                block_timestamp_usecs,
+                                version,
+                            ));
                             ledger_metadata_batch
-                                .put::<BlockIndexSchema>(&block_height, &version)?;
+                                .put::<BlockInfoSchema>(&block_height, &block_info)?;
                         }
                     }
                 }

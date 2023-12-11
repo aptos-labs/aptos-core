@@ -10,6 +10,7 @@ spec aptos_framework::chain_id {
         aborts_if addr != @aptos_framework;
         aborts_if exists<ChainId>(@aptos_framework);
         ensures exists<ChainId>(addr);
+        ensures global<ChainId>(addr).id == id;
     }
 
     spec get {

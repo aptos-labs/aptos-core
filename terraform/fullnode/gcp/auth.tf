@@ -1,3 +1,7 @@
+locals {
+  zone_project = var.zone_project != "" ? var.zone_project : var.project
+}
+
 resource "google_service_account" "gke" {
   account_id = "aptos-${terraform.workspace}-gke"
 }
