@@ -330,7 +330,7 @@ impl<'env> SpecTranslator<'env> {
             .params
             .iter()
             .enumerate()
-            .map(|(i, Parameter(name, ty))| {
+            .map(|(i, Parameter(name, ty, _loc))| {
                 let bv_flag = if global_state
                     .spec_fun_operation_map
                     .contains_key(&(module_env.get_id(), id))
@@ -376,7 +376,9 @@ impl<'env> SpecTranslator<'env> {
                 boogie_name,
                 fun.params
                     .iter()
-                    .map(|Parameter(n, _)| { format!("{}", n.display(module_env.symbol_pool())) })
+                    .map(|Parameter(n, _, _loc)| {
+                        format!("{}", n.display(module_env.symbol_pool()))
+                    })
                     .join(", ")
             );
             let type_check =

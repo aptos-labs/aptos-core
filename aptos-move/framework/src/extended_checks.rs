@@ -134,7 +134,7 @@ impl<'a> ExtendedChecker<'a> {
                 self.env
                     .error(&fun.get_loc(), "`init_module` function must be private")
             }
-            for Parameter(_, ty) in fun.get_parameters() {
+            for Parameter(_, ty, _) in fun.get_parameters() {
                 let ok = match ty {
                     Type::Primitive(PrimitiveType::Signer) => true,
                     Type::Reference(_, ty) => matches!(*ty, Type::Primitive(PrimitiveType::Signer)),

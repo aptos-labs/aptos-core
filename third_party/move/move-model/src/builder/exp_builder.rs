@@ -43,7 +43,7 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     /// A symbol table for type parameters.
     pub type_params_table: BTreeMap<Symbol, Type>,
     /// Type parameters in sequence they have been added.
-    pub type_params: Vec<(Symbol, Type)>,
+    pub type_params: Vec<(Symbol, Type, Loc)>,
     /// Function pointer table
     pub fun_ptrs_table: BTreeMap<Symbol, (Symbol, Vec<Symbol>)>,
     /// A scoped symbol table for local names. The first element in the list contains the most
@@ -226,7 +226,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 
     /// Get type parameters with names from this translator (old style)
-    pub fn get_type_params_with_name(&self) -> Vec<(Symbol, Type)> {
+    pub fn get_type_params_with_name(&self) -> Vec<(Symbol, Type, Loc)> {
         self.type_params.clone()
     }
 
@@ -234,7 +234,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     pub fn get_type_params(&self) -> Vec<TypeParameter> {
         self.type_params
             .iter()
-            .map(|(n, _)| TypeParameter::new_named(n))
+            .map(|(n, _, loc)| TypeParameter::new_named(n, loc))
             .collect()
     }
 
@@ -261,10 +261,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
     }
 
-    /// Shortcut for a diagnosis note.
-    pub fn note(&mut self, loc: &Loc, msg: &str) {
+    /// Shortcut for reporting an error.
+    pub fn error_with_labels(&mut self, loc: &Loc, msg: &str, labels: Vec<(Loc, String)>) {
+        self.had_errors = true;
         if self.mode != ExpTranslationMode::TryImplAsSpec {
-            self.parent.parent.env.diag(Severity::Note, loc, msg)
+            self.parent.parent.env.error_with_labels(loc, msg, labels);
         }
     }
 
@@ -424,7 +425,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     fn type_display_context(&self) -> TypeDisplayContext<'_> {
         TypeDisplayContext {
             env: self.parent.parent.env,
-            type_param_names: Some(self.type_params.iter().map(|(s, _)| *s).collect()),
+            type_param_names: Some(self.type_params.iter().map(|(s, _, _loc)| *s).collect()),
             subs_opt: Some(&self.subs),
             builder_struct_table: Some(&self.parent.parent.reverse_struct_table),
         }
@@ -478,7 +479,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 );
                 return;
             }
-            self.type_params.push((name, ty));
+            self.type_params.push((name, ty, loc.clone()));
         } else if report_errors {
             let param_name = name.display(self.symbol_pool());
             let context = TypeDisplayContext::new(self.parent.parent.env);
@@ -494,8 +495,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 
     /// Defines a vector of formal type parameters.
-    pub fn define_type_params(&mut self, loc: &Loc, params: &[TypeParameter], report_errors: bool) {
-        for (pos, TypeParameter(name, _)) in params.iter().enumerate() {
+    pub fn define_type_params(
+        &mut self,
+        _loc: &Loc,
+        params: &[TypeParameter],
+        report_errors: bool,
+    ) {
+        for (pos, TypeParameter(name, _, loc)) in params.iter().enumerate() {
             self.define_type_param(loc, *name, Type::new_param(pos), report_errors)
         }
     }
@@ -549,8 +555,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             .insert(name, entry)
         {
             let display = name.display(self.symbol_pool()).to_string();
-            self.error(loc, &format!("duplicate declaration of `{}`", display));
-            self.note(&old.loc, &format!("previous declaration of `{}`", display));
+            self.error_with_labels(
+                loc,
+                &format!("duplicate declaration of `{}`", display),
+                vec![(
+                    old.loc.clone(),
+                    format!("previous declaration of `{}`", display),
+                )],
+            );
             // Put the old entry back
             self.local_table.front_mut().unwrap().insert(name, old);
         }
@@ -586,7 +598,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let ty = Type::new_param(i);
                 let sym = self.symbol_pool().make(n.value.as_str());
                 let abilities = self.parent.translate_abilities(a);
-                self.define_type_param(&self.to_loc(&n.loc), sym, ty, true /*report_errors*/);
+                let loc = self.to_loc(&n.loc);
+                self.define_type_param(&loc, sym, ty, true /*report_errors*/);
                 TypeParameter(
                     sym,
                     if is_phantom {
@@ -594,6 +607,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     } else {
                         TypeParameterKind::new(abilities)
                     },
+                    loc,
                 )
             })
             .collect_vec()
@@ -612,8 +626,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             .map(|(idx, (v, ty))| {
                 let ty = self.translate_type(ty);
                 let sym = self.symbol_pool().make(v.0.value.as_str());
+                let loc = self.to_loc(&v.loc());
                 self.define_local(
-                    &self.to_loc(&v.0.loc),
+                    &loc,
                     sym,
                     ty.clone(),
                     None,
@@ -622,7 +637,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     // a `LocalVar`.
                     if for_move_fun { Some(idx) } else { None },
                 );
-                Parameter(sym, ty)
+                Parameter(sym, ty, loc)
             })
             .collect_vec()
     }
@@ -945,10 +960,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 if is_wildcard(resource) {
                     ResourceSpecifier::DeclaredInModule(module_id)
                 } else {
-                    let mident = sp(specifier.loc, EA::ModuleIdent_ {
-                        address: *address,
-                        module: *module,
-                    });
+                    let mident = sp(
+                        specifier.loc,
+                        EA::ModuleIdent_ {
+                            address: *address,
+                            module: *module,
+                        },
+                    );
                     let maccess = sp(
                         specifier.loc,
                         EA::ModuleAccess_::ModuleAccess(mident, *resource),
@@ -1422,11 +1440,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let id = self.new_node_id_with_type_loc(&rt, &loc);
                 if self.mode == ExpTranslationMode::Impl {
                     // Remember information about this spec block for deferred checking.
-                    self.placeholder_map
-                        .insert(id, ExpPlaceholder::SpecBlockInfo {
+                    self.placeholder_map.insert(
+                        id,
+                        ExpPlaceholder::SpecBlockInfo {
                             spec_id: *spec_id,
                             locals: self.get_locals(),
-                        });
+                        },
+                    );
                 }
                 ExpData::Call(id, Operation::NoOp, vec![])
             },
@@ -2285,9 +2305,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             );
             let global_id = self.new_node_id_with_type_loc(&ghost_mem_ty, loc);
             self.set_node_instantiation(global_id, vec![ghost_mem_ty]);
-            let global_access = ExpData::Call(global_id, Operation::Global(None), vec![
-                zero_addr.into_exp()
-            ]);
+            let global_access = ExpData::Call(
+                global_id,
+                Operation::Global(None),
+                vec![zero_addr.into_exp()],
+            );
             let select_id = self.new_node_id_with_type_loc(&ty, loc);
             self.set_node_instantiation(select_id, instantiation);
             return ExpData::Call(
@@ -2419,11 +2441,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     Operation::Select(mid, sid, FieldId::new(field_name))
                 } else {
                     // Create a placeholder for later resolution.
-                    self.placeholder_map
-                        .insert(id, ExpPlaceholder::FieldSelectInfo {
+                    self.placeholder_map.insert(
+                        id,
+                        ExpPlaceholder::FieldSelectInfo {
                             struct_ty: ty,
                             field_name,
-                        });
+                        },
+                    );
                     Operation::NoOp
                 };
                 ExpData::Call(id, oper, vec![exp.into_exp()])

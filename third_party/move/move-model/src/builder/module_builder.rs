@@ -20,9 +20,10 @@ use crate::{
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     intrinsics::process_intrinsic_declaration,
     model::{
-        FieldData, FieldId, FunId, FunctionData, FunctionKind, Loc, ModuleId, MoveIrLoc,
-        NamedConstantData, NamedConstantId, NodeId, Parameter, QualifiedId, QualifiedInstId,
-        SchemaId, SpecFunId, SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind,
+        EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, Loc, ModuleId,
+        MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, QualifiedId,
+        QualifiedInstId, SchemaId, SpecFunId, SpecVarId, StructData, StructId, TypeParameter,
+        TypeParameterKind,
     },
     options::ModelBuilderOptions,
     pragmas::{
@@ -832,7 +833,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 }
                 let name = et.symbol_pool().make(&name.value);
                 let type_ = et.translate_type(type_);
-                vars.push(Parameter(name, type_));
+                vars.push(Parameter(name, type_, et.to_loc(&member.loc)));
             }
         }
         // Add schema declaration prototype to the symbol table.
@@ -1109,11 +1110,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     ) {
         let (type_params, params, result_type) = self.decl_ana_signature(signature, true);
         let generic_msg = "provided function signature must match function declaration";
-        if fun_decl.type_params != type_params {
+        if !fun_decl.type_params.eq_ignoring_loc(&type_params) {
             self.parent
                 .error(loc, &format!("{}: type parameter mismatch", generic_msg));
         }
-        if fun_decl.params != params {
+        if !fun_decl.params.eq_ignoring_loc(&params) {
             self.parent
                 .error(loc, &format!("{}: parameter mismatch", generic_msg));
         }
@@ -1353,11 +1354,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     et.set_translate_move_fun()
                 }
                 let loc = et.to_loc(&body.loc);
-                for (pos, TypeParameter(name, _)) in type_params.iter().enumerate() {
+                for (pos, TypeParameter(name, _, loc)) in type_params.iter().enumerate() {
                     et.define_type_param(&loc, *name, Type::new_param(pos), false);
                 }
                 et.enter_scope();
-                for (idx, Parameter(n, ty)) in params.iter().enumerate() {
+                for (idx, Parameter(n, ty, loc)) in params.iter().enumerate() {
                     et.define_local(&loc, *n, ty.clone(), None, Some(idx));
                 }
                 let access_specifiers = if !as_spec_fun {
@@ -1441,7 +1442,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let no_mut_ref_param = self.spec_funs[spec_fun_idx]
                 .params
                 .iter()
-                .map(|Parameter(_, ty)| !ty.is_mutable_reference())
+                .map(|Parameter(_, ty, _loc)| !ty.is_mutable_reference())
                 .all(|b| b); // `no_mut_ref_param` if none of the types are mut refs.
             return self.spec_funs[spec_fun_idx].is_native && no_mut_ref_param;
         };
@@ -1491,7 +1492,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 e.params = e
                     .params
                     .iter()
-                    .map(|Parameter(n, ty)| Parameter(*n, ty.skip_reference().clone()))
+                    .map(|Parameter(n, ty, loc)| {
+                        Parameter(*n, ty.skip_reference().clone(), loc.clone())
+                    })
                     .collect_vec();
                 e.result_type = e.result_type.skip_reference().clone();
             }
@@ -1501,7 +1504,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         spec_fun_decl.params = spec_fun_decl
             .params
             .iter()
-            .map(|Parameter(s, ty)| Parameter(*s, ty.skip_reference().clone()))
+            .map(|Parameter(s, ty, loc)| Parameter(*s, ty.skip_reference().clone(), loc.clone()))
             .collect_vec();
         spec_fun_decl.result_type = spec_fun_decl.result_type.skip_reference().clone();
     }
@@ -1610,9 +1613,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         // Check the expression and extract results.
         let sym = self.symbol_pool().make(&name.value);
         let kind = if post_state {
-            ConditionKind::LetPost(sym)
+            ConditionKind::LetPost(sym, loc.clone())
         } else {
-            ConditionKind::LetPre(sym)
+            ConditionKind::LetPre(sym, loc.clone())
         };
         let mut et = self.exp_translator_for_context(loc, context, &kind);
         let (_, def) = et.translate_exp_free(def);
@@ -1809,7 +1812,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .expect("invalid spec block context")
                     .clone();
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
-                for (pos, TypeParameter(name, _)) in entry.type_params.iter().enumerate() {
+                for (pos, TypeParameter(name, _, loc)) in entry.type_params.iter().enumerate() {
                     et.define_type_param(
                         loc,
                         *name,
@@ -1818,7 +1821,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     );
                 }
                 et.enter_scope();
-                for (idx, Parameter(n, ty)) in entry.params.iter().enumerate() {
+                for (idx, Parameter(n, ty, loc)) in entry.params.iter().enumerate() {
                     et.define_local(loc, *n, ty.clone(), None, Some(idx));
                 }
                 // Define the placeholders for the result values of a function if this is an
@@ -1848,7 +1851,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .expect("invalid spec block context")
                     .clone();
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
-                for (pos, TypeParameter(name, _)) in entry.type_params.iter().enumerate() {
+                for (pos, TypeParameter(name, _, loc)) in entry.type_params.iter().enumerate() {
                     et.define_type_param(loc, *name, Type::new_param(pos), false);
                 }
 
@@ -1895,7 +1898,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .expect("invalid spec block context")
                     .clone();
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
-                for (pos, TypeParameter(name, _)) in entry.type_params.iter().enumerate() {
+                for (pos, TypeParameter(name, _, loc)) in entry.type_params.iter().enumerate() {
                     et.define_type_param(loc, *name, Type::new_param(pos), false);
                 }
 
@@ -2124,7 +2127,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 .conditions
                 .iter()
                 .filter_map(|c| match &c.kind {
-                    LetPost(name) | LetPre(name) => Some(*name),
+                    LetPost(name, _loc) | LetPre(name, _loc) => Some(*name),
                     _ => None,
                 })
                 .collect()
@@ -2168,7 +2171,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
             // If this is a let, check for name collision.
             match &cond.kind {
-                LetPost(name) | LetPre(name) => {
+                LetPost(name, loc) | LetPre(name, loc) => {
                     let name = *name;
                     if bound_lets.contains(&name) {
                         // Find a new name by appending #0, #1, .. to this name.
@@ -2184,9 +2187,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         };
                         let_substitution.insert(name, new_name);
                         if matches!(&cond.kind, LetPost(..)) {
-                            cond.kind = LetPost(new_name)
+                            cond.kind = LetPost(new_name, loc.clone())
                         } else {
-                            cond.kind = LetPre(new_name)
+                            cond.kind = LetPre(new_name, loc.clone())
                         }
                         bound_lets.insert(new_name);
                     } else {
@@ -2347,26 +2350,31 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         // Defines a type local with duplication check
         fn define_type_param(
             builder: &mut ModuleBuilder,
-            ty_params_defined: &mut BTreeSet<Symbol>,
+            ty_params_defined: &mut BTreeMap<Symbol, Loc>,
             name: &Name,
-        ) -> Option<Symbol> {
+        ) -> Option<(Symbol, Loc)> {
             let symbol = builder.symbol_pool().make(&name.value);
-            if !ty_params_defined.insert(symbol) {
-                builder.parent.env.error(
-                    &builder.parent.to_loc(&name.loc),
-                    &format!("duplicate declaration of `{}`", &name.value),
+            let loc = builder.parent.to_loc(&name.loc);
+            if let Some(old_loc) = ty_params_defined.get(&symbol) {
+                builder
+                    .parent
+                    .error(&loc, &format!("duplicate declaration of `{}`", &name.value));
+                builder.parent.note(
+                    old_loc,
+                    &format!("previous declaration of `{}`", &name.value),
                 );
                 None
             } else {
-                Some(symbol)
+                ty_params_defined.insert(symbol, loc.clone());
+                Some((symbol, loc))
             }
         }
 
         fn define_type_params(
             builder: &mut ModuleBuilder,
             type_params: &[(Name, EA::AbilitySet)],
-        ) -> Option<Vec<Symbol>> {
-            let mut ty_params_defined = BTreeSet::new();
+        ) -> Option<Vec<(Symbol, Loc)>> {
+            let mut ty_params_defined = BTreeMap::new();
             type_params
                 .iter()
                 .map(|(name, _)| define_type_param(builder, &mut ty_params_defined, name))
@@ -2464,7 +2472,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 let loc = et.to_loc(&body.loc);
                 et.define_type_params(&loc, &type_params, false);
                 et.enter_scope();
-                for Parameter(n, ty) in params {
+                for Parameter(n, ty, loc) in params {
                     et.define_local(&loc, n, ty, None, None);
                 }
                 let translated = et.translate_seq(&loc, seq, &result_type);
@@ -2614,7 +2622,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
     /// Analysis of schema after it is ensured that all included schemas are fully analyzed.
     fn def_ana_schema_content(&mut self, name: QualifiedSymbol, block: &EA::SpecBlock) {
-        let loc = self.parent.env.to_loc(&block.loc);
         let entry = self
             .parent
             .spec_schema_table
@@ -2624,7 +2631,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let mut all_vars: BTreeMap<Symbol, LocalVarEntry> = entry
             .vars
             .iter()
-            .map(|Parameter(n, ty)| {
+            .map(|Parameter(n, ty, loc)| {
                 (*n, LocalVarEntry {
                     loc: loc.clone(),
                     type_: ty.clone(),
@@ -3103,25 +3110,39 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             // If a formal argument is bound to an expression that contains a name
             // that conflicts with variables defined in the condition, return an error
             for bound_expr in argument_map.values() {
-                let exp_loc = self.parent.env.get_node_loc(bound_expr.node_id());
+                let mut labels = Vec::new();
                 for loc_sym in bound_expr.bound_local_vars_with_node_id().keys() {
                     match kind {
-                        ConditionKind::LetPost(name) | ConditionKind::LetPre(name) => {
+                        ConditionKind::LetPost(name, loc) | ConditionKind::LetPre(name, loc) => {
                             if name == loc_sym {
-                                self.parent.error(
-                                    &exp_loc,
-                                    &format!("Variable `{}` conflicts with a specification variable in the schema {}", name.display(self.symbol_pool()),
-                                             schema_name.display(self.parent.env))
-                                );
+                                labels.push((
+                                    loc.clone(),
+                                    format!(
+                                        "Variable {} defined here",
+                                        name.display(self.symbol_pool())
+                                    )
+                                    .to_owned(),
+                                ))
                             }
                         },
                         _ => {},
                     }
                 }
+                if !labels.is_empty() {
+                    let exp_loc = self.parent.env.get_node_loc(bound_expr.node_id());
+                    self.parent.env.error_with_labels(
+                        &exp_loc,
+                        &format!(
+                            "A specification variable in the schema {} conflicts with",
+                            schema_name.display(self.parent.env)
+                        ),
+                        labels,
+                    );
+                }
             }
 
             match kind {
-                ConditionKind::LetPost(name) | ConditionKind::LetPre(name) => {
+                ConditionKind::LetPost(name, _loc) | ConditionKind::LetPre(name, _loc) => {
                     // If a let name is introduced by this condition, remove it from argument_map
                     // as it shadows schema arguments.
                     argument_map.remove(name);
@@ -3231,7 +3252,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         // this block.
         let context_type_params = context_type_params
             .iter()
-            .map(|(n, _)| TypeParameter(*n, TypeParameterKind::default()))
+            .map(|(n, _, loc)| TypeParameter(*n, TypeParameterKind::default(), loc.clone()))
             .collect::<Vec<_>>();
         self.def_ana_schema_exp(
             if let Some(type_params) = alt_context_type_params {

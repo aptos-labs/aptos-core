@@ -224,6 +224,11 @@ impl<'env> ModelBuilder<'env> {
         self.env.error_with_notes(at, msg, notes)
     }
 
+    /// Shortcut for a diagnosis note.
+    pub fn note(&mut self, loc: &Loc, msg: &str) {
+        self.env.diag(Severity::Note, loc, msg)
+    }
+
     /// Defines a spec function, adding it to the spec fun table.
     pub fn define_spec_or_builtin_fun(
         &mut self,
@@ -257,7 +262,7 @@ impl<'env> ModelBuilder<'env> {
         if let Some(old) = self.spec_var_table.insert(name.clone(), entry) {
             let var_name = name.display(self.env);
             self.error(loc, &format!("duplicate declaration of `{}`", var_name));
-            self.error(&old.loc, &format!("previous declaration of `{}`", var_name));
+            self.note(&old.loc, &format!("previous declaration of `{}`", var_name));
         }
     }
 

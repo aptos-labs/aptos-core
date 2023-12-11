@@ -342,7 +342,7 @@ impl<'a> NumberOperationAnalysis<'a> {
                                     if callee_spec_fun.body.is_some() {
                                         let body_exp = callee_spec_fun.body.as_ref().unwrap();
                                         let local_map = body_exp.bound_local_vars_with_node_id();
-                                        for (i, Parameter(sym, _)) in
+                                        for (i, Parameter(sym, _, loc)) in
                                             callee_spec_fun.params.iter().enumerate()
                                         {
                                             if local_map.contains_key(sym) {
@@ -353,9 +353,10 @@ impl<'a> NumberOperationAnalysis<'a> {
                                                     // Still need to check compatibility
                                                     if !allow_merge && oper.conflict(&para_vec[i]) {
                                                         self.func_target.global_env().error(
-                                                            &self
-                                                                .func_target
-                                                                .get_bytecode_loc(attr_id),
+                                                            loc,
+                                                            // &self
+                                                            // .func_target
+                                                            // .get_bytecode_loc(attr_id),
                                                             CONFLICT_ERROR_MSG,
                                                         );
                                                     } else {

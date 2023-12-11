@@ -44,7 +44,7 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         local_names: BTreeMap::new(),
     };
     let mut scope = BTreeMap::new();
-    for Parameter(name, ty) in gen.func_env.get_parameters() {
+    for Parameter(name, ty, _loc) in gen.func_env.get_parameters() {
         let temp = gen.new_temp(ty);
         scope.insert(name, temp);
         gen.local_names.insert(temp, name);
@@ -785,7 +785,7 @@ impl<'env> Generator<'env> {
             .get_function(fun)
             .get_parameters()
             .into_iter()
-            .map(|Parameter(_, ty)| ty.instantiate(&type_args))
+            .map(|Parameter(_, ty, _loc)| ty.instantiate(&type_args))
             .collect();
         if args.len() != param_types.len() {
             self.internal_error(id, "inconsistent type arity");

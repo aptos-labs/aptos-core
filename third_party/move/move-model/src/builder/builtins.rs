@@ -24,11 +24,15 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
     let address_t = &Type::new_prim(PrimitiveType::Address);
 
     let mk_param = |trans: &ModelBuilder<'_>, p: usize, ty: Type| {
-        Parameter(trans.env.symbol_pool().make(&format!("p{}", p)), ty)
+        Parameter(
+            trans.env.symbol_pool().make(&format!("p{}", p)),
+            ty,
+            loc.clone(),
+        )
     };
 
     let param_t = &Type::TypeParameter(0);
-    let param_t_decl = TypeParameter::new_named(&trans.env.symbol_pool().make("T"));
+    let param_t_decl = TypeParameter::new_named(&trans.env.symbol_pool().make("T"), &loc);
 
     let mk_num_const = |value: BigInt, visibility: EntryVisibility| ConstEntry {
         loc: loc.clone(),
@@ -672,7 +676,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         trans.define_spec_or_builtin_fun(
             trans.builtin_qualified_symbol("int2bv"),
             SpecOrBuiltinFunEntry {
-                loc,
+                loc: loc.clone(),
                 oper: Operation::Int2Bv,
                 type_params: vec![param_t_decl],
                 type_param_constraints: BTreeMap::default(),
