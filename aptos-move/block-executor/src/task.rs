@@ -8,8 +8,8 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    aggregator::PanicError, fee_statement::FeeStatement,
-    transaction::BlockExecutableTransaction as Transaction, write_set::WriteOp,
+    fee_statement::FeeStatement, transaction::BlockExecutableTransaction as Transaction,
+    write_set::WriteOp,
 };
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
 use move_core_types::value::MoveTypeLayout;
@@ -82,11 +82,6 @@ pub trait ExecutorTask: Sync {
         txn: &Self::Txn,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
-
-    fn execute_skipped_checkpoint(
-        txn: &Self::Txn,
-        output: &mut Self::Output,
-    ) -> Result<(), PanicError>;
 
     fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool;
 }

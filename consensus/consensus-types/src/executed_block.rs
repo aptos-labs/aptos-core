@@ -15,7 +15,7 @@ use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     contract_event::ContractEvent,
-    transaction::{SignedTransaction, Transaction, TransactionStatus},
+    transaction::{SignedTransaction, Transaction},
     validator_txn::ValidatorTransaction,
 };
 use once_cell::sync::OnceCell;
@@ -169,19 +169,12 @@ impl ExecutedBlock {
             return vec![];
         }
 
-        let txns_with_state_checkpoint =
-            self.block
-                .transactions_to_execute(validators, validator_txns, txns);
+        let input_txns = self
+            .block
+            .transactions_to_execute(validators, validator_txns, txns);
 
-        itertools::zip_eq(
-            txns_with_state_checkpoint,
-            self.state_compute_result.compute_status(),
-        )
-        .filter_map(|(txn, status)| match status {
-            TransactionStatus::Keep(_) => Some(txn),
-            _ => None,
-        })
-        .collect()
+        self.state_compute_result
+            .transactions_to_commit(input_txns, self.id())
     }
 
     pub fn reconfig_event(&self) -> Vec<ContractEvent> {

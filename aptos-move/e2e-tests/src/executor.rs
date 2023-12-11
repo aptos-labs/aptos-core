@@ -445,14 +445,8 @@ impl FakeExecutor {
             txn_block
                 .into_iter()
                 .map(Transaction::UserTransaction)
-                .chain(Some(Transaction::StateCheckpoint(HashValue::random())))
                 .collect(),
         )
-        .map(|mut results| {
-            // remove state checkpoint
-            results.pop().unwrap();
-            results
-        })
     }
 
     /// Executes the transaction as a singleton block and applies the resulting write set to the

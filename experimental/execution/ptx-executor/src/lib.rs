@@ -53,7 +53,7 @@ impl VMExecutor for PtxBlockExecutor {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let _timer = TIMER.timer_with(&["block_total"]);
 
         let concurrency_level = AptosVM::get_concurrency_level();
@@ -101,7 +101,7 @@ impl VMExecutor for PtxBlockExecutor {
             ret_clone.lock().replace(txn_outputs);
         });
         let ret = ret.lock().take().unwrap();
-        Ok(BlockOutput::new(ret, None))
+        Ok(BlockOutput::new(ret))
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(

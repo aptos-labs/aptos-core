@@ -5,18 +5,12 @@
 use crate::{
     aptos_vm::AptosVM, block_executor::AptosTransactionOutput, data_cache::AsMoveResolver,
 };
-use aptos_aggregator::types::code_invariant_error;
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
-use aptos_types::{
-    aggregator::PanicError,
-    transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
-        TransactionOutput, TransactionStatus, WriteSetPayload,
-    },
-    write_set::WriteSet,
+use aptos_types::transaction::{
+    signature_verified_transaction::SignatureVerifiedTransaction, Transaction, WriteSetPayload,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{ExecutorView, ResourceGroupView};
@@ -119,39 +113,6 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
                     ExecutionStatus::Abort(err)
                 }
             },
-        }
-    }
-
-    fn execute_skipped_checkpoint(
-        txn: &Self::Txn,
-        output: &mut Self::Output,
-    ) -> Result<(), PanicError> {
-        if txn.is_valid() {
-            match txn.expect_valid() {
-                Transaction::StateCheckpoint(_) => {
-                    aptos_block_executor::task::TransactionOutput::set_txn_output_for_non_dynamic_change_set(output);
-                    let committed_output = output.committed_output();
-                    if !committed_output.status().is_retry() {
-                        return Err(code_invariant_error(format!(
-                            "Block limit cannot be reached on StateCheckpoint transaction, as it is free and empty. {:?}",
-                            committed_output,
-                        )));
-                    }
-
-                    let events = vec![];
-                    let status = TransactionStatus::Keep(aptos_types::transaction::ExecutionStatus::Success);
-                    *output = AptosTransactionOutput::new_from_committed_output(TransactionOutput::new(WriteSet::default(), events, 0, status));
-                    Ok(())
-                },
-                valid_txn => {
-                    Err(code_invariant_error(format!(
-                        "Last transaction in a block where limit is reached is not StateCheckpoint, but: {}",
-                        valid_txn.type_name()
-                    )))
-                },
-            }
-        } else {
-            Err(code_invariant_error("When block limit is used, last transaction (should be StateCheckpoint or genesis) must not be invalid"))
         }
     }
 

@@ -6,7 +6,7 @@ use crate::{
     account_generator::{AccountCache, AccountGenerator},
     metrics::{NUM_TXNS, TIMER},
 };
-use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue};
+use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::info;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
@@ -369,7 +369,6 @@ impl TransactionGenerator {
                     );
                     Transaction::UserTransaction(txn)
                 })
-                .chain(Some(Transaction::StateCheckpoint(HashValue::random())))
                 .collect();
             bar.inc(transactions.len() as u64 - 1);
             if let Some(sender) = &self.block_sender {
@@ -664,7 +663,6 @@ impl TransactionGenerator {
         for i in 0..block_size {
             transactions.push(transactions_by_index.get(&i).unwrap().clone());
         }
-        transactions.push(Transaction::StateCheckpoint(HashValue::random()));
 
         NUM_TXNS
             .with_label_values(&["generation_done"])

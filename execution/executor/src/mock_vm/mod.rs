@@ -81,7 +81,7 @@ impl VMExecutor for MockVM {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         // output_cache is used to store the output of transactions so they are visible to later
         // transactions.
         let mut output_cache = HashMap::new();
@@ -188,7 +188,7 @@ impl VMExecutor for MockVM {
             }
         }
 
-        Ok(BlockOutput::new(outputs, None))
+        Ok(BlockOutput::new(outputs))
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(

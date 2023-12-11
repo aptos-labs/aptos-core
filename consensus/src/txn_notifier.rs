@@ -57,8 +57,8 @@ impl TxnNotifier for MempoolNotifier {
             return Ok(());
         }
         let compute_status = compute_results.compute_status();
-        // the length of compute_status is user_txns.len() + 2 due to having both blockmetadata and state checkpoint
-        let expected_len = user_txns.len() + 2;
+        // the length of compute_status is user_txns.len() + 1 due to having blockmetadata
+        let expected_len = user_txns.len() + 1;
         if expected_len != compute_status.len() {
             // reconfiguration suffix blocks don't have any transactions
             if compute_status.is_empty() {

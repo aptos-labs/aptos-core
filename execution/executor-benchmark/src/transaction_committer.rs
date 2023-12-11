@@ -86,7 +86,8 @@ where
             NUM_TXNS
                 .with_label_values(&["commit"])
                 .inc_by(num_txns as u64);
-            self.version += num_txns as u64;
+            // We have one more transaction, because StateCheckpoint/BlockEpilogue is added on top of the input transactions.
+            self.version += num_txns as u64 + 1;
             let commit_start = std::time::Instant::now();
             let ledger_info_with_sigs = gen_li_with_sigs(block_id, root_hash, self.version);
             self.executor

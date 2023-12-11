@@ -70,6 +70,7 @@ where
             .unwrap();
 
         assert_eq!(output.txn_statuses().len(), num_txns);
+        assert_eq!(output.txns_to_keep_len(), num_txns + 1);
 
         let msg = LedgerUpdateMessage {
             current_block_start_time,

@@ -1050,7 +1050,7 @@ where
         executor_initial_arguments: E::Argument,
         signature_verified_block: &[T],
         base_view: &S,
-    ) -> Result<Vec<E::Output>, E::Error> {
+    ) -> Result<BlockOutput<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
         // will only have a coordinator role but no workers for rolling commit.
@@ -1066,7 +1066,7 @@ where
         let shared_counter = AtomicU32::new(start_shared_counter);
 
         if signature_verified_block.is_empty() {
-            return Ok(vec![]);
+            return Ok(BlockOutput::new(vec![]));
         }
 
         let num_txns = signature_verified_block.len();
@@ -1117,19 +1117,14 @@ where
         drop(timer);
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
-        let (block_limit_processor, maybe_error) = shared_commit_state.into_inner();
+        let (_block_limit_processor, maybe_error) = shared_commit_state.into_inner();
 
-        Self::execute_checkpoint_on_block_limit_reached(
-            block_limit_processor,
-            num_txns as usize,
-            signature_verified_block,
-            &mut final_results.acquire(),
-        )
-        .unwrap();
+        // TODO add block end info to output.
+        // block_limit_processor.is_block_limit_reached();
 
         match maybe_error {
             Some(err) => Err(err),
-            None => Ok(final_results.into_inner()),
+            None => Ok(BlockOutput::new(final_results.into_inner())),
         }
     }
 
@@ -1217,7 +1212,7 @@ where
         signature_verified_block: &[T],
         base_view: &S,
         dynamic_change_set_optimizations_enabled: bool,
-    ) -> Result<Vec<E::Output>, E::Error> {
+    ) -> Result<BlockOutput<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(executor_arguments);
@@ -1436,32 +1431,10 @@ where
 
         ret.resize_with(num_txns, E::Output::skip_output);
 
-        Self::execute_checkpoint_on_block_limit_reached(
-            block_limit_processor,
-            num_txns,
-            signature_verified_block,
-            &mut ret,
-        )
-        .unwrap();
+        // TODO add block end info to output.
+        // block_limit_processor.is_block_limit_reached();
 
-        Ok(ret)
-    }
-
-    fn execute_checkpoint_on_block_limit_reached(
-        block_limit_processor: BlockGasLimitProcessor<T>,
-        num_txns: usize,
-        signature_verified_block: &[T],
-        ret: &mut [<E as ExecutorTask>::Output],
-    ) -> Result<(), PanicError> {
-        if block_limit_processor.is_block_limit_reached() {
-            let idx = num_txns - 1;
-            let txn = &signature_verified_block[idx];
-            let txn_output = ret
-                .get_mut(idx)
-                .ok_or_else(|| code_invariant_error("Missing output for last transaction"))?;
-            E::execute_skipped_checkpoint(txn, txn_output)?;
-        }
-        Ok(())
+        Ok(BlockOutput::new(ret))
     }
 
     pub fn execute_block(
@@ -1469,7 +1442,7 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: &[T],
         base_view: &S,
-    ) -> Result<BlockOutput<E::Txn, E::Output>, E::Error> {
+    ) -> Result<BlockOutput<E::Output>, E::Error> {
         let dynamic_change_set_optimizations_enabled = signature_verified_block.len() != 1
             || E::is_transaction_dynamic_change_set_capable(&signature_verified_block[0]);
 
@@ -1533,7 +1506,7 @@ where
             panic!("Sequential execution failed with {:?}", e);
         }
 
-        ret.map(|outputs| BlockOutput::new(outputs, None))
+        ret
     }
 }
 

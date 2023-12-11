@@ -285,6 +285,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             ApplyChunkOutput::calculate_state_checkpoint(
                 chunk_output,
                 &self.commit_queue.lock().latest_state(),
+                None, // append_state_checkpoint_to_block
                 Some(known_state_checkpoints),
                 false, // is_block
             )?;
@@ -369,6 +370,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             ApplyChunkOutput::calculate_state_checkpoint(
                 chunk_output,
                 &self.commit_queue.lock().latest_state(),
+                None, // append_state_checkpoint_to_block
                 Some(known_state_checkpoints),
                 false, // is_block
             )?

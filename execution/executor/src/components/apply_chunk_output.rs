@@ -27,11 +27,13 @@ use aptos_types::{
     proof::accumulator::{InMemoryEventAccumulator, InMemoryTransactionAccumulator},
     state_store::ShardedStateUpdates,
     transaction::{
-        Transaction, TransactionInfo, TransactionOutput, TransactionStatus, TransactionToCommit,
+        ExecutionStatus, Transaction, TransactionInfo, TransactionOutput, TransactionStatus,
+        TransactionToCommit,
     },
+    write_set::WriteSet,
 };
 use rayon::prelude::*;
-use std::sync::Arc;
+use std::{iter::repeat, sync::Arc};
 
 pub struct ApplyChunkOutput;
 
@@ -39,6 +41,7 @@ impl ApplyChunkOutput {
     pub fn calculate_state_checkpoint(
         chunk_output: ChunkOutput,
         parent_state: &StateDelta,
+        append_state_checkpoint_to_block: Option<HashValue>,
         known_state_checkpoints: Option<Vec<Option<HashValue>>>,
         is_block: bool,
     ) -> Result<(StateDelta, Option<EpochState>, StateCheckpointOutput)> {
@@ -53,7 +56,11 @@ impl ApplyChunkOutput {
                 .start_timer();
             // Separate transactions with different VM statuses, i.e., Keep, Discard and Retry.
             // Will return transactions with Retry txns sorted after Keep/Discard txns.
-            Self::sort_transactions_with_state_checkpoint(transactions, transaction_outputs)?
+            Self::sort_transactions_with_state_checkpoint(
+                transactions,
+                transaction_outputs,
+                append_state_checkpoint_to_block,
+            )?
         };
 
         // Apply the write set, get the latest state.
@@ -156,6 +163,7 @@ impl ApplyChunkOutput {
             Self::calculate_state_checkpoint(
                 chunk_output,
                 base_view.state(),
+                None, // append_state_checkpoint_to_block
                 known_state_checkpoint_hashes,
                 /*is_block=*/ false,
             )?;
@@ -177,8 +185,9 @@ impl ApplyChunkOutput {
     }
 
     fn sort_transactions_with_state_checkpoint(
-        transactions: Vec<Transaction>,
+        mut transactions: Vec<Transaction>,
         transaction_outputs: Vec<TransactionOutput>,
+        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<(
         bool,
         Vec<TransactionStatus>,
@@ -186,71 +195,89 @@ impl ApplyChunkOutput {
         TransactionsWithParsedOutput,
         TransactionsWithParsedOutput,
     )> {
-        let transaction_outputs: Vec<ParsedTransactionOutput> =
+        let mut transaction_outputs: Vec<ParsedTransactionOutput> =
             transaction_outputs.into_iter().map(Into::into).collect();
+        // N.B. off-by-1 intentionally, for exclusive index
+        let new_epoch_marker = transaction_outputs
+            .iter()
+            .position(|o| o.is_reconfig())
+            .map(|idx| idx + 1);
 
-        // TODO: simplify and confirm that we don't depend on order of statuses
-        // Logic currently is to keep the order between to_keep and discart statuses,
-        // but put retries at the end.
-        let mut statuses = vec![];
-        let mut to_keep = vec![];
-        let mut to_discard = vec![];
-        let mut to_retry = vec![];
+        let block_gas_limit_marker = transaction_outputs
+            .iter()
+            .position(|o| matches!(o.status(), TransactionStatus::Retry));
 
-        let mut found_epoch_ended_marker = false;
-        let mut found_retry = false;
+        // Transactions after the epoch ending txn are all to be retried.
+        // Transactions after the txn that exceeded per-block gas limit are also to be retried.
+        let to_retry = if let Some(pos) = new_epoch_marker {
+            TransactionsWithParsedOutput::new(
+                transactions.drain(pos..).collect(),
+                transaction_outputs.drain(pos..).collect(),
+            )
+        } else if let Some(pos) = block_gas_limit_marker {
+            TransactionsWithParsedOutput::new(
+                transactions.drain(pos..).collect(),
+                transaction_outputs.drain(pos..).collect(),
+            )
+        } else {
+            TransactionsWithParsedOutput::new(vec![], vec![])
+        };
 
-        for (transaction, transaction_output) in
-            itertools::zip_eq(transactions, transaction_outputs)
-        {
-            match transaction_output.status() {
-                TransactionStatus::Keep(_) => {
-                    if found_epoch_ended_marker {
-                        error!("Found Keep transaction after epoch ending marker, discarding.");
-                        statuses.push(transaction_output.status().clone());
-                        to_discard.push((transaction, transaction_output));
-                        continue;
-                    }
-                    if found_retry && !matches!(transaction, Transaction::StateCheckpoint(_)) {
-                        error!("Found Keep non-StateCheckpoint transaction after retry, marking to retry.");
-                        to_retry.push((transaction, transaction_output));
-                        continue;
-                    }
-                    if transaction_output.is_reconfig() {
-                        found_epoch_ended_marker = true;
-                    }
-                    statuses.push(transaction_output.status().clone());
-                    to_keep.push((transaction, transaction_output))
-                },
-                TransactionStatus::Discard(_) => {
-                    // VM shouldn't have output anything for discarded transactions, log if it did.
-                    if !transaction_output.write_set().is_empty()
-                        || !transaction_output.events().is_empty()
-                    {
-                        error!(
-                            "Discarded transaction has non-empty write set or events. \
-                            Transaction: {:?}. Status: {:?}.",
-                            transaction,
-                            transaction_output.status(),
-                        );
-                        APTOS_EXECUTOR_ERRORS.inc();
-                    }
-                    statuses.push(transaction_output.status().clone());
-                    to_discard.push((transaction, transaction_output))
-                },
-                TransactionStatus::Retry => {
-                    found_retry = true;
-                    to_retry.push((transaction, transaction_output))
-                },
-            }
+        let state_checkpoint_to_add =
+            new_epoch_marker.map_or_else(|| append_state_checkpoint_to_block, |_| None);
+
+        let keeps_and_discards = transaction_outputs.iter().map(|t| t.status()).cloned();
+        let retries = repeat(TransactionStatus::Retry).take(to_retry.len());
+
+        let status = keeps_and_discards.chain(retries).collect();
+
+        // Separate transactions with the Keep status out.
+        let (mut to_keep, to_discard) = itertools::zip_eq(transactions, transaction_outputs)
+            .partition::<Vec<(Transaction, ParsedTransactionOutput)>, _>(|(_, o)| {
+                matches!(o.status(), TransactionStatus::Keep(_))
+            });
+
+        // Append the StateCheckpoint transaction to the end of to_keep
+        if let Some(block_id) = state_checkpoint_to_add {
+            let state_checkpoint_txn = Transaction::StateCheckpoint(block_id);
+            let state_checkpoint_txn_output: ParsedTransactionOutput =
+                Into::into(TransactionOutput::new(
+                    WriteSet::default(),
+                    Vec::new(),
+                    0,
+                    TransactionStatus::Keep(ExecutionStatus::Success),
+                ));
+            to_keep.push((state_checkpoint_txn, state_checkpoint_txn_output));
         }
 
+        // Sanity check transactions with the Discard status:
+        let to_discard = to_discard
+            .into_iter()
+            .map(|(t, o)| {
+                // In case a new status other than Retry, Keep and Discard is added:
+                if !matches!(o.status(), TransactionStatus::Discard(_)) {
+                    error!("Status other than Retry, Keep or Discard; Transaction discarded.");
+                }
+                // VM shouldn't have output anything for discarded transactions, log if it did.
+                if !o.write_set().is_empty() || !o.events().is_empty() {
+                    error!(
+                        "Discarded transaction has non-empty write set or events. \
+                     Transaction: {:?}. Status: {:?}.",
+                        t,
+                        o.status(),
+                    );
+                    APTOS_EXECUTOR_ERRORS.inc();
+                }
+                Ok((t, o))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
         Ok((
-            found_epoch_ended_marker,
-            statuses,
+            new_epoch_marker.is_some(),
+            status,
             to_keep.into(),
             to_discard.into(),
-            to_retry.into(),
+            to_retry,
         ))
     }
 

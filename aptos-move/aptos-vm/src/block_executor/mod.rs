@@ -58,13 +58,6 @@ impl AptosTransactionOutput {
         }
     }
 
-    pub(crate) fn new_from_committed_output(output: TransactionOutput) -> Self {
-        Self {
-            vm_output: Mutex::new(None),
-            committed_output: OnceCell::from(output),
-        }
-    }
-
     pub(crate) fn committed_output(&self) -> &TransactionOutput {
         self.committed_output.get().unwrap()
     }
@@ -396,7 +389,7 @@ impl BlockAptosVM {
         state_view: &S,
         config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,
-    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         let num_txns = signature_verified_block.len();
         if state_view.id() != StateViewId::Miscellaneous {
@@ -417,7 +410,7 @@ impl BlockAptosVM {
         let ret = executor.execute_block(state_view, signature_verified_block, state_view);
         match ret {
             Ok(block_output) => {
-                let (transaction_outputs, block_limit_info_transaction) = block_output.into_inner();
+                let transaction_outputs = block_output.into_inner();
                 let output_vec: Vec<_> = transaction_outputs
                     .into_iter()
                     .map(|output| output.take_output())
@@ -432,10 +425,7 @@ impl BlockAptosVM {
                     flush_speculative_logs(pos);
                 }
 
-                Ok(BlockOutput::new(
-                    output_vec,
-                    block_limit_info_transaction.map(|(txn, output)| (txn, output.take_output())),
-                ))
+                Ok(BlockOutput::new(output_vec))
             },
             Err(Error::FallbackToSequential(e)) => {
                 unreachable!(

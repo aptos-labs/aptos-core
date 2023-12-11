@@ -93,8 +93,8 @@ impl VMExecutor for FakeVM {
         _transactions: &[SignatureVerifiedTransaction],
         _state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
-        Ok(BlockOutput::new(vec![], None))
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+        Ok(BlockOutput::new(vec![]))
     }
 }
 

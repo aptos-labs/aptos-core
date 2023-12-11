@@ -411,6 +411,42 @@ impl StateComputeResult {
         &self.compute_status
     }
 
+    pub fn transactions_to_commit(
+        &self,
+        input_txns: Vec<Transaction>,
+        block_id: HashValue,
+    ) -> Vec<Transaction> {
+        let output = itertools::zip_eq(input_txns, self.compute_status())
+            .filter_map(|(txn, status)| {
+                assert!(
+                    !matches!(txn, Transaction::StateCheckpoint(_)),
+                    "{:?}: {:?}",
+                    txn,
+                    status
+                );
+                match status {
+                    TransactionStatus::Keep(_) => Some(txn),
+                    _ => None,
+                }
+            })
+            .chain((!self.has_reconfiguration()).then_some(Transaction::StateCheckpoint(block_id)))
+            .collect::<Vec<_>>();
+
+        assert!(
+            self.has_reconfiguration()
+                || matches!(output.last(), Some(Transaction::StateCheckpoint(_))),
+            "{:?}",
+            output.last()
+        );
+
+        println!(
+            "Transactions to commit {:?}",
+            output.iter().map(|txn| txn.type_name()).collect::<Vec<_>>()
+        );
+
+        output
+    }
+
     pub fn epoch_state(&self) -> &Option<EpochState> {
         &self.epoch_state
     }

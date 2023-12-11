@@ -124,7 +124,6 @@ impl ExecutionPipeline {
         let input_txns = input_txns.unwrap();
         tokio::task::spawn_blocking(move || {
             let txns_to_execute = Block::transactions_to_execute_for_metadata(
-                block.id(),
                 validator_txns,
                 input_txns.clone(),
                 metadata,

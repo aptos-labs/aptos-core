@@ -158,7 +158,7 @@ pub trait VMExecutor: Send + Sync {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus>;
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus>;
 
     /// Executes a block of transactions and returns output for each one of them,
     /// Without applying any block limit

@@ -83,6 +83,10 @@ impl StateCheckpointOutput {
         self.txns.txn_statuses()
     }
 
+    pub fn txns_to_keep_len(&self) -> usize {
+        self.txns.to_keep.len()
+    }
+
     pub fn into_inner(
         self,
     ) -> (

@@ -5,14 +5,14 @@
 #![forbid(unsafe_code)]
 
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
-use anyhow::{bail, Result};
+use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_executor_service::{
     local_executor_helper::SHARDED_BLOCK_EXECUTOR,
     remote_executor_client::{get_remote_addresses, REMOTE_SHARDED_BLOCK_EXECUTOR},
 };
 use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, ExecutedChunk};
-use aptos_logger::{error, sample, sample::SampleRate, warn};
+use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
     state_delta::StateDelta,
@@ -65,26 +65,14 @@ impl ChunkOutput {
     }
 
     fn by_transaction_execution_unsharded<V: VMExecutor>(
-        mut transactions: Vec<SignatureVerifiedTransaction>,
+        transactions: Vec<SignatureVerifiedTransaction>,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Self> {
         let block_output = Self::execute_block::<V>(&transactions, &state_view, onchain_config)?;
 
-        let (mut transaction_outputs, block_limit_info_transaction) = block_output.into_inner();
-
-        if let Some((txn, output)) = block_limit_info_transaction {
-            if let Some(SignatureVerifiedTransaction::Valid(Transaction::StateCheckpoint(_))) =
-                transactions.last()
-            {
-                transactions.insert(transactions.len() - 1, txn);
-                transaction_outputs.insert(transaction_outputs.len() - 1, output);
-            } else {
-                error!("StateCheckpoint transaction is not the last transaction in the block that has block_limit_info_transaction.");
-                bail!("StateCheckpoint transaction is not the last transaction in the block that has block_limit_info_transaction.");
-            }
-        }
-
+        let transaction_outputs = block_output.into_inner();
+        // TODO add block_limit_info to ChunkOutput, to add it to StateCheckpoint
         Ok(Self {
             transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
             transaction_outputs,
@@ -158,6 +146,7 @@ impl ChunkOutput {
     pub fn into_state_checkpoint_output(
         self,
         parent_state: &StateDelta,
+        block_id: HashValue,
     ) -> Result<(StateDelta, Option<EpochState>, StateCheckpointOutput)> {
         fail_point!("executor::into_state_checkpoint_output", |_| {
             Err(anyhow::anyhow!(
@@ -170,6 +159,7 @@ impl ChunkOutput {
         ApplyChunkOutput::calculate_state_checkpoint(
             self,
             parent_state,
+            Some(block_id),
             None,
             /*is_block=*/ true,
         )
@@ -204,7 +194,7 @@ impl ChunkOutput {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>> {
+    ) -> Result<BlockOutput<TransactionOutput>> {
         Ok(V::execute_block(transactions, state_view, onchain_config)?)
     }
 
@@ -217,7 +207,7 @@ impl ChunkOutput {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>> {
+    ) -> Result<BlockOutput<TransactionOutput>> {
         use aptos_state_view::{StateViewId, TStateView};
         use aptos_types::write_set::WriteSet;
 

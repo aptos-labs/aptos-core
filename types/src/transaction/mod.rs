@@ -1252,30 +1252,35 @@ impl TransactionOutputProvider for TransactionOutput {
     }
 }
 
-pub struct BlockOutput<Txn, Output> {
+#[derive(Debug)]
+pub struct BlockOutput<Output: Debug> {
     transaction_outputs: Vec<Output>,
-    block_limit_info_transaction: Option<(Txn, Output)>,
+    // TODO add block_limit_info
 }
 
-impl<Txn, Output> BlockOutput<Txn, Output> {
-    pub fn new(
-        transaction_outputs: Vec<Output>,
-        block_limit_info_transaction: Option<(Txn, Output)>,
-    ) -> Self {
+impl<Output: Debug> BlockOutput<Output> {
+    pub fn new(transaction_outputs: Vec<Output>) -> Self {
         Self {
             transaction_outputs,
-            block_limit_info_transaction,
         }
     }
 
     /// If block limit is not set (i.e. in tests), we can safely unwrap here
     pub fn into_transaction_outputs_forced(self) -> Vec<Output> {
-        assert!(self.block_limit_info_transaction.is_none());
+        // TODO assert there is no block limit info?
+        // assert!(self.block_limit_info_transaction.is_none());
         self.transaction_outputs
     }
 
-    pub fn into_inner(self) -> (Vec<Output>, Option<(Txn, Output)>) {
-        (self.transaction_outputs, self.block_limit_info_transaction)
+    // TODO add block_limit_info
+    pub fn into_inner(self) -> Vec<Output> {
+        self.transaction_outputs
+    }
+
+    pub fn get_transaction_outputs_forced(&self) -> &[Output] {
+        // TODO assert there is no block limit info?
+        // assert!(self.block_limit_info_transaction.is_none());
+        &self.transaction_outputs
     }
 }
 

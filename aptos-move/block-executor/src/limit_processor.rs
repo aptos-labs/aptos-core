@@ -206,6 +206,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         self.finish_update_counters_and_log_info(false, num_committed, num_total)
     }
 
+    #[allow(unused)]
     pub(crate) fn is_block_limit_reached(&self) -> bool {
         self.block_limit_reached
     }

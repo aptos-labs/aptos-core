@@ -451,7 +451,7 @@ pub fn test_execution_with_storage_impl_inner(
 
     let transaction_list_with_proof = db
         .reader
-        .get_transactions(14, 16, current_version, false)
+        .get_transactions(14, 15, current_version, false)
         .unwrap();
     let expected_txns: Vec<Transaction> = block3.iter().map(|t| t.expect_valid().clone()).collect();
     verify_transactions(&transaction_list_with_proof, &expected_txns).unwrap();
