@@ -19,9 +19,9 @@ spec aptos_framework::account {
 
         aborts_if !exists<Account>(account_address) && (
             account_address == @vm_reserved
-            || account_address == @aptos_framework
-            || account_address == @aptos_token
-            || !(len(authentication_key) == 32)
+                || account_address == @aptos_framework
+                || account_address == @aptos_token
+                || !(len(authentication_key) == 32)
         );
         ensures exists<Account>(account_address);
     }
@@ -31,7 +31,7 @@ spec aptos_framework::account {
     /// The Account does not exist under the new address before creating the account.
     /// Limit the new account address is not @vm_reserved / @aptos_framework / @aptos_toke.
     spec create_account(new_address: address): signer {
-        include CreateAccountAbortsIf {addr: new_address};
+        include CreateAccountAbortsIf { addr: new_address };
         aborts_if new_address == @vm_reserved || new_address == @aptos_framework || new_address == @aptos_token;
         ensures signer::address_of(result) == new_address;
         ensures exists<Account>(new_address);
@@ -40,7 +40,7 @@ spec aptos_framework::account {
     /// Check if the bytes of the new address is 32.
     /// The Account does not exist under the new address before creating the account.
     spec create_account_unchecked(new_address: address): signer {
-        include CreateAccountAbortsIf {addr: new_address};
+        include CreateAccountAbortsIf { addr: new_address };
         ensures signer::address_of(result) == new_address;
         ensures exists<Account>(new_address);
     }
@@ -94,12 +94,22 @@ spec aptos_framework::account {
         ensures account_resource.authentication_key == new_auth_key;
     }
 
-    spec fun spec_assert_valid_rotation_proof_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: RotationProofChallenge): vector<u8>;
+    spec fun spec_assert_valid_rotation_proof_signature_and_get_auth_key(
+        scheme: u8,
+        public_key_bytes: vector<u8>,
+        signature: vector<u8>,
+        challenge: RotationProofChallenge
+    ): vector<u8>;
 
     spec assert_valid_rotation_proof_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: &RotationProofChallenge): vector<u8> {
         pragma opaque;
         include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf;
-        ensures [abstract] result == spec_assert_valid_rotation_proof_signature_and_get_auth_key(scheme, public_key_bytes, signature, challenge);
+        ensures [abstract] result == spec_assert_valid_rotation_proof_signature_and_get_auth_key(
+            scheme,
+            public_key_bytes,
+            signature,
+            challenge
+        );
     }
     spec schema AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf {
         scheme: u8;
@@ -128,13 +138,13 @@ spec aptos_framework::account {
     /// The Account existed under the signer
     /// The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
     spec rotate_authentication_key(
-        account: &signer,
-        from_scheme: u8,
-        from_public_key_bytes: vector<u8>,
-        to_scheme: u8,
-        to_public_key_bytes: vector<u8>,
-        cap_rotate_key: vector<u8>,
-        cap_update_table: vector<u8>,
+    account: &signer,
+    from_scheme: u8,
+    from_public_key_bytes: vector<u8>,
+    to_scheme: u8,
+    to_public_key_bytes: vector<u8>,
+    cap_rotate_key: vector<u8>,
+    cap_update_table: vector<u8>,
     ) {
         let addr = signer::address_of(account);
         let account_resource = global<Account>(addr);
@@ -178,7 +188,12 @@ spec aptos_framework::account {
 
         // Verify all properties in update_auth_key_and_originating_address_table
         let originating_addr = addr;
-        let new_auth_key_vector = spec_assert_valid_rotation_proof_signature_and_get_auth_key(to_scheme, to_public_key_bytes, cap_update_table, challenge);
+        let new_auth_key_vector = spec_assert_valid_rotation_proof_signature_and_get_auth_key(
+            to_scheme,
+            to_public_key_bytes,
+            cap_update_table,
+            challenge
+        );
 
         let address_map = global<OriginatingAddress>(@aptos_framework).address_map;
         let new_auth_key = from_bcs::deserialize<address>(new_auth_key_vector);
@@ -198,15 +213,14 @@ spec aptos_framework::account {
 
         let post auth_key = global<Account>(addr).authentication_key;
         ensures auth_key == new_auth_key_vector;
-
     }
 
     spec rotate_authentication_key_with_rotation_capability(
-        delegate_signer: &signer,
-        rotation_cap_offerer_address: address,
-        new_scheme: u8,
-        new_public_key_bytes: vector<u8>,
-        cap_update_table: vector<u8>
+    delegate_signer: &signer,
+    rotation_cap_offerer_address: address,
+    new_scheme: u8,
+    new_public_key_bytes: vector<u8>,
+    cap_update_table: vector<u8>
     ) {
         aborts_if !exists<Account>(rotation_cap_offerer_address);
         let delegate_address = signer::address_of(delegate_signer);
@@ -228,7 +242,12 @@ spec aptos_framework::account {
             challenge: challenge,
         };
 
-        let new_auth_key_vector = spec_assert_valid_rotation_proof_signature_and_get_auth_key(new_scheme, new_public_key_bytes, cap_update_table, challenge);
+        let new_auth_key_vector = spec_assert_valid_rotation_proof_signature_and_get_auth_key(
+            new_scheme,
+            new_public_key_bytes,
+            cap_update_table,
+            challenge
+        );
         let address_map = global<OriginatingAddress>(@aptos_framework).address_map;
 
         // Verify all properties in update_auth_key_and_originating_address_table
@@ -251,11 +270,11 @@ spec aptos_framework::account {
     }
 
     spec offer_rotation_capability(
-        account: &signer,
-        rotation_capability_sig_bytes: vector<u8>,
-        account_scheme: u8,
-        account_public_key_bytes: vector<u8>,
-        recipient_address: address,
+    account: &signer,
+    rotation_capability_sig_bytes: vector<u8>,
+    account_scheme: u8,
+    account_public_key_bytes: vector<u8>,
+    recipient_address: address,
     ) {
         let source_address = signer::address_of(account);
         let account_resource = global<Account>(source_address);
@@ -284,7 +303,9 @@ spec aptos_framework::account {
 
         include account_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: account_public_key_bytes };
         aborts_if account_scheme == MULTI_ED25519_SCHEME && ({
-            let expected_auth_key = multi_ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);
+            let expected_auth_key = multi_ed25519::spec_public_key_bytes_to_authentication_key(
+                account_public_key_bytes
+            );
             account_resource.authentication_key != expected_auth_key
         });
         include account_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewSignatureFromBytesAbortsIf { bytes: rotation_capability_sig_bytes };
@@ -304,11 +325,11 @@ spec aptos_framework::account {
     /// The Account existed under the signer.
     /// The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME.
     spec offer_signer_capability(
-        account: &signer,
-        signer_capability_sig_bytes: vector<u8>,
-        account_scheme: u8,
-        account_public_key_bytes: vector<u8>,
-        recipient_address: address
+    account: &signer,
+    signer_capability_sig_bytes: vector<u8>,
+    account_scheme: u8,
+    account_public_key_bytes: vector<u8>,
+    recipient_address: address
     ) {
         let source_address = signer::address_of(account);
         let account_resource = global<Account>(source_address);
@@ -335,7 +356,9 @@ spec aptos_framework::account {
 
         include account_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: account_public_key_bytes };
         aborts_if account_scheme == MULTI_ED25519_SCHEME && ({
-            let expected_auth_key = multi_ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);
+            let expected_auth_key = multi_ed25519::spec_public_key_bytes_to_authentication_key(
+                account_public_key_bytes
+            );
             account_resource.authentication_key != expected_auth_key
         });
         include account_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewSignatureFromBytesAbortsIf { bytes: signer_capability_sig_bytes };
@@ -379,7 +402,7 @@ spec aptos_framework::account {
         let addr = signer::address_of(account);
         let account_resource = global<Account>(addr);
         aborts_if !exists<Account>(addr);
-        aborts_if !option::spec_contains(account_resource.signer_capability_offer.for,to_be_revoked_address);
+        aborts_if !option::spec_contains(account_resource.signer_capability_offer.for, to_be_revoked_address);
         modifies global<Account>(addr);
         ensures exists<Account>(to_be_revoked_address);
     }
@@ -396,7 +419,7 @@ spec aptos_framework::account {
         let addr = signer::address_of(account);
         let account_resource = global<Account>(addr);
         aborts_if !exists<Account>(addr);
-        aborts_if !option::spec_contains(account_resource.rotation_capability_offer.for,to_be_revoked_address);
+        aborts_if !option::spec_contains(account_resource.rotation_capability_offer.for, to_be_revoked_address);
         modifies global<Account>(addr);
         ensures exists<Account>(to_be_revoked_address);
         let post offer_for = global<Account>(addr).rotation_capability_offer.for;
@@ -416,7 +439,7 @@ spec aptos_framework::account {
     /// The Account existed under the signer.
     /// The value of signer_capability_offer.for of Account resource under the signer is offerer_address.
     spec create_authorized_signer(account: &signer, offerer_address: address): signer {
-        include AccountContainsAddr{
+        include AccountContainsAddr {
             account: account,
             address: offerer_address,
         };
@@ -431,7 +454,7 @@ spec aptos_framework::account {
         let addr = signer::address_of(account);
         let account_resource = global<Account>(address);
         aborts_if !exists<Account>(address);
-        aborts_if !option::spec_contains(account_resource.signer_capability_offer.for,addr);
+        aborts_if !option::spec_contains(account_resource.signer_capability_offer.for, addr);
     }
 
     /// The Account existed under the signer
@@ -452,7 +475,7 @@ spec aptos_framework::account {
 
         aborts_if len(ZERO_AUTH_KEY) != 32;
         include exists_at(resource_addr) ==> CreateResourceAccountAbortsIf;
-        include !exists_at(resource_addr) ==> CreateAccountAbortsIf {addr: resource_addr};
+        include !exists_at(resource_addr) ==> CreateAccountAbortsIf { addr: resource_addr };
 
         ensures signer::address_of(result_1) == resource_addr;
         let post offer_for = global<Account>(resource_addr).signer_capability_offer.for;
@@ -465,22 +488,22 @@ spec aptos_framework::account {
     /// The system reserved addresses is @0x1 / @0x2 / @0x3 / @0x4 / @0x5  / @0x6 / @0x7 / @0x8 / @0x9 / @0xa.
     spec create_framework_reserved_account(addr: address): (signer, SignerCapability) {
         aborts_if spec_is_framework_address(addr);
-        include CreateAccountAbortsIf {addr};
+        include CreateAccountAbortsIf { addr };
         ensures signer::address_of(result_1) == addr;
         ensures result_2 == SignerCapability { account: addr };
     }
 
-    spec fun spec_is_framework_address(addr: address): bool{
+    spec fun spec_is_framework_address(addr: address): bool {
         addr != @0x1 &&
-        addr != @0x2 &&
-        addr != @0x3 &&
-        addr != @0x4 &&
-        addr != @0x5 &&
-        addr != @0x6 &&
-        addr != @0x7 &&
-        addr != @0x8 &&
-        addr != @0x9 &&
-        addr != @0xa
+            addr != @0x2 &&
+            addr != @0x3 &&
+            addr != @0x4 &&
+            addr != @0x5 &&
+            addr != @0x6 &&
+            addr != @0x7 &&
+            addr != @0x8 &&
+            addr != @0x9 &&
+            addr != @0xa
     }
 
     /// The Account existed under the signer.
@@ -508,11 +531,7 @@ spec aptos_framework::account {
         aborts_if account.guid_creation_num + 1 >= MAX_GUID_CREATION_NUM;
     }
 
-    spec register_coin<CoinType>(account_addr: address) {
-        aborts_if !exists<Account>(account_addr);
-        aborts_if !type_info::spec_is_struct<CoinType>();
-        modifies global<Account>(account_addr);
-    }
+    spec register_coin<CoinType>(_account_addr: address) {}
 
     spec create_signer_with_capability(capability: &SignerCapability): signer {
         let addr = capability.account;
@@ -527,9 +546,9 @@ spec aptos_framework::account {
     }
 
     spec update_auth_key_and_originating_address_table(
-        originating_addr: address,
-        account_resource: &mut Account,
-        new_auth_key_vector: vector<u8>,
+    originating_addr: address,
+    account_resource: &mut Account,
+    new_auth_key_vector: vector<u8>,
     ) {
         modifies global<OriginatingAddress>(@aptos_framework);
         include UpdateAuthKeyAndOriginatingAddressTableAbortsIf;
@@ -548,15 +567,18 @@ spec aptos_framework::account {
         aborts_if !from_bcs::deserializable<address>(new_auth_key_vector);
         aborts_if curr_auth_key != new_auth_key && table::spec_contains(address_map, new_auth_key);
 
-        ensures table::spec_contains(global<OriginatingAddress>(@aptos_framework).address_map, from_bcs::deserialize<address>(new_auth_key_vector));
+        ensures table::spec_contains(
+            global<OriginatingAddress>(@aptos_framework).address_map,
+            from_bcs::deserialize<address>(new_auth_key_vector)
+        );
     }
 
     spec verify_signed_message<T: drop>(
-        account: address,
-        account_scheme: u8,
-        account_public_key: vector<u8>,
-        signed_message_bytes: vector<u8>,
-        message: T,
+    account: address,
+    account_scheme: u8,
+    account_public_key: vector<u8>,
+    signed_message_bytes: vector<u8>,
+    message: T,
     ) {
         pragma aborts_if_is_partial;
 

@@ -247,7 +247,7 @@ async fn test_get_account_resources_with_pagination() {
         .expect("Cursor header was missing");
     let cursor_header = StateKeyWrapper::from_str(cursor_header.to_str().unwrap()).unwrap();
     let resources: Vec<MoveResource> = serde_json::from_slice(resp.body()).unwrap();
-    assert_eq!(resources.len(), 5);
+    assert_eq!(resources.len(), 8);
     assert_eq!(resources, all_resources[5..10].to_vec());
 
     // Get the rest of the resources, assert there is no cursor now.

@@ -254,11 +254,11 @@ spec aptos_framework::object {
         ensures result == ConstructorRef { self: obj_addr, can_delete: true };
     }
 
-    spec create_object_internal(
-    creator_address: address,
-    object: address,
-    can_delete: bool,
-    ): ConstructorRef {
+    spec create_object_at_address(owner_address: address, object_address: address, can_delete: bool): ConstructorRef {
+        pragma verify = false;
+    }
+
+    spec create_object_internal(creator_address: address, object: address, can_delete: bool): ConstructorRef {
         // property 1: Creating an object twice on the same address must never occur.
         aborts_if exists<ObjectCore>(object);
         ensures exists<ObjectCore>(object);

@@ -17,7 +17,7 @@
         "data": {
           "authentication_key": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
           "coin_register_events": {
-            "counter": "1",
+            "counter": "0",
             "guid": {
               "id": {
                 "addr": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
@@ -25,7 +25,7 @@
               }
             }
           },
-          "guid_creation_num": "4",
+          "guid_creation_num": "2",
           "key_rotation_events": {
             "counter": "0",
             "guid": {

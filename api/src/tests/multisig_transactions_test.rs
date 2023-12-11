@@ -23,7 +23,7 @@ async fn test_multisig_transaction_with_payload_succeeds() {
         .create_multisig_account(
             owner_account_1,
             vec![owner_account_2.address(), owner_account_3.address()],
-            2,    /* 2-of-3 */
+            2, /* 2-of-3 */
             1000, /* initial balance */
         )
         .await;
@@ -79,7 +79,7 @@ async fn test_multisig_transaction_to_update_owners() {
             ])]),
         ),
     ))
-    .unwrap();
+        .unwrap();
     context
         .create_multisig_transaction(
             owner_account_1,
@@ -102,7 +102,7 @@ async fn test_multisig_transaction_to_update_owners() {
         owner_account_3.address(),
         owner_account_4.address(),
     ])
-    .await;
+        .await;
 
     let remove_owners_payload = bcs::to_bytes(&MultisigTransactionPayload::EntryFunction(
         EntryFunction::new(
@@ -114,7 +114,7 @@ async fn test_multisig_transaction_to_update_owners() {
             ])]),
         ),
     ))
-    .unwrap();
+        .unwrap();
     context
         .create_multisig_transaction(
             owner_account_1,
@@ -135,7 +135,7 @@ async fn test_multisig_transaction_to_update_owners() {
         owner_account_2.address(),
         owner_account_3.address(),
     ])
-    .await;
+        .await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -147,7 +147,7 @@ async fn test_multisig_transaction_update_signature_threshold() {
         .create_multisig_account(
             owner_account_1,
             vec![owner_account_2.address()],
-            2,    /* 2-of-2 */
+            2, /* 2-of-2 */
             1000, /* initial balance */
         )
         .await;
@@ -161,7 +161,7 @@ async fn test_multisig_transaction_update_signature_threshold() {
             serialize_values(&vec![MoveValue::U64(1)]),
         ),
     ))
-    .unwrap();
+        .unwrap();
     context
         .create_multisig_transaction(
             owner_account_1,
@@ -183,7 +183,7 @@ async fn test_multisig_transaction_update_signature_threshold() {
         signature_threshold_payload,
         1,
     )
-    .await;
+        .await;
     assert_signature_threshold(&context, multisig_account, 1).await;
 }
 
@@ -343,7 +343,7 @@ async fn test_multisig_transaction_simulation() {
         .create_multisig_account(
             owner_account_1,
             vec![owner_account_2.address(), owner_account_3.address()],
-            2,    /* 2-of-3 */
+            2, /* 2-of-3 */
             1000, /* initial balance */
         )
         .await;
@@ -367,14 +367,9 @@ async fn test_multisig_transaction_simulation() {
     let withdraw_event = &simulation_resp["events"].as_array().unwrap()[0];
     assert_eq!(
         withdraw_event["type"].as_str().unwrap(),
-        "0x1::coin::WithdrawEvent"
+        "0x1::fungible_asset::WithdrawEvent"
     );
-    let withdraw_from_account = AccountAddress::from_hex_literal(
-        withdraw_event["guid"]["account_address"].as_str().unwrap(),
-    )
-    .unwrap();
     let withdrawn_amount = withdraw_event["data"]["amount"].as_str().unwrap();
-    assert_eq!(withdraw_from_account, multisig_account);
     assert_eq!(withdrawn_amount, "1000");
 
     // Simulating transferring more than what the multisig account has should fail.
@@ -400,7 +395,7 @@ async fn test_simulate_multisig_transaction_should_charge_gas_against_sender() {
         .create_multisig_account(
             owner_account,
             vec![],
-            1,  /* 1-of-1 */
+            1, /* 1-of-1 */
             10, /* initial balance */
         )
         .await;
@@ -477,7 +472,7 @@ fn construct_multisig_txn_transfer_payload(recipient: AccountAddress, amount: u6
             serialize_values(&vec![MoveValue::Address(recipient), MoveValue::U64(amount)]),
         ),
     ))
-    .unwrap()
+        .unwrap()
 }
 
 async fn assert_multisig_tx_executed(
@@ -513,7 +508,7 @@ async fn assert_multisig_tx_execution_failed(
         transaction_execution_failed_events.as_array().unwrap();
     assert_eq!(1, transaction_execution_failed_events.len());
     let event_data = &transaction_execution_failed_events[sequence_number - 1]["data"];
-    assert_eq!("65542", event_data["execution_error"]["error_code"]);
+    assert_eq!("65540", event_data["execution_error"]["error_code"]);
     let expected_payload = format!("0x{}", hex::encode(payload));
-    assert_eq!(expected_payload, event_data["transaction_payload"],);
+    assert_eq!(expected_payload, event_data["transaction_payload"], );
 }

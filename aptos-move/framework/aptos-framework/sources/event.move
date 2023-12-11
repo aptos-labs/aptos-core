@@ -8,6 +8,7 @@ module aptos_framework::event {
     use aptos_framework::guid::GUID;
 
     friend aptos_framework::account;
+    friend aptos_framework::lite_account;
     friend aptos_framework::object;
 
     /// Emit a module event with payload `msg`.
@@ -36,6 +37,13 @@ module aptos_framework::event {
         counter: u64,
         /// A globally unique ID for this event stream.
         guid: GUID,
+    }
+
+    public fun destory_handle<T: drop + store>(event_handle: EventHandle<T>) {
+        let EventHandle<T> {
+            counter: _,
+            guid: _,
+        } = event_handle;
     }
 
     #[deprecated]

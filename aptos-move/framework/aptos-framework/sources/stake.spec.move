@@ -92,7 +92,7 @@ spec aptos_framework::stake {
         aborts_if amount != 0 && !exists<StakePool>(pool_address);
         modifies global<StakePool>(pool_address);
         include StakedValueNochange;
-        let min_amount = aptos_std::math64::min(amount,pre_stake_pool.active.value);
+        let min_amount = aptos_std::math64::min(amount, pre_stake_pool.active.value);
 
         ensures stake_pool.active.value == pre_stake_pool.active.value - min_amount;
         ensures stake_pool.pending_inactive.value == pre_stake_pool.pending_inactive.value + min_amount;
@@ -119,10 +119,10 @@ spec aptos_framework::stake {
     }
 
     spec update_network_and_fullnode_addresses(
-        operator: &signer,
-        pool_address: address,
-        new_network_addresses: vector<u8>,
-        new_fullnode_addresses: vector<u8>,
+    operator: &signer,
+    pool_address: address,
+    new_network_addresses: vector<u8>,
+    new_fullnode_addresses: vector<u8>,
     ) {
         let pre_stake_pool = global<StakePool>(pool_address);
         let post validator_info = global<ValidatorConfig>(pool_address);
@@ -163,10 +163,10 @@ spec aptos_framework::stake {
     }
 
     spec rotate_consensus_key(
-        operator: &signer,
-        pool_address: address,
-        new_consensus_pubkey: vector<u8>,
-        proof_of_possession: vector<u8>,
+    operator: &signer,
+    pool_address: address,
+    new_consensus_pubkey: vector<u8>,
+    proof_of_possession: vector<u8>,
     ) {
         pragma aborts_if_is_partial;
         let pre_stake_pool = global<StakePool>(pool_address);
@@ -210,7 +210,9 @@ spec aptos_framework::stake {
         let validator_perf = global<ValidatorPerformance>(@aptos_framework);
         let post post_validator_perf = global<ValidatorPerformance>(@aptos_framework);
         let validator_len = len(validator_perf.validators);
-        ensures (option::spec_is_some(ghost_proposer_idx) && option::spec_borrow(ghost_proposer_idx) < validator_len) ==>
+        ensures (option::spec_is_some(ghost_proposer_idx) && option::spec_borrow(
+            ghost_proposer_idx
+        ) < validator_len) ==>
             (post_validator_perf.validators[option::spec_borrow(ghost_proposer_idx)].successful_proposals ==
                 validator_perf.validators[option::spec_borrow(ghost_proposer_idx)].successful_proposals + 1);
     }
@@ -231,12 +233,24 @@ spec aptos_framework::stake {
         let rewards_rate = spec_get_reward_rate_1(staking_config);
         let rewards_rate_denominator = spec_get_reward_rate_2(staking_config);
         let rewards_amount_1 = if (stake_pool.active.value > 0) {
-            spec_rewards_amount(stake_pool.active.value, num_successful_proposals, num_total_proposals, rewards_rate, rewards_rate_denominator)
+            spec_rewards_amount(
+                stake_pool.active.value,
+                num_successful_proposals,
+                num_total_proposals,
+                rewards_rate,
+                rewards_rate_denominator
+            )
         } else {
             0
         };
         let rewards_amount_2 = if (stake_pool.pending_inactive.value > 0) {
-            spec_rewards_amount(stake_pool.pending_inactive.value, num_successful_proposals, num_total_proposals, rewards_rate, rewards_rate_denominator)
+            spec_rewards_amount(
+                stake_pool.pending_inactive.value,
+                num_successful_proposals,
+                num_total_proposals,
+                rewards_rate,
+                rewards_rate_denominator
+            )
         } else {
             0
         };
@@ -248,16 +262,22 @@ spec aptos_framework::stake {
         let post post_inactive_value = post_stake_pool.inactive.value;
         ensures post_stake_pool.pending_active.value == 0;
         // the amount stored in the stake pool should not changed after the update
-        ensures if (features::spec_is_enabled(features::COLLECT_AND_DISTRIBUTE_GAS_FEES) && table::spec_contains(fees_table, pool_address)) {
+        ensures if (features::spec_is_enabled(features::COLLECT_AND_DISTRIBUTE_GAS_FEES) && table::spec_contains(
+            fees_table,
+            pool_address
+        )) {
             !table::spec_contains(post_fees_table, pool_address) &&
-            post_active_value == stake_pool.active.value + rewards_amount_1 + stake_pool.pending_active.value + table::spec_get(fees_table, pool_address).value
+                post_active_value == stake_pool.active.value + rewards_amount_1 + stake_pool.pending_active.value + table::spec_get(
+                    fees_table,
+                    pool_address
+                ).value
         } else {
             post_active_value == stake_pool.active.value + rewards_amount_1 + stake_pool.pending_active.value
         };
         // when current lockup cycle has expired, pending inactive should be fully unlocked and moved into inactive
         ensures if (timestamp::spec_now_seconds() >= stake_pool.locked_until_secs) {
             post_pending_inactive_value == 0 &&
-            post_inactive_value == stake_pool.inactive.value + stake_pool.pending_inactive.value + rewards_amount_2
+                post_inactive_value == stake_pool.inactive.value + stake_pool.pending_inactive.value + rewards_amount_2
         } else {
             post_pending_inactive_value == stake_pool.pending_inactive.value + rewards_amount_2
         };
@@ -278,8 +298,8 @@ spec aptos_framework::stake {
 
         let stake_pool = global<StakePool>(pool_address);
 
-        include DistributeRewardsAbortsIf {stake: stake_pool.active};
-        include DistributeRewardsAbortsIf {stake: stake_pool.pending_inactive};
+        include DistributeRewardsAbortsIf { stake: stake_pool.active };
+        include DistributeRewardsAbortsIf { stake: stake_pool.pending_inactive };
     }
 
     spec distribute_rewards {
@@ -320,7 +340,13 @@ spec aptos_framework::stake {
 
         let stake_amount = coin::value(stake);
         let rewards_amount = if (stake_amount > 0) {
-            spec_rewards_amount(stake_amount, num_successful_proposals, num_total_proposals, rewards_rate, rewards_rate_denominator)
+            spec_rewards_amount(
+                stake_amount,
+                num_successful_proposals,
+                num_total_proposals,
+                rewards_rate,
+                rewards_rate_denominator
+            )
         } else {
             0
         };
@@ -361,7 +387,7 @@ spec aptos_framework::stake {
         ensures option::is_some(result) ==> v[option::borrow(result)].addr == addr;
         // Additional postcondition to help the quantifier instantiation.
         ensures option::is_some(result) ==> spec_contains(v, addr);
-        ensures [abstract] result == spec_find_validator(v,addr);
+        ensures [abstract] result == spec_find_validator(v, addr);
     }
 
     spec append {
@@ -395,7 +421,10 @@ spec aptos_framework::stake {
         let validator_set = global<ValidatorSet>(@aptos_framework);
         ensures result == VALIDATOR_STATUS_PENDING_ACTIVE ==> spec_contains(validator_set.pending_active, pool_address);
         ensures result == VALIDATOR_STATUS_ACTIVE ==> spec_contains(validator_set.active_validators, pool_address);
-        ensures result == VALIDATOR_STATUS_PENDING_INACTIVE ==> spec_contains(validator_set.pending_inactive, pool_address);
+        ensures result == VALIDATOR_STATUS_PENDING_INACTIVE ==> spec_contains(
+            validator_set.pending_inactive,
+            pool_address
+        );
         ensures result == VALIDATOR_STATUS_INACTIVE ==> (
             !spec_contains(validator_set.pending_active, pool_address)
                 && !spec_contains(validator_set.active_validators, pool_address)
@@ -410,6 +439,7 @@ spec aptos_framework::stake {
     }
 
     spec add_stake {
+        pragma aborts_if_is_partial;
         include ResourceRequirement;
         include AddStakeAbortsIfAndEnsures;
     }
@@ -428,7 +458,7 @@ spec aptos_framework::stake {
             post_collected_fee.value == collected_fee.value + fee.value
         } else {
             table::spec_contains(post_fees_table, validator_addr) &&
-            table::spec_get(post_fees_table, validator_addr) == fee
+                table::spec_get(post_fees_table, validator_addr) == fee
         };
     }
 
@@ -483,19 +513,23 @@ spec aptos_framework::stake {
         let voting_power_increase_limit = config.voting_power_increase_limit;
         let post post_validator_set = global<ValidatorSet>(@aptos_framework);
         let update_voting_power_increase = amount != 0 && (spec_contains(validator_set.active_validators, pool_address)
-                                                           || spec_contains(validator_set.pending_active, pool_address));
+            || spec_contains(validator_set.pending_active, pool_address));
         aborts_if update_voting_power_increase && validator_set.total_joining_power + amount > MAX_U128;
         ensures update_voting_power_increase ==> post_validator_set.total_joining_power == validator_set.total_joining_power + amount;
         aborts_if update_voting_power_increase && validator_set.total_voting_power > 0
-                && validator_set.total_voting_power * voting_power_increase_limit > MAX_U128;
+            && validator_set.total_voting_power * voting_power_increase_limit > MAX_U128;
         aborts_if update_voting_power_increase && validator_set.total_voting_power > 0
-                && validator_set.total_joining_power + amount > validator_set.total_voting_power * voting_power_increase_limit / 100;
+            && validator_set.total_joining_power + amount > validator_set.total_voting_power * voting_power_increase_limit / 100;
         let stake_pool = global<StakePool>(pool_address);
         let post post_stake_pool = global<StakePool>(pool_address);
         let value_pending_active = stake_pool.pending_active.value;
         let value_active = stake_pool.active.value;
-        ensures amount != 0 && spec_is_current_epoch_validator(pool_address) ==> post_stake_pool.pending_active.value == value_pending_active + amount;
-        ensures amount != 0 && !spec_is_current_epoch_validator(pool_address) ==> post_stake_pool.active.value == value_active + amount;
+        ensures amount != 0 && spec_is_current_epoch_validator(
+            pool_address
+        ) ==> post_stake_pool.pending_active.value == value_pending_active + amount;
+        ensures amount != 0 && !spec_is_current_epoch_validator(
+            pool_address
+        ) ==> post_stake_pool.active.value == value_active + amount;
         let maximum_stake = config.maximum_stake;
         let value_pending_inactive = stake_pool.pending_inactive.value;
         let next_epoch_voting_power = value_pending_active + value_active + value_pending_inactive;
@@ -510,12 +544,6 @@ spec aptos_framework::stake {
 
         let owner_address = signer::address_of(owner);
         aborts_if !exists<OwnerCapability>(owner_address);
-
-        include coin::WithdrawAbortsIf<AptosCoin>{ account: owner };
-        let coin_store = global<coin::CoinStore<AptosCoin>>(owner_address);
-        let balance = coin_store.coin.value;
-        let post coin_post = global<coin::CoinStore<AptosCoin>>(owner_address).coin.value;
-        ensures coin_post == balance - amount;
 
         let owner_cap = global<OwnerCapability>(owner_address);
         include AddStakeWithCapAbortsIfAndEnsures { owner_cap };
@@ -585,7 +613,9 @@ spec aptos_framework::stake {
         requires exists<ValidatorPerformance>(@aptos_framework);
         requires exists<ValidatorSet>(@aptos_framework);
         requires exists<StakingConfig>(@aptos_framework);
-        requires exists<StakingRewardsConfig>(@aptos_framework) || !features::spec_periodical_reward_rate_decrease_enabled();
+        requires exists<StakingRewardsConfig>(
+            @aptos_framework
+        ) || !features::spec_periodical_reward_rate_decrease_enabled();
         requires exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         requires exists<ValidatorFees>(@aptos_framework);
     }
@@ -598,7 +628,10 @@ spec aptos_framework::stake {
             if (epoch_rewards_rate.value == 0) {
                 0
             } else {
-                let denominator_0 = aptos_std::fixed_point64::spec_divide_u128(staking_config::MAX_REWARDS_RATE, epoch_rewards_rate);
+                let denominator_0 = aptos_std::fixed_point64::spec_divide_u128(
+                    staking_config::MAX_REWARDS_RATE,
+                    epoch_rewards_rate
+                );
                 let denominator = if (denominator_0 > MAX_U64) {
                     MAX_U64
                 } else {
@@ -608,7 +641,7 @@ spec aptos_framework::stake {
                 nominator
             }
         } else {
-                config.rewards_rate
+            config.rewards_rate
         }
     }
 
@@ -618,7 +651,10 @@ spec aptos_framework::stake {
             if (epoch_rewards_rate.value == 0) {
                 1
             } else {
-                let denominator_0 = aptos_std::fixed_point64::spec_divide_u128(staking_config::MAX_REWARDS_RATE, epoch_rewards_rate);
+                let denominator_0 = aptos_std::fixed_point64::spec_divide_u128(
+                    staking_config::MAX_REWARDS_RATE,
+                    epoch_rewards_rate
+                );
                 let denominator = if (denominator_0 > MAX_U64) {
                     MAX_U64
                 } else {
@@ -627,7 +663,7 @@ spec aptos_framework::stake {
                 denominator
             }
         } else {
-                config.rewards_rate_denominator
+            config.rewards_rate_denominator
         }
     }
 }

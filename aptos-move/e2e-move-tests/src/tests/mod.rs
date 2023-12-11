@@ -24,6 +24,8 @@ mod metadata;
 mod mint_nft;
 mod missing_gas_parameter;
 mod module_event;
+
+mod new_account;
 mod new_integer_types;
 mod nft_dao;
 mod offer_rotation_capability;

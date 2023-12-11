@@ -123,6 +123,14 @@ impl Account {
             .expect("access path in test")
     }
 
+    /// Returns the AccessPath that describes the LiteAccount resource instance.
+    ///
+    /// Use this to retrieve or publish the Account blob.
+    pub fn make_lite_account_access_path(&self) -> AccessPath {
+        AccessPath::resource_access_path(self.addr, AccountResource::struct_tag())
+            .expect("access path in test")
+    }
+
     /// Returns the AccessPath that describes the Account's CoinStore resource instance.
     ///
     /// Use this to retrieve or publish the Account CoinStore blob.
@@ -259,9 +267,9 @@ impl TransactionBuilder {
             self.ttl.unwrap_or(DEFAULT_EXPIRATION_TIME),
             self.chain_id.unwrap_or_else(ChainId::test),
         )
-        .sign(&self.sender.privkey, self.sender.pubkey)
-        .unwrap()
-        .into_inner()
+            .sign(&self.sender.privkey, self.sender.pubkey)
+            .unwrap()
+            .into_inner()
     }
 
     pub fn sign_multi_agent(self) -> SignedTransaction {
@@ -284,13 +292,13 @@ impl TransactionBuilder {
             self.ttl.unwrap_or(DEFAULT_EXPIRATION_TIME),
             ChainId::test(),
         )
-        .sign_multi_agent(
-            &self.sender.privkey,
-            secondary_signer_addresses,
-            secondary_private_keys,
-        )
-        .unwrap()
-        .into_inner()
+            .sign_multi_agent(
+                &self.sender.privkey,
+                secondary_signer_addresses,
+                secondary_private_keys,
+            )
+            .unwrap()
+            .into_inner()
     }
 
     pub fn sign_fee_payer(self) -> SignedTransaction {
@@ -314,15 +322,15 @@ impl TransactionBuilder {
             self.ttl.unwrap_or(DEFAULT_EXPIRATION_TIME),
             ChainId::test(),
         )
-        .sign_fee_payer(
-            &self.sender.privkey,
-            secondary_signer_addresses,
-            secondary_private_keys,
-            *fee_payer.address(),
-            &fee_payer.privkey,
-        )
-        .unwrap()
-        .into_inner()
+            .sign_fee_payer(
+                &self.sender.privkey,
+                secondary_signer_addresses,
+                secondary_private_keys,
+                *fee_payer.address(),
+                &fee_payer.privkey,
+            )
+            .unwrap()
+            .into_inner()
     }
 }
 
@@ -367,6 +375,42 @@ impl CoinStore {
     }
 }
 
+//---------------------------------------------------------------------------
+// FungibleStore resource represenation
+//---------------------------------------------------------------------------
+
+/// Struct that represents an account CoinStore resource for tests.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FungibleStore {
+    metadata: AccountAddress,
+    balance: u64,
+    frozen: bool,
+}
+
+impl FungibleStore {
+    /// Create a new FungibleStore
+    pub fn new(balance: u64) -> Self {
+        Self {
+            metadata: AccountAddress::ONE,
+            balance,
+            frozen: false,
+        }
+    }
+
+    /// Retrieve the balance inside of this
+    pub fn balance(&self) -> u64 {
+        self.balance
+    }
+
+    /// Returns the Move Value for the account's CoinStore
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let coin_store = CoinStoreResource::new(
+            self.coin,
+            self.frozen,
+        );
+        bcs::to_bytes(&coin_store).unwrap()
+    }
+}
 //---------------------------------------------------------------------------
 // Account resource represenation
 //---------------------------------------------------------------------------
@@ -538,4 +582,18 @@ impl AccountData {
     pub fn received_events_count(&self) -> u64 {
         self.coin_store.deposit_events.count()
     }
+}
+//---------------------------------------------------------------------------
+// Lite Account resource represenation
+//---------------------------------------------------------------------------
+
+/// Represents an account along with initial state about it.
+///
+/// `AccountData` captures the initial state needed to create accounts for tests.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LiteAccountData {
+    account: Account,
+    sequence_number: u64,
+    primary_fungible_store: FungibleStore,
+    coin_store: CoinStore,
 }

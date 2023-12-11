@@ -36,6 +36,7 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::guid`](guid.md#0x1_guid)
 -  [`0x1::managed_coin`](managed_coin.md#0x1_managed_coin)
 -  [`0x1::multisig_account`](multisig_account.md#0x1_multisig_account)
+-  [`0x1::new_account`](new_account.md#0x1_new_account)
 -  [`0x1::object`](object.md#0x1_object)
 -  [`0x1::optional_aggregator`](optional_aggregator.md#0x1_optional_aggregator)
 -  [`0x1::primary_fungible_store`](primary_fungible_store.md#0x1_primary_fungible_store)

@@ -41,6 +41,13 @@ pub struct LocalAccount {
     sequence_number: AtomicU64,
 }
 
+pub fn get_apt_primary_store_address(address: AccountAddress) -> AccountAddress {
+    let mut bytes = address.to_vec();
+    bytes.append(&mut AccountAddress::ONE.to_vec());
+    bytes.push(0xfc);
+    AccountAddress::from_bytes(aptos_crypto::hash::HashValue::sha3_256_of(&bytes).to_vec()).unwrap()
+}
+
 impl LocalAccount {
     /// Create a new representation of an account locally. Note: This function
     /// does not actually create an account on the Aptos blockchain, just a
@@ -80,8 +87,8 @@ impl LocalAccount {
     /// create an account on the Aptos blockchain, it just generates a new
     /// account locally.
     pub fn generate<R>(rng: &mut R) -> Self
-    where
-        R: ::rand_core::RngCore + ::rand_core::CryptoRng,
+        where
+            R: ::rand_core::RngCore + ::rand_core::CryptoRng,
     {
         let key = AccountKey::generate(rng);
         let address = key.authentication_key().account_address();
@@ -167,7 +174,6 @@ impl LocalAccount {
     pub fn private_key(&self) -> &Ed25519PrivateKey {
         self.key.private_key()
     }
-
     pub fn public_key(&self) -> &Ed25519PublicKey {
         self.key.public_key()
     }
@@ -343,8 +349,8 @@ pub struct AccountKey {
 
 impl AccountKey {
     pub fn generate<R>(rng: &mut R) -> Self
-    where
-        R: ::rand_core::RngCore + ::rand_core::CryptoRng,
+        where
+            R: ::rand_core::RngCore + ::rand_core::CryptoRng,
     {
         let private_key = Ed25519PrivateKey::generate(rng);
         Self::from_private_key(private_key)

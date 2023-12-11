@@ -54,6 +54,7 @@ use serde_json::{json, Value};
 use std::{boxed::Box, iter::once, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use warp::{http::header::CONTENT_TYPE, Filter, Rejection, Reply};
 use warp_reverse_proxy::reverse_proxy_filter;
+use aptos_sdk::types::get_apt_primary_store_address;
 
 const TRANSFER_AMOUNT: u64 = 200_000_000;
 
@@ -108,11 +109,11 @@ pub fn new_test_context(
         tmp_dir.path(),
         aptos_cached_packages::head_release_bundle().clone(),
     )
-    .unwrap()
-    .with_init_genesis_config(Some(Arc::new(|genesis_config| {
-        genesis_config.recurring_lockup_duration_secs = 86400;
-    })))
-    .with_randomize_first_validator_ports(false);
+        .unwrap()
+        .with_init_genesis_config(Some(Arc::new(|genesis_config| {
+            genesis_config.recurring_lockup_duration_secs = 86400;
+        })))
+        .with_randomize_first_validator_ports(false);
 
     let (root_key, genesis, genesis_waypoint, validators) = builder.build(&mut rng).unwrap();
     let (validator_identity, _, _, _) = validators[0].get_key_objects(None).unwrap();
@@ -124,14 +125,14 @@ pub fn new_test_context(
         DbReaderWriter::wrap(
             AptosDB::open(
                 StorageDirPaths::from_path(&tmp_dir),
-                false,                       /* readonly */
+                false, /* readonly */
                 NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
                 RocksdbConfigs::default(),
                 false, /* indexer */
                 BUFFERED_STATE_TARGET_ITEMS,
                 DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             )
-            .unwrap(),
+                .unwrap(),
         )
     };
     let ret =
@@ -282,22 +283,22 @@ impl TestContext {
         nval["data"] = match val["type"].as_str() {
             Some("0x1::code::PackageRegistry") => {
                 Value::String("package registry omitted".to_string())
-            },
+            }
             // Ideally this wouldn't be stripped, but it changes by minor changes to the
             // Move modules, which leads to a bad devx.
             Some("0x1::state_storage::StateStorageUsage") => {
                 Value::String("state storage omitted".to_string())
-            },
+            }
             Some("0x1::state_storage::GasParameter") => {
                 Value::String("state storage gas parameter omitted".to_string())
-            },
+            }
             _ => {
                 if val["bytecode"].as_str().is_some() {
                     Value::String("bytecode omitted".to_string())
                 } else {
                     val["data"].clone()
                 }
-            },
+            }
         };
         nval
     }
@@ -378,7 +379,7 @@ impl TestContext {
             }),
             expected_status_code,
         )
-        .await;
+            .await;
     }
 
     pub async fn execute_multisig_transaction_with_payload(
@@ -403,7 +404,7 @@ impl TestContext {
             }),
             expected_status_code,
         )
-        .await;
+            .await;
     }
 
     pub async fn create_multisig_account(
@@ -425,7 +426,7 @@ impl TestContext {
             create_multisig_txn,
             self.account_transfer_to(account, multisig_address, initial_balance),
         ])
-        .await;
+            .await;
         multisig_address
     }
 
@@ -659,19 +660,33 @@ impl TestContext {
     }
 
     pub async fn get_apt_balance(&self, account: AccountAddress) -> u64 {
-        let coin_balance = self
-            .api_get_account_resource(
+        let coin_balance_option = self
+            .api_get_account_resource_option(
                 account,
                 "0x1",
                 "coin",
                 "CoinStore<0x1::aptos_coin::AptosCoin>",
             )
             .await;
-        coin_balance["data"]["coin"]["value"]
-            .as_str()
-            .unwrap()
+        let coin = coin_balance_option.map(|x| x["data"]["coin"]["value"]
+            .as_str().unwrap()
             .parse::<u64>()
             .unwrap()
+        ).unwrap_or(0);
+        let fungible_store_option = self
+            .api_get_account_resource_option(
+                get_apt_primary_store_address(account),
+                "0x1",
+                "fungible_asset",
+                "FungibleStore",
+            )
+            .await;
+        let fa = fungible_store_option.map(|x| x["data"]["balance"]
+            .as_str().unwrap()
+            .parse::<u64>()
+            .unwrap()
+        ).unwrap_or(0);
+        coin + fa
     }
 
     pub async fn gen_events_by_handle(
@@ -719,17 +734,26 @@ impl TestContext {
     }
 
     // TODO: Add support for generic_type_params if necessary.
+    pub async fn api_get_account_resource_option(
+        &self,
+        account: AccountAddress,
+        resource_account_address: &str,
+        module: &str,
+        name: &str,
+    ) -> Option<Value> {
+        let resource = format!("{}::{}::{}", resource_account_address, module, name);
+        self.gen_resource(&account, &resource).await
+    }
+
     pub async fn api_get_account_resource(
         &self,
         account: AccountAddress,
         resource_account_address: &str,
         module: &str,
         name: &str,
-    ) -> serde_json::Value {
-        let resource = format!("{}::{}::{}", resource_account_address, module, name);
-        self.gen_resource(&account, &resource).await.unwrap()
+    ) -> Value {
+        self.api_get_account_resource_option(account, resource_account_address, module, name).await.unwrap()
     }
-
     // TODO: remove the helper function since we don't publish module directly anymore
     pub async fn api_publish_module(&mut self, account: &mut LocalAccount, code: HexEncodedBytes) {
         self.api_execute_txn(
@@ -741,7 +765,7 @@ impl TestContext {
                 ],
             }),
         )
-        .await;
+            .await;
     }
 
     pub async fn api_execute_entry_function(
@@ -760,7 +784,7 @@ impl TestContext {
                 "arguments": args
             }),
         )
-        .await;
+            .await;
     }
 
     pub async fn api_execute_txn(&mut self, account: &mut LocalAccount, payload: Value) {
@@ -832,7 +856,7 @@ impl TestContext {
             }),
             expected_status_code,
         )
-        .await
+            .await
     }
 
     pub async fn simulate_transaction(
@@ -887,7 +911,7 @@ impl TestContext {
                 .method("GET")
                 .path(&self.prepend_path(path)),
         )
-        .await
+            .await
     }
 
     pub async fn post(&self, path: &str, body: Value) -> Value {
@@ -897,7 +921,7 @@ impl TestContext {
                 .path(&self.prepend_path(path))
                 .json(&body),
         )
-        .await
+            .await
     }
 
     pub async fn post_bcs_txn(&self, path: &str, body: impl AsRef<[u8]>) -> Value {
@@ -908,7 +932,7 @@ impl TestContext {
                 .header(CONTENT_TYPE, mime_types::BCS_SIGNED_TRANSACTION)
                 .body(body),
         )
-        .await
+            .await
     }
 
     pub async fn reply(&self, req: warp::test::RequestBuilder) -> Response<Bytes> {
@@ -922,7 +946,7 @@ impl TestContext {
     pub fn get_routes_with_poem(
         &self,
         poem_address: SocketAddr,
-    ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
+    ) -> impl Filter<Extract=(impl Reply, ), Error=Rejection> + Clone {
         warp::path!("v1" / ..).and(reverse_proxy_filter(
             "v1".to_string(),
             format!("http://{}/v1", poem_address),

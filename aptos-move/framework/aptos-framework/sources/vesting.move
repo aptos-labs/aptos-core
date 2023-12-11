@@ -393,7 +393,10 @@ module aptos_framework::vesting {
     /// address is actually a shareholder address, just return the address back.
     ///
     /// This returns 0x0 if no shareholder is found for the given beneficiary / the address is not a shareholder itself.
-    public fun shareholder(vesting_contract_address: address, shareholder_or_beneficiary: address): address acquires VestingContract {
+    public fun shareholder(
+        vesting_contract_address: address,
+        shareholder_or_beneficiary: address
+    ): address acquires VestingContract {
         assert_active_vesting_contract(vesting_contract_address);
 
         let shareholders = &shareholders(vesting_contract_address);
@@ -702,7 +705,10 @@ module aptos_framework::vesting {
     /// has already been terminated.
     public entry fun admin_withdraw(admin: &signer, contract_address: address) acquires VestingContract {
         let vesting_contract = borrow_global<VestingContract>(contract_address);
-        assert!(vesting_contract.state == VESTING_POOL_TERMINATED, error::invalid_state(EVESTING_CONTRACT_STILL_ACTIVE));
+        assert!(
+            vesting_contract.state == VESTING_POOL_TERMINATED,
+            error::invalid_state(EVESTING_CONTRACT_STILL_ACTIVE)
+        );
 
         let vesting_contract = borrow_global_mut<VestingContract>(contract_address);
         verify_admin(admin, vesting_contract);
@@ -1029,7 +1035,16 @@ module aptos_framework::vesting {
     public fun setup(aptos_framework: &signer, accounts: &vector<address>) {
         use aptos_framework::aptos_account::create_account;
 
-        stake::initialize_for_test_custom(aptos_framework, MIN_STAKE, GRANT_AMOUNT * 10, 3600, true, 10, 10000, 1000000);
+        stake::initialize_for_test_custom(
+            aptos_framework,
+            MIN_STAKE,
+            GRANT_AMOUNT * 10,
+            3600,
+            true,
+            10,
+            10000,
+            1000000
+        );
 
         vector::for_each_ref(accounts, |addr| {
             let addr: address = *addr;
@@ -1038,7 +1053,11 @@ module aptos_framework::vesting {
             };
         });
 
-        std::features::change_feature_flags(aptos_framework, vector[MODULE_EVENT, OPERATOR_BENEFICIARY_CHANGE], vector[]);
+        std::features::change_feature_flags(
+            aptos_framework,
+            vector[MODULE_EVENT, OPERATOR_BENEFICIARY_CHANGE],
+            vector[]
+        );
     }
 
     #[test_only]
@@ -1281,18 +1300,6 @@ module aptos_framework::vesting {
         setup_vesting_contract(admin, &vector[@1, @2], &vector[1], @11, 0);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60002, location = aptos_framework::aptos_account)]
-    public entry fun test_create_vesting_contract_with_unregistered_withdrawal_account_should_fail(
-        aptos_framework: &signer,
-        admin: &signer,
-    ) acquires AdminStore {
-        let admin_address = signer::address_of(admin);
-        setup(aptos_framework, &vector[admin_address]);
-        create_account_for_test(@11);
-        setup_vesting_contract(admin, &vector[@1, @2], &vector[1], @11, 0);
-    }
-
     #[test(aptos_framework = @0x1)]
     #[expected_failure(abort_code = 0x10002, location = Self)]
     public entry fun test_create_empty_vesting_schedule_should_fail(aptos_framework: &signer) {
@@ -1413,7 +1420,13 @@ module aptos_framework::vesting {
 
         // Distribution should pay commission to operator first and remaining amount to shareholders.
         stake::fast_forward_to_unlock(stake_pool_address);
-        stake::assert_stake_pool(stake_pool_address, with_rewards(GRANT_AMOUNT), with_rewards(accumulated_rewards), 0, 0);
+        stake::assert_stake_pool(
+            stake_pool_address,
+            with_rewards(GRANT_AMOUNT),
+            with_rewards(accumulated_rewards),
+            0,
+            0
+        );
         // Operator also earns more commission from the rewards earnt on the withdrawn rewards.
         let commission_on_staker_rewards = (with_rewards(staker_rewards) - staker_rewards) / 10;
         staker_rewards = with_rewards(staker_rewards) - commission_on_staker_rewards;
@@ -1464,7 +1477,13 @@ module aptos_framework::vesting {
 
         // Distribution should pay commission to operator first and remaining amount to shareholders.
         stake::fast_forward_to_unlock(stake_pool_address);
-        stake::assert_stake_pool(stake_pool_address, with_rewards(GRANT_AMOUNT), with_rewards(accumulated_rewards), 0, 0);
+        stake::assert_stake_pool(
+            stake_pool_address,
+            with_rewards(GRANT_AMOUNT),
+            with_rewards(accumulated_rewards),
+            0,
+            0
+        );
         // Operator also earns more commission from the rewards earnt on the withdrawn rewards.
         let commission_on_staker_rewards = (with_rewards(staker_rewards) - staker_rewards) / 10;
         staker_rewards = with_rewards(staker_rewards) - commission_on_staker_rewards;
@@ -1519,7 +1538,10 @@ module aptos_framework::vesting {
 
         // Stake pool earns some rewards.
         stake::end_epoch();
-        let (_, accumulated_rewards, _) = staking_contract::staking_contract_amounts(contract_address, operator_address);
+        let (_, accumulated_rewards, _) = staking_contract::staking_contract_amounts(
+            contract_address,
+            operator_address
+        );
 
         // Update commission percentage to 20%. This also immediately requests commission.
         update_commission_percentage(admin, contract_address, 20);
@@ -1532,7 +1554,10 @@ module aptos_framework::vesting {
 
         // Stake pool earns some more rewards.
         stake::end_epoch();
-        let (_, accumulated_rewards, _) = staking_contract::staking_contract_amounts(contract_address, operator_address);
+        let (_, accumulated_rewards, _) = staking_contract::staking_contract_amounts(
+            contract_address,
+            operator_address
+        );
 
         // Request commission again.
         staking_contract::request_commission(operator, contract_address, operator_address);
@@ -1550,7 +1575,14 @@ module aptos_framework::vesting {
         assert!(coin::balance<AptosCoin>(operator_address) == expected_commission, 1);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123, shareholder = @0x234, operator1 = @0x345, beneficiary = @0x456, operator2 = @0x567)]
+    #[test(
+        aptos_framework = @0x1,
+        admin = @0x123,
+        shareholder = @0x234,
+        operator1 = @0x345,
+        beneficiary = @0x456,
+        operator2 = @0x567
+    )]
     public entry fun test_set_beneficiary_for_operator(
         aptos_framework: &signer,
         admin: &signer,
@@ -1626,7 +1658,6 @@ module aptos_framework::vesting {
         // Assert that the rewards go to operator2, and the balance of the operator1's beneficiay remains the same.
         assert!(coin::balance<AptosCoin>(operator_address2) >= expected_commission, 1);
         assert!(coin::balance<AptosCoin>(beneficiary_address) == old_beneficiay_balance, 1);
-
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123, shareholder = @0x234)]
@@ -1805,8 +1836,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60002, location = aptos_framework::aptos_account)]
-    public entry fun test_set_beneficiary_with_unregistered_account_should_fail(
+    public entry fun test_set_beneficiary_with_no_coin_store_account_should_succeed(
         aptos_framework: &signer,
         admin: &signer,
     ) acquires AdminStore, VestingContract {
