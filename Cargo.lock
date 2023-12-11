@@ -405,6 +405,7 @@ dependencies = [
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
+ "aptos-package-builder",
  "aptos-proptest-helpers",
  "aptos-runtimes",
  "aptos-sdk",

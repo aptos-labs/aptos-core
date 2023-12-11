@@ -93,7 +93,6 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     marker::Sync,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
     },
 };
@@ -115,12 +114,6 @@ pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
             .unwrap(),
     )
 });
-
-/// Remove this once the bundle is removed from the code.
-static MODULE_BUNDLE_DISALLOWED: AtomicBool = AtomicBool::new(true);
-pub fn allow_module_bundle_for_test() {
-    MODULE_BUNDLE_DISALLOWED.store(false, Ordering::Relaxed);
-}
 
 macro_rules! unwrap_or_discard {
     ($res:expr) => {
