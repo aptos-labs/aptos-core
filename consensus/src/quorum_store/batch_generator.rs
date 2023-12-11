@@ -153,7 +153,16 @@ impl BatchGenerator {
             if batches.len() == self.config.sender_max_num_batches {
                 return false;
             }
-            let num_batch_txns = std::cmp::min(self.config.sender_max_batch_txns, remaining_txns);
+            let num_take_txns = std::cmp::min(self.config.sender_max_batch_txns, remaining_txns);
+            let mut batch_bytes = 0;
+            let num_batch_txns = txns
+                .iter()
+                .take(num_take_txns)
+                .take_while(|txn| {
+                    batch_bytes += txn.raw_txn_bytes_len();
+                    batch_bytes <= self.config.sender_max_batch_bytes
+                })
+                .count();
             let batch_txns: Vec<_> = txns.drain(0..num_batch_txns).collect();
             for txn in &batch_txns {
                 assert!(txn.gas_unit_price() >= bucket_start);
