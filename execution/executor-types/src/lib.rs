@@ -21,6 +21,7 @@ use aptos_types::{
     proof::{AccumulatorExtensionProof, SparseMerkleProofExt},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
+        block_epilogue::{BlockEndInfo, BlockEpiloguePayload},
         ExecutionStatus, Transaction, TransactionInfo, TransactionListWithProof,
         TransactionOutputListWithProof, TransactionStatus, Version,
     },
@@ -329,6 +330,8 @@ pub struct StateComputeResult {
     transaction_info_hashes: Vec<HashValue>,
 
     subscribable_events: Vec<ContractEvent>,
+
+    block_end_info: Option<BlockEndInfo>,
 }
 
 impl StateComputeResult {
@@ -342,6 +345,7 @@ impl StateComputeResult {
         compute_status_for_input_txns: Vec<TransactionStatus>,
         transaction_info_hashes: Vec<HashValue>,
         subscribable_events: Vec<ContractEvent>,
+        block_end_info: Option<BlockEndInfo>,
     ) -> Self {
         Self {
             root_hash,
@@ -353,6 +357,7 @@ impl StateComputeResult {
             compute_status_for_input_txns,
             transaction_info_hashes,
             subscribable_events,
+            block_end_info,
         }
     }
 
@@ -370,6 +375,7 @@ impl StateComputeResult {
             compute_status_for_input_txns: vec![],
             transaction_info_hashes: vec![],
             subscribable_events: vec![],
+            block_end_info: None,
         }
     }
 
@@ -387,6 +393,7 @@ impl StateComputeResult {
             ],
             transaction_info_hashes: vec![],
             subscribable_events: vec![],
+            block_end_info: None,
         }
     }
 
@@ -404,9 +411,7 @@ impl StateComputeResult {
         ret.compute_status_for_input_txns = compute_status;
         ret
     }
-}
 
-impl StateComputeResult {
     pub fn version(&self) -> Version {
         max(self.num_leaves, 1)
             .checked_sub(1)
@@ -444,7 +449,10 @@ impl StateComputeResult {
         let output = itertools::zip_eq(input_txns, self.compute_status_for_input_txns())
             .filter_map(|(txn, status)| {
                 assert!(
-                    !matches!(txn, Transaction::StateCheckpoint(_)),
+                    !matches!(
+                        txn,
+                        Transaction::StateCheckpoint(_) | Transaction::BlockEpilogue(_)
+                    ),
                     "{:?}: {:?}",
                     txn,
                     status
@@ -454,12 +462,25 @@ impl StateComputeResult {
                     _ => None,
                 }
             })
-            .chain((!self.has_reconfiguration()).then_some(Transaction::StateCheckpoint(block_id)))
+            .chain(
+                (!self.has_reconfiguration()).then_some(self.block_end_info.clone().map_or(
+                    Transaction::StateCheckpoint(block_id),
+                    |block_end_info| {
+                        Transaction::BlockEpilogue(BlockEpiloguePayload::WithBlockEndInfo {
+                            block_id,
+                            block_end_info,
+                        })
+                    },
+                )),
+            )
             .collect::<Vec<_>>();
 
         assert!(
             self.has_reconfiguration()
-                || matches!(output.last(), Some(Transaction::StateCheckpoint(_))),
+                || matches!(
+                    output.last(),
+                    Some(Transaction::StateCheckpoint(_) | Transaction::BlockEpilogue(_))
+                ),
             "{:?}",
             output.last()
         );

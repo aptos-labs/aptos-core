@@ -2463,7 +2463,7 @@ impl AptosVM {
                 }
                 (vm_status, output)
             },
-            Transaction::StateCheckpoint(_) => {
+            Transaction::StateCheckpoint(_) | Transaction::BlockEpilogue(_) => {
                 let status = TransactionStatus::Keep(ExecutionStatus::Success);
                 let output = VMOutput::empty_with_status(status);
                 (VMStatus::Executed, output)

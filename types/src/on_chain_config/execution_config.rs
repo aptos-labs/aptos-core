@@ -84,7 +84,7 @@ impl OnChainExecutionConfig {
                 use_module_publishing_block_conflict: true,
                 block_output_limit: Some(5 * 1024 * 1024),
                 include_user_txn_size_in_block_output: true,
-                add_block_limit_outcome_onchain: false,
+                add_block_limit_outcome_onchain: true,
             },
             transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
         })

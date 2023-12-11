@@ -42,6 +42,7 @@ use std::{
 
 pub mod analyzed_transaction;
 pub mod authenticator;
+pub mod block_epilogue;
 mod block_output;
 mod change_set;
 mod module;
@@ -51,6 +52,7 @@ pub mod signature_verified_transaction;
 pub mod user_transaction_context;
 pub mod webauthn;
 
+use self::block_epilogue::BlockEpiloguePayload;
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::state_store::create_empty_sharded_state_updates;
 use crate::{
@@ -1993,6 +1995,12 @@ pub enum Transaction {
     /// Transaction to update the block metadata resource at the beginning of a block,
     /// when on-chain randomness is enabled.
     BlockMetadataExt(BlockMetadataExt),
+
+    /// Transaction to let the executor update the global state tree and record the root hash
+    /// in the TransactionInfo
+    /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
+    /// Replaces StateCheckpoint, with optionally having more data.
+    BlockEpilogue(BlockEpiloguePayload),
 }
 
 impl From<BlockMetadataExt> for Transaction {
@@ -2026,6 +2034,13 @@ impl Transaction {
         }
     }
 
+    pub fn try_as_block_epilogue(&self) -> Option<&BlockEpiloguePayload> {
+        match self {
+            Transaction::BlockEpilogue(v1) => Some(v1),
+            _ => None,
+        }
+    }
+
     pub fn try_as_validator_txn(&self) -> Option<&ValidatorTransaction> {
         match self {
             Transaction::ValidatorTransaction(t) => Some(t),
@@ -2039,6 +2054,7 @@ impl Transaction {
             Transaction::GenesisTransaction(_) => "genesis_transaction",
             Transaction::BlockMetadata(_) => "block_metadata",
             Transaction::StateCheckpoint(_) => "state_checkpoint",
+            Transaction::BlockEpilogue(_) => "block_epilogue",
             Transaction::ValidatorTransaction(_) => "validator_transaction",
             Transaction::BlockMetadataExt(_) => "block_metadata_ext",
         }

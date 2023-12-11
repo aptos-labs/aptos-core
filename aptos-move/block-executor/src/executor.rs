@@ -877,7 +877,7 @@ where
         let shared_counter = AtomicU32::new(start_shared_counter);
 
         if signature_verified_block.is_empty() {
-            return Ok(BlockOutput::new(vec![]));
+            return Ok(BlockOutput::new(vec![], None));
         }
 
         let num_txns = signature_verified_block.len();
@@ -938,11 +938,19 @@ where
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
 
-        // TODO add block end info to output.
-        // block_limit_processor.is_block_limit_reached();
+        let block_end_info = if self
+            .config
+            .onchain
+            .block_gas_limit_type
+            .add_block_limit_outcome_onchain()
+        {
+            Some(shared_commit_state.into_inner().get_block_end_info())
+        } else {
+            None
+        };
 
         (!shared_maybe_error.load(Ordering::SeqCst))
-            .then(|| BlockOutput::new(final_results.into_inner()))
+            .then(|| BlockOutput::new(final_results.into_inner(), block_end_info))
             .ok_or(())
     }
 
@@ -1299,10 +1307,18 @@ where
 
         counters::update_state_counters(unsync_map.stats(), false);
 
-        // TODO add block end info to output.
-        // block_limit_processor.is_block_limit_reached();
+        let block_end_info = if self
+            .config
+            .onchain
+            .block_gas_limit_type
+            .add_block_limit_outcome_onchain()
+        {
+            Some(block_limit_processor.get_block_end_info())
+        } else {
+            None
+        };
 
-        Ok(BlockOutput::new(ret))
+        Ok(BlockOutput::new(ret, block_end_info))
     }
 
     pub fn execute_block(
@@ -1397,7 +1413,7 @@ where
                 .iter()
                 .map(|_| E::Output::discard_output(error_code))
                 .collect();
-            return Ok(BlockOutput::new(ret));
+            return Ok(BlockOutput::new(ret, None));
         }
 
         Err(sequential_error)
