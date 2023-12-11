@@ -57,7 +57,9 @@ use maplit::hashmap;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
-pub fn prepare_buffer_manager() -> (
+pub fn prepare_buffer_manager(
+    bounded_executor: BoundedExecutor,
+) -> (
     BufferManager,
     Sender<OrderedBlocks>,
     Sender<ResetRequest>,
@@ -159,6 +161,7 @@ pub fn prepare_buffer_manager() -> (
             epoch: 1,
             verifier: validators.clone(),
         }),
+        bounded_executor,
     );
 
     (
@@ -191,6 +194,7 @@ pub fn launch_buffer_manager() -> (
 ) {
     let runtime = consensus_runtime();
 
+    let bounded_executor: BoundedExecutor = BoundedExecutor::new(1, runtime.handle().clone());
     let (
         buffer_manager,
         block_tx,
@@ -205,14 +209,13 @@ pub fn launch_buffer_manager() -> (
         signers,
         result_rx,
         validators,
-    ) = prepare_buffer_manager();
-    let bounded_executor = BoundedExecutor::new(1, runtime.handle().clone());
+    ) = prepare_buffer_manager(bounded_executor);
 
     runtime.spawn(execution_schedule_phase_pipeline.start());
     runtime.spawn(execution_wait_phase_pipeline.start());
     runtime.spawn(signing_phase_pipeline.start());
     runtime.spawn(persisting_phase_pipeline.start());
-    runtime.spawn(buffer_manager.start(bounded_executor));
+    runtime.spawn(buffer_manager.start());
 
     (
         block_tx,
