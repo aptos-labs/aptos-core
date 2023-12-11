@@ -15,17 +15,16 @@ use crate::{
         CertifiedNode, Node,
     },
     monitor,
-    network::{IncomingDAGRequest, TConsensusMsg},
+    network::{IncomingDAGRequest, RpcResponder},
 };
+use aptos_bounded_executor::{concurrent_map, BoundedExecutor};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_logger::{debug, error, warn};
-use aptos_network::protocols::network::RpcError;
 use aptos_types::epoch_state::EpochState;
-use bytes::Bytes;
 use futures::StreamExt;
 use std::sync::Arc;
-use tokio::select;
+use tokio::{runtime::Handle, select};
 
 pub(crate) struct NetworkHandler {
     epoch_state: Arc<EpochState>,
@@ -67,10 +66,39 @@ impl NetworkHandler {
         _buffer: Vec<DAGMessage>,
     ) -> SyncOutcome {
         // TODO: process buffer
+
+        // TODO: Pass bounded executor from EpochManager.
+        let executor = BoundedExecutor::new(2, Handle::current());
+        let epoch_state = self.epoch_state.clone();
+
+        let mut verified_msg_stream = concurrent_map(
+            dag_rpc_rx,
+            executor,
+            move |rpc_request: IncomingDAGRequest| {
+                let epoch_state = epoch_state.clone();
+                async move {
+                    debug!("deserializing and verifying message");
+                    let result = rpc_request
+                        .req
+                        .try_into()
+                        .and_then(|dag_message: DAGMessage| {
+                            monitor!(
+                                "dag_message_verify",
+                                dag_message.verify(rpc_request.sender, &epoch_state.verifier)
+                            )?;
+                            Ok(dag_message)
+                        });
+                    debug!("message verified");
+                    (result, rpc_request.sender, rpc_request.responder)
+                }
+            },
+        );
+
         loop {
             select! {
-                msg = dag_rpc_rx.select_next_some() => {
-                    match self.process_rpc(msg).await {
+                (msg, author, responder) = verified_msg_stream.select_next_some() => {
+                    debug!("receive verified message");
+                    match self.process_verified_message(msg, author, responder).await {
                         Ok(sync_status) => {
                             if matches!(sync_status, SyncOutcome::NeedsSync(_) | SyncOutcome::EpochEnds) {
                                 return sync_status;
@@ -108,65 +136,62 @@ impl NetworkHandler {
         }
     }
 
-    async fn process_rpc(
+    async fn process_verified_message(
         &mut self,
-        rpc_request: IncomingDAGRequest,
+        dag_message_result: anyhow::Result<DAGMessage>,
+        author: Author,
+        responder: RpcResponder,
     ) -> anyhow::Result<SyncOutcome> {
-        let dag_message: DAGMessage = rpc_request.req.try_into()?;
-        let epoch = dag_message.epoch();
-
-        debug!(
-            "processing rpc message {} from {}",
-            dag_message.name(),
-            rpc_request.sender
-        );
-
         let response: Result<DAGMessage, DAGError> = {
-            match monitor!(
-                "dag_message_verify",
-                dag_message.verify(rpc_request.sender, &self.epoch_state.verifier)
-            ) {
-                Ok(_) => match dag_message {
-                    DAGMessage::NodeMsg(node) => self
-                        .node_receiver
-                        .process(node)
-                        .await
-                        .map(|r| r.into())
-                        .map_err(|err| {
-                            err.downcast::<NodeBroadcastHandleError>()
-                                .map_or(DAGError::Unknown, |err| {
-                                    DAGError::NodeBroadcastHandleError(err)
-                                })
-                        }),
-                    DAGMessage::CertifiedNodeMsg(certified_node_msg) => {
-                        match self.state_sync_trigger.check(certified_node_msg).await? {
-                            SyncOutcome::Synced(Some(certified_node_msg)) => self
-                                .dag_driver
-                                .process(certified_node_msg.certified_node())
-                                .await
-                                .map(|r| r.into())
-                                .map_err(|err| {
-                                    err.downcast::<DagDriverError>()
-                                        .map_or(DAGError::Unknown, |err| {
-                                            DAGError::DagDriverError(err)
-                                        })
-                                }),
-                            status @ (SyncOutcome::NeedsSync(_) | SyncOutcome::EpochEnds) => {
-                                return Ok(status)
-                            },
-                            _ => unreachable!(),
-                        }
-                    },
-                    DAGMessage::FetchRequest(request) => self
-                        .fetch_receiver
-                        .process(request)
-                        .await
-                        .map(|r| r.into())
-                        .map_err(|err| {
-                            err.downcast::<FetchRequestHandleError>()
-                                .map_or(DAGError::Unknown, DAGError::FetchRequestHandleError)
-                        }),
-                    _ => unreachable!("verification must catch this error"),
+            match dag_message_result {
+                Ok(dag_message) => {
+                    debug!(
+                        author = author,
+                        message = dag_message,
+                        "process verified message"
+                    );
+                    match dag_message {
+                        DAGMessage::NodeMsg(node) => self
+                            .node_receiver
+                            .process(node)
+                            .await
+                            .map(|r| r.into())
+                            .map_err(|err| {
+                                err.downcast::<NodeBroadcastHandleError>()
+                                    .map_or(DAGError::Unknown, |err| {
+                                        DAGError::NodeBroadcastHandleError(err)
+                                    })
+                            }),
+                        DAGMessage::CertifiedNodeMsg(certified_node_msg) => {
+                            match self.state_sync_trigger.check(certified_node_msg).await? {
+                                SyncOutcome::Synced(Some(certified_node_msg)) => self
+                                    .dag_driver
+                                    .process(certified_node_msg.certified_node())
+                                    .await
+                                    .map(|r| r.into())
+                                    .map_err(|err| {
+                                        err.downcast::<DagDriverError>()
+                                            .map_or(DAGError::Unknown, |err| {
+                                                DAGError::DagDriverError(err)
+                                            })
+                                    }),
+                                status @ (SyncOutcome::NeedsSync(_) | SyncOutcome::EpochEnds) => {
+                                    return Ok(status)
+                                },
+                                _ => unreachable!(),
+                            }
+                        },
+                        DAGMessage::FetchRequest(request) => self
+                            .fetch_receiver
+                            .process(request)
+                            .await
+                            .map(|r| r.into())
+                            .map_err(|err| {
+                                err.downcast::<FetchRequestHandleError>()
+                                    .map_or(DAGError::Unknown, DAGError::FetchRequestHandleError)
+                            }),
+                        _ => unreachable!("verification must catch this error"),
+                    }
                 },
                 Err(err) => {
                     error!(error = ?err, "error verifying message");
@@ -180,18 +205,10 @@ impl NetworkHandler {
             response.as_ref().map(|r| r.name())
         );
 
-        let response: DAGRpcResult = response.map_err(|e| DAGRpcError::new(epoch, e)).into();
-
-        let rpc_response = rpc_request
-            .protocol
-            .to_bytes(&response.into_network_message())
-            .map(Bytes::from)
-            .map_err(RpcError::Error);
-
-        rpc_request
-            .response_sender
-            .send(rpc_response)
-            .map_err(|_| anyhow::anyhow!("unable to respond to rpc"))?;
+        let response: DAGRpcResult = response
+            .map_err(|e| DAGRpcError::new(self.epoch_state.epoch, e))
+            .into();
+        responder.respond(response)?;
 
         Ok(SyncOutcome::Synced(None))
     }
