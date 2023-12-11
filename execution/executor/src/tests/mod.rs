@@ -521,14 +521,14 @@ fn test_deleted_key_from_state_store() {
     let transaction2 = create_test_transaction(1);
     let write_set1 = WriteSetMut::new(vec![(
         dummy_state_key1.clone(),
-        WriteOp::Modification(dummy_value1.clone()),
+        WriteOp::legacy_modification(dummy_value1.clone()),
     )])
     .freeze()
     .unwrap();
 
     let write_set2 = WriteSetMut::new(vec![(
         dummy_state_key2.clone(),
-        WriteOp::Modification(dummy_value2.clone()),
+        WriteOp::legacy_modification(dummy_value2.clone()),
     )])
     .freeze()
     .unwrap();
@@ -557,7 +557,7 @@ fn test_deleted_key_from_state_store() {
     assert_eq!(state_value2_from_db, StateValue::from(dummy_value2.clone()));
 
     let transaction3 = create_test_transaction(2);
-    let write_set3 = WriteSetMut::new(vec![(dummy_state_key1.clone(), WriteOp::Deletion)])
+    let write_set3 = WriteSetMut::new(vec![(dummy_state_key1.clone(), WriteOp::legacy_deletion())])
         .freeze()
         .unwrap();
 
