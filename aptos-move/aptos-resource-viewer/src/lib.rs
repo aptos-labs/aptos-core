@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, Result};
+use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, account_state::AccountState,
     contract_event::ContractEvent,
@@ -60,6 +61,16 @@ impl<'a, V: CompiledModuleViewer> AptosValueAnnotator<'a, V> {
             output.insert(tag, value);
         }
         Ok(AnnotatedAccountStateBlob(output))
+    }
+}
+
+pub trait AsValueAnnotator<S> {
+    fn as_value_annotator(&self) -> AptosValueAnnotator<S>;
+}
+
+impl<S: StateView + CompiledModuleViewer> AsValueAnnotator<S> for S {
+    fn as_value_annotator(&self) -> AptosValueAnnotator<S> {
+        AptosValueAnnotator::new(self)
     }
 }
 

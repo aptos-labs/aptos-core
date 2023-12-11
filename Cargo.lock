@@ -3283,6 +3283,7 @@ name = "aptos-resource-viewer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-state-view",
  "aptos-types",
  "aptos-vm",
  "move-bytecode-utils",

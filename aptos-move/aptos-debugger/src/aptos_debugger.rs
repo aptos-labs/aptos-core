@@ -6,7 +6,7 @@ use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
-use aptos_resource_viewer::{AnnotatedAccountStateBlob, AptosValueAnnotator};
+use aptos_resource_viewer::{AnnotatedAccountStateBlob, AsValueAnnotator};
 use aptos_rest_client::Client;
 use aptos_state_view::TStateView;
 use aptos_types::{
@@ -185,14 +185,17 @@ impl AptosDebugger {
         version: Version,
     ) -> Result<Option<AnnotatedAccountStateBlob>> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let annotator = AptosValueAnnotator::new(&state_view);
         Ok(
             match self
                 .debugger
                 .get_account_state_by_version(account, version)
                 .await?
             {
-                Some(account_state) => Some(annotator.view_account_state(&account_state)?),
+                Some(account_state) => Some(
+                    state_view
+                        .as_value_annotator()
+                        .view_account_state(&account_state)?,
+                ),
                 None => None,
             },
         )
@@ -204,7 +207,7 @@ impl AptosDebugger {
     ) -> Result<Vec<(AccountAddress, AnnotatedAccountStateBlob)>> {
         let accounts = self.debugger.get_admin_accounts(version).await?;
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let annotator = AptosValueAnnotator::new(&state_view);
+        let annotator = state_view.as_value_annotator();
 
         let mut result = vec![];
         for (addr, state) in accounts.into_iter() {
