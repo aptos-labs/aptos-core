@@ -17,13 +17,13 @@ provider "helm" {
 module "validator" {
   source = "../../aptos-node/gcp"
 
-  manage_via_tf = var.manage_via_tf
+  cluster_bootstrap = var.cluster_bootstrap
+  manage_via_tf     = var.manage_via_tf
 
   # Project config
-  project        = var.project
-  zone           = var.zone
-  region         = var.region
-  node_locations = var.node_locations
+  project = var.project
+  zone    = var.zone
+  region  = var.region
 
   # DNS
   zone_name     = var.zone_name # keep empty if you don't want a DNS name
@@ -51,7 +51,7 @@ module "validator" {
   gke_enable_node_autoprovisioning     = var.gke_enable_node_autoprovisioning
   gke_node_autoprovisioning_max_cpu    = var.gke_node_autoprovisioning_max_cpu
   gke_node_autoprovisioning_max_memory = var.gke_node_autoprovisioning_max_memory
-  gke_autoscaling_profile              = var.gke_autoscaling_profile
+  gke_enable_autoscaling               = var.gke_enable_autoscaling
   gke_autoscaling_max_node_count       = var.gke_autoscaling_max_node_count
 
   # Testnet config
@@ -63,18 +63,14 @@ module "validator" {
   num_fullnode_groups        = var.num_fullnode_groups
 
   # Instance config
-  default_disk_size_gb            = var.default_disk_size_gb
-  default_disk_type               = var.default_disk_type
-  create_nodepools                = var.create_nodepools
-  nodepool_sysctls                = var.nodepool_sysctls
-  core_instance_type              = var.core_instance_type
-  utility_instance_type           = var.utility_instance_type
-  validator_instance_type         = var.validator_instance_type
-  utility_instance_enable_taint   = var.utility_instance_enable_taint
-  validator_instance_enable_taint = var.validator_instance_enable_taint
+  utility_instance_type   = var.utility_instance_type
+  validator_instance_type = var.validator_instance_type
 
-  enable_clouddns        = var.enable_clouddns
-  enable_image_streaming = var.enable_image_streaming
+  # addons
+  enable_monitoring      = var.enable_monitoring
+  enable_node_exporter   = var.enable_prometheus_node_exporter
+  monitoring_helm_values = var.monitoring_helm_values
+
   gke_maintenance_policy = var.gke_maintenance_policy
 }
 
@@ -90,8 +86,8 @@ locals {
   aptos_node_helm_prefix = var.enable_forge ? "aptos-node" : "${module.validator.helm_release_name}-aptos-node"
 }
 
+
 resource "helm_release" "genesis" {
-  count       = var.enable_genesis ? 1 : 0
   name        = "genesis"
   chart       = local.genesis_helm_chart_path
   max_history = 5

@@ -1,0 +1,70 @@
+[sources.tcp_input]
+  type = "socket"
+  address = "0.0.0.0:5044"
+  max_length = 1024000
+  mode = "tcp"
+
+[sources.syslog]
+  type = "syslog"
+  mode = "udp"
+  address = "0.0.0.0:1514"
+  max_length = 10240
+
+[transforms.parse_json]
+  type = "json_parser"
+  inputs = ["tcp_input"]
+  drop_invalid = false
+  field = "message"
+
+[transforms.add_fields]
+  type = "add_fields"
+  inputs = ["parse_json", "syslog"]
+  overwrite = true
+
+  # Fields
+  fields.owner = "{{ required "logger.name must be set" .Values.logger.name }}"
+  fields.chain_name = "{{ required "chain.name must be set" .Values.chain.name }}"
+
+{{- if .Values.loggingCentralHost }}
+[sinks.http_output]
+  # General
+  type = "http" # required
+  inputs = ["add_fields"] # required
+  compression = "none" # optional, default
+  healthcheck = true # optional, default
+  uri = "https://{{.Values.loggingCentralHost}}:9000" # required
+
+  # Batch
+  batch.max_events = 1000 # optional, no default, events
+
+  # Buffer
+  buffer.max_events = 50000 # optional
+  buffer.type = "memory" # optional, default
+  buffer.when_full = "drop_newest" # optional
+
+  # Encoding
+  encoding.codec = "ndjson" # required
+
+  # TLS
+  tls.enabled = true
+  tls.ca_file = "/etc/vector/cert/ca.crt"
+  tls.crt_file = "/etc/vector/cert/tls.crt"
+  tls.key_file = "/etc/vector/cert/tls.key"
+  tls.verify_certificate = {{ .Values.logging.vector.verifyServer | default true }}
+  tls.verify_hostname = {{ .Values.logging.vector.verifyServer | default true }}
+{{- end }}
+
+{{- if .Values.logging.vector.logToFile }}
+[sinks.file]
+  inputs = ["add_fields"]
+  type = "file"
+  path = "/tmp/logs/vector-%Y-%m-%d.log"
+  encoding.codec = "ndjson"
+{{- end }}
+
+{{- range .Values.logging.vector.outputs }}
+[sinks.{{ .output_id }}]
+    {{- range $k, $v := .config }}
+    {{ $k }} = {{ toJson $v }}
+    {{- end }}
+{{- end }}

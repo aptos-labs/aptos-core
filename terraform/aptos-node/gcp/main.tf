@@ -11,6 +11,7 @@ provider "google-beta" {
 data "google_client_config" "provider" {}
 
 locals {
+  zone           = "${var.region}-${var.zone}"
   workspace_name = var.workspace_name_override == "" ? terraform.workspace : var.workspace_name_override
 }
 
