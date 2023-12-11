@@ -2,9 +2,12 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::file_format_generator::{
-    module_generator::{ModuleContext, ModuleGenerator},
-    MAX_FUNCTION_DEF_COUNT, MAX_LOCAL_COUNT,
+use crate::{
+    file_format_generator::{
+        module_generator::{ModuleContext, ModuleGenerator},
+        MAX_FUNCTION_DEF_COUNT, MAX_LOCAL_COUNT,
+    },
+    pipeline::livevar_analysis_processor::LiveVarAnnotation,
 };
 use move_binary_format::file_format as FF;
 use move_model::{
@@ -15,7 +18,6 @@ use move_model::{
 use move_stackless_bytecode::{
     function_target::FunctionTarget,
     function_target_pipeline::FunctionVariant,
-    livevar_analysis::LiveVarAnnotation,
     stackless_bytecode::{Bytecode, Constant, Label, Operation},
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -84,7 +86,12 @@ struct LabelInfo {
 
 impl<'a> FunctionGenerator<'a> {
     /// Runs the function generator for the given function.
-    pub fn run<'b>(gen: &'a mut ModuleGenerator, ctx: &'b ModuleContext, fun_env: FunctionEnv<'b>) {
+    pub fn run<'b>(
+        gen: &'a mut ModuleGenerator,
+        ctx: &'b ModuleContext,
+        fun_env: FunctionEnv<'b>,
+        acquires_list: &BTreeSet<StructId>,
+    ) {
         let loc = fun_env.get_loc();
         let function = gen.function_index(ctx, &loc, &fun_env);
         let visibility = fun_env.visibility();
@@ -111,11 +118,18 @@ impl<'a> FunctionGenerator<'a> {
         } else {
             (gen, None)
         };
+        let acquires_global_resources = acquires_list
+            .iter()
+            .map(|id| {
+                let struct_env = fun_env.module_env.get_struct(*id);
+                gen.struct_def_index(ctx, &struct_env.get_loc(), &struct_env)
+            })
+            .collect();
         let def = FF::FunctionDefinition {
             function,
             visibility,
             is_entry: fun_env.is_entry(),
-            acquires_global_resources: vec![],
+            acquires_global_resources,
             code,
         };
         ctx.checked_bound(
@@ -268,9 +282,9 @@ impl<'a> FunctionGenerator<'a> {
             Bytecode::SaveMem(_, _, _)
             | Bytecode::Call(_, _, _, _, Some(_))
             | Bytecode::SaveSpecVar(_, _, _)
-            | Bytecode::Prop(_, _, _) => ctx
-                .fun_ctx
-                .internal_error("unexpected specification bytecode"),
+            | Bytecode::Prop(_, _, _) => {
+                // do nothing -- skip specification ops
+            },
         }
     }
 
@@ -812,7 +826,7 @@ impl<'env> BytecodeContext<'env> {
             .get::<LiveVarAnnotation>()
             .expect("livevar analysis result");
         an.get_live_var_info_at(self.code_offset)
-            .map(|a| a.after.contains(&temp))
+            .map(|a| a.after.contains_key(&temp))
             .unwrap_or(false)
     }
 
@@ -826,7 +840,7 @@ impl<'env> BytecodeContext<'env> {
             .get::<LiveVarAnnotation>()
             .expect("livevar analysis result");
         an.get_live_var_info_at(self.code_offset)
-            .map(|a| a.before.contains(&temp))
+            .map(|a| a.before.contains_key(&temp))
             .unwrap_or(false)
     }
 }

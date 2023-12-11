@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    change_set::{GroupWrite, VMChangeSet},
-    check_change_set::CheckChangeSet,
-};
+use crate::{change_set::VMChangeSet, check_change_set::CheckChangeSet};
 use aptos_gas_algebra::GasExpression;
 use aptos_gas_schedule::{
     gas_params::txn::*, AptosGasParameters, VMGasParameters, LATEST_GAS_FEATURE_VERSION,
@@ -12,7 +9,7 @@ use aptos_gas_schedule::{
 use aptos_types::{
     on_chain_config::{ConfigStorage, OnChainConfig, StorageGasSchedule},
     state_store::state_key::StateKey,
-    write_set::WriteOp,
+    write_set::WriteOpSize,
 };
 use either::Either;
 use move_core_types::{
@@ -57,8 +54,8 @@ impl StoragePricingV1 {
             }
     }
 
-    fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas {
-        use aptos_types::write_set::WriteOp::*;
+    fn io_gas_per_write(&self, key: &StateKey, op_size: &WriteOpSize) -> InternalGas {
+        use aptos_types::write_set::WriteOpSize::*;
 
         let mut cost = self.write_data_per_op * NumArgs::new(1);
 
@@ -71,15 +68,15 @@ impl StoragePricingV1 {
                 );
         }
 
-        match op {
-            Creation(data) | CreationWithMetadata { data, .. } => {
+        match op_size {
+            Creation { write_len } => {
                 cost += self.write_data_per_new_item * NumArgs::new(1)
-                    + self.write_data_per_byte_in_val * NumBytes::new(data.len() as u64);
+                    + self.write_data_per_byte_in_val * NumBytes::new(*write_len);
             },
-            Modification(data) | ModificationWithMetadata { data, .. } => {
-                cost += self.write_data_per_byte_in_val * NumBytes::new(data.len() as u64);
+            Modification { write_len } => {
+                cost += self.write_data_per_byte_in_val * NumBytes::new(*write_len);
             },
-            Deletion | DeletionWithMetadata { .. } => (),
+            Deletion | DeletionWithDeposit { .. } => (),
         }
 
         cost
@@ -128,8 +125,8 @@ impl StoragePricingV2 {
         }
     }
 
-    fn write_op_size(&self, key: &StateKey, value: &[u8]) -> NumBytes {
-        let value_size = NumBytes::new(value.len() as u64);
+    fn write_op_size(&self, key: &StateKey, value_size: u64) -> NumBytes {
+        let value_size = NumBytes::new(value_size);
 
         if self.feature_version >= 3 {
             let key_size = NumBytes::new(key.size() as u64);
@@ -150,19 +147,19 @@ impl StoragePricingV2 {
         self.per_item_read * (NumArgs::from(1)) + self.per_byte_read * loaded
     }
 
-    fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas {
-        use aptos_types::write_set::WriteOp::*;
+    fn io_gas_per_write(&self, key: &StateKey, op_size: &WriteOpSize) -> InternalGas {
+        use aptos_types::write_set::WriteOpSize::*;
 
-        match &op {
-            Creation(data) | CreationWithMetadata { data, .. } => {
+        match op_size {
+            Creation { write_len } => {
                 self.per_item_create * NumArgs::new(1)
-                    + self.write_op_size(key, data) * self.per_byte_create
+                    + self.write_op_size(key, *write_len) * self.per_byte_create
             },
-            Modification(data) | ModificationWithMetadata { data, .. } => {
+            Modification { write_len } => {
                 self.per_item_write * NumArgs::new(1)
-                    + self.write_op_size(key, data) * self.per_byte_write
+                    + self.write_op_size(key, *write_len) * self.per_byte_write
             },
-            Deletion | DeletionWithMetadata { .. } => 0.into(),
+            Deletion | DeletionWithDeposit { .. } => 0.into(),
         }
     }
 }
@@ -194,35 +191,17 @@ impl StoragePricingV3 {
     fn io_gas_per_write(
         &self,
         key: &StateKey,
-        op: &WriteOp,
+        op_size: &WriteOpSize,
     ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
-        use WriteOp::*;
-
-        match op {
-            Creation(data)
-            | CreationWithMetadata { data, .. }
-            | Modification(data)
-            | ModificationWithMetadata { data, .. } => Either::Left(
-                STORAGE_IO_PER_STATE_SLOT_WRITE * NumArgs::new(1)
-                    + STORAGE_IO_PER_STATE_BYTE_WRITE * self.write_op_size(key, data.len() as u64),
-            ),
-            Deletion | DeletionWithMetadata { .. } => Either::Right(InternalGas::zero()),
-        }
-    }
-
-    fn io_gas_per_group_write(
-        &self,
-        key: &StateKey,
-        group_write: &GroupWrite,
-    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
-        match group_write.encoded_group_size() {
-            Some(group_op_size) => Either::Left(
-                STORAGE_IO_PER_STATE_SLOT_WRITE * NumArgs::new(1)
-                    + STORAGE_IO_PER_STATE_BYTE_WRITE * self.write_op_size(key, group_op_size),
-            ),
-            // Deletion.
-            None => Either::Right(InternalGas::zero()),
-        }
+        op_size.write_len().map_or_else(
+            || Either::Right(InternalGas::zero()),
+            |write_len| {
+                Either::Left(
+                    STORAGE_IO_PER_STATE_SLOT_WRITE * NumArgs::new(1)
+                        + STORAGE_IO_PER_STATE_BYTE_WRITE * self.write_op_size(key, write_len),
+                )
+            },
+        )
     }
 }
 
@@ -283,30 +262,14 @@ impl StoragePricing {
     pub fn io_gas_per_write(
         &self,
         key: &StateKey,
-        op: &WriteOp,
+        op_size: &WriteOpSize,
     ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
         use StoragePricing::*;
 
         match self {
-            V1(v1) => Either::Left(v1.io_gas_per_write(key, op)),
-            V2(v2) => Either::Left(v2.io_gas_per_write(key, op)),
-            V3(v3) => Either::Right(v3.io_gas_per_write(key, op)),
-        }
-    }
-
-    /// If group write size is provided, then the StateKey is for a resource group and the
-    /// WriteOp does not contain the raw data, and the provided size should be used instead.
-    pub fn io_gas_per_group_write(
-        &self,
-        key: &StateKey,
-        group_write: &GroupWrite,
-    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
-        use StoragePricing::*;
-
-        match self {
-            V3(v3) => Either::<InternalGas, _>::Right(v3.io_gas_per_group_write(key, group_write)),
-            V2(_) => unreachable!("Group write handling unreachable for StoragePricing V2"),
-            V1(_) => unreachable!("Group write handling unreachable for StoragePricing V1"),
+            V1(v1) => Either::Left(v1.io_gas_per_write(key, op_size)),
+            V2(v2) => Either::Left(v2.io_gas_per_write(key, op_size)),
+            V3(v3) => Either::Right(v3.io_gas_per_write(key, op_size)),
         }
     }
 }
@@ -400,9 +363,9 @@ impl CheckChangeSet for ChangeSetConfigs {
         }
 
         let mut write_set_size = 0;
-        for (key, op) in change_set.write_set_iter() {
-            if let Some(bytes) = op.bytes() {
-                let write_op_size = (bytes.len() + key.size()) as u64;
+        for (key, op_size) in change_set.write_set_size_iter() {
+            if let Some(len) = op_size.write_len() {
+                let write_op_size = len + (key.size() as u64);
                 if write_op_size > self.max_bytes_per_write_op {
                     return Err(VMStatus::error(ERR, None));
                 }

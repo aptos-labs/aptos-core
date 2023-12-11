@@ -18,7 +18,7 @@ use crate::{
     },
 };
 use aptos_aggregator::delta_change_set::serialize;
-use aptos_types::{contract_event::ReadWriteEvent, write_set::TransactionWrite};
+use aptos_types::{contract_event::TransactionEvent, write_set::TransactionWrite};
 use aptos_vm_types::resource_group_adapter::group_size_as_sum;
 use bytes::Bytes;
 use claims::{assert_matches, assert_none, assert_some, assert_some_eq};
@@ -92,7 +92,7 @@ pub(crate) struct BaselineOutput<K> {
 impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
     /// Must be invoked after parallel execution to have incarnation information set and
     /// work with dynamic read/writes.
-    pub(crate) fn generate<E: Debug + Clone + ReadWriteEvent>(
+    pub(crate) fn generate<E: Debug + Clone + TransactionEvent>(
         txns: &[MockTransaction<K, E>],
         maybe_block_gas_limit: Option<u64>,
     ) -> Self {
@@ -270,7 +270,12 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                     for (group_key, size) in output.read_group_sizes.iter() {
                         let group_map = group_world.entry(group_key).or_insert(base_map.clone());
 
-                        assert_eq!(*size, group_size_as_sum(group_map.iter()).unwrap());
+                        assert_eq!(
+                            group_size_as_sum(group_map.iter().map(|(t, v)| (t, v.len())))
+                                .unwrap()
+                                .get(),
+                            *size
+                        );
                     }
 
                     // Test normal reads.
@@ -360,7 +365,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                 assert_eq!(*idx, self.resolved_deltas.len());
             },
             Err(BlockExecutorError::FallbackToSequential(e)) => {
-                unimplemented!("not tested here {:?}", e)
+                unimplemented!("not tested here FallbackToSequential({:?})", e)
             },
         }
     }

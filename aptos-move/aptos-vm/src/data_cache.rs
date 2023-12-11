@@ -32,8 +32,8 @@ use aptos_types::{
 };
 use aptos_vm_types::{
     resolver::{
-        ExecutorView, ResourceGroupView, StateStorageView, StateValueMetadataResolver,
-        TResourceGroupView, TResourceView,
+        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView,
+        StateValueMetadataResolver, TResourceGroupView, TResourceView,
     },
     resource_group_adapter::ResourceGroupAdapter,
 };
@@ -88,7 +88,7 @@ pub struct StorageAdapter<'e, E> {
 }
 
 impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
-    pub(crate) fn from_borrowed_with_config(
+    pub(crate) fn new_with_config(
         executor_view: &'e E,
         gas_feature_version: u64,
         features: &Features,
@@ -109,15 +109,6 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             max_identifier_size,
             resource_group_adapter,
         )
-    }
-
-    // TODO[agg_v2](fix): delete after simulation uses block executor.
-    pub(crate) fn from_borrowed(executor_view: &'e E) -> Self {
-        let config_view = ConfigAdapter(executor_view);
-        let (_, gas_feature_version) = gas_config(&config_view);
-        let features = Features::fetch_config(&config_view).unwrap_or_default();
-
-        Self::from_borrowed_with_config(executor_view, gas_feature_version, &features, None)
     }
 
     fn new(
@@ -169,6 +160,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
                 self.resource_group_view
                     .resource_group_size(&key)
                     .map_err(common_error)?
+                    .get()
             } else {
                 0
             };
@@ -200,7 +192,7 @@ impl<'e, E: ExecutorView> ResourceGroupResolver for StorageAdapter<'e, E> {
         self.resource_group_view.release_group_cache()
     }
 
-    fn resource_group_size(&self, group_key: &StateKey) -> anyhow::Result<u64> {
+    fn resource_group_size(&self, group_key: &StateKey) -> anyhow::Result<ResourceGroupSize> {
         self.resource_group_view.resource_group_size(group_key)
     }
 
@@ -208,7 +200,7 @@ impl<'e, E: ExecutorView> ResourceGroupResolver for StorageAdapter<'e, E> {
         &self,
         group_key: &StateKey,
         resource_tag: &StructTag,
-    ) -> anyhow::Result<u64> {
+    ) -> anyhow::Result<usize> {
         self.resource_group_view
             .resource_size_in_group(group_key, resource_tag)
     }
@@ -320,6 +312,13 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
         self.executor_view.generate_delayed_field_id()
     }
 
+    fn validate_and_convert_delayed_field_id(
+        &self,
+        id: u64,
+    ) -> Result<Self::Identifier, PanicError> {
+        self.executor_view.validate_and_convert_delayed_field_id(id)
+    }
+
     fn get_reads_needing_exchange(
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
@@ -328,6 +327,15 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
     {
         self.executor_view
             .get_reads_needing_exchange(delayed_write_set_keys, skip)
+    }
+
+    fn get_group_reads_needing_exchange(
+        &self,
+        delayed_write_set_keys: &HashSet<Self::Identifier>,
+        skip: &HashSet<Self::ResourceKey>,
+    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+        self.executor_view
+            .get_group_reads_needing_exchange(delayed_write_set_keys, skip)
     }
 }
 
@@ -393,14 +401,6 @@ impl<'e, E: ExecutorView> StateValueMetadataResolver for StorageAdapter<'e, E> {
         self.executor_view
             .get_resource_state_value_metadata(state_key)
     }
-
-    fn get_resource_group_state_value_metadata(
-        &self,
-        _state_key: &StateKey,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
-        // TODO[agg_v2](fix): forward to self.executor_view.
-        unimplemented!("Resource group metadata handling not yet implemented");
-    }
 }
 
 // Allows to extract the view from `StorageAdapter`.
@@ -427,6 +427,8 @@ pub(crate) mod tests {
         state_view: &S,
         group_size_kind: GroupSizeKind,
     ) -> StorageAdapter<S> {
+        assert!(group_size_kind != GroupSizeKind::AsSum, "not yet supported");
+
         let (gas_feature_version, resource_group_charge_as_size_sum_enabled) = match group_size_kind
         {
             GroupSizeKind::AsSum => (12, true),
@@ -435,6 +437,7 @@ pub(crate) mod tests {
         };
 
         let group_adapter = ResourceGroupAdapter::new(
+            // TODO[agg_v2](fix) add a converter for StateView for tests that implements ResourceGroupView
             None,
             state_view,
             gas_feature_version,

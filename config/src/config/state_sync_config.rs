@@ -243,7 +243,7 @@ pub struct DataStreamingServiceConfig {
 impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
-            enable_subscription_streaming: true,
+            enable_subscription_streaming: false,
             global_summary_refresh_interval_ms: 50,
             max_concurrent_requests: MAX_CONCURRENT_REQUESTS,
             max_concurrent_state_requests: MAX_CONCURRENT_STATE_REQUESTS,
@@ -357,7 +357,7 @@ impl ConfigSanitizer for StateSyncConfig {
     fn sanitize(
         node_config: &NodeConfig,
         node_type: NodeType,
-        chain_id: ChainId,
+        chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
         // Sanitize the state sync driver config
         StateSyncDriverConfig::sanitize(node_config, node_type, chain_id)
@@ -368,7 +368,7 @@ impl ConfigSanitizer for StateSyncDriverConfig {
     fn sanitize(
         node_config: &NodeConfig,
         _node_type: NodeType,
-        _chain_id: ChainId,
+        _chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
         let state_sync_driver_config = &node_config.state_sync.state_sync_driver;
@@ -393,7 +393,7 @@ impl ConfigOptimizer for StateSyncConfig {
         node_config: &mut NodeConfig,
         local_config_yaml: &Value,
         node_type: NodeType,
-        chain_id: ChainId,
+        chain_id: Option<ChainId>,
     ) -> Result<bool, Error> {
         // Optimize the driver and data streaming service configs
         let modified_driver_config =
@@ -414,7 +414,7 @@ impl ConfigOptimizer for StateSyncDriverConfig {
         node_config: &mut NodeConfig,
         local_config_yaml: &Value,
         _node_type: NodeType,
-        chain_id: ChainId,
+        chain_id: Option<ChainId>,
     ) -> Result<bool, Error> {
         let state_sync_driver_config = &mut node_config.state_sync.state_sync_driver;
         let local_driver_config_yaml = &local_config_yaml["state_sync"]["state_sync_driver"];
@@ -423,11 +423,14 @@ impl ConfigOptimizer for StateSyncDriverConfig {
         // because pruning has kicked in, and nodes will struggle
         // to locate all the data since genesis.
         let mut modified_config = false;
-        if (chain_id.is_testnet() || chain_id.is_mainnet())
-            && local_driver_config_yaml["bootstrapping_mode"].is_null()
-        {
-            state_sync_driver_config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
-            modified_config = true;
+        if let Some(chain_id) = chain_id {
+            if (chain_id.is_testnet() || chain_id.is_mainnet())
+                && local_driver_config_yaml["bootstrapping_mode"].is_null()
+            {
+                state_sync_driver_config.bootstrapping_mode =
+                    BootstrappingMode::DownloadLatestStates;
+                modified_config = true;
+            }
         }
 
         Ok(modified_config)
@@ -439,7 +442,7 @@ impl ConfigOptimizer for DataStreamingServiceConfig {
         node_config: &mut NodeConfig,
         local_config_yaml: &Value,
         node_type: NodeType,
-        _chain_id: ChainId,
+        _chain_id: Option<ChainId>,
     ) -> Result<bool, Error> {
         let data_streaming_service_config = &mut node_config.state_sync.data_streaming_service;
         let local_stream_config_yaml = &local_config_yaml["state_sync"]["data_streaming_service"];
@@ -479,7 +482,7 @@ mod tests {
             &mut node_config,
             &serde_yaml::from_str("{}").unwrap(), // An empty local config,
             NodeType::ValidatorFullnode,
-            ChainId::new(40), // Not mainnet or testnet
+            Some(ChainId::new(40)), // Not mainnet or testnet
         )
         .unwrap();
         assert!(modified_config);
@@ -501,7 +504,7 @@ mod tests {
             &mut node_config,
             &serde_yaml::from_str("{}").unwrap(), // An empty local config,
             NodeType::Validator,
-            ChainId::testnet(),
+            Some(ChainId::testnet()),
         )
         .unwrap();
         assert!(modified_config);
@@ -521,7 +524,7 @@ mod tests {
             &mut node_config,
             &serde_yaml::from_str("{}").unwrap(), // An empty local config,
             NodeType::ValidatorFullnode,
-            ChainId::mainnet(),
+            Some(ChainId::mainnet()),
         )
         .unwrap();
         assert!(modified_config);
@@ -551,7 +554,7 @@ mod tests {
             &mut node_config,
             &local_config_yaml,
             NodeType::ValidatorFullnode,
-            ChainId::testnet(),
+            Some(ChainId::testnet()),
         )
         .unwrap();
         assert!(modified_config);
@@ -573,7 +576,7 @@ mod tests {
             &mut node_config,
             &serde_yaml::from_str("{}").unwrap(), // An empty local config,
             NodeType::Validator,
-            ChainId::mainnet(),
+            Some(ChainId::mainnet()),
         )
         .unwrap();
         assert!(modified_config);
@@ -600,7 +603,7 @@ mod tests {
             &mut node_config,
             &serde_yaml::from_str("{}").unwrap(), // An empty local config,
             NodeType::PublicFullnode,
-            ChainId::testnet(),
+            Some(ChainId::testnet()),
         )
         .unwrap();
         assert!(modified_config);
@@ -646,7 +649,7 @@ mod tests {
             &mut node_config,
             &local_config_yaml,
             NodeType::ValidatorFullnode,
-            ChainId::testnet(),
+            Some(ChainId::testnet()),
         )
         .unwrap();
         assert!(modified_config);
@@ -681,7 +684,7 @@ mod tests {
 
         // Verify that sanitization fails
         let error =
-            StateSyncConfig::sanitize(&node_config, NodeType::Validator, ChainId::testnet())
+            StateSyncConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::testnet()))
                 .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }

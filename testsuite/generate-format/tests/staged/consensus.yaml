@@ -207,6 +207,10 @@ BlockType:
                   - TYPENAME: AccountAddress
     2:
       Genesis: UNIT
+    3:
+      ProposalExt:
+        NEWTYPE:
+          TYPENAME: ProposalExt
 ChainId:
   NEWTYPESTRUCT: U8
 ChangeSet:
@@ -307,6 +311,10 @@ ConsensusMsg:
       CommitMessage:
         NEWTYPE:
           TYPENAME: CommitMessage
+    16:
+      RandGenMessage:
+        NEWTYPE:
+          TYPENAME: RandGenMessage
 ContractEvent:
   ENUM:
     0:
@@ -334,6 +342,9 @@ DAGNetworkMessage:
   STRUCT:
     - epoch: U64
     - data: BYTES
+DummyValidatorTransaction:
+  STRUCT:
+    - payload: BYTES
 Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
@@ -468,6 +479,23 @@ ProofWithData:
     - proofs:
         SEQ:
           TYPENAME: ProofOfStore
+ProposalExt:
+  ENUM:
+    0:
+      V0:
+        STRUCT:
+          - validator_txns:
+              SEQ:
+                TYPENAME: ValidatorTransaction
+          - payload:
+              TYPENAME: Payload
+          - author:
+              TYPENAME: AccountAddress
+          - failed_authors:
+              SEQ:
+                TUPLE:
+                  - U64
+                  - TYPENAME: AccountAddress
 ProposalMsg:
   STRUCT:
     - proposal:
@@ -482,6 +510,10 @@ QuorumCert:
         TYPENAME: VoteData
     - signed_ledger_info:
         TYPENAME: LedgerInfoWithSignatures
+RandGenMessage:
+  STRUCT:
+    - epoch: U64
+    - data: BYTES
 RawTransaction:
   STRUCT:
     - sender:
@@ -602,6 +634,10 @@ Transaction:
       StateCheckpoint:
         NEWTYPE:
           TYPENAME: HashValue
+    4:
+      ValidatorTransaction:
+        NEWTYPE:
+          TYPENAME: ValidatorTransaction
 TransactionArgument:
   ENUM:
     0:
@@ -747,6 +783,12 @@ ValidatorConsensusInfo:
     - public_key:
         TYPENAME: PublicKey
     - voting_power: U64
+ValidatorTransaction:
+  ENUM:
+    0:
+      DummyTopic:
+        NEWTYPE:
+          TYPENAME: DummyValidatorTransaction
 ValidatorVerifier:
   STRUCT:
     - validator_infos:

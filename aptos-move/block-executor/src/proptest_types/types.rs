@@ -9,6 +9,7 @@ use crate::{
 use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
+    resolver::TAggregatorV1View,
     types::DelayedFieldID,
 };
 use aptos_mvhashmap::types::TxnIndex;
@@ -16,8 +17,7 @@ use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    contract_event::ReadWriteEvent,
-    event::EventKey,
+    contract_event::TransactionEvent,
     executable::ModulePath,
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,
@@ -31,7 +31,7 @@ use aptos_types::{
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
 use bytes::Bytes;
 use claims::{assert_ge, assert_le, assert_ok};
-use move_core_types::{language_storage::TypeTag, value::MoveTypeLayout};
+use move_core_types::value::MoveTypeLayout;
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
@@ -447,7 +447,7 @@ impl<K, E> MockTransaction<K, E> {
 
 impl<
         K: Debug + Hash + Ord + Clone + Send + Sync + ModulePath + 'static,
-        E: Debug + Clone + Send + Sync + ReadWriteEvent + 'static,
+        E: Debug + Clone + Send + Sync + TransactionEvent + 'static,
     > Transaction for MockTransaction<K, E>
 {
     type Event = E;
@@ -568,7 +568,10 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             .collect()
     }
 
-    fn new_mock_write_txn<K: Clone + Hash + Debug + Eq + Ord, E: Debug + Clone + ReadWriteEvent>(
+    fn new_mock_write_txn<
+        K: Clone + Hash + Debug + Eq + Ord,
+        E: Debug + Clone + TransactionEvent,
+    >(
         self,
         universe: &[K],
         module_read_fn: &dyn Fn(usize) -> bool,
@@ -605,7 +608,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
     pub(crate) fn materialize<
         K: Clone + Hash + Debug + Eq + Ord,
-        E: Send + Sync + Debug + Clone + ReadWriteEvent,
+        E: Send + Sync + Debug + Clone + TransactionEvent,
     >(
         self,
         universe: &[K],
@@ -631,7 +634,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
     // operations. Last 3 keys of the universe are used as group keys.
     pub(crate) fn materialize_groups<
         K: Clone + Hash + Debug + Eq + Ord,
-        E: Send + Sync + Debug + Clone + ReadWriteEvent,
+        E: Send + Sync + Debug + Clone + TransactionEvent,
     >(
         self,
         universe: &[K],
@@ -738,7 +741,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
     pub(crate) fn materialize_with_deltas<
         K: Clone + Hash + Debug + Eq + Ord,
-        E: Send + Sync + Debug + Clone + ReadWriteEvent,
+        E: Send + Sync + Debug + Clone + TransactionEvent,
     >(
         self,
         universe: &[K],
@@ -776,7 +779,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
     pub(crate) fn materialize_disjoint_module_rw<
         K: Clone + Hash + Debug + Eq + Ord,
-        E: Send + Sync + Debug + Clone + ReadWriteEvent,
+        E: Send + Sync + Debug + Clone + TransactionEvent,
     >(
         self,
         universe: &[K],
@@ -821,7 +824,7 @@ impl<K, E> MockTask<K, E> {
 impl<K, E> ExecutorTask for MockTask<K, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
-    E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
+    E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
     type Argument = ();
     type Error = usize;
@@ -838,7 +841,6 @@ where
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
-        _materialize_deltas: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
         match txn {
             MockTransaction::Write {
@@ -884,9 +886,9 @@ where
                     .map(|group_key| {
                         (
                             group_key.clone(),
-                            view.resource_group_size(group_key).expect(
-                                "Group must exist and size computation should must succeed",
-                            ),
+                            view.resource_group_size(group_key)
+                                .expect("Group must exist and size computation must succeed")
+                                .get(),
                         )
                     })
                     .collect();
@@ -962,6 +964,10 @@ where
             MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
         }
     }
+
+    fn is_transaction_dynamic_change_set_capable(_txn: &Self::Txn) -> bool {
+        true
+    }
 }
 
 pub(crate) fn raw_metadata(v: u64) -> StateValueMetadataKind {
@@ -986,14 +992,14 @@ pub(crate) struct MockOutput<K, E> {
 impl<K, E> TransactionOutput for MockOutput<K, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
-    E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
+    E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
     type Txn = MockTransaction<K, E>;
 
     // TODO[agg_v2](tests): Assigning MoveTypeLayout as None for all the writes for now.
     // That means, the resources do not have any DelayedFields embededded in them.
     // Change it to test resources with DelayedFields as well.
-    fn resource_write_set(&self) -> BTreeMap<K, (ValueType, Option<Arc<MoveTypeLayout>>)> {
+    fn resource_write_set(&self) -> Vec<(K, (ValueType, Option<Arc<MoveTypeLayout>>))> {
         self.writes
             .iter()
             .filter(|(k, _)| k.module_path().is_none())
@@ -1032,12 +1038,19 @@ where
 
     fn reads_needing_delayed_field_exchange(
         &self,
-    ) -> BTreeMap<
-        <Self::Txn as Transaction>::Key,
-        (<Self::Txn as Transaction>::Value, Arc<MoveTypeLayout>),
-    > {
+    ) -> Vec<(<Self::Txn as Transaction>::Key, Arc<MoveTypeLayout>)> {
         // TODO[agg_v2](tests): add aggregators V2 to the proptest?
-        BTreeMap::new()
+        Vec::new()
+    }
+
+    fn group_reads_needing_delayed_field_exchange(
+        &self,
+    ) -> Vec<(
+        <Self::Txn as Transaction>::Key,
+        <Self::Txn as Transaction>::Value,
+    )> {
+        // TODO[agg_v2](tests): add aggregators V2 to the proptest?
+        Vec::new()
     }
 
     // TODO[agg_v2](tests): Currently, appending None to all events, which means none of the
@@ -1046,12 +1059,23 @@ where
         self.events.iter().map(|e| (e.clone(), None)).collect()
     }
 
-    fn resource_group_write_set(&self) -> Vec<(K, ValueType, BTreeMap<u32, ValueType>)> {
+    // TODO[agg_v2](fix) Using the concrete type layout here. Should we find a way to use generics?
+    fn resource_group_write_set(
+        &self,
+    ) -> Vec<(
+        K,
+        ValueType,
+        BTreeMap<u32, (ValueType, Option<Arc<MoveTypeLayout>>)>,
+    )> {
         self.group_writes
             .iter()
             .cloned()
             .map(|(group_key, metadata_v, inner_ops)| {
-                (group_key, metadata_v, inner_ops.into_iter().collect())
+                (
+                    group_key,
+                    metadata_v,
+                    inner_ops.into_iter().map(|(k, v)| (k, (v, None))).collect(),
+                )
             })
             .collect()
     }
@@ -1069,22 +1093,30 @@ where
         }
     }
 
+    fn materialize_agg_v1(
+        &self,
+        _view: &impl TAggregatorV1View<Identifier = <Self::Txn as Transaction>::Key>,
+    ) {
+        // TODO[agg_v2](tests): implement this method and compare
+        // against sequential execution results v. aggregator v1.
+    }
+
     fn incorporate_materialized_txn_output(
         &self,
         aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
-        _patched_resource_write_set: BTreeMap<
-            <Self::Txn as Transaction>::Key,
-            <Self::Txn as Transaction>::Value,
-        >,
-        _patched_events: Vec<<Self::Txn as Transaction>::Event>,
-        _combined_groups: Vec<(
+        _patched_resource_write_set: Vec<(
             <Self::Txn as Transaction>::Key,
             <Self::Txn as Transaction>::Value,
         )>,
+        _patched_events: Vec<<Self::Txn as Transaction>::Event>,
     ) {
         assert_ok!(self.materialized_delta_writes.set(aggregator_v1_writes));
         // TODO[agg_v2](tests): Set the patched resource write set and events. But that requires the function
         // to take &mut self as input
+    }
+
+    fn set_txn_output_for_non_dynamic_change_set(&self) {
+        // TODO[agg_v2](tests): anything to be added here for tests?
     }
 
     fn fee_statement(&self) -> FeeStatement {
@@ -1104,23 +1136,15 @@ where
 
 #[derive(Clone, Debug)]
 pub(crate) struct MockEvent {
-    key: EventKey,
-    sequence_number: u64,
-    type_tag: TypeTag,
     event_data: Vec<u8>,
 }
 
-impl ReadWriteEvent for MockEvent {
-    fn get_event_data(&self) -> (EventKey, u64, &TypeTag, &[u8]) {
-        (
-            self.key,
-            self.sequence_number,
-            &self.type_tag,
-            &self.event_data,
-        )
+impl TransactionEvent for MockEvent {
+    fn get_event_data(&self) -> &[u8] {
+        &self.event_data
     }
 
-    fn update_event_data(&mut self, event_data: Vec<u8>) {
+    fn set_event_data(&mut self, event_data: Vec<u8>) {
         self.event_data = event_data;
     }
 }

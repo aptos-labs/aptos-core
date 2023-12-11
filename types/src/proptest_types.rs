@@ -28,6 +28,7 @@ use crate::{
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
+    validator_txn::{DummyValidatorTransaction, ValidatorTransaction},
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -1210,6 +1211,22 @@ impl Arbitrary for ValidatorVerifier {
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         vec(any::<ValidatorConsensusInfo>(), 1..1000)
             .prop_map(ValidatorVerifier::new)
+            .boxed()
+    }
+}
+
+#[cfg(any(test, feature = "fuzzing"))]
+impl Arbitrary for ValidatorTransaction {
+    type Parameters = SizeRange;
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        Just(Value::Null)
+            .prop_map(|_| {
+                ValidatorTransaction::DummyTopic(DummyValidatorTransaction {
+                    payload: vec![0xFF; 16],
+                })
+            })
             .boxed()
     }
 }

@@ -107,6 +107,34 @@ impl Default for QuorumStoreConfig {
 }
 
 impl QuorumStoreConfig {
+    /// Since every validator can contribute to every round, the quorum store
+    /// batches should be small enough to fit in a DAG node. And, since proof
+    /// broadcasting is disabled, Quorum Store needs to create only enough
+    /// batches to fit the self proposed nodes. These configs below reflect
+    /// this behavior.
+    pub fn default_for_dag() -> Self {
+        Self {
+            sender_max_batch_txns: 300,
+            sender_max_batch_bytes: 4 * 1024 * 1024,
+            sender_max_num_batches: 5,
+            sender_max_total_txns: 500,
+            sender_max_total_bytes: 8 * 1024 * 1024,
+            receiver_max_batch_txns: 300,
+            receiver_max_batch_bytes: 4 * 1024 * 1024,
+            receiver_max_num_batches: 5,
+            receiver_max_total_txns: 500,
+            receiver_max_total_bytes: 8 * 1024 * 1024,
+            back_pressure: QuorumStoreBackPressureConfig {
+                backlog_txn_limit_count: 100000,
+                backlog_per_validator_batch_limit_count: 20,
+                dynamic_min_txn_per_s: 100,
+                dynamic_max_txn_per_s: 200,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
     fn sanitize_send_recv_batch_limits(
         sanitizer_name: &str,
         config: &QuorumStoreConfig,
@@ -186,15 +214,214 @@ impl ConfigSanitizer for QuorumStoreConfig {
     fn sanitize(
         node_config: &NodeConfig,
         _node_type: NodeType,
-        _chain_id: ChainId,
+        _chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
 
+        // Sanitize the send/recv batch limits
         Self::sanitize_send_recv_batch_limits(
             &sanitizer_name,
             &node_config.consensus.quorum_store,
         )?;
+
+        // Sanitize the batch total limits
         Self::sanitize_batch_total_limits(&sanitizer_name, &node_config.consensus.quorum_store)?;
+
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::config::ConsensusConfig;
+
+    #[test]
+    fn test_send_recv_batch_limits_txns() {
+        // Create a node config with invalid txn limits
+        let node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                quorum_store: QuorumStoreConfig {
+                    sender_max_batch_txns: 100,
+                    receiver_max_batch_txns: 50,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = QuorumStoreConfig::sanitize(
+            &node_config,
+            NodeType::Validator,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_send_recv_batch_limits_bytes() {
+        // Create a node config with invalid byte limits
+        let node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                quorum_store: QuorumStoreConfig {
+                    sender_max_batch_bytes: 100,
+                    receiver_max_batch_bytes: 50,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = QuorumStoreConfig::sanitize(
+            &node_config,
+            NodeType::Validator,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_send_recv_batch_limits_total_txns() {
+        // Create a node config with invalid total txn limits
+        let node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                quorum_store: QuorumStoreConfig {
+                    sender_max_total_txns: 100,
+                    receiver_max_total_txns: 50,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error =
+            QuorumStoreConfig::sanitize(&node_config, NodeType::Validator, None).unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_send_recv_batch_limits_total_bytes() {
+        // Create a node config with invalid total byte limits
+        let node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                quorum_store: QuorumStoreConfig {
+                    sender_max_total_bytes: 100,
+                    receiver_max_total_bytes: 50,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = QuorumStoreConfig::sanitize(
+            &node_config,
+            NodeType::Validator,
+            Some(ChainId::testnet()),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_batch_total_limits_send_txns() {
+        // Create a node config with invalid sender txn limits
+        let node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                quorum_store: QuorumStoreConfig {
+                    sender_max_batch_txns: 100,
+                    sender_max_total_txns: 50,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = QuorumStoreConfig::sanitize(
+            &node_config,
+            NodeType::Validator,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_batch_total_limits_send_bytes() {
+        // Create a node config with invalid sender byte limits
+        let node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                quorum_store: QuorumStoreConfig {
+                    sender_max_batch_bytes: 100,
+                    sender_max_total_bytes: 50,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error =
+            QuorumStoreConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::test()))
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_batch_total_limits_recv_txns() {
+        // Create a node config with invalid receiver txn limits
+        let node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                quorum_store: QuorumStoreConfig {
+                    receiver_max_batch_txns: 2002,
+                    receiver_max_total_txns: 2001,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = QuorumStoreConfig::sanitize(
+            &node_config,
+            NodeType::Validator,
+            Some(ChainId::testnet()),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_batch_total_limits_recv_bytes() {
+        // Create a node config with invalid receiver byte limits
+        let node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                quorum_store: QuorumStoreConfig {
+                    receiver_max_batch_bytes: 5_000_002,
+                    receiver_max_total_bytes: 5_000_001,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error =
+            QuorumStoreConfig::sanitize(&node_config, NodeType::Validator, None).unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
 }

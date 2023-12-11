@@ -2,13 +2,14 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{serde_helper::vec_bytes, transaction::transaction_argument::TransactionArgument};
+use crate::serde_helper::vec_bytes;
 pub use move_core_types::abi::{
     ArgumentABI, ScriptFunctionABI as EntryFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
 use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
+    transaction_argument::TransactionArgument,
 };
 use serde::{Deserialize, Serialize};
 use std::fmt;

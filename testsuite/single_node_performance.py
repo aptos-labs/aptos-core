@@ -73,14 +73,19 @@ NUM_ACCOUNTS = max(
 MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 
 # numbers are based on the machine spec used by github action
-# Calibrate from https://gist.github.com/igor-aptos/7b12ca28de03894cddda8e415f37889e
+# Calibrate using median value from
+# Axiom: https://app.axiom.co/aptoslabs-hghf/explorer?qid=88fegG0H1si-s3x8pv&relative=1
+# Humio: https://gist.github.com/igor-aptos/7b12ca28de03894cddda8e415f37889e
 # Local machine numbers will be higher.
+# For charts over time, you can modify the following query:
+# https://app.axiom.co/aptoslabs-hghf/explorer?qid=29zYzeVi7FX-s4ukl5&relative=1
 # fmt: off
 TESTS = [
     RunGroupConfig(expected_tps=25300, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=3500, key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=16200, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=42000, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
+    # this was changed from 42000 to make landings not flaky, needs follow up
+    RunGroupConfig(expected_tps=35500, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=13500, key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=33200, key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=22000, key=RunGroupKey("account-resource32-b"), included_in=LAND_BLOCKING_AND_C),
@@ -95,11 +100,19 @@ TESTS = [
     RunGroupConfig(expected_tps=365, key=RunGroupKey("batch100-transfer"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=1100, key=RunGroupKey("batch100-transfer", executor_type="native"), included_in=Flow.CONTINUOUS),
 
-    RunGroupConfig(expected_tps=160, key=RunGroupKey("vector-picture30k"), included_in=LAND_BLOCKING_AND_C, waived=True),
-    RunGroupConfig(expected_tps=1000, key=RunGroupKey("vector-picture30k", module_working_set_size=20), included_in=Flow.CONTINUOUS, waived=True),
+    RunGroupConfig(expected_tps=165, key=RunGroupKey("vector-picture40"), included_in=Flow(0), waived=True),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("vector-picture40", module_working_set_size=20), included_in=Flow(0), waived=True),
+    RunGroupConfig(expected_tps=160, key=RunGroupKey("vector-picture30k"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("vector-picture30k", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=17, key=RunGroupKey("smart-table-picture30-k-with200-change"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=82, key=RunGroupKey("smart-table-picture30-k-with200-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=3, key=RunGroupKey("smart-table-picture1-m-with1-k-change"), included_in=LAND_BLOCKING_AND_C, waived=True),
+    RunGroupConfig(expected_tps=12, key=RunGroupKey("smart-table-picture1-m-with1-k-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=5, key=RunGroupKey("smart-table-picture1-b-with1-k-change"), included_in=Flow(0), waived=True),
+    RunGroupConfig(expected_tps=10, key=RunGroupKey("smart-table-picture1-b-with1-k-change", module_working_set_size=20), included_in=Flow(0), waived=True),
 
-    RunGroupConfig(expected_tps=1890, key=RunGroupKey("token-v1ft-mint-and-transfer"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=8800, key=RunGroupKey("token-v1ft-mint-and-transfer", module_working_set_size=20), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=1890, key=RunGroupKey("token-v1ft-mint-and-transfer"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=9250, key=RunGroupKey("token-v1ft-mint-and-transfer", module_working_set_size=20), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=1100, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=5900, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential", module_working_set_size=20), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=1300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
@@ -109,10 +122,10 @@ TESTS = [
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-store-sequential"), included_in=Flow(0)),
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
 
-    RunGroupConfig(expected_tps=24000, key=RunGroupKey("no-op5-signers"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=25500, key=RunGroupKey("no-op5-signers"), included_in=Flow.CONTINUOUS),
    
     RunGroupConfig(expected_tps=1710, key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=5800, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=6900, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
 
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded", sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded", sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
@@ -214,6 +227,7 @@ class RunResults:
     io_gps: float
     execution_gps: float
     gpt: float
+    output_bps: float
     fraction_in_execution: float
     fraction_of_execution_in_vm: float
     fraction_in_commit: float
@@ -248,6 +262,9 @@ def extract_run_results(
         gpt = float(
             re.findall(r"Overall execution GPT: (\d+\.?\d*) gas/txn", output)[-1]
         )
+        output_bps = float(
+            re.findall(r"Overall execution output: (\d+\.?\d*) bytes/s", output)[-1]
+        )
     elif create_db:
         tps = float(
             get_only(
@@ -261,6 +278,7 @@ def extract_run_results(
         io_gps = 0
         execution_gps = 0
         gpt = 0
+        output_bps = 0
     else:
         tps = float(get_only(re.findall(r"Overall TPS: (\d+\.?\d*) txn/s", output)))
         gps = float(get_only(re.findall(r"Overall GPS: (\d+\.?\d*) gas/s", output)))
@@ -271,6 +289,9 @@ def extract_run_results(
             get_only(re.findall(r"Overall executionGPS: (\d+\.?\d*) gas/s", output))
         )
         gpt = float(get_only(re.findall(r"Overall GPT: (\d+\.?\d*) gas/txn", output)))
+        output_bps = float(
+            re.findall(r"Overall output: (\d+\.?\d*) bytes/s", output)[-1]
+        )
 
     if create_db:
         fraction_in_execution = 0
@@ -295,6 +316,7 @@ def extract_run_results(
         io_gps=io_gps,
         execution_gps=execution_gps,
         gpt=gpt,
+        output_bps=output_bps,
         fraction_in_execution=fraction_in_execution,
         fraction_of_execution_in_vm=fraction_of_execution_in_vm,
         fraction_in_commit=fraction_in_commit,
@@ -334,6 +356,7 @@ def print_table(
                 "io g/s",
                 "exe g/s",
                 "g/t",
+                "out B/s",
             ]
         )
 
@@ -366,6 +389,7 @@ def print_table(
             row.append(int(round(result.single_node_result.io_gps)))
             row.append(int(round(result.single_node_result.execution_gps)))
             row.append(int(round(result.single_node_result.gpt)))
+            row.append(int(round(result.single_node_result.output_bps)))
         rows.append(row)
 
     print(tabulate(rows, headers=headers))

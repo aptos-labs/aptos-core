@@ -18,6 +18,7 @@ use aptos_types::{
     access_path::AccessPath,
     account_config::CORE_CODE_ADDRESS,
     aggregate_signature::AggregateSignature,
+    block_executor::config::BlockExecutorConfigFromOnchain,
     block_info::{BlockInfo, GENESIS_EPOCH, GENESIS_ROUND, GENESIS_TIMESTAMP_USECS},
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ConfigurationResource,
@@ -47,13 +48,13 @@ pub fn maybe_bootstrap<V: VMExecutor>(
     db: &DbReaderWriter,
     genesis_txn: &Transaction,
     waypoint: Waypoint,
-) -> Result<bool> {
+) -> Result<Option<LedgerInfoWithSignatures>> {
     let executed_trees = db.reader.get_latest_executed_trees()?;
     // if the waypoint is not targeted with the genesis txn, it may be either already bootstrapped, or
     // aiming for state sync to catch up.
     if executed_trees.version().map_or(0, |v| v + 1) != waypoint.version() {
         info!(waypoint = %waypoint, "Skip genesis txn.");
-        return Ok(false);
+        return Ok(None);
     }
 
     let committer = calculate_genesis::<V>(db, executed_trees, genesis_txn)?;
@@ -63,8 +64,9 @@ pub fn maybe_bootstrap<V: VMExecutor>(
         waypoint,
         committer.waypoint(),
     );
+    let ledger_info = committer.output.ledger_info.clone();
     committer.commit()?;
-    Ok(true)
+    Ok(ledger_info)
 }
 
 pub struct GenesisCommitter {
@@ -148,7 +150,7 @@ pub fn calculate_genesis<V: VMExecutor>(
     let (mut output, _, _) = ChunkOutput::by_transaction_execution::<V>(
         vec![genesis_txn.clone().into()].into(),
         base_state_view,
-        None,
+        BlockExecutorConfigFromOnchain::new_no_block_limit(),
     )?
     .apply_to_ledger(&executed_trees, None, None)?;
     ensure!(

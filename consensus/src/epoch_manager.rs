@@ -10,12 +10,6 @@ use crate::{
     counters,
     dag::{DagBootstrapper, DagCommitSigner, StorageAdapter},
     error::{error_kind, DbError},
-    experimental::{
-        buffer_manager::{OrderedBlocks, ResetRequest},
-        decoupled_execution_utils::prepare_phases_and_buffer_manager,
-        ordering_state_computer::{DagStateSyncComputer, OrderingStateComputer},
-        signing_phase::CommitSignerProvider,
-    },
     liveness::{
         cached_proposer_election::CachedProposerElection,
         leader_reputation::{
@@ -38,9 +32,17 @@ use crate::{
         IncomingDAGRequest, IncomingRpcRequest, NetworkReceivers, NetworkSender,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
-    payload_client::QuorumStoreClient,
+    payload_client::{
+        mixed::MixedPayloadClient, user::quorum_store_client::QuorumStoreClient, PayloadClient,
+    },
     payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
+    pipeline::{
+        buffer_manager::{OrderedBlocks, ResetRequest},
+        decoupled_execution_utils::prepare_phases_and_buffer_manager,
+        ordering_state_computer::{DagStateSyncComputer, OrderingStateComputer},
+        signing_phase::CommitSignerProvider,
+    },
     quorum_store::{
         quorum_store_builder::{DirectMempoolInnerBuilder, InnerBuilder, QuorumStoreBuilder},
         quorum_store_coordinator::CoordinatorCommand,
@@ -48,7 +50,7 @@ use crate::{
     },
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
-    state_replication::{PayloadClient, StateComputer},
+    state_replication::StateComputer,
     transaction_deduper::create_transaction_deduper,
     transaction_shuffler::create_transaction_shuffler,
     util::time_service::TimeService,
@@ -57,7 +59,8 @@ use anyhow::{bail, ensure, Context};
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{
-    ConsensusConfig, DagConsensusConfig, NodeConfig, QcAggregatorType, SecureBackend,
+    ConsensusConfig, DagConsensusConfig, ExecutionConfig, NodeConfig, QcAggregatorType,
+    SecureBackend,
 };
 use aptos_consensus_types::{
     common::{Author, Round},
@@ -81,7 +84,7 @@ use aptos_types::{
         OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
     },
     validator_signer::ValidatorSigner,
-    validator_verifier::ValidatorVerifier,
+    validator_txn::pool::ValidatorTransactionPoolClient,
 };
 use fail::fail_point;
 use futures::{
@@ -120,6 +123,8 @@ pub enum LivenessStorageData {
 pub struct EpochManager<P: OnChainConfigProvider> {
     author: Author,
     config: ConsensusConfig,
+    #[allow(unused)]
+    execution_config: ExecutionConfig,
     time_service: Arc<dyn TimeService>,
     self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
     network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
@@ -129,6 +134,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     commit_state_computer: Arc<dyn StateComputer>,
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
+    validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
     reconfig_events: ReconfigNotificationListener<P>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingCommitRequest>>,
@@ -171,15 +177,18 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         reconfig_events: ReconfigNotificationListener<P>,
         bounded_executor: BoundedExecutor,
         aptos_time_service: aptos_time_service::TimeService,
+        validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
+        let execution_config = node_config.execution.clone();
         let dag_config = node_config.dag_consensus.clone();
         let sr_config = &node_config.consensus.safety_rules;
         let safety_rules_manager = SafetyRulesManager::new(sr_config);
         Self {
             author,
             config,
+            execution_config,
             time_service,
             self_sender,
             network_sender,
@@ -190,6 +199,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             commit_state_computer,
             storage,
             safety_rules_manager,
+            validator_txn_pool_client,
             reconfig_events,
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
@@ -509,8 +519,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         Ok(())
     }
 
-    fn spawn_block_retrieval_task(&mut self, epoch: u64, block_store: Arc<BlockStore>) {
-        let (request_tx, mut request_rx) = aptos_channel::new(
+    fn spawn_block_retrieval_task(
+        &mut self,
+        epoch: u64,
+        block_store: Arc<BlockStore>,
+        max_blocks_allowed: u64,
+    ) {
+        let (request_tx, mut request_rx) = aptos_channel::new::<_, IncomingBlockRetrievalRequest>(
             QueueStyle::LIFO,
             1,
             Some(&counters::BLOCK_RETRIEVAL_TASK_MSGS),
@@ -518,6 +533,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let task = async move {
             info!(epoch = epoch, "Block retrieval task starts");
             while let Some(request) = request_rx.next().await {
+                if request.req.num_blocks() > max_blocks_allowed {
+                    warn!(
+                        "Ignore block retrieval with too many blocks: {}",
+                        request.req.num_blocks()
+                    );
+                    continue;
+                }
                 if let Err(e) = monitor!(
                     "process_block_retrieval",
                     block_store.process_block_retrieval(request).await
@@ -536,7 +558,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     fn spawn_decoupled_execution(
         &mut self,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
-        verifier: ValidatorVerifier,
+        epoch_state: Arc<EpochState>,
     ) -> (
         UnboundedSender<OrderedBlocks>,
         UnboundedSender<ResetRequest>,
@@ -545,7 +567,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.author,
             self.network_sender.clone(),
             self.self_sender.clone(),
-            verifier.clone(),
+            epoch_state.verifier.clone(),
         );
 
         let (block_tx, block_rx) = unbounded::<OrderedBlocks>();
@@ -576,14 +598,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.commit_state_computer.clone(),
             block_rx,
             reset_rx,
-            verifier,
+            epoch_state,
         );
+        let bounded_executor = self.bounded_executor.clone();
 
         tokio::spawn(execution_schedule_phase.start());
         tokio::spawn(execution_wait_phase.start());
         tokio::spawn(signing_phase.start());
         tokio::spawn(persisting_phase.start());
-        tokio::spawn(buffer_manager.start());
+        tokio::spawn(buffer_manager.start(bounded_executor));
 
         (block_tx, reset_tx)
     }
@@ -647,7 +670,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     async fn start_recovery_manager(
         &mut self,
         ledger_data: LedgerRecoveryData,
-        epoch_state: EpochState,
+        onchain_consensus_config: OnChainConsensusConfig,
+        epoch_state: Arc<EpochState>,
         network_sender: NetworkSender,
     ) {
         let (recovery_manager_tx, recovery_manager_rx) = aptos_channel::new(
@@ -664,6 +688,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.storage.clone(),
             self.commit_state_computer.clone(),
             ledger_data.committed_round(),
+            self.config
+                .max_blocks_per_sending_request(onchain_consensus_config.quorum_store_enabled()),
         );
         tokio::spawn(recovery_manager.start(recovery_manager_rx, close_rx));
     }
@@ -672,10 +698,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         epoch_state: &EpochState,
         network_sender: NetworkSender,
+        consensus_config: &OnChainConsensusConfig,
     ) -> (Arc<PayloadManager>, QuorumStoreClient, QuorumStoreBuilder) {
         // Start QuorumStore
         let (consensus_to_quorum_store_tx, consensus_to_quorum_store_rx) =
             mpsc::channel(self.config.intra_consensus_channel_buffer_size);
+
+        let quorum_store_config = if consensus_config.is_dag_enabled() {
+            self.dag_config.quorum_store.clone()
+        } else {
+            self.config.quorum_store.clone()
+        };
 
         let mut quorum_store_builder = if self.quorum_store_enabled {
             info!("Building QuorumStore");
@@ -683,7 +716,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.epoch(),
                 self.author,
                 epoch_state.verifier.len() as u64,
-                self.config.quorum_store.clone(),
+                quorum_store_config,
                 consensus_to_quorum_store_rx,
                 self.quorum_store_to_mempool_sender.clone(),
                 self.config.mempool_txn_pull_timeout_ms,
@@ -692,6 +725,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 epoch_state.verifier.clone(),
                 self.config.safety_rules.backend.clone(),
                 self.quorum_store_storage.clone(),
+                !consensus_config.is_dag_enabled(),
             ))
         } else {
             info!("Building DirectMempool");
@@ -722,27 +756,28 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) {
         let transaction_shuffler =
             create_transaction_shuffler(onchain_execution_config.transaction_shuffler_type());
-        let block_gas_limit = onchain_execution_config.block_gas_limit();
+        let block_executor_onchain_config =
+            onchain_execution_config.block_executor_onchain_config();
         let transaction_deduper =
             create_transaction_deduper(onchain_execution_config.transaction_deduper_type());
         self.commit_state_computer.new_epoch(
             epoch_state,
             payload_manager,
             transaction_shuffler,
-            block_gas_limit,
+            block_executor_onchain_config,
             transaction_deduper,
         );
     }
 
     fn init_ordering_state_computer(
         &mut self,
-        epoch_state: &EpochState,
+        epoch_state: Arc<EpochState>,
         onchain_consensus_config: &OnChainConsensusConfig,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
     ) -> Arc<dyn StateComputer> {
         if onchain_consensus_config.decoupled_execution() {
-            let (block_tx, reset_tx) = self
-                .spawn_decoupled_execution(commit_signer_provider, epoch_state.verifier.clone());
+            let (block_tx, reset_tx) =
+                self.spawn_decoupled_execution(commit_signer_provider, epoch_state);
             Arc::new(OrderingStateComputer::new(
                 block_tx,
                 self.commit_state_computer.clone(),
@@ -777,7 +812,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     async fn start_round_manager(
         &mut self,
         recovery_data: RecoveryData,
-        epoch_state: EpochState,
+        epoch_state: Arc<EpochState>,
         onchain_consensus_config: OnChainConsensusConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
@@ -823,7 +858,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
         let state_computer = self.init_ordering_state_computer(
-            &epoch_state,
+            epoch_state.clone(),
             &onchain_consensus_config,
             safety_rules_container.clone(),
         );
@@ -858,6 +893,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
+            onchain_consensus_config.validator_txn_enabled(),
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::LIFO,
@@ -872,6 +908,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         );
         self.round_manager_tx = Some(round_manager_tx.clone());
         self.buffered_proposal_tx = Some(buffered_proposal_tx.clone());
+        let max_blocks_allowed = self
+            .config
+            .max_blocks_per_receiving_request(onchain_consensus_config.quorum_store_enabled());
 
         let mut round_manager = RoundManager::new(
             epoch_state,
@@ -898,7 +937,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             close_rx,
         ));
 
-        self.spawn_block_retrieval_task(epoch, block_store);
+        self.spawn_block_retrieval_task(epoch, block_store, max_blocks_allowed);
     }
 
     fn start_quorum_store(&mut self, quorum_store_builder: QuorumStoreBuilder) {
@@ -923,13 +962,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");
-        let epoch_state = EpochState {
+        let epoch_state = Arc::new(EpochState {
             epoch: payload.epoch(),
             verifier: (&validator_set).into(),
-        };
+        });
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
+
         if let Err(error) = &onchain_consensus_config {
             error!("Failed to read on-chain consensus config {}", error);
         }
@@ -938,7 +978,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             error!("Failed to read on-chain execution config {}", error);
         }
 
-        self.epoch_state = Some(Arc::new(epoch_state.clone()));
+        self.epoch_state = Some(epoch_state.clone());
 
         let consensus_config = onchain_consensus_config.unwrap_or_default();
         let execution_config = onchain_execution_config
@@ -977,18 +1017,26 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.set_epoch_start_metrics(epoch_state);
         self.quorum_store_enabled = self.enable_quorum_store(consensus_config);
         let network_sender = self.create_network_sender(epoch_state);
-        let (payload_manager, payload_client, quorum_store_builder) = self
-            .init_payload_provider(epoch_state, network_sender.clone())
+        let (payload_manager, quorum_store_client, quorum_store_builder) = self
+            .init_payload_provider(epoch_state, network_sender.clone(), consensus_config)
             .await;
-
+        let mixed_payload_client = MixedPayloadClient::new(
+            consensus_config.validator_txn_enabled(),
+            self.validator_txn_pool_client.clone(),
+            Arc::new(quorum_store_client),
+        );
         self.init_commit_state_computer(epoch_state, payload_manager.clone(), execution_config);
         self.start_quorum_store(quorum_store_builder);
-        (network_sender, Arc::new(payload_client), payload_manager)
+        (
+            network_sender,
+            Arc::new(mixed_payload_client),
+            payload_manager,
+        )
     }
 
     async fn start_new_epoch_with_joltean(
         &mut self,
-        epoch_state: EpochState,
+        epoch_state: Arc<EpochState>,
         consensus_config: OnChainConsensusConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
@@ -1009,15 +1057,20 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             },
             LivenessStorageData::PartialRecoveryData(ledger_data) => {
                 self.recovery_mode = true;
-                self.start_recovery_manager(ledger_data, epoch_state, network_sender)
-                    .await
+                self.start_recovery_manager(
+                    ledger_data,
+                    consensus_config,
+                    epoch_state,
+                    network_sender,
+                )
+                .await
             },
         }
     }
 
     async fn start_new_epoch_with_dag(
         &mut self,
-        epoch_state: EpochState,
+        epoch_state: Arc<EpochState>,
         onchain_consensus_config: OnChainConsensusConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
@@ -1033,7 +1086,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             "decoupled execution must be enabled"
         );
         let (block_tx, reset_tx) =
-            self.spawn_decoupled_execution(commit_signer, epoch_state.verifier.clone());
+            self.spawn_decoupled_execution(commit_signer, epoch_state.clone());
         let state_computer = Arc::new(DagStateSyncComputer::new(
             self.commit_state_computer.clone(),
             reset_tx,
@@ -1061,7 +1114,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.dag_config.clone(),
             onchain_dag_consensus_config.clone(),
             signer,
-            Arc::new(epoch_state),
+            epoch_state.clone(),
             dag_storage,
             network_sender_arc.clone(),
             network_sender_arc.clone(),
@@ -1070,6 +1123,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             payload_manager,
             payload_client,
             state_computer,
+            block_tx,
+            onchain_consensus_config.quorum_store_enabled(),
+            onchain_consensus_config.validator_txn_enabled(),
         );
 
         let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);
@@ -1077,7 +1133,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let (dag_shutdown_tx, dag_shutdown_rx) = oneshot::channel();
         self.dag_shutdown_tx = Some(dag_shutdown_tx);
 
-        tokio::spawn(bootstrapper.start(dag_rpc_rx, block_tx, dag_shutdown_rx));
+        tokio::spawn(bootstrapper.start(dag_rpc_rx, dag_shutdown_rx));
     }
 
     fn enable_quorum_store(&mut self, onchain_config: &OnChainConsensusConfig) -> bool {
@@ -1333,6 +1389,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     Err(anyhow::anyhow!("Buffer manager not started"))
                 }
             },
+            IncomingRpcRequest::RandGenRequest(_) => Ok(()),
         }
     }
 

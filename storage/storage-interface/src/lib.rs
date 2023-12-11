@@ -40,6 +40,7 @@ use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
 pub mod async_proof_fetcher;
+pub mod block_info;
 pub mod cached_state_view;
 mod executed_trees;
 mod metrics;
@@ -238,6 +239,9 @@ pub trait DbReader: Send + Sync {
         fn get_block_timestamp(&self, version: Version) -> Result<u64>;
 
         fn get_next_block_event(&self, version: Version) -> Result<(Version, NewBlockEvent)>;
+
+        /// See [AptosDB::get_latest_block_events].
+        fn get_latest_block_events(&self, num_events: usize) -> Result<Vec<EventWithVersion>>;
 
         /// Returns the start_version, end_version and NewBlockEvent of the block containing the input
         /// transaction version.

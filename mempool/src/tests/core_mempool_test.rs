@@ -16,6 +16,7 @@ use aptos_types::{
     mempool_status::MempoolStatusCode, transaction::SignedTransaction, vm_status::DiscardedVMStatus,
 };
 use itertools::Itertools;
+use maplit::btreemap;
 use std::time::{Duration, SystemTime};
 
 #[test]
@@ -294,7 +295,7 @@ fn test_system_ttl() {
 
     // GC routine should clear transaction from first insert but keep last one.
     mempool.gc();
-    let batch = mempool.get_batch(1, 1024, true, false, vec![]);
+    let batch = mempool.get_batch(1, 1024, true, false, btreemap![]);
     assert_eq!(vec![transaction.make_signed_transaction()], batch);
 }
 
@@ -306,11 +307,14 @@ fn test_commit_callback() {
     let txns = add_txns_to_mempool(&mut pool, vec![TestTransaction::new(1, 6, 1)]);
 
     // Check that pool is empty.
-    assert!(pool.get_batch(1, 1024, true, false, vec![]).is_empty());
+    assert!(pool.get_batch(1, 1024, true, false, btreemap![]).is_empty());
     // Transaction 5 got back from consensus.
     pool.commit_transaction(&TestTransaction::get_address(1), 5);
     // Verify that we can execute transaction 6.
-    assert_eq!(pool.get_batch(1, 1024, true, false, vec![])[0], txns[0]);
+    assert_eq!(
+        pool.get_batch(1, 1024, true, false, btreemap![])[0],
+        txns[0]
+    );
 }
 
 #[test]
@@ -612,7 +616,7 @@ fn test_parking_lot_eviction() {
     }
     // Make sure that we have correct txns in Mempool.
     let mut txns: Vec<_> = pool
-        .get_batch(5, 5120, true, false, vec![])
+        .get_batch(5, 5120, true, false, btreemap![])
         .iter()
         .map(SignedTransaction::sequence_number)
         .collect();
@@ -641,7 +645,7 @@ fn test_parking_lot_evict_only_for_ready_txn_insertion() {
 
     // Make sure that we have correct txns in Mempool.
     let mut txns: Vec<_> = pool
-        .get_batch(5, 5120, true, false, vec![])
+        .get_batch(5, 5120, true, false, btreemap![])
         .iter()
         .map(SignedTransaction::sequence_number)
         .collect();
@@ -677,7 +681,7 @@ fn test_gc_ready_transaction() {
     pool.gc_by_expiration_time(Duration::from_secs(1));
 
     // Make sure txns 2 and 3 became not ready and we can't read them from any API.
-    let block = pool.get_batch(1, 1024, true, false, vec![]);
+    let block = pool.get_batch(1, 1024, true, false, btreemap![]);
     assert_eq!(block.len(), 1);
     assert_eq!(block[0].sequence_number(), 0);
 
@@ -702,7 +706,7 @@ fn test_clean_stuck_transactions() {
     let db_sequence_number = 10;
     let txn = TestTransaction::new(0, db_sequence_number, 1).make_signed_transaction();
     pool.add_txn(txn, 1, db_sequence_number, TimelineState::NotReady, false);
-    let block = pool.get_batch(1, 1024, true, false, vec![]);
+    let block = pool.get_batch(1, 1024, true, false, btreemap![]);
     assert_eq!(block.len(), 1);
     assert_eq!(block[0].sequence_number(), 10);
 }
@@ -768,11 +772,11 @@ fn test_bytes_limit() {
     for seq in 0..100 {
         add_txn(&mut pool, TestTransaction::new(1, seq, 1)).unwrap();
     }
-    let get_all = pool.get_batch(100, 100 * 1024, true, false, vec![]);
+    let get_all = pool.get_batch(100, 100 * 1024, true, false, btreemap![]);
     assert_eq!(get_all.len(), 100);
     let txn_size = get_all[0].raw_txn_bytes_len() as u64;
     let limit = 10;
-    let hit_limit = pool.get_batch(100, txn_size * limit, true, false, vec![]);
+    let hit_limit = pool.get_batch(100, txn_size * limit, true, false, btreemap![]);
     assert_eq!(hit_limit.len(), limit as usize);
 }
 
@@ -820,7 +824,7 @@ fn test_sequence_number_behavior_at_capacity() {
     add_txn(&mut pool, TestTransaction::new(2, 0, 1)).unwrap();
     pool.commit_transaction(&TestTransaction::get_address(2), 0);
 
-    let batch = pool.get_batch(10, 10240, true, false, vec![]);
+    let batch = pool.get_batch(10, 10240, true, false, btreemap![]);
     assert_eq!(batch.len(), 1);
 }
 
@@ -831,13 +835,13 @@ fn test_not_return_non_full() {
     let mut pool = CoreMempool::new(&config);
     add_txn(&mut pool, TestTransaction::new(0, 0, 1)).unwrap();
 
-    let batch = pool.get_batch(10, 10240, true, false, vec![]);
+    let batch = pool.get_batch(10, 10240, true, false, btreemap![]);
     assert_eq!(batch.len(), 1);
 
-    let batch = pool.get_batch(10, 10240, false, false, vec![]);
+    let batch = pool.get_batch(10, 10240, false, false, btreemap![]);
     assert_eq!(batch.len(), 0);
 
-    let batch = pool.get_batch(1, 10240, false, false, vec![]);
+    let batch = pool.get_batch(1, 10240, false, false, btreemap![]);
     assert_eq!(batch.len(), 1);
 }
 
@@ -856,14 +860,12 @@ fn test_include_gas_upgraded() {
         TestTransaction::new(address_index, sequence_number, low_gas_price),
     )
     .unwrap();
-    let low_gas_txn = TransactionInProgress {
-        summary: TransactionSummary::new(
-            TestTransaction::get_address(address_index),
-            sequence_number,
-        ),
-        gas_unit_price: low_gas_price,
-    };
-    let batch = pool.get_batch(10, 10240, true, true, vec![low_gas_txn.clone()]);
+
+    let low_gas_txn =
+        TransactionSummary::new(TestTransaction::get_address(address_index), sequence_number);
+    let batch = pool.get_batch(10, 10240, true, true, btreemap! {
+        low_gas_txn => TransactionInProgress::new(low_gas_price)
+    });
     assert_eq!(batch.len(), 0);
 
     let high_gas_price = 100;
@@ -872,16 +874,13 @@ fn test_include_gas_upgraded() {
         TestTransaction::new(address_index, sequence_number, high_gas_price),
     )
     .unwrap();
-    let high_gas_txn = TransactionInProgress {
-        summary: TransactionSummary::new(
-            TestTransaction::get_address(address_index),
-            sequence_number,
-        ),
-        gas_unit_price: high_gas_price,
-    };
+    let high_gas_txn =
+        TransactionSummary::new(TestTransaction::get_address(address_index), sequence_number);
 
     // When gas upgraded is allowed and the low gas txn (but not the high gas txn) is excluded, will the high gas txn be included.
-    let batch = pool.get_batch(10, 10240, true, true, vec![low_gas_txn.clone()]);
+    let batch = pool.get_batch(10, 10240, true, true, btreemap! {
+        low_gas_txn => TransactionInProgress::new(low_gas_price)
+    });
     assert_eq!(batch.len(), 1);
     assert_eq!(
         batch[0].sender(),
@@ -890,30 +889,28 @@ fn test_include_gas_upgraded() {
     assert_eq!(batch[0].sequence_number(), sequence_number);
     assert_eq!(batch[0].gas_unit_price(), high_gas_price);
     // In all other cases, the transaction will be excluded.
-    let batch = pool.get_batch(10, 10240, true, false, vec![low_gas_txn.clone()]);
+    let batch = pool.get_batch(10, 10240, true, false, btreemap! {
+        low_gas_txn => TransactionInProgress::new(low_gas_price)
+    });
     assert_eq!(batch.len(), 0);
 
-    let batch = pool.get_batch(10, 10240, true, true, vec![high_gas_txn.clone()]);
+    let batch = pool.get_batch(10, 10240, true, true, btreemap! {
+        high_gas_txn => TransactionInProgress::new(high_gas_price)
+    });
     assert_eq!(batch.len(), 0);
-    let batch = pool.get_batch(10, 10240, true, false, vec![high_gas_txn.clone()]);
-    assert_eq!(batch.len(), 0);
-
-    let batch = pool.get_batch(10, 10240, true, true, vec![
-        low_gas_txn.clone(),
-        high_gas_txn.clone(),
-    ]);
-    assert_eq!(batch.len(), 0);
-    let batch = pool.get_batch(10, 10240, true, false, vec![
-        low_gas_txn.clone(),
-        high_gas_txn.clone(),
-    ]);
+    let batch = pool.get_batch(10, 10240, true, false, btreemap! {
+        high_gas_txn => TransactionInProgress::new(high_gas_price)
+    });
     assert_eq!(batch.len(), 0);
 
-    let batch = pool.get_batch(10, 10240, true, false, vec![
-        high_gas_txn.clone(),
-        low_gas_txn.clone(),
-    ]);
+    let batch = pool.get_batch(10, 10240, true, true, btreemap! {
+        low_gas_txn => TransactionInProgress::new(low_gas_price),
+        high_gas_txn => TransactionInProgress::new(high_gas_price)
+    });
     assert_eq!(batch.len(), 0);
-    let batch = pool.get_batch(10, 10240, true, true, vec![high_gas_txn, low_gas_txn]);
+    let batch = pool.get_batch(10, 10240, true, false, btreemap! {
+        low_gas_txn => TransactionInProgress::new(low_gas_price),
+        high_gas_txn => TransactionInProgress::new(high_gas_price)
+    });
     assert_eq!(batch.len(), 0);
 }

@@ -9,7 +9,8 @@ use crate::{
     counters::{BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS},
 };
 use aptos_aggregator::{
-    delayed_change::DelayedChange, delta_change_set::DeltaOp, types::DelayedFieldID,
+    delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
+    types::DelayedFieldID,
 };
 use aptos_block_executor::{
     errors::Error, executor::BlockExecutor,
@@ -19,18 +20,19 @@ use aptos_block_executor::{
 use aptos_infallible::Mutex;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
+    block_executor::config::BlockExecutorConfig,
     contract_event::ContractEvent,
     executable::ExecutableTestType,
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, BlockExecutableTransaction,
-        TransactionOutput, TransactionStatus,
+        signature_verified_transaction::SignatureVerifiedTransaction, TransactionOutput,
+        TransactionStatus,
     },
     write_set::WriteOp,
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
-use aptos_vm_types::output::VMOutput;
+use aptos_vm_types::{abstract_write_op::AbstractResourceWriteOp, output::VMOutput};
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::VMStatus};
 use once_cell::sync::OnceCell;
 use rayon::ThreadPool;
@@ -67,12 +69,8 @@ impl AptosTransactionOutput {
                 .lock()
                 .take()
                 .expect("Output must be set")
-                .into_transaction_output_with_materialized_write_set(
-                    vec![],
-                    BTreeMap::new(),
-                    vec![],
-                    vec![],
-                ),
+                .into_transaction_output_with_materialized_write_set(vec![], vec![], vec![])
+                .expect("Transaction output is not alerady materialized"),
         }
     }
 }
@@ -88,27 +86,37 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     // TODO: get rid of the cloning data-structures in the following APIs.
 
-    /// Should never be called after incorporate_additional_writes, as it
-    /// will consume vm_output to prepare an output with deltas.
-    fn resource_group_write_set(&self) -> Vec<(StateKey, WriteOp, BTreeMap<StructTag, WriteOp>)> {
+    /// Should never be called after incorporating materialized output, as that consumes vm_output.
+    fn resource_group_write_set(
+        &self,
+    ) -> Vec<(
+        StateKey,
+        WriteOp,
+        BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
+    )> {
         self.vm_output
             .lock()
             .as_ref()
             .expect("Output must be set to get resource group writes")
             .change_set()
-            .resource_group_write_set()
+            .resource_write_set()
             .iter()
-            .map(|(group_key, group_write)| {
-                (
-                    group_key.clone(),
-                    group_write.metadata_op().clone(),
-                    // TODO: propagate layouts.
-                    group_write
-                        .inner_ops()
-                        .iter()
-                        .map(|(tag, (op, _maybe_layout))| (tag.clone(), op.clone()))
-                        .collect(),
-                )
+            .flat_map(|(key, write)| {
+                if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
+                    Some((
+                        key.clone(),
+                        group_write.metadata_op().clone(),
+                        group_write
+                            .inner_ops()
+                            .iter()
+                            .map(|(tag, (op, maybe_layout))| {
+                                (tag.clone(), (op.clone(), maybe_layout.clone()))
+                            })
+                            .collect(),
+                    ))
+                } else {
+                    None
+                }
             })
             .collect()
     }
@@ -120,21 +128,38 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .as_ref()
             .expect("Output must be set to get metadata ops")
             .change_set()
-            .resource_group_write_set()
+            .resource_write_set()
             .iter()
-            .map(|(group_key, group_write)| (group_key.clone(), group_write.metadata_op().clone()))
+            .flat_map(|(key, write)| {
+                if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
+                    Some((key.clone(), group_write.metadata_op().clone()))
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn resource_write_set(&self) -> BTreeMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)> {
+    fn resource_write_set(&self) -> Vec<(StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>))> {
         self.vm_output
             .lock()
             .as_ref()
             .expect("Output must be set to get resource writes")
             .change_set()
             .resource_write_set()
-            .clone()
+            .iter()
+            .flat_map(|(key, write)| match write {
+                AbstractResourceWriteOp::Write(write_op) => {
+                    Some((key.clone(), (write_op.clone(), None)))
+                },
+                AbstractResourceWriteOp::WriteWithDelayedFields(write) => Some((
+                    key.clone(),
+                    (write.write_op.clone(), Some(write.layout.clone())),
+                )),
+                _ => None,
+            })
+            .collect()
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
@@ -181,22 +206,42 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .clone()
     }
 
-    fn reads_needing_delayed_field_exchange(
-        &self,
-    ) -> BTreeMap<
-        <Self::Txn as BlockExecutableTransaction>::Key,
-        (
-            <Self::Txn as BlockExecutableTransaction>::Value,
-            Arc<MoveTypeLayout>,
-        ),
-    > {
+    fn reads_needing_delayed_field_exchange(&self) -> Vec<(StateKey, Arc<MoveTypeLayout>)> {
         self.vm_output
             .lock()
             .as_ref()
             .expect("Output to be set to get reads")
             .change_set()
-            .reads_needing_delayed_field_exchange()
-            .clone()
+            .resource_write_set()
+            .iter()
+            .flat_map(|(key, write)| {
+                if let AbstractResourceWriteOp::InPlaceDelayedFieldChange(change) = write {
+                    Some((key.clone(), change.layout.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(StateKey, WriteOp)> {
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get reads")
+            .change_set()
+            .resource_write_set()
+            .iter()
+            .flat_map(|(key, write)| {
+                if let AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(change) =
+                    write
+                {
+                    Some((key.clone(), change.metadata_op.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
@@ -210,18 +255,20 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .to_vec()
     }
 
+    fn materialize_agg_v1(&self, view: &impl TAggregatorV1View<Identifier = StateKey>) {
+        self.vm_output
+            .lock()
+            .as_mut()
+            .expect("Output must be set to incorporate materialized data")
+            .try_materialize(view)
+            .expect("Delta materialization failed");
+    }
+
     fn incorporate_materialized_txn_output(
         &self,
-        aggregator_v1_writes: Vec<(<Self::Txn as BlockExecutableTransaction>::Key, WriteOp)>,
-        patched_resource_write_set: BTreeMap<
-            <Self::Txn as BlockExecutableTransaction>::Key,
-            <Self::Txn as BlockExecutableTransaction>::Value,
-        >,
-        patched_events: Vec<<Self::Txn as BlockExecutableTransaction>::Event>,
-        combined_groups: Vec<(
-            <Self::Txn as BlockExecutableTransaction>::Key,
-            <Self::Txn as BlockExecutableTransaction>::Value,
-        )>,
+        aggregator_v1_writes: Vec<(StateKey, WriteOp)>,
+        patched_resource_write_set: Vec<(StateKey, WriteOp)>,
+        patched_events: Vec<ContractEvent>,
     ) {
         assert!(
             self.committed_output
@@ -234,8 +281,25 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                             aggregator_v1_writes,
                             patched_resource_write_set,
                             patched_events,
-                            combined_groups,
-                        ),
+                        )
+                        // TODO[agg_v2](fix) - propagate issued to block executor.
+                        .expect("Materialization must not fail"),
+                )
+                .is_ok(),
+            "Could not combine VMOutput with the patched resource and event data"
+        );
+    }
+
+    fn set_txn_output_for_non_dynamic_change_set(&self) {
+        assert!(
+            self.committed_output
+                .set(
+                    self.vm_output
+                        .lock()
+                        .take()
+                        .expect("Output must be set to incorporate materialized data")
+                        .into_transaction_output()
+                        .expect("We should be able to always convert to transaction output"),
                 )
                 .is_ok(),
             "Could not combine VMOutput with the patched resource and event data"
@@ -264,8 +328,7 @@ impl BlockAptosVM {
         executor_thread_pool: Arc<ThreadPool>,
         signature_verified_block: &[SignatureVerifiedTransaction],
         state_view: &S,
-        concurrency_level: usize,
-        maybe_block_gas_limit: Option<u64>,
+        config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
@@ -276,19 +339,14 @@ impl BlockAptosVM {
             init_speculative_logs(num_txns);
         }
 
-        BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
+        BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
         let executor = BlockExecutor::<
             SignatureVerifiedTransaction,
             AptosExecutorTask<S>,
             S,
             L,
             ExecutableTestType,
-        >::new(
-            concurrency_level,
-            executor_thread_pool,
-            maybe_block_gas_limit,
-            transaction_commit_listener,
-        );
+        >::new(config, executor_thread_pool, transaction_commit_listener);
 
         let ret = executor.execute_block(state_view, signature_verified_block, state_view);
         match ret {

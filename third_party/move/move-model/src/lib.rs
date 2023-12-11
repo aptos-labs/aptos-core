@@ -49,6 +49,7 @@ use std::{
 pub mod ast;
 mod builder;
 pub mod code_writer;
+pub mod constant_folder;
 pub mod exp_generator;
 pub mod exp_rewriter;
 pub mod intrinsics;
@@ -403,6 +404,7 @@ fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
             fun_data.called_funs = Some(
                 fun_data
                     .def
+                    .borrow()
                     .clone()
                     .map(|e| e.called_funs())
                     .unwrap_or_default(),

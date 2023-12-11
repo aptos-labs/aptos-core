@@ -18,6 +18,7 @@ aptos-accumulator = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-db-indexer = { workspace = true }
+aptos-executor = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-experimental-runtimes = { workspace = true }
 aptos-infallible = { workspace = true }
@@ -29,7 +30,7 @@ aptos-rocksdb-options = { workspace = true }
 aptos-schemadb = { workspace = true }
 aptos-scratchpad = { workspace = true }
 aptos-state-view = { workspace = true }
-aptos-storage-interface = { workspace = true }
+aptos-storage-interface = { workspace = true, features = ["fuzzing"] }
 aptos-temppath = { workspace = true, optional = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }

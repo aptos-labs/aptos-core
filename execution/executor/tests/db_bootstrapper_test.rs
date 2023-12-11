@@ -30,7 +30,7 @@ use aptos_types::{
     event::EventHandle,
     on_chain_config::{access_path_for_config, ConfigurationResource, OnChainConfig, ValidatorSet},
     state_store::state_key::StateKey,
-    test_helpers::transaction_test_helpers::{block, BLOCK_GAS_LIMIT},
+    test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     trusted_state::TrustedState,
     validator_signer::ValidatorSigner,
@@ -75,7 +75,9 @@ fn test_empty_db() {
     assert!(trusted_state_change.is_epoch_change());
 
     // `maybe_bootstrap()` does nothing on non-empty DB.
-    assert!(!maybe_bootstrap::<AptosVM>(&db_rw, &genesis_txn, waypoint).unwrap());
+    assert!(maybe_bootstrap::<AptosVM>(&db_rw, &genesis_txn, waypoint)
+        .unwrap()
+        .is_none());
 }
 
 fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &ValidatorSigner) {
@@ -87,9 +89,9 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
     let executor = BlockExecutor::<AptosVM>::new(db.clone());
     let output = executor
         .execute_block(
-            (block_id, block(txns, BLOCK_GAS_LIMIT)).into(),
+            (block_id, block(txns, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG)).into(),
             executor.committed_block_id(),
-            BLOCK_GAS_LIMIT,
+            TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         )
         .unwrap();
     assert_eq!(output.num_leaves(), target_version + 1);
@@ -279,7 +281,9 @@ fn test_new_genesis() {
 
     // Bootstrap DB into new genesis.
     let waypoint = generate_waypoint::<AptosVM>(&db, &genesis_txn).unwrap();
-    assert!(maybe_bootstrap::<AptosVM>(&db, &genesis_txn, waypoint).unwrap());
+    assert!(maybe_bootstrap::<AptosVM>(&db, &genesis_txn, waypoint)
+        .unwrap()
+        .is_some());
     assert_eq!(waypoint.version(), 6);
 
     // Client bootable from waypoint.

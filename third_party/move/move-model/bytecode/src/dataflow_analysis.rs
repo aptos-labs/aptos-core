@@ -36,7 +36,7 @@ pub trait TransferFunctions {
         instrs: &[Bytecode],
         cfg: &StacklessControlFlowGraph,
     ) -> Self::State {
-        if cfg.is_dummmy(block_id) {
+        if cfg.is_dummy(block_id) {
             return state;
         }
         let instr_inds = cfg.instr_indexes(block_id).unwrap();
@@ -64,6 +64,21 @@ pub trait DataflowAnalysis: TransferFunctions {
         instrs: &[Bytecode],
         cfg: &StacklessControlFlowGraph,
     ) -> StateMap<Self::State> {
+        self.analyze_function_with_debug_print(initial_state, instrs, cfg, None)
+    }
+
+    fn analyze_function_with_debug_print(
+        &self,
+        initial_state: Self::State,
+        instrs: &[Bytecode],
+        cfg: &StacklessControlFlowGraph,
+        debug_printer: Option<&dyn Fn(&Self::State) -> String>,
+    ) -> StateMap<Self::State> {
+        let debug_print_state = |block_id: BlockId, prefix: &str, state: &Self::State| {
+            if let Some(p) = &debug_printer {
+                eprintln!("B{} {}: {}", block_id, prefix, p(state))
+            }
+        };
         let mut state_map: StateMap<Self::State> = StateMap::new();
         let mut work_list = VecDeque::new();
         work_list.push_back(cfg.entry_block());
@@ -73,13 +88,16 @@ pub trait DataflowAnalysis: TransferFunctions {
         });
         while let Some(block_id) = work_list.pop_front() {
             let pre = state_map.get(&block_id).expect("basic block").pre.clone();
+            debug_print_state(block_id, "pre", &pre);
             let post = self.execute_block(block_id, pre, instrs, cfg);
-
+            debug_print_state(block_id, "post", &post);
             // propagate postcondition of this block to successor blocks
             for next_block_id in cfg.successors(block_id) {
                 match state_map.get_mut(next_block_id) {
                     Some(next_block_res) => {
+                        debug_print_state(*next_block_id, "pre join", &next_block_res.pre);
                         let join_result = next_block_res.pre.join(&post);
+                        debug_print_state(*next_block_id, "post join", &next_block_res.pre);
                         match join_result {
                             JoinResult::Unchanged => {
                                 // Pre is the same after join. Reanalyzing this block would produce
@@ -126,7 +144,7 @@ pub trait DataflowAnalysis: TransferFunctions {
         let mut result = BTreeMap::new();
         for (block_id, block_state) in state_map {
             let mut state = block_state.pre;
-            if !cfg.is_dummmy(block_id) {
+            if !cfg.is_dummy(block_id) {
                 let instr_inds = cfg.instr_indexes(block_id).unwrap();
                 if Self::BACKWARD {
                     for offset in instr_inds.rev() {

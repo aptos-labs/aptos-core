@@ -16,7 +16,10 @@ use crate::{
     txn_commit_hook::NoOpTransactionCommitHook,
 };
 use aptos_aggregator::types::PanicOr;
-use aptos_types::{contract_event::ReadWriteEvent, executable::ExecutableTestType};
+use aptos_types::{
+    block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
+    executable::ExecutableTestType,
+};
 use claims::assert_ok;
 use num_cpus;
 use proptest::{
@@ -41,7 +44,7 @@ fn run_transactions<K, V, E>(
 ) where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
-    E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
+    E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
     Vec<u8>: From<V>,
 {
     let mut transactions: Vec<_> = transaction_gens
@@ -76,9 +79,8 @@ fn run_transactions<K, V, E>(
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
             ExecutableTestType,
         >::new(
-            num_cpus::get(),
+            BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
             executor_thread_pool.clone(),
-            maybe_block_gas_limit,
             None,
         )
         .execute_transactions_parallel((), &transactions, &data_view);
@@ -216,9 +218,8 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
             ExecutableTestType,
         >::new(
-            num_cpus::get(),
+            BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
             executor_thread_pool.clone(),
-            maybe_block_gas_limit,
             None,
         )
         .execute_transactions_parallel((), &transactions, &data_view);
@@ -267,9 +268,8 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
             ExecutableTestType,
         >::new(
-            num_cpus::get(),
+            BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
             executor_thread_pool.clone(),
-            maybe_block_gas_limit,
             None,
         )
         .execute_transactions_parallel((), &transactions, &data_view);
@@ -423,9 +423,8 @@ fn publishing_fixed_params_with_block_gas_limit(
         NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
         ExecutableTestType,
     >::new(
-        num_cpus::get(),
+        BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
         executor_thread_pool,
-        maybe_block_gas_limit,
         None,
     )
     .execute_transactions_parallel((), &transactions, &data_view);
@@ -466,9 +465,11 @@ fn publishing_fixed_params_with_block_gas_limit(
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
             ExecutableTestType,
         >::new(
-            num_cpus::get(),
+            BlockExecutorConfig::new_maybe_block_limit(
+                num_cpus::get(),
+                Some(max(w_index, r_index) as u64 * MAX_GAS_PER_TXN + 1),
+            ),
             executor_thread_pool.clone(),
-            Some(max(w_index, r_index) as u64 * MAX_GAS_PER_TXN + 1),
             None,
         ) // Ensure enough gas limit to commit the module txns (4 is maximum gas per txn)
         .execute_transactions_parallel((), &transactions, &data_view);
@@ -550,7 +551,11 @@ fn non_empty_group(
             NonEmptyGroupDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
             ExecutableTestType,
-        >::new(num_cpus::get(), executor_thread_pool.clone(), None, None)
+        >::new(
+            BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+            executor_thread_pool.clone(),
+            None,
+        )
         .execute_transactions_parallel((), &transactions, &data_view);
 
         BaselineOutput::generate(&transactions, None).assert_output(&output);
@@ -563,7 +568,11 @@ fn non_empty_group(
             NonEmptyGroupDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
             ExecutableTestType,
-        >::new(num_cpus::get(), executor_thread_pool.clone(), None, None)
+        >::new(
+            BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+            executor_thread_pool.clone(),
+            None,
+        )
         .execute_transactions_sequential((), &transactions, &data_view, true);
         // TODO: test dynamic disabled as well.
 

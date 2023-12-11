@@ -13,12 +13,14 @@ use crate::{
     network_id::NetworkId,
 };
 use aptos_crypto::x25519;
+use aptos_logger::info;
 use aptos_temppath::TempPath;
 use aptos_types::account_address::AccountAddress as PeerId;
 use rand::{prelude::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
+    fmt::Debug,
     path::{Path, PathBuf},
 };
 
@@ -56,6 +58,8 @@ pub struct NodeConfig {
     #[serde(default)]
     pub mempool: MempoolConfig,
     #[serde(default)]
+    pub netbench: Option<NetbenchConfig>,
+    #[serde(default)]
     pub peer_monitoring_service: PeerMonitoringServiceConfig,
     #[serde(default)]
     pub state_sync: StateSyncConfig,
@@ -63,11 +67,27 @@ pub struct NodeConfig {
     pub storage: StorageConfig,
     #[serde(default)]
     pub validator_network: Option<NetworkConfig>,
-    #[serde(default)]
-    pub netbench: Option<NetbenchConfig>,
 }
 
 impl NodeConfig {
+    /// Logs the node config using INFO level logging. This is useful for
+    /// working around the length restrictions in the logger.
+    pub fn log_all_configs(&self) {
+        // Parse the node config as serde JSON
+        let config_value =
+            serde_json::to_value(self).expect("Failed to serialize the node config!");
+        let config_map = config_value
+            .as_object()
+            .expect("Failed to get the config map!");
+
+        // Log each config entry
+        for (config_name, config_value) in config_map {
+            let config_string =
+                serde_json::to_string(config_value).expect("Failed to parse the config value!");
+            info!("Using {} config: {}", config_name, config_string);
+        }
+    }
+
     /// Returns the data directory for this config
     pub fn get_data_dir(&self) -> &Path {
         &self.base.data_dir

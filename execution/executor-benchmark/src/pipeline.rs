@@ -7,7 +7,10 @@ use crate::{
 };
 use aptos_block_partitioner::v2::config::PartitionerV2Config;
 use aptos_crypto::HashValue;
-use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
+use aptos_executor::{
+    block_executor::{BlockExecutor, TransactionBlockExecutor},
+    metrics::APTOS_PROCESSED_TXNS_OUTPUT_SIZE,
+};
 use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait};
 use aptos_logger::info;
 use aptos_types::{
@@ -144,6 +147,7 @@ where
                 let start_time = Instant::now();
                 let mut executed = 0;
                 let start_gas_measurement = GasMeasuring::start();
+                let start_output_size = APTOS_PROCESSED_TXNS_OUTPUT_SIZE.get_sample_sum();
                 while let Ok(msg) = executable_block_receiver.recv() {
                     let ExecuteBlockMessage {
                         current_block_start_time,
@@ -161,6 +165,8 @@ where
                 }
 
                 let delta_gas = start_gas_measurement.end();
+                let delta_output_size =
+                    APTOS_PROCESSED_TXNS_OUTPUT_SIZE.get_sample_sum() - start_output_size;
 
                 let elapsed = start_time.elapsed().as_secs_f64();
                 info!(
@@ -188,6 +194,10 @@ where
                     "Overall execution GPT: {} gas/txn (over {} txns)",
                     delta_gas.gas / (delta_gas.gas_count as f64).max(1.0),
                     executed
+                );
+                info!(
+                    "Overall execution output: {} bytes/s",
+                    delta_output_size / elapsed
                 );
 
                 start_commit_tx.map(|tx| tx.send(()));

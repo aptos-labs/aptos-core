@@ -11,6 +11,7 @@ use aptos_rest_client::Client;
 use aptos_state_view::TStateView;
 use aptos_types::{
     account_address::AccountAddress,
+    block_executor::config::BlockExecutorConfigFromOnchain,
     chain_id::ChainId,
     on_chain_config::{Features, OnChainConfig, TimedFeaturesBuilder},
     transaction::{
@@ -29,58 +30,8 @@ use aptos_vm::{
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{change_set::VMChangeSet, output::VMOutput, storage::ChangeSetConfigs};
-use clap::Parser;
 use move_binary_format::errors::VMResult;
-use std::{
-    path::{Path, PathBuf},
-    sync::Arc,
-};
-use url::Url;
-
-#[derive(Parser)]
-#[clap(group(clap::ArgGroup::new("target")
-        .required(true)
-        .args(&["rest_endpoint", "db_path"]),
-))]
-pub struct Command {
-    /// Use full node's rest api as query endpoint.
-    #[clap(long, group = "target")]
-    rest_endpoint: Option<String>,
-
-    /// Use a local db instance to serve as query endpoint.
-    #[clap(long, group = "target")]
-    db_path: Option<PathBuf>,
-
-    #[clap(long)]
-    begin_version: u64,
-
-    #[clap(long)]
-    limit: u64,
-
-    #[clap(long, default_value_t = 1)]
-    concurrency_level: usize,
-}
-
-impl Command {
-    pub async fn run(self) -> Result<()> {
-        AptosVM::set_concurrency_level_once(self.concurrency_level);
-
-        let debugger = if let Some(rest_endpoint) = self.rest_endpoint {
-            AptosDebugger::rest_client(Client::new(Url::parse(&rest_endpoint)?))?
-        } else {
-            AptosDebugger::db(self.db_path.unwrap())?
-        };
-
-        println!(
-            "{:#?}",
-            debugger
-                .execute_past_transactions(self.begin_version, self.limit)
-                .await?
-        );
-
-        Ok(())
-    }
-}
+use std::{path::Path, sync::Arc};
 
 pub struct AptosDebugger {
     debugger: Arc<dyn AptosValidatorInterface + Send>,
@@ -109,8 +60,12 @@ impl AptosDebugger {
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             txns.into_iter().map(|x| x.into()).collect::<Vec<_>>();
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        AptosVM::execute_block(&sig_verified_txns, &state_view, None)
-            .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
+        AptosVM::execute_block(
+            &sig_verified_txns,
+            &state_view,
+            BlockExecutorConfigFromOnchain::new_no_block_limit(),
+        )
+        .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
     }
 
     pub fn execute_transaction_at_version_with_gas_profiler(
@@ -125,8 +80,8 @@ impl AptosDebugger {
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
 
         // TODO(Gas): revisit this.
-        let vm = AptosVM::new_from_state_view(&state_view);
         let resolver = state_view.as_move_resolver();
+        let vm = AptosVM::new(&resolver);
 
         let (status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(
             &resolver,
@@ -294,10 +249,9 @@ impl AptosDebugger {
         let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);
         f(&mut session).map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
         let change_set = session
-            .finish(
-                &mut (),
-                &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-            )
+            .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
+                LATEST_GAS_FEATURE_VERSION,
+            ))
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
         Ok(change_set)
     }
@@ -309,10 +263,4 @@ fn is_reconfiguration(vm_output: &TransactionOutput) -> bool {
         .events()
         .iter()
         .any(|event| event.event_key() == Some(&new_epoch_event_key))
-}
-
-#[test]
-fn verify_tool() {
-    use clap::CommandFactory;
-    Command::command().debug_assert()
 }

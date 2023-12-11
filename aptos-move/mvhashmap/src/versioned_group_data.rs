@@ -1,16 +1,22 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{Flag, Incarnation, MVGroupError, ShiftedTxnIndex, TxnIndex, Version};
+use crate::types::{
+    Flag, Incarnation, MVGroupError, ShiftedTxnIndex, TxnIndex, ValueWithLayout, Version,
+};
 use anyhow::bail;
 use aptos_types::write_set::{TransactionWrite, WriteOpKind};
-use claims::{assert_none, assert_some};
+use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
+use claims::{assert_matches, assert_none, assert_some};
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use move_core_types::value::MoveTypeLayout;
 use serde::Serialize;
 use std::{
-    collections::{btree_map::BTreeMap, HashMap, HashSet},
+    collections::{
+        btree_map::{self, BTreeMap},
+        HashMap, HashSet,
+    },
     fmt::Debug,
     hash::Hash,
     sync::Arc,
@@ -20,17 +26,15 @@ struct GroupEntry<V> {
     incarnation: Incarnation,
     // Note: can be a raw pointer (different data-structure holds the value during the
     // lifetime), but would require unsafe access.
-    value: Arc<V>,
-    layout: Option<Arc<MoveTypeLayout>>,
+    value: ValueWithLayout<V>,
     flag: Flag,
 }
 
 impl<V: TransactionWrite> GroupEntry<V> {
-    fn new(incarnation: Incarnation, value: Arc<V>, layout: Option<Arc<MoveTypeLayout>>) -> Self {
+    fn new(incarnation: Incarnation, value: ValueWithLayout<V>) -> Self {
         Self {
             incarnation,
             value,
-            layout,
             flag: Flag::Done,
         }
     }
@@ -54,10 +58,10 @@ pub(crate) struct VersionedGroupValue<T, V> {
     /// Note: if we do not garbage collect final idx_to_update contents until the end of
     /// block execution (lifetime of the data-structure), then we can have other structures
     /// hold raw pointers to the values as an optimization.
-    idx_to_update: BTreeMap<ShiftedTxnIndex, CachePadded<HashMap<T, Arc<V>>>>,
+    idx_to_update: BTreeMap<ShiftedTxnIndex, CachePadded<HashMap<T, ValueWithLayout<V>>>>,
 
     /// Group contents corresponding to the latest committed version.
-    committed_group: HashMap<T, Arc<V>>,
+    committed_group: HashMap<T, ValueWithLayout<V>>,
 }
 
 /// Maps each key (access path) to an internal VersionedValue.
@@ -78,44 +82,91 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> Default
 }
 
 impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGroupValue<T, V> {
-    fn set_base_values(
-        &mut self,
-        shifted_idx: ShiftedTxnIndex,
-        // TODO[agg_v2](fix) add layout to values
-        values: impl IntoIterator<Item = (T, V)>,
-    ) {
-        match self.idx_to_update.get(&shifted_idx) {
+    fn set_raw_base_values(&mut self, values: impl Iterator<Item = (T, V)>) {
+        let zero_idx = ShiftedTxnIndex::zero_idx();
+        match self.idx_to_update.get(&zero_idx) {
             Some(previous) => {
                 // base value may have already been provided by another transaction
                 // executed simultaneously and asking for the same resource group.
                 // Value from storage must be identical, but then delayed field
                 // identifier exchange could've modified it.
                 //
-                // If maybe_layout is None, they are required to be identical
-                // If maybe_layout is Some, there might have been an exchange
+                // If they are RawFromStorage, they need to be identical.
                 // Assert the length of bytes for efficiency (instead of full equality)
-                for (tag, v) in values.into_iter() {
+                for (tag, v) in values {
                     let prev_v = previous
                         .get(&tag)
                         .expect("Reading twice from storage must be consistent");
-                    assert!(v.bytes().map(|b| b.len()) == prev_v.bytes().map(|b| b.len()));
+                    if let ValueWithLayout::RawFromStorage(prev_v) = prev_v {
+                        assert!(v.bytes().map(|b| b.len()) == prev_v.bytes().map(|b| b.len()));
+                    }
                 }
             },
             // For base value, incarnation is irrelevant, and is always set to 0.
             None => {
-                self.write(shifted_idx, 0, values);
+                self.write(
+                    zero_idx,
+                    0,
+                    values.map(|(k, v)| (k, ValueWithLayout::RawFromStorage(Arc::new(v)))),
+                );
             },
         }
+    }
+
+    fn update_tagged_base_value_with_layout(
+        &mut self,
+        tag: T,
+        value: V,
+        layout: Option<Arc<MoveTypeLayout>>,
+    ) {
+        let zero_idx = ShiftedTxnIndex::zero_idx();
+        let v = ValueWithLayout::Exchanged(Arc::new(value), layout.clone());
+
+        use btree_map::Entry::*;
+        match self
+            .versioned_map
+            .entry(tag.clone())
+            .or_default()
+            .entry(zero_idx.clone())
+        {
+            Occupied(mut o) => {
+                match &o.get().value {
+                    ValueWithLayout::RawFromStorage(_) => {
+                        o.insert(CachePadded::new(GroupEntry::new(0, v.clone())));
+
+                        assert_matches!(
+                            self.idx_to_update
+                                .get_mut(&zero_idx)
+                                .expect("Base version must exist when updating for exchange")
+                                .insert(tag.clone(), v.clone()),
+                            Some(ValueWithLayout::RawFromStorage(_))
+                        );
+
+                        let existing = self
+                            .committed_group
+                            .get_mut(&tag)
+                            .expect("Tag must exist in committed when updating for exchange");
+                        assert_matches!(existing, &mut ValueWithLayout::RawFromStorage(_));
+                        *existing = v;
+                    },
+                    ValueWithLayout::Exchanged(_, _) => {
+                        // already exchanged, skipping.
+                    },
+                }
+            },
+            Vacant(_) => {
+                unreachable!("Base version must exist when updating for exchange")
+            },
+        };
     }
 
     fn write(
         &mut self,
         shifted_idx: ShiftedTxnIndex,
         incarnation: Incarnation,
-        // TODO[agg_v2](fix) add layout to values
-        values: impl IntoIterator<Item = (T, V)>,
+        values: impl Iterator<Item = (T, ValueWithLayout<V>)>,
     ) -> bool {
-        let zero_idx = ShiftedTxnIndex::zero();
+        let zero_idx = ShiftedTxnIndex::zero_idx();
         let at_base_version = shifted_idx == zero_idx;
 
         // Remove any prior entries.
@@ -123,23 +174,18 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
         let mut writes_outside = false;
 
         let arc_map = values
-            .into_iter()
             .map(|(tag, v)| {
                 if !prev_tags.contains(&tag) {
                     writes_outside = true;
                 }
 
-                let arc_v = Arc::new(v);
-
                 // Update versioned_map.
-                let tag_entry = self.versioned_map.entry(tag.clone()).or_default();
-                tag_entry.insert(
+                self.versioned_map.entry(tag.clone()).or_default().insert(
                     shifted_idx.clone(),
-                    // TODO[agg_v2](fix) layout shouldn't be none
-                    CachePadded::new(GroupEntry::new(incarnation, arc_v.clone(), None)),
+                    CachePadded::new(GroupEntry::new(incarnation, v.clone())),
                 );
 
-                (tag, arc_v)
+                (tag, v)
             })
             .collect();
 
@@ -219,6 +265,9 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                 (Vacant(entry), Creation) => {
                     entry.insert(v.clone());
                 },
+                (Occupied(mut entry), Creation) if entry.get().write_op_kind() == Deletion => {
+                    entry.insert(v.clone());
+                },
                 (_, _) => {
                     bail!(
                         "WriteOp kind {:?} not consistent with previous value at tag {:?}",
@@ -232,7 +281,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
         Ok(())
     }
 
-    fn get_committed_group(&self) -> Vec<(T, Arc<V>)> {
+    fn get_committed_group(&self) -> Vec<(T, ValueWithLayout<V>)> {
         self.committed_group.clone().into_iter().collect()
     }
 
@@ -240,9 +289,12 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
         &self,
         tag: &T,
         txn_idx: TxnIndex,
-    ) -> Result<(Version, Arc<V>, Option<Arc<MoveTypeLayout>>), MVGroupError> {
+    ) -> Result<(Version, ValueWithLayout<V>), MVGroupError> {
         let common_error = || -> MVGroupError {
-            if self.idx_to_update.contains_key(&ShiftedTxnIndex::zero()) {
+            if self
+                .idx_to_update
+                .contains_key(&ShiftedTxnIndex::zero_idx())
+            {
                 MVGroupError::TagNotFound
             } else {
                 MVGroupError::Uninitialized
@@ -254,7 +306,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
             .ok_or(common_error())
             .and_then(|tree| {
                 match tree
-                    .range(ShiftedTxnIndex::zero()..ShiftedTxnIndex::new(txn_idx))
+                    .range(ShiftedTxnIndex::zero_idx()..ShiftedTxnIndex::new(txn_idx))
                     .next_back()
                 {
                     Some((idx, entry)) => {
@@ -267,7 +319,6 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                             Ok((
                                 idx.idx().map(|idx| (idx, entry.incarnation)),
                                 entry.value.clone(),
-                                entry.layout.clone(),
                             ))
                         }
                     },
@@ -276,39 +327,35 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
             })
     }
 
-    fn get_latest_group_size(&self, txn_idx: TxnIndex) -> Result<u64, MVGroupError> {
-        if !self.idx_to_update.contains_key(&ShiftedTxnIndex::zero()) {
+    fn get_latest_group_size(&self, txn_idx: TxnIndex) -> Result<ResourceGroupSize, MVGroupError> {
+        if !self
+            .idx_to_update
+            .contains_key(&ShiftedTxnIndex::zero_idx())
+        {
             return Err(MVGroupError::Uninitialized);
         }
 
-        self.versioned_map
+        let sizes = self
+            .versioned_map
             .iter()
-            .try_fold(0_u64, |len, (tag, tree)| {
-                match tree
-                    .range(ShiftedTxnIndex::zero()..ShiftedTxnIndex::new(txn_idx))
+            .flat_map(|(tag, tree)| {
+                tree.range(ShiftedTxnIndex::zero_idx()..ShiftedTxnIndex::new(txn_idx))
                     .next_back()
-                {
-                    Some((idx, entry)) => {
+                    .and_then(|(idx, entry)| {
                         if entry.flag == Flag::Estimate {
-                            Err(MVGroupError::Dependency(
+                            Some(Err(MVGroupError::Dependency(
                                 idx.idx().expect("May not depend on storage version"),
-                            ))
+                            )))
                         } else {
-                            match entry.value.bytes() {
-                                Some(bytes) => {
-                                    let delta = bytes.len() as u64
-                                        + bcs::serialized_size(tag)
-                                            .map_err(|_| MVGroupError::TagSerializationError)?
-                                            as u64;
-                                    Ok(len + delta)
-                                },
-                                None => Ok(len),
-                            }
+                            entry
+                                .value
+                                .bytes_len()
+                                .map(|bytes_len| Ok((tag, bytes_len)))
                         }
-                    },
-                    None => Ok(len),
-                }
+                    })
             })
+            .collect::<Result<Vec<_>, MVGroupError>>()?;
+        group_size_as_sum(sizes.into_iter()).map_err(|_| MVGroupError::TagSerializationError)
     }
 }
 
@@ -324,12 +371,26 @@ impl<
         }
     }
 
-    pub fn set_base_values(&self, key: K, base_values: impl IntoIterator<Item = (T, V)>) {
+    pub fn set_raw_base_values(&self, key: K, base_values: impl IntoIterator<Item = (T, V)>) {
         // Incarnation is irrelevant for storage version, set to 0.
         self.group_values
             .entry(key)
             .or_default()
-            .set_base_values(ShiftedTxnIndex::zero(), base_values);
+            .set_raw_base_values(base_values.into_iter());
+    }
+
+    pub fn update_tagged_base_value_with_layout(
+        &self,
+        key: K,
+        tag: T,
+        value: V,
+        layout: Option<Arc<MoveTypeLayout>>,
+    ) {
+        // Incarnation is irrelevant for storage version, set to 0.
+        self.group_values
+            .entry(key)
+            .or_default()
+            .update_tagged_base_value_with_layout(tag, value, layout);
     }
 
     pub fn write(
@@ -337,12 +398,14 @@ impl<
         key: K,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
-        values: impl IntoIterator<Item = (T, V)>,
+        values: impl IntoIterator<Item = (T, (V, Option<Arc<MoveTypeLayout>>))>,
     ) -> bool {
         self.group_values.entry(key).or_default().write(
             ShiftedTxnIndex::new(txn_idx),
             incarnation,
-            values,
+            values
+                .into_iter()
+                .map(|(k, (v, l))| (k, ValueWithLayout::Exchanged(Arc::new(v), l))),
         )
     }
 
@@ -366,12 +429,14 @@ impl<
     /// Read the latest value corresponding to a tag at a given group (identified by key).
     /// Return the size of the group (if requested), as defined above, alongside the version
     /// information (None if storage/pre-block version).
-    pub fn read_from_group(
+    /// If the layout of the resource is current UnSet, this function sets the layout of the
+    /// group to the provided layout.
+    pub fn fetch_tagged_data(
         &self,
         key: &K,
         tag: &T,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<(Version, Arc<V>, Option<Arc<MoveTypeLayout>>), MVGroupError> {
+    ) -> anyhow::Result<(Version, ValueWithLayout<V>), MVGroupError> {
         match self.group_values.get(key) {
             Some(g) => g.get_latest_tagged_value(tag, txn_idx),
             None => Err(MVGroupError::Uninitialized),
@@ -383,7 +448,11 @@ impl<
     /// marked as an estimate, a dependency is returned. Note: it would be possible to
     /// process estimated entry sizes, but would have to mark that if after the re-execution
     /// the entry size changes, then re-execution must reduce validation idx.
-    pub fn get_group_size(&self, key: &K, txn_idx: TxnIndex) -> Result<u64, MVGroupError> {
+    pub fn get_group_size(
+        &self,
+        key: &K,
+        txn_idx: TxnIndex,
+    ) -> Result<ResourceGroupSize, MVGroupError> {
         match self.group_values.get(key) {
             Some(g) => g.get_latest_group_size(txn_idx),
             None => Err(MVGroupError::Uninitialized),
@@ -403,10 +472,22 @@ impl<
     /// The method checks that each committed write op kind is consistent with the existence of
     /// a previous value of the resource (must be creation iff no previous value, deletion or
     /// modification otherwise). When consistent, the output is Ok(..).
-    pub fn finalize_group(&self, key: &K, txn_idx: TxnIndex) -> anyhow::Result<Vec<(T, Arc<V>)>> {
+    pub fn finalize_group(
+        &self,
+        key: &K,
+        txn_idx: TxnIndex,
+    ) -> anyhow::Result<Vec<(T, ValueWithLayout<V>)>> {
         let mut v = self.group_values.get_mut(key).expect("Path must exist");
 
         v.commit_idx(ShiftedTxnIndex::new(txn_idx))?;
+        Ok(v.get_committed_group())
+    }
+
+    pub fn get_last_committed_group(
+        &self,
+        key: &K,
+    ) -> anyhow::Result<Vec<(T, ValueWithLayout<V>)>> {
+        let v = self.group_values.get_mut(key).expect("Path must exist");
         Ok(v.get_committed_group())
     }
 }
@@ -460,7 +541,7 @@ mod test {
             3,
             1,
             // tags 0, 1, 2.
-            (0..2).map(|i| (i, TestValue::creation_with_len(1))),
+            (0..2).map(|i| (i, (TestValue::creation_with_len(1), None))),
         );
 
         // Size should be uninitialized even if the output of lower txn is stored
@@ -475,18 +556,21 @@ mod test {
         );
         // for reading a tag at ap_1, w.o. returning size, idx = 3 is Uninitialized.
         assert_matches!(
-            map.read_from_group(&ap_1, &1, 3),
+            map.fetch_tagged_data(&ap_1, &1, 3),
             Err(MVGroupError::Uninitialized)
         );
         // ... but idx = 4 should find the previously stored value.
         assert_eq!(
-            map.read_from_group(&ap_1, &1, 4).unwrap(),
+            map.fetch_tagged_data(&ap_1, &1, 4).unwrap(),
             // Arc compares by value, no return size, incarnation.
-            (Ok((3, 1)), Arc::new(TestValue::creation_with_len(1)), None)
+            (
+                Ok((3, 1)),
+                ValueWithLayout::Exchanged(Arc::new(TestValue::creation_with_len(1)), None)
+            )
         );
         // ap_0 should still be uninitialized.
         assert_matches!(
-            map.read_from_group(&ap_0, &1, 3),
+            map.fetch_tagged_data(&ap_0, &1, 3),
             Err(MVGroupError::Uninitialized)
         );
 
@@ -495,13 +579,13 @@ mod test {
             4,
             0,
             // tags 1, 2.
-            (1..3).map(|i| (i, TestValue::creation_with_len(4))),
+            (1..3).map(|i| (i, (TestValue::creation_with_len(4), None))),
         );
         assert_matches!(
-            map.read_from_group(&ap_2, &2, 4),
+            map.fetch_tagged_data(&ap_2, &2, 4),
             Err(MVGroupError::Uninitialized)
         );
-        map.set_base_values(
+        map.set_raw_base_values(
             ap_2.clone(),
             // base tags 0, 1.
             (0..2).map(|i| (i, TestValue::creation_with_len(2))),
@@ -509,24 +593,26 @@ mod test {
 
         // Tag not found vs not initialized,
         assert_matches!(
-            map.read_from_group(&ap_2, &2, 4),
+            map.fetch_tagged_data(&ap_2, &2, 4),
             Err(MVGroupError::TagNotFound)
         );
         assert_matches!(
-            map.read_from_group(&ap_2, &4, 5),
+            map.fetch_tagged_data(&ap_2, &4, 5),
             Err(MVGroupError::TagNotFound)
         );
         // vs finding a versioned entry from txn 4, vs from storage.
         assert_eq!(
-            map.read_from_group(&ap_2, &2, 5).unwrap(),
-            (Ok((4, 0)), Arc::new(TestValue::creation_with_len(4)), None)
+            map.fetch_tagged_data(&ap_2, &2, 5).unwrap(),
+            (
+                Ok((4, 0)),
+                ValueWithLayout::Exchanged(Arc::new(TestValue::creation_with_len(4)), None)
+            )
         );
         assert_eq!(
-            map.read_from_group(&ap_2, &0, 5).unwrap(),
+            map.fetch_tagged_data(&ap_2, &0, 5).unwrap(),
             (
                 Err(StorageVersion),
-                Arc::new(TestValue::creation_with_len(2)),
-                None
+                ValueWithLayout::RawFromStorage(Arc::new(TestValue::creation_with_len(2)))
             )
         );
     }
@@ -542,41 +628,56 @@ mod test {
             5,
             3,
             // tags 0, 1, values are derived from [txn_idx, incarnation] seed.
-            (0..2).map(|i| (i, TestValue::new(vec![5, 3]))),
+            (0..2).map(|i| (i, (TestValue::new(vec![5, 3]), None))),
         );
         assert_eq!(
-            map.read_from_group(&ap, &1, 12).unwrap(),
-            (Ok((5, 3)), Arc::new(TestValue::new(vec![5, 3])), None)
+            map.fetch_tagged_data(&ap, &1, 12).unwrap(),
+            (
+                Ok((5, 3)),
+                ValueWithLayout::Exchanged(Arc::new(TestValue::new(vec![5, 3])), None)
+            )
         );
         map.write(
             ap.clone(),
             10,
             1,
             // tags 1, 2, values are derived from [txn_idx, incarnation] seed.
-            (1..3).map(|i| (i, TestValue::new(vec![10, 1]))),
+            (1..3).map(|i| (i, (TestValue::new(vec![10, 1]), None))),
         );
         assert_eq!(
-            map.read_from_group(&ap, &1, 12).unwrap(),
-            (Ok((10, 1)), Arc::new(TestValue::new(vec![10, 1])), None)
+            map.fetch_tagged_data(&ap, &1, 12).unwrap(),
+            (
+                Ok((10, 1)),
+                ValueWithLayout::Exchanged(Arc::new(TestValue::new(vec![10, 1])), None)
+            )
         );
 
         map.mark_estimate(&ap, 10);
-        assert_matches!(map.read_from_group(&ap, &1, 12), Err(Dependency(10)));
-        assert_matches!(map.read_from_group(&ap, &2, 12), Err(Dependency(10)));
-        assert_matches!(map.read_from_group(&ap, &3, 12), Err(Uninitialized));
+        assert_matches!(map.fetch_tagged_data(&ap, &1, 12), Err(Dependency(10)));
+        assert_matches!(map.fetch_tagged_data(&ap, &2, 12), Err(Dependency(10)));
+        assert_matches!(map.fetch_tagged_data(&ap, &3, 12), Err(Uninitialized));
         assert_eq!(
-            map.read_from_group(&ap, &0, 12).unwrap(),
-            (Ok((5, 3)), Arc::new(TestValue::new(vec![5, 3])), None)
+            map.fetch_tagged_data(&ap, &0, 12).unwrap(),
+            (
+                Ok((5, 3)),
+                ValueWithLayout::Exchanged(Arc::new(TestValue::new(vec![5, 3])), None)
+            )
         );
 
         map.remove(&ap, 10);
         assert_eq!(
-            map.read_from_group(&ap, &0, 12).unwrap(),
-            (Ok((5, 3)), Arc::new(TestValue::new(vec![5, 3])), None)
+            map.fetch_tagged_data(&ap, &0, 12).unwrap(),
+            (
+                Ok((5, 3)),
+                ValueWithLayout::Exchanged(Arc::new(TestValue::new(vec![5, 3])), None)
+            )
         );
         assert_eq!(
-            map.read_from_group(&ap, &1, 12).unwrap(),
-            (Ok((5, 3)), Arc::new(TestValue::new(vec![5, 3])), None)
+            map.fetch_tagged_data(&ap, &1, 12).unwrap(),
+            (
+                Ok((5, 3)),
+                ValueWithLayout::Exchanged(Arc::new(TestValue::new(vec![5, 3])), None)
+            )
         );
     }
 
@@ -591,60 +692,81 @@ mod test {
             5,
             3,
             // tags 0, 1
-            (0..2).map(|i| (i, TestValue::creation_with_len(2))),
+            (0..2).map(|i| (i, (TestValue::creation_with_len(2), None))),
         );
         assert_matches!(map.get_group_size(&ap, 12), Err(Uninitialized));
 
-        map.set_base_values(
+        map.set_raw_base_values(
             ap.clone(),
             // base tag 1, 2, 3, 4
             (1..5).map(|i| (i, TestValue::creation_with_len(1))),
         );
 
         let tag: usize = 5;
-        let tag_len = bcs::serialized_size(&tag).unwrap();
         let one_entry_len = TestValue::creation_with_len(1).bytes().unwrap().len();
         let two_entry_len = TestValue::creation_with_len(2).bytes().unwrap().len();
         let three_entry_len = TestValue::creation_with_len(3).bytes().unwrap().len();
         let four_entry_len = TestValue::creation_with_len(4).bytes().unwrap().len();
-        let exp_size = 2 * two_entry_len + 3 * one_entry_len + 5 * tag_len;
-        assert_ok_eq!(map.get_group_size(&ap, 12), exp_size as u64);
+        let exp_size = group_size_as_sum(vec![(&tag, two_entry_len); 2].into_iter().chain(vec![
+            (
+                &tag,
+                one_entry_len
+            );
+            3
+        ]))
+        .unwrap();
+        assert_ok_eq!(map.get_group_size(&ap, 12), exp_size);
 
         map.write(
             ap.clone(),
             10,
             1,
             // tags 4, 5
-            (4..6).map(|i| (i, TestValue::creation_with_len(3))),
+            (4..6).map(|i| (i, (TestValue::creation_with_len(3), None))),
         );
-        let exp_size_12 = exp_size + 2 * three_entry_len + tag_len - one_entry_len;
-        assert_ok_eq!(map.get_group_size(&ap, 12), exp_size_12 as u64);
-        assert_ok_eq!(map.get_group_size(&ap, 10), exp_size as u64);
+        let exp_size_12 = group_size_as_sum(
+            vec![(&tag, one_entry_len); 2]
+                .into_iter()
+                .chain(vec![(&tag, two_entry_len); 2])
+                .chain(vec![(&tag, three_entry_len); 2]),
+        )
+        .unwrap();
+        assert_ok_eq!(map.get_group_size(&ap, 12), exp_size_12);
+        assert_ok_eq!(map.get_group_size(&ap, 10), exp_size);
 
         map.mark_estimate(&ap, 5);
         assert_matches!(map.get_group_size(&ap, 12), Err(Dependency(5)));
-        let exp_size_4 = 4 * (tag_len + one_entry_len);
-        assert_ok_eq!(map.get_group_size(&ap, 4), exp_size_4 as u64);
+        let exp_size_4 = group_size_as_sum(vec![(&tag, one_entry_len); 4].into_iter()).unwrap();
+
+        assert_ok_eq!(map.get_group_size(&ap, 4), exp_size_4);
 
         map.write(
             ap.clone(),
             6,
             1,
-            (0..2).map(|i| (i, TestValue::creation_with_len(4))),
+            (0..2).map(|i| (i, (TestValue::creation_with_len(4), None))),
         );
-        let exp_size_7 = 2 * four_entry_len + 3 * one_entry_len + 5 * tag_len;
-        assert_ok_eq!(map.get_group_size(&ap, 7), exp_size_7 as u64);
+        let exp_size_7 = group_size_as_sum(vec![(&tag, one_entry_len); 3].into_iter().chain(vec![
+            (
+                &tag,
+                four_entry_len
+            );
+            2
+        ]))
+        .unwrap();
+
+        assert_ok_eq!(map.get_group_size(&ap, 7), exp_size_7);
         assert_matches!(map.get_group_size(&ap, 6), Err(Dependency(5)));
 
         map.remove(&ap, 5);
-        assert_ok_eq!(map.get_group_size(&ap, 6), exp_size_4 as u64);
+        assert_ok_eq!(map.get_group_size(&ap, 6), exp_size_4);
     }
 
     fn finalize_group_as_hashmap(
         map: &VersionedGroupData<KeyType<Vec<u8>>, usize, TestValue>,
         key: &KeyType<Vec<u8>>,
         idx: TxnIndex,
-    ) -> HashMap<usize, Arc<TestValue>> {
+    ) -> HashMap<usize, ValueWithLayout<TestValue>> {
         map.finalize_group(key, idx).unwrap().into_iter().collect()
     }
 
@@ -653,7 +775,7 @@ mod test {
         let ap = KeyType(b"/foo/f".to_vec());
         let map = VersionedGroupData::<KeyType<Vec<u8>>, usize, TestValue>::new();
 
-        map.set_base_values(
+        map.set_raw_base_values(
             ap.clone(),
             // base tag 1, 2, 3
             (1..4).map(|i| (i, TestValue::with_kind(i, true))),
@@ -664,8 +786,8 @@ mod test {
             3,
             // insert at 0, remove at 1.
             vec![
-                (0, TestValue::with_kind(100, true)),
-                (1, TestValue::deletion()),
+                (0, (TestValue::with_kind(100, true), None)),
+                (1, (TestValue::deletion(), None)),
             ],
         );
         map.write(
@@ -673,7 +795,7 @@ mod test {
             3,
             0,
             // tags 2, 3
-            (2..4).map(|i| (i, TestValue::with_kind(200 + i, false))),
+            (2..4).map(|i| (i, (TestValue::with_kind(200 + i, false), None))),
         );
         let committed_3 = finalize_group_as_hashmap(&map, &ap, 3);
         // The value at tag 1 is from base, while 2 and 3 are from txn 3.
@@ -681,58 +803,58 @@ mod test {
         assert_eq!(committed_3.len(), 3);
         assert_some_eq!(
             committed_3.get(&1),
-            &Arc::new(TestValue::with_kind(1, true))
+            &ValueWithLayout::RawFromStorage(Arc::new(TestValue::with_kind(1, true)))
         );
         assert_some_eq!(
             committed_3.get(&2),
-            &Arc::new(TestValue::with_kind(202, false))
+            &ValueWithLayout::Exchanged(Arc::new(TestValue::with_kind(202, false)), None)
         );
         assert_some_eq!(
             committed_3.get(&3),
-            &Arc::new(TestValue::with_kind(203, false))
+            &ValueWithLayout::Exchanged(Arc::new(TestValue::with_kind(203, false)), None)
         );
 
         map.write(ap.clone(), 5, 3, vec![
-            (3, TestValue::with_kind(303, false)),
-            (4, TestValue::with_kind(304, true)),
+            (3, (TestValue::with_kind(303, false), None)),
+            (4, (TestValue::with_kind(304, true), None)),
         ]);
         let committed_5 = finalize_group_as_hashmap(&map, &ap, 5);
         assert_eq!(committed_5.len(), 4);
         assert_some_eq!(
             committed_5.get(&1),
-            &Arc::new(TestValue::with_kind(1, true))
+            &ValueWithLayout::RawFromStorage(Arc::new(TestValue::with_kind(1, true)))
         );
         assert_some_eq!(
             committed_5.get(&2),
-            &Arc::new(TestValue::with_kind(202, false))
+            &ValueWithLayout::Exchanged(Arc::new(TestValue::with_kind(202, false)), None)
         );
         assert_some_eq!(
             committed_5.get(&3),
-            &Arc::new(TestValue::with_kind(303, false))
+            &ValueWithLayout::Exchanged(Arc::new(TestValue::with_kind(303, false)), None)
         );
         assert_some_eq!(
             committed_5.get(&4),
-            &Arc::new(TestValue::with_kind(304, true))
+            &ValueWithLayout::Exchanged(Arc::new(TestValue::with_kind(304, true)), None)
         );
 
         let committed_7 = finalize_group_as_hashmap(&map, &ap, 7);
         assert_eq!(committed_7.len(), 4);
         assert_some_eq!(
             committed_7.get(&0),
-            &Arc::new(TestValue::with_kind(100, true))
+            &ValueWithLayout::Exchanged(Arc::new(TestValue::with_kind(100, true)), None)
         );
         assert_none!(committed_7.get(&1));
         assert_some_eq!(
             committed_7.get(&2),
-            &Arc::new(TestValue::with_kind(202, false))
+            &ValueWithLayout::Exchanged(Arc::new(TestValue::with_kind(202, false)), None)
         );
         assert_some_eq!(
             committed_7.get(&3),
-            &Arc::new(TestValue::with_kind(303, false))
+            &ValueWithLayout::Exchanged(Arc::new(TestValue::with_kind(303, false)), None)
         );
         assert_some_eq!(
             committed_7.get(&4),
-            &Arc::new(TestValue::with_kind(304, true))
+            &ValueWithLayout::Exchanged(Arc::new(TestValue::with_kind(304, true)), None)
         );
 
         map.write(
@@ -741,27 +863,28 @@ mod test {
             0,
             // re-insert at 1, remove everything else
             vec![
-                (0, TestValue::deletion()),
-                (1, TestValue::with_kind(400, true)),
-                (2, TestValue::deletion()),
-                (3, TestValue::deletion()),
-                (4, TestValue::deletion()),
+                (0, (TestValue::deletion(), None)),
+                (1, (TestValue::with_kind(400, true), None)),
+                (2, (TestValue::deletion(), None)),
+                (3, (TestValue::deletion(), None)),
+                (4, (TestValue::deletion(), None)),
             ],
         );
         let committed_8 = finalize_group_as_hashmap(&map, &ap, 8);
         assert_eq!(committed_8.len(), 1);
         assert_some_eq!(
             committed_8.get(&1),
-            &Arc::new(TestValue::with_kind(400, true))
+            &ValueWithLayout::Exchanged(Arc::new(TestValue::with_kind(400, true)), None)
         );
     }
 
+    // TODO[agg_v2](test) Test with non trivial layout.
     #[test]
     fn group_commit_op_kind_checks() {
         let ap = KeyType(b"/foo/f".to_vec());
         let map = VersionedGroupData::<KeyType<Vec<u8>>, usize, TestValue>::new();
 
-        map.set_base_values(
+        map.set_raw_base_values(
             ap.clone(),
             // base tag 1, 2, 3
             (1..4).map(|i| (i, TestValue::with_kind(i, true))),
@@ -771,7 +894,7 @@ mod test {
             3,
             2,
             // remove at 0, must fail commit.
-            vec![(0, TestValue::deletion())],
+            vec![(0, (TestValue::deletion(), None))],
         );
         assert_err!(map.finalize_group(&ap, 3));
 
@@ -780,7 +903,7 @@ mod test {
             3,
             2,
             // modify at 0, must fail commit.
-            vec![(0, TestValue::with_kind(100, false))],
+            vec![(0, (TestValue::with_kind(100, false), None))],
         );
         assert_err!(map.finalize_group(&ap, 3));
 
@@ -789,7 +912,7 @@ mod test {
             3,
             2,
             // create at 1, must fail commit
-            vec![(1, TestValue::with_kind(101, true))],
+            vec![(1, (TestValue::with_kind(101, true), None))],
         );
         assert_err!(map.finalize_group(&ap, 3));
 
@@ -800,20 +923,26 @@ mod test {
             2,
             // modify at 0, must fail commit.
             vec![
-                (0, TestValue::with_kind(100, true)),
-                (1, TestValue::with_kind(101, false)),
+                (0, (TestValue::with_kind(100, true), None)),
+                (1, (TestValue::with_kind(101, false), None)),
             ],
         );
         let committed = finalize_group_as_hashmap(&map, &ap, 3);
         assert_some_eq!(
             committed.get(&0),
-            &Arc::new(TestValue::with_kind(100, true))
+            &ValueWithLayout::Exchanged(Arc::new(TestValue::with_kind(100, true)), None)
         );
         assert_some_eq!(
             committed.get(&1),
-            &Arc::new(TestValue::with_kind(101, false))
+            &ValueWithLayout::Exchanged(Arc::new(TestValue::with_kind(101, false)), None)
         );
-        assert_some_eq!(committed.get(&2), &Arc::new(TestValue::with_kind(2, true)));
-        assert_some_eq!(committed.get(&3), &Arc::new(TestValue::with_kind(3, true)));
+        assert_some_eq!(
+            committed.get(&2),
+            &ValueWithLayout::RawFromStorage(Arc::new(TestValue::with_kind(2, true)))
+        );
+        assert_some_eq!(
+            committed.get(&3),
+            &ValueWithLayout::RawFromStorage(Arc::new(TestValue::with_kind(3, true)))
+        );
     }
 }

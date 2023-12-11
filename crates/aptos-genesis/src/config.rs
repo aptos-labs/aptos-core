@@ -68,7 +68,7 @@ pub struct Layout {
     /// Duration of each vesting period (in seconds).
     pub employee_vesting_period_duration: Option<u64>,
     /// Onchain Consensus Config
-    #[serde(default)]
+    #[serde(default = "OnChainConsensusConfig::default_for_genesis")]
     pub on_chain_consensus_config: OnChainConsensusConfig,
     /// Onchain Execution Config
     #[serde(default = "OnChainExecutionConfig::default_for_genesis")]

@@ -6,6 +6,7 @@
 //!
 //! All schemas are `pub(crate)` so not shown in rustdoc, refer to the source code to see details.
 
+pub(crate) mod block_info;
 pub(crate) mod db_metadata;
 pub(crate) mod epoch_by_version;
 pub(crate) mod event;
@@ -30,6 +31,7 @@ pub(crate) mod write_set;
 use anyhow::{ensure, Result};
 use aptos_schemadb::ColumnFamilyName;
 
+pub const BLOCK_INFO_CF_NAME: ColumnFamilyName = "block_info";
 pub const DB_METADATA_CF_NAME: ColumnFamilyName = "db_metadata";
 pub const EPOCH_BY_VERSION_CF_NAME: ColumnFamilyName = "epoch_by_version";
 pub const EVENT_ACCUMULATOR_CF_NAME: ColumnFamilyName = "event_accumulator";
@@ -78,6 +80,7 @@ pub mod fuzzing {
     pub fn fuzz_decode(data: &[u8]) {
         #[allow(unused_must_use)]
         {
+            assert_no_panic_decoding::<super::block_info::BlockInfoSchema>(data);
             assert_no_panic_decoding::<super::epoch_by_version::EpochByVersionSchema>(data);
             assert_no_panic_decoding::<super::event::EventSchema>(data);
             assert_no_panic_decoding::<super::event_accumulator::EventAccumulatorSchema>(data);

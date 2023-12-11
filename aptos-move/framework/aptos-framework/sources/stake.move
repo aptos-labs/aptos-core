@@ -552,7 +552,7 @@ module aptos_framework::stake {
         move_from<OwnerCapability>(owner_address)
     }
 
-    /// Deposit `owner_cap` into `account`. This requires `account` to not already have owernship of another
+    /// Deposit `owner_cap` into `account`. This requires `account` to not already have ownership of another
     /// staking pool.
     public fun deposit_owner_cap(owner: &signer, owner_cap: OwnerCapability) {
         assert!(!exists<OwnerCapability>(signer::address_of(owner)), error::not_found(EOWNER_CAP_ALREADY_EXISTS));
@@ -1357,11 +1357,6 @@ module aptos_framework::stake {
 
     fun assert_owner_cap_exists(owner: address) {
         assert!(exists<OwnerCapability>(owner), error::not_found(EOWNER_CAP_NOT_FOUND));
-    }
-
-    // Will be deleted after transaction_fee has its own MintCap for storage refunds.
-    public(friend) fun copy_aptos_coin_mint_cap_for_storage_refund(): MintCapability<AptosCoin> acquires AptosCoinCapabilities {
-        borrow_global<AptosCoinCapabilities>(@aptos_framework).mint_cap
     }
 
     #[test_only]

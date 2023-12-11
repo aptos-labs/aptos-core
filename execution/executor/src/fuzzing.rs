@@ -16,10 +16,13 @@ use aptos_storage_interface::{
     DbReader, DbReaderWriter, DbWriter,
 };
 use aptos_types::{
-    block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions},
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain,
+        partitioner::{ExecutableTransactions, PartitionedTransactions},
+    },
     ledger_info::LedgerInfoWithSignatures,
     state_store::ShardedStateUpdates,
-    test_helpers::transaction_test_helpers::BLOCK_GAS_LIMIT,
+    test_helpers::transaction_test_helpers::TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
     transaction::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
@@ -55,7 +58,7 @@ pub fn fuzz_execute_and_commit_blocks(
         let _execution_results = executor.execute_block(
             (block_id, sig_verified_block).into(),
             parent_block_id,
-            BLOCK_GAS_LIMIT,
+            TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         );
         parent_block_id = block_id;
         block_ids.push(block_id);
@@ -70,13 +73,9 @@ impl TransactionBlockExecutor for FakeVM {
     fn execute_transaction_block(
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<FakeVM>(
-            transactions,
-            state_view,
-            maybe_block_gas_limit,
-        )
+        ChunkOutput::by_transaction_execution::<FakeVM>(transactions, state_view, onchain_config)
     }
 }
 
@@ -85,7 +84,7 @@ impl VMExecutor for FakeVM {
         _sharded_block_executor: &ShardedBlockExecutor<S, E>,
         _transactions: PartitionedTransactions,
         _state_view: Arc<S>,
-        _maybe_block_gas_limit: Option<u64>,
+        _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         Ok(Vec::new())
     }
@@ -93,7 +92,7 @@ impl VMExecutor for FakeVM {
     fn execute_block(
         _transactions: &[SignatureVerifiedTransaction],
         _state_view: &impl StateView,
-        _maybe_block_gas_limit: Option<u64>,
+        _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         Ok(Vec::new())
     }

@@ -6,7 +6,11 @@ use aptos_aggregator::{
     types::{DelayedFieldsSpeculativeError, PanicOr},
 };
 use aptos_crypto::hash::HashValue;
-use aptos_types::executable::ExecutableDescriptor;
+use aptos_types::{
+    executable::ExecutableDescriptor,
+    write_set::{TransactionWrite, WriteOpKind},
+};
+use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use move_core_types::value::MoveTypeLayout;
 use std::sync::{atomic::AtomicU32, Arc};
@@ -38,7 +42,7 @@ pub enum MVGroupError {
     TagNotFound,
     /// A dependency on other transaction has been found during the read.
     Dependency(TxnIndex),
-    /// Tag serialization is needed for group size computation
+    /// Tag serialization is needed for group size computation.
     TagSerializationError,
 }
 
@@ -66,7 +70,7 @@ pub enum MVModulesError {
 #[derive(Debug, Eq, PartialEq)]
 pub enum GroupReadResult {
     Value(Option<Bytes>, Option<Arc<MoveTypeLayout>>),
-    Size(u64),
+    Size(ResourceGroupSize),
     Uninitialized,
 }
 
@@ -78,7 +82,7 @@ impl GroupReadResult {
         }
     }
 
-    pub fn into_size(self) -> u64 {
+    pub fn into_size(self) -> ResourceGroupSize {
         match self {
             GroupReadResult::Size(size) => size,
             _ => unreachable!("Expected size"),
@@ -95,7 +99,7 @@ pub enum MVDataOutput<V> {
     Resolved(u128),
     /// Information from the last versioned-write. Note that the version is returned
     /// and not the data to avoid copying big values around.
-    Versioned(Version, Arc<V>, Option<Arc<MoveTypeLayout>>),
+    Versioned(Version, ValueWithLayout<V>),
 }
 
 /// Returned as Ok(..) when read successfully from the multi-version data-structure.
@@ -143,6 +147,14 @@ impl MVDelayedFieldsError {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum UnsyncGroupError {
+    /// The base group contents are not initialized.
+    Uninitialized,
+    /// Entry corresponding to the tag was not found.
+    TagNotFound,
+}
+
 // In order to store base vales at the lowest index, i.e. at index 0, without conflicting
 // with actual transaction index 0, the following struct wraps the index and internally
 // increments it by 1.
@@ -164,9 +176,66 @@ impl ShiftedTxnIndex {
         }
     }
 
-    pub(crate) fn zero() -> Self {
+    pub(crate) fn zero_idx() -> Self {
         Self { idx: 0 }
     }
+}
+
+// TODO[agg_v2](cleanup): consider adding `DoesntExist` variant.
+// Currently, "not existing value" is represented as Deletion.
+#[derive(Debug, PartialEq, Eq)]
+pub enum ValueWithLayout<V> {
+    // When we read from storage, but don't have access to layout, we can only store the raw value.
+    // This should never be returned to the user, before exchange is performed.
+    RawFromStorage(Arc<V>),
+    // We've used the optional layout, and applied exchange to the storage value.
+    // The type layout is Some if there is a delayed field in the resource.
+    // The type layout is None if there is no delayed field in the resource.
+    Exchanged(Arc<V>, Option<Arc<MoveTypeLayout>>),
+}
+
+impl<T> Clone for ValueWithLayout<T> {
+    fn clone(&self) -> Self {
+        match self {
+            ValueWithLayout::RawFromStorage(value) => {
+                ValueWithLayout::RawFromStorage(value.clone())
+            },
+            ValueWithLayout::Exchanged(value, layout) => {
+                ValueWithLayout::Exchanged(value.clone(), layout.clone())
+            },
+        }
+    }
+}
+
+impl<V: TransactionWrite> ValueWithLayout<V> {
+    pub fn write_op_kind(&self) -> WriteOpKind {
+        match self {
+            ValueWithLayout::RawFromStorage(value) => value.write_op_kind(),
+            ValueWithLayout::Exchanged(value, _) => value.write_op_kind(),
+        }
+    }
+
+    pub fn bytes_len(&self) -> Option<usize> {
+        match self {
+            ValueWithLayout::RawFromStorage(value) | ValueWithLayout::Exchanged(value, _) => {
+                value.bytes().map(|b| b.len())
+            },
+        }
+    }
+
+    pub fn extract_value_no_layout(&self) -> &V {
+        match self {
+            ValueWithLayout::RawFromStorage(value) => value.as_ref(),
+            ValueWithLayout::Exchanged(value, None) => value.as_ref(),
+            ValueWithLayout::Exchanged(_, Some(_)) => panic!("Unexpected layout"),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum UnknownOrLayout<'a> {
+    Unknown,
+    Known(Option<&'a MoveTypeLayout>),
 }
 
 #[cfg(test)]
@@ -197,7 +266,7 @@ pub(crate) mod test {
 
     #[test]
     fn test_shifted_idx() {
-        let zero = ShiftedTxnIndex::zero();
+        let zero = ShiftedTxnIndex::zero_idx();
         let shifted_indices: Vec<_> = (0..20).map(ShiftedTxnIndex::new).collect();
         for (i, shifted_idx) in shifted_indices.iter().enumerate() {
             assert_ne!(zero, *shifted_idx);
@@ -206,7 +275,7 @@ pub(crate) mod test {
             }
             assert_eq!(ShiftedTxnIndex::new(i as TxnIndex), *shifted_idx);
         }
-        assert_eq!(ShiftedTxnIndex::zero(), zero);
+        assert_eq!(ShiftedTxnIndex::zero_idx(), zero);
         assert_err!(zero.idx());
 
         for (i, shifted_idx) in shifted_indices.into_iter().enumerate() {

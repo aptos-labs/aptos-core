@@ -23,7 +23,13 @@ To initialize a delegation pool, follow the instructions in [delegation pool ope
 
 ## Bootstrapping validator node
 
-After initializing the stake pool, make sure the validator node is bootstrapped with the correct [genesis blob and waypoint](../../node-files-all-networks/node-files.md) for the corresponding network. To bootstrap your node, first you need to know the pool address to use:
+After initializing the stake pool, make sure the validator node is bootstrapped with the correct [genesis blob and waypoint](../../node-files-all-networks/node-files.md) for the corresponding network. 
+
+1. Follow the steps for [joining the validator set.](../../../nodes/validator-node/operator/connect-to-aptos-network/#joining-validator-set)
+2. Bring up the validator fullnode (VFN) only. It will connect to other nodes and fast sync.
+3. Once the VFN is synced, bring up the validator. It will sync from the VFN and then connect to other validators and start participating in consensus.
+
+To bootstrap your node, first you need to know the pool address to use:
 
 
 ```bash
@@ -56,7 +62,7 @@ aptos node get-stake-pool \
 ### Using Terraform
 
 1. Increase the `era` number in your Terraform configuration. When this configuration is applied, it will wipe the data.
-2. Update `chain_id` to 1 (for mainnet). The chain IDs for other Aptos networks are in [Aptos Blockchain Deployments](../../deployments.md).
+2. Update `chain_id` to 1 (for mainnet). The chain IDs for other Aptos networks are in [Aptos Blockchain Networks](../../networks.md).
 3. Update your Docker image to the [latest release](../../../releases/index.md) of the network branch (e.g. mainnet, testnet).
 4. Close the metrics port and the REST API port for validator.
 
@@ -116,7 +122,7 @@ aptos node get-stake-pool \
 Next, follow the below steps to set up the validator node using the operator account and join the validator set. This is required for your validator and validator fullnode to start syncing.
 
 :::tip Mainnet vs Testnet
-The below CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Deployments](../../deployments.md) to see how profiles can be configured based on the network.
+The below CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Networks](../../networks.md) to see how profiles can be configured based on the network.
 :::
 
 ### 1. Initialize Aptos CLI

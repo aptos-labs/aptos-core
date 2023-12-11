@@ -9,7 +9,7 @@ use crate::{
         StateCheckpointTransaction, UserTransactionRequestInner, WriteModule, WriteResource,
         WriteTableItem,
     },
-    view::ViewRequest,
+    view::{ViewFunction, ViewRequest},
     Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event, HexEncodedBytes,
     MoveFunction, MoveModuleBytecode, MoveResource, MoveScriptBytecode, MoveType, MoveValue,
     PendingTransaction, ResourceGroup, ScriptPayload, ScriptWriteSet, SubmitTransactionRequest,
@@ -151,6 +151,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     timestamp: timestamp.into(),
                 })
             },
+            ValidatorTransaction(_txn) => todo!(),
         })
     }
 
@@ -877,17 +878,17 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         self.inner.view_value(typ, bytes)?.try_into()
     }
 
-    pub fn function_return_types(&self, function: &EntryFunction) -> Result<Vec<MoveType>> {
-        let module = function.module().clone();
+    pub fn function_return_types(&self, function: &ViewFunction) -> Result<Vec<MoveType>> {
+        let module = function.module.clone();
         let code = self.inner.get_module(&module)? as Rc<dyn Bytecode>;
         let func = code
-            .find_function(function.function())
+            .find_function(function.function.as_ident_str())
             .ok_or_else(|| format_err!("could not find entry function by {:?}", function))?;
 
         Ok(func.return_)
     }
 
-    pub fn convert_view_function(&self, view_request: ViewRequest) -> Result<EntryFunction> {
+    pub fn convert_view_function(&self, view_request: ViewRequest) -> Result<ViewFunction> {
         let ViewRequest {
             function,
             type_arguments,
@@ -912,15 +913,15 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
             .map(bcs::to_bytes)
             .collect::<Result<_, bcs::Error>>()?;
 
-        Ok(EntryFunction::new(
-            module.into(),
-            function.name.into(),
-            type_arguments
+        Ok(ViewFunction {
+            module: module.into(),
+            function: function.name.into(),
+            ty_args: type_arguments
                 .into_iter()
                 .map(|v| v.try_into())
                 .collect::<Result<_>>()?,
             args,
-        ))
+        })
     }
 }
 

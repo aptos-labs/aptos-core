@@ -1,10 +1,19 @@
 // Copyright © Aptos Foundation
 
-use crate::dag::types::{CertifiedNode, Extensions, Node, NodeCertificate};
+use crate::{
+    dag::types::{CertifiedNode, Extensions, Node, NodeCertificate},
+    payload_manager::TPayloadManager,
+};
 use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_types::aggregate_signature::AggregateSignature;
 
 pub(super) const TEST_DAG_WINDOW: u64 = 5;
+
+pub(super) struct MockPayloadManager {}
+
+impl TPayloadManager for MockPayloadManager {
+    fn prefetch_payload_data(&self, _payload: &Payload, _timestamp: u64) {}
+}
 
 pub(crate) fn new_certified_node(
     round: Round,
@@ -16,6 +25,7 @@ pub(crate) fn new_certified_node(
         round,
         author,
         0,
+        vec![],
         Payload::empty(false),
         parents,
         Extensions::empty(),
@@ -34,6 +44,7 @@ pub(crate) fn new_node(
         round,
         author,
         timestamp,
+        vec![],
         Payload::empty(false),
         parents,
         Extensions::empty(),

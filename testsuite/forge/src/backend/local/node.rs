@@ -4,8 +4,14 @@
 
 use crate::{FullNode, HealthCheckError, LocalVersion, Node, NodeExt, Validator, Version};
 use anyhow::{anyhow, ensure, Context, Result};
-use aptos_config::{config::NodeConfig, keys::ConfigKey};
-use aptos_db::{fast_sync_storage_wrapper::SECONDARY_DB_DIR, LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
+use aptos_config::{
+    config::{NodeConfig, SECURE_STORAGE_FILENAME},
+    keys::ConfigKey,
+};
+use aptos_db::{
+    common::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME},
+    fast_sync_storage_wrapper::SECONDARY_DB_DIR,
+};
 use aptos_logger::{debug, info};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
@@ -157,6 +163,10 @@ impl LocalNode {
             self.name, self.config.inspection_service.port
         );
         info!(
+            "Node {}: Admin service is listening at http://127.0.0.1:{}",
+            self.name, self.config.admin_service.port
+        );
+        info!(
             "Node {}: Backup service is listening at http://127.0.0.1:{}",
             self.name,
             self.config.storage.backup_service_address.port()
@@ -293,7 +303,7 @@ impl Node for LocalNode {
         let node_config = self.config();
         let ledger_db_path = node_config.storage.dir().join(LEDGER_DB_NAME);
         let state_db_path = node_config.storage.dir().join(STATE_MERKLE_DB_NAME);
-        let secure_storage_path = node_config.get_working_dir().join("secure_storage.json");
+        let secure_storage_path = node_config.get_working_dir().join(SECURE_STORAGE_FILENAME);
         let state_sync_db_path = node_config.storage.dir().join(STATE_SYNC_DB_NAME);
         let secondary_db_path = node_config.storage.dir().join(SECONDARY_DB_DIR);
 
@@ -311,10 +321,10 @@ impl Node for LocalNode {
         assert!(ledger_db_path.as_path().exists() && state_db_path.as_path().exists());
         assert!(state_sync_db_path.as_path().exists());
         if self.config.base.role.is_validator() {
-            assert!(secure_storage_path.as_path().exists(),);
+            assert!(secure_storage_path.as_path().exists());
         }
 
-        // Remove the files
+        // Remove the primary DB files
         fs::remove_dir_all(ledger_db_path)
             .map_err(anyhow::Error::from)
             .context("Failed to delete ledger_db_path")?;
@@ -325,12 +335,14 @@ impl Node for LocalNode {
             .map_err(anyhow::Error::from)
             .context("Failed to delete state_sync_db_path")?;
 
-        // remove secondary db if the path exists
+        // Remove the secondary DB files
         if secondary_db_path.as_path().exists() {
             fs::remove_dir_all(secondary_db_path)
                 .map_err(anyhow::Error::from)
                 .context("Failed to delete secondary_db_path")?;
         }
+
+        // Remove the secure storage file
         if self.config.base.role.is_validator() {
             fs::remove_file(secure_storage_path)
                 .map_err(anyhow::Error::from)

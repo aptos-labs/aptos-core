@@ -70,7 +70,7 @@ target "debian-base" {
   dockerfile = "docker/builder/debian-base.Dockerfile"
   contexts = {
     # Run `docker buildx imagetools inspect debian:bullseye` to find the latest multi-platform hash
-    debian = "docker-image://debian:bullseye@sha256:c141beaa9e0767774221cc82efe3a6712a1cc4f75d2699334dfd9a28a6f7357b"
+    debian = "docker-image://debian:bullseye@sha256:ab2b95aa8d7d6d54866b92c322cf0693933c1ae8038652f24ddfda1d1763a45a"
   }
 }
 
@@ -115,11 +115,23 @@ target "tools-builder" {
   ]
 }
 
+target "indexer-builder" {
+  dockerfile = "docker/builder/builder.Dockerfile"
+  target     = "indexer-builder"
+  contexts = {
+    builder-base = "target:builder-base"
+  }
+  secret = [
+    "id=GIT_CREDENTIALS"
+  ]
+}
+
 target "_common" {
   contexts = {
     debian-base   = "target:debian-base"
     node-builder  = "target:aptos-node-builder"
     tools-builder = "target:tools-builder"
+    indexer-builder = "target:indexer-builder"
   }
   labels = {
     "org.label-schema.schema-version" = "1.0",

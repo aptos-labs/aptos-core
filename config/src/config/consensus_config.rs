@@ -66,6 +66,11 @@ pub struct ConsensusConfig {
     pub window_for_chain_health: usize,
     pub chain_health_backoff: Vec<ChainHealthBackoffValues>,
     pub qc_aggregator_type: QcAggregatorType,
+    // Max blocks allowed for block retrieval requests
+    pub max_blocks_per_sending_request: u64,
+    pub max_blocks_per_sending_request_quorum_store_override: u64,
+    pub max_blocks_per_receiving_request: u64,
+    pub max_blocks_per_receiving_request_quorum_store_override: u64,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -252,6 +257,12 @@ impl Default for ConsensusConfig {
             ],
 
             qc_aggregator_type: QcAggregatorType::default(),
+            // This needs to fit into the network message size, so with quorum store it can be much bigger
+            max_blocks_per_sending_request: 10,
+            // TODO: this is for release compatibility, after release we can configure it to match the receiving max
+            max_blocks_per_sending_request_quorum_store_override: 10,
+            max_blocks_per_receiving_request: 10,
+            max_blocks_per_receiving_request_quorum_store_override: 100,
         }
     }
 }
@@ -259,6 +270,22 @@ impl Default for ConsensusConfig {
 impl ConsensusConfig {
     pub fn set_data_dir(&mut self, data_dir: PathBuf) {
         self.safety_rules.set_data_dir(data_dir);
+    }
+
+    pub fn max_blocks_per_sending_request(&self, quorum_store_enabled: bool) -> u64 {
+        if quorum_store_enabled {
+            self.max_blocks_per_sending_request_quorum_store_override
+        } else {
+            self.max_blocks_per_sending_request
+        }
+    }
+
+    pub fn max_blocks_per_receiving_request(&self, quorum_store_enabled: bool) -> u64 {
+        if quorum_store_enabled {
+            self.max_blocks_per_receiving_request_quorum_store_override
+        } else {
+            self.max_blocks_per_receiving_request
+        }
     }
 
     pub fn max_sending_block_txns(&self, quorum_store_enabled: bool) -> u64 {
@@ -400,7 +427,7 @@ impl ConfigSanitizer for ConsensusConfig {
     fn sanitize(
         node_config: &NodeConfig,
         node_type: NodeType,
-        chain_id: ChainId,
+        chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
 
@@ -409,15 +436,18 @@ impl ConfigSanitizer for ConsensusConfig {
         QuorumStoreConfig::sanitize(node_config, node_type, chain_id)?;
 
         // Verify that the consensus-only feature is not enabled in mainnet
-        if chain_id.is_mainnet() && is_consensus_only_perf_test_enabled() {
-            return Err(Error::ConfigSanitizerFailed(
-                sanitizer_name,
-                "consensus-only-perf-test should not be enabled in mainnet!".to_string(),
-            ));
+        if let Some(chain_id) = chain_id {
+            if chain_id.is_mainnet() && is_consensus_only_perf_test_enabled() {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name,
+                    "consensus-only-perf-test should not be enabled in mainnet!".to_string(),
+                ));
+            }
         }
 
         // Sender block limits must be <= receiver block limits
         Self::sanitize_send_recv_block_limits(&sanitizer_name, &node_config.consensus)?;
+
         // Quorum store batches must be <= consensus blocks
         Self::sanitize_batch_block_limits(&sanitizer_name, &node_config.consensus)?;
 
@@ -446,5 +476,243 @@ mod test {
         let s = serde_yaml::to_string(&config).unwrap();
 
         serde_yaml::from_str::<ConsensusConfig>(&s).unwrap();
+    }
+
+    #[test]
+    fn test_send_recv_block_txn_limits() {
+        // Create a node config with invalid block txn limits
+        let node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                max_sending_block_txns: 100,
+                max_receiving_block_txns: 50,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = ConsensusConfig::sanitize(
+            &node_config,
+            NodeType::ValidatorFullnode,
+            Some(ChainId::testnet()),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_send_recv_block_bytes_limits() {
+        // Create a node config with invalid block byte limits
+        let node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                max_sending_block_bytes: 100,
+                max_receiving_block_bytes: 50,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = ConsensusConfig::sanitize(
+            &node_config,
+            NodeType::ValidatorFullnode,
+            Some(ChainId::testnet()),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_send_recv_quorum_store_block_txn_override() {
+        // Create a node config with invalid block txn limits
+        let node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                max_sending_block_txns_quorum_store_override: 100,
+                max_receiving_block_txns_quorum_store_override: 50,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = ConsensusConfig::sanitize(
+            &node_config,
+            NodeType::ValidatorFullnode,
+            Some(ChainId::testnet()),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_send_recv_quorum_store_block_byte_override() {
+        // Create a node config with invalid block byte limits
+        let node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                max_sending_block_bytes_quorum_store_override: 100,
+                max_receiving_block_bytes_quorum_store_override: 50,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = ConsensusConfig::sanitize(
+            &node_config,
+            NodeType::ValidatorFullnode,
+            Some(ChainId::testnet()),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_invalid_batch_txn_limits() {
+        // Create a node config with invalid batch txn limits
+        let node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                max_sending_block_txns_quorum_store_override: 100,
+                quorum_store: QuorumStoreConfig {
+                    receiver_max_batch_txns: 101,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error =
+            ConsensusConfig::sanitize(&node_config, NodeType::ValidatorFullnode, None).unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_invalid_batch_byte_limits() {
+        // Create a node config with invalid batch byte limits
+        let node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                max_sending_block_bytes_quorum_store_override: 100,
+                quorum_store: QuorumStoreConfig {
+                    receiver_max_batch_bytes: 101,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error =
+            ConsensusConfig::sanitize(&node_config, NodeType::ValidatorFullnode, None).unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_invalid_pipeline_backpressure_txn_limits() {
+        // Create a node config with invalid pipeline backpressure txn limits
+        let node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                pipeline_backpressure: vec![PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 0,
+                    max_sending_block_txns_override: 350,
+                    max_sending_block_bytes_override: 0,
+                    backpressure_proposal_delay_ms: 0,
+                }],
+                quorum_store: QuorumStoreConfig {
+                    receiver_max_batch_txns: 250,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = ConsensusConfig::sanitize(
+            &node_config,
+            NodeType::ValidatorFullnode,
+            Some(ChainId::testnet()),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_invalid_pipeline_backpressure_byte_limits() {
+        // Create a node config with invalid pipeline backpressure byte limits
+        let node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                pipeline_backpressure: vec![PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 0,
+                    max_sending_block_txns_override: 251,
+                    max_sending_block_bytes_override: 100,
+                    backpressure_proposal_delay_ms: 0,
+                }],
+                quorum_store: QuorumStoreConfig {
+                    receiver_max_batch_bytes: 2_000_000,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error =
+            ConsensusConfig::sanitize(&node_config, NodeType::ValidatorFullnode, None).unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_invalid_chain_health_backoff_txn_limits() {
+        // Create a node config with invalid chain health backoff txn limits
+        let node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                chain_health_backoff: vec![ChainHealthBackoffValues {
+                    backoff_if_below_participating_voting_power_percentage: 0,
+                    max_sending_block_txns_override: 100,
+                    max_sending_block_bytes_override: 0,
+                    backoff_proposal_delay_ms: 0,
+                }],
+                quorum_store: QuorumStoreConfig {
+                    receiver_max_batch_txns: 251,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error =
+            ConsensusConfig::sanitize(&node_config, NodeType::ValidatorFullnode, None).unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_invalid_chain_health_backoff_byte_limits() {
+        // Create a node config with invalid chain health backoff byte limits
+        let node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                chain_health_backoff: vec![ChainHealthBackoffValues {
+                    backoff_if_below_participating_voting_power_percentage: 0,
+                    max_sending_block_txns_override: 0,
+                    max_sending_block_bytes_override: 100,
+                    backoff_proposal_delay_ms: 0,
+                }],
+                quorum_store: QuorumStoreConfig {
+                    receiver_max_batch_bytes: 2_000_000,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error =
+            ConsensusConfig::sanitize(&node_config, NodeType::ValidatorFullnode, None).unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
 }

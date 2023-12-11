@@ -24,14 +24,14 @@ use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
-    aggregator::PanicError,
     on_chain_config::{Features, TimedFeatures, TimedFeaturesBuilder},
-    write_set::WriteOp,
 };
 #[cfg(feature = "testing")]
 use aptos_types::{
+    aggregator::PanicError,
     chain_id::ChainId,
     state_store::{state_key::StateKey, state_value::StateValue},
+    write_set::WriteOp,
 };
 #[cfg(feature = "testing")]
 use bytes::Bytes;
@@ -40,6 +40,7 @@ use move_core_types::language_storage::StructTag;
 #[cfg(feature = "testing")]
 use move_core_types::value::MoveTypeLayout;
 use move_vm_runtime::native_functions::NativeFunctionTable;
+#[cfg(feature = "testing")]
 use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
@@ -53,21 +54,15 @@ use {
     },
     move_vm_runtime::native_extensions::NativeContextExtensions,
     once_cell::sync::Lazy,
-    std::sync::atomic::{AtomicU32, Ordering},
 };
 
 #[cfg(feature = "testing")]
-struct AptosBlankStorage {
-    counter: AtomicU32,
-}
+struct AptosBlankStorage;
 
 #[cfg(feature = "testing")]
 impl AptosBlankStorage {
     pub fn new() -> Self {
-        Self {
-            // Put some recognizable number, to easily spot missed exchanges
-            counter: AtomicU32::new(55551111),
-        }
+        Self {}
     }
 }
 
@@ -98,7 +93,7 @@ impl TDelayedFieldView for AptosBlankStorage {
         &self,
         _id: &Self::Identifier,
     ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
-        unimplemented!()
+        unreachable!()
     }
 
     fn delayed_field_try_add_delta_outcome(
@@ -108,11 +103,18 @@ impl TDelayedFieldView for AptosBlankStorage {
         _delta: &SignedU128,
         _max_value: u128,
     ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
-        unimplemented!()
+        unreachable!()
     }
 
     fn generate_delayed_field_id(&self) -> Self::Identifier {
-        (self.counter.fetch_add(1, Ordering::SeqCst) as u64).into()
+        unreachable!()
+    }
+
+    fn validate_and_convert_delayed_field_id(
+        &self,
+        _id: u64,
+    ) -> Result<Self::Identifier, PanicError> {
+        unreachable!()
     }
 
     fn get_reads_needing_exchange(
@@ -121,6 +123,14 @@ impl TDelayedFieldView for AptosBlankStorage {
         _skip: &HashSet<Self::ResourceKey>,
     ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
     {
+        unreachable!()
+    }
+
+    fn get_group_reads_needing_exchange(
+        &self,
+        _delayed_write_set_keys: &HashSet<Self::Identifier>,
+        _skip: &HashSet<Self::ResourceKey>,
+    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
         unimplemented!()
     }
 }

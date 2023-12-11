@@ -4,7 +4,7 @@
 use crate::{
     pruner::{db_sub_pruner::DBSubPruner, pruner_utils::get_or_initialize_subpruner_progress},
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-    TransactionStore,
+    transaction_store::TransactionStore,
 };
 use anyhow::Result;
 use aptos_logger::info;

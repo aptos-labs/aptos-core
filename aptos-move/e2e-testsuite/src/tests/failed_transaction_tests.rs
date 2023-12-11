@@ -16,6 +16,7 @@ use aptos_types::{
 use aptos_vm::{data_cache::AsMoveResolver, transaction_metadata::TransactionMetadata, AptosVM};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::storage::StorageGasParameters;
+use claims::assert_some;
 use move_core_types::vm_status::StatusCode::TYPE_MISMATCH;
 
 #[test]
@@ -26,7 +27,7 @@ fn failed_transaction_cleanup_test() {
     executor.add_account_data(&sender);
 
     let log_context = AdapterLogSchema::new(executor.get_state_view().id(), 0);
-    let aptos_vm = AptosVM::new_from_state_view(executor.get_state_view());
+    let aptos_vm = AptosVM::new(&executor.get_state_view().as_move_resolver());
     let data_cache = executor.get_state_view().as_move_resolver();
 
     let txn_data = TransactionMetadata {
@@ -60,7 +61,11 @@ fn failed_transaction_cleanup_test() {
         &change_set_configs,
     );
 
-    let write_set: Vec<(&StateKey, &WriteOp)> = out1.change_set().write_set_iter().collect();
+    let write_set: Vec<(&StateKey, &WriteOp)> = out1
+        .change_set()
+        .concrete_write_set_iter()
+        .map(|(k, v)| (k, assert_some!(v)))
+        .collect();
     assert!(!write_set.is_empty());
     assert_eq!(out1.gas_used(), 90_000);
     assert!(!out1.status().is_discarded());

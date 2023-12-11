@@ -119,7 +119,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
 
     // On-chain genesis process.
-    let consensus_config = OnChainConsensusConfig::default();
+    let consensus_config = OnChainConsensusConfig::default_for_genesis();
     let execution_config = OnChainExecutionConfig::default_for_genesis();
     let gas_schedule = default_gas_schedule();
     initialize(
@@ -142,7 +142,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     emit_new_block_and_epoch_event(&mut session);
 
     let configs = ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION);
-    let mut change_set = session.finish(&mut (), &configs).unwrap();
+    let mut change_set = session.finish(&configs).unwrap();
 
     // Publish the framework, using a different session id, in case both scripts creates tables
     let state_view = GenesisStateView::new();
@@ -153,7 +153,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let id2 = HashValue::new(id2_arr);
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
     publish_framework(&mut session, framework);
-    let additional_change_set = session.finish(&mut (), &configs).unwrap();
+    let additional_change_set = session.finish(&configs).unwrap();
     change_set
         .squash_additional_change_set(additional_change_set, &configs)
         .unwrap();
@@ -165,7 +165,9 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         change_set.aggregator_v1_delta_set().is_empty(),
         "non-empty delta change set in genesis"
     );
-    assert!(!change_set.write_set_iter().any(|(_, op)| op.is_deletion()));
+    assert!(!change_set
+        .concrete_write_set_iter()
+        .any(|(_, op)| op.expect("expect only concrete write ops").is_deletion()));
     verify_genesis_write_set(change_set.events());
 
     let change_set = change_set
@@ -253,7 +255,7 @@ pub fn encode_genesis_change_set(
     emit_new_block_and_epoch_event(&mut session);
 
     let configs = ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION);
-    let mut change_set = session.finish(&mut (), &configs).unwrap();
+    let mut change_set = session.finish(&configs).unwrap();
 
     let state_view = GenesisStateView::new();
     let data_cache = state_view.as_move_resolver();
@@ -264,7 +266,7 @@ pub fn encode_genesis_change_set(
     let id2 = HashValue::new(id2_arr);
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
     publish_framework(&mut session, framework);
-    let additional_change_set = session.finish(&mut (), &configs).unwrap();
+    let additional_change_set = session.finish(&configs).unwrap();
     change_set
         .squash_additional_change_set(additional_change_set, &configs)
         .unwrap();
@@ -277,7 +279,9 @@ pub fn encode_genesis_change_set(
         "non-empty delta change set in genesis"
     );
 
-    assert!(!change_set.write_set_iter().any(|(_, op)| op.is_deletion()));
+    assert!(!change_set
+        .concrete_write_set_iter()
+        .any(|(_, op)| op.expect("expect only concrete write ops").is_deletion()));
     verify_genesis_write_set(change_set.events());
     change_set
         .try_into_storage_change_set()
@@ -434,6 +438,8 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::SINGLE_SENDER_AUTHENTICATOR,
         FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION,
         FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
+        FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
+        FeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
     ]
 }
 
@@ -819,7 +825,7 @@ pub fn generate_test_genesis(
             employee_vesting_start: 1663456089,
             employee_vesting_period_duration: 5 * 60, // 5 minutes
         },
-        &OnChainConsensusConfig::default(),
+        &OnChainConsensusConfig::default_for_genesis(),
         &OnChainExecutionConfig::default_for_genesis(),
         &default_gas_schedule(),
     );
@@ -841,7 +847,7 @@ pub fn generate_mainnet_genesis(
         framework,
         ChainId::test(),
         &mainnet_genesis_config(),
-        &OnChainConsensusConfig::default(),
+        &OnChainConsensusConfig::default_for_genesis(),
         &OnChainExecutionConfig::default_for_genesis(),
         &default_gas_schedule(),
     );

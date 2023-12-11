@@ -110,7 +110,7 @@ impl WriteOp {
             (Deletion, Creation(data) | CreationWithMetadata {data, ..}) => {
                 *op = Modification(data)
             },
-            (DeletionWithMetadata {metadata, ..}, Creation(data)| CreationWithMetadata {data, ..}) => {
+            (DeletionWithMetadata {metadata, ..}, Creation(data) | CreationWithMetadata {data, ..}) => {
                 *op = ModificationWithMetadata{data, metadata: metadata.clone()}
             },
             (Creation(_) | CreationWithMetadata {..}, Deletion | DeletionWithMetadata {..}) => {
@@ -140,6 +140,64 @@ impl WriteOp {
             CreationWithMetadata { metadata, .. }
             | ModificationWithMetadata { metadata, .. }
             | DeletionWithMetadata { metadata, .. } => Some(metadata),
+        }
+    }
+
+    pub fn get_metadata_mut(&mut self) -> Option<&mut StateValueMetadata> {
+        use WriteOp::*;
+
+        match self {
+            Creation(_) | Modification(_) | Deletion => None,
+            CreationWithMetadata { metadata, .. }
+            | ModificationWithMetadata { metadata, .. }
+            | DeletionWithMetadata { metadata, .. } => Some(metadata),
+        }
+    }
+}
+
+pub enum WriteOpSize {
+    Creation { write_len: u64 },
+    Modification { write_len: u64 },
+    Deletion,
+    DeletionWithDeposit { deposit: u64 },
+}
+
+impl From<&WriteOp> for WriteOpSize {
+    fn from(value: &WriteOp) -> Self {
+        use WriteOp::*;
+        match value {
+            Creation(data) | CreationWithMetadata { data, .. } => WriteOpSize::Creation {
+                write_len: data.len() as u64,
+            },
+            Modification(data) | ModificationWithMetadata { data, .. } => {
+                WriteOpSize::Modification {
+                    write_len: data.len() as u64,
+                }
+            },
+            Deletion => WriteOpSize::Deletion,
+            DeletionWithMetadata { metadata } => WriteOpSize::DeletionWithDeposit {
+                deposit: metadata.deposit(),
+            },
+        }
+    }
+}
+
+impl WriteOpSize {
+    pub fn write_len(&self) -> Option<u64> {
+        match self {
+            WriteOpSize::Creation { write_len } | WriteOpSize::Modification { write_len } => {
+                Some(*write_len)
+            },
+            WriteOpSize::Deletion | WriteOpSize::DeletionWithDeposit { .. } => None,
+        }
+    }
+
+    pub fn deletion_deposit(&self) -> Option<u64> {
+        match self {
+            WriteOpSize::DeletionWithDeposit { deposit } => Some(*deposit),
+            WriteOpSize::Creation { .. }
+            | WriteOpSize::Modification { .. }
+            | WriteOpSize::Deletion => None,
         }
     }
 }

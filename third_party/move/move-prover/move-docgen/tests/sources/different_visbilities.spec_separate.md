@@ -1,5 +1,5 @@
 
-<a name="0x2_TestViz"></a>
+<a id="0x2_TestViz"></a>
 
 # Module `0x2::TestViz`
 
@@ -14,7 +14,7 @@
 
 
 
-<a name="0x2_TestViz_this_is_a_public_fun"></a>
+<a id="0x2_TestViz_this_is_a_public_fun"></a>
 
 ## Function `this_is_a_public_fun`
 
@@ -37,7 +37,7 @@ This is a public function
 
 </details>
 
-<a name="0x2_TestViz_this_is_a_public_script_fun"></a>
+<a id="0x2_TestViz_this_is_a_public_script_fun"></a>
 
 ## Function `this_is_a_public_script_fun`
 
@@ -60,7 +60,7 @@ This is a public entry function
 
 </details>
 
-<a name="0x2_TestViz_this_is_a_private_fun"></a>
+<a id="0x2_TestViz_this_is_a_private_fun"></a>
 
 ## Function `this_is_a_private_fun`
 

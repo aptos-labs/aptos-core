@@ -12,7 +12,7 @@ use aptos_aggregator::{
 use aptos_mvhashmap::{
     types::{
         MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion, TxnIndex,
-        Version,
+        ValueWithLayout, Version,
     },
     versioned_data::VersionedData,
     versioned_delayed_fields::TVersionedDelayedFieldView,
@@ -22,6 +22,7 @@ use aptos_types::{
     aggregator::PanicError, state_store::state_value::StateValueMetadataKind,
     transaction::BlockExecutableTransaction as Transaction, write_set::TransactionWrite,
 };
+use aptos_vm_types::resolver::ResourceGroupSize;
 use derivative::Derivative;
 use move_core_types::value::MoveTypeLayout;
 use std::{
@@ -30,7 +31,7 @@ use std::{
             Entry,
             Entry::{Occupied, Vacant},
         },
-        HashMap,
+        HashMap, HashSet,
     },
     sync::Arc,
 };
@@ -144,6 +145,16 @@ impl<V: TransactionWrite> DataRead<V> {
             (_, _) => unreachable!("{:?}, {:?} must be covered", self_kind, kind),
         })
     }
+
+    pub(crate) fn from_value_with_layout(version: Version, value: ValueWithLayout<V>) -> Self {
+        match value {
+            // If value was never exchanged, then metadata can be the highest one without full value.
+            ValueWithLayout::RawFromStorage(v) => DataRead::Metadata(v.as_state_value_metadata()),
+            ValueWithLayout::Exchanged(v, layout) => {
+                DataRead::Versioned(version, v.clone(), layout)
+            },
+        }
+    }
 }
 
 /// Additional state regarding groups that may be provided to the VM during transaction
@@ -152,13 +163,13 @@ impl<V: TransactionWrite> DataRead<V> {
 /// over the latest contents present in the group, i.e. the respective tags and values (in
 /// this sense, group size is even more speculative than other captured information, as it
 /// does not depend on a single "latest" entry, but collected sizes of many "latest" entries).
-#[derive(Derivative)]
+#[derive(Derivative, Clone)]
 #[derivative(Default(bound = ""))]
-struct GroupRead<T: Transaction> {
+pub(crate) struct GroupRead<T: Transaction> {
     /// The size of the resource group can be read (used for gas charging).
-    collected_size: Option<u64>,
+    pub(crate) collected_size: Option<ResourceGroupSize>,
     /// Reads to individual resources in the group, keyed by a tag.
-    inner_reads: HashMap<T::Tag, DataRead<T::Value>>,
+    pub(crate) inner_reads: HashMap<T::Tag, DataRead<T::Value>>,
 }
 
 /// Defines different ways `DelayedFieldResolver` can be used to read its values
@@ -319,6 +330,22 @@ impl<T: Transaction> CapturedReads<T> {
             .filter(|(_, v)| matches!(v, DataRead::Versioned(_, _, Some(_))))
     }
 
+    // Return an iterator over the captured group reads that contain a delayed field
+    pub(crate) fn get_group_read_values_with_delayed_fields<'a>(
+        &'a self,
+        skip: &'a HashSet<T::Key>,
+    ) -> impl Iterator<Item = (&T::Key, &GroupRead<T>)> {
+        // TODO[agg_v2](optimize) - We could potentially filter out inner_reads
+        // to only contain those that have Some(layout)
+        self.group_reads.iter().filter(|(key, group_read)| {
+            !skip.contains(key)
+                && group_read
+                    .inner_reads
+                    .iter()
+                    .any(|(_, data_read)| matches!(data_read, DataRead::Versioned(_, _, Some(_))))
+        })
+    }
+
     // Given a hashmap entry for a key, incorporate a new DataRead. This checks
     // consistency and ensures that the most comprehensive read is recorded.
     fn update_entry<K, V: TransactionWrite>(
@@ -360,7 +387,7 @@ impl<T: Transaction> CapturedReads<T> {
     pub(crate) fn capture_group_size(
         &mut self,
         group_key: T::Key,
-        group_size: u64,
+        group_size: ResourceGroupSize,
     ) -> anyhow::Result<()> {
         let group = self.group_reads.entry(group_key).or_default();
 
@@ -374,7 +401,7 @@ impl<T: Transaction> CapturedReads<T> {
         Ok(())
     }
 
-    pub(crate) fn group_size(&self, group_key: &T::Key) -> Option<u64> {
+    pub(crate) fn group_size(&self, group_key: &T::Key) -> Option<ResourceGroupSize> {
         self.group_reads
             .get(group_key)
             .and_then(|group| group.collected_size)
@@ -504,11 +531,7 @@ impl<T: Transaction> CapturedReads<T> {
             .and_then(|r| r.filter_by_kind(min_kind))
     }
 
-    // pub(crate) fn get_delayed_field_keys(&self) -> impl Iterator<Item = &T::Identifier> {
-    //     self.delayed_field_reads.keys()
-    // }
-
-    pub(crate) fn validate_incorrect_use(&self) -> bool {
+    pub(crate) fn is_incorrect_use(&self) -> bool {
         self.incorrect_use
     }
 
@@ -525,9 +548,9 @@ impl<T: Transaction> CapturedReads<T> {
         use MVDataOutput::*;
         self.data_reads.iter().all(|(k, r)| {
             match data_map.fetch_data(k, idx_to_validate) {
-                Ok(Versioned(version, v, layout)) => {
+                Ok(Versioned(version, v)) => {
                     matches!(
-                        DataRead::Versioned(version, v, layout).contains(r),
+                        DataRead::from_value_with_layout(version, v).contains(r),
                         DataReadComparison::Contains
                     )
                 },
@@ -564,10 +587,10 @@ impl<T: Transaction> CapturedReads<T> {
             }
 
             ret && group.inner_reads.iter().all(|(tag, r)| {
-                match group_map.read_from_group(key, tag, idx_to_validate) {
-                    Ok((version, v, layout)) => {
+                match group_map.fetch_tagged_data(key, tag, idx_to_validate) {
+                    Ok((version, v)) => {
                         matches!(
-                            DataRead::Versioned(version, v, layout).contains(r),
+                            DataRead::from_value_with_layout(version, v).contains(r),
                             DataReadComparison::Contains
                         )
                     },
@@ -641,6 +664,10 @@ impl<T: Transaction> CapturedReads<T> {
 
     pub(crate) fn mark_failure(&mut self) {
         self.speculative_failure = true;
+    }
+
+    pub(crate) fn mark_incorrect_use(&mut self) {
+        self.incorrect_use = true;
     }
 }
 
