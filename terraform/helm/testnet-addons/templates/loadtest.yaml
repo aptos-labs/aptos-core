@@ -1,0 +1,123 @@
+{{- if .Values.load_test.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "testnet-addons.fullname" . }}-load-test
+  labels:
+    {{- include "testnet-addons.labels" . | nindent 4 }}
+    app.kubernetes.io/name: load-test
+spec:
+  concurrencyPolicy: Replace
+  schedule: {{ printf "*/%d * * * *" (int .Values.load_test.intervalMins) | quote }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "testnet-addons.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/name: load-test
+        spec:
+          restartPolicy: Never
+          priorityClassName: {{ include "testnet-addons.fullname" . }}-high
+          containers:
+          - name: load-test
+            image: {{ .Values.load_test.image.repo }}:{{ .Values.load_test.image.tag | default .Values.imageTag }}
+            imagePullPolicy: {{ .Values.load_test.image.pullPolicy }}
+            command:
+            - aptos-transaction-emitter
+            - emit-tx
+            - --mint-key={{ .Values.load_test.config.mint_key }}
+            - --chain-id={{ .Values.genesis.chain_id }}
+            # Build targets args for internal cluster targets
+            {{- $numTargets := 0 }}
+            {{- $targetSuffix := "" }}
+            {{- $targetGroups := list }}
+            {{- if $.Values.load_test.config.use_pfns }}
+              {{- $numTargets = $.Values.load_test.config.numFullnodeGroups }}
+              {{- $targetSuffix = "fullnode" }}
+              {{- $targetGroups = list }}
+            {{- else if $.Values.load_test.config.use_validators }}
+              {{- $numTargets = $.Values.genesis.numValidators }}
+              {{- $targetSuffix = "validator" }}
+              {{- $targetGroups = list }}
+            {{- else }}
+              {{- $numTargets = $.Values.load_test.config.numFullnodeGroups }}
+              {{- $targetSuffix = "fullnode" }}
+              {{- $targetGroups = $.Values.load_test.fullnode.groups }}
+            {{- end }}
+            {{- if $.Values.load_test.config.use_pfns }}
+              {{- range $i := until (int $numTargets) }}
+            - --targets=http://{{ printf "fullnode%d.%s" $i $.Values.service.domain }}
+            # - --targets=https://{{ printf "%s" $.Values.service.domain }}
+              {{- end }}
+            {{- else }}
+              {{- range $i := until (int $numTargets) }}
+                {{- $port := 80 }}
+                {{- if $targetGroups }}
+                {{- range $group := $targetGroups }}
+                {{- $nodeName := join "-" (list $.Values.genesis.username_prefix $i $group.name "lb") }}
+            - --targets=http://{{ $nodeName }}:{{ $port }}
+                {{- end }}
+                {{- else }}
+                {{- $nodeName := join "-" (list $.Values.genesis.username_prefix $i $targetSuffix "lb") }}
+            - --targets=http://{{ $nodeName }}:{{ $port }}
+               {{- end }}
+              {{- end }}
+            {{- end }}
+          {{- with .Values.load_test }}
+            # Either provide target TPS or mempool backlog
+            {{- if gt (int .config.target_tps) 0 }}
+            - --target-tps={{ .config.target_tps }}
+            {{- else }}
+            - --mempool-backlog={{ .config.mempool_backlog }}
+            {{- end }}
+            - --duration={{ .config.duration }}
+            # - --delay-after-minting=300
+            - --expected-max-txns={{ .config.expected_max_txns }}
+            - --txn-expiration-time-secs={{ .config.txn_expiration_time_secs }}
+            - --max-transactions-per-account={{ .config.max_transactions_per_account }}
+            - --transaction-type={{ .config.transaction_type }}
+            env:
+            - name: RUST_BACKTRACE
+              value: "full"
+            - name: REUSE_ACC
+              value: "1"
+            {{- with .resources }}
+            resources:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+            securityContext:
+              readOnlyRootFilesystem: true
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                - ALL
+              seccompProfile:
+                type: RuntimeDefault
+          {{- with .nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 6180
+            runAsGroup: 6180
+            fsGroup: 6180
+            # sysctls:
+            # - name: net.ipv4.tcp_tw_reuse
+            #   value: "1"
+          {{- end }}
+          serviceAccountName: {{ include "testnet-addons.serviceAccountName" . }}
+          {{- if .Values.imagePullSecret }}
+          imagePullSecrets:
+          - name: {{.Values.imagePullSecret}}
+          {{- end }}
+{{- end }}

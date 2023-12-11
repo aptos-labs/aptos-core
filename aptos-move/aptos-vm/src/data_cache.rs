@@ -4,7 +4,7 @@
 //! Scratchpad for on chain values during the execution.
 
 use crate::{
-    aptos_vm_impl::gas_config,
+    gas::get_gas_config_from_storage,
     move_vm_ext::{
         get_max_binary_format_version, get_max_identifier_size, AptosMoveResolver, AsExecutorView,
         AsResourceGroupView, ResourceGroupResolver,
@@ -347,7 +347,7 @@ pub trait AsMoveResolver<S> {
 impl<S: StateView> AsMoveResolver<S> for S {
     fn as_move_resolver(&self) -> StorageAdapter<S> {
         let config_view = ConfigAdapter(self);
-        let (_, gas_feature_version) = gas_config(&config_view);
+        let (_, gas_feature_version) = get_gas_config_from_storage(&config_view);
         let features = Features::fetch_config(&config_view).unwrap_or_default();
         let max_binary_version =
             get_max_binary_format_version(&features, Some(gas_feature_version));

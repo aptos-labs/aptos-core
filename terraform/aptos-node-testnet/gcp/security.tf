@@ -17,7 +17,6 @@ locals {
 }
 
 resource "kubernetes_labels" "pss-chaos-mesh" {
-  count       = var.enable_forge ? 1 : 0
   api_version = "v1"
   kind        = "Namespace"
   metadata {
