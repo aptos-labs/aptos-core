@@ -44,6 +44,7 @@ use std::{
 pub mod analyzed_transaction;
 pub mod authenticator;
 mod block_output;
+pub mod block_epilogue;
 mod change_set;
 mod module;
 mod multisig;
@@ -53,6 +54,7 @@ pub mod webauthn;
 
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::state_store::create_empty_sharded_state_updates;
+use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload};
 use crate::{
     contract_event::TransactionEvent, executable::ModulePath, fee_statement::FeeStatement,
     proof::accumulator::InMemoryEventAccumulator, validator_txn::ValidatorTransaction,
@@ -1853,6 +1855,12 @@ pub enum Transaction {
 
     /// Transaction that only proposed by a validator mainly to update on-chain configs.
     ValidatorTransaction(ValidatorTransaction),
+
+    /// Transaction to let the executor update the global state tree and record the root hash
+    /// in the TransactionInfo
+    /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
+    /// Replaces StateCheckpoint, with optionally having more data.
+    BlockEpilogue(BlockEpiloguePayload),
 }
 
 impl Transaction {
@@ -1866,6 +1874,13 @@ impl Transaction {
     pub fn try_as_block_metadata(&self) -> Option<&BlockMetadata> {
         match self {
             Transaction::BlockMetadata(v1) => Some(v1),
+            _ => None,
+        }
+    }
+
+    pub fn try_as_block_epilogue(&self) -> Option<&BlockEpiloguePayload> {
+        match self {
+            Transaction::BlockEpilogue(v1) => Some(v1),
             _ => None,
         }
     }
@@ -1889,6 +1904,8 @@ impl Transaction {
             // TODO: display proper information for client
             Transaction::StateCheckpoint(_) => String::from("state_checkpoint"),
             // TODO: display proper information for client
+            Transaction::BlockEpilogue(_) => String::from("block_epilogue"),
+            // TODO: display proper information for client
             Transaction::ValidatorTransaction(_) => String::from("validator_transaction"),
         }
     }
@@ -1899,6 +1916,7 @@ impl Transaction {
             Transaction::GenesisTransaction(_) => "genesis_transaction",
             Transaction::BlockMetadata(_) => "block_metadata",
             Transaction::StateCheckpoint(_) => "state_checkpoint",
+            Transaction::BlockEpilogue(_) => "block_epilogue",
             Transaction::ValidatorTransaction(_) => "validator_transaction",
         }
     }

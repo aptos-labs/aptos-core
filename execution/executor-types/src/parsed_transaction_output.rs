@@ -128,7 +128,9 @@ impl TransactionsWithParsedOutput {
             Transaction::BlockMetadata(_)
             | Transaction::UserTransaction(_)
             | Transaction::ValidatorTransaction(_) => false,
-            Transaction::GenesisTransaction(_) | Transaction::StateCheckpoint(_) => true,
+            Transaction::GenesisTransaction(_)
+            | Transaction::StateCheckpoint(_)
+            | Transaction::BlockEpilogue(_) => true,
         }
     }
 
