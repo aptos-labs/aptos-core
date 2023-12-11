@@ -377,6 +377,8 @@ impl InnerBuilder {
                 Some(&counters::BATCH_RETRIEVAL_TASK_MSGS),
             );
         let aptos_db_clone = self.aptos_db.clone();
+        // TODO: Once v2 handler is released, remove this flag and always use v2
+        let use_v2 = false;
         spawn_named!("batch_serve", async move {
             info!(epoch = epoch, "Batch retrieval task starts");
             while let Some(rpc_request) = batch_retrieval_rx.next().await {
@@ -395,14 +397,23 @@ impl InnerBuilder {
                         },
                     }
                 };
-                let msg = ConsensusMsg::BatchResponseV2(Box::new(response));
-                let bytes = rpc_request.protocol.to_bytes(&msg).unwrap();
-                if let Err(e) = rpc_request
-                    .response_sender
-                    .send(Ok(bytes.into()))
-                    .map_err(|_| anyhow::anyhow!("Failed to send block retrieval response"))
-                {
-                    warn!(epoch = epoch, error = ?e, kind = error_kind(&e));
+                let msg = if use_v2 {
+                    Some(ConsensusMsg::BatchResponseV2(Box::new(response)))
+                } else if let BatchResponse::Batch(batch) = response {
+                    Some(ConsensusMsg::BatchResponse(Box::new(batch)))
+                } else {
+                    None
+                };
+
+                if let Some(msg) = msg {
+                    let bytes = rpc_request.protocol.to_bytes(&msg).unwrap();
+                    if let Err(e) = rpc_request
+                        .response_sender
+                        .send(Ok(bytes.into()))
+                        .map_err(|_| anyhow::anyhow!("Failed to send block retrieval response"))
+                    {
+                        warn!(epoch = epoch, error = ?e, kind = error_kind(&e));
+                    }
                 }
             }
             info!(epoch = epoch, "Batch retrieval task stops");
