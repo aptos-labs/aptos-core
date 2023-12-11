@@ -50,7 +50,6 @@ aptos-peer-monitoring-service-types = { workspace = true }
 aptos-runtimes = { workspace = true }
 aptos-secure-storage = { workspace = true }
 aptos-state-sync-driver = { workspace = true }
-aptos-state-view = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-storage-service-client = { workspace = true }
 aptos-storage-service-notifications = { workspace = true }

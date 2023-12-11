@@ -10,12 +10,12 @@ use crate::{
         DeltaApplicationFailureReason, PanicOr,
     },
 };
-use aptos_state_view::StateView;
 use aptos_types::{
     aggregator::PanicError,
     state_store::{
         state_key::StateKey,
         state_value::{StateValue, StateValueMetadataKind},
+        StateView,
     },
     write_set::WriteOp,
 };

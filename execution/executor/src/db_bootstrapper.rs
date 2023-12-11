@@ -9,7 +9,6 @@ use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutedChunk;
 use aptos_logger::prelude::*;
-use aptos_state_view::{StateViewId, TStateView};
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
     DbWriter, ExecutedTrees,
@@ -22,7 +21,7 @@ use aptos_types::{
     block_info::{BlockInfo, GENESIS_EPOCH, GENESIS_ROUND, GENESIS_TIMESTAMP_USECS},
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ConfigurationResource,
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, StateViewId, TStateView},
     timestamp::TimestampResource,
     transaction::{Transaction, Version},
     waypoint::Waypoint,

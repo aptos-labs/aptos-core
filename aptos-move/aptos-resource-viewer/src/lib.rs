@@ -3,10 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, Result};
-use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, account_state::AccountState,
-    contract_event::ContractEvent,
+    contract_event::ContractEvent, state_store::StateView,
 };
 use move_bytecode_utils::viewer::CompiledModuleViewer;
 use move_core_types::language_storage::StructTag;

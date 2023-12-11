@@ -8,12 +8,12 @@ use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEAT
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_resource_viewer::{AnnotatedAccountStateBlob, AsValueAnnotator};
 use aptos_rest_client::Client;
-use aptos_state_view::TStateView;
 use aptos_types::{
     account_address::AccountAddress,
     block_executor::config::BlockExecutorConfigFromOnchain,
     chain_id::ChainId,
     on_chain_config::{Features, OnChainConfig, TimedFeaturesBuilder},
+    state_store::TStateView,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
         Transaction, TransactionInfo, TransactionOutput, TransactionPayload, Version,

@@ -30,13 +30,13 @@ use aptos_mvhashmap::{
     versioned_delayed_fields::TVersionedDelayedFieldView,
     MVHashMap,
 };
-use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     aggregator::PanicError,
     executable::{Executable, ModulePath},
     state_store::{
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadataKind},
+        StateViewId, TStateView,
     },
     transaction::BlockExecutableTransaction as Transaction,
     write_set::TransactionWrite,
@@ -1913,11 +1913,12 @@ mod test {
         versioned_delayed_fields::TVersionedDelayedFieldView,
         MVHashMap,
     };
-    use aptos_state_view::TStateView;
     use aptos_types::{
         aggregator::DelayedFieldID,
         executable::Executable,
-        state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
+        state_store::{
+            state_storage_usage::StateStorageUsage, state_value::StateValue, TStateView,
+        },
         transaction::BlockExecutableTransaction,
         write_set::TransactionWrite,
     };

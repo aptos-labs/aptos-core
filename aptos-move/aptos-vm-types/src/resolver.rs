@@ -5,12 +5,12 @@ use aptos_aggregator::{
     resolver::{TAggregatorV1View, TDelayedFieldView},
     types::DelayedFieldID,
 };
-use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     state_store::{
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadataKind},
+        StateView, StateViewId,
     },
     write_set::WriteOp,
 };

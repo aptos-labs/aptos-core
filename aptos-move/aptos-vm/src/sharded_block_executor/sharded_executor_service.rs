@@ -16,12 +16,12 @@ use crate::{
     },
 };
 use aptos_logger::{info, trace};
-use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::{
         config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
         partitioner::{ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies},
     },
+    state_store::StateView,
     transaction::{
         analyzed_transaction::AnalyzedTransaction,
         signature_verified_transaction::SignatureVerifiedTransaction, TransactionOutput,

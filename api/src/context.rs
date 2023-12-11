@@ -20,7 +20,6 @@ use aptos_crypto::HashValue;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_logger::{error, warn};
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
-use aptos_state_view::TStateView;
 use aptos_storage_interface::{
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
     DbReader, Order, MAX_REQUEST_LIMIT,
@@ -39,6 +38,7 @@ use aptos_types::{
         state_key::{StateKey, StateKeyInner},
         state_key_prefix::StateKeyPrefix,
         state_value::StateValue,
+        TStateView,
     },
     transaction::{SignedTransaction, TransactionWithProof, Version},
 };

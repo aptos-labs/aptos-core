@@ -29,13 +29,13 @@ use aptos_mvhashmap::{
     versioned_delayed_fields::CommitError,
     MVHashMap,
 };
-use aptos_state_view::TStateView;
 use aptos_types::{
     aggregator::PanicError,
     block_executor::config::BlockExecutorConfig,
     contract_event::TransactionEvent,
     executable::Executable,
     fee_statement::FeeStatement,
+    state_store::TStateView,
     transaction::BlockExecutableTransaction as Transaction,
     write_set::{TransactionWrite, WriteOp},
 };

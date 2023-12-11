@@ -7,7 +7,6 @@ use anyhow::Result;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
-use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_storage_interface::{state_view::DbStateViewAtVersion, DbReader, DbReaderWriter};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
@@ -17,6 +16,7 @@ use aptos_types::{
     move_resource::MoveStorage,
     on_chain_config,
     on_chain_config::{OnChainConfig, OnChainConfigPayload, OnChainConfigProvider},
+    state_store::account_with_state_view::AsAccountWithStateView,
     transaction::Version,
 };
 use futures::{channel::mpsc::SendError, stream::FusedStream, Stream};

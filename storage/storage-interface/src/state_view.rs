@@ -4,16 +4,14 @@
 
 use crate::DbReader;
 use anyhow::{anyhow, Result};
-use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
-    on_chain_config::ConfigStorage,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        TStateView,
     },
     transaction::Version,
 };
-use bytes::Bytes;
 use move_binary_format::CompiledModule;
 use move_bytecode_utils::viewer::ModuleViewer;
 use move_core_types::language_storage::ModuleId;
@@ -88,16 +86,5 @@ impl ModuleViewer for DbStateView {
                 e,
             )
         })
-    }
-}
-
-// TODO: We can implement this for S: StateView but need to move the trait
-//       definition to aptos-types first.
-impl ConfigStorage for DbStateView {
-    fn fetch_config(&self, access_path: AccessPath) -> Option<Bytes> {
-        let state_key = StateKey::access_path(access_path);
-        self.get_state_value(&state_key)
-            .ok()?
-            .map(|s| s.bytes().clone())
     }
 }

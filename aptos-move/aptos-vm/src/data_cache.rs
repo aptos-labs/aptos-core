@@ -17,7 +17,6 @@ use aptos_aggregator::{
     resolver::{TAggregatorV1View, TDelayedFieldView},
     types::{DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
 };
-use aptos_state_view::{StateView, StateViewId};
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,
@@ -27,13 +26,14 @@ use aptos_types::{
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadataKind},
+        StateView, StateViewId,
     },
     write_set::WriteOp,
 };
 use aptos_vm_types::{
     resolver::{
         ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView,
-        StateValueMetadataResolver, TResourceGroupView, TResourceView,
+        StateValueMetadataResolver, TResourceGroupView,
     },
     resource_group_adapter::ResourceGroupAdapter,
 };
@@ -63,16 +63,6 @@ pub(crate) fn get_resource_group_from_metadata(
         .get(struct_tag.name.as_ident_str().as_str())?
         .iter()
         .find_map(|attr| attr.get_resource_group_member())
-}
-
-struct ConfigAdapter<'a, K, L>(&'a dyn TResourceView<Key = K, Layout = L>);
-
-impl<'a> ConfigStorage for ConfigAdapter<'a, StateKey, MoveTypeLayout> {
-    fn fetch_config(&self, access_path: AccessPath) -> Option<Bytes> {
-        self.0
-            .get_resource_bytes(&StateKey::access_path(access_path), None)
-            .ok()?
-    }
 }
 
 /// Adapter to convert a `ExecutorView` into a `AptosMoveResolver`.
@@ -348,9 +338,8 @@ pub trait AsMoveResolver<S> {
 
 impl<S: StateView> AsMoveResolver<S> for S {
     fn as_move_resolver(&self) -> StorageAdapter<S> {
-        let config_view = ConfigAdapter(self);
-        let (_, gas_feature_version) = get_gas_config_from_storage(&config_view);
-        let features = Features::fetch_config(&config_view).unwrap_or_default();
+        let (_, gas_feature_version) = get_gas_config_from_storage(self);
+        let features = Features::fetch_config(self).unwrap_or_default();
         let max_binary_version =
             get_max_binary_format_version(&features, Some(gas_feature_version));
         let resource_group_adapter = ResourceGroupAdapter::new(

@@ -6,9 +6,8 @@ use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{AptosGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_language_e2e_tests::{common_transactions::peer_to_peer_txn, executor::FakeExecutor};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
-use aptos_state_view::TStateView;
 use aptos_types::{
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, TStateView},
     transaction::ExecutionStatus,
     vm_status::{StatusCode, VMStatus},
     write_set::WriteOp,
