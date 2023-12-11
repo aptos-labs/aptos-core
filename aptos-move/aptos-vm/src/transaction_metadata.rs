@@ -55,9 +55,6 @@ impl TransactionMetadata {
                 TransactionPayload::Script(s) => HashValue::sha3_256_of(s.code()).to_vec(),
                 TransactionPayload::EntryFunction(_) => vec![],
                 TransactionPayload::Multisig(_) => vec![],
-
-                // Deprecated. Will be removed in the future.
-                TransactionPayload::ModuleBundle(_) => vec![],
             },
             script_size: match txn.payload() {
                 TransactionPayload::Script(s) => (s.code().len() as u64).into(),

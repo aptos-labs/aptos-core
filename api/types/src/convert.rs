@@ -5,9 +5,8 @@
 use crate::{
     transaction::{
         DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem, DeletedTableData,
-        ModuleBundlePayload, MultisigPayload, MultisigTransactionPayload,
-        StateCheckpointTransaction, UserTransactionRequestInner, WriteModule, WriteResource,
-        WriteTableItem,
+        MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
+        UserTransactionRequestInner, WriteModule, WriteResource, WriteTableItem,
     },
     view::{ViewFunction, ViewRequest},
     Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event, HexEncodedBytes,
@@ -28,8 +27,7 @@ use aptos_types::{
         table::TableHandle,
     },
     transaction::{
-        EntryFunction, ExecutionStatus, ModuleBundle, Multisig, RawTransaction, Script,
-        SignedTransaction,
+        EntryFunction, ExecutionStatus, Multisig, RawTransaction, Script, SignedTransaction,
     },
     vm_status::AbortLocation,
     write_set::WriteOp,
@@ -260,14 +258,6 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     transaction_payload,
                 })
             },
-
-            // Deprecated. Will be removed in the future.
-            ModuleBundle(modules) => TransactionPayload::ModuleBundlePayload(ModuleBundlePayload {
-                modules: modules
-                    .into_iter()
-                    .map(|module| MoveModuleBytecode::from(module).try_parse_abi())
-                    .collect::<Result<Vec<_>>>()?,
-            }),
         };
         Ok(ret)
     }
@@ -695,17 +685,6 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     multisig_address: multisig.multisig_address.into(),
                     transaction_payload,
                 })
-            },
-
-            // Deprecated. Will be removed in the future.
-            TransactionPayload::ModuleBundlePayload(payload) => {
-                Target::ModuleBundle(ModuleBundle::new(
-                    payload
-                        .modules
-                        .into_iter()
-                        .map(|m| m.bytecode.into())
-                        .collect(),
-                ))
             },
         };
         Ok(ret)

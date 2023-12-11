@@ -12938,20 +12938,6 @@
           }
         }
       },
-      "ModuleBundlePayload": {
-        "type": "object",
-        "required": [
-          "modules"
-        ],
-        "properties": {
-          "modules": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MoveModuleBytecode"
-            }
-          }
-        }
-      },
       "MoveAbility": {
         "type": "string"
       },
@@ -13732,9 +13718,6 @@
             "$ref": "#/components/schemas/TransactionPayload_ScriptPayload"
           },
           {
-            "$ref": "#/components/schemas/TransactionPayload_ModuleBundlePayload"
-          },
-          {
             "$ref": "#/components/schemas/TransactionPayload_MultisigPayload"
           }
         ],
@@ -13743,7 +13726,6 @@
           "mapping": {
             "entry_function_payload": "#/components/schemas/TransactionPayload_EntryFunctionPayload",
             "script_payload": "#/components/schemas/TransactionPayload_ScriptPayload",
-            "module_bundle_payload": "#/components/schemas/TransactionPayload_ModuleBundlePayload",
             "multisig_payload": "#/components/schemas/TransactionPayload_MultisigPayload"
           }
         }
@@ -13764,25 +13746,6 @@
           },
           {
             "$ref": "#/components/schemas/EntryFunctionPayload"
-          }
-        ]
-      },
-      "TransactionPayload_ModuleBundlePayload": {
-        "allOf": [
-          {
-            "type": "object",
-            "required": [
-              "type"
-            ],
-            "properties": {
-              "type": {
-                "type": "string",
-                "example": "module_bundle_payload"
-              }
-            }
-          },
-          {
-            "$ref": "#/components/schemas/ModuleBundlePayload"
           }
         ]
       },

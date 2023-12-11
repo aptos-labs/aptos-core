@@ -386,13 +386,6 @@ pub fn update_counters_for_processed_chunk<T, O>(
                         .with_label_values(&[process_type, "multisig", state])
                         .inc();
                 },
-
-                // Deprecated. Will be removed in the future.
-                aptos_types::transaction::TransactionPayload::ModuleBundle(_module) => {
-                    metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
-                        .with_label_values(&[process_type, "module", state])
-                        .inc();
-                },
             }
         }
 

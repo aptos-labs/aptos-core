@@ -6,8 +6,8 @@ use aptos_language_e2e_tests::{data_store::GENESIS_CHANGE_SET_HEAD, executor::Fa
 use aptos_types::{
     chain_id::ChainId,
     transaction::{
-        EntryFunction, ExecutionStatus, ModuleBundle, Script, TransactionArgument,
-        TransactionPayload, TransactionStatus,
+        EntryFunction, ExecutionStatus, Script, TransactionArgument, TransactionPayload,
+        TransactionStatus,
     },
     write_set::WriteSet,
 };
@@ -168,7 +168,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     // publish all packages
     for group in packages {
         let sender = *group[0].address();
-        let serialized_modules: Vec<Vec<u8>> = group
+        let _serialized_modules: Vec<Vec<u8>> = group
             .iter()
             .map(|m| {
                 let mut b = vec![];
@@ -178,13 +178,14 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
             .map_err(|_| Corpus::Keep)?;
 
         // deprecated but easiest way to publish modules
-        let mb = ModuleBundle::new(serialized_modules);
+        // let mb = ModuleBundle::new(serialized_modules);
         let acc = vm.new_account_at(sender);
         let tx = acc
             .transaction()
             .gas_unit_price(100)
             .sequence_number(0)
-            .payload(TransactionPayload::ModuleBundle(mb))
+            // TODO(George): FIXME
+            //.payload(TransactionPayload::ModuleBundle(mb))
             .sign();
         tdbg!("publishing");
         let res = vm

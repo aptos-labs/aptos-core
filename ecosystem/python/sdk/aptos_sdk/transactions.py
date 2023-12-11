@@ -208,8 +208,7 @@ class FeePayerRawTransaction(RawTransactionWithData):
 
 class TransactionPayload:
     SCRIPT: int = 0
-    MODULE_BUNDLE: int = 1
-    SCRIPT_FUNCTION: int = 2
+    ENTRY_FUNCTION: int = 1
 
     variant: int
     value: Any
@@ -217,10 +216,8 @@ class TransactionPayload:
     def __init__(self, payload: Any):
         if isinstance(payload, Script):
             self.variant = TransactionPayload.SCRIPT
-        elif isinstance(payload, ModuleBundle):
-            self.variant = TransactionPayload.MODULE_BUNDLE
         elif isinstance(payload, EntryFunction):
-            self.variant = TransactionPayload.SCRIPT_FUNCTION
+            self.variant = TransactionPayload.ENTRY_FUNCTION
         else:
             raise Exception("Invalid type")
         self.value = payload
@@ -239,9 +236,7 @@ class TransactionPayload:
 
         if variant == TransactionPayload.SCRIPT:
             payload: Any = Script.deserialize(deserializer)
-        elif variant == TransactionPayload.MODULE_BUNDLE:
-            payload = ModuleBundle.deserialize(deserializer)
-        elif variant == TransactionPayload.SCRIPT_FUNCTION:
+        elif variant == TransactionPayload.ENTRY_FUNCTION:
             payload = EntryFunction.deserialize(deserializer)
         else:
             raise Exception("Invalid type")
@@ -251,18 +246,6 @@ class TransactionPayload:
     def serialize(self, serializer: Serializer):
         serializer.uleb128(self.variant)
         self.value.serialize(serializer)
-
-
-class ModuleBundle:
-    def __init__(self):
-        raise NotImplementedError
-
-    @staticmethod
-    def deserialize(deserializer: Deserializer) -> ModuleBundle:
-        raise NotImplementedError
-
-    def serialize(self, serializer: Serializer):
-        raise NotImplementedError
 
 
 class Script:

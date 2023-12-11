@@ -36,7 +36,6 @@ export type { HexEncodedBytes } from './models/HexEncodedBytes';
 export type { IdentifierWrapper } from './models/IdentifierWrapper';
 export type { IndexedSignature } from './models/IndexedSignature';
 export type { IndexResponse } from './models/IndexResponse';
-export type { ModuleBundlePayload } from './models/ModuleBundlePayload';
 export type { MoveAbility } from './models/MoveAbility';
 export type { MoveFunction } from './models/MoveFunction';
 export type { MoveFunctionGenericTypeParam } from './models/MoveFunctionGenericTypeParam';
@@ -80,7 +79,6 @@ export type { Transaction_StateCheckpointTransaction } from './models/Transactio
 export type { Transaction_UserTransaction } from './models/Transaction_UserTransaction';
 export type { TransactionPayload } from './models/TransactionPayload';
 export type { TransactionPayload_EntryFunctionPayload } from './models/TransactionPayload_EntryFunctionPayload';
-export type { TransactionPayload_ModuleBundlePayload } from './models/TransactionPayload_ModuleBundlePayload';
 export type { TransactionPayload_MultisigPayload } from './models/TransactionPayload_MultisigPayload';
 export type { TransactionPayload_ScriptPayload } from './models/TransactionPayload_ScriptPayload';
 export type { TransactionsBatchSingleSubmissionFailure } from './models/TransactionsBatchSingleSubmissionFailure';

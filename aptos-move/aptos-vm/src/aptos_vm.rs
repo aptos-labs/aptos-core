@@ -71,9 +71,9 @@ use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
     deserializer::DeserializerConfig,
-    errors::{verification_error, Location, PartialVMError, VMError, VMResult},
+    errors::{Location, PartialVMError, VMError, VMResult},
     file_format_common::{IDENTIFIER_SIZE_MAX, LEGACY_IDENTIFIER_SIZE_MAX},
-    CompiledModule, IndexKind,
+    CompiledModule,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -943,32 +943,6 @@ impl AptosVM {
         Ok(respawned_session)
     }
 
-    fn verify_module_bundle(
-        session: &mut SessionExt,
-        module_bundle: &ModuleBundle,
-    ) -> VMResult<()> {
-        for module_blob in module_bundle.iter() {
-            match CompiledModule::deserialize_with_config(
-                module_blob.code(),
-                &session.get_vm_config().deserializer_config,
-            ) {
-                Ok(module) => {
-                    // verify the module doesn't exist
-                    if session.load_module(&module.self_id()).is_ok() {
-                        return Err(verification_error(
-                            StatusCode::DUPLICATE_MODULE_NAME,
-                            IndexKind::AddressIdentifier,
-                            module.self_handle_idx().0,
-                        )
-                        .finish(Location::Undefined));
-                    }
-                },
-                Err(err) => return Err(err.finish(Location::Undefined)),
-            }
-        }
-        Ok(())
-    }
-
     /// Execute all module initializers.
     fn execute_module_initialization(
         &self,
@@ -1039,73 +1013,6 @@ impl AptosVM {
             }
         }
         Ok(result)
-    }
-
-    /// Execute a module bundle load request.
-    /// TODO: this is going to be deprecated and removed in favor of code publishing via
-    /// NativeCodeContext
-    fn execute_modules(
-        &self,
-        resolver: &impl AptosMoveResolver,
-        mut session: SessionExt,
-        gas_meter: &mut impl AptosGasMeter,
-        txn_data: &TransactionMetadata,
-        modules: &ModuleBundle,
-        log_context: &AdapterLogSchema,
-        new_published_modules_loaded: &mut bool,
-        change_set_configs: &ChangeSetConfigs,
-    ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        if MODULE_BUNDLE_DISALLOWED.load(Ordering::Relaxed) {
-            return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
-        }
-        fail_point!("move_adapter::execute_module", |_| {
-            Err(VMStatus::error(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                None,
-            ))
-        });
-
-        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
-
-        Self::verify_module_bundle(&mut session, modules)?;
-        session.publish_module_bundle_with_compat_config(
-            modules.clone().into_inner(),
-            txn_data.sender(),
-            gas_meter,
-            Compatibility::new(
-                true,
-                true,
-                !self
-                    .features
-                    .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-            ),
-        )?;
-
-        // call init function of the each module
-        self.execute_module_initialization(
-            &mut session,
-            gas_meter,
-            &self.deserialize_module_bundle(modules)?,
-            BTreeSet::new(),
-            &[txn_data.sender()],
-            new_published_modules_loaded,
-        )?;
-
-        let respawned_session = self.charge_change_set_and_respawn_session(
-            session,
-            resolver,
-            gas_meter,
-            change_set_configs,
-            txn_data,
-        )?;
-
-        self.success_transaction_cleanup(
-            respawned_session,
-            gas_meter,
-            txn_data,
-            log_context,
-            change_set_configs,
-        )
     }
 
     /// Resolve a pending code publish request registered via the NativeCodeContext.
@@ -1418,18 +1325,6 @@ impl AptosVM {
                     )
                 }
             },
-
-            // Deprecated. Will be removed in the future.
-            TransactionPayload::ModuleBundle(m) => self.execute_modules(
-                resolver,
-                session,
-                gas_meter,
-                &txn_data,
-                m,
-                log_context,
-                &mut new_published_modules_loaded,
-                &storage_gas_params.change_set_configs,
-            ),
         };
 
         let gas_usage = txn_data
@@ -1776,21 +1671,6 @@ impl AptosVM {
                 } else {
                     Ok(())
                 }
-            },
-
-            // Deprecated. Will be removed in the future.
-            TransactionPayload::ModuleBundle(_module) => {
-                if MODULE_BUNDLE_DISALLOWED.load(Ordering::Relaxed) {
-                    return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
-                }
-                check_gas(
-                    get_or_vm_startup_failure(&self.gas_params, log_context)?,
-                    self.gas_feature_version,
-                    resolver,
-                    txn_data,
-                    log_context,
-                )?;
-                transaction_validation::run_module_prologue(session, txn_data, log_context)
             },
         }
     }

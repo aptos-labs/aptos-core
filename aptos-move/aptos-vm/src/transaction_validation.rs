@@ -154,40 +154,6 @@ pub(crate) fn run_script_prologue(
         .or_else(|err| convert_prologue_error(err, log_context))
 }
 
-// Deprecated (see ModuleBundle).
-pub(crate) fn run_module_prologue(
-    session: &mut SessionExt,
-    txn_data: &TransactionMetadata,
-    log_context: &AdapterLogSchema,
-) -> Result<(), VMStatus> {
-    let txn_sequence_number = txn_data.sequence_number();
-    let txn_authentication_key = txn_data.authentication_key();
-    let txn_gas_price = txn_data.gas_unit_price();
-    let txn_max_gas_units = txn_data.max_gas_amount();
-    let txn_expiration_timestamp_secs = txn_data.expiration_timestamp_secs();
-    let chain_id = txn_data.chain_id();
-    let mut gas_meter = UnmeteredGasMeter;
-    session
-        .execute_function_bypass_visibility(
-            &APTOS_TRANSACTION_VALIDATION.module_id(),
-            &APTOS_TRANSACTION_VALIDATION.module_prologue_name,
-            vec![],
-            serialize_values(&vec![
-                MoveValue::Signer(txn_data.sender),
-                MoveValue::U64(txn_sequence_number),
-                MoveValue::vector_u8(txn_authentication_key.to_vec()),
-                MoveValue::U64(txn_gas_price.into()),
-                MoveValue::U64(txn_max_gas_units.into()),
-                MoveValue::U64(txn_expiration_timestamp_secs),
-                MoveValue::U8(chain_id.id()),
-            ]),
-            &mut gas_meter,
-        )
-        .map(|_return_vals| ())
-        .map_err(expect_no_verification_errors)
-        .or_else(|err| convert_prologue_error(err, log_context))
-}
-
 /// Run the prologue for a multisig transaction. This needs to verify that:
 /// 1. The the multisig tx exists
 /// 2. It has received enough approvals to meet the signature threshold of the multisig account

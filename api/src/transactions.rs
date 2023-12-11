@@ -902,9 +902,6 @@ impl TransactionsApi {
                             }
                         }
                     },
-
-                    // Deprecated. Will be removed in the future.
-                    TransactionPayload::ModuleBundle(_) => {},
                 }
                 // TODO: Verify script args?
 

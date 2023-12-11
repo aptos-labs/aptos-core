@@ -12,7 +12,7 @@ use crate::{
 pub use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PublicKey, HashValue};
 use aptos_global_constants::{GAS_UNIT_PRICE, MAX_GAS_AMOUNT};
-use aptos_types::transaction::{EntryFunction, ModuleBundle, Script};
+use aptos_types::transaction::{EntryFunction, Script};
 
 pub struct TransactionBuilder {
     sender: Option<AccountAddress>,
@@ -139,12 +139,6 @@ impl TransactionFactory {
 
     pub fn payload(&self, payload: TransactionPayload) -> TransactionBuilder {
         self.transaction_builder(payload)
-    }
-
-    pub fn module(&self, code: Vec<u8>) -> TransactionBuilder {
-        self.payload(TransactionPayload::ModuleBundle(ModuleBundle::singleton(
-            code,
-        )))
     }
 
     pub fn entry_function(&self, func: EntryFunction) -> TransactionBuilder {

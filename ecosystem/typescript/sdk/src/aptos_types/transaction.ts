@@ -436,10 +436,9 @@ export abstract class TransactionPayload {
     switch (index) {
       case 0:
         return TransactionPayloadScript.load(deserializer);
-      // TODO: change to 1 once ModuleBundle has been removed from rust
-      case 2:
+      case 1:
         return TransactionPayloadEntryFunction.load(deserializer);
-      case 3:
+      case 2:
         return TransactionPayloadMultisig.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TransactionPayload: ${index}`);

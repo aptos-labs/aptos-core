@@ -607,8 +607,6 @@ pub enum GenesisPayload {
 pub enum TransactionPayload {
     EntryFunctionPayload(EntryFunctionPayload),
     ScriptPayload(ScriptPayload),
-    // Deprecated. Will be removed in the future.
-    ModuleBundlePayload(ModuleBundlePayload),
     MultisigPayload(MultisigPayload),
 }
 
@@ -618,24 +616,7 @@ impl VerifyInput for TransactionPayload {
             TransactionPayload::EntryFunctionPayload(inner) => inner.verify(),
             TransactionPayload::ScriptPayload(inner) => inner.verify(),
             TransactionPayload::MultisigPayload(inner) => inner.verify(),
-            // Deprecated. Will be removed in the future.
-            TransactionPayload::ModuleBundlePayload(inner) => inner.verify(),
         }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
-pub struct ModuleBundlePayload {
-    pub modules: Vec<MoveModuleBytecode>,
-}
-
-impl VerifyInput for ModuleBundlePayload {
-    fn verify(&self) -> anyhow::Result<()> {
-        for module in self.modules.iter() {
-            module.verify()?;
-        }
-
-        Ok(())
     }
 }
 

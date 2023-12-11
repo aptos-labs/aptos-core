@@ -9687,15 +9687,6 @@ components:
           format: uint8
         signature:
           $ref: '#/components/schemas/Signature'
-    ModuleBundlePayload:
-      type: object
-      required:
-      - modules
-      properties:
-        modules:
-          type: array
-          items:
-            $ref: '#/components/schemas/MoveModuleBytecode'
     MoveAbility:
       type: string
     MoveFunction:
@@ -10325,14 +10316,12 @@ components:
       oneOf:
       - $ref: '#/components/schemas/TransactionPayload_EntryFunctionPayload'
       - $ref: '#/components/schemas/TransactionPayload_ScriptPayload'
-      - $ref: '#/components/schemas/TransactionPayload_ModuleBundlePayload'
       - $ref: '#/components/schemas/TransactionPayload_MultisigPayload'
       discriminator:
         propertyName: type
         mapping:
           entry_function_payload: '#/components/schemas/TransactionPayload_EntryFunctionPayload'
           script_payload: '#/components/schemas/TransactionPayload_ScriptPayload'
-          module_bundle_payload: '#/components/schemas/TransactionPayload_ModuleBundlePayload'
           multisig_payload: '#/components/schemas/TransactionPayload_MultisigPayload'
     TransactionPayload_EntryFunctionPayload:
       allOf:
@@ -10344,16 +10333,6 @@ components:
             type: string
             example: entry_function_payload
       - $ref: '#/components/schemas/EntryFunctionPayload'
-    TransactionPayload_ModuleBundlePayload:
-      allOf:
-      - type: object
-        required:
-        - type
-        properties:
-          type:
-            type: string
-            example: module_bundle_payload
-      - $ref: '#/components/schemas/ModuleBundlePayload'
     TransactionPayload_MultisigPayload:
       allOf:
       - type: object
