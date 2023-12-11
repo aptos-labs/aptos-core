@@ -7,7 +7,7 @@ use aptos_types::{
     fee_statement::FeeStatement, on_chain_config::BlockGasLimitType,
     transaction::BlockExecutableTransaction as Transaction,
 };
-use claims::assert_le;
+use claims::{assert_le, assert_none};
 
 pub struct BlockGasLimitProcessor<T: Transaction> {
     block_gas_limit_type: BlockGasLimitType,
@@ -43,28 +43,37 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         let conflict_multiplier = if let Some(conflict_overlap_length) =
             self.block_gas_limit_type.conflict_penalty_window()
         {
+            let txn_read_write_summary = txn_read_write_summary.expect(
+                "txn_read_write_summary needs to be computed if conflict_penalty_window is set",
+            );
             self.txn_read_write_summaries.push(
                 if self
                     .block_gas_limit_type
                     .use_granular_resource_group_conflicts()
                 {
-                    txn_read_write_summary.unwrap()
-                } else {
                     txn_read_write_summary
-                        .unwrap()
-                        .collapse_resource_group_conflicts()
+                } else {
+                    txn_read_write_summary.collapse_resource_group_conflicts()
                 },
             );
             self.compute_conflict_multiplier(conflict_overlap_length as usize)
         } else {
+            assert_none!(txn_read_write_summary);
             1
         };
-
-        // println!("[{}] Multiplier {}, with read/write summary: {:?}", self.txn_fee_statements.len() - 1, conflict_multiplier, self.txn_read_write_summaries.last());
 
         // When the accumulated execution and io gas of the committed txns exceeds
         // PER_BLOCK_GAS_LIMIT, early halt BlockSTM. Storage fee does not count towards
         // the per block gas limit, as we measure execution related cost here.
+        println!(
+            "{} * ({} * {} + {} * {})",
+            conflict_multiplier,
+            fee_statement.execution_gas_used(),
+            self.block_gas_limit_type
+                .execution_gas_effective_multiplier(),
+            fee_statement.io_gas_used(),
+            self.block_gas_limit_type.io_gas_effective_multiplier()
+        );
         self.accumulated_effective_block_gas += conflict_multiplier
             * (fee_statement.execution_gas_used()
                 * self
@@ -73,15 +82,15 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                 + fee_statement.io_gas_used()
                     * self.block_gas_limit_type.io_gas_effective_multiplier());
 
-        self.accumulated_approx_output_size += approx_output_size.unwrap_or(0);
+        if self.block_gas_limit_type.block_output_limit().is_some() {
+            self.accumulated_approx_output_size += approx_output_size
+                .expect("approx_output_size needs to be computed if block_output_limit is set");
+        } else {
+            assert_none!(approx_output_size);
+        }
     }
 
-    fn should_end_block(&self, is_parallel: bool) -> bool {
-        let mode = if is_parallel {
-            counters::Mode::PARALLEL
-        } else {
-            counters::Mode::SEQUENTIAL
-        };
+    fn should_end_block(&self, mode: &str) -> bool {
         if let Some(per_block_gas_limit) = self.block_gas_limit_type.block_gas_limit() {
             // When the accumulated block gas of the committed txns exceeds
             // PER_BLOCK_GAS_LIMIT, early halt BlockSTM.
@@ -91,9 +100,9 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                     .with_label_values(&[mode])
                     .inc();
                 info!(
-                    "[BlockSTM]: execution (is_parallel = {}) early halted due to \
+                    "[BlockSTM]: execution ({}) early halted due to \
                     accumulated_block_gas {} >= PER_BLOCK_GAS_LIMIT {}",
-                    is_parallel, accumulated_block_gas, per_block_gas_limit,
+                    mode, accumulated_block_gas, per_block_gas_limit,
                 );
 
                 return true;
@@ -107,9 +116,9 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                     .with_label_values(&[mode])
                     .inc();
                 info!(
-                    "[BlockSTM]: execution (is_parallel = {}) early halted due to \
+                    "[BlockSTM]: execution ({}) early halted due to \
                     accumulated_output {} >= PER_BLOCK_OUTPUT_LIMIT {}",
-                    is_parallel, accumulated_output, per_block_output_limit,
+                    mode, accumulated_output, per_block_output_limit,
                 );
 
                 return true;
@@ -120,11 +129,11 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
     }
 
     pub(crate) fn should_end_block_parallel(&self) -> bool {
-        self.should_end_block(true)
+        self.should_end_block(counters::Mode::PARALLEL)
     }
 
     pub(crate) fn should_end_block_sequential(&self) -> bool {
-        self.should_end_block(false)
+        self.should_end_block(counters::Mode::SEQUENTIAL)
     }
 
     fn get_effective_accumulated_block_gas(&self) -> u64 {
@@ -203,4 +212,197 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
     }
 }
 
-// TODO: add tests for accumulate_fee_statement / compute_conflict_multiplier for different BlockGasLimitType configs
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::{
+        proptest_types::types::{KeyType, MockEvent, MockTransaction},
+        types::InputOutputKey,
+    };
+    use aptos_types::aggregator::DelayedFieldID;
+    use std::collections::HashSet;
+
+    // TODO: add tests for accumulate_fee_statement / compute_conflict_multiplier for different BlockGasLimitType configs
+
+    const DEFAULT_COMPLEX_LIMIT: BlockGasLimitType = BlockGasLimitType::ComplexLimitV1 {
+        effective_block_gas_limit: 1000000,
+        execution_gas_effective_multiplier: 1,
+        io_gas_effective_multiplier: 1,
+        conflict_penalty_window: 1,
+        block_output_limit: None,
+        add_block_limit_outcome_onchain: false,
+        use_granular_resource_group_conflicts: false,
+    };
+
+    type TestTxn = MockTransaction<KeyType<u64>, MockEvent>;
+
+    #[test]
+    fn test_output_limit_not_used() {
+        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(DEFAULT_COMPLEX_LIMIT, 10);
+        // Assert passing none here doesn't panic.
+        processor.accumulate_fee_statement(FeeStatement::zero(), None, None);
+        assert!(!processor.should_end_block_parallel());
+    }
+
+    fn execution_fee(execution_gas: u64) -> FeeStatement {
+        FeeStatement::new(execution_gas, execution_gas, 0, 0, 0)
+    }
+
+    #[test]
+    fn test_gas_limit() {
+        let block_gas_limit = BlockGasLimitType::ComplexLimitV1 {
+            effective_block_gas_limit: 100,
+            execution_gas_effective_multiplier: 1,
+            io_gas_effective_multiplier: 1,
+            conflict_penalty_window: 1,
+            block_output_limit: None,
+            add_block_limit_outcome_onchain: false,
+            use_granular_resource_group_conflicts: false,
+        };
+
+        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, 10);
+
+        processor.accumulate_fee_statement(execution_fee(10), None, None);
+        assert!(!processor.should_end_block_parallel());
+        processor.accumulate_fee_statement(execution_fee(50), None, None);
+        assert!(!processor.should_end_block_parallel());
+        processor.accumulate_fee_statement(execution_fee(40), None, None);
+        assert!(processor.should_end_block_parallel());
+    }
+
+    #[test]
+    fn test_output_limit_used() {
+        let block_gas_limit = BlockGasLimitType::ComplexLimitV1 {
+            effective_block_gas_limit: 1000000,
+            execution_gas_effective_multiplier: 1,
+            io_gas_effective_multiplier: 1,
+            conflict_penalty_window: 1,
+            block_output_limit: Some(100),
+            add_block_limit_outcome_onchain: false,
+            use_granular_resource_group_conflicts: false,
+        };
+
+        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, 10);
+
+        processor.accumulate_fee_statement(FeeStatement::zero(), None, Some(10));
+        assert!(!processor.should_end_block_parallel());
+        processor.accumulate_fee_statement(FeeStatement::zero(), None, Some(50));
+        assert!(!processor.should_end_block_parallel());
+        processor.accumulate_fee_statement(FeeStatement::zero(), None, Some(40));
+        assert!(processor.should_end_block_parallel());
+    }
+
+    fn to_map(
+        reads: &[InputOutputKey<u64, u32, u64>],
+    ) -> HashSet<InputOutputKey<KeyType<u64>, u32, DelayedFieldID>> {
+        reads
+            .iter()
+            .map(|key| match key {
+                InputOutputKey::Resource(k) => InputOutputKey::Resource(KeyType(*k, false)),
+                InputOutputKey::Group(k, t) => InputOutputKey::Group(KeyType(*k, false), *t),
+                InputOutputKey::DelayedField(i) => {
+                    InputOutputKey::DelayedField(DelayedFieldID::new(*i))
+                },
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_conflict_limit_coarse_resource_groups() {
+        let block_gas_limit = BlockGasLimitType::ComplexLimitV1 {
+            effective_block_gas_limit: 1000,
+            execution_gas_effective_multiplier: 1,
+            io_gas_effective_multiplier: 1,
+            conflict_penalty_window: 8,
+            block_output_limit: None,
+            add_block_limit_outcome_onchain: false,
+            use_granular_resource_group_conflicts: false,
+        };
+
+        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, 10);
+
+        processor.accumulate_fee_statement(
+            execution_fee(10),
+            Some(ReadWriteSummary::new(
+                to_map(&[InputOutputKey::Resource(1)]),
+                to_map(&[InputOutputKey::Resource(1)]),
+            )),
+            None,
+        );
+        assert_eq!(1, processor.compute_conflict_multiplier(8));
+        assert_eq!(processor.accumulated_effective_block_gas, 10);
+        assert!(!processor.should_end_block_parallel());
+        processor.accumulate_fee_statement(
+            execution_fee(10),
+            Some(ReadWriteSummary::new(
+                to_map(&[InputOutputKey::Resource(1)]),
+                to_map(&[InputOutputKey::Group(1, 1)]),
+            )),
+            None,
+        );
+        assert_eq!(2, processor.compute_conflict_multiplier(8));
+        assert_eq!(processor.accumulated_effective_block_gas, 30);
+        assert!(!processor.should_end_block_parallel());
+        processor.accumulate_fee_statement(
+            execution_fee(10),
+            Some(ReadWriteSummary::new(
+                to_map(&[InputOutputKey::Group(2, 1)]),
+                to_map(&[InputOutputKey::Group(2, 1)]),
+            )),
+            None,
+        );
+        assert_eq!(1, processor.compute_conflict_multiplier(8));
+        assert_eq!(processor.accumulated_effective_block_gas, 40);
+        assert!(!processor.should_end_block_parallel());
+        processor.accumulate_fee_statement(
+            execution_fee(10),
+            Some(ReadWriteSummary::new(
+                to_map(&[InputOutputKey::Group(2, 2)]),
+                to_map(&[InputOutputKey::Group(2, 2)]),
+            )),
+            None,
+        );
+        assert_eq!(2, processor.compute_conflict_multiplier(8));
+        assert_eq!(processor.accumulated_effective_block_gas, 60);
+        assert!(!processor.should_end_block_parallel());
+    }
+
+    #[test]
+    fn test_conflict_limit_granular_resource_groups() {
+        let block_gas_limit = BlockGasLimitType::ComplexLimitV1 {
+            effective_block_gas_limit: 1000,
+            execution_gas_effective_multiplier: 1,
+            io_gas_effective_multiplier: 1,
+            conflict_penalty_window: 8,
+            block_output_limit: None,
+            add_block_limit_outcome_onchain: false,
+            use_granular_resource_group_conflicts: true,
+        };
+
+        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, 10);
+
+        assert!(!processor.should_end_block_parallel());
+        processor.accumulate_fee_statement(
+            execution_fee(10),
+            Some(ReadWriteSummary::new(
+                to_map(&[InputOutputKey::Group(2, 1)]),
+                to_map(&[InputOutputKey::Group(2, 1)]),
+            )),
+            None,
+        );
+        assert_eq!(1, processor.compute_conflict_multiplier(8));
+        assert_eq!(processor.accumulated_effective_block_gas, 10);
+        assert!(!processor.should_end_block_parallel());
+        processor.accumulate_fee_statement(
+            execution_fee(10),
+            Some(ReadWriteSummary::new(
+                to_map(&[InputOutputKey::Group(2, 2)]),
+                to_map(&[InputOutputKey::Group(2, 2)]),
+            )),
+            None,
+        );
+        assert_eq!(1, processor.compute_conflict_multiplier(8));
+        assert_eq!(processor.accumulated_effective_block_gas, 20);
+        assert!(!processor.should_end_block_parallel());
+    }
+}

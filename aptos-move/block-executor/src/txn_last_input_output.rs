@@ -6,7 +6,7 @@ use crate::{
     errors::{Error, IntentionalFallbackToSequential},
     explicit_sync_wrapper::ExplicitSyncWrapper,
     task::{ExecutionStatus, TransactionOutput},
-    types::InputOutputKey,
+    types::{InputOutputKey, ReadWriteSummary},
 };
 use aptos_aggregator::types::PanicOr;
 use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
@@ -432,6 +432,14 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             | ExecutionStatus::SpeculativeExecutionAbortError(_)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {},
         };
+    }
+
+    pub(crate) fn get_txn_read_write_summary(&self, txn_idx: TxnIndex) -> ReadWriteSummary<T> {
+        let read_set = self.read_set(txn_idx).expect("Read set must be recorded");
+
+        let reads = read_set.get_read_summary();
+        let writes = self.get_write_summary(txn_idx);
+        ReadWriteSummary::new(reads, writes)
     }
 
     pub(crate) fn get_write_summary(

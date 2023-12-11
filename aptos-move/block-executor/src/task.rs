@@ -188,6 +188,10 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// Return the fee statement of the transaction.
     fn fee_statement(&self) -> FeeStatement;
 
+    /// Deterministic, but approximate size of the output, as
+    /// before creating actual TransactionOutput, we don't know the exact size of it.
+    ///
+    /// Sum of all sizes of writes (keys + write_ops) and events.
     fn output_approx_size(&self) -> u64;
 
     fn get_write_summary(

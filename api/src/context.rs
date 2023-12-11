@@ -1029,7 +1029,7 @@ impl Context {
                     } else if let Some(full_block_gas_used) =
                         block_config.block_gas_limit_type.block_gas_limit()
                     {
-                        // be pesimistic for conflicts, as such information is not onchain
+                        // be pessimistic for conflicts, as such information is not onchain
                         let gas_used = prices_and_used.iter().map(|(_, used)| *used).sum::<u64>();
                         let max_conflict_multiplier = block_config
                             .block_gas_limit_type

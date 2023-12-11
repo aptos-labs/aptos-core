@@ -404,19 +404,6 @@ where
         Ok(execution_still_valid)
     }
 
-    fn get_txn_read_write_summary(
-        txn_idx: TxnIndex,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-    ) -> ReadWriteSummary<T> {
-        let read_set = last_input_output
-            .read_set(txn_idx)
-            .expect("Read set must be recorded");
-
-        let reads = read_set.get_read_summary();
-        let writes = last_input_output.get_write_summary(txn_idx);
-        ReadWriteSummary::new(reads, writes)
-    }
-
     /// This method may be executed by different threads / workers, but is guaranteed to be executed
     /// non-concurrently by the scheduling in parallel executor. This allows to perform light logic
     /// related to committing a transaction in a simple way and without excessive synchronization
@@ -443,7 +430,8 @@ where
         block: &[T],
     ) -> ::std::result::Result<(), PanicOr<IntentionalFallbackToSequential>> {
         let mut shared_commit_state_guard = shared_commit_state.acquire();
-        let (accumulator, shared_maybe_error) = shared_commit_state_guard.dereference_mut();
+        let (block_limit_processor, shared_maybe_error) =
+            shared_commit_state_guard.dereference_mut();
 
         while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
             if !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)? {
@@ -491,26 +479,21 @@ where
             }
 
             if let Some(fee_statement) = last_input_output.fee_statement(txn_idx) {
-                let approx_output_size = if block_gas_limit_type.block_output_limit().is_some() {
-                    last_input_output.output_approx_size(txn_idx)
-                } else {
-                    None
-                };
-                let txn_read_write_summary =
-                    if block_gas_limit_type.conflict_penalty_window().is_some() {
-                        Some(Self::get_txn_read_write_summary(txn_idx, last_input_output))
-                    } else {
-                        None
-                    };
+                let approx_output_size = block_gas_limit_type
+                    .block_output_limit()
+                    .and_then(|_| last_input_output.output_approx_size(txn_idx));
+                let txn_read_write_summary = block_gas_limit_type
+                    .conflict_penalty_window()
+                    .map(|_| last_input_output.get_txn_read_write_summary(txn_idx));
 
                 // For committed txns with Success status, calculate the accumulated gas costs.
-                accumulator.accumulate_fee_statement(
+                block_limit_processor.accumulate_fee_statement(
                     fee_statement,
                     txn_read_write_summary,
                     approx_output_size,
                 );
 
-                if accumulator.should_end_block_parallel() {
+                if block_limit_processor.should_end_block_parallel() {
                     // Set the execution output status to be SkipRest, to skip the rest of the txns.
                     last_input_output.update_to_skip_rest(txn_idx);
                 }
@@ -607,7 +590,7 @@ where
                         "Block execution was aborted due to {:?}",
                         shared_maybe_error.as_ref().unwrap()
                     );
-                    accumulator.finish_parallel_update_counters_and_log_info(
+                    block_limit_processor.finish_parallel_update_counters_and_log_info(
                         txn_idx + 1,
                         scheduler.num_txns(),
                     );
@@ -628,7 +611,7 @@ where
                 }
 
                 if scheduler.halt() {
-                    accumulator.finish_parallel_update_counters_and_log_info(
+                    block_limit_processor.finish_parallel_update_counters_and_log_info(
                         txn_idx + 1,
                         scheduler.num_txns(),
                     );
@@ -1224,7 +1207,7 @@ where
         let counter = RefCell::new(start_counter);
         let unsync_map = UnsyncMap::new();
         let mut ret = Vec::with_capacity(num_txns);
-        let mut accumulator = BlockGasLimitProcessor::<T>::new(
+        let mut block_limit_processor = BlockGasLimitProcessor::<T>::new(
             self.config.onchain.block_gas_limit_type.clone(),
             num_txns,
         );
@@ -1248,33 +1231,25 @@ where
                     // Calculating the accumulated gas costs of the committed txns.
                     let fee_statement = output.fee_statement();
 
-                    let approx_output_size = if self
+                    let approx_output_size = self
                         .config
                         .onchain
                         .block_gas_limit_type
                         .block_output_limit()
-                        .is_some()
-                    {
-                        Some(output.output_approx_size())
-                    } else {
-                        None
-                    };
+                        .map(|_| output.output_approx_size());
 
-                    let read_write_summary = if self
+                    let read_write_summary = self
                         .config
                         .onchain
                         .block_gas_limit_type
                         .conflict_penalty_window()
-                        .is_some()
-                    {
-                        Some(ReadWriteSummary::new(
-                            latest_view.take_sequential_reads().get_read_summary(),
-                            output.get_write_summary(),
-                        ))
-                    } else {
-                        None
-                    };
-                    accumulator.accumulate_fee_statement(
+                        .map(|_| {
+                            ReadWriteSummary::new(
+                                latest_view.take_sequential_reads().get_read_summary(),
+                                output.get_write_summary(),
+                            )
+                        });
+                    block_limit_processor.accumulate_fee_statement(
                         fee_statement,
                         read_write_summary,
                         approx_output_size,
@@ -1419,12 +1394,12 @@ where
                 break;
             }
 
-            if accumulator.should_end_block_sequential() {
+            if block_limit_processor.should_end_block_sequential() {
                 break;
             }
         }
 
-        accumulator
+        block_limit_processor
             .finish_sequential_update_counters_and_log_info(ret.len() as u32, num_txns as u32);
 
         ret.resize_with(num_txns, E::Output::skip_output);

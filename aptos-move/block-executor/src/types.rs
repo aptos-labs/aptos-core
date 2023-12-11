@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::transaction::BlockExecutableTransaction as Transaction;
 use std::{collections::HashSet, fmt};
