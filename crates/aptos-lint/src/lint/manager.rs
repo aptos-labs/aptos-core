@@ -1,23 +1,22 @@
-use move_compiler::FullyCompiledProgram;
+use move_model::model::GlobalEnv;
 
-use super::{visitor::LintVisitor, context::VisitorContext};
+use super::visitor::ExpDataVisitor;
 
-pub struct VisitorManager<'a> {
-    linters: Vec<Box<dyn LintVisitor + 'a>>,
+pub struct VisitorManager {
+    linters: Vec<Box<dyn ExpDataVisitor>>,
 }
 
-impl<'a> VisitorManager<'a> {
-    pub fn new(linters: Vec<Box<dyn LintVisitor + 'a>>) -> Self {
+impl VisitorManager {
+    pub fn new(linters: Vec<Box<dyn ExpDataVisitor>>) -> Self {
         Self { linters }
     }
 
-    pub fn run(&mut self, custom_ast: FullyCompiledProgram, context: &mut VisitorContext) {
-        for (_, _, module) in &custom_ast.typing.modules {
-            
+    pub fn run(&mut self, env: GlobalEnv) {
+        for module_env in &env.get_target_modules() {
             for linter in &mut self.linters {
-                linter.visit_module(module, context);
-                for (_, _, function) in &module.functions {
-                    linter.visit_function(function, context);
+                linter.visit_module(&module_env, &env);
+                for func_env in module_env.get_functions() {
+                    linter.visit(&func_env, &env);
                 }
             }
         }

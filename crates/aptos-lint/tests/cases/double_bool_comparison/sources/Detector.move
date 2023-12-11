@@ -1,7 +1,7 @@
 module NamedAddr::Detector {
     const ERROR_NUM: u64 = 2;
-    public fun func1(x: u64, y: u64) {
-        if (x == y || x < y) {}; // should be x <= y
+    public fun func1(x: u64, y: u64, z: u64) {
+        if (x == y || z < y) {};
         if (x < y || x == y) {}; // should be x <= y
         if (x == y || x > y) {}; // should be x >= y
         if (x > y || x == y) {}; // should be x >= y

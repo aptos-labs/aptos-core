@@ -1,39 +1,63 @@
-use std::{ path::PathBuf, collections::BTreeMap };
+use std::{ path::{ PathBuf, Path }, io::Write };
 use anyhow::Result;
-use move_command_line_common::address::NumericalAddress;
-use move_compiler::{
-    FullyCompiledProgram,
-    construct_pre_compiled_lib,
-    shared::{ known_attributes::KnownAttribute, PackagePaths },
-    Flags,
-    diagnostics,
+use move_compiler::{ shared::known_attributes::KnownAttribute, Flags };
+use move_core_types::account_address::AccountAddress;
+use move_model::{
+    run_model_builder_with_options_and_compilation_flags,
+    options::ModelBuilderOptions,
+    model::GlobalEnv,
+};
+use move_package::{
+    BuildConfig,
+    resolution::resolution_graph::{ ResolutionGraph, ResolvedGraph },
+    source_package::layout::SourcePackageLayout,
 };
 
-pub fn build_ast(path: &PathBuf) -> Result<FullyCompiledProgram> {
-    let targets: Vec<String> = vec![path.as_path().to_str().unwrap().to_owned()];
-    let paths = vec![PackagePaths {
-        name: None,
-        paths: targets,
-        named_address_map: move_stdlib_named_addresses(),
-    }];
-    let fully_compiled_program = match
-        construct_pre_compiled_lib(paths, None, Flags::empty(), KnownAttribute::get_all_attribute_names())?
-    {
-        Ok(p) => p,
-        Err((files, diags)) => {
-            diagnostics::report_diagnostics(&files, diags);
-        }
-    };
-    Ok(fully_compiled_program)
+use super::resolved_graph::TraitResolvedGraph;
+
+trait TraitAstConfig {
+    fn get_resolution_graph<W: Write>(self, path: &Path, writer: &mut W) -> Result<ResolutionGraph<AccountAddress>>;
 }
 
-fn move_stdlib_named_addresses() -> BTreeMap<String, NumericalAddress> {
-    let mapping = [
-        ("std", "0x1"),
-        ("NamedAddr", "0xCAFE"),
-    ];
-    mapping
-        .iter()
-        .map(|(name, addr)| (name.to_string(), NumericalAddress::parse_str(addr).unwrap()))
-        .collect()
+impl TraitAstConfig for BuildConfig {
+    fn get_resolution_graph<W: Write>(self, path: &Path, writer: &mut W) -> Result<ResolutionGraph<AccountAddress>> {
+        let resolution_graph = self.resolution_graph_for_package(path, writer)?;
+
+        Ok(resolution_graph)
+    }
+}
+
+fn handle_reroot_path<T, F>(path: Option<PathBuf>, f: F) -> Result<T> where F: FnOnce(PathBuf) -> Result<T> {
+    let path = path.unwrap_or_else(|| PathBuf::from("."));
+    let rooted_path = SourcePackageLayout::try_find_root(&path.canonicalize()?)?;
+    let pop = std::env::current_dir().unwrap();
+    std::env::set_current_dir(&rooted_path).unwrap();
+    let ret = f(PathBuf::from("."));
+    std::env::set_current_dir(pop).unwrap();
+    return ret;
+}
+
+pub fn compile_ast(path: &Path) -> Result<GlobalEnv> {
+    let build_config: BuildConfig = BuildConfig::default();
+    let resolution_graph: ResolvedGraph = build_config.get_resolution_graph(path, &mut std::io::stdout())?;
+    resolution_graph.check_cyclic_dependency()?;
+    let (sources_package_paths, deps_package_paths) = resolution_graph.get_root_package_paths()?;
+
+    let model = run_model_builder_with_options_and_compilation_flags(
+        vec![sources_package_paths],
+        deps_package_paths,
+        ModelBuilderOptions {
+            compile_via_model: true,
+            ..ModelBuilderOptions::default()
+        },
+        Flags::empty(),
+        KnownAttribute::get_all_attribute_names()
+    ).unwrap_or_else(|e| panic!("Unable to build move model: {}", e));
+    Ok(model)
+}
+
+pub fn build_ast(path: Option<PathBuf>) -> Result<GlobalEnv> {
+    handle_reroot_path(path, |rerooted_path| {
+        return compile_ast(&rerooted_path);
+    })
 }

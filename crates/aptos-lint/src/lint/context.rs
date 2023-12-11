@@ -1,29 +1,23 @@
 
+use codespan::{FileId, Files};
 use codespan_reporting::diagnostic::Label;
 use codespan_reporting::term::{Config, emit};
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use codespan_reporting::diagnostic::Diagnostic;
-use codespan_reporting::files::SimpleFiles;
-use move_compiler::FullyCompiledProgram;
-use move_compiler::diagnostics::FileId;
 
-pub struct VisitorContext {
-    pub ast: FullyCompiledProgram,
-    pub files: SimpleFiles<String, String>,
-    pub diagnostics: Vec<Diagnostic<usize>>,
+
+pub struct VisitorContext{
+    pub files: Files<String>,
+    pub diagnostics: Vec<Diagnostic<FileId>>,
 }
 impl VisitorContext {
-    pub fn new(ast: FullyCompiledProgram) -> Self {
+    pub fn new(files: Files<String>) -> Self {
         Self {
             diagnostics: Vec::new(),
-            ast,
-            files: SimpleFiles::new(),
+            files,
         }
     }
 
-    pub fn add_file(&mut self, filename: String, source: String) -> FileId {
-        self.files.add(filename, source)
-    }
 
     pub fn add_diagnostic(&mut self, file_id: FileId, start: usize, end: usize, message: &str, severity: codespan_reporting::diagnostic::Severity) {
         let label = Label::primary(file_id, start..end)
@@ -46,7 +40,7 @@ impl VisitorContext {
                 &config,
                 &self.files,
                 &diagnostic,
-            );
+            ).expect("emit must not fail");
         }
     }
 }

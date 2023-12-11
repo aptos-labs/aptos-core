@@ -3,6 +3,8 @@ module NamedAddr::Detector {
     public fun func1(x: bool) {
         if (x == true) {};
         if (x == false) {};
+        if (x != true) {};
+        if (x != false) {};
         if (x) {};
         if (!x) {};
     }

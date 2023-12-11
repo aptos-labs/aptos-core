@@ -1,7 +1,10 @@
-use move_compiler::FullyCompiledProgram;
+use std::path::PathBuf;
 
+use move_model::model::GlobalEnv;
+
+mod resolved_graph;
 
 pub mod build;
-pub fn main(path: std::path::PathBuf) -> anyhow::Result<FullyCompiledProgram> {
-    build::build_ast(&path)
+pub fn main(path: Option<PathBuf>) -> anyhow::Result<GlobalEnv> {
+    build::build_ast(path)
 }
