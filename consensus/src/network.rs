@@ -63,6 +63,29 @@ pub trait TConsensusMsg: Sized + Serialize + DeserializeOwned {
     fn into_network_message(self) -> ConsensusMsg;
 }
 
+#[derive(Debug)]
+pub struct RpcResponder {
+    pub protocol: ProtocolId,
+    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
+
+impl RpcResponder {
+    pub fn respond<R>(self, response: R) -> anyhow::Result<()>
+    where
+        R: TConsensusMsg,
+    {
+        let rpc_response = self
+            .protocol
+            .to_bytes(&response.into_network_message())
+            .map(Bytes::from)
+            .map_err(RpcError::Error);
+
+        self.response_sender
+            .send(rpc_response)
+            .map_err(|_| anyhow::anyhow!("unable to respond to rpc"))
+    }
+}
+
 /// The block retrieval request is used internally for implementing RPC: the callback is executed
 /// for carrying the response
 #[derive(Debug)]
@@ -83,8 +106,7 @@ pub struct IncomingBatchRetrievalRequest {
 pub struct IncomingDAGRequest {
     pub req: DAGNetworkMessage,
     pub sender: Author,
-    pub protocol: ProtocolId,
-    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+    pub responder: RpcResponder,
 }
 
 #[derive(Debug)]
@@ -721,8 +743,10 @@ impl NetworkTask {
                             IncomingRpcRequest::DAGRequest(IncomingDAGRequest {
                                 req,
                                 sender: peer_id,
-                                protocol,
-                                response_sender: callback,
+                                responder: RpcResponder {
+                                    protocol,
+                                    response_sender: callback,
+                                },
                             })
                         },
                         ConsensusMsg::CommitMessage(req) => {
