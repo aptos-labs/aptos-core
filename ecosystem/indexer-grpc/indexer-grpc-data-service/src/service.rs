@@ -13,13 +13,13 @@ use aptos_indexer_grpc_utils::{
     cache_operator::{CacheBatchGetStatus, CacheOperator},
     chunk_transactions,
     config::IndexerGrpcFileStoreConfig,
-    constants::{GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER, MESSAGE_SIZE_LIMIT},
-    counters::{
-        IndexerGrpcStep, DURATION_IN_SECS, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_COUNT,
-        TOTAL_SIZE_IN_BYTES, TRANSACTION_UNIX_TIMESTAMP,
+    constants::{
+        IndexerGrpcRequestMetadata, GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER,
+        MESSAGE_SIZE_LIMIT,
     },
+    counters::{log_grpc_step, IndexerGrpcStep},
     file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
-    time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime,
+    time_diff_since_pb_timestamp_in_secs,
     types::RedisUrl,
     EncodedTransactionWithVersion,
 };
@@ -30,7 +30,6 @@ use aptos_protos::{
 };
 use futures::Stream;
 use prost::Message;
-use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     pin::Pin,
@@ -44,18 +43,6 @@ use tonic::{Request, Response, Status};
 use tracing::{error, info, warn};
 use uuid::Uuid;
 type ResponseStream = Pin<Box<dyn Stream<Item = Result<TransactionsResponse, Status>> + Send>>;
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-struct RequestMetadata {
-    pub processor_name: String,
-    pub request_email: String,
-    pub request_user_classification: String,
-    pub request_api_key_name: String,
-    pub request_connection_id: String,
-    // Token is no longer needed behind api gateway.
-    #[deprecated]
-    pub request_token: String,
-}
 
 const MOVING_AVERAGE_WINDOW_SIZE: u64 = 10_000;
 // When trying to fetch beyond the current head of cache, the server will retry after this duration.
@@ -80,6 +67,7 @@ pub struct RawDataServerWrapper {
     pub redis_client: Arc<redis::Client>,
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub data_service_response_channel_size: usize,
+    pub enable_verbose_logging: bool,
 }
 
 impl RawDataServerWrapper {
@@ -87,6 +75,7 @@ impl RawDataServerWrapper {
         redis_address: RedisUrl,
         file_store_config: IndexerGrpcFileStoreConfig,
         data_service_response_channel_size: usize,
+        enable_verbose_logging: bool,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             redis_client: Arc::new(
@@ -96,6 +85,7 @@ impl RawDataServerWrapper {
             ),
             file_store_config,
             data_service_response_channel_size,
+            enable_verbose_logging,
         })
     }
 }
@@ -161,24 +151,22 @@ impl RawData for RawDataServerWrapper {
         };
 
         // Adds tracing context for the request.
-        info!(
-            request_name = request_metadata.processor_name.as_str(),
-            request_email = request_metadata.request_email.as_str(),
-            request_api_key_name = request_metadata.request_api_key_name.as_str(),
-            processor_name = request_metadata.processor_name.as_str(),
-            connection_id = request_metadata.request_connection_id.as_str(),
-                    request_user_classification =
-                        request_metadata.request_user_classification.as_str(),
-            request_user_classification = request_metadata.request_user_classification.as_str(),
-            service_type = SERVICE_TYPE,
-            start_version = current_version,
-            num_of_transactions = ?transactions_count,
-            step = IndexerGrpcStep::DataServiceNewRequestReceived.get_step(),
-            "{}",
-            IndexerGrpcStep::DataServiceNewRequestReceived.get_label(),
+        log_grpc_step(
+            SERVICE_TYPE,
+            IndexerGrpcStep::DataServiceNewRequestReceived,
+            self.enable_verbose_logging,
+            Some(current_version as i64),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(request_metadata.clone()),
         );
 
         let redis_client = self.redis_client.clone();
+        let enable_verbose_logging = self.enable_verbose_logging;
         tokio::spawn({
             let request_metadata = request_metadata.clone();
             async move {
@@ -260,6 +248,7 @@ impl RawData for RawDataServerWrapper {
                         file_store_operator.as_ref(),
                         current_batch_start_time,
                         request_metadata.clone(),
+                        enable_verbose_logging,
                     )
                     .await
                     {
@@ -333,6 +322,7 @@ impl RawData for RawDataServerWrapper {
                         chain_id as u32,
                         current_batch_start_time,
                         request_metadata.clone(),
+                        enable_verbose_logging,
                     );
                     let data_latency_in_secs = resp_items
                         .last()
@@ -349,6 +339,7 @@ impl RawData for RawDataServerWrapper {
                         tx.clone(),
                         current_batch_start_time,
                         request_metadata.clone(),
+                        enable_verbose_logging,
                     )
                     .await
                     {
@@ -449,7 +440,8 @@ fn get_transactions_responses_builder(
     data: Vec<EncodedTransactionWithVersion>,
     chain_id: u32,
     current_batch_start_time: Instant,
-    request_metadata: RequestMetadata,
+    request_metadata: IndexerGrpcRequestMetadata,
+    enable_logging: bool,
 ) -> Vec<TransactionsResponse> {
     let transactions: Vec<Transaction> = data
         .into_iter()
@@ -478,28 +470,18 @@ fn get_transactions_responses_builder(
     let overall_end_version = overall_end_txn.version;
     let overall_start_txn_timestamp = overall_start_txn.clone().timestamp;
     let overall_end_txn_timestamp = overall_end_txn.clone().timestamp;
-    info!(
-        start_version = overall_start_version,
-        end_version = overall_end_version,
-        start_txn_timestamp_iso = overall_start_txn_timestamp
-            .clone()
-            .map(|t| timestamp_to_iso(&t)),
-        end_txn_timestamp_iso = overall_end_txn_timestamp
-            .clone()
-            .map(|t| timestamp_to_iso(&t)),
-        num_of_transactions = overall_end_version - overall_start_version + 1,
-        duration_in_secs = current_batch_start_time.elapsed().as_secs_f64(),
-        size_in_bytes = overall_size_in_bytes,
-        service_type = SERVICE_TYPE,
-        request_name = request_metadata.processor_name.as_str(),
-        request_email = request_metadata.request_email.as_str(),
-        request_api_key_name = request_metadata.request_api_key_name.as_str(),
-        processor_name = request_metadata.processor_name.as_str(),
-        connection_id = request_metadata.request_connection_id.as_str(),
-        request_user_classification = request_metadata.request_user_classification.as_str(),
-        step = IndexerGrpcStep::DataServiceTxnsDecoded.get_step(),
-        "{}",
-        IndexerGrpcStep::DataServiceTxnsDecoded.get_label(),
+    log_grpc_step(
+        SERVICE_TYPE,
+        IndexerGrpcStep::DataServiceTxnsDecoded,
+        enable_logging,
+        Some(overall_start_version as i64),
+        Some(overall_end_version as i64),
+        overall_start_txn_timestamp.as_ref(),
+        overall_end_txn_timestamp.as_ref(),
+        Some(current_batch_start_time.elapsed().as_secs_f64()),
+        Some(overall_size_in_bytes),
+        Some((overall_end_version - overall_start_version + 1) as i64),
+        Some(request_metadata.clone()),
     );
     resp_items
 }
@@ -511,7 +493,8 @@ async fn data_fetch(
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
     file_store_operator: &dyn FileStoreOperator,
     current_batch_start_time: Instant,
-    request_metadata: RequestMetadata,
+    request_metadata: IndexerGrpcRequestMetadata,
+    enable_logging: bool,
 ) -> anyhow::Result<TransactionsDataStatus> {
     let batch_get_result = cache_operator
         .batch_get_encoded_proto_data(starting_version)
@@ -542,58 +525,19 @@ async fn data_fetch(
                 transaction.timestamp
             };
 
-            info!(
-                start_version = starting_version,
-                end_version = starting_version + num_of_transactions as u64 - 1,
-                start_txn_timestamp_iso = start_version_timestamp
-                    .map(|t| timestamp_to_iso(&t))
-                    .unwrap_or_default(),
-                end_txn_timestamp_iso = end_version_timestamp
-                    .map(|t| timestamp_to_iso(&t))
-                    .unwrap_or_default(),
-                num_of_transactions = transactions.len(),
-                size_in_bytes = size_in_bytes,
-                duration_in_secs = duration_in_secs,
-                request_name = request_metadata.processor_name.as_str(),
-                request_email = request_metadata.request_email.as_str(),
-                request_api_key_name = request_metadata.request_api_key_name.as_str(),
-                processor_name = request_metadata.processor_name.as_str(),
-                connection_id = request_metadata.request_connection_id.as_str(),
-                request_user_classification = request_metadata.request_user_classification.as_str(),
-                service_type = SERVICE_TYPE,
-                step = IndexerGrpcStep::DataServiceDataFetchedCache.get_step(),
-                "{}",
-                IndexerGrpcStep::DataServiceDataFetchedCache.get_label(),
+            log_grpc_step(
+                SERVICE_TYPE,
+                IndexerGrpcStep::DataServiceDataFetchedCache,
+                enable_logging,
+                Some(starting_version as i64),
+                Some(starting_version as i64 + num_of_transactions as i64 - 1),
+                start_version_timestamp.as_ref(),
+                end_version_timestamp.as_ref(),
+                Some(duration_in_secs),
+                Some(size_in_bytes),
+                Some(num_of_transactions as i64),
+                Some(request_metadata.clone()),
             );
-
-            LATEST_PROCESSED_VERSION
-                .with_label_values(&[
-                    SERVICE_TYPE,
-                    IndexerGrpcStep::DataServiceDataFetchedCache.get_step(),
-                    IndexerGrpcStep::DataServiceDataFetchedCache.get_label(),
-                ])
-                .set((starting_version + num_of_transactions as u64 - 1) as i64);
-            NUM_TRANSACTIONS_COUNT
-                .with_label_values(&[
-                    SERVICE_TYPE,
-                    IndexerGrpcStep::DataServiceDataFetchedCache.get_step(),
-                    IndexerGrpcStep::DataServiceDataFetchedCache.get_label(),
-                ])
-                .set(num_of_transactions as i64);
-            TOTAL_SIZE_IN_BYTES
-                .with_label_values(&[
-                    SERVICE_TYPE,
-                    IndexerGrpcStep::DataServiceDataFetchedCache.get_step(),
-                    IndexerGrpcStep::DataServiceDataFetchedCache.get_label(),
-                ])
-                .set(size_in_bytes as i64);
-            DURATION_IN_SECS
-                .with_label_values(&[
-                    SERVICE_TYPE,
-                    IndexerGrpcStep::DataServiceDataFetchedCache.get_step(),
-                    IndexerGrpcStep::DataServiceDataFetchedCache.get_label(),
-                ])
-                .set(duration_in_secs);
 
             Ok(TransactionsDataStatus::Success(
                 build_protobuf_encoded_transaction_wrappers(transactions, starting_version),
@@ -626,60 +570,20 @@ async fn data_fetch(
                         transaction.timestamp
                     };
 
-                    info!(
-                        start_version = starting_version,
-                        end_version = starting_version + num_of_transactions as u64 - 1,
-                        start_txn_timestamp_iso = start_version_timestamp
-                            .clone()
-                            .map(|t| timestamp_to_iso(&t))
-                            .unwrap_or_default(),
-                        end_txn_timestamp_iso = end_version_timestamp
-                            .map(|t| timestamp_to_iso(&t))
-                            .unwrap_or_default(),
-                        num_of_transactions = transactions.len(),
-                        size_in_bytes = size_in_bytes,
-                        duration_in_secs = duration_in_secs,
-                        service_type = SERVICE_TYPE,
-                        request_name = request_metadata.processor_name.as_str(),
-                        request_email = request_metadata.request_email.as_str(),
-                        request_api_key_name = request_metadata.request_api_key_name.as_str(),
-                        processor_name = request_metadata.processor_name.as_str(),
-                        connection_id = request_metadata.request_connection_id.as_str(),
-                        request_user_classification =
-                            request_metadata.request_user_classification.as_str(),
-                        step = IndexerGrpcStep::DataServiceDataFetchedFilestore.get_step(),
-                        "{}",
-                        IndexerGrpcStep::DataServiceDataFetchedFilestore.get_label(),
+                    log_grpc_step(
+                        SERVICE_TYPE,
+                        IndexerGrpcStep::DataServiceDataFetchedFilestore,
+                        enable_logging,
+                        Some(starting_version as i64),
+                        Some(starting_version as i64 + num_of_transactions as i64 - 1),
+                        start_version_timestamp.as_ref(),
+                        end_version_timestamp.as_ref(),
+                        Some(duration_in_secs),
+                        Some(size_in_bytes),
+                        Some(num_of_transactions as i64),
+                        Some(request_metadata.clone()),
                     );
 
-                    LATEST_PROCESSED_VERSION
-                        .with_label_values(&[
-                            SERVICE_TYPE,
-                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_step(),
-                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_label(),
-                        ])
-                        .set((starting_version + num_of_transactions as u64 - 1) as i64);
-                    NUM_TRANSACTIONS_COUNT
-                        .with_label_values(&[
-                            SERVICE_TYPE,
-                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_step(),
-                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_label(),
-                        ])
-                        .set(num_of_transactions as i64);
-                    TOTAL_SIZE_IN_BYTES
-                        .with_label_values(&[
-                            SERVICE_TYPE,
-                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_step(),
-                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_label(),
-                        ])
-                        .set(size_in_bytes as i64);
-                    DURATION_IN_SECS
-                        .with_label_values(&[
-                            SERVICE_TYPE,
-                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_step(),
-                            IndexerGrpcStep::DataServiceDataFetchedFilestore.get_label(),
-                        ])
-                        .set(duration_in_secs);
                     Ok(TransactionsDataStatus::Success(
                         build_protobuf_encoded_transaction_wrappers(transactions, starting_version),
                     ))
@@ -731,7 +635,9 @@ async fn data_fetch_error_handling(err: anyhow::Error, current_version: u64, cha
 }
 
 /// Gets the request metadata. Useful for logging.
-fn get_request_metadata(req: &Request<GetTransactionsRequest>) -> tonic::Result<RequestMetadata> {
+fn get_request_metadata(
+    req: &Request<GetTransactionsRequest>,
+) -> tonic::Result<IndexerGrpcRequestMetadata> {
     let request_metadata_pairs = vec![
         ("request_api_key_name", REQUEST_HEADER_APTOS_API_KEY_NAME),
         ("request_email", REQUEST_HEADER_APTOS_EMAIL_HEADER),
@@ -758,7 +664,7 @@ fn get_request_metadata(req: &Request<GetTransactionsRequest>) -> tonic::Result<
         "request_connection_id".to_string(),
         Uuid::new_v4().to_string(),
     );
-    let request_metadata: RequestMetadata =
+    let request_metadata: IndexerGrpcRequestMetadata =
         serde_json::from_str(&serde_json::to_string(&request_metadata_map).unwrap()).unwrap();
     // TODO: update the request name if these are internal requests.
     Ok(request_metadata)
@@ -768,7 +674,8 @@ async fn channel_send_multiple_with_timeout(
     resp_items: Vec<TransactionsResponse>,
     tx: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
     current_batch_start_time: Instant,
-    request_metadata: RequestMetadata,
+    request_metadata: IndexerGrpcRequestMetadata,
+    enable_logging: bool,
 ) -> Result<(), SendTimeoutError<Result<TransactionsResponse, Status>>> {
     let overall_size_in_bytes = resp_items
         .iter()
@@ -782,7 +689,6 @@ async fn channel_send_multiple_with_timeout(
     let overall_end_txn_timestamp = overall_end_txn.clone().timestamp;
 
     for resp_item in resp_items {
-        let current_instant = std::time::Instant::now();
         let response_size = resp_item.encoded_len();
         let num_of_transactions = resp_item.transactions.len();
         let start_version = resp_item.transactions.first().unwrap().version;
@@ -808,126 +714,34 @@ async fn channel_send_multiple_with_timeout(
         )
         .await?;
 
-        info!(
-            start_version = start_version,
-            end_version = end_version,
-            start_txn_timestamp_iso = timestamp_to_iso(start_version_txn_timestamp),
-            end_txn_timestamp_iso = timestamp_to_iso(end_version_txn_timestamp),
-            duration_in_secs = current_batch_start_time.elapsed().as_secs_f64(),
-            size_in_bytes = response_size,
-            num_of_transactions = num_of_transactions,
-            service_type = SERVICE_TYPE,
-            step = IndexerGrpcStep::DataServiceChunkSent.get_step(),
-            request_name = request_metadata.processor_name.as_str(),
-            request_email = request_metadata.request_email.as_str(),
-            request_api_key_name = request_metadata.request_api_key_name.as_str(),
-            processor_name = request_metadata.processor_name.as_str(),
-            connection_id = request_metadata.request_connection_id.as_str(),
-            request_user_classification = request_metadata.request_user_classification.as_str(),
-            "{}",
-            IndexerGrpcStep::DataServiceChunkSent.get_label(),
+        log_grpc_step(
+            SERVICE_TYPE,
+            IndexerGrpcStep::DataServiceChunkSent,
+            enable_logging,
+            Some(start_version as i64),
+            Some(end_version as i64),
+            Some(start_version_txn_timestamp),
+            Some(end_version_txn_timestamp),
+            Some(current_batch_start_time.elapsed().as_secs_f64()),
+            Some(response_size),
+            Some(num_of_transactions as i64),
+            Some(request_metadata.clone()),
         );
-
-        LATEST_PROCESSED_VERSION
-            .with_label_values(&[
-                SERVICE_TYPE,
-                IndexerGrpcStep::DataServiceChunkSent.get_step(),
-                IndexerGrpcStep::DataServiceChunkSent.get_label(),
-            ])
-            .set(end_version as i64);
-        TRANSACTION_UNIX_TIMESTAMP
-            .with_label_values(&[
-                SERVICE_TYPE,
-                IndexerGrpcStep::DataServiceChunkSent.get_step(),
-                IndexerGrpcStep::DataServiceChunkSent.get_label(),
-            ])
-            .set(timestamp_to_unixtime(end_version_txn_timestamp));
-        NUM_TRANSACTIONS_COUNT
-            .with_label_values(&[
-                SERVICE_TYPE,
-                IndexerGrpcStep::DataServiceChunkSent.get_step(),
-                IndexerGrpcStep::DataServiceChunkSent.get_label(),
-            ])
-            .set(num_of_transactions as i64);
-        TOTAL_SIZE_IN_BYTES
-            .with_label_values(&[
-                SERVICE_TYPE,
-                IndexerGrpcStep::DataServiceChunkSent.get_step(),
-                IndexerGrpcStep::DataServiceChunkSent.get_label(),
-            ])
-            .set(response_size as i64);
-        DURATION_IN_SECS
-            .with_label_values(&[
-                SERVICE_TYPE,
-                IndexerGrpcStep::DataServiceChunkSent.get_step(),
-                IndexerGrpcStep::DataServiceChunkSent.get_label(),
-            ])
-            .set(current_instant.elapsed().as_secs_f64());
     }
 
-    info!(
-        start_version = overall_start_version,
-        end_version = overall_end_version,
-        start_txn_timestamp_iso = overall_start_txn_timestamp
-            .clone()
-            .map(|t| timestamp_to_iso(&t)),
-        end_txn_timestamp_iso = overall_end_txn_timestamp
-            .clone()
-            .map(|t| timestamp_to_iso(&t)),
-        num_of_transactions = overall_end_version - overall_start_version + 1,
-        duration_in_secs = current_batch_start_time.elapsed().as_secs_f64(),
-        size_in_bytes = overall_size_in_bytes,
-        service_type = SERVICE_TYPE,
-        request_name = request_metadata.processor_name.as_str(),
-        request_email = request_metadata.request_email.as_str(),
-        request_api_key_name = request_metadata.request_api_key_name.as_str(),
-        processor_name = request_metadata.processor_name.as_str(),
-        connection_id = request_metadata.request_connection_id.as_str(),
-        request_user_classification = request_metadata.request_user_classification.as_str(),
-        step = IndexerGrpcStep::DataServiceAllChunksSent.get_step(),
-        "{}",
-        IndexerGrpcStep::DataServiceAllChunksSent.get_label(),
+    log_grpc_step(
+        SERVICE_TYPE,
+        IndexerGrpcStep::DataServiceAllChunksSent,
+        enable_logging,
+        Some(overall_start_version as i64),
+        Some(overall_end_version as i64),
+        overall_start_txn_timestamp.as_ref(),
+        overall_end_txn_timestamp.as_ref(),
+        Some(current_batch_start_time.elapsed().as_secs_f64()),
+        Some(overall_size_in_bytes),
+        Some((overall_end_version - overall_start_version + 1) as i64),
+        Some(request_metadata.clone()),
     );
-
-    LATEST_PROCESSED_VERSION
-        .with_label_values(&[
-            SERVICE_TYPE,
-            IndexerGrpcStep::DataServiceAllChunksSent.get_step(),
-            IndexerGrpcStep::DataServiceAllChunksSent.get_label(),
-        ])
-        .set(overall_end_version as i64);
-    TRANSACTION_UNIX_TIMESTAMP
-        .with_label_values(&[
-            SERVICE_TYPE,
-            IndexerGrpcStep::DataServiceAllChunksSent.get_step(),
-            IndexerGrpcStep::DataServiceAllChunksSent.get_label(),
-        ])
-        .set(
-            overall_end_txn_timestamp
-                .map(|t| timestamp_to_unixtime(&t))
-                .unwrap_or_default(),
-        );
-    NUM_TRANSACTIONS_COUNT
-        .with_label_values(&[
-            SERVICE_TYPE,
-            IndexerGrpcStep::DataServiceAllChunksSent.get_step(),
-            IndexerGrpcStep::DataServiceAllChunksSent.get_label(),
-        ])
-        .set((overall_end_version - overall_start_version + 1) as i64);
-    TOTAL_SIZE_IN_BYTES
-        .with_label_values(&[
-            SERVICE_TYPE,
-            IndexerGrpcStep::DataServiceAllChunksSent.get_step(),
-            IndexerGrpcStep::DataServiceAllChunksSent.get_label(),
-        ])
-        .set(overall_size_in_bytes as i64);
-    DURATION_IN_SECS
-        .with_label_values(&[
-            SERVICE_TYPE,
-            IndexerGrpcStep::DataServiceAllChunksSent.get_step(),
-            IndexerGrpcStep::DataServiceAllChunksSent.get_label(),
-        ])
-        .set(current_batch_start_time.elapsed().as_secs_f64());
 
     Ok(())
 }

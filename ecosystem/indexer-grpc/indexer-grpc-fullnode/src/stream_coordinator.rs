@@ -11,8 +11,7 @@ use aptos_api_types::{AsConverter, Transaction as APITransaction, TransactionOnC
 use aptos_indexer_grpc_utils::{
     chunk_transactions,
     constants::MESSAGE_SIZE_LIMIT,
-    counters::{IndexerGrpcStep, DURATION_IN_SECS, TRANSACTION_UNIX_TIMESTAMP},
-    timestamp_to_unixtime,
+    counters::{log_grpc_step_fullnode, IndexerGrpcStep},
 };
 use aptos_logger::{error, info, sample, sample::SampleRate};
 use aptos_protos::{
@@ -80,7 +79,10 @@ impl IndexerStreamCoordinator {
     /// 2. Convert transactions to rust objects (for example stringifying move structs into json)
     /// 3. Convert into protobuf objects
     /// 4. Encode protobuf objects (base64)
-    pub async fn process_next_batch(&mut self) -> Vec<Result<EndVersion, Status>> {
+    pub async fn process_next_batch(
+        &mut self,
+        enable_verbose_logging: bool,
+    ) -> Vec<Result<EndVersion, Status>> {
         let ledger_chain_id = self.context.chain_id().id();
         let mut tasks = vec![];
         let batches = self.get_batches().await;
@@ -96,36 +98,35 @@ impl IndexerStreamCoordinator {
                 // Fetch and convert transactions from API
                 let raw_txns =
                     Self::fetch_raw_txns_with_retries(context.clone(), ledger_version, batch).await;
-                DURATION_IN_SECS
-                    .with_label_values(&[
-                        SERVICE_TYPE,
-                        IndexerGrpcStep::FullnodeFetchedBatch.get_step(),
-                        IndexerGrpcStep::FullnodeFetchedBatch.get_label(),
-                    ])
-                    .set(batch_start_time.elapsed().as_secs_f64());
+                log_grpc_step_fullnode(
+                    IndexerGrpcStep::FullnodeFetchedBatch,
+                    enable_verbose_logging,
+                    None,
+                    None,
+                    None,
+                    Some(ledger_version as i64),
+                    None,
+                    Some(batch_start_time.elapsed().as_secs_f64()),
+                    Some(raw_txns.len() as i64),
+                );
                 let api_txns = Self::convert_to_api_txns(context, raw_txns).await;
                 api_txns.last().map(record_fetched_transaction_latency);
                 let pb_txns = Self::convert_to_pb_txns(api_txns);
-                DURATION_IN_SECS
-                    .with_label_values(&[
-                        SERVICE_TYPE,
-                        IndexerGrpcStep::FullnodeDecodedBatch.get_step(),
-                        IndexerGrpcStep::FullnodeDecodedBatch.get_label(),
-                    ])
-                    .set(batch_start_time.elapsed().as_secs_f64());
-                let end_txn_timestamp = pb_txns.last().unwrap().timestamp.clone();
-                TRANSACTION_UNIX_TIMESTAMP
-                    .with_label_values(&[
-                        SERVICE_TYPE,
-                        IndexerGrpcStep::FullnodeProcessedBatch.get_step(),
-                        IndexerGrpcStep::FullnodeProcessedBatch.get_label(),
-                    ])
-                    .set(
-                        end_txn_timestamp
-                            .clone()
-                            .map(|t| timestamp_to_unixtime(&t))
-                            .unwrap_or_default(),
-                    );
+                let start_transaction = pb_txns.first().unwrap();
+                let end_transaction = pb_txns.last().unwrap();
+                let end_txn_timestamp = end_transaction.timestamp.clone();
+
+                log_grpc_step_fullnode(
+                    IndexerGrpcStep::FullnodeDecodedBatch,
+                    enable_verbose_logging,
+                    Some(start_transaction.version as i64),
+                    Some(end_transaction.version as i64),
+                    end_txn_timestamp.as_ref(),
+                    Some(ledger_version as i64),
+                    None,
+                    Some(batch_start_time.elapsed().as_secs_f64()),
+                    Some(pb_txns.len() as i64),
+                );
 
                 // Wrap in stream response object and send to channel
                 for chunk in pb_txns.chunks(output_batch_size as usize) {
@@ -149,19 +150,19 @@ impl IndexerStreamCoordinator {
                         }
                     }
                 }
-                TRANSACTION_UNIX_TIMESTAMP
-                    .with_label_values(&[
-                        SERVICE_TYPE,
-                        IndexerGrpcStep::FullnodeSentBatch.get_step(),
-                        IndexerGrpcStep::FullnodeSentBatch.get_label(),
-                    ])
-                    .set(
-                        end_txn_timestamp
-                            .clone()
-                            .map(|t| timestamp_to_unixtime(&t))
-                            .unwrap_or_default(),
-                    );
-                Ok(pb_txns.last().unwrap().version)
+
+                log_grpc_step_fullnode(
+                    IndexerGrpcStep::FullnodeSentBatch,
+                    enable_verbose_logging,
+                    Some(start_transaction.version as i64),
+                    Some(end_transaction.version as i64),
+                    end_txn_timestamp.as_ref(),
+                    Some(ledger_version as i64),
+                    None,
+                    Some(batch_start_time.elapsed().as_secs_f64()),
+                    Some(pb_txns.len() as i64),
+                );
+                Ok(end_transaction.version)
             });
             tasks.push(task);
         }
