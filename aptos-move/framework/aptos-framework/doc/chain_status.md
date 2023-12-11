@@ -219,6 +219,7 @@ Helper function to assert genesis state.
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
+<b>invariant</b> <a href="chain_status.md#0x1_chain_status_is_genesis">is_genesis</a>() == !<a href="chain_status.md#0x1_chain_status_is_operating">is_operating</a>();
 </code></pre>
 
 
@@ -234,7 +235,8 @@ Helper function to assert genesis state.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> delegate_invariants_to_caller;
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>aborts_if</b> addr != @aptos_framework;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">GenesisEndMarker</a>&gt;(@aptos_framework);
