@@ -121,8 +121,7 @@ impl AptosDB {
                 db: self.state_store.clone(),
                 version: Some(ledger_next_version - 1),
             };
-            let resolver = state_view.as_move_resolver();
-            let annotator = MoveValueAnnotator::new(&resolver);
+            let annotator = state_view.as_value_annotator();
 
             const BATCH_SIZE: Version = 10000;
             let mut next_version = indexer.next_version();

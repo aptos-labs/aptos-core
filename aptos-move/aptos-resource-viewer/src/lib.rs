@@ -15,6 +15,7 @@ pub use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 use std::{
     collections::BTreeMap,
     fmt::{Display, Formatter},
+    ops::Deref,
 };
 
 pub struct AptosValueAnnotator<'a, T>(MoveValueAnnotator<'a, T>);
@@ -82,5 +83,13 @@ impl Display for AnnotatedAccountStateBlob {
             writeln!(f, ",")?;
         }
         writeln!(f, "}}")
+    }
+}
+
+impl<'r, R> Deref for AptosValueAnnotator<'r, R> {
+    type Target = MoveValueAnnotator<'r, R>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

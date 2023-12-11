@@ -15,6 +15,7 @@ use crate::{
 use anyhow::{bail, ensure, Result};
 use aptos_config::config::RocksdbConfig;
 use aptos_logger::warn;
+use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator, AsValueAnnotator};
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{state_view::DbStateView, DbReader};
@@ -34,7 +35,6 @@ use move_core_types::{
     ident_str,
     language_storage::{StructTag, TypeTag},
 };
-use move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryInto,
@@ -82,13 +82,13 @@ impl Indexer {
             db: db_reader,
             version: Some(last_version),
         };
-        let annotator = MoveValueAnnotator::new(&state_view);
+        let annotator = state_view.as_value_annotator();
         self.index_with_annotator(&annotator, first_version, write_sets)
     }
 
     pub fn index_with_annotator<R: CompiledModuleViewer>(
         &self,
-        annotator: &MoveValueAnnotator<R>,
+        annotator: &AptosValueAnnotator<R>,
         first_version: Version,
         write_sets: &[&WriteSet],
     ) -> Result<()> {
@@ -152,13 +152,13 @@ impl Indexer {
 
 struct TableInfoParser<'a, R> {
     indexer: &'a Indexer,
-    annotator: &'a MoveValueAnnotator<'a, R>,
+    annotator: &'a AptosValueAnnotator<'a, R>,
     result: HashMap<TableHandle, TableInfo>,
     pending_on: HashMap<TableHandle, Vec<Bytes>>,
 }
 
 impl<'a, R: CompiledModuleViewer> TableInfoParser<'a, R> {
-    pub fn new(indexer: &'a Indexer, annotator: &'a MoveValueAnnotator<R>) -> Self {
+    pub fn new(indexer: &'a Indexer, annotator: &'a AptosValueAnnotator<R>) -> Self {
         Self {
             indexer,
             annotator,
