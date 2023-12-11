@@ -774,8 +774,10 @@ where
                 });
 
             // Must contain committed value as we set the base value above.
-            aggregator_v1_delta_writes
-                .push((k, WriteOp::Modification(serialize(&committed_delta).into())));
+            aggregator_v1_delta_writes.push((
+                k,
+                WriteOp::legacy_modification(serialize(&committed_delta).into()),
+            ));
         }
         aggregator_v1_delta_writes
     }

@@ -144,13 +144,9 @@ pub trait AptosGasMeter: MoveGasMeter {
 
         // Write set
         let mut writeset_charge_and_refund = ChargeAndRefund::zero();
-        for (key, op_size, metadata_opt) in change_set.write_set_iter_mut() {
-            writeset_charge_and_refund.combine(pricing.charge_refund_write_op(
-                params,
-                key,
-                &op_size,
-                metadata_opt,
-            ));
+        for (key, op_size, metadata) in change_set.write_set_iter_mut() {
+            writeset_charge_and_refund
+                .combine(pricing.charge_refund_write_op(params, key, &op_size, metadata));
         }
         let ChargeAndRefund {
             non_discountable,

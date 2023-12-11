@@ -5,15 +5,18 @@
 //! For each transaction the VM executes, the VM will output a `WriteSet` that contains each access
 //! path it updates. For each access path, the VM can either give its new value or delete it.
 
-use crate::state_store::{
-    state_key::StateKey,
-    state_value::{StateValue, StateValueMetadata, StateValueMetadataKind},
+use crate::{
+    state_store::{
+        state_key::StateKey,
+        state_value::{StateValue, StateValueMetadata},
+    },
+    write_set::WriteOp::{Creation, Deletion, Modification},
 };
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use bytes::Bytes;
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::{btree_map, BTreeMap},
     fmt::Debug,
@@ -41,8 +44,9 @@ pub enum WriteOpKind {
     Deletion,
 }
 
-#[derive(Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
-pub enum WriteOp {
+#[derive(Serialize, Deserialize)]
+#[serde(rename = "WriteOp")]
+enum PersistedWriteOp {
     Creation(Bytes),
     Modification(Bytes),
     Deletion,
@@ -59,7 +63,64 @@ pub enum WriteOp {
     },
 }
 
+impl PersistedWriteOp {
+    fn into_in_mem_form(self) -> WriteOp {
+        use PersistedWriteOp::*;
+
+        match self {
+            Creation(data) => WriteOp::Creation {
+                data,
+                metadata: StateValueMetadata::Dummy,
+            },
+            Modification(data) => WriteOp::Modification {
+                data,
+                metadata: StateValueMetadata::Dummy,
+            },
+            Deletion => WriteOp::Deletion {
+                metadata: StateValueMetadata::Dummy,
+            },
+            CreationWithMetadata { data, metadata } => WriteOp::Creation { data, metadata },
+            ModificationWithMetadata { data, metadata } => WriteOp::Modification { data, metadata },
+            DeletionWithMetadata { metadata } => WriteOp::Deletion { metadata },
+        }
+    }
+}
+
+#[derive(Clone, Eq, Hash, PartialEq)]
+pub enum WriteOp {
+    Creation {
+        data: Bytes,
+        metadata: StateValueMetadata,
+    },
+    Modification {
+        data: Bytes,
+        metadata: StateValueMetadata,
+    },
+    Deletion {
+        metadata: StateValueMetadata,
+    },
+}
+
 impl WriteOp {
+    fn to_persistable_form(&self) -> PersistedWriteOp {
+        use PersistedWriteOp::*;
+
+        match self.clone() {
+            Self::Creation { data, metadata } => match metadata.into_persistable() {
+                None => Creation(data),
+                Some(metadata) => CreationWithMetadata { data, metadata },
+            },
+            Self::Modification { data, metadata } => match metadata.into_persistable() {
+                None => Modification(data),
+                Some(metadata) => ModificationWithMetadata { data, metadata },
+            },
+            Self::Deletion { metadata } => match metadata.into_persistable() {
+                None => Deletion,
+                Some(metadata) => DeletionWithMetadata { metadata },
+            },
+        }
+    }
+
     /// Merges two write ops on the same state item.
     ///
     /// returns `false` if the result indicates no op has happened -- that's when the first op
@@ -67,53 +128,45 @@ impl WriteOp {
     pub fn squash(op: &mut Self, other: Self) -> Result<bool> {
         use WriteOp::*;
 
-        // n.b. With write sets from multiple sessions being squashed together, it's possible
-        //   to see two ops carrying different metadata (or one with it the other without)
-        //   due to deleting in one session and recreating in another. The original metadata
-        //   shouldn't change due to the squash.
-        // And because the deposit or refund happens after all squashing is finished, it's
-        // not a concern of fairness.
-
         match (&op, other) {
-            (
-                Modification(_)
-                | ModificationWithMetadata { .. }
-                | Creation(_)
-                | CreationWithMetadata { .. },
-                Creation(_) | CreationWithMetadata {..},
-            ) // create existing
-            | (
-                Deletion | DeletionWithMetadata {..},
-                Deletion | DeletionWithMetadata {..} | Modification(_) | ModificationWithMetadata { .. },
-            ) // delete or modify already deleted
+            (Modification { .. } | Creation { .. }, Creation { .. }) // create existing
+            | (Deletion { .. }, Modification { .. } | Deletion { .. }) // delete or modify already deleted
             => {
-                bail!(
-                    "The given change sets cannot be squashed",
-                )
+                bail!("The given change sets cannot be squashed")
             },
-            (Modification(_), Modification(data) | ModificationWithMetadata {data, ..}) => *op = Modification(data),
-            (ModificationWithMetadata{metadata, ..}, Modification(data) | ModificationWithMetadata{data, ..}) => {
-                *op = ModificationWithMetadata{data, metadata: metadata.clone()}
+            (Creation {metadata: old_meta, .. } | Modification {metadata: old_meta, ..}, Modification {data, metadata}) => {
+                // It's not allowed to squash a op with an already charged op (in which case the metadata will change -- for example the bytes_deposit might increase)
+                old_meta.ensure_equivalent(&metadata).context("Squashing Creation | Modification with Modification")?;
+
+                *op = Modification {
+                    data,
+                    metadata,
+                };
             },
-            (Creation(_), Modification(data) | ModificationWithMetadata {data, ..} ) => {
-                *op = Creation(data)
+            (Modification {metadata: old_meta, ..}, Deletion {metadata}) => {
+                // It's not allowed to squash a op with an already charged op (in which case the metadata will change -- for example the bytes_deposit might increase)
+                old_meta.ensure_equivalent(&metadata).context("Squashing Modification with Deletion")?;
+
+                *op = Deletion {
+                    metadata,
+                }
             },
-            (CreationWithMetadata{metadata , ..}, Modification(data) | ModificationWithMetadata{data, ..}) => {
-                *op = CreationWithMetadata{data, metadata: metadata.clone()}
+            (Deletion {metadata: old_meta}, Creation {data, ..}) => {
+                // n.b. With write sets from multiple sessions being squashed together, it's possible
+                //   to see two ops carrying different metadata (or one with it the other without)
+                //   due to deleting in one session and recreating in another. The original metadata
+                //   shouldn't change due to the squash.
+                // And because the deposit or refund happens after all squashing is finished, it's
+                // not a concern of fairness.
+                *op = Modification {
+                    data,
+                    metadata: old_meta.clone(),
+                }
             },
-            (Modification(_) , Deletion | DeletionWithMetadata {..}) => {
-                *op = Deletion
-            },
-            (ModificationWithMetadata{metadata, ..} , Deletion | DeletionWithMetadata {..}) => {
-                *op = DeletionWithMetadata {metadata: metadata.clone()}
-            },
-            (Deletion, Creation(data) | CreationWithMetadata {data, ..}) => {
-                *op = Modification(data)
-            },
-            (DeletionWithMetadata {metadata, ..}, Creation(data) | CreationWithMetadata {data, ..}) => {
-                *op = ModificationWithMetadata{data, metadata: metadata.clone()}
-            },
-            (Creation(_) | CreationWithMetadata {..}, Deletion | DeletionWithMetadata {..}) => {
+            (Creation {metadata: old_meta, .. }, Deletion {metadata}) => {
+                // It's not allowed to squash a op with an already charged op (in which case the metadata will change -- for example the bytes_deposit might increase)
+                old_meta.ensure_equivalent(&metadata).context("Squashing Creation with Deletion")?;
+
                 return Ok(false)
             },
         }
@@ -124,34 +177,75 @@ impl WriteOp {
         use WriteOp::*;
 
         match self {
-            Creation(data)
-            | CreationWithMetadata { data, .. }
-            | Modification(data)
-            | ModificationWithMetadata { data, .. } => Some(data),
-            Deletion | DeletionWithMetadata { .. } => None,
+            Creation { data, .. } | Modification { data, .. } => Some(data),
+            Deletion { .. } => None,
         }
     }
 
-    pub fn metadata(&self) -> Option<&StateValueMetadata> {
+    pub fn metadata(&self) -> &StateValueMetadata {
         use WriteOp::*;
 
         match self {
-            Creation(_) | Modification(_) | Deletion => None,
-            CreationWithMetadata { metadata, .. }
-            | ModificationWithMetadata { metadata, .. }
-            | DeletionWithMetadata { metadata, .. } => Some(metadata),
+            Creation { metadata, .. } | Modification { metadata, .. } | Deletion { metadata } => {
+                metadata
+            },
         }
     }
 
-    pub fn get_metadata_mut(&mut self) -> Option<&mut StateValueMetadata> {
+    pub fn get_metadata_mut(&mut self) -> &mut StateValueMetadata {
         use WriteOp::*;
 
         match self {
-            Creation(_) | Modification(_) | Deletion => None,
-            CreationWithMetadata { metadata, .. }
-            | ModificationWithMetadata { metadata, .. }
-            | DeletionWithMetadata { metadata, .. } => Some(metadata),
+            Creation { metadata, .. } | Modification { metadata, .. } | Deletion { metadata } => {
+                metadata
+            },
         }
+    }
+
+    pub fn into_metadata(self) -> StateValueMetadata {
+        match self {
+            Creation { metadata, .. } | Modification { metadata, .. } | Deletion { metadata } => {
+                metadata
+            },
+        }
+    }
+
+    pub fn legacy_creation(data: Bytes) -> Self {
+        Self::Creation {
+            data,
+            metadata: StateValueMetadata::Dummy,
+        }
+    }
+
+    pub fn legacy_modification(data: Bytes) -> Self {
+        Self::Modification {
+            data,
+            metadata: StateValueMetadata::Dummy,
+        }
+    }
+
+    pub fn legacy_deletion() -> Self {
+        Self::Deletion {
+            metadata: StateValueMetadata::Dummy,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for WriteOp {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        PersistedWriteOp::deserialize(deserializer).map(|persisted| persisted.into_in_mem_form())
+    }
+}
+
+impl Serialize for WriteOp {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.to_persistable_form().serialize(serializer)
     }
 }
 
@@ -165,15 +259,13 @@ impl From<&WriteOp> for WriteOpSize {
     fn from(value: &WriteOp) -> Self {
         use WriteOp::*;
         match value {
-            Creation(data) | CreationWithMetadata { data, .. } => WriteOpSize::Creation {
+            Creation { data, .. } => WriteOpSize::Creation {
                 write_len: data.len() as u64,
             },
-            Modification(data) | ModificationWithMetadata { data, .. } => {
-                WriteOpSize::Modification {
-                    write_len: data.len() as u64,
-                }
+            Modification { data, .. } => WriteOpSize::Modification {
+                write_len: data.len() as u64,
             },
-            Deletion | DeletionWithMetadata { .. } => WriteOpSize::Deletion,
+            Deletion { .. } => WriteOpSize::Deletion,
         }
     }
 }
@@ -198,7 +290,7 @@ pub trait TransactionWrite: Debug {
     // Returns metadata that would be observed by a read following the 'self' write.
     // Provided as a separate method to avoid the clone in as_state_value method
     // (although default implementation below does just that).
-    fn as_state_value_metadata(&self) -> Option<StateValueMetadataKind> {
+    fn as_state_value_metadata(&self) -> Option<StateValueMetadata> {
         self.as_state_value()
             .map(|state_value| state_value.into_metadata())
     }
@@ -252,36 +344,32 @@ impl TransactionWrite for WriteOp {
     }
 
     fn as_state_value(&self) -> Option<StateValue> {
-        self.bytes().map(|bytes| match self.metadata() {
-            None => StateValue::new_legacy(bytes.clone()),
-            Some(metadata) => StateValue::new_with_metadata(bytes.clone(), metadata.clone()),
-        })
+        self.bytes()
+            .map(|bytes| StateValue::new_with_metadata(bytes.clone(), self.metadata().clone()))
     }
 
     // Note that even if WriteOp is DeletionWithMetadata, the method returns None, as a later
     // read would not read the metadata of the deletion op.
-    fn as_state_value_metadata(&self) -> Option<StateValueMetadataKind> {
-        self.bytes().map(|_| self.metadata().cloned())
+    fn as_state_value_metadata(&self) -> Option<StateValueMetadata> {
+        self.bytes().map(|_| self.metadata().clone())
     }
 
     fn from_state_value(maybe_state_value: Option<StateValue>) -> Self {
-        match maybe_state_value.map(|state_value| state_value.into()) {
-            None => WriteOp::Deletion,
-            Some((None, bytes)) => WriteOp::Creation(bytes),
-            Some((Some(metadata), bytes)) => WriteOp::CreationWithMetadata {
-                data: bytes,
-                metadata,
+        match maybe_state_value {
+            None => Self::legacy_deletion(),
+            Some(state_value) => {
+                let (metadata, data) = state_value.into_parts();
+                Self::Creation { data, metadata }
             },
         }
     }
 
     fn write_op_kind(&self) -> WriteOpKind {
+        use WriteOpKind::*;
         match self {
-            WriteOp::Creation(_) | WriteOp::CreationWithMetadata { .. } => WriteOpKind::Creation,
-            WriteOp::Modification(_) | WriteOp::ModificationWithMetadata { .. } => {
-                WriteOpKind::Modification
-            },
-            WriteOp::Deletion | WriteOp::DeletionWithMetadata { .. } => WriteOpKind::Deletion,
+            WriteOp::Creation { .. } => Creation,
+            WriteOp::Modification { .. } => Modification,
+            WriteOp::Deletion { .. } => Deletion,
         }
     }
 
@@ -289,24 +377,20 @@ impl TransactionWrite for WriteOp {
         use WriteOp::*;
 
         match self {
-            Creation(data) | CreationWithMetadata { data, .. } => *data = bytes,
-            Modification(data) | ModificationWithMetadata { data, .. } => *data = bytes,
-            Deletion | DeletionWithMetadata { .. } => (),
+            Creation { data, .. } | Modification { data, .. } => *data = bytes,
+            Deletion { .. } => (),
         }
     }
 
     fn convert_read_to_modification(&self) -> Option<Self> {
         use WriteOp::*;
 
-        match self {
-            Creation(data) | Modification(data) => Some(Modification(data.clone())),
-            CreationWithMetadata { data, metadata }
-            | ModificationWithMetadata { data, metadata } => Some(ModificationWithMetadata {
-                data: data.clone(),
-                metadata: metadata.clone(),
-            }),
+        match self.clone() {
+            Creation { data, metadata } | Modification { data, metadata } => {
+                Some(Modification { data, metadata })
+            },
             // Deletion don't have data to become modification.
-            Deletion | DeletionWithMetadata { .. } => None,
+            Deletion { .. } => None,
         }
     }
 }
@@ -314,41 +398,24 @@ impl TransactionWrite for WriteOp {
 impl std::fmt::Debug for WriteOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            WriteOp::Modification(value) => write!(
+            WriteOp::Creation { data, metadata } => write!(
                 f,
-                "Modification({})",
-                value
-                    .iter()
-                    .map(|byte| format!("{:02x}", byte))
-                    .collect::<String>()
-            ),
-            WriteOp::Creation(value) => write!(
-                f,
-                "Creation({})",
-                value
-                    .iter()
-                    .map(|byte| format!("{:02x}", byte))
-                    .collect::<String>()
-            ),
-            WriteOp::Deletion => write!(f, "Deletion"),
-            WriteOp::CreationWithMetadata { data, metadata } => write!(
-                f,
-                "CreationWithMetadata({}, metadata:{:?})",
+                "Creation({}, metadata:{:?})",
                 data.iter()
                     .map(|byte| format!("{:02x}", byte))
                     .collect::<String>(),
                 metadata,
             ),
-            WriteOp::ModificationWithMetadata { data, metadata } => write!(
+            WriteOp::Modification { data, metadata } => write!(
                 f,
-                "ModificationWithMetadata({}, metadata:{:?})",
+                "Modification({}, metadata:{:?})",
                 data.iter()
                     .map(|byte| format!("{:02x}", byte))
                     .collect::<String>(),
                 metadata,
             ),
-            WriteOp::DeletionWithMetadata { metadata } => {
-                write!(f, "DeletionWithMetadata(metadata:{:?})", metadata,)
+            WriteOp::Deletion { metadata } => {
+                write!(f, "Deletion(metadata:{:?})", metadata,)
             },
         }
     }
@@ -435,7 +502,7 @@ impl WriteSetV0 {
             .write_set
             .insert(
                 TOTAL_SUPPLY_STATE_KEY.clone(),
-                WriteOp::Modification(bcs::to_bytes(&value).unwrap().into())
+                WriteOp::legacy_modification(bcs::to_bytes(&value).unwrap().into())
             )
             .is_some());
     }

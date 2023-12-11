@@ -62,11 +62,11 @@ fn test_mock_vm_different_senders() {
             [
                 (
                     StateKey::access_path(balance_ap(sender)),
-                    WriteOp::Modification(amount.le_bytes()),
+                    WriteOp::legacy_modification(amount.le_bytes()),
                 ),
                 (
                     StateKey::access_path(seqnum_ap(sender)),
-                    WriteOp::Modification(1u64.le_bytes()),
+                    WriteOp::legacy_modification(1u64.le_bytes()),
                 ),
             ]
             .into_iter()
@@ -101,11 +101,11 @@ fn test_mock_vm_same_sender() {
             [
                 (
                     StateKey::access_path(balance_ap(sender)),
-                    WriteOp::Modification((amount * (i as u64 + 1)).le_bytes()),
+                    WriteOp::legacy_modification((amount * (i as u64 + 1)).le_bytes()),
                 ),
                 (
                     StateKey::access_path(seqnum_ap(sender)),
-                    WriteOp::Modification((i as u64 + 1).le_bytes()),
+                    WriteOp::legacy_modification((i as u64 + 1).le_bytes()),
                 ),
             ]
             .into_iter()
@@ -143,15 +143,15 @@ fn test_mock_vm_payment() {
         [
             (
                 StateKey::access_path(balance_ap(gen_address(0))),
-                WriteOp::Modification(50u64.le_bytes())
+                WriteOp::legacy_modification(50u64.le_bytes())
             ),
             (
                 StateKey::access_path(seqnum_ap(gen_address(0))),
-                WriteOp::Modification(2u64.le_bytes())
+                WriteOp::legacy_modification(2u64.le_bytes())
             ),
             (
                 StateKey::access_path(balance_ap(gen_address(1))),
-                WriteOp::Modification(150u64.le_bytes())
+                WriteOp::legacy_modification(150u64.le_bytes())
             ),
         ]
         .into_iter()

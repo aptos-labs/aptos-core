@@ -71,7 +71,7 @@ impl DiskSpacePricing {
         params: &TransactionGasParameters,
         key: &StateKey,
         op_size: &WriteOpSize,
-        metadata: Option<&mut StateValueMetadata>,
+        metadata: &mut StateValueMetadata,
     ) -> ChargeAndRefund {
         match self {
             Self::V1 => Self::charge_refund_write_op_v1(params, key, op_size, metadata),
@@ -160,7 +160,7 @@ impl DiskSpacePricing {
         params: &TransactionGasParameters,
         key: &StateKey,
         op_size: &WriteOpSize,
-        metadata: Option<&mut StateValueMetadata>,
+        metadata: &mut StateValueMetadata,
     ) -> ChargeAndRefund {
         use WriteOpSize::*;
 
@@ -170,8 +170,8 @@ impl DiskSpacePricing {
                 let bytes_fee = Self::discounted_write_op_size_for_v1(params, key, *write_len)
                     * params.legacy_storage_fee_per_excess_state_byte;
 
-                if let Some(m) = metadata {
-                    m.set_slot_deposit(slot_fee.into())
+                if !metadata.is_dummy() {
+                    metadata.set_slot_deposit(slot_fee.into())
                 }
 
                 ChargeAndRefund {
@@ -190,18 +190,10 @@ impl DiskSpacePricing {
                     refund: 0.into(),
                 }
             },
-            Deletion => {
-                let refund = match metadata {
-                    None => 0,
-                    Some(m) => m.total_deposit(),
-                }
-                .into();
-
-                ChargeAndRefund {
-                    non_discountable: 0.into(),
-                    discountable: 0.into(),
-                    refund,
-                }
+            Deletion => ChargeAndRefund {
+                non_discountable: 0.into(),
+                discountable: 0.into(),
+                refund: metadata.total_deposit().into(),
             },
         }
     }
@@ -210,7 +202,7 @@ impl DiskSpacePricing {
         params: &TransactionGasParameters,
         key: &StateKey,
         op_size: &WriteOpSize,
-        metadata: Option<&mut StateValueMetadata>,
+        metadata: &mut StateValueMetadata,
     ) -> ChargeAndRefund {
         use WriteOpSize::*;
 
@@ -227,11 +219,9 @@ impl DiskSpacePricing {
                 let slot_deposit = params.storage_fee_per_state_slot_refundable * NumSlots::new(1);
                 let bytes_deposit = num_bytes * params.storage_fee_per_state_byte_refundable;
 
-                if let Some(m) = metadata {
-                    m.set_deposits(slot_deposit.into(), bytes_deposit.into())
-                } else {
-                    // FIXME(aldenhu): this shouldn't happen
-                }
+                metadata.assert_v1();
+                metadata.set_slot_deposit(slot_deposit.into());
+                metadata.set_bytes_deposit(bytes_deposit.into());
 
                 ChargeAndRefund {
                     non_discountable: slot_deposit + bytes_deposit,
@@ -243,7 +233,7 @@ impl DiskSpacePricing {
                 // change of slot size or per byte price can result in a charge or refund of permanent bytes fee
                 let num_bytes = NumBytes::new(key.size() as u64) + NumBytes::new(*write_len);
                 let target_bytes_deposit = num_bytes * params.storage_fee_per_state_byte_refundable;
-                let old_bytes_deposit = metadata.as_ref().map_or(0, |m| m.bytes_deposit()).into();
+                let old_bytes_deposit = Fee::new(metadata.bytes_deposit());
                 let (state_bytes_charge, state_bytes_refund) = if target_bytes_deposit
                     > old_bytes_deposit
                 {
@@ -255,10 +245,9 @@ impl DiskSpacePricing {
                     (0.into(), bytes_refund)
                 };
 
-                // FIXME(aldenhu): upgrade to new format automatically, otherwise old slots will be heavily punished whenever modified.
-                if let Some(m) = metadata {
-                    m.set_bytes_deposit(target_bytes_deposit.into())
-                }
+                metadata
+                    .upgrade()
+                    .set_bytes_deposit(target_bytes_deposit.into());
 
                 ChargeAndRefund {
                     non_discountable: state_bytes_charge,
@@ -266,18 +255,10 @@ impl DiskSpacePricing {
                     refund: state_bytes_refund,
                 }
             },
-            Deletion => {
-                let refund = match metadata {
-                    None => 0,
-                    Some(m) => m.total_deposit(),
-                }
-                .into();
-
-                ChargeAndRefund {
-                    non_discountable: 0.into(),
-                    discountable,
-                    refund,
-                }
+            Deletion => ChargeAndRefund {
+                non_discountable: 0.into(),
+                discountable,
+                refund: metadata.total_deposit().into(),
             },
         }
     }
