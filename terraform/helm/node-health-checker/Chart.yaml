@@ -1,0 +1,8 @@
+apiVersion: v2
+name: node-health-checker
+version: 0.1
+appVersion: 0.1.0
+description: Node health checker
+home: https://aptoslabs.com/
+sources:
+- https://github.com/aptos-labs/aptos-core
