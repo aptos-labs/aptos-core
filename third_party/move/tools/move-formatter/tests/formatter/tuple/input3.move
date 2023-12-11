@@ -1,11 +1,5 @@
 address 0x42 {
     module example {
-        // all 3 of these functions are equivalent
-
-        // when no return type is provided, it is assumed to be `()`
-        fun returs_unit_1() {// comment
-        }
-
         // there is an implicit () value in empty expression blocks
         fun returs_unit_2(): () { /*comment*/}
 
@@ -13,12 +7,12 @@ address 0x42 {
         fun returs_unit_3(): () { (/*comment*/) }
 
         fun returns_3_values(): (u64, bool, address) {
-            // comment
+            // comment1
             (
-                // comment
+                // comment2
                 0, 
-            /*comment*/false/*comment*/, 
-            @0x42)// comment
+            /*comment3*/false/*comment4*/, 
+            @0x42)// comment5
         }
     }
 }

@@ -17,10 +17,10 @@ module TestFunFormat {
     }
 
     fun f_multiple() 
-      acquires R 
-      reads R 
-      writes T, S 
-      reads G<u64> {
+        acquires R 
+        reads R 
+        writes T, S 
+        reads G<u64> {
     }
 
     fun f5() acquires 0x42::*::* {
@@ -42,7 +42,7 @@ module TestFunFormat {
     }
 
     fun make_up_address(x: u64): address {
-      @0x42
+        @0x42
     }
 
     fun f11() !reads *(0x42), *(0x43) {
