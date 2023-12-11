@@ -23,7 +23,7 @@ use aptos_types::{
     state_store::{
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
-        state_value::{StateValue, StateValueMetadataKind},
+        state_value::{StateValue, StateValueMetadata},
     },
     write_set::{TransactionWrite, WriteOp},
 };
@@ -357,7 +357,7 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
     fn get_resource_state_value_metadata(
         &self,
         state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+    ) -> anyhow::Result<Option<StateValueMetadata>> {
         match self.change_set.resource_write_set().get(state_key) {
             Some(
                 AbstractResourceWriteOp::Write(write_op)
@@ -487,7 +487,7 @@ mod test {
     }
 
     fn write(v: u128) -> WriteOp {
-        WriteOp::Modification(serialize(&v).into())
+        WriteOp::legacy_modification(serialize(&v).into())
     }
 
     fn read_resource(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {
@@ -586,15 +586,15 @@ mod test {
             (
                 key("resource_group_both"),
                 GroupWrite::new(
-                    WriteOp::Deletion,
+                    WriteOp::legacy_deletion(),
                     vec![
                         (
                             mock_tag_0(),
-                            (WriteOp::Modification(serialize(&1000).into()), None),
+                            (WriteOp::legacy_modification(serialize(&1000).into()), None),
                         ),
                         (
                             mock_tag_2(),
-                            (WriteOp::Modification(serialize(&300).into()), None),
+                            (WriteOp::legacy_modification(serialize(&300).into()), None),
                         ),
                     ],
                     0,
@@ -603,10 +603,10 @@ mod test {
             (
                 key("resource_group_write_set"),
                 GroupWrite::new(
-                    WriteOp::Deletion,
+                    WriteOp::legacy_deletion(),
                     vec![(
                         mock_tag_1(),
-                        (WriteOp::Modification(serialize(&5000).into()), None),
+                        (WriteOp::legacy_modification(serialize(&5000).into()), None),
                     )],
                     0,
                 ),

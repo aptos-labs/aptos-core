@@ -39,7 +39,7 @@ use aptos_types::{
     executable::{Executable, ModulePath},
     state_store::{
         state_storage_usage::StateStorageUsage,
-        state_value::{StateValue, StateValueMetadataKind},
+        state_value::{StateValue, StateValueMetadata},
     },
     transaction::BlockExecutableTransaction as Transaction,
     write_set::TransactionWrite,
@@ -76,7 +76,7 @@ use std::{
 #[derive(Debug)]
 pub(crate) enum ReadResult {
     Value(Option<StateValue>, Option<Arc<MoveTypeLayout>>),
-    Metadata(Option<StateValueMetadataKind>),
+    Metadata(Option<StateValueMetadata>),
     Exists(bool),
     Uninitialized,
     // Must halt the execution of the calling transaction. This might be because
@@ -1236,17 +1236,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                     return None;
                 }
 
-                if let Ok(Some(maybe_metadata)) = self.get_resource_state_value_metadata(&key) {
-                    let maybe_metadata = maybe_metadata.map(
-                        |metadata: aptos_types::state_store::state_value::StateValueMetadata| {
-                            StateValue::new_with_metadata(Bytes::new(), metadata)
-                        },
-                    );
+                if let Ok(Some(metadata)) = self.get_resource_state_value_metadata(&key) {
+                    let metadata = Some(StateValue::new_with_metadata(Bytes::new(), metadata));
                     if let Ok(GroupReadResult::Size(group_size)) =
                         parallel_state.read_group_size(&key, self.txn_idx)
                     {
-                        let metadata_op: T::Value =
-                            TransactionWrite::from_state_value(maybe_metadata);
+                        let metadata_op: T::Value = TransactionWrite::from_state_value(metadata);
                         if let Some(metadata_op) = metadata_op.convert_read_to_modification() {
                             return Some(Ok((key.clone(), (metadata_op, group_size.get()))));
                         }
@@ -1447,7 +1442,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
     fn get_resource_state_value_metadata(
         &self,
         state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+    ) -> anyhow::Result<Option<StateValueMetadata>> {
         self.get_resource_state_value_impl(state_key, UnknownOrLayout::Unknown, ReadKind::Metadata)
             .map(|res| {
                 if let ReadResult::Metadata(v) = res {
@@ -2936,7 +2931,7 @@ mod test {
         fn get_resource_state_value_metadata(
             &self,
             state_key: &KeyType<u32>,
-        ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+        ) -> anyhow::Result<Option<StateValueMetadata>> {
             let seq = self
                 .latest_view_seq
                 .get_resource_state_value_metadata(state_key);

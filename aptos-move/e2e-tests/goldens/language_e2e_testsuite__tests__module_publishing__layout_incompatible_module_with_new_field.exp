@@ -8,11 +8,11 @@ Ok(
                             StateKey {
                                 inner: AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Code(f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1::M)" },
                                 hash: OnceCell(Uninit),
-                            }: CreationWithMetadata(a11ceb0b0600000005010002020204070606080c200a2c05000000010000014d01540166f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1000201020300, metadata:V0 { deposit: 0, creation_time_usecs: 0 }),
+                            }: Creation(a11ceb0b0600000005010002020204070606080c200a2c05000000010000014d01540166f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1000201020300, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 0, bytes_deposit: 0, creation_time_usecs: 0 }) }),
                             StateKey {
                                 inner: AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" },
                                 hash: OnceCell(Uninit),
-                            }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10300000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000),
+                            }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10300000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: None }),
                         },
                     },
                 ),
@@ -37,7 +37,7 @@ Ok(
                             StateKey {
                                 inner: AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" },
                                 hash: OnceCell(Uninit),
-                            }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10400000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000),
+                            }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10400000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: None }),
                         },
                     },
                 ),
