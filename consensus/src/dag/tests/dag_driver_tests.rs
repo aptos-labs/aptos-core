@@ -1,6 +1,5 @@
 // Copyright © Aptos Foundation
 
-use super::helpers::MockPayloadManager;
 use crate::{
     dag::{
         adapter::TLedgerInfoProvider,
@@ -14,7 +13,7 @@ use crate::{
         round_state::{OptimisticResponsive, RoundState},
         tests::{
             dag_test::MockStorage,
-            helpers::{new_certified_node, TEST_DAG_WINDOW},
+            helpers::{new_certified_node, MockPayloadManager, TEST_DAG_WINDOW},
             order_rule_tests::TestNotifier,
         },
         types::{CertifiedAck, DAGMessage, TestAck},
@@ -22,6 +21,7 @@ use crate::{
     },
     test_utils::MockPayloadManager as MockPayloadClient,
 };
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
@@ -37,7 +37,7 @@ use async_trait::async_trait;
 use claims::{assert_ok, assert_ok_eq};
 use futures_channel::mpsc::unbounded;
 use std::{sync::Arc, time::Duration};
-use tokio::sync::oneshot;
+use tokio::{runtime::Handle, sync::oneshot};
 use tokio_retry::strategy::ExponentialBackoff;
 
 struct MockNetworkSender {
@@ -147,6 +147,7 @@ fn setup(
         ExponentialBackoff::from_millis(10),
         aptos_time_service::TimeService::mock(),
         Duration::from_millis(500),
+        BoundedExecutor::new(2, Handle::current()),
     ));
     let time_service = TimeService::mock();
     let validators = signers.iter().map(|vs| vs.author()).collect();

@@ -1130,6 +1130,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             block_tx,
             onchain_consensus_config.quorum_store_enabled(),
             onchain_consensus_config.validator_txn_enabled(),
+            self.bounded_executor.clone(),
         );
 
         let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);
