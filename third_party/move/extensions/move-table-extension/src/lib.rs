@@ -94,7 +94,7 @@ pub trait TableResolver {
         handle: &TableHandle,
         key: &[u8],
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, anyhow::Error>;
+    ) -> PartialVMResult<Option<Bytes>>;
 }
 
 /// The native table context extension. This needs to be attached to the NativeContextExtensions

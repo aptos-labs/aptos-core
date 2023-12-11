@@ -527,7 +527,7 @@ impl Account {
         let resolver = state_view.as_move_resolver();
 
         let bytes = resolver
-            // TODO: change to viewer?
+            // TODO(george): decouple ResourceResolver from viewers/annotators.
             .get_resource(&self.address.into(), resource_type)
             .context(format!(
                 "Failed to query DB to check for {} at {}",

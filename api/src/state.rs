@@ -293,7 +293,7 @@ impl StateApi {
 
         let (ledger_info, ledger_version, state_view) = self.context.state_view(ledger_version)?;
         let bytes = state_view
-            // TODO: Change to view resource?
+            // TODO(george): decouple ResourceResolver from viewers/annotators.
             .as_move_resolver()
             .get_resource(&address.into(), &resource_type)
             .context(format!(

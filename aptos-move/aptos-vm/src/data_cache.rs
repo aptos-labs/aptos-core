@@ -253,11 +253,13 @@ impl<'e, E: ExecutorView> TableResolver for StorageAdapter<'e, E> {
         handle: &TableHandle,
         key: &[u8],
         layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, Error> {
-        self.executor_view.get_resource_bytes(
-            &StateKey::table_item((*handle).into(), key.to_vec()),
-            layout,
-        )
+    ) -> PartialVMResult<Option<Bytes>> {
+        self.executor_view
+            .get_resource_bytes(
+                &StateKey::table_item((*handle).into(), key.to_vec()),
+                layout,
+            )
+            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 }
 

@@ -175,7 +175,7 @@ impl TableResolver for MockStateView {
         handle: &TableHandle,
         key: &[u8],
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> anyhow::Result<Option<Bytes>> {
+    ) -> PartialVMResult<Option<Bytes>> {
         let state_key = StateKey::table_item((*handle).into(), key.to_vec());
         Ok(match self.in_memory_cache.get(&state_key) {
             Some(blob) => Some(blob.clone()),
