@@ -11,6 +11,7 @@ use aptos_rest_client::Client;
 use aptos_state_view::TStateView;
 use aptos_types::{
     account_address::AccountAddress,
+    block_executor::config::BlockExecutorConfigFromOnchain,
     chain_id::ChainId,
     on_chain_config::{Features, OnChainConfig, TimedFeaturesBuilder},
     transaction::{
@@ -59,8 +60,12 @@ impl AptosDebugger {
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             txns.into_iter().map(|x| x.into()).collect::<Vec<_>>();
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        AptosVM::execute_block(&sig_verified_txns, &state_view, None)
-            .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
+        AptosVM::execute_block(
+            &sig_verified_txns,
+            &state_view,
+            BlockExecutorConfigFromOnchain::new_no_block_limit(),
+        )
+        .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
     }
 
     pub fn execute_transaction_at_version_with_gas_profiler(
@@ -244,10 +249,9 @@ impl AptosDebugger {
         let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);
         f(&mut session).map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
         let change_set = session
-            .finish(
-                &mut (),
-                &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-            )
+            .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
+                LATEST_GAS_FEATURE_VERSION,
+            ))
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
         Ok(change_set)
     }

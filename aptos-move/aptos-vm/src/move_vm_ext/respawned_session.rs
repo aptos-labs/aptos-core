@@ -21,15 +21,18 @@ use aptos_state_view::StateViewId;
 use aptos_types::{
     aggregator::PanicError,
     state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        state_key::StateKey,
+        state_storage_usage::StateStorageUsage,
+        state_value::{StateValue, StateValueMetadataKind},
     },
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_types::{
+    abstract_write_op::{AbstractResourceWriteOp, WriteWithDelayedFieldsOp},
     change_set::VMChangeSet,
     resolver::{
-        ExecutorView, ResourceGroupView, StateStorageView, TModuleView, TResourceGroupView,
-        TResourceView,
+        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TModuleView,
+        TResourceGroupView, TResourceView,
     },
     storage::ChangeSetConfigs,
 };
@@ -39,10 +42,16 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
+use rand::Rng;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
+
+fn unwrap_or_invariant_violation<T>(value: Option<T>, msg: &str) -> Result<T, VMStatus> {
+    value
+        .ok_or_else(|| VMStatus::error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, err_msg(msg)))
+}
 
 /// We finish the session after the user transaction is done running to get the change set and
 /// charge gas and storage fee based on it before running storage refunds and the transaction
@@ -77,14 +86,22 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         Ok(RespawnedSessionBuilder {
             executor_view,
             resolver_builder: |executor_view| vm.as_move_resolver(executor_view),
-            session_builder: |resolver| Some(vm.vm_impl.new_session(resolver, session_id)),
+            session_builder: |resolver| Some(vm.new_session(resolver, session_id)),
             storage_refund,
         }
         .build())
     }
 
-    pub fn execute<R>(&mut self, fun: impl FnOnce(&mut SessionExt) -> R) -> R {
-        self.with_session_mut(|session| fun(session.as_mut().unwrap()))
+    pub fn execute<T>(
+        &mut self,
+        fun: impl FnOnce(&mut SessionExt) -> Result<T, VMStatus>,
+    ) -> Result<T, VMStatus> {
+        self.with_session_mut(|session| {
+            fun(unwrap_or_invariant_violation(
+                session.as_mut(),
+                "VM respawned session has to be set for execution.",
+            )?)
+        })
     }
 
     pub fn finish(
@@ -92,7 +109,12 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<VMChangeSet, VMStatus> {
         let additional_change_set = self.with_session_mut(|session| {
-            session.take().unwrap().finish(&mut (), change_set_configs)
+            unwrap_or_invariant_violation(
+                session.take(),
+                "VM session cannot be finished more than once.",
+            )?
+            .finish(change_set_configs)
+            .map_err(|e| e.into_vm_status())
         })?;
         if additional_change_set.has_creation() {
             // After respawning, for example, in the epilogue, there shouldn't be new slots
@@ -125,16 +147,29 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
 }
 
 // Sporadically checks if the given two input type layouts match
-pub fn assert_layout_matches(
+pub fn randomly_check_layout_matches(
     layout_1: Option<&MoveTypeLayout>,
     layout_2: Option<&MoveTypeLayout>,
 ) -> Result<(), PanicError> {
-    //TODO[agg_v2](optimize): Don't compare the layouts everytime. Do this operation sporadically
-    if layout_1 != layout_2 {
+    if layout_1.is_some() != layout_2.is_some() {
         return Err(code_invariant_error(format!(
             "Layouts don't match when they are expected to: {:?} and {:?}",
             layout_1, layout_2
         )));
+    }
+    if layout_1.is_some() {
+        // Checking if 2 layouts are equal is a recursive operation and is expensive.
+        // We generally call this `randomly_check_layout_matches` function when we know
+        // that the layouts are supposed to match. As an optimization, we only randomly
+        // check if the layouts are matching.
+        let mut rng = rand::thread_rng();
+        let random_number: u32 = rng.gen_range(0, 100);
+        if random_number == 1 && layout_1 != layout_2 {
+            return Err(code_invariant_error(format!(
+                "Layouts don't match when they are expected to: {:?} and {:?}",
+                layout_1, layout_2
+            )));
+        }
     }
     Ok(())
 }
@@ -297,10 +332,49 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<StateValue>> {
         match self.change_set.resource_write_set().get(state_key) {
-            Some((write_op, _)) => Ok(write_op.as_state_value()),
-            None => self
+            Some(
+                AbstractResourceWriteOp::Write(write_op)
+                | AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFieldsOp {
+                    write_op,
+                    ..
+                }),
+            ) => Ok(write_op.as_state_value()),
+            // We could either return from the read, or do the base read again.
+            Some(AbstractResourceWriteOp::InPlaceDelayedFieldChange(_)) | None => self
                 .base_executor_view
                 .get_resource_state_value(state_key, maybe_layout),
+            Some(AbstractResourceWriteOp::WriteResourceGroup(_))
+            | Some(AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(_)) => {
+                // In case this is a resource group, and feature is enabled that creates these ops,
+                // this should never be called.
+                // Call to metadata should go through get_resource_state_value_metadata(), and
+                // calls to individual tagged resources should go through their trait.
+                unreachable!("get_resource_state_value should never be called for resource group");
+            },
+        }
+    }
+
+    fn get_resource_state_value_metadata(
+        &self,
+        state_key: &Self::Key,
+    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+        match self.change_set.resource_write_set().get(state_key) {
+            Some(
+                AbstractResourceWriteOp::Write(write_op)
+                | AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFieldsOp {
+                    write_op,
+                    ..
+                }),
+            ) => Ok(write_op.as_state_value_metadata()),
+            Some(AbstractResourceWriteOp::WriteResourceGroup(write_op)) => {
+                Ok(write_op.metadata_op().as_state_value_metadata())
+            },
+            // We could either return from the read, or do the base read again.
+            Some(AbstractResourceWriteOp::InPlaceDelayedFieldChange(_))
+            | Some(AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(_))
+            | None => self
+                .base_executor_view
+                .get_resource_state_value_metadata(state_key),
         }
     }
 }
@@ -310,9 +384,12 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
     type Layout = MoveTypeLayout;
     type ResourceTag = StructTag;
 
-    fn resource_group_size(&self, _group_key: &Self::GroupKey) -> anyhow::Result<u64> {
+    fn resource_group_size(
+        &self,
+        _group_key: &Self::GroupKey,
+    ) -> anyhow::Result<ResourceGroupSize> {
         // In respawned session, gas is irrelevant, so we return 0 (GroupSizeKind::None).
-        Ok(0)
+        Ok(ResourceGroupSize::zero_concrete())
     }
 
     fn get_resource_from_group(
@@ -321,13 +398,24 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<Bytes>> {
+        use AbstractResourceWriteOp::*;
         if let Some((write_op, layout)) = self
             .change_set
-            .resource_group_write_set()
+            .resource_write_set()
             .get(group_key)
+            .and_then(|write| match write {
+                WriteResourceGroup(group_write) => Some(Ok(group_write)),
+                ResourceGroupInPlaceDelayedFieldChange(_) => None,
+                Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
+                    Some(Err(anyhow::anyhow!(
+                        "Non-ResourceGroup write found for key in get_resource_from_group call"
+                    )))
+                },
+            })
+            .transpose()?
             .and_then(|g| g.inner_ops().get(resource_tag))
         {
-            assert_layout_matches(maybe_layout, layout.as_deref())
+            randomly_check_layout_matches(maybe_layout, layout.as_deref())
                 .map_err(|e| anyhow::anyhow!("get_resource_from_group layout check: {:?}", e))?;
 
             Ok(write_op.extract_raw_bytes())
@@ -378,7 +466,7 @@ mod test {
     use aptos_aggregator::delta_change_set::{delta_add, serialize};
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::{account_address::AccountAddress, write_set::WriteOp};
-    use aptos_vm_types::{change_set::GroupWrite, check_change_set::CheckChangeSet};
+    use aptos_vm_types::{abstract_write_op::GroupWrite, check_change_set::CheckChangeSet};
     use move_core_types::{
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},
@@ -525,7 +613,7 @@ mod test {
             ),
         ]);
 
-        let change_set = VMChangeSet::new(
+        let change_set = VMChangeSet::new_expanded(
             resource_write_set,
             resource_group_write_set,
             module_write_set,

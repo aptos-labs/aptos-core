@@ -1,5 +1,5 @@
 
-<a name="0x1_guid"></a>
+<a id="0x1_guid"></a>
 
 # Module `0x1::guid`
 
@@ -19,6 +19,7 @@ A module for generating globally unique identifiers
 -  [Function `eq_id`](#0x1_guid_eq_id)
 -  [Specification](#@Specification_1)
     -  [Function `create`](#@Specification_1_create)
+    -  [Function `create_id`](#@Specification_1_create_id)
     -  [Function `id`](#@Specification_1_id)
     -  [Function `creator_address`](#@Specification_1_creator_address)
     -  [Function `id_creator_address`](#@Specification_1_id_creator_address)
@@ -31,7 +32,7 @@ A module for generating globally unique identifiers
 
 
 
-<a name="0x1_guid_GUID"></a>
+<a id="0x1_guid_GUID"></a>
 
 ## Struct `GUID`
 
@@ -59,7 +60,7 @@ A globally unique identifier derived from the sender's address and a counter
 
 </details>
 
-<a name="0x1_guid_ID"></a>
+<a id="0x1_guid_ID"></a>
 
 ## Struct `ID`
 
@@ -93,12 +94,12 @@ A non-privileged identifier that can be freely created by anyone. Useful for loo
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_guid_EGUID_GENERATOR_NOT_PUBLISHED"></a>
+<a id="0x1_guid_EGUID_GENERATOR_NOT_PUBLISHED"></a>
 
 GUID generator must be published ahead of first usage of <code>create_with_capability</code> function.
 
@@ -108,7 +109,7 @@ GUID generator must be published ahead of first usage of <code>create_with_capab
 
 
 
-<a name="0x1_guid_create"></a>
+<a id="0x1_guid_create"></a>
 
 ## Function `create`
 
@@ -140,7 +141,7 @@ Create and return a new GUID from a trusted module.
 
 </details>
 
-<a name="0x1_guid_create_id"></a>
+<a id="0x1_guid_create_id"></a>
 
 ## Function `create_id`
 
@@ -165,7 +166,7 @@ Create a non-privileged id from <code>addr</code> and <code>creation_num</code>
 
 </details>
 
-<a name="0x1_guid_id"></a>
+<a id="0x1_guid_id"></a>
 
 ## Function `id`
 
@@ -190,7 +191,7 @@ Get the non-privileged ID associated with a GUID
 
 </details>
 
-<a name="0x1_guid_creator_address"></a>
+<a id="0x1_guid_creator_address"></a>
 
 ## Function `creator_address`
 
@@ -215,7 +216,7 @@ Return the account address that created the GUID
 
 </details>
 
-<a name="0x1_guid_id_creator_address"></a>
+<a id="0x1_guid_id_creator_address"></a>
 
 ## Function `id_creator_address`
 
@@ -240,7 +241,7 @@ Return the account address that created the guid::ID
 
 </details>
 
-<a name="0x1_guid_creation_num"></a>
+<a id="0x1_guid_creation_num"></a>
 
 ## Function `creation_num`
 
@@ -265,7 +266,7 @@ Return the creation number associated with the GUID
 
 </details>
 
-<a name="0x1_guid_id_creation_num"></a>
+<a id="0x1_guid_id_creation_num"></a>
 
 ## Function `id_creation_num`
 
@@ -290,7 +291,7 @@ Return the creation number associated with the guid::ID
 
 </details>
 
-<a name="0x1_guid_eq_id"></a>
+<a id="0x1_guid_eq_id"></a>
 
 ## Function `eq_id`
 
@@ -315,7 +316,7 @@ Return true if the GUID's ID is <code>id</code>
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -327,7 +328,7 @@ Return true if the GUID's ID is <code>id</code>
 
 
 
-<a name="@Specification_1_create"></a>
+<a id="@Specification_1_create"></a>
 
 ### Function `create`
 
@@ -345,7 +346,23 @@ Return true if the GUID's ID is <code>id</code>
 
 
 
-<a name="@Specification_1_id"></a>
+<a id="@Specification_1_create_id"></a>
+
+### Function `create_id`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_create_id">create_id</a>(addr: <b>address</b>, creation_num: u64): <a href="guid.md#0x1_guid_ID">guid::ID</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_id"></a>
 
 ### Function `id`
 
@@ -361,7 +378,7 @@ Return true if the GUID's ID is <code>id</code>
 
 
 
-<a name="@Specification_1_creator_address"></a>
+<a id="@Specification_1_creator_address"></a>
 
 ### Function `creator_address`
 
@@ -377,7 +394,7 @@ Return true if the GUID's ID is <code>id</code>
 
 
 
-<a name="@Specification_1_id_creator_address"></a>
+<a id="@Specification_1_id_creator_address"></a>
 
 ### Function `id_creator_address`
 
@@ -393,7 +410,7 @@ Return true if the GUID's ID is <code>id</code>
 
 
 
-<a name="@Specification_1_creation_num"></a>
+<a id="@Specification_1_creation_num"></a>
 
 ### Function `creation_num`
 
@@ -409,7 +426,7 @@ Return true if the GUID's ID is <code>id</code>
 
 
 
-<a name="@Specification_1_id_creation_num"></a>
+<a id="@Specification_1_id_creation_num"></a>
 
 ### Function `id_creation_num`
 
@@ -425,7 +442,7 @@ Return true if the GUID's ID is <code>id</code>
 
 
 
-<a name="@Specification_1_eq_id"></a>
+<a id="@Specification_1_eq_id"></a>
 
 ### Function `eq_id`
 

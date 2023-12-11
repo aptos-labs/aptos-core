@@ -6,7 +6,7 @@
 
 use crate::{
     ast::QualifiedSymbol,
-    model::{GlobalEnv, Loc, ModuleId, QualifiedInstId, StructEnv, StructId},
+    model::{GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructEnv, StructId},
     symbol::Symbol,
 };
 use itertools::Itertools;
@@ -16,6 +16,7 @@ use move_core_types::{
     u256::U256,
 };
 use num::BigInt;
+use num_traits::identities::Zero;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     fmt,
@@ -28,14 +29,14 @@ pub enum Type {
     Primitive(PrimitiveType),
     Tuple(Vec<Type>),
     Vector(Box<Type>),
-    Struct(ModuleId, StructId, Vec<Type>),
+    Struct(ModuleId, StructId, /*type-params*/ Vec<Type>),
     TypeParameter(u16),
+    Fun(/*args*/ Box<Type>, /*result*/ Box<Type>),
 
     // Types only appearing in programs.
     Reference(ReferenceKind, Box<Type>),
 
-    // Types only appearing in specifications
-    Fun(Box<Type>, Box<Type>),
+    // Types only appearing in specifications.
     TypeDomain(Box<Type>),
     ResourceDomain(ModuleId, StructId, Option<Vec<Type>>),
 
@@ -94,12 +95,14 @@ pub struct Substitution {
 /// A constraint on a type variable, maintained during unification.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Constraint {
-    /// Combination
     /// The type variable must be instantiated with one of the given number types. This is used
     /// for representing integer constants.
     SomeNumber(BTreeSet<PrimitiveType>),
     /// The type variable must be instantiated with a reference of given type.
     SomeReference(Type),
+    /// The type variable must be instantiated with a struct which has the given fields with
+    /// types.
+    SomeStruct(BTreeMap<Symbol, Type>),
     /// The type variable defaults to the given type if no other binding is found. This is
     /// a pseudo constraint which never fails, but used to generate a default for
     /// inference.
@@ -123,9 +126,21 @@ impl Constraint {
         }
     }
 
+    /// Returns true if the constraint should be propagated over references, such that if we
+    /// have `&t`, the constraint should be forwarded to `t`.
+    pub fn propagate_over_reference(&self) -> bool {
+        matches!(self, Constraint::SomeStruct(..))
+    }
+
     /// Joins the two constraints. If they are incompatible, produces a type unification error.
-    /// Otherwise returns true if the constraint has been absorbed by the other and can be waived.
-    pub fn join(&mut self, loc: &Loc, other: &Constraint) -> Result<bool, TypeUnificationError> {
+    /// Otherwise returns true if `self` absorbs the `other` constraint (and waives the `other`).
+    pub fn join(
+        &mut self,
+        context: &impl UnificationContext,
+        subs: &mut Substitution,
+        loc: &Loc,
+        other: &Constraint,
+    ) -> Result<bool, TypeUnificationError> {
         match (&mut *self, other) {
             (Constraint::SomeNumber(opts1), Constraint::SomeNumber(opts2)) => {
                 let joined: BTreeSet<PrimitiveType> = opts1.intersection(opts2).cloned().collect();
@@ -139,6 +154,25 @@ impl Constraint {
                     *opts1 = joined;
                     Ok(true)
                 }
+            },
+            (Constraint::SomeReference(ty1), Constraint::SomeReference(ty2)) => {
+                *ty1 = subs.unify(context, Variance::NoVariance, WideningOrder::Join, ty1, ty2)?;
+                Ok(true)
+            },
+            (Constraint::SomeStruct(fields1), Constraint::SomeStruct(fields2)) => {
+                // Join the fields together, unifying their types if there are overlaps.
+                for (name, ty) in fields2 {
+                    if let Some(old_type) = fields1.insert(*name, ty.clone()) {
+                        subs.unify(
+                            context,
+                            Variance::NoVariance,
+                            WideningOrder::Join,
+                            &old_type,
+                            ty,
+                        )?;
+                    }
+                }
+                Ok(true)
             },
             (Constraint::WithDefault(_), _) | (_, Constraint::WithDefault(_)) => Ok(false),
             (_, _) => Err(TypeUnificationError::ConstraintsIncompatible(
@@ -166,6 +200,15 @@ impl Constraint {
             },
             Constraint::SomeReference(ty) => {
                 format!("&{}", ty.display(display_context))
+            },
+            Constraint::SomeStruct(field_map) => {
+                format!(
+                    "struct{{{}}}",
+                    field_map
+                        .keys()
+                        .map(|s| s.display(display_context.env.symbol_pool()).to_string())
+                        .join(",")
+                )
             },
             Constraint::WithDefault(_ty) => "".to_owned(),
         }
@@ -244,6 +287,34 @@ impl PrimitiveType {
             _ => unreachable!("no num type"),
         }
     }
+
+    /// Gets the manimal value allowed for a numeric type, or none if it is unbounded.
+    pub fn get_min_value(self: &PrimitiveType) -> Option<BigInt> {
+        match self {
+            PrimitiveType::U8 => Some(BigInt::zero()),
+            PrimitiveType::U16 => Some(BigInt::zero()),
+            PrimitiveType::U32 => Some(BigInt::zero()),
+            PrimitiveType::U64 => Some(BigInt::zero()),
+            PrimitiveType::U128 => Some(BigInt::zero()),
+            PrimitiveType::U256 => Some(BigInt::zero()),
+            PrimitiveType::Num => None,
+            _ => unreachable!("no num type"),
+        }
+    }
+
+    /// Gets the number of bits in the type, or None if unbounded..
+    pub fn get_num_bits(self: &PrimitiveType) -> Option<usize> {
+        match self {
+            PrimitiveType::U8 => Some(8),
+            PrimitiveType::U16 => Some(16),
+            PrimitiveType::U32 => Some(32),
+            PrimitiveType::U64 => Some(64),
+            PrimitiveType::U128 => Some(128),
+            PrimitiveType::U256 => Some(256),
+            PrimitiveType::Num => None,
+            _ => unreachable!("no num type"),
+        }
+    }
 }
 
 impl Type {
@@ -318,13 +389,19 @@ impl Type {
         }
     }
 
+    pub fn describe_valid_for_constant() -> &'static str {
+        "Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, \
+         or `vector<_>` with valid element type."
+    }
+
     /// Returns true if this type is a specification language only type or contains specification
     /// language only types
     pub fn is_spec(&self) -> bool {
         use Type::*;
         match self {
             Primitive(p) => p.is_spec(),
-            Fun(..) | TypeDomain(..) | ResourceDomain(..) | Error => true,
+            Fun(args, result) => args.is_spec() || result.is_spec(),
+            TypeDomain(..) | ResourceDomain(..) | Error => true,
             Var(..) | TypeParameter(..) => false,
             Tuple(ts) => ts.iter().any(|t| t.is_spec()),
             Struct(_, _, ts) => ts.iter().any(|t| t.is_spec()),
@@ -631,14 +708,14 @@ impl Type {
                     .expect("Invariant violation: vector type argument contains incomplete, tuple, or spec type"))
             )),
             Reference(r, t) =>
-            match r {
-                ReferenceKind::Mutable => {
-                    Some(MType::MutableReference(Box::new(t.into_normalized_type(env).expect("Invariant violation: reference type contains incomplete, tuple, or spec type"))))
+                match r {
+                    ReferenceKind::Mutable => {
+                        Some(MType::MutableReference(Box::new(t.into_normalized_type(env).expect("Invariant violation: reference type contains incomplete, tuple, or spec type"))))
+                    }
+                    ReferenceKind::Immutable => {
+                        Some(MType::Reference(Box::new(t.into_normalized_type(env).expect("Invariant violation: reference type contains incomplete, tuple, or spec type"))))
+                    }
                 },
-                ReferenceKind::Immutable => {
-                    Some(MType::Reference(Box::new(t.into_normalized_type(env).expect("Invariant violation: reference type contains incomplete, tuple, or spec type"))))
-                },
-            },
             TypeParameter(idx) => Some(MType::TypeParameter(idx)),
             Tuple(..) | Error | Fun(..) | TypeDomain(..) | ResourceDomain(..) | Var(..) =>
                 None
@@ -835,6 +912,40 @@ impl WideningOrder {
     }
 }
 
+/// A trait via which unification logic can access environment information, like
+/// struct definitions.
+pub trait UnificationContext {
+    /// Get the field map for a struct, with field types instantiated.
+    fn get_struct_field_map(&self, id: &QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type>;
+}
+
+/// A struct representing an empty unification context.
+pub struct NoUnificationContext;
+
+impl UnificationContext for NoUnificationContext {
+    fn get_struct_field_map(&self, _id: &QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type> {
+        BTreeMap::new()
+    }
+}
+
+/// A struct representing a cached unification context.
+#[derive(Debug)]
+pub struct CachedUnificationContext(pub BTreeMap<QualifiedId<StructId>, BTreeMap<Symbol, Type>>);
+
+impl UnificationContext for CachedUnificationContext {
+    fn get_struct_field_map(&self, id: &QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type> {
+        self.0
+            .get(&id.to_qualified_id())
+            .map(|field_map| {
+                field_map
+                    .iter()
+                    .map(|(n, ty)| (*n, ty.instantiate(&id.inst)))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+}
+
 impl Substitution {
     /// Creates a new substitution.
     pub fn new() -> Self {
@@ -849,25 +960,28 @@ impl Substitution {
     /// `SomeNumber({u16})`. A TypeUnificationError is returned if the constraints are incompatible.
     pub fn add_constraint(
         &mut self,
+        context: &impl UnificationContext,
         var: u32,
         loc: Loc,
         order: WideningOrder,
         ctr: Constraint,
     ) -> Result<(), TypeUnificationError> {
-        let current = self.constraints.entry(var).or_default();
+        // Move current constraint list out of self to avoid sharing conflicts while it
+        // is being transformed.
+        let mut current = self.constraints.remove(&var).unwrap_or_default();
         let mut absorbed = false;
         for (_, o, c) in current.iter_mut() {
-            // If the orders are compatible, try to join constraints
-            if *o == order {
-                absorbed = c.join(&loc, &ctr)?;
-                if absorbed {
-                    break;
-                }
+            // Join constraints. If join returns true and the orders are the same, the
+            // constraint is absorbed.
+            absorbed = c.join(context, self, &loc, &ctr)? && *o == order;
+            if absorbed {
+                break;
             }
         }
         if !absorbed {
             current.push((loc, order, ctr))
         }
+        self.constraints.insert(var, current);
         Ok(())
     }
 
@@ -899,7 +1013,9 @@ impl Substitution {
     /// errors.
     pub fn bind(
         &mut self,
+        context: &impl UnificationContext,
         var: u32,
+        variance: Variance,
         order: WideningOrder,
         ty: Type,
     ) -> Result<(), TypeUnificationError> {
@@ -910,7 +1026,7 @@ impl Substitution {
                 // The effective order is the one combining the constraint order with the
                 // context order. The result needs to be swapped because the constraint
                 // of the variable is evaluated against the given type.
-                self.eval_constraint(&loc, &ty, o.combine(order).swap(), c)?
+                self.eval_constraint(context, &loc, &ty, variance, o.combine(order).swap(), c)?
             }
         }
         self.subs.insert(var, ty);
@@ -918,13 +1034,15 @@ impl Substitution {
     }
 
     /// Evaluates whether the given type satisfies the constraint, discharging the constraint.
-    /// Notice that discharging is possible since we expect the type to be fully specialized.
-    /// For variables, we just transfer the constraint. For other types, since constraints
-    /// are over shallow structure of types, they can be decided.
+    /// Notice that discharging is possible since (a) for variables, we just transfer the
+    /// constraint. (b) For other types, since constraints are over shallow structure of types,
+    /// they can be decided based on the top-level type term.
     pub fn eval_constraint(
         &mut self,
+        context: &impl UnificationContext,
         loc: &Loc,
         ty: &Type,
+        variance: Variance,
         order: WideningOrder,
         c: Constraint,
     ) -> Result<(), TypeUnificationError> {
@@ -933,36 +1051,53 @@ impl Substitution {
         } else if let Type::Var(other_var) = ty {
             // Transfer constraint on to other variable, which we assert to be free
             debug_assert!(!self.subs.contains_key(other_var));
-            self.add_constraint(*other_var, loc.clone(), order, c)
+            self.add_constraint(context, *other_var, loc.clone(), order, c)
+        } else if c.propagate_over_reference() && ty.is_reference() {
+            // Propagate constraint to referred type
+            self.eval_constraint(context, loc, ty.skip_reference(), variance, order, c)
         } else {
-            match &c {
-                Constraint::SomeNumber(options) => match ty {
-                    Type::Primitive(prim) if options.contains(prim) => Ok(()),
-                    _ => Err(TypeUnificationError::ConstraintUnsatisfied(
-                        loc.clone(),
-                        ty.clone(),
-                        order,
-                        c,
-                    )),
+            let constraint_unsatisfied_error = || {
+                Err(TypeUnificationError::ConstraintUnsatisfied(
+                    loc.clone(),
+                    ty.clone(),
+                    order,
+                    c.clone(),
+                ))
+            };
+            match (&c, ty) {
+                (Constraint::SomeNumber(options), Type::Primitive(prim))
+                    if options.contains(prim) =>
+                {
+                    Ok(())
                 },
-                Constraint::SomeReference(inner_type) => match ty {
-                    Type::Reference(_, target_type) => {
-                        match self.unify(Variance::NoVariance, order, target_type, inner_type) {
-                            Ok(_) => Ok(()),
-                            Err(e) => Err(TypeUnificationError::RedirectedError(
-                                loc.clone(),
-                                Box::new(e),
-                            )),
+                (Constraint::SomeReference(inner_type), Type::Reference(_, target_type)) => self
+                    .unify(context, variance, order, target_type, inner_type)
+                    .map(|_| ())
+                    .map_err(|e| e.redirect(loc.clone())),
+                (Constraint::SomeStruct(constr_field_map), Type::Struct(mid, sid, inst)) => {
+                    let field_map =
+                        context.get_struct_field_map(&mid.qualified_inst(*sid, inst.clone()));
+                    // The actual struct must have all the fields in the constraint, with same
+                    // type.
+                    for (field_name, field_ty) in constr_field_map {
+                        if let Some(declared_field_type) = field_map.get(field_name) {
+                            self.unify(
+                                context,
+                                variance,
+                                WideningOrder::RightToLeft,
+                                field_ty,
+                                declared_field_type,
+                            )
+                            .map(|_| ())
+                            .map_err(|e| e.redirect(loc.clone()))?
+                        } else {
+                            return constraint_unsatisfied_error();
                         }
-                    },
-                    _ => Err(TypeUnificationError::ConstraintUnsatisfied(
-                        loc.clone(),
-                        ty.clone(),
-                        order,
-                        c,
-                    )),
+                    }
+                    Ok(())
                 },
-                Constraint::WithDefault(_) => Ok(()),
+                (Constraint::WithDefault(_), _) => Ok(()),
+                _ => constraint_unsatisfied_error(),
             }
         }
     }
@@ -1034,6 +1169,7 @@ impl Substitution {
     /// this.
     pub fn unify(
         &mut self,
+        context: &impl UnificationContext,
         variance: Variance,
         order: WideningOrder,
         t1: &Type,
@@ -1054,22 +1190,22 @@ impl Substitution {
                 };
                 return Ok(Type::Reference(
                     *kind,
-                    Box::new(self.unify(sub_variance, order, bt1.as_ref(), t2)?),
+                    Box::new(self.unify(context, variance, order, bt1.as_ref(), t2)?),
                 ));
             }
             if let Type::Reference(kind, bt2) = t2 {
                 return Ok(Type::Reference(
                     *kind,
-                    Box::new(self.unify(sub_variance, order, t1, bt2.as_ref())?),
+                    Box::new(self.unify(context, variance, order, t1, bt2.as_ref())?),
                 ));
             }
         }
 
         // Substitute or assign variables.
-        if let Some(rt) = self.try_substitute_or_assign(variance, order, t1, t2)? {
+        if let Some(rt) = self.try_substitute_or_assign(context, variance, order, t1, t2)? {
             return Ok(rt);
         }
-        if let Some(rt) = self.try_substitute_or_assign(variance, order.swap(), t2, t1)? {
+        if let Some(rt) = self.try_substitute_or_assign(context, variance, order.swap(), t2, t1)? {
             return Ok(rt);
         }
 
@@ -1098,7 +1234,7 @@ impl Substitution {
                 }
             },
             (Type::Reference(k1, ty1), Type::Reference(k2, ty2)) => {
-                let ty = self.unify(sub_variance, order, ty1, ty2)?;
+                let ty = self.unify(context, sub_variance, order, ty1, ty2)?;
                 let k = if variance.is_impl_variance() {
                     use ReferenceKind::*;
                     use WideningOrder::*;
@@ -1126,27 +1262,37 @@ impl Substitution {
                 return Ok(Type::Tuple(self.unify_vec(
                     // Note for tuples, we pass on `variance` not `sub_variance`. A shallow
                     // variance type will be effective for the elements of tuples,
-                    // which are treated similar as expression lists in function calls.
-                    variance, order, ts1, ts2, "tuples",
+                    // which are treated similar as expression lists in function calls, and allow
+                    // e.g. reference type conversions.
+                    context, variance, order, ts1, ts2, "tuples",
                 )?));
             },
             (Type::Fun(a1, r1), Type::Fun(a2, r2)) => {
+                // Same as for tuples, we pass on `variance` not `sub_variance`, allowing
+                // conversion for arguments. We also have contra-variance of arguments:
+                //   |T1|R1 <= |T2|R2  <==>  T1 >= T2 && R1 <= R2
+                // Intuitively, function f1 can safely _substitute_ function f2 if any argument
+                // of type T2 can be passed as a T1 -- which is the case since T1 >= T2 (every
+                // T2 is also a T1).
                 return Ok(Type::Fun(
-                    Box::new(self.unify(sub_variance, order, a1, a2)?),
-                    Box::new(self.unify(sub_variance, order, r1, r2)?),
+                    Box::new(self.unify(context, variance, order.swap(), a1, a2)?),
+                    Box::new(self.unify(context, variance, order, r1, r2)?),
                 ));
             },
             (Type::Struct(m1, s1, ts1), Type::Struct(m2, s2, ts2)) => {
                 if m1 == m2 && s1 == s2 {
+                    // For structs, also pass on `variance`, not `sub_variance`, to inherit
+                    // shallow processing to fields.
                     return Ok(Type::Struct(
                         *m1,
                         *s1,
-                        self.unify_vec(sub_variance, order, ts1, ts2, "structs")?,
+                        self.unify_vec(context, variance, order, ts1, ts2, "structs")?,
                     ));
                 }
             },
             (Type::Vector(e1), Type::Vector(e2)) => {
                 return Ok(Type::Vector(Box::new(self.unify(
+                    context,
                     sub_variance,
                     order,
                     e1,
@@ -1155,6 +1301,7 @@ impl Substitution {
             },
             (Type::TypeDomain(e1), Type::TypeDomain(e2)) => {
                 return Ok(Type::TypeDomain(Box::new(self.unify(
+                    context,
                     sub_variance,
                     order,
                     e1,
@@ -1177,6 +1324,7 @@ impl Substitution {
     /// Helper to unify two type vectors.
     fn unify_vec(
         &mut self,
+        context: &impl UnificationContext,
         variance: Variance,
         order: WideningOrder,
         ts1: &[Type],
@@ -1192,7 +1340,7 @@ impl Substitution {
         }
         let mut rs = vec![];
         for i in 0..ts1.len() {
-            rs.push(self.unify(variance, order, &ts1[i], &ts2[i])?);
+            rs.push(self.unify(context, variance, order, &ts1[i], &ts2[i])?);
         }
         Ok(rs)
     }
@@ -1201,6 +1349,7 @@ impl Substitution {
     /// was performed, None if not.
     fn try_substitute_or_assign(
         &mut self,
+        context: &impl UnificationContext,
         variance: Variance,
         order: WideningOrder,
         t1: &Type,
@@ -1208,7 +1357,7 @@ impl Substitution {
     ) -> Result<Option<Type>, TypeUnificationError> {
         if let Type::Var(v1) = t1 {
             if let Some(s1) = self.subs.get(v1).cloned() {
-                return Ok(Some(self.unify(variance, order, &s1, t2)?));
+                return Ok(Some(self.unify(context, variance, order, &s1, t2)?));
             }
             // Be sure to skip any top-level var assignments for t2, for
             // cycle check.
@@ -1226,7 +1375,7 @@ impl Substitution {
             }
             // Cycle check.
             if !self.occurs_check(&t2, *v1) {
-                self.bind(*v1, order, t2.clone())?;
+                self.bind(context, *v1, variance, order, t2.clone())?;
                 Ok(Some(t2))
             } else {
                 Err(TypeUnificationError::CyclicSubstitution(
@@ -1406,11 +1555,13 @@ impl TypeUnificationAdapter {
     /// unify the LHS and RHS respectively. If the LHS and RHS cannot unify, None is returned.
     pub fn unify(
         self,
+        context: &impl UnificationContext,
         variance: Variance,
         shallow_subst: bool,
     ) -> Option<(BTreeMap<u16, Type>, BTreeMap<u16, Type>)> {
         let mut subst = Substitution::new();
         match subst.unify_vec(
+            context,
             variance,
             WideningOrder::LeftToRight,
             &self.types_adapted_lhs,
@@ -1455,14 +1606,28 @@ impl TypeUnificationAdapter {
 }
 
 impl TypeUnificationError {
+    /// Redirect the error to be reported at given location instead of default location.
+    pub fn redirect(self, loc: Loc) -> Self {
+        Self::RedirectedError(loc, Box::new(self))
+    }
+
     /// If this error is associated with a specific location, return this.
     pub fn specific_loc(&self) -> Option<Loc> {
-        // Not used for now
-        None
+        match self {
+            TypeUnificationError::RedirectedError(loc, e) => {
+                Some(e.specific_loc().unwrap_or_else(|| loc.clone()))
+            },
+            TypeUnificationError::ConstraintsIncompatible(loc, ..) => Some(loc.clone()),
+            _ => None,
+        }
     }
 
     /// Return the message for this error.
-    pub fn message(&self, display_context: &TypeDisplayContext) -> String {
+    pub fn message(
+        &self,
+        unification_context: &impl UnificationContext,
+        display_context: &TypeDisplayContext,
+    ) -> String {
         match self {
             TypeUnificationError::TypeMismatch(t1, t2) => {
                 format!(
@@ -1504,17 +1669,101 @@ impl TypeUnificationError {
                         ty.display(display_context)
                     )
                 },
+                Constraint::SomeStruct(field_map) => {
+                    Self::message_for_struct(unification_context, display_context, field_map, ty)
+                },
                 Constraint::WithDefault(_) => unreachable!("default constraint in error message"),
             },
             TypeUnificationError::ConstraintsIncompatible(_, c1, c2) => {
-                format!(
-                    "constraint `{}` incompatible with `{}`",
-                    c1.display(display_context),
-                    c2.display(display_context)
-                )
+                use Constraint::*;
+                // Abstract details of gross incompatibilities
+                match (c1, c2) {
+                    (SomeStruct(..), SomeNumber(..)) | (SomeNumber(..), SomeStruct(..)) => {
+                        "struct incompatible with integer".to_owned()
+                    },
+                    (SomeReference(..), SomeNumber(..)) | (SomeNumber(..), SomeReference(..)) => {
+                        "reference incompatible with integer".to_owned()
+                    },
+                    _ => {
+                        format!(
+                            "constraint `{}` incompatible with `{}`",
+                            c1.display(display_context),
+                            c2.display(display_context)
+                        )
+                    },
+                }
             },
-            TypeUnificationError::RedirectedError(_, err) => err.message(display_context),
+            TypeUnificationError::RedirectedError(_, err) => {
+                err.message(unification_context, display_context)
+            },
         }
+    }
+
+    fn message_for_struct(
+        unification_context: &impl UnificationContext,
+        display_context: &TypeDisplayContext,
+        field_map: &BTreeMap<Symbol, Type>,
+        ty: &Type,
+    ) -> String {
+        // Determine why this constraint did not match for better error message
+        if let Type::Struct(mid, sid, inst) = ty {
+            let actual_field_map =
+                unification_context.get_struct_field_map(&mid.qualified_inst(*sid, inst.clone()));
+            let missing_fields = field_map
+                .keys()
+                .filter(|n| !actual_field_map.contains_key(n))
+                .collect::<Vec<_>>();
+            if !missing_fields.is_empty() {
+                // Primary error is missing fields
+                let fields =
+                    Self::print_fields(display_context.env, missing_fields.into_iter().cloned());
+                format!(
+                    "{} not declared in struct `{}`",
+                    fields,
+                    ty.display(display_context)
+                )
+            } else {
+                // Primary error is a type mismatch
+                let fields = field_map
+                    .iter()
+                    .filter_map(|(n, ty)| {
+                        let Some(actual_ty) = actual_field_map.get(n) else {
+                            return None;
+                        };
+                        if ty != actual_ty {
+                            Some(format!(
+                                "field `{}` has type `{}` instead of `{}`",
+                                n.display(display_context.env.symbol_pool()),
+                                ty.display(display_context),
+                                actual_ty.display(display_context)
+                            ))
+                        } else {
+                            None
+                        }
+                    })
+                    .join(" and ");
+                format!("{} in `{}`", fields, ty.display(display_context))
+            }
+        } else {
+            format!(
+                "expected a struct{} but found `{}`",
+                if field_map.is_empty() {
+                    "".to_owned()
+                } else {
+                    format!(
+                        " with {}",
+                        Self::print_fields(display_context.env, field_map.keys().cloned(),)
+                    )
+                },
+                ty.display(display_context)
+            )
+        }
+    }
+
+    fn print_fields(env: &GlobalEnv, names: impl Iterator<Item = Symbol>) -> String {
+        names
+            .map(|n| format!("field `{}`", n.display(env.symbol_pool()),))
+            .join(" and ")
     }
 }
 
@@ -1556,7 +1805,7 @@ impl TypeInstantiationDerivation {
                     treat_lhs_type_param_as_var_after_index,
                     treat_rhs_type_param_as_var_after_index,
                 );
-                let rel = adapter.unify(Variance::SpecVariance, false);
+                let rel = adapter.unify(&NoUnificationContext, Variance::SpecVariance, false);
                 if let Some((subst_lhs, subst_rhs)) = rel {
                     let subst = if target_lhs { subst_lhs } else { subst_rhs };
                     for (param_idx, inst_ty) in subst.into_iter() {
@@ -1809,27 +2058,15 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                 } else if let Some(ctrs) =
                     self.context.subs_opt.and_then(|s| s.constraints.get(idx))
                 {
-                    let mut out = "".to_owned();
-                    for (_, _, c) in ctrs {
-                        // We asssume no inconsistent constraints, so break on the first one
-                        match c {
-                            Constraint::SomeNumber(_) => {
-                                out = "integer".to_owned();
-                                break;
-                            },
-                            Constraint::SomeReference(ty) => {
-                                out = format!("&_{}", ty.display(self.context));
-                                break;
-                            },
-                            Constraint::WithDefault(ty) => {
-                                out = format!("{}/*default*/", ty.display(self.context))
-                            },
-                        }
+                    if ctrs.is_empty() {
+                        write!(f, "?{}", idx)
+                    } else {
+                        let out = ctrs
+                            .iter()
+                            .map(|(_, _, c)| c.display(self.context).to_string())
+                            .join(" & ");
+                        f.write_str(&out)
                     }
-                    if out.is_empty() {
-                        out = format!("?{}", idx)
-                    }
-                    f.write_str(&out)
                 } else {
                     write!(f, "?{}", idx)
                 }

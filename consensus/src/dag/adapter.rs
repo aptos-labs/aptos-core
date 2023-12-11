@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::observability::counters::{NUM_NODES_PER_BLOCK, NUM_ROUNDS_PER_BLOCK};
 use crate::{
     consensusdb::{CertifiedNodeSchema, ConsensusDB, DagVoteSchema, NodeSchema},
     counters::update_counters_for_committed_blocks,
@@ -9,7 +10,7 @@ use crate::{
         storage::{CommitEvent, DAGStorage},
         CertifiedNode, Node, NodeId, Vote,
     },
-    experimental::buffer_manager::OrderedBlocks,
+    pipeline::buffer_manager::OrderedBlocks,
 };
 use anyhow::{anyhow, bail};
 use aptos_bitvec::BitVec;
@@ -119,9 +120,11 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         let round = anchor.round();
         let timestamp = anchor.metadata().timestamp();
         let author = *anchor.author();
+        let mut validator_txns = vec![];
         let mut payload = Payload::empty(!anchor.payload().is_direct());
         let mut node_digests = vec![];
         for node in &ordered_nodes {
+            validator_txns.extend(node.validator_txns().clone());
             payload.extend(node.payload().clone());
             node_digests.push(node.digest());
         }
@@ -138,12 +141,23 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                 parents_bitvec.set(*idx as u16);
             }
         }
+        let parent_timestamp = self.parent_block_info.read().timestamp_usecs();
+        let block_timestamp = timestamp.max(parent_timestamp.checked_add(1).expect("must add"));
+
+        NUM_NODES_PER_BLOCK.observe(ordered_nodes.len() as f64);
+        let rounds_between = {
+            let anchor_node = ordered_nodes.first().map_or(0, |node| node.round());
+            let lowest_round_node = ordered_nodes.last().map_or(0, |node| node.round());
+            anchor_node.saturating_sub(lowest_round_node)
+        };
+        NUM_ROUNDS_PER_BLOCK.observe((rounds_between + 1) as f64);
 
         let block = ExecutedBlock::new(
             Block::new_for_dag(
                 epoch,
                 round,
-                timestamp,
+                block_timestamp,
+                validator_txns,
                 payload,
                 author,
                 failed_author,
@@ -151,6 +165,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                 parents_bitvec,
                 node_digests,
             ),
+            vec![],
             StateComputeResult::new_dummy(),
         );
         let block_info = block.block_info();

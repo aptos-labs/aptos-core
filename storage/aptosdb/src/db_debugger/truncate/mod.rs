@@ -2,20 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    db::AptosDB,
     db_debugger::ShardingConfig,
-    jellyfish_merkle_node::JellyfishMerkleNodeSchema,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         epoch_by_version::EpochByVersionSchema,
+        jellyfish_merkle_node::JellyfishMerkleNodeSchema,
         version_data::VersionDataSchema,
     },
     state_merkle_db::StateMerkleDb,
+    state_store::StateStore,
     utils::truncation_helper::{
         find_closest_node_version_at_or_before, get_current_version_in_state_merkle_db,
         get_ledger_commit_progress, get_overall_commit_progress, get_state_kv_commit_progress,
         truncate_state_merkle_db,
     },
-    AptosDB, StateStore,
 };
 use anyhow::{ensure, Result};
 use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
@@ -228,6 +229,11 @@ impl Cmd {
 mod test {
     use super::*;
     use crate::{
+        common::NUM_STATE_SHARDS,
+        db::{
+            test_helper::{arb_blocks_to_commit_with_block_nums, update_in_memory_state},
+            AptosDB,
+        },
         schema::{
             epoch_by_version::EpochByVersionSchema, ledger_info::LedgerInfoSchema,
             stale_node_index::StaleNodeIndexSchema,
@@ -237,9 +243,7 @@ mod test {
             transaction_info::TransactionInfoSchema, version_data::VersionDataSchema,
             write_set::WriteSetSchema,
         },
-        test_helper::{arb_blocks_to_commit_with_block_nums, update_in_memory_state},
         utils::truncation_helper::num_frozen_nodes_in_accumulator,
-        AptosDB, NUM_STATE_SHARDS,
     };
     use aptos_storage_interface::DbReader;
     use aptos_temppath::TempPath;
@@ -250,7 +254,7 @@ mod test {
 
         #[test]
         fn test_truncation(input in arb_blocks_to_commit_with_block_nums(80, 120)) {
-            use crate::DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD;
+            use aptos_config::config::DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD;
             aptos_logger::Logger::new().init();
             let sharding_config = ShardingConfig {
                 enable_storage_sharding: input.1,

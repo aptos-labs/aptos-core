@@ -454,7 +454,7 @@ impl InMemoryStateCalculatorV2 {
         for (i, (txn, txn_output)) in to_keep.iter().enumerate() {
             ensure!(
                 TransactionsWithParsedOutput::need_checkpoint(txn, txn_output) ^ (i != num_txns - 1),
-                "Checkpoint is allowed iff it's the last txn in the block. index: {i}, is_last: {}, txn: {txn:?}, is_reconfig: {}",
+                "Checkpoint is allowed iff it's the last txn in the block. index: {i}, num_txns: {num_txns}, is_last: {}, txn: {txn:?}, is_reconfig: {}",
                 i == num_txns - 1,
                 txn_output.is_reconfig()
             );

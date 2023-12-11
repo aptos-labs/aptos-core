@@ -4,11 +4,10 @@
 //! This file defines the state merkle snapshot committer running in background thread.
 
 use crate::{
-    jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    metrics::LATEST_SNAPSHOT_VERSION,
+    metrics::{LATEST_SNAPSHOT_VERSION, OTHER_TIMERS_SECONDS},
+    pruner::PrunerManager,
+    schema::{jellyfish_merkle_node::JellyfishMerkleNodeSchema, version_data::VersionDataSchema},
     state_store::{buffered_state::CommitMessage, StateDb},
-    version_data::VersionDataSchema,
-    PrunerManager, OTHER_TIMERS_SECONDS,
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::HashValue;
@@ -94,9 +93,8 @@ impl StateMerkleBatchCommitter {
                         .epoch_snapshot_pruner
                         .maybe_set_pruner_target_db_version(current_version);
 
-                    if !self.state_db.skip_usage {
-                        self.check_usage_consistency(&state_delta).unwrap();
-                    }
+                    self.check_usage_consistency(&state_delta).unwrap();
+
                     state_delta.base.log_generation("buffered_state_commit");
                     state_delta
                         .current

@@ -815,6 +815,9 @@ impl<'env> SpecTranslator<'env> {
             Operation::Slice => self.translate_primitive_call("$SliceVecByRange", args),
             Operation::Range => self.translate_primitive_call("$Range", args),
 
+            // Copy and Move treated as identity for Boogie
+            Operation::Copy | Operation::Move => self.translate_exp(&args[0]),
+
             // Binary operators
             Operation::Add => self.translate_op("+", "Add", args),
             Operation::Sub => self.translate_op("-", "Sub", args),
@@ -1497,7 +1500,7 @@ impl<'env> SpecTranslator<'env> {
         );
         let (_, some_var) = self.require_range_var(&range.0);
         let free_vars = range_and_body
-            .free_vars(self.env)
+            .free_vars_with_types(self.env)
             .into_iter()
             .filter(|(s, _)| *s != some_var)
             .map(|(s, ty)| (s, self.inst(ty.skip_reference())))

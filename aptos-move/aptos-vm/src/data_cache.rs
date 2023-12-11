@@ -4,7 +4,7 @@
 //! Scratchpad for on chain values during the execution.
 
 use crate::{
-    aptos_vm_impl::gas_config,
+    gas::get_gas_config_from_storage,
     move_vm_ext::{
         get_max_binary_format_version, get_max_identifier_size, AptosMoveResolver, AsExecutorView,
         AsResourceGroupView, ResourceGroupResolver,
@@ -32,8 +32,8 @@ use aptos_types::{
 };
 use aptos_vm_types::{
     resolver::{
-        ExecutorView, ResourceGroupView, StateStorageView, StateValueMetadataResolver,
-        TResourceGroupView, TResourceView,
+        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView,
+        StateValueMetadataResolver, TResourceGroupView, TResourceView,
     },
     resource_group_adapter::ResourceGroupAdapter,
 };
@@ -160,6 +160,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
                 self.resource_group_view
                     .resource_group_size(&key)
                     .map_err(common_error)?
+                    .get()
             } else {
                 0
             };
@@ -191,7 +192,7 @@ impl<'e, E: ExecutorView> ResourceGroupResolver for StorageAdapter<'e, E> {
         self.resource_group_view.release_group_cache()
     }
 
-    fn resource_group_size(&self, group_key: &StateKey) -> anyhow::Result<u64> {
+    fn resource_group_size(&self, group_key: &StateKey) -> anyhow::Result<ResourceGroupSize> {
         self.resource_group_view.resource_group_size(group_key)
     }
 
@@ -199,7 +200,7 @@ impl<'e, E: ExecutorView> ResourceGroupResolver for StorageAdapter<'e, E> {
         &self,
         group_key: &StateKey,
         resource_tag: &StructTag,
-    ) -> anyhow::Result<u64> {
+    ) -> anyhow::Result<usize> {
         self.resource_group_view
             .resource_size_in_group(group_key, resource_tag)
     }
@@ -354,7 +355,7 @@ pub trait AsMoveResolver<S> {
 impl<S: StateView> AsMoveResolver<S> for S {
     fn as_move_resolver(&self) -> StorageAdapter<S> {
         let config_view = ConfigAdapter(self);
-        let (_, gas_feature_version) = gas_config(&config_view);
+        let (_, gas_feature_version) = get_gas_config_from_storage(&config_view);
         let features = Features::fetch_config(&config_view).unwrap_or_default();
         let max_binary_version =
             get_max_binary_format_version(&features, Some(gas_feature_version));

@@ -37,7 +37,8 @@ use aptos_types::{
     },
     vm_status::StatusCode,
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
+use aptos_vm::{data_cache::AsMoveResolver, AptosSimulationVM};
+use move_core_types::vm_status::VMStatus;
 use poem_openapi::{
     param::{Path, Query},
     payload::Json,
@@ -1179,10 +1180,11 @@ impl TransactionsApi {
         ledger_info: LedgerInfo,
         txn: SignedTransaction,
     ) -> SimulateTransactionResult<Vec<UserTransaction>> {
-        // Transactions shouldn't have a valid signature or this could be used to attack
+        // The caller must ensure that the signature is not valid, as otherwise
+        // a malicious actor could execute the transaction without their knowledge
         if txn.verify_signature().is_ok() {
             return Err(SubmitTransactionError::bad_request_with_code(
-                "Simulated transactions must have a non-valid signature",
+                "Simulated transactions must not have a valid signature",
                 AptosErrorCode::InvalidInput,
                 &ledger_info,
             ));
@@ -1190,7 +1192,8 @@ impl TransactionsApi {
 
         // Simulate transaction
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
-        let (_, output) = AptosVM::simulate_signed_transaction(&txn, &state_view);
+        let (vm_status, output) =
+            AptosSimulationVM::create_vm_and_simulate_signed_transaction(&txn, &state_view);
         let version = ledger_info.version();
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)
@@ -1232,7 +1235,22 @@ impl TransactionsApi {
                 let mut user_transactions = Vec::new();
                 for transaction in transactions.into_iter() {
                     match transaction {
-                        Transaction::UserTransaction(user_txn) => user_transactions.push(*user_txn),
+                        Transaction::UserTransaction(user_txn) => {
+                            let mut txn = *user_txn;
+                            match &vm_status {
+                                VMStatus::Error {
+                                    message: Some(msg), ..
+                                }
+                                | VMStatus::ExecutionFailure {
+                                    message: Some(msg), ..
+                                } => {
+                                    txn.info.vm_status +=
+                                        format!("\nExecution failed with status: {}", msg).as_str();
+                                },
+                                _ => (),
+                            }
+                            user_transactions.push(txn);
+                        },
                         _ => {
                             return Err(SubmitTransactionError::internal_with_code(
                                 "Simulation transaction resulted in a non-UserTransaction",

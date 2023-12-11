@@ -26,6 +26,7 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     validator_signer::ValidatorSigner,
+    validator_txn::ValidatorTransaction,
     validator_verifier::ValidatorVerifier,
 };
 use serde::{Deserialize, Serialize};
@@ -55,6 +56,7 @@ struct NodeWithoutDigest<'a> {
     round: Round,
     author: Author,
     timestamp: u64,
+    validator_txns: &'a Vec<ValidatorTransaction>,
     payload: &'a Payload,
     parents: &'a Vec<NodeCertificate>,
     extensions: &'a Extensions,
@@ -78,6 +80,7 @@ impl<'a> From<&'a Node> for NodeWithoutDigest<'a> {
             round: node.metadata.round,
             author: node.metadata.author,
             timestamp: node.metadata.timestamp,
+            validator_txns: &node.validator_txns,
             payload: &node.payload,
             parents: &node.parents,
             extensions: &node.extensions,
@@ -146,6 +149,7 @@ impl Deref for NodeMetadata {
 #[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq)]
 pub struct Node {
     metadata: NodeMetadata,
+    validator_txns: Vec<ValidatorTransaction>,
     payload: Payload,
     parents: Vec<NodeCertificate>,
     extensions: Extensions,
@@ -157,6 +161,7 @@ impl Node {
         round: Round,
         author: Author,
         timestamp: u64,
+        validator_txns: Vec<ValidatorTransaction>,
         payload: Payload,
         parents: Vec<NodeCertificate>,
         extensions: Extensions,
@@ -166,6 +171,7 @@ impl Node {
             round,
             author,
             timestamp,
+            &validator_txns,
             &payload,
             &parents,
             &extensions,
@@ -181,6 +187,7 @@ impl Node {
                 timestamp,
                 digest,
             },
+            validator_txns,
             payload,
             parents,
             extensions,
@@ -196,6 +203,7 @@ impl Node {
     ) -> Self {
         Self {
             metadata,
+            validator_txns: vec![],
             payload,
             parents,
             extensions,
@@ -208,6 +216,7 @@ impl Node {
         round: Round,
         author: Author,
         timestamp: u64,
+        validator_txns: &Vec<ValidatorTransaction>,
         payload: &Payload,
         parents: &Vec<NodeCertificate>,
         extensions: &Extensions,
@@ -217,6 +226,7 @@ impl Node {
             round,
             author,
             timestamp,
+            validator_txns,
             payload,
             parents,
             extensions,
@@ -230,6 +240,7 @@ impl Node {
             self.metadata.round,
             self.metadata.author,
             self.metadata.timestamp,
+            &self.validator_txns,
             &self.payload,
             &self.parents,
             &self.extensions,
@@ -278,6 +289,10 @@ impl Node {
 
     pub fn payload(&self) -> &Payload {
         &self.payload
+    }
+
+    pub fn validator_txns(&self) -> &Vec<ValidatorTransaction> {
+        &self.validator_txns
     }
 
     pub fn verify(&self, sender: Author, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
@@ -823,6 +838,13 @@ impl TConsensusMsg for DAGMessage {
         }
     }
 
+    fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self> {
+        match msg {
+            ConsensusMsg::DAGMessage(msg) => Ok(bcs::from_bytes(&msg.data)?),
+            _ => bail!("unexpected consensus message type {:?}", msg),
+        }
+    }
+
     fn into_network_message(self) -> ConsensusMsg {
         ConsensusMsg::DAGMessage(DAGNetworkMessage {
             epoch: self.epoch(),
@@ -855,6 +877,13 @@ impl TConsensusMsg for DAGRpcResult {
         match &self.0 {
             Ok(dag_message) => dag_message.epoch(),
             Err(error) => error.epoch(),
+        }
+    }
+
+    fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self> {
+        match msg {
+            ConsensusMsg::DAGMessage(msg) => Ok(bcs::from_bytes(&msg.data)?),
+            _ => bail!("unexpected consensus message type {:?}", msg),
         }
     }
 

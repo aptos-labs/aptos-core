@@ -31,6 +31,7 @@ use aptos_types::{
     },
 };
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
+use claims::assert_ok;
 use move_core_types::{
     language_storage::{StructTag, TypeTag},
     move_resource::MoveStructType,
@@ -81,6 +82,7 @@ pub struct MoveHarness {
     txn_seq_no: BTreeMap<AccountAddress, u64>,
 
     default_gas_unit_price: u64,
+    max_gas_per_txn: u64,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -91,6 +93,8 @@ pub enum BlockSplit {
 }
 
 impl MoveHarness {
+    const DEFAULT_MAX_GAS_PER_TXN: u64 = 2_000_000;
+
     /// Creates a new harness.
     pub fn new() -> Self {
         register_package_hooks(Box::new(AptosPackageHooks {}));
@@ -98,6 +102,7 @@ impl MoveHarness {
             executor: FakeExecutor::from_head_genesis(),
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
+            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
         }
     }
 
@@ -107,6 +112,7 @@ impl MoveHarness {
             executor,
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
+            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
         }
     }
 
@@ -116,6 +122,7 @@ impl MoveHarness {
             executor: FakeExecutor::from_head_genesis_with_count(count),
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
+            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
         }
     }
 
@@ -125,6 +132,7 @@ impl MoveHarness {
             executor: FakeExecutor::from_testnet_genesis(),
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
+            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
         }
     }
 
@@ -143,7 +151,15 @@ impl MoveHarness {
             executor: FakeExecutor::from_mainnet_genesis(),
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
+            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
         }
+    }
+
+    pub fn store_and_fund_account(&mut self, acc: &Account, balance: u64, seq_num: u64) -> Account {
+        let data = AccountData::with_account(acc.clone(), balance, seq_num);
+        self.executor.add_account_data(&data);
+        self.txn_seq_no.insert(*acc.address(), seq_num);
+        data.account().clone()
     }
 
     /// Creates an account for the given static address. This address needs to be static so
@@ -152,23 +168,14 @@ impl MoveHarness {
         // The below will use the genesis keypair but that should be fine.
         let acc = Account::new_genesis_account(addr);
         // Mint the account 10M Aptos coins (with 8 decimals).
-        let data = AccountData::with_account(acc, 1_000_000_000_000_000, 10);
-        self.executor.add_account_data(&data);
-        self.txn_seq_no.insert(addr, 10);
-        data.account().clone()
+        self.store_and_fund_account(&acc, 1_000_000_000_000_000, 10)
     }
 
     // Creates an account with a randomly generated address and key pair
     pub fn new_account_with_key_pair(&mut self) -> Account {
-        let mut rng = StdRng::from_seed(OsRng.gen());
-
-        let privkey = Ed25519PrivateKey::generate(&mut rng);
-        let pubkey = privkey.public_key();
-        let acc = Account::with_keypair(privkey, pubkey);
-        let data = AccountData::with_account(acc.clone(), 1_000_000_000_000_000, 0);
-        self.executor.add_account_data(&data);
-        self.txn_seq_no.insert(*acc.address(), 0);
-        data.account().clone()
+        let acc = create_random_key_pair();
+        // Mint the account 10M Aptos coins (with 8 decimals).
+        self.store_and_fund_account(&acc, 1_000_000_000_000_000, 0)
     }
 
     pub fn new_account_with_balance_and_sequence_number(
@@ -176,15 +183,8 @@ impl MoveHarness {
         balance: u64,
         sequence_number: u64,
     ) -> Account {
-        let mut rng = StdRng::from_seed(OsRng.gen());
-
-        let privkey = Ed25519PrivateKey::generate(&mut rng);
-        let pubkey = privkey.public_key();
-        let acc = Account::with_keypair(privkey, pubkey);
-        let data = AccountData::with_account(acc.clone(), balance, sequence_number);
-        self.executor.add_account_data(&data);
-        self.txn_seq_no.insert(*acc.address(), sequence_number);
-        data.account().clone()
+        let acc = create_random_key_pair();
+        self.store_and_fund_account(&acc, balance, sequence_number)
     }
 
     /// Gets the account where the Aptos framework is installed (0x1).
@@ -231,6 +231,20 @@ impl MoveHarness {
         result
     }
 
+    /// Runs a block of signed transactions. On success, applies the write set.
+    pub fn run_block_get_output(
+        &mut self,
+        txn_block: Vec<SignedTransaction>,
+    ) -> Vec<TransactionOutput> {
+        let result = assert_ok!(self.executor.execute_block(txn_block));
+        for output in &result {
+            if matches!(output.status(), TransactionStatus::Keep(_)) {
+                self.executor.apply_write_set(output.write_set());
+            }
+        }
+        result
+    }
+
     /// Creates a transaction, based on provided payload.
     pub fn create_transaction_payload(
         &mut self,
@@ -244,7 +258,7 @@ impl MoveHarness {
         account
             .transaction()
             .sequence_number(seq_no)
-            .max_gas_amount(2_000_000)
+            .max_gas_amount(self.max_gas_per_txn)
             .gas_unit_price(self.default_gas_unit_price)
             .payload(payload)
             .sign()
@@ -618,8 +632,7 @@ impl MoveHarness {
             ]);
     }
 
-    /// Increase maximal transaction size.
-    pub fn increase_transaction_size(&mut self) {
+    fn change_one_gas_param_from_default(&mut self, param: &str, param_value: u64) {
         // TODO: The AptosGasParameters::zeros() schedule doesn't do what we want, so
         // explicitly manipulating gas entries. Wasn't obvious from the gas code how to
         // do this differently then below, so perhaps improve this...
@@ -628,8 +641,8 @@ impl MoveHarness {
         let entries = entries
             .into_iter()
             .map(|(name, val)| {
-                if name == "txn.max_transaction_size_in_bytes" {
-                    (name, 1000 * 1024)
+                if name == param {
+                    (name, param_value)
                 } else {
                     (name, val)
                 }
@@ -649,6 +662,15 @@ impl MoveHarness {
                     .simple_serialize()
                     .unwrap(),
             ]);
+    }
+
+    pub fn modify_gas_scaling(&mut self, gas_scaling_factor: u64) {
+        self.change_one_gas_param_from_default("txn.gas_unit_scaling_factor", gas_scaling_factor);
+    }
+
+    /// Increase maximal transaction size.
+    pub fn increase_transaction_size(&mut self) {
+        self.change_one_gas_param_from_default("txn.max_transaction_size_in_bytes", 1000 * 1024);
     }
 
     pub fn sequence_number(&self, addr: &AccountAddress) -> u64 {
@@ -719,12 +741,12 @@ impl MoveHarness {
         &mut self,
         block_split: BlockSplit,
         txn_block: Vec<(u64, SignedTransaction)>,
-    ) -> Vec<TransactionStatus> {
+    ) -> Vec<TransactionOutput> {
         fn run_and_check_block(
             harness: &mut MoveHarness,
             txn_block: Vec<(u64, SignedTransaction)>,
             offset: usize,
-        ) -> Vec<TransactionStatus> {
+        ) -> Vec<TransactionOutput> {
             use crate::assert_abort_ref;
 
             if txn_block.is_empty() {
@@ -736,24 +758,24 @@ impl MoveHarness {
                 offset,
                 txns.len()
             );
-            let outputs = harness.run_block(txns);
-            for (idx, (error, status)) in errors.into_iter().zip(outputs.iter()).enumerate() {
+            let outputs = harness.run_block_get_output(txns);
+            for (idx, (error, output)) in errors.into_iter().zip(outputs.iter()).enumerate() {
                 if error == SUCCESS {
                     assert_success!(
-                        status.clone(),
+                        output.status().clone(),
                         "Didn't succeed on txn {}, with block starting at {}",
                         idx + offset,
                         offset,
                     );
                 } else {
                     assert_abort_ref!(
-                        status,
+                        output.status(),
                         error,
-                        "Error code missmatch on txn {} that should've failed, with block starting at {}. Expected {}, got {:?}",
+                        "Error code missmatch on txn {} that should've failed, with block starting at {}. Expected {}, gotten {:?}",
                         idx + offset,
                         offset,
                         error,
-                        status,
+                        output.status(),
                     );
                 }
             }
@@ -789,6 +811,17 @@ impl MoveHarness {
             },
         }
     }
+
+    pub fn set_max_gas_per_txn(&mut self, max_gas_per_txn: u64) {
+        self.max_gas_per_txn = max_gas_per_txn
+    }
+}
+
+pub fn create_random_key_pair() -> Account {
+    let mut rng = StdRng::from_seed(OsRng.gen());
+    let privkey = Ed25519PrivateKey::generate(&mut rng);
+    let pubkey = privkey.public_key();
+    Account::with_keypair(privkey, pubkey)
 }
 
 impl BlockSplit {
@@ -864,6 +897,23 @@ macro_rules! assert_success {
             $s,
             aptos_types::transaction::TransactionStatus::Keep(
                 aptos_types::transaction::ExecutionStatus::Success),
+            $($arg)+
+        )
+    }};
+}
+
+/// Helper to assert transaction resulted in OUT_OF_GAS error
+#[macro_export]
+macro_rules! assert_out_of_gas {
+    ($s:expr $(,)?) => {{
+        assert_eq!($s, aptos_types::transaction::TransactionStatus::Keep(
+            aptos_types::transaction::ExecutionStatus::OutOfGas))
+    }};
+    ($s:expr, $($arg:tt)+) => {{
+        assert_eq!(
+            $s,
+            aptos_types::transaction::TransactionStatus::Keep(
+                aptos_types::transaction::ExecutionStatus::OutOfGas),
             $($arg)+
         )
     }};

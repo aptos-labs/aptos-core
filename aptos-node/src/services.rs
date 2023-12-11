@@ -25,7 +25,7 @@ use aptos_peer_monitoring_service_server::{
 use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
 use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_time_service::TimeService;
-use aptos_types::chain_id::ChainId;
+use aptos_types::{chain_id::ChainId, validator_txn::pool::ValidatorTransactionPoolClient};
 use futures::channel::{mpsc, mpsc::Sender};
 use std::{sync::Arc, time::Instant};
 use tokio::runtime::{Handle, Runtime};
@@ -89,6 +89,7 @@ pub fn start_consensus_runtime(
     consensus_network_interfaces: ApplicationNetworkInterfaces<ConsensusMsg>,
     consensus_notifier: ConsensusNotifier,
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
+    validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let instant = Instant::now();
     let consensus = aptos_consensus::consensus_provider::start_consensus(
@@ -100,6 +101,7 @@ pub fn start_consensus_runtime(
         db_rw,
         consensus_reconfig_subscription
             .expect("Consensus requires a reconfiguration subscription!"),
+        validator_txn_pool_client,
     );
     debug!("Consensus started in {} ms", instant.elapsed().as_millis());
     consensus

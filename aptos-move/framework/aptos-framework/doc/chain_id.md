@@ -1,5 +1,5 @@
 
-<a name="0x1_chain_id"></a>
+<a id="0x1_chain_id"></a>
 
 # Module `0x1::chain_id`
 
@@ -21,7 +21,7 @@ This code provides a container for storing a chain id and functions to initializ
 
 
 
-<a name="0x1_chain_id_ChainId"></a>
+<a id="0x1_chain_id_ChainId"></a>
 
 ## Resource `ChainId`
 
@@ -48,7 +48,7 @@ This code provides a container for storing a chain id and functions to initializ
 
 </details>
 
-<a name="0x1_chain_id_initialize"></a>
+<a id="0x1_chain_id_initialize"></a>
 
 ## Function `initialize`
 
@@ -75,7 +75,7 @@ Publish the chain ID <code>id</code> of this instance under the SystemAddresses 
 
 </details>
 
-<a name="0x1_chain_id_get"></a>
+<a id="0x1_chain_id_get"></a>
 
 ## Function `get`
 
@@ -101,7 +101,7 @@ Return the chain ID of this instance.
 
 </details>
 
-<a name="@Specification_0"></a>
+<a id="@Specification_0"></a>
 
 ## Specification
 
@@ -113,7 +113,7 @@ Return the chain ID of this instance.
 
 
 
-<a name="@Specification_0_initialize"></a>
+<a id="@Specification_0_initialize"></a>
 
 ### Function `initialize`
 
@@ -128,11 +128,12 @@ Return the chain ID of this instance.
 <b>aborts_if</b> addr != @aptos_framework;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="chain_id.md#0x1_chain_id_ChainId">ChainId</a>&gt;(@aptos_framework);
 <b>ensures</b> <b>exists</b>&lt;<a href="chain_id.md#0x1_chain_id_ChainId">ChainId</a>&gt;(addr);
+<b>ensures</b> <b>global</b>&lt;<a href="chain_id.md#0x1_chain_id_ChainId">ChainId</a>&gt;(addr).id == id;
 </code></pre>
 
 
 
-<a name="@Specification_0_get"></a>
+<a id="@Specification_0_get"></a>
 
 ### Function `get`
 

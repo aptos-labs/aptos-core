@@ -29,3 +29,9 @@ error: invalid call of `M::mut_mut`: mutability mismatch (&mut != &) for argumen
    │
 17 │         mut_mut<u64>(&0, &0);
    │                      ^^
+
+error: mutability mismatch (&mut != &)
+   ┌─ tests/checking/typing/subtype_args_invalid.move:21:9
+   │
+21 │         f(&0, &0); // not okay
+   │         ^^^^^^^^^

@@ -31,7 +31,13 @@ spec aptos_framework::genesis {
         ensures exists<transaction_fee::AptosCoinCapabilities>(@aptos_framework);
     }
 
+    spec set_genesis_end {
+        pragma delegate_invariants_to_caller;
+    }
+
     spec create_initialize_validators_with_commission {
+        pragma verify_duration_estimate = 120;
+
         include stake::ResourceRequirement;
         include CompareTimeRequires;
         include aptos_coin::ExistsAptosCoin;
@@ -48,6 +54,8 @@ spec aptos_framework::genesis {
     }
 
     spec initialize_for_verification {
+        // This function cause timeout (property proved)
+        pragma verify_duration_estimate = 120;
         // We construct `initialize_for_verification` which is a "#[verify_only]" function that
         // simulates the genesis encoding process in `vm-genesis` (written in Rust).
         include InitalizeRequires;

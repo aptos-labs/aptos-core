@@ -49,6 +49,7 @@ pub enum FeatureFlag {
     OPERATOR_BENEFICIARY_CHANGE = 39,
     VM_BINARY_FORMAT_V7 = 40,
     RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM = 41,
+    COMMISSION_CHANGE_DELEGATION_POOL = 42,
 }
 
 /// Representation of features on chain as a bitset.
@@ -83,7 +84,7 @@ impl OnChainConfig for Features {
 }
 
 impl Features {
-    fn enable(&mut self, flag: FeatureFlag) {
+    pub fn enable(&mut self, flag: FeatureFlag) {
         let byte_index = (flag as u64 / 8) as usize;
         let bit_mask = 1 << (flag as u64 % 8);
         while self.features.len() <= byte_index {

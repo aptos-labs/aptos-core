@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use crate::{AptosDB, EventStore};
+use crate::{db::AptosDB, event_store::EventStore};
 use aptos_crypto::hash::ACCUMULATOR_PLACEHOLDER_HASH;
 use aptos_proptest_helpers::Index;
 use aptos_temppath::TempPath;

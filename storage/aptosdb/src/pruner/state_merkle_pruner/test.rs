@@ -2,13 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    new_sharded_kv_schema_batch,
-    stale_node_index::StaleNodeIndexSchema,
-    stale_state_value_index::StaleStateValueIndexSchema,
+    common::NUM_STATE_SHARDS,
+    db::{
+        test_helper::{arb_state_kv_sets, update_store},
+        AptosDB,
+    },
+    pruner::{PrunerManager, StateKvPrunerManager, StateMerklePrunerManager},
+    schema::{
+        stale_node_index::StaleNodeIndexSchema, stale_state_value_index::StaleStateValueIndexSchema,
+    },
     state_merkle_db::StateMerkleDb,
     state_store::StateStore,
-    test_helper::{arb_state_kv_sets, update_store},
-    AptosDB, PrunerManager, StateKvPrunerManager, StateMerklePrunerManager, NUM_STATE_SHARDS,
+    utils::new_sharded_kv_schema_batch,
 };
 use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
 use aptos_crypto::HashValue;
@@ -64,6 +69,7 @@ fn put_value_set(
             &state_kv_metadata_batch,
             /*put_state_value_indices=*/ false,
             /*skip_usage=*/ false,
+            /*last_checkpoint_index=*/ None,
         )
         .unwrap();
     state_store

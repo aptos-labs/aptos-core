@@ -106,6 +106,9 @@ ContractEventV2:
     - type_tag:
         TYPENAME: TypeTag
     - event_data: BYTES
+DummyValidatorTransaction:
+  STRUCT:
+    - payload: BYTES
 Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
@@ -252,6 +255,12 @@ StructTag:
     - type_args:
         SEQ:
           TYPENAME: TypeTag
+ValidatorTransaction:
+  ENUM:
+    0:
+      DummyTopic:
+        NEWTYPE:
+          TYPENAME: DummyValidatorTransaction
 TableHandle:
   NEWTYPESTRUCT:
     TYPENAME: AccountAddress
@@ -273,6 +282,10 @@ Transaction:
       StateCheckpoint:
         NEWTYPE:
           TYPENAME: HashValue
+    4:
+      ValidatorTransaction:
+        NEWTYPE:
+          TYPENAME: ValidatorTransaction
 TransactionArgument:
   ENUM:
     0:

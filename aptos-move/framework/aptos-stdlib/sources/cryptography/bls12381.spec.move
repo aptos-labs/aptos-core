@@ -7,9 +7,11 @@ spec aptos_std::bls12381 {
     }
 
     spec public_key_from_bytes_with_pop {
+        pragma opaque;
         aborts_if false;
         ensures spec_verify_proof_of_possession_internal(pk_bytes, pop.bytes) ==> (std::option::spec_is_some(result) && std::option::spec_borrow(result).bytes == pk_bytes);
         ensures !spec_verify_proof_of_possession_internal(pk_bytes, pop.bytes) ==> std::option::spec_is_none(result);
+        ensures [abstract] result == spec_public_key_from_bytes_with_pop(pk_bytes, pop);
     }
 
     spec aggregate_pubkeys {
@@ -116,6 +118,8 @@ spec aptos_std::bls12381 {
     /// # Helper functions
 
     spec fun spec_aggregate_pubkeys_internal_1(public_keys: vector<PublicKeyWithPoP>): vector<u8>;
+
+    spec fun spec_public_key_from_bytes_with_pop(pk_bytes: vector<u8>, pop: ProofOfPossession): Option<PublicKeyWithPoP>;
 
     spec fun spec_aggregate_pubkeys_internal_2(public_keys: vector<PublicKeyWithPoP>): bool;
 

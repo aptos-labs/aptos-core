@@ -10,7 +10,7 @@ module aptos_std::math_fixed {
 
     /// Natural log 2 in 32 bit fixed point
     const LN2: u128 = 2977044472;  // ln(2) in fixed 32 representation
-    const LN2_X_32: u64 = 32 * 2977044472;  // ln(2) in fixed 32 representation
+    const LN2_X_32: u64 = 32 * 2977044472;  // 32 * ln(2) in fixed 32 representation
 
     /// Square root of fixed point number
     public fun sqrt(x: FixedPoint32): FixedPoint32 {

@@ -21,8 +21,11 @@ use core::{
     result::Result::{Err, Ok},
 };
 use futures::StreamExt;
-use rand::{rngs::StdRng, SeedableRng};
-use std::{path::Path, time::Instant};
+use rand::{rngs::StdRng, Rng, SeedableRng};
+use std::{
+    path::Path,
+    time::{Duration, Instant},
+};
 
 #[derive(Debug)]
 pub struct AccountMinter<'t> {
@@ -379,7 +382,8 @@ impl<'t> AccountMinter<'t> {
         txn_executor: &dyn ReliableTransactionSubmitter,
         coins_for_source: u64,
     ) -> Result<LocalAccount> {
-        for i in 0..3 {
+        const NUM_TRIES: usize = 3;
+        for i in 0..NUM_TRIES {
             self.source_account.set_sequence_number(
                 txn_executor
                     .query_sequence_number(self.source_account.address())
@@ -397,7 +401,12 @@ impl<'t> AccountMinter<'t> {
                 error!(
                     "Couldn't create new source account, {:?}, try {}, retrying",
                     e, i
-                )
+                );
+                // random sleep to coordinate with other instances
+                if i + 1 < NUM_TRIES {
+                    let sleep_secs = rand::thread_rng().gen_range(0, 10);
+                    tokio::time::sleep(Duration::from_secs(sleep_secs)).await;
+                }
             } else {
                 new_source_account.set_sequence_number(
                     txn_executor
