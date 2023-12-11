@@ -100,6 +100,21 @@ impl IndexerAsyncV2 {
         self.index_with_annotator(&annotator, first_version, write_sets)
     }
 
+    pub fn handle_pending_on_items(
+        &self,
+        db_reader: Arc<dyn DbReader>,
+        last_version: Version,
+    ) -> Result<()> {
+        let state_view = DbStateView {
+            db: db_reader,
+            version: Some(last_version),
+        };
+        let resolver = state_view.as_move_resolver();
+        let annotator = MoveValueAnnotator::new(&resolver);
+        let mut table_info_parser = TableInfoParser::new(self, &annotator, &self.pending_on);
+        table_info_parser.parse_pending_on()
+    }
+
     pub fn index_with_annotator<R: MoveResolver>(
         &self,
         annotator: &MoveValueAnnotator<R>,
@@ -177,6 +192,10 @@ impl IndexerAsyncV2 {
             std::thread::sleep(Duration::from_millis(TABLE_INFO_RETRY_TIME_MILLIS));
         }
     }
+
+    pub fn is_indexer_async_v2_pending_on_empty(&self) -> bool {
+        self.pending_on.is_empty()
+    }
 }
 
 struct TableInfoParser<'a, R> {
@@ -198,6 +217,18 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
             result: HashMap::new(),
             pending_on,
         }
+    }
+
+    pub fn parse_pending_on(&mut self) -> Result<()> {
+        let handles: Vec<TableHandle> = self.pending_on.iter().map(|entry| *entry.key()).collect();
+        for handle in handles {
+            if let Some(pending_items) = self.pending_on.remove(&handle) {
+                for bytes in pending_items.1 {
+                    self.parse_table_item(handle, &bytes)?;
+                }
+            }
+        };
+        Ok(())
     }
 
     /// Parses a write operation and extracts table information from it.

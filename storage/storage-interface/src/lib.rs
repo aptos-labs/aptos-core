@@ -453,6 +453,8 @@ pub trait DbReader: Send + Sync {
         /// Returns  the next version which internal indexer async v2 DB should parse
         fn get_indexer_async_v2_next_version(&self) -> Result<Version>;
 
+        fn is_indexer_async_v2_pending_on_empty(&self) -> Result<bool>;
+
         /// Returns state storage usage at the end of an epoch.
         fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage>;
     ); // end delegated
@@ -570,6 +572,14 @@ pub trait DbWriter: Send + Sync {
         db_reader: Arc<dyn DbReader>,
         first_version: Version,
         write_sets: &[&WriteSet],
+    ) -> Result<()> {
+        unimplemented!()
+    }
+
+    fn handle_pending_on_items(
+        &self,
+        db_reader: Arc<dyn DbReader>,
+        last_version: Version,
     ) -> Result<()> {
         unimplemented!()
     }

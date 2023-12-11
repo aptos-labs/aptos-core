@@ -845,10 +845,6 @@ impl DbReader for FakeAptosDB {
         self.inner.indexer_enabled()
     }
 
-    fn indexer_async_v2_enabled(&self) -> bool {
-        self.inner.indexer_async_v2_enabled()
-    }
-
     fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
         self.inner.get_state_storage_usage(version)
     }

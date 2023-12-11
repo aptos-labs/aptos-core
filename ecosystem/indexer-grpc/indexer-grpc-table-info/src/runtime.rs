@@ -50,7 +50,7 @@ pub fn bootstrap(
             Arc::new(Context::new(chain_id, db.reader.clone(), mp_sender, node_config));
         let mut ma = MovingAverage::new(10_000);
         let mut base: u64 = 0;
-        let db_writer = db.writer.clone();
+        let db = db.clone();
         let mut parser =
             TableInfoParser::new(context, start_version, parser_task_count, parser_batch_size);
         // 1. fetch new transactions
@@ -60,7 +60,7 @@ pub fn bootstrap(
         // 5. after all batches from the loop complete, start from 1 again
         loop {
             let start_time = std::time::Instant::now();
-            let results = parser.process_next_batch(db_writer.clone()).await;
+            let results = parser.process_next_batch(db.clone()).await;
             let max_version =
                 match TableInfoParser::get_max_batch_version(results) {
                     Ok(max_version) => max_version,

@@ -216,6 +216,19 @@ impl DbWriter for AptosDB {
                 .unwrap_or(Ok(()))
         })
     }
+
+    fn handle_pending_on_items(
+        &self,
+        db_reader: Arc<dyn DbReader>,
+        last_version: Version,
+    ) -> Result<()> {
+        gauged_api("handle_pending_on_items", || {
+            self.indexer_async_v2
+                .as_ref()
+                .map(|indexer| indexer.handle_pending_on_items(db_reader, last_version))
+                .unwrap_or(Ok(()))
+        })
+    }
 }
 
 impl AptosDB {

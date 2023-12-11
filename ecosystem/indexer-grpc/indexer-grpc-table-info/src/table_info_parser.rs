@@ -9,7 +9,7 @@ use aptos_db_indexer_async_v2::counters::{
 };
 use aptos_logger::{debug, error, info, sample, sample::SampleRate};
 use aptos_sdk::bcs;
-use aptos_storage_interface::DbWriter;
+use aptos_storage_interface::{DbReaderWriter, DbWriter};
 use aptos_types::write_set::WriteSet;
 use std::{sync::Arc, time::Duration};
 use tonic::Status;
@@ -55,11 +55,11 @@ impl TableInfoParser {
     /// 2. Get write sets from transactions and parse write sets to get handle -> key,value type mapping, write the mapping to the rocksdb
     pub async fn process_next_batch(
         &mut self,
-        db_writer: Arc<dyn DbWriter>,
+        db: DbReaderWriter,
     ) -> Vec<Result<EndVersion, Status>> {
         let mut tasks = vec![];
         let batches = self.get_batches().await;
-        let db_writer = db_writer.clone();
+        let db_writer = db.writer.clone();
 
         for batch in batches {
             let start_time = std::time::Instant::now();
@@ -70,7 +70,6 @@ impl TableInfoParser {
                 let raw_txns =
                     Self::fetch_raw_txns_with_retries(context.clone(), ledger_version, batch).await;
                 Self::parse_table_info(context.clone(), raw_txns.clone(), db_writer.clone())
-                    .await
                     .expect("Failed to parse table info");
 
                 DURATION_IN_SECS
@@ -93,7 +92,30 @@ impl TableInfoParser {
             tasks.push(task);
         }
         match futures::future::try_join_all(tasks).await {
-            Ok(res) => res,
+            Ok(res) => {
+                let db_reader = db.reader.clone();
+                let mut retried: u64 = 0;
+                while !db_reader.clone().is_indexer_async_v2_pending_on_empty().unwrap() {
+                    retried += 1;
+                    let retry_batch = TransactionBatchInfo {
+                        start_version: self.current_version,
+                        num_transactions_to_fetch: self.parser_batch_size * self.parser_task_count,
+                    };
+                    let context = self.context.clone();
+                    let ledger_version = self.highest_known_version;
+                    let raw_txns =
+                        Self::fetch_raw_txns_with_retries(context.clone(), ledger_version, retry_batch).await;
+                    Self::parse_table_info(context.clone(), raw_txns.clone(), db_writer.clone())
+                        .expect("Failed to parse table info");
+                    info!(
+                        start_version = self.current_version,
+                        retry_count = retried,
+                        "Missing data in table info parsing",
+                    );
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+                res
+            },
             Err(err) => panic!("Error processing table info batches: {:?}", err),
         }
     }
@@ -188,7 +210,7 @@ impl TableInfoParser {
         }
     }
 
-    async fn parse_table_info(
+    fn parse_table_info(
         context: Arc<Context>,
         raw_txns: Vec<TransactionOnChainData>,
         db_writer: Arc<dyn DbWriter>,

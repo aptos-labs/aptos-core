@@ -285,13 +285,13 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
             // TODO(grao): Support path override here.
             let restore_handler = Arc::new(AptosDB::open_kv_only(
                 StorageDirPaths::from_path(db_dir),
-                false,                       /* read_only */
+                false, /* read_only */
                 NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
                 opt.rocksdb_opt.clone().into(),
-                false,
+                false, /* indexer */
                 BUFFERED_STATE_TARGET_ITEMS,
                 DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-                false,
+                false, /* indexer async v2 */
             )?)
             .get_restore_handler();
 

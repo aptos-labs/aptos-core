@@ -767,6 +767,17 @@ impl DbReader for AptosDB {
                 .unwrap_or(0))
         })
     }
+
+    fn is_indexer_async_v2_pending_on_empty(&self) -> Result<bool> {
+        gauged_api("is_indexer_async_v2_pending_on_empty", || {
+            Ok(self
+                .indexer_async_v2
+                .as_ref()
+                .map(|indexer| indexer.is_indexer_async_v2_pending_on_empty())
+                .unwrap_or(false)
+            )
+        })
+    }
 }
 
 impl AptosDB {
