@@ -419,7 +419,13 @@ impl QuorumStoreSender for NetworkSender {
                 batch.verify_with_digest(request_digest)?;
                 Ok(BatchResponse::Batch(*batch))
             },
-            ConsensusMsg::BatchResponseV2(maybe_batch) => Ok(*maybe_batch),
+            ConsensusMsg::BatchResponseV2(maybe_batch) => {
+                if let BatchResponse::Batch(batch) = maybe_batch.as_ref() {
+                    batch.verify_with_digest(request_digest)?;
+                }
+                // Note BatchResponse::NotFound(ledger_info) is verified later with a ValidatorVerifier
+                Ok(*maybe_batch)
+            },
             _ => Err(anyhow!("Invalid batch response")),
         }
     }
