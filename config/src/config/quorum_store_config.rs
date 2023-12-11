@@ -10,6 +10,9 @@ use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
+pub const SENDER_BATCH_PADDING_BYTES: usize = 160;
+const DEFAULT_SENDER_MAX_NUM_BATCHES: usize = 20;
+
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct QuorumStoreBackPressureConfig {
@@ -80,10 +83,11 @@ impl Default for QuorumStoreConfig {
             batch_generation_min_non_empty_interval_ms: 200,
             batch_generation_max_interval_ms: 250,
             sender_max_batch_txns: 250,
-            sender_max_batch_bytes: 1024 * 1024,
-            sender_max_num_batches: 20,
+            sender_max_batch_bytes: 1024 * 1024 - SENDER_BATCH_PADDING_BYTES,
+            sender_max_num_batches: DEFAULT_SENDER_MAX_NUM_BATCHES,
             sender_max_total_txns: 2000,
-            sender_max_total_bytes: 4 * 1024 * 1024,
+            sender_max_total_bytes: 4 * 1024 * 1024
+                - DEFAULT_SENDER_MAX_NUM_BATCHES * SENDER_BATCH_PADDING_BYTES,
             receiver_max_batch_txns: 250,
             receiver_max_batch_bytes: 1024 * 1024,
             receiver_max_num_batches: 20,

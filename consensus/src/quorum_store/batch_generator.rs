@@ -146,16 +146,38 @@ impl BatchGenerator {
         num_txns_in_bucket: usize,
         expiry_time: u64,
         bucket_start: u64,
+        total_batches_remaining: &mut u64,
+        total_txns_remaining: &mut u64,
+        total_bytes_remaining: &mut u64,
     ) -> bool {
         let mut remaining_txns = num_txns_in_bucket;
         while remaining_txns > 0 {
-            if batches.len() == self.config.sender_max_num_batches {
+            if *total_batches_remaining == 0
+                || *total_txns_remaining == 0
+                || *total_bytes_remaining == 0
+            {
                 return false;
             }
-            let num_batch_txns = std::cmp::min(self.config.sender_max_batch_txns, remaining_txns);
+            let num_take_txns = std::cmp::min(self.config.sender_max_batch_txns, remaining_txns);
+            let mut batch_bytes: u64 = 0;
+            let num_batch_txns = txns
+                .iter()
+                .take(num_take_txns)
+                .take_while(|txn| {
+                    let txn_bytes = txn.txn_bytes_len() as u64;
+                    batch_bytes += txn_bytes;
+                    *total_txns_remaining = total_txns_remaining.saturating_sub(1);
+                    *total_bytes_remaining = total_bytes_remaining.saturating_sub(txn_bytes);
+
+                    batch_bytes <= self.config.sender_max_batch_bytes as u64
+                        && *total_txns_remaining > 0
+                        && *total_bytes_remaining > 0
+                })
+                .count();
             let batch_txns: Vec<_> = txns.drain(0..num_batch_txns).collect();
             let batch = self.create_new_batch(batch_txns, expiry_time, bucket_start);
             batches.push(batch);
+            *total_batches_remaining = total_batches_remaining.saturating_sub(1);
             remaining_txns -= num_batch_txns;
         }
         true
@@ -169,6 +191,10 @@ impl BatchGenerator {
         // Sort by gas, in descending order. This is a stable sort on existing mempool ordering,
         // so will not reorder accounts or their sequence numbers as long as they have the same gas.
         pulled_txns.sort_by_key(|txn| u64::MAX - txn.gas_unit_price());
+
+        let mut max_batches_remaining = self.config.sender_max_num_batches as u64;
+        let mut max_txns_remaining = self.config.sender_max_total_txns as u64;
+        let mut max_bytes_remaining = self.config.sender_max_total_bytes as u64;
 
         let reverse_buckets_excluding_zero: Vec<_> = self
             .config
@@ -202,6 +228,9 @@ impl BatchGenerator {
                 num_txns_in_bucket,
                 expiry_time,
                 *bucket_start,
+                &mut max_batches_remaining,
+                &mut max_txns_remaining,
+                &mut max_bytes_remaining,
             );
             if !batches_space_remaining {
                 return batches;
@@ -214,6 +243,9 @@ impl BatchGenerator {
                 pulled_txns.len(),
                 expiry_time,
                 0,
+                &mut max_batches_remaining,
+                &mut max_txns_remaining,
+                &mut max_bytes_remaining,
             );
         }
         batches

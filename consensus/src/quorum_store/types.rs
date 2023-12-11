@@ -129,6 +129,22 @@ impl BatchPayload {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use aptos_config::config;
+
+    #[test]
+    fn test_batch_payload_padding() {
+        use super::*;
+        let empty_batch_payload = BatchPayload::new(PeerId::random(), vec![]);
+        // We overestimate the ULEB128 encoding of the number of transactions as 128 bytes.
+        assert_eq!(
+            empty_batch_payload.num_bytes() + 127,
+            config::SENDER_BATCH_PADDING_BYTES
+        );
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Batch {
     batch_info: BatchInfo,

@@ -109,6 +109,7 @@ impl BatchCoordinator {
     async fn handle_batches_msg(&mut self, author: PeerId, batches: Vec<Batch>) {
         if let Err(e) = self.ensure_max_limits(&batches) {
             warn!("Batch from {}: {}", author, e);
+            counters::RECEIVED_BATCH_MAX_LIMIT_FAILED.inc();
             return;
         }
 
