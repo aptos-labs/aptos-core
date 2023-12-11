@@ -191,9 +191,9 @@ spec aptos_framework::coin {
         include DepositAbortsIf<CoinType>;
         ensures global<CoinStore<CoinType>>(account_addr).coin.value == old(global<CoinStore<CoinType>>(account_addr)).coin.value + coin.value;
     }
+
     spec schema DepositAbortsIf<CoinType> {
         account_addr: address;
-        coin: Coin<CoinType>;
         let coin_store = global<CoinStore<CoinType>>(account_addr);
         aborts_if !exists<CoinStore<CoinType>>(account_addr);
         aborts_if coin_store.frozen;

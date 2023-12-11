@@ -6,12 +6,16 @@ use crate::{
     network_interface::ConsensusMsg,
     rand::rand_gen::types::{
         AugData, AugDataSignature, AugmentedData, CertifiedAugData, CertifiedAugDataAck, Proof,
-        RandShare, Share, ShareAck,
+        RandConfig, RandShare, Share, ShareAck,
     },
 };
 use anyhow::bail;
 use aptos_enum_conversion_derive::EnumConversion;
+use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::RBMessage;
+use aptos_types::epoch_state::EpochState;
+use bytes::Bytes;
+use futures_channel::oneshot;
 use serde::{Deserialize, Serialize};
 use std::cmp::min;
 
@@ -23,6 +27,16 @@ pub enum RandMessage<S, P, D> {
     AugDataSignature(AugDataSignature),
     CertifiedAugData(CertifiedAugData<D>),
     CertifiedAugDataAck(CertifiedAugDataAck),
+}
+
+impl<S: Share, P: Proof<Share = S>, D: AugmentedData> RandMessage<S, P, D> {
+    pub fn verify(
+        &self,
+        _epoch_state: &EpochState,
+        _rand_config: &RandConfig,
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
 }
 
 impl<S: Share, P: Proof<Share = S>, D: AugmentedData> RBMessage for RandMessage<S, P, D> {}
@@ -61,6 +75,12 @@ pub struct RandGenMessage {
     data: Vec<u8>,
 }
 
+impl RandGenMessage {
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+}
+
 impl core::fmt::Debug for RandGenMessage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RandGenMessage")
@@ -68,4 +88,10 @@ impl core::fmt::Debug for RandGenMessage {
             .field("data", &hex::encode(&self.data[..min(20, self.data.len())]))
             .finish()
     }
+}
+
+pub struct RpcRequest<S, P, D> {
+    pub req: RandMessage<S, P, D>,
+    pub protocol: ProtocolId,
+    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
 }

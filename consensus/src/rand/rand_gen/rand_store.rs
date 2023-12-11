@@ -5,6 +5,7 @@ use crate::{
     pipeline::buffer_manager::OrderedBlocks,
     rand::rand_gen::{
         block_queue::{BlockQueue, QueueItem},
+        storage::interface::RandStorage,
         types::{Proof, RandConfig, RandDecision, RandShare, Share},
     },
 };
@@ -14,7 +15,7 @@ use aptos_consensus_types::{
     randomness::RandMetadata,
 };
 use aptos_logger::error;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 struct ShareAggregator<S> {
     shares: HashMap<Author, RandShare<S>>,
@@ -159,20 +160,22 @@ impl<S: Share, P: Proof<Share = S>> RandItem<S, P> {
     }
 }
 
-pub struct RandStore<S, P> {
+pub struct RandStore<S, P, Storage> {
     author: Author,
     rand_config: RandConfig,
     rand_map: HashMap<Round, RandItem<S, P>>,
     block_queue: BlockQueue,
+    db: Arc<Storage>,
 }
 
-impl<S: Share, P: Proof<Share = S>> RandStore<S, P> {
-    pub fn new(author: Author, rand_config: RandConfig) -> Self {
+impl<S: Share, P: Proof<Share = S>, Storage: RandStorage<S, P>> RandStore<S, P, Storage> {
+    pub fn new(author: Author, rand_config: RandConfig, db: Arc<Storage>) -> Self {
         Self {
             author,
             rand_config,
             rand_map: HashMap::new(),
             block_queue: BlockQueue::new(),
+            db,
         }
     }
 
@@ -246,13 +249,14 @@ mod tests {
     use crate::rand::rand_gen::{
         block_queue::QueueItem,
         rand_store::{RandItem, RandStore, ShareAggregator},
+        storage::in_memory::InMemRandDb,
         test_utils::{
             create_decision, create_ordered_blocks, create_share, create_share_for_round,
         },
-        types::{MockProof, MockShare, RandConfig},
+        types::{MockAugData, MockProof, MockShare, RandConfig},
     };
     use aptos_consensus_types::{common::Author, randomness::RandMetadata};
-    use std::{collections::HashMap, str::FromStr};
+    use std::{collections::HashMap, str::FromStr, sync::Arc};
 
     #[test]
     fn test_share_aggregator() {
@@ -313,7 +317,11 @@ mod tests {
             .collect();
         let authors: Vec<Author> = weights.keys().cloned().collect();
         let config = RandConfig::new(Author::ZERO, weights);
-        let mut rand_store = RandStore::new(Author::ZERO, config);
+        let mut rand_store = RandStore::new(
+            Author::ZERO,
+            config,
+            Arc::new(InMemRandDb::<MockShare, MockProof, MockAugData>::new()),
+        );
 
         let rounds = vec![vec![1], vec![2, 3], vec![5, 8, 13]];
         let blocks_1 = QueueItem::new(create_ordered_blocks(rounds[0].clone()));

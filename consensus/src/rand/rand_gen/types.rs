@@ -7,15 +7,19 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::bls12381::Signature;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_infallible::RwLock;
 use aptos_types::{aggregate_signature::AggregateSignature, validator_verifier::ValidatorVerifier};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug};
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub(super) struct MockShare;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub(super) struct MockProof;
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub(super) struct MockAugData;
 
 impl Share for MockShare {
     fn verify(
@@ -47,6 +51,8 @@ impl Proof for MockProof {
     }
 }
 
+impl AugmentedData for MockAugData {}
+
 pub trait Share:
     Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned + 'static
 {
@@ -73,7 +79,7 @@ pub trait AugmentedData:
 {
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct ShareId {
     epoch: u64,
     round: Round,
@@ -172,10 +178,24 @@ impl<P> ShareAck<P> {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Hash, Eq)]
 pub struct AugDataId {
     epoch: u64,
     author: Author,
+}
+
+impl AugDataId {
+    pub fn new(epoch: u64, author: Author) -> Self {
+        Self { epoch, author }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
+    pub fn author(&self) -> Author {
+        self.author
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
@@ -273,10 +293,12 @@ impl CertifiedAugDataAck {
     }
 }
 
+#[derive(Clone)]
 pub struct RandConfig {
     author: Author,
     threshold: u64,
     weights: HashMap<Author, u64>,
+    certified_data: Arc<RwLock<HashMap<Author, Vec<u8>>>>,
 }
 
 impl RandConfig {
@@ -286,6 +308,7 @@ impl RandConfig {
             author,
             weights,
             threshold: sum * 2 / 3 + 1,
+            certified_data: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -298,5 +321,9 @@ impl RandConfig {
 
     pub fn threshold_weight(&self) -> u64 {
         self.threshold
+    }
+
+    pub fn add_certified_data(&self, author: Author, data: Vec<u8>) {
+        self.certified_data.write().insert(author, data);
     }
 }
