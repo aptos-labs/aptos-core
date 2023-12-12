@@ -784,6 +784,63 @@ class RestClient:
         )
         return await self.submit_bcs_transaction(signed_transaction)
 
+    async def view(
+        self,
+        function: str,
+        type_arguments: List[str],
+        arguments: List[str],
+        ledger_version: Optional[int] = None,
+    ) -> bytes:
+        """
+        Execute a view Move function with the given parameters and return its execution result.
+
+        The Aptos nodes prune account state history, via a configurable time window. If the requested ledger version
+        has been pruned, the server responds with a 410.
+
+        :param function: Entry function id is string representation of an entry function defined on-chain.
+        :param type_arguments: Type arguments of the function.
+        :param arguments: Arguments of the function.
+        :param ledger_version: Ledger version to get state of account. If not provided, it will be the latest version.
+        :returns: Execution result.
+        """
+        response = await self._post(
+            endpoint="view",
+            params={
+                "ledger_version": ledger_version,
+            },
+            headers={
+                "Accept": "application/json, application/x-bcs",
+                "Content-Type": "application/json",
+            },
+            data={
+                "function": function,
+                "type_arguments": type_arguments,
+                "arguments": arguments,
+            }
+        )
+        if response.status_code >= 400:
+            raise ApiError(response.text, response.status_code)
+
+        return response.content
+
+    async def _post(
+        self,
+        endpoint: str,
+        params: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, Any]] = None,
+        data: Optional[Dict[str, Any]] = None,
+    ) -> httpx.Response:
+        # format params:
+        params = {} if params is None else params
+        params = {key: val for key, val in params.items() if val is not None}
+        return await self.client.post(
+            url=f"{self.base_url}/{endpoint}",
+            params=params,
+            headers=headers,
+            # data=data,
+            json=data,
+        )
+
     async def _get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> httpx.Response:
         # format params:
         params = {} if params is None else params
