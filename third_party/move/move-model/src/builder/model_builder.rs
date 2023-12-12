@@ -16,7 +16,7 @@ use crate::{
         SpecFunId, SpecVarId, StructId, TypeParameter,
     },
     symbol::Symbol,
-    ty::{check_instantiation, Constraint, Type},
+    ty::{infer_abilities, infer_and_check_abilities, Constraint, Type},
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -390,21 +390,29 @@ impl<'env> ModelBuilder<'env> {
             .expect("invalid Type::Struct")
     }
 
-    // assuming all structs are well defined
-    // checks whether the type is instantiated properly, i.e.,
-    // - the type arguments given to the struct are instantiated properly
-    // - the type arguments satisfy the ability constraints defined on the struct generics
-    // and returns the abilities of the given type
-    // `ty_params` specify the abilities held by type params
-    pub fn check_instantiation(
-        &self,
-        ty: &Type,
-        ty_params: &[TypeParameter],
-        loc: &Loc,
-    ) -> AbilitySet {
-        check_instantiation(
+    /// returns the abilities for the generics and the abilities of the struct
+    fn get_abilities(&self, mid: ModuleId, sid: StructId) -> (Vec<AbilitySet>, AbilitySet) {
+        let struct_entry = self.lookup_struct_entry(mid.qualified(sid));
+        let struct_abilities = struct_entry.abilities;
+        let params_ability_constraints = struct_entry
+            .type_params
+            .iter()
+            .map(|tp| tp.1.abilities)
+            .collect_vec();
+        (params_ability_constraints, struct_abilities)
+    }
+
+    fn gen_get_abilities<'a>(
+        &'a self,
+    ) -> impl Fn(ModuleId, StructId) -> (Vec<AbilitySet>, AbilitySet) + Copy + 'a {
+        |mid, sid| self.get_abilities(mid, sid)
+    }
+
+    /// Specialized `ty::infer_and_check_abilities`
+    /// where the abilities of type arguments are given by `ty_params`
+    pub fn check_instantiation(&self, ty: &Type, ty_params: &[TypeParameter], loc: &Loc) {
+        infer_and_check_abilities(
             ty,
-            Some(loc),
             |i| {
                 if let Some(tp) = ty_params.get(i as usize) {
                     tp.1.abilities
@@ -412,41 +420,16 @@ impl<'env> ModelBuilder<'env> {
                     panic!("ICE unbound type parameter")
                 }
             },
-            |mid, sid| {
-                let struct_entry = self.lookup_struct_entry(mid.qualified(sid));
-                let struct_abilities = struct_entry.abilities;
-                let params_ability_constraints = struct_entry
-                    .type_params
-                    .iter()
-                    .map(|tp| tp.1.abilities)
-                    .collect_vec();
-                (params_ability_constraints, struct_abilities)
-            },
+            self.gen_get_abilities(),
+            loc,
             |loc, err| self.error(loc, err),
-            true,
-        )
+        );
     }
 
     /// Infers the abilities the given type may have,
-    // if all type params have all abilities.
+    /// if all type params have all abilities.
     pub fn infer_abilities_may_have(&self, ty: &Type) -> AbilitySet {
-        check_instantiation(
-            ty,
-            None,
-            |_| AbilitySet::ALL,
-            |mid, sid| {
-                let struct_entry = self.lookup_struct_entry(mid.qualified(sid));
-                let struct_abilities = struct_entry.abilities;
-                let params_ability_constraints = struct_entry
-                    .type_params
-                    .iter()
-                    .map(|tp| tp.1.abilities)
-                    .collect_vec();
-                (params_ability_constraints, struct_abilities)
-            },
-            |loc, err| self.error(loc, err),
-            false,
-        )
+        infer_abilities(ty, |_| AbilitySet::ALL, self.gen_get_abilities())
     }
 
     /// Checks whether a struct is well defined.

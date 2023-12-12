@@ -14,26 +14,26 @@ use move_stackless_bytecode::{
     stackless_bytecode::{AssignKind, Bytecode, Operation},
 };
 
-// Returns the abilities of the given type.
+/// Returns the abilities of the given type.
 fn type_abilities(func_target: &FunctionTarget, ty: &Type) -> AbilitySet {
     let ty_params = func_target.get_type_parameters();
     let global_env = func_target.global_env();
     global_env.type_abilities(ty, &ty_params)
 }
 
-// Determines if the given type has constraint copy.
+/// Determines if the given type has constraint copy.
 fn has_copy(func_target: &FunctionTarget, ty: &Type) -> bool {
     type_abilities(func_target, ty).has_ability(Ability::Copy)
 }
 
-// Checks if the given type has constraint copy, and add diagnostics if not.
+/// Checks if the given type has constraint copy, and add diagnostics if not.
 fn check_copy(func_target: &FunctionTarget, ty: &Type, loc: &Loc, err_msg: &str) {
     if !has_copy(func_target, ty) {
         func_target.global_env().error(loc, err_msg)
     }
 }
 
-// Checks if the given temporary variable has constraint copy, and add diagnostics if not.
+/// Checks if the given temporary variable has constraint copy, and add diagnostics if not.
 fn check_copy_for_temp_with_msg(
     func_target: &FunctionTarget,
     t: TempIndex,
@@ -57,14 +57,14 @@ fn has_drop(func_target: &FunctionTarget, ty: &Type) -> bool {
     type_abilities(func_target, ty).has_ability(Ability::Drop)
 }
 
-// Checks if the given type has constraint drop, and add diagnostics if not.
+/// Checks if the given type has constraint drop, and add diagnostics if not.
 fn check_drop(func_target: &FunctionTarget, ty: &Type, loc: &Loc, err_msg: &str) {
     if !has_drop(func_target, ty) {
         func_target.global_env().error(loc, err_msg)
     }
 }
 
-// Checks if the given temporary variable has constraint drop, and add diagnostics if not.
+/// Checks if the given temporary variable has constraint drop, and add diagnostics if not.
 fn check_drop_for_temp_with_msg(
     func_target: &FunctionTarget,
     t: TempIndex,
@@ -75,10 +75,10 @@ fn check_drop_for_temp_with_msg(
     check_drop(func_target, ty, loc, err_msg)
 }
 
-// `t` is the local containing the reference being written to
+/// `t` is the local containing the reference being written to
 fn check_write_ref(target: &FunctionTarget, t: TempIndex, loc: &Loc) {
     if let Type::Reference(_, ty) = target.get_local_type(t) {
-        // todo: check key, store
+        // TODO: check key, store
         check_drop(target, ty, loc, "write_ref: cannot drop")
     } else {
         panic!("ICE typing error")
@@ -127,25 +127,23 @@ fn get_abilities<'a>(
     }
 }
 
-// checks that the given type is instantiated with types satisfying their ability constraints
-// on the type parameter
+/// checks that the given type is instantiated with types satisfying their ability constraints
+/// on the type parameter
 fn check_struct_inst(
     target: &FunctionTarget,
     mid: ModuleId,
     sid: StructId,
-    insts: &[Type],
+    ty_args: &[Type],
     loc: &Loc,
 ) -> AbilitySet {
     let ty_params = target.get_type_parameters();
     ty::check_struct_inst(
         mid,
         sid,
-        insts,
-        Some(loc),
+        ty_args,
         ty_param_abilities(&ty_params),
         get_abilities(target),
-        |loc, msg| target.global_env().error(loc, msg),
-        true,
+        Some((loc, |loc: &Loc, msg: &str| target.global_env().error(loc, msg))),
     )
 }
 
@@ -158,27 +156,23 @@ fn check_fun_inst(target: &FunctionTarget, mid: ModuleId, fid: FunId, inst: &[Ty
     for (param, ty) in fun_env.get_type_parameters().iter().zip(inst.iter()) {
         let required_abilities = param.1.abilities;
         let given_abilities = check_instantiation(target, ty, loc);
-        // todo: which field, why
+        // TODO: which field, why
         if !required_abilities.is_subset(given_abilities) {
             target.global_env().error(loc, "invalid instantiation")
         }
     }
 }
 
-// checks whether the type is instantiated properly, i.e.,
-// - the type arguments given to the struct are instantiated properly
-// - the type arguments satisfy the ability constraints defined on the struct generics
-// and returns the abilities of the given type
-// `ty_params` specify the abilities held by type params
+/// `ty::infer_and_check_abilities` in the context of a `FunctionTarget`
+/// where the abilities of type parameters comes from the function generics
 pub fn check_instantiation(target: &FunctionTarget, ty: &Type, loc: &Loc) -> AbilitySet {
     let ty_params = target.get_type_parameters();
-    ty::check_instantiation(
+    ty::infer_and_check_abilities(
         ty,
-        Some(loc),
         ty_param_abilities(&ty_params),
         get_abilities(target),
+        loc,
         |loc, msg| target.global_env().error(loc, msg),
-        true,
     )
 }
 
