@@ -36,6 +36,8 @@ pub struct IndexerGrpcConfig {
 
     /// Number of transactions returned in a single stream response
     pub output_batch_size: u16,
+
+    pub enable_verbose_logging: bool,
 }
 
 // Reminder, #[serde(default)] on IndexerGrpcConfig means that the default values for
@@ -53,6 +55,7 @@ impl Default for IndexerGrpcConfig {
             processor_task_count: DEFAULT_PROCESSOR_TASK_COUNT,
             processor_batch_size: DEFAULT_PROCESSOR_BATCH_SIZE,
             output_batch_size: DEFAULT_OUTPUT_BATCH_SIZE,
+            enable_verbose_logging: false,
         }
     }
 }

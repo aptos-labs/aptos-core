@@ -3,21 +3,17 @@
 
 use crate::metrics::{
     ERROR_COUNT, LATEST_PROCESSED_VERSION as LATEST_PROCESSED_VERSION_OLD, PROCESSED_BATCH_SIZE,
-    PROCESSED_LATENCY_IN_SECS, PROCESSED_VERSIONS_COUNT,
+    PROCESSED_VERSIONS_COUNT,
 };
 use anyhow::{bail, Context, Result};
 use aptos_indexer_grpc_utils::{
     cache_operator::CacheOperator,
     config::IndexerGrpcFileStoreConfig,
-    counters::{
-        IndexerGrpcStep, DURATION_IN_SECS, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_COUNT,
-        TOTAL_SIZE_IN_BYTES, TRANSACTION_UNIX_TIMESTAMP,
-    },
+    counters::{log_grpc_step, IndexerGrpcStep},
     create_grpc_client,
     file_store_operator::{
         FileStoreMetadata, FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator,
     },
-    time_diff_since_pb_timestamp_in_secs, timestamp_to_unixtime,
     types::RedisUrl,
 };
 use aptos_moving_average::MovingAverage;
@@ -48,6 +44,7 @@ pub struct Worker {
     fullnode_grpc_address: Url,
     /// File store config
     file_store: IndexerGrpcFileStoreConfig,
+    enable_verbose_logging: bool,
 }
 
 /// GRPC data status enum is to identify the data frame.
@@ -76,11 +73,12 @@ impl Worker {
         fullnode_grpc_address: Url,
         redis_main_instance_address: RedisUrl,
         file_store: IndexerGrpcFileStoreConfig,
+        enable_verbose_logging: bool,
     ) -> Result<Self> {
         let redis_client = redis::Client::open(redis_main_instance_address.0.clone())
             .with_context(|| {
                 format!(
-                    "Failed to create redis client for {}",
+                    "[Indexer Cache] Failed to create redis client for {}",
                     redis_main_instance_address
                 )
             })?;
@@ -88,6 +86,7 @@ impl Worker {
             redis_client,
             file_store,
             fullnode_grpc_address,
+            enable_verbose_logging,
         })
     }
 
@@ -155,6 +154,7 @@ impl Worker {
                 file_store_metadata,
                 file_store_operator,
                 response.into_inner(),
+                self.enable_verbose_logging,
             )
             .await?;
         }
@@ -164,7 +164,9 @@ impl Worker {
 async fn process_transactions_from_node_response(
     response: TransactionsFromNodeResponse,
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
+    enable_verbose_logging: bool,
 ) -> Result<GrpcDataStatus> {
+    let size_in_bytes = response.encoded_len();
     match response.response.unwrap() {
         Response::Status(status) => {
             match StatusType::try_from(status.r#type).expect("[Indexer Cache] Invalid status type.")
@@ -186,6 +188,7 @@ async fn process_transactions_from_node_response(
             }
         },
         Response::Data(data) => {
+            let starting_time = std::time::Instant::now();
             let transaction_len = data.transactions.len();
             let first_transaction = data
                 .transactions
@@ -196,9 +199,11 @@ async fn process_transactions_from_node_response(
                 .last()
                 .context("There were unexpectedly no transactions in the response")?;
             let start_version = first_transaction.version;
+            let first_transaction_pb_timestamp = first_transaction.timestamp.clone();
             let last_transaction_pb_timestamp = last_transaction.timestamp.clone();
             let transactions = data
                 .transactions
+                .clone()
                 .into_iter()
                 .map(|tx| {
                     let timestamp_in_seconds = match tx.timestamp {
@@ -215,23 +220,27 @@ async fn process_transactions_from_node_response(
 
             // Push to cache.
             match cache_operator.update_cache_transactions(transactions).await {
-                Ok(_) => {},
+                Ok(_) => {
+                    log_grpc_step(
+                        SERVICE_TYPE,
+                        IndexerGrpcStep::CacheWorkerTxnsProcessed,
+                        enable_verbose_logging,
+                        Some(first_transaction.version as i64),
+                        Some(last_transaction.version as i64),
+                        first_transaction_pb_timestamp.as_ref(),
+                        last_transaction_pb_timestamp.as_ref(),
+                        Some(starting_time.elapsed().as_secs_f64()),
+                        Some(size_in_bytes),
+                        Some((last_transaction.version - first_transaction.version + 1) as i64),
+                        None,
+                    );
+                },
                 Err(e) => {
                     ERROR_COUNT
                         .with_label_values(&["failed_to_update_cache_version"])
                         .inc();
                     bail!("Update cache with version failed: {}", e);
                 },
-            }
-            if let Some(ref txn_time) = last_transaction_pb_timestamp {
-                PROCESSED_LATENCY_IN_SECS.set(time_diff_since_pb_timestamp_in_secs(txn_time));
-                TRANSACTION_UNIX_TIMESTAMP
-                    .with_label_values(&[
-                        SERVICE_TYPE,
-                        IndexerGrpcStep::CacheWorkerTxnsProcessed.get_step(),
-                        IndexerGrpcStep::CacheWorkerTxnsProcessed.get_label(),
-                    ])
-                    .set(timestamp_to_unixtime(txn_time));
             }
             Ok(GrpcDataStatus::ChunkDataOk {
                 start_version,
@@ -250,20 +259,24 @@ async fn setup_cache_with_init_signal(
     ChainID,
     StartingVersion,
 )> {
-    let (fullnode_chain_id, starting_version) =
-        match init_signal.response.expect("Response type does not exist.") {
-            Response::Status(status_frame) => {
-                match StatusType::try_from(status_frame.r#type).expect("Invalid status type.") {
-                    StatusType::Init => (init_signal.chain_id, status_frame.start_version),
-                    _ => {
-                        bail!("[Indexer Cache] Streaming error: first frame is not INIT signal.");
-                    },
-                }
-            },
-            _ => {
-                bail!("[Indexer Cache] Streaming error: first frame is not siganl frame.");
-            },
-        };
+    let (fullnode_chain_id, starting_version) = match init_signal
+        .response
+        .expect("[Indexer Cache] Response type does not exist.")
+    {
+        Response::Status(status_frame) => {
+            match StatusType::try_from(status_frame.r#type)
+                .expect("[Indexer Cache] Invalid status type.")
+            {
+                StatusType::Init => (init_signal.chain_id, status_frame.start_version),
+                _ => {
+                    bail!("[Indexer Cache] Streaming error: first frame is not INIT signal.");
+                },
+            }
+        },
+        _ => {
+            bail!("[Indexer Cache] Streaming error: first frame is not siganl frame.");
+        },
+    };
 
     let mut cache_operator = CacheOperator::new(conn);
     cache_operator.cache_setup_if_needed().await?;
@@ -282,6 +295,7 @@ async fn process_streaming_response(
     file_store_operator: Box<dyn FileStoreOperator>,
     mut resp_stream: impl futures_core::Stream<Item = Result<TransactionsFromNodeResponse, tonic::Status>>
         + std::marker::Unpin,
+    enable_verbose_logging: bool,
 ) -> Result<()> {
     let mut tps_calculator = MovingAverage::new(10_000);
     let mut transaction_count = 0;
@@ -295,7 +309,7 @@ async fn process_streaming_response(
     let (mut cache_operator, fullnode_chain_id, starting_version) =
         setup_cache_with_init_signal(conn, init_signal)
             .await
-            .context("Failed to setup cache")?;
+            .context("[Indexer Cache] Failed to setup cache")?;
     // It's required to start the worker with the same version as file store.
     if let Some(file_store_metadata) = file_store_metadata {
         if file_store_metadata.version != starting_version {
@@ -313,7 +327,10 @@ async fn process_streaming_response(
         let received: TransactionsFromNodeResponse = match received {
             Ok(r) => r,
             Err(err) => {
-                error!("[Indexer Cache] Streaming error: {}", err);
+                error!(
+                    service_type = SERVICE_TYPE,
+                    "[Indexer Cache] Streaming error: {}", err
+                );
                 ERROR_COUNT.with_label_values(&["streaming_error"]).inc();
                 break;
             },
@@ -325,7 +342,13 @@ async fn process_streaming_response(
 
         let size_in_bytes = received.encoded_len();
 
-        match process_transactions_from_node_response(received, &mut cache_operator).await {
+        match process_transactions_from_node_response(
+            received,
+            &mut cache_operator,
+            enable_verbose_logging,
+        )
+        .await
+        {
             Ok(status) => match status {
                 GrpcDataStatus::ChunkDataOk {
                     start_version,
@@ -378,45 +401,28 @@ async fn process_streaming_response(
                         .await
                         .context("Failed to update the latest version in the cache")?;
                     transaction_count = 0;
-                    info!(
-                        current_version = current_version,
-                        chain_id = fullnode_chain_id,
-                        tps = (tps_calculator.avg() * 1000.0) as u64,
-                        "[Indexer Cache] Successfully process current batch."
+
+                    log_grpc_step(
+                        SERVICE_TYPE,
+                        IndexerGrpcStep::CacheWorkerBatchProcessed,
+                        enable_verbose_logging,
+                        Some(start_version as i64),
+                        Some((start_version + num_of_transactions - 1) as i64),
+                        None,
+                        None,
+                        Some(starting_time.elapsed().as_secs_f64()),
+                        Some(size_in_bytes),
+                        Some(num_of_transactions as i64),
+                        None,
                     );
-                    LATEST_PROCESSED_VERSION
-                        .with_label_values(&[
-                            SERVICE_TYPE,
-                            IndexerGrpcStep::CacheWorkerBatchProcessed.get_step(),
-                            IndexerGrpcStep::CacheWorkerBatchProcessed.get_label(),
-                        ])
-                        .set((start_version + num_of_transactions - 1) as i64);
-                    NUM_TRANSACTIONS_COUNT
-                        .with_label_values(&[
-                            SERVICE_TYPE,
-                            IndexerGrpcStep::CacheWorkerBatchProcessed.get_step(),
-                            IndexerGrpcStep::CacheWorkerBatchProcessed.get_label(),
-                        ])
-                        .set(num_of_transactions as i64);
-                    TOTAL_SIZE_IN_BYTES
-                        .with_label_values(&[
-                            SERVICE_TYPE,
-                            IndexerGrpcStep::CacheWorkerBatchProcessed.get_step(),
-                            IndexerGrpcStep::CacheWorkerBatchProcessed.get_label(),
-                        ])
-                        .set(size_in_bytes as i64);
-                    DURATION_IN_SECS
-                        .with_label_values(&[
-                            SERVICE_TYPE,
-                            IndexerGrpcStep::CacheWorkerBatchProcessed.get_step(),
-                            IndexerGrpcStep::CacheWorkerBatchProcessed.get_label(),
-                        ])
-                        .set(starting_time.elapsed().as_secs() as f64);
                     starting_time = std::time::Instant::now();
                 },
             },
             Err(e) => {
                 error!(
+                    start_version = current_version,
+                    chain_id = fullnode_chain_id,
+                    service_type = SERVICE_TYPE,
                     "[Indexer Cache] Process transactions from fullnode failed: {}",
                     e
                 );
