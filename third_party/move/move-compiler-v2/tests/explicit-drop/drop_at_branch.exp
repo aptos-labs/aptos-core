@@ -91,7 +91,7 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
   7: return $t1
 }
 
-============ after ExplicateDrop: ================
+============ after ExplicitDrop: ================
 
 [variant baseline]
 fun explicate_drop::drop_at_branch($t0: bool): u8 {

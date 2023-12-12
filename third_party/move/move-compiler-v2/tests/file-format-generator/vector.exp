@@ -161,9 +161,9 @@ fun vector::test_fold() {
  16: $t16 := borrow_local($t9)
      # live vars: $t9, $t16
  17: $t15 := vector::pop_back<u64>($t16)
-     # live vars: $t9
+     # live vars: $t9, $t15
  18: $t14 := move($t15)
-     # live vars: $t9
+     # live vars: $t9, $t14
  19: $t17 := move($t14)
      # live vars: $t9
  20: $t18 := 0

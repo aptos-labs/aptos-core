@@ -85,7 +85,7 @@ fun explicate_drop::test0(): u8 {
   5: return $t0
 }
 
-============ after ExplicateDrop: ================
+============ after ExplicitDrop: ================
 
 [variant baseline]
 fun explicate_drop::test0(): u8 {
@@ -99,7 +99,6 @@ fun explicate_drop::test0(): u8 {
   2: $t4 := borrow_local($t1)
   3: $t3 := move($t4)
   4: $t0 := read_ref($t3)
-  5: destroy($t1)
-  6: destroy($t4)
-  7: return $t0
+  5: destroy($t4)
+  6: return $t0
 }

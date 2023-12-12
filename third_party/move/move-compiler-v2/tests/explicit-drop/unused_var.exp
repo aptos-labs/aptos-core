@@ -169,7 +169,7 @@ fun explicate_drop::unused_var() {
   2: return ()
 }
 
-============ after ExplicateDrop: ================
+============ after ExplicitDrop: ================
 
 [variant baseline]
 fun explicate_drop::id<#0>($t0: #0): #0 {
@@ -194,8 +194,7 @@ fun explicate_drop::unused_call_assign() {
   0: $t2 := 42
   1: $t1 := explicate_drop::id<u64>($t2)
   2: $t0 := move($t1)
-  3: destroy($t0)
-  4: return ()
+  3: return ()
 }
 
 
@@ -205,6 +204,5 @@ fun explicate_drop::unused_var() {
      var $t1: u64
   0: $t1 := 42
   1: $t0 := move($t1)
-  2: destroy($t0)
-  3: return ()
+  2: return ()
 }

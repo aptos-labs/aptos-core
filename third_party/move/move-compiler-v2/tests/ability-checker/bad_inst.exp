@@ -73,7 +73,7 @@ fun test::test(): test::U<test::S<test::T>> {
   4: return $t0
 }
 
-============ after ExplicateDrop: ================
+============ after ExplicitDrop: ================
 
 [variant baseline]
 fun test::test(): test::U<test::S<test::T>> {
@@ -90,13 +90,13 @@ fun test::test(): test::U<test::S<test::T>> {
 
 
 Diagnostics:
-error: invalid instantiation
+error: Invalid instantiation
    ┌─ tests/ability-checker/bad_inst.move:13:16
    │
 13 │         U<S<T>> { x: S { x: T { } } }
    │                      ^^^^^^^^^^^^^^
 
-error: invalid instantiation
+error: Invalid instantiation
    ┌─ tests/ability-checker/bad_inst.move:13:3
    │
 13 │         U<S<T>> { x: S { x: T { } } }

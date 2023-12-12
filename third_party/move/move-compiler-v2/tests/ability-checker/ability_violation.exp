@@ -226,7 +226,7 @@ fun ability::no_key($t0: address) {
   5: return ()
 }
 
-============ after ExplicateDrop: ================
+============ after ExplicitDrop: ================
 
 [variant baseline]
 fun ability::invalid_copy() {
@@ -273,8 +273,7 @@ fun ability::no_key($t0: address) {
   6: destroy($t3)
   7: $t5 := exists<ability::Impotent>($t0)
   8: destroy($t4)
-  9: destroy($t5)
- 10: return ()
+  9: return ()
 }
 
 
@@ -392,6 +391,5 @@ fun ability::no_key($t0: address) {
   6: destroy($t3)
   7: $t5 := exists<ability::Impotent>($t0)
   8: destroy($t4)
-  9: destroy($t5)
- 10: return ()
+  9: return ()
 }
