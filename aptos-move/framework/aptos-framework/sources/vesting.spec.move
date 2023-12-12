@@ -145,7 +145,9 @@ spec aptos_framework::vesting {
         aborts_if !exists<account::Account>(withdrawal_address);
         aborts_if !exists<coin::CoinStore<AptosCoin>>(withdrawal_address);
         aborts_if len(shareholders) == 0;
+        // property 2: The vesting pool should not exceed a maximum of 30 shareholders.
         aborts_if simple_map::spec_len(buy_ins) != len(shareholders);
+        ensures global<VestingContract>(result).grant_pool.shareholders_limit == 30;
     }
 
     spec unlock_rewards(contract_address: address) {
