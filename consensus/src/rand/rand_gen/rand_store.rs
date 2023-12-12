@@ -14,6 +14,7 @@ use aptos_consensus_types::{
     common::{Author, Round},
     randomness::RandMetadata,
 };
+use aptos_logger::error;
 use std::{collections::HashMap, sync::Arc};
 
 struct ShareAggregator<S> {
@@ -170,11 +171,41 @@ pub struct RandStore<S, P, Storage> {
 
 impl<S: Share, P: Proof<Share = S>, Storage: RandStorage<S, P>> RandStore<S, P, Storage> {
     pub fn new(epoch: u64, author: Author, rand_config: RandConfig, db: Arc<Storage>) -> Self {
+        let mut rand_map: HashMap<Round, RandItem<S, P>> = HashMap::new();
+        let all_shares = db.get_all_shares().unwrap_or_default();
+        let mut shares_to_delete = vec![];
+        for (_, share) in all_shares {
+            let rand_metadata = share.metadata();
+            if rand_metadata.epoch() != epoch {
+                shares_to_delete.push(share);
+                continue;
+            }
+            let rand_item = rand_map
+                .entry(rand_metadata.round())
+                .or_insert_with(Default::default);
+            let _ = rand_item.add_share(share, &rand_config);
+        }
+        let all_decisions = db.get_all_decisions().unwrap_or_default();
+        let mut decisions_to_delete = vec![];
+        for (_, decision) in all_decisions {
+            let round = decision.rand_metadata().round();
+            if decision.rand_metadata().epoch() != epoch {
+                decisions_to_delete.push(decision);
+                continue;
+            }
+            rand_map.insert(round, RandItem::Decided(decision));
+        }
+        if let Err(e) = db.remove_shares(shares_to_delete.into_iter()) {
+            error!("[RandStore] Failed to remove shares: {:?}", e);
+        }
+        if let Err(e) = db.remove_decisions(decisions_to_delete.into_iter()) {
+            error!("[RandStore] Failed to remove decisions: {:?}", e);
+        }
         Self {
             epoch,
             author,
             rand_config,
-            rand_map: HashMap::new(),
+            rand_map,
             block_queue: BlockQueue::new(),
             db,
         }
@@ -281,7 +312,7 @@ mod tests {
         assert_eq!(aggr.total_weight, 6);
         // retain the shares with the same metadata
         aggr.retain(
-            &RandConfig::new(Author::ZERO, weights),
+            &RandConfig::new(1, Author::ZERO, weights),
             &RandMetadata::new_for_testing(1),
         );
         assert_eq!(aggr.shares.len(), 2);
@@ -291,7 +322,7 @@ mod tests {
     #[test]
     fn test_rand_item() {
         let weights = HashMap::from([(Author::ONE, 1), (Author::TWO, 2), (Author::ZERO, 3)]);
-        let config = RandConfig::new(Author::ZERO, weights);
+        let config = RandConfig::new(1, Author::ZERO, weights);
         let shares = vec![
             create_share_for_round(2, Author::ONE),
             create_share_for_round(1, Author::TWO),
@@ -321,7 +352,7 @@ mod tests {
             .map(|i| (Author::from_str(&format!("{:x}", i)).unwrap(), 1))
             .collect();
         let authors: Vec<Author> = weights.keys().cloned().collect();
-        let config = RandConfig::new(Author::ZERO, weights);
+        let config = RandConfig::new(1, Author::ZERO, weights);
         let mut rand_store = RandStore::new(
             1,
             Author::ZERO,

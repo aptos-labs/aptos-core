@@ -9,18 +9,20 @@ use crate::{
         block_queue::QueueItem,
         network_messages::{RandMessage, RpcRequest},
         rand_store::RandStore,
+        reliable_broadcast_state::{AugDataCertBuilder, CertifiedAugDataAckState, ShareAckState},
         storage::interface::{AugDataStorage, RandStorage},
         types::{AugmentedData, Proof, RandConfig, RandDecision, Share},
     },
 };
 use aptos_bounded_executor::BoundedExecutor;
-use aptos_consensus_types::common::Author;
+use aptos_consensus_types::{common::Author, randomness::RandMetadata};
 use aptos_logger::{error, info, spawn_named, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
-use aptos_reliable_broadcast::ReliableBroadcast;
+use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{epoch_state::EpochState, validator_signer::ValidatorSigner};
 use bytes::Bytes;
+use futures::future::{AbortHandle, Abortable};
 use futures_channel::oneshot;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
@@ -94,7 +96,13 @@ impl<
     }
 
     fn process_incoming_blocks(&mut self, blocks: OrderedBlocks) {
-        let queue_item = QueueItem::new(blocks, None);
+        let broadcast_handles = blocks
+            .ordered_blocks
+            .iter()
+            .map(|block| RandMetadata::from(block.block()))
+            .map(|metadata| self.broadcast_share(metadata))
+            .collect();
+        let queue_item = QueueItem::new(blocks, Some(broadcast_handles));
         self.rand_store.add_blocks(queue_item);
     }
 
@@ -121,10 +129,91 @@ impl<
         let _ = sender.send(Ok(protocol.to_bytes(&msg).unwrap().into()));
     }
 
+    async fn verification_task(
+        epoch_state: Arc<EpochState>,
+        mut incoming_rpc_request: Receiver<IncomingRandGenRequest>,
+        verified_msg_tx: UnboundedSender<RpcRequest<S, P, D>>,
+        rand_config: RandConfig,
+        bounded_executor: BoundedExecutor,
+    ) {
+        while let Some(rand_gen_msg) = incoming_rpc_request.recv().await {
+            let tx = verified_msg_tx.clone();
+            let epoch_state_clone = epoch_state.clone();
+            let config_clone = rand_config.clone();
+            bounded_executor
+                .spawn(async move {
+                    match bcs::from_bytes::<RandMessage<S, P, D>>(rand_gen_msg.req.data()) {
+                        Ok(msg) => {
+                            if msg
+                                .verify(&epoch_state_clone, &config_clone, rand_gen_msg.sender)
+                                .is_ok()
+                            {
+                                let _ = tx.send(RpcRequest {
+                                    req: msg,
+                                    protocol: rand_gen_msg.protocol,
+                                    response_sender: rand_gen_msg.response_sender,
+                                });
+                            }
+                        },
+                        Err(e) => {
+                            warn!("Invalid rand gen message: {}", e);
+                        },
+                    }
+                })
+                .await;
+        }
+    }
+
+    fn broadcast_share(&self, metadata: RandMetadata) -> DropGuard {
+        let share = S::generate(&self.config, metadata);
+        let rb = self.reliable_broadcast.clone();
+        let validators = self.epoch_state.verifier.get_ordered_account_addresses();
+        let share_ack_state = ShareAckState::new(
+            validators.into_iter(),
+            share.metadata().clone(),
+            self.config.clone(),
+            self.rand_decision_tx.clone(),
+        );
+        let task = async move {
+            let round = share.round();
+            info!("[RandManager] Start broadcasting share for {}", round);
+            let share = rb.broadcast(share, share_ack_state).await;
+            info!("[RandManager] Finish broadcasting share for {}", round);
+            share
+        };
+        let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        tokio::spawn(Abortable::new(task, abort_registration));
+        DropGuard::new(abort_handle)
+    }
+
+    fn broadcast_aug_data(&self) -> DropGuard {
+        let data = D::generate(&self.config);
+        let aug_ack = AugDataCertBuilder::new(data.clone(), self.epoch_state.clone());
+        let rb = self.reliable_broadcast.clone();
+        let rb2 = self.reliable_broadcast.clone();
+        let first_phase = async move {
+            info!("[RandManager] Start broadcasting aug data");
+            let data = rb.broadcast(data, aug_ack).await;
+            info!("[RandManager] Finish broadcasting aug data");
+            data
+        };
+        let validators = self.epoch_state.verifier.get_ordered_account_addresses();
+        let task = async move {
+            let cert = first_phase.await;
+            let ack_state = CertifiedAugDataAckState::new(validators.into_iter());
+            info!("[RandManager] Start broadcasting certified aug data");
+            rb2.broadcast(cert, ack_state).await;
+            info!("[RandManager] Finish broadcasting certified aug data");
+        };
+        let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        tokio::spawn(Abortable::new(task, abort_registration));
+        DropGuard::new(abort_handle)
+    }
+
     pub async fn start(
         mut self,
         mut incoming_blocks: Receiver<OrderedBlocks>,
-        mut incoming_rpc_request: Receiver<IncomingRandGenRequest>,
+        incoming_rpc_request: Receiver<IncomingRandGenRequest>,
         mut reset_rx: Receiver<ResetRequest>,
         bounded_executor: BoundedExecutor,
     ) {
@@ -132,38 +221,32 @@ impl<
         let (verified_msg_tx, mut verified_msg_rx) = tokio::sync::mpsc::unbounded_channel();
         let epoch_state = self.epoch_state.clone();
         let rand_config = self.config.clone();
-        spawn_named!("rand manager verification", async move {
-            while let Some(rand_gen_msg) = incoming_rpc_request.recv().await {
-                let tx = verified_msg_tx.clone();
-                let epoch_state_clone = epoch_state.clone();
-                let config_clone = rand_config.clone();
-                bounded_executor
-                    .spawn(async move {
-                        match bcs::from_bytes::<RandMessage<S, P, D>>(rand_gen_msg.req.data()) {
-                            Ok(msg) => {
-                                if msg
-                                    .verify(&epoch_state_clone, &config_clone, rand_gen_msg.sender)
-                                    .is_ok()
-                                {
-                                    let _ = tx.send(RpcRequest {
-                                        req: msg,
-                                        protocol: rand_gen_msg.protocol,
-                                        response_sender: rand_gen_msg.response_sender,
-                                    });
-                                }
-                            },
-                            Err(e) => {
-                                warn!("Invalid rand gen message: {}", e);
-                            },
-                        }
-                    })
-                    .await;
-            }
-        });
+        spawn_named!(
+            "rand manager verification",
+            Self::verification_task(
+                epoch_state,
+                incoming_rpc_request,
+                verified_msg_tx,
+                rand_config,
+                bounded_executor,
+            )
+        );
+
+        let _guard = self.broadcast_aug_data();
+
         while !self.stop {
             tokio::select! {
                 Some(blocks) = incoming_blocks.recv() => {
                     self.process_incoming_blocks(blocks);
+                }
+                Some(decision) = self.rand_decision_rx.recv() => {
+                    if let Err(e) = self.rand_store.add_decision(decision) {
+                        error!("[RandManager] Failed to add decision: {}", e);
+                    }
+                }
+                Some(reset) = reset_rx.recv() => {
+                    while incoming_blocks.try_recv().is_ok() {}
+                    self.process_reset(reset);
                 }
                 Some(request) = verified_msg_rx.recv() => {
                     let RpcRequest {
@@ -192,15 +275,6 @@ impl<
                         }
                         _ => unreachable!("[RandManager] Unexpected message type after verification"),
                     }
-                }
-                Some(decision) = self.rand_decision_rx.recv() => {
-                    if let Err(e) = self.rand_store.add_decision(decision) {
-                        error!("[RandManager] Failed to add decision: {}", e);
-                    }
-                }
-                Some(reset) = reset_rx.recv() => {
-                    while let Ok(_) = incoming_blocks.try_recv() {}
-                    self.process_reset(reset);
                 }
             }
             if let Some(ready_blocks) = self.rand_store.try_dequeue_rand_ready_prefix() {

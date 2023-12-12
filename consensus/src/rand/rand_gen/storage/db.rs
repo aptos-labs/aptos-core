@@ -95,7 +95,7 @@ impl<S: Share, P: Proof<Share = S>> RandStorage<S, P> for RandDb {
         Ok(self.get_all::<RandShareSchema<S>>()?)
     }
 
-    fn get_all_decision(&self) -> anyhow::Result<Vec<(RandMetadata, RandDecision<P>)>> {
+    fn get_all_decisions(&self) -> anyhow::Result<Vec<(RandMetadata, RandDecision<P>)>> {
         Ok(self.get_all::<RandDecisionSchema<P>>()?)
     }
 
