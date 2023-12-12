@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
-/// Maximum retry time for exponential backoff (5 sec = 3-4 retries)
-pub const MAX_RETRY_TIME_SECONDS: u64 = 5;
+/// Maximum retry time for exponential backoff (2 sec = 3-4 retries)
+pub const MAX_RETRY_TIME_SECONDS: u64 = 2;
 
 /// Allocate 15 seconds for a HEAD request
 pub const MAX_HEAD_REQUEST_RETRY_SECONDS: u64 = 15;
