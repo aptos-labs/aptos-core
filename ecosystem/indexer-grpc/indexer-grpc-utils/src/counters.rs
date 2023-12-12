@@ -18,7 +18,8 @@ pub enum IndexerGrpcStep {
     CacheWorkerTxnsProcessed, // [Indexer Cache] Processed transactions in a batch.
     CacheWorkerBatchProcessed, // [Indexer Cache] Successfully process current batch.
 
-    FilestoreUploadTxns, // [File worker] Upload transactions to filestore.
+    FilestoreUploadTxns,     // [File worker] Upload transactions to filestore.
+    FilestoreUpdateMetadata, // [File worker] Upload transactions to filestore.
 
     FullnodeFetchedBatch, // [Indexer Fullnode] Fetched batch of transactions from fullnode
     FullnodeDecodedBatch, // [Indexer Fullnode] Decoded batch of transactions from fullnode
@@ -45,6 +46,7 @@ impl IndexerGrpcStep {
             IndexerGrpcStep::CacheWorkerBatchProcessed => "2",
             // Filestore worker steps
             IndexerGrpcStep::FilestoreUploadTxns => "1",
+            IndexerGrpcStep::FilestoreUpdateMetadata => "2",
             // Fullnode steps
             IndexerGrpcStep::FullnodeFetchedBatch => "1",
             IndexerGrpcStep::FullnodeDecodedBatch => "2",
@@ -77,6 +79,7 @@ impl IndexerGrpcStep {
             IndexerGrpcStep::CacheWorkerBatchProcessed => "[Indexer Cache] Successfully process current batch.",
             // Filestore worker steps
             IndexerGrpcStep::FilestoreUploadTxns => "[File worker] Upload transactions to filestore.",
+            IndexerGrpcStep::FilestoreUpdateMetadata => "[File worker] Update filestore metadata.",
             // Fullnode steps
             IndexerGrpcStep::FullnodeFetchedBatch => "[Indexer Fullnode] Fetched batch of transactions from fullnode",
             IndexerGrpcStep::FullnodeDecodedBatch => "[Indexer Fullnode] Decoded batch of transactions from fullnode",
