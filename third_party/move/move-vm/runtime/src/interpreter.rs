@@ -2417,7 +2417,11 @@ impl Frame {
         &self.ty_args
     }
 
-    fn resolver<'a>(&self, loader: &'a Loader, module_store: &'a ModuleStorageAdapter) -> Resolver<'a> {
+    fn resolver<'a>(
+        &self,
+        loader: &'a Loader,
+        module_store: &'a ModuleStorageAdapter,
+    ) -> Resolver<'a> {
         self.function.get_resolver(loader, module_store)
     }
 

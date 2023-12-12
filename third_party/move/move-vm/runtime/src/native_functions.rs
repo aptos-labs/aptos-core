@@ -136,7 +136,7 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
                 self.resolver.loader(),
                 address,
                 type_,
-                &self.resolver.module_store(),
+                self.resolver.module_store(),
             )
             .map_err(|err| err.finish(Location::Undefined))?;
         let exists = value

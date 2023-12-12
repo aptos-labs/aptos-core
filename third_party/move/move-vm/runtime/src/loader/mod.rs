@@ -43,7 +43,7 @@ mod script;
 mod type_loader;
 
 pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunction, Scope};
-pub(crate) use modules::{Module, ModuleStorageAdapter, ModuleCache, ModuleStorage};
+pub(crate) use modules::{Module, ModuleCache, ModuleStorage, ModuleStorageAdapter};
 pub(crate) use script::{Script, ScriptCache};
 use type_loader::intern_type;
 
@@ -1490,7 +1490,7 @@ impl<'a> Resolver<'a> {
     }
 
     pub(crate) fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
-        self.loader.type_to_type_layout(ty, &self.module_store)
+        self.loader.type_to_type_layout(ty, self.module_store)
     }
 
     pub(crate) fn type_to_type_layout_with_identifier_mappings(
@@ -1498,7 +1498,7 @@ impl<'a> Resolver<'a> {
         ty: &Type,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
         self.loader
-            .type_to_type_layout_with_identifier_mappings(ty, &self.module_store)
+            .type_to_type_layout_with_identifier_mappings(ty, self.module_store)
     }
 
     pub(crate) fn type_to_fully_annotated_layout(
@@ -1506,7 +1506,7 @@ impl<'a> Resolver<'a> {
         ty: &Type,
     ) -> PartialVMResult<MoveTypeLayout> {
         self.loader
-            .type_to_fully_annotated_layout(ty, &self.module_store)
+            .type_to_fully_annotated_layout(ty, self.module_store)
     }
 
     // get the loader
@@ -1516,7 +1516,7 @@ impl<'a> Resolver<'a> {
 
     // get the loader
     pub(crate) fn module_store(&self) -> &ModuleStorageAdapter {
-        &self.module_store
+        self.module_store
     }
 }
 

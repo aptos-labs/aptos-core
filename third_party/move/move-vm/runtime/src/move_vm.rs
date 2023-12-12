@@ -5,7 +5,7 @@
 use crate::{
     config::VMConfig,
     data_cache::TransactionDataCache,
-    loader::{ModuleStorageAdapter, ModuleStorage},
+    loader::{ModuleStorage, ModuleStorageAdapter},
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunction,
     runtime::VMRuntime,
