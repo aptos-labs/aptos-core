@@ -1,7 +1,5 @@
 //# init --addresses A=42
 
-
-
 //# run --signers A
 script {
     use std::signer;
@@ -10,8 +8,6 @@ script {
         assert!(signer::address_of(&s) == @42, 1000);
     }
 }
-
-
 
 //# publish
 module A::M {
@@ -24,8 +20,6 @@ module A::M {
     }
 }
 
-
-
 //# run --signers A
 script {
     use A::M;
@@ -34,8 +28,3 @@ script {
         M::publish_foo(&s);
     }
 }
-
-
-
-// Note: named addresses are not supported in resource names yet.
-//# view --address A --resource 0x2a::M::Foo

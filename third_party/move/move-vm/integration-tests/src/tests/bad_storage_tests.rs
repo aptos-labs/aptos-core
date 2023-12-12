@@ -565,7 +565,7 @@ fn test_storage_returns_bogus_error_when_loading_module() {
             )
             .unwrap_err();
 
-        assert_eq!(err.status_type(), StatusType::InvariantViolation);
+        assert_eq!(err.major_status(), *error_code);
     }
 }
 
@@ -647,6 +647,6 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
             )
             .unwrap_err();
 
-        assert_eq!(err.status_type(), StatusType::InvariantViolation);
+        assert_eq!(err.major_status(), *error_code);
     }
 }

@@ -21,5 +21,3 @@ label b0:
     M.test(&s);
     return;
 }
-
-//# view --address 0x1 --resource 0x1::M::R

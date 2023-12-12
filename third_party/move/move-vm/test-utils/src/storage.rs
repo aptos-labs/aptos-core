@@ -359,7 +359,7 @@ impl ModuleViewer for InMemoryStorage {
             .accounts
             .get(module_id.address())
             .and_then(|account_storage| account_storage.modules.get(module_id.name()))
-            .ok_or_else(|| anyhow!("Module {:?} not found", module_id))?;
+            .ok_or_else(|| anyhow!("Module {:?} can't be found", module_id))?;
         CompiledModule::deserialize(bytes)
             .map_err(|e| anyhow!("Failed to deserialize module {:?}: {:?}", module_id, e))
     }

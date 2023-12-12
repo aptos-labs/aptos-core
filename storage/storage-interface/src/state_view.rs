@@ -78,7 +78,7 @@ impl ModuleViewer for DbStateView {
         let state_key = StateKey::access_path(AccessPath::from(module_id));
         let state_value = self
             .get_state_value(&state_key)?
-            .ok_or_else(|| anyhow!("Module {:?} not found", module_id))?;
+            .ok_or_else(|| anyhow!("Module {:?} can't be found", module_id))?;
         CompiledModule::deserialize(state_value.bytes()).map_err(|e| {
             anyhow!(
                 "Module {:?} failed to deserialize with error code {:?}",

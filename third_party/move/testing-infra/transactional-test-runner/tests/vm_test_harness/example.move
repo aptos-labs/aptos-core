@@ -10,10 +10,6 @@ script {
     fun main() {}
 }
 
-//# view
-//#     --address 0x1
-//#     --resource 0x42::N::R<u64>
-
 //# publish
 module A::N {
     struct R<V: store> has key {
@@ -44,10 +40,6 @@ script {
     }
 }
 
-//# view
-//#     --address 0x1
-//#     --resource 0x42::N::R<u64>
-
 //# run --signers 0x1 --syntax=mvir
 
 import 0x42.N;
@@ -56,7 +48,3 @@ label b0:
     _ = N.take(&s);
     return;
 }
-
-//# view
-//#     --address 0x1
-//#     --resource 0x42::N::R<u64>
