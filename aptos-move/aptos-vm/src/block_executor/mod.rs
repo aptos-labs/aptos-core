@@ -15,7 +15,7 @@ use aptos_aggregator::{
 use aptos_block_executor::{
     errors::Error, executor::BlockExecutor,
     task::TransactionOutput as BlockExecutorTransactionOutput,
-    txn_commit_hook::TransactionCommitHook,
+    txn_commit_hook::TransactionCommitHook, types::InputOutputKey,
 };
 use aptos_infallible::Mutex;
 use aptos_types::{
@@ -35,7 +35,10 @@ use aptos_vm_types::{abstract_write_op::AbstractResourceWriteOp, output::VMOutpu
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::VMStatus};
 use once_cell::sync::OnceCell;
 use rayon::ThreadPool;
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashSet},
+    sync::Arc,
+};
 
 /// Output type wrapper used by block executor. VM output is stored first, then
 /// transformed into TransactionOutput type that is returned.
@@ -314,6 +317,61 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .as_ref()
             .expect("Output to be set to get fee statement")
             .fee_statement()
+    }
+
+    fn output_approx_size(&self) -> u64 {
+        let vm_output = self.vm_output.lock();
+        let change_set = vm_output
+            .as_ref()
+            .expect("Output to be set to get write summary")
+            .change_set();
+
+        let mut size = 0;
+        for (state_key, write_size) in change_set.write_set_size_iter() {
+            size += state_key.size() as u64 + write_size.write_len().unwrap_or(0);
+        }
+
+        for (event, _) in change_set.events() {
+            size += event.size() as u64;
+        }
+
+        size
+    }
+
+    fn get_write_summary(&self) -> HashSet<InputOutputKey<StateKey, StructTag, DelayedFieldID>> {
+        let vm_output = self.vm_output.lock();
+        let change_set = vm_output
+            .as_ref()
+            .expect("Output to be set to get write summary")
+            .change_set();
+
+        let mut writes = HashSet::new();
+
+        for (state_key, write) in change_set.resource_write_set() {
+            match write {
+                AbstractResourceWriteOp::Write(_)
+                | AbstractResourceWriteOp::WriteWithDelayedFields(_) => {
+                    writes.insert(InputOutputKey::Resource(state_key.clone()));
+                },
+                AbstractResourceWriteOp::WriteResourceGroup(write) => {
+                    for tag in write.inner_ops().keys() {
+                        writes.insert(InputOutputKey::Group(state_key.clone(), tag.clone()));
+                    }
+                },
+                AbstractResourceWriteOp::InPlaceDelayedFieldChange(_)
+                | AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(_) => {
+                    // No conflicts on resources from in-place delayed field changes.
+                    // Delayed fields conflicts themselves are handled via
+                    // delayed_field_change_set below.
+                },
+            }
+        }
+
+        for identifier in change_set.delayed_field_change_set().keys() {
+            writes.insert(InputOutputKey::DelayedField(*identifier));
+        }
+
+        writes
     }
 }
 

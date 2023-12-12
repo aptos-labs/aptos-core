@@ -205,7 +205,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             Err(vm_error) => Err(anyhow!(
                 "Unable to publish module '{}'. Got VMError: {}",
                 module.self_id(),
-                vm_error.format_test_output(move_test_debug() || verbose, self.comparison_mode)
+                vm_error.format_test_output(
+                    move_test_debug() || verbose,
+                    !move_test_debug() && self.comparison_mode
+                )
             )),
         }
     }
@@ -249,7 +252,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .map_err(|vm_error| {
                 anyhow!(
                     "Script execution failed with VMError: {}",
-                    vm_error.format_test_output(move_test_debug() || verbose, self.comparison_mode)
+                    vm_error.format_test_output(
+                        move_test_debug() || verbose,
+                        !move_test_debug() && self.comparison_mode
+                    )
                 )
             })?;
         Ok((None, serialized_return_values))
@@ -294,7 +300,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .map_err(|vm_error| {
                 anyhow!(
                     "Function execution failed with VMError: {}",
-                    vm_error.format_test_output(move_test_debug() || verbose, self.comparison_mode)
+                    vm_error.format_test_output(
+                        move_test_debug() || verbose,
+                        !move_test_debug() && self.comparison_mode
+                    )
                 )
             })?;
         Ok((None, serialized_return_values))

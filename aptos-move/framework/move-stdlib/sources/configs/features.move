@@ -145,6 +145,7 @@ module std::features {
         is_enabled(BLS12_381_STRUCTURES)
     }
 
+
     /// Whether native_public_key_validate aborts when a public key of the wrong length is given
     /// Lifetime: ephemeral
     const ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH: u64 = 14;
@@ -318,6 +319,17 @@ module std::features {
 
     public fun commission_change_delegation_pool_enabled(): bool acquires Features {
         is_enabled(COMMISSION_CHANGE_DELEGATION_POOL)
+    }
+
+    /// Whether the generic algebra implementation for BN254 operations are enabled.
+    ///
+    /// Lifetime: transient
+    const BN254_STRUCTURES: u64 = 43;
+
+    public fun get_bn254_strutures_feature(): u64 { BN254_STRUCTURES }
+
+    public fun bn254_structures_enabled(): bool acquires Features {
+        is_enabled(BN254_STRUCTURES)
     }
 
     // ============================================================================================

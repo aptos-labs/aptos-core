@@ -25,6 +25,7 @@ aptos-table-natives = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-types = { workspace = true }
 ark-bls12-381 = { workspace = true }
+ark-bn254 = { workspace = true }
 ark-ec = { workspace = true }
 ark-ff = { workspace = true }
 ark-serialize = { workspace = true }

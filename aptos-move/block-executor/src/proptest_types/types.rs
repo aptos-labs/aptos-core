@@ -1132,6 +1132,23 @@ where
             0,
         )
     }
+
+    fn output_approx_size(&self) -> u64 {
+        // TODO add block output limit testing
+        0
+    }
+
+    fn get_write_summary(
+        &self,
+    ) -> HashSet<
+        crate::types::InputOutputKey<
+            <Self::Txn as Transaction>::Key,
+            <Self::Txn as Transaction>::Tag,
+            <Self::Txn as Transaction>::Identifier,
+        >,
+    > {
+        HashSet::new()
+    }
 }
 
 #[derive(Clone, Debug)]

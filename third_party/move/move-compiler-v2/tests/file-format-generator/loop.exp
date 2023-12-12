@@ -155,7 +155,7 @@ fun loops::nested_loop($t0: u64): u64 {
      # live vars: $t0, $t7
  11: $t6 := -($t0, $t7)
      # live vars: $t6
- 12: $t0 := move($t6)
+ 12: $t0 := copy($t6)
      # live vars: $t0
  13: goto 19
      # live vars: $t0
@@ -175,7 +175,7 @@ fun loops::nested_loop($t0: u64): u64 {
      # live vars: $t0, $t9
  21: $t8 := -($t0, $t9)
      # live vars: $t8
- 22: $t0 := move($t8)
+ 22: $t0 := copy($t8)
      # live vars: $t0
  23: goto 0
      # live vars: $t0
@@ -191,7 +191,7 @@ fun loops::nested_loop($t0: u64): u64 {
      # live vars: $t0
  29: label L1
      # live vars: $t0
- 30: $t1 := move($t0)
+ 30: $t1 := copy($t0)
      # live vars: $t1
  31: return $t1
 }
@@ -219,7 +219,7 @@ fun loops::while_loop($t0: u64): u64 {
      # live vars: $t0, $t5
   6: $t4 := -($t0, $t5)
      # live vars: $t4
-  7: $t0 := move($t4)
+  7: $t0 := copy($t4)
      # live vars: $t0
   8: goto 11
      # live vars: $t0
@@ -233,7 +233,7 @@ fun loops::while_loop($t0: u64): u64 {
      # live vars: $t0
  13: label L1
      # live vars: $t0
- 14: $t1 := move($t0)
+ 14: $t1 := copy($t0)
      # live vars: $t1
  15: return $t1
 }
@@ -297,7 +297,7 @@ fun loops::while_loop_with_break_and_continue($t0: u64): u64 {
      # live vars: $t0, $t9
  22: $t8 := -($t0, $t9)
      # live vars: $t8
- 23: $t0 := move($t8)
+ 23: $t0 := copy($t8)
      # live vars: $t0
  24: goto 27
      # live vars: $t0
@@ -311,7 +311,7 @@ fun loops::while_loop_with_break_and_continue($t0: u64): u64 {
      # live vars: $t0
  29: label L1
      # live vars: $t0
- 30: $t1 := move($t0)
+ 30: $t1 := copy($t0)
      # live vars: $t1
  31: return $t1
 }
@@ -370,7 +370,7 @@ B8:
 B9:
 	31: Branch(0)
 B10:
-	32: MoveLoc[0](Arg0: u64)
+	32: CopyLoc[0](Arg0: u64)
 	33: StLoc[5](loc4: u64)
 	34: MoveLoc[5](loc4: u64)
 	35: Ret
@@ -398,7 +398,7 @@ B2:
 B3:
 	14: Branch(0)
 B4:
-	15: MoveLoc[0](Arg0: u64)
+	15: CopyLoc[0](Arg0: u64)
 	16: StLoc[3](loc2: u64)
 	17: MoveLoc[3](loc2: u64)
 	18: Ret
@@ -450,7 +450,7 @@ B8:
 B9:
 	30: Branch(0)
 B10:
-	31: MoveLoc[0](Arg0: u64)
+	31: CopyLoc[0](Arg0: u64)
 	32: StLoc[5](loc4: u64)
 	33: MoveLoc[5](loc4: u64)
 	34: Ret

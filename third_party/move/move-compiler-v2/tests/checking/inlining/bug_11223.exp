@@ -1,0 +1,174 @@
+// ---- Model Dump
+module 0xcafe::vectors {
+    use std::vector;
+    public entry fun guess_flips_break2(flips: vector<u8>): u64 {
+        {
+          let flipsref5: &vector<u8> = Borrow(Immutable)(flips);
+          {
+            let _v: vector<u8> = Copy(flips);
+            {
+              let _v2: vector<u8> = flips;
+              {
+                let x: &vector<u8> = flipsref5;
+                vector::length<u8>(x)
+              }
+            }
+          }
+        }
+    }
+    spec fun $guess_flips_break2(flips: vector<u8>): u64 {
+        {
+          let flipsref5: vector<u8> = flips;
+          {
+            let _v: vector<u8> = Copy(flips);
+            {
+              let _v2: vector<u8> = flips;
+              {
+                let x: vector<u8> = flipsref5;
+                vector::$length<u8>(x)
+              }
+            }
+          }
+        }
+    }
+} // end 0xcafe::vectors
+
+============ initial bytecode ================
+
+[variant baseline]
+public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
+     var $t1: u64
+     var $t2: &vector<u8>
+     var $t3: &vector<u8>
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+     var $t6: vector<u8>
+     var $t7: &vector<u8>
+  0: $t3 := borrow_local($t0)
+  1: $t2 := infer($t3)
+  2: $t5 := copy($t0)
+  3: $t4 := infer($t5)
+  4: $t6 := infer($t0)
+  5: $t7 := infer($t2)
+  6: $t1 := vector::length<u8>($t7)
+  7: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
+     var $t1: u64
+     var $t2: &vector<u8>
+     var $t3: &vector<u8>
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+     var $t6: vector<u8>
+     var $t7: &vector<u8>
+     # live vars: $t0
+  0: $t3 := borrow_local($t0)
+     # live vars: $t3
+  1: $t2 := copy($t3)
+     # live vars: $t2
+  2: $t5 := copy($t0)
+     # live vars: $t2
+  3: $t4 := copy($t5)
+     # live vars: $t2
+  4: $t6 := copy($t0)
+     # live vars: $t2
+  5: $t7 := copy($t2)
+     # live vars: $t7
+  6: $t1 := vector::length<u8>($t7)
+     # live vars: $t1
+  7: return $t1
+}
+
+============ after VisibilityChecker: ================
+
+[variant baseline]
+public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
+     var $t1: u64
+     var $t2: &vector<u8>
+     var $t3: &vector<u8>
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+     var $t6: vector<u8>
+     var $t7: &vector<u8>
+     # live vars: $t0
+  0: $t3 := borrow_local($t0)
+     # live vars: $t3
+  1: $t2 := copy($t3)
+     # live vars: $t2
+  2: $t5 := copy($t0)
+     # live vars: $t2
+  3: $t4 := copy($t5)
+     # live vars: $t2
+  4: $t6 := copy($t0)
+     # live vars: $t2
+  5: $t7 := copy($t2)
+     # live vars: $t7
+  6: $t1 := vector::length<u8>($t7)
+     # live vars: $t1
+  7: return $t1
+}
+
+============ after MemorySafetyProcessor: ================
+
+[variant baseline]
+public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
+     var $t1: u64
+     var $t2: &vector<u8>
+     var $t3: &vector<u8>
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+     var $t6: vector<u8>
+     var $t7: &vector<u8>
+     # live vars: $t0
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     #
+  0: $t3 := borrow_local($t0)
+     # live vars: $t3
+     # graph: {L0=local($t0)[borrow(false) -> L1],L1=local($t3)[]}
+     # local_to_label: {$t0=L0,$t3=L1}
+     # global_to_label: {}
+     #
+  1: $t2 := copy($t3)
+     # live vars: $t2
+     # graph: {L0=local($t0)[borrow(false) -> L1],L1=local($t3)[skip -> L257],L257=local($t2)[]}
+     # local_to_label: {$t0=L0,$t2=L257,$t3=L1}
+     # global_to_label: {}
+     #
+  2: $t5 := copy($t0)
+     # live vars: $t2
+     # graph: {L0=local($t0)[borrow(false) -> L1],L1=local($t3)[skip -> L257],L257=local($t2)[]}
+     # local_to_label: {$t0=L0,$t2=L257,$t3=L1}
+     # global_to_label: {}
+     #
+  3: $t4 := copy($t5)
+     # live vars: $t2
+     # graph: {L0=local($t0)[borrow(false) -> L1],L1=local($t3)[skip -> L257],L257=local($t2)[]}
+     # local_to_label: {$t0=L0,$t2=L257,$t3=L1}
+     # global_to_label: {}
+     #
+  4: $t6 := copy($t0)
+     # live vars: $t2
+     # graph: {L0=local($t0)[borrow(false) -> L1],L1=local($t3)[skip -> L257],L257=local($t2)[]}
+     # local_to_label: {$t0=L0,$t2=L257,$t3=L1}
+     # global_to_label: {}
+     #
+  5: $t7 := copy($t2)
+     # live vars: $t7
+     # graph: {L0=local($t0)[borrow(false) -> L1],L1=local($t3)[skip -> L257],L257=local($t2)[skip -> L1281],L1281=local($t7)[]}
+     # local_to_label: {$t0=L0,$t2=L257,$t3=L1,$t7=L1281}
+     # global_to_label: {}
+     #
+  6: $t1 := vector::length<u8>($t7)
+     # live vars: $t1
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     #
+  7: return $t1
+}
