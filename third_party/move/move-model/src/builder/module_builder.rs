@@ -1453,14 +1453,20 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     // This is calling a function from another module we already have
                     // translated. In this case, the impurity has already been propagated
                     // in translate_call.
+                    Ok(())
                 } else {
                     // This is calling a function from the module we are currently translating.
                     // Need to recursively ensure we have propagated impurity because of
                     // arbitrary call graphs, including cyclic.
                     if !self.propagate_function_impurity(visited, *fid) {
                         is_pure = false;
+                        Err(()) // Short-curcuit the visit; this function is not pure
+                    } else {
+                        Ok(())
                     }
                 }
+            } else {
+                Ok(())
             }
         });
         if is_pure {
@@ -2070,6 +2076,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     );
                     ok = false;
                 }
+                Ok(()) // continue visit
             };
             cond.exp.visit(&mut visitor);
         } else if let FunctionCode(name, _) | FunctionCodeV2(name, _) = context {
@@ -2101,6 +2108,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         },
                     };
                 }
+                Ok(()) // continue visit
             };
             cond.exp.visit(&mut visitor);
         }
@@ -3411,7 +3419,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         }
         // Check for purity requirements. All data invariants must be pure expressions and
         // not depend on global state.
-        let check_uses_memory = |mid: ModuleId, fid: SpecFunId| {
+        let check_uses_no_memory = |mid: ModuleId, fid: SpecFunId| {
             if mid.to_usize() < self.parent.env.get_module_count() {
                 // This is calling a function from another module we already have
                 // translated.
@@ -3428,7 +3436,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         for struct_spec in self.struct_specs.values() {
             for cond in &struct_spec.conditions {
                 if matches!(cond.kind, ConditionKind::StructInvariant)
-                    && !cond.exp.uses_memory(&check_uses_memory)
+                    && !cond.exp.uses_no_memory(&check_uses_no_memory)
                 {
                     self.parent.error(
                         &cond.loc,
@@ -3529,6 +3537,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 },
                 _ => {},
             }
+            Ok(())
         });
         (used_memory, callees)
     }

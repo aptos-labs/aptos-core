@@ -517,6 +517,7 @@ impl<'a> Analyzer<'a> {
                     }
                 }
             }
+            Ok(())
         });
     }
 

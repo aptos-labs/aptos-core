@@ -1482,7 +1482,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             &mut |e| {
                 if self.placeholder_map.is_empty() {
                     // Shortcut case of no placeholders
-                    return Err(e);
+                    return RewriteResult::Unchanged(e);
                 }
                 let exp_data: ExpData = e.into();
                 if let ExpData::Call(id, Operation::NoOp, args) = exp_data {

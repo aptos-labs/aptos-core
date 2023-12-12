@@ -757,37 +757,40 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
     /// Also check for Break or Continue inside a lambda and not inside a loop.
     fn check_for_return_break_continue_in_lambda(env: &GlobalEnv, lambda_body: &Exp) {
         let mut in_loop = 0;
-        lambda_body.visit_pre_post(&mut |up, e| match e {
-            ExpData::Loop(..) if !up => {
-                in_loop += 1;
-            },
-            ExpData::Loop(..) if up => {
-                in_loop -= 1;
-            },
-            ExpData::Return(node_id, _) if !up => {
-                let node_loc = env.get_node_loc(*node_id);
-                env.error(
-                    &node_loc,
-                    concat!(
-                        "Return not currently supported in function-typed arguments",
-                        " (lambda expressions)"
-                    ),
-                )
-            },
-            ExpData::LoopCont(node_id, is_continue) if !up && in_loop == 0 => {
-                let node_loc = env.get_node_loc(*node_id);
-                env.error(
-                    &node_loc,
-                    &format!(
+        let _ = lambda_body.visit_pre_post(&mut |up, e| {
+            match e {
+                ExpData::Loop(..) if !up => {
+                    in_loop += 1;
+                },
+                ExpData::Loop(..) if up => {
+                    in_loop -= 1;
+                },
+                ExpData::Return(node_id, _) if !up => {
+                    let node_loc = env.get_node_loc(*node_id);
+                    env.error(
+                        &node_loc,
                         concat!(
-                            "{} outside of a loop not supported in function-typed arguments",
+                            "Return not currently supported in function-typed arguments",
                             " (lambda expressions)"
                         ),
-                        if *is_continue { "Continue" } else { "Break" }
-                    ),
-                )
-            },
-            _ => {},
+                    )
+                },
+                ExpData::LoopCont(node_id, is_continue) if !up && in_loop == 0 => {
+                    let node_loc = env.get_node_loc(*node_id);
+                    env.error(
+                        &node_loc,
+                        &format!(
+                            concat!(
+                                "{} outside of a loop not supported in function-typed arguments",
+                                " (lambda expressions)"
+                            ),
+                            if *is_continue { "Continue" } else { "Break" }
+                        ),
+                    )
+                },
+                _ => {},
+            }
+            Ok(())
         });
     }
 

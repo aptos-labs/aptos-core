@@ -609,7 +609,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, 'b
                             && cont.span().start() >= loc.span().start()
                             && cont.span().end() <= loc.span().end()
                     };
-                    arg.visit_pre_post(&mut |up: bool, e: &ExpData| {
+                    let _ = arg.visit_pre_post(&mut |up: bool, e: &ExpData| {
                         let sub_loc = self.builder.global_env().get_node_loc(e.node_id());
                         if !up
                             && !loc_contained(&loc, &sub_loc)
@@ -617,6 +617,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, 'b
                         {
                             labels.push((sub_loc, "substituted sub-expression".to_owned()))
                         }
+                        Ok(()) // continue visit
                     });
                     self.builder.global_env().diag_with_labels(
                         Severity::Error,

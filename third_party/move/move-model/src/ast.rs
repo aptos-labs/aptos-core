@@ -622,6 +622,7 @@ impl ExpData {
         let mut ids = vec![];
         self.visit(&mut |e| {
             ids.push(e.node_id());
+            Ok(())
         });
         ids
     }
@@ -651,8 +652,9 @@ impl ExpData {
                     }
                 }
             }
+            Ok(())
         };
-        self.visit_pre_post(&mut visitor);
+        let _ = self.visit_pre_post(&mut visitor);
         vars
     }
 
@@ -704,8 +706,9 @@ impl ExpData {
                     }
                 }
             }
+            Ok(())
         };
-        self.visit_pre_post(&mut visitor);
+        let _ = self.visit_pre_post(&mut visitor);
     }
 
     /// Returns just the free local variables in this expression.
@@ -746,6 +749,7 @@ impl ExpData {
                 },
                 _ => {},
             }
+            Ok(())
         };
         self.visit(&mut visitor);
         result
@@ -760,6 +764,7 @@ impl ExpData {
                     temps.push((*idx, env.get_node_type(*id)));
                 }
             }
+            Ok(())
         };
         self.visit(&mut visitor);
         temps
@@ -772,6 +777,7 @@ impl ExpData {
             if let ExpData::Call(_, Operation::MoveFunction(mid, fid), _) = e {
                 called.insert(mid.qualified(*fid));
             }
+            Ok(())
         };
         self.visit(&mut visitor);
         called
@@ -787,22 +793,27 @@ impl ExpData {
                     .or_default()
                     .insert(*node_id);
             }
+            Ok(())
         };
         self.visit(&mut visitor);
         called
     }
 
     pub fn has_exit(&self) -> bool {
-        // TODO: we currently cannot break out of a visitor, so we maintain a state when we
-        // are inside a loop.
-        let mut in_loop = false;
+        let mut loop_count = 0; // Count internal nested loops.
         let mut has_exit = false;
-        let mut visitor = |post: bool, e: &ExpData| match e {
-            ExpData::Loop(_, _) => in_loop = !post,
-            ExpData::LoopCont(_, _) if !in_loop => has_exit = true,
-            _ => {},
+        let mut visitor = |up: bool, e: &ExpData| {
+            match e {
+                ExpData::Loop(_, _) => loop_count += if up { -1 } else { 1 },
+                ExpData::LoopCont(_, _) if loop_count == 0 => {
+                    has_exit = true;
+                    return Err(()); // found an exit, exit visit early
+                },
+                _ => {},
+            }
+            Ok(())
         };
-        self.visit_pre_post(&mut visitor);
+        let _ = self.visit_pre_post(&mut visitor);
         has_exit
     }
 
@@ -813,39 +824,45 @@ impl ExpData {
     /// but is not documented as such in the book
     pub fn is_valid_for_constant(&self, env: &GlobalEnv, reasons: &mut Vec<(Loc, String)>) -> bool {
         let mut valid = true;
-        let mut visitor = |e: &ExpData| match e {
-            ExpData::Value(..) | ExpData::Invalid(_) | ExpData::Sequence(_, _) => {},
-            ExpData::Call(id, oper, _args) => {
-                // Note that _args are visited separately.  No need to check them here.
-                if !oper.is_builtin_op() {
+        let mut visitor = |e: &ExpData| {
+            match e {
+                ExpData::Value(..) | ExpData::Invalid(_) | ExpData::Sequence(_, _) => {},
+                ExpData::Call(id, oper, _args) => {
+                    // Note that _args are visited separately.  No need to check them here.
+                    if !oper.is_builtin_op() {
+                        reasons.push((
+                            env.get_node_loc(*id),
+                            "Invalid call or operation in constant".to_owned(),
+                        ));
+                        valid = false;
+                    }
+                },
+                _ => {
+                    let id = e.node_id();
                     reasons.push((
-                        env.get_node_loc(*id),
-                        "Invalid call or operation in constant".to_owned(),
+                        env.get_node_loc(id),
+                        "Invalid statement or expression in constant".to_owned(),
                     ));
                     valid = false;
-                }
-            },
-            _ => {
-                let id = e.node_id();
-                reasons.push((
-                    env.get_node_loc(id),
-                    "Invalid statement or expression in constant".to_owned(),
-                ));
-                valid = false
-            },
+                },
+            }
+            Ok(()) // always keep going
         };
         self.visit_top_down(&mut visitor);
         valid
     }
 
     /// Visits expression, calling visitor on each sub-expression, depth first.
+    /// `visitor` returns false to indicate that visit should stop early.
     pub fn visit<F>(&self, visitor: &mut F)
     where
-        F: FnMut(&ExpData),
+        F: FnMut(&ExpData) -> Result<(), ()>,
     {
-        self.visit_pre_post(&mut |up, e| {
+        let _ = self.visit_pre_post(&mut |up, e| {
             if up {
-                visitor(e);
+                visitor(e)
+            } else {
+                Ok(())
             }
         });
     }
@@ -853,11 +870,13 @@ impl ExpData {
     /// Visits expression, calling visitor parent expression, then subexpressions, depth first.
     pub fn visit_top_down<F>(&self, visitor: &mut F)
     where
-        F: FnMut(&ExpData),
+        F: FnMut(&ExpData) -> Result<(), ()>,
     {
-        self.visit_pre_post(&mut |up, e| {
+        let _ = self.visit_pre_post(&mut |up, e| {
             if !up {
-                visitor(e);
+                visitor(e)
+            } else {
+                Ok(())
             }
         });
     }
@@ -868,10 +887,11 @@ impl ExpData {
     {
         let mut found = false;
         self.visit(&mut |e| {
-            if !found {
-                // This still continues to visit after a match is found, may want to
-                // optimize if it becomes an issue.
-                found = predicate(e)
+            if predicate(e) {
+                found = true;
+                Err(()) // shortcut, stop visiting
+            } else {
+                Ok(()) // keep going
             }
         });
         found
@@ -881,92 +901,96 @@ impl ExpData {
     /// be called before descending into expression, and `visitor(true, ..)` after. Notice
     /// we use one function instead of two so a lambda can be passed which encapsulates mutable
     /// references.
-    pub fn visit_pre_post<F>(&self, visitor: &mut F)
+    /// - `visitor` returns `Err(())`` to indicate that visit should stop early.
+    /// - `visit_pre_post` returns `false` if visitor returned `false`.
+    pub fn visit_pre_post<F>(&self, visitor: &mut F) -> Result<(), ()>
     where
-        F: FnMut(bool, &ExpData),
+        F: FnMut(bool, &ExpData) -> Result<(), ()>,
     {
         use ExpData::*;
-        visitor(false, self);
+        visitor(false, self)?;
         match self {
             Call(_, _, args) => {
                 for exp in args {
-                    exp.visit_pre_post(visitor);
+                    exp.visit_pre_post(visitor)?;
                 }
             },
             Invoke(_, target, args) => {
-                target.visit_pre_post(visitor);
+                target.visit_pre_post(visitor)?;
                 for exp in args {
-                    exp.visit_pre_post(visitor);
+                    exp.visit_pre_post(visitor)?
                 }
             },
-            Lambda(_, _, body) => body.visit_pre_post(visitor),
+            Lambda(_, _, body) => body.visit_pre_post(visitor)?,
             Quant(_, _, ranges, triggers, condition, body) => {
                 for (_, range) in ranges {
-                    range.visit_pre_post(visitor);
+                    range.visit_pre_post(visitor)?;
                 }
                 for trigger in triggers {
                     for e in trigger {
-                        e.visit_pre_post(visitor);
+                        e.visit_pre_post(visitor)?;
                     }
                 }
                 if let Some(exp) = condition {
-                    exp.visit_pre_post(visitor);
+                    exp.visit_pre_post(visitor)?;
                 }
-                body.visit_pre_post(visitor);
+                body.visit_pre_post(visitor)?;
             },
             Block(_, _, binding, body) => {
                 if let Some(exp) = binding {
-                    exp.visit_pre_post(visitor)
+                    exp.visit_pre_post(visitor)?;
                 }
-                body.visit_pre_post(visitor)
+                body.visit_pre_post(visitor)?;
             },
             IfElse(_, c, t, e) => {
-                c.visit_pre_post(visitor);
-                t.visit_pre_post(visitor);
-                e.visit_pre_post(visitor);
+                c.visit_pre_post(visitor)?;
+                t.visit_pre_post(visitor)?;
+                e.visit_pre_post(visitor)?;
             },
-            Loop(_, e) => e.visit_pre_post(visitor),
-            Return(_, e) => e.visit_pre_post(visitor),
+            Loop(_, e) => e.visit_pre_post(visitor)?,
+            Return(_, e) => e.visit_pre_post(visitor)?,
             Sequence(_, es) => {
                 for e in es {
-                    e.visit_pre_post(visitor)
+                    e.visit_pre_post(visitor)?;
                 }
             },
-            Assign(_, _, e) => e.visit_pre_post(visitor),
+            Assign(_, _, e) => e.visit_pre_post(visitor)?,
             Mutate(_, lhs, rhs) => {
-                lhs.visit_pre_post(visitor);
-                rhs.visit_pre_post(visitor);
+                lhs.visit_pre_post(visitor)?;
+                rhs.visit_pre_post(visitor)?;
             },
-            SpecBlock(_, spec) => Self::visit_pre_post_spec(spec, visitor),
+            SpecBlock(_, spec) => Self::visit_pre_post_spec(spec, visitor)?,
             // Explicitly list all enum variants
             LoopCont(..) | Value(..) | LocalVar(..) | Temporary(..) | Invalid(..) => {},
         }
-        visitor(true, self);
+        visitor(true, self)
     }
 
-    fn visit_pre_post_spec<F>(spec: &Spec, visitor: &mut F)
+    fn visit_pre_post_spec<F>(spec: &Spec, visitor: &mut F) -> Result<(), ()>
     where
-        F: FnMut(bool, &ExpData),
+        F: FnMut(bool, &ExpData) -> Result<(), ()>,
     {
         for cond in &spec.conditions {
-            Self::visit_pre_post_cond(cond, visitor)
+            Self::visit_pre_post_cond(cond, visitor)?
         }
         for impl_spec in spec.on_impl.values() {
-            Self::visit_pre_post_spec(impl_spec, visitor)
+            Self::visit_pre_post_spec(impl_spec, visitor)?
         }
         for cond in spec.update_map.values() {
-            Self::visit_pre_post_cond(cond, visitor)
+            Self::visit_pre_post_cond(cond, visitor)?
         }
+        Ok(())
     }
 
-    fn visit_pre_post_cond<F>(cond: &Condition, visitor: &mut F)
+    fn visit_pre_post_cond<F>(cond: &Condition, visitor: &mut F) -> Result<(), ()>
     where
-        F: FnMut(bool, &ExpData),
+        F: FnMut(bool, &ExpData) -> Result<(), ()>,
     {
-        cond.exp.visit_pre_post(visitor);
+        cond.exp.visit_pre_post(visitor)?;
         for exp in &cond.additional_exps {
-            exp.visit_pre_post(visitor);
+            exp.visit_pre_post(visitor)?
         }
+        Ok(())
     }
 
     /// Rewrites this expression and sub-expression based on the rewriter function. The function
@@ -992,7 +1016,7 @@ impl ExpData {
         pattern_rewriter: &mut G,
     ) -> Exp
     where
-        F: FnMut(Exp) -> Result<Exp, Exp>,
+        F: FnMut(Exp) -> RewriteResult,
         G: FnMut(&Pattern, bool) -> Option<Pattern>,
     {
         ExpRewriter {
@@ -1098,6 +1122,7 @@ impl ExpData {
                     _ => {},
                 }
             }
+            Ok(()) // keep going.
         });
     }
 
@@ -1139,6 +1164,7 @@ impl ExpData {
                     _ => {},
                 }
             }
+            Ok(()) // keep going.
         });
     }
 
@@ -1154,6 +1180,7 @@ impl ExpData {
                     _ => {},
                 }
             }
+            Ok(()) // keep going.
         });
     }
 
@@ -1170,6 +1197,7 @@ impl ExpData {
                     _ => {},
                 }
             }
+            Ok(()) // keep going.
         });
     }
 
@@ -1418,7 +1446,7 @@ impl<'a> fmt::Display for EnvDisplay<'a, Value> {
 
 impl Operation {
     /// Determines whether this operation depends on global memory
-    pub fn uses_memory<F>(&self, check_pure: &F) -> bool
+    pub fn uses_no_memory<F>(&self, check_pure: &F) -> bool
     where
         F: Fn(ModuleId, SpecFunId) -> bool,
     {
@@ -1476,7 +1504,7 @@ impl Operation {
 
 impl ExpData {
     /// Determines whether this expression depends on global memory
-    pub fn uses_memory<F>(&self, check_pure: &F) -> bool
+    pub fn uses_no_memory<F>(&self, check_pure: &F) -> bool
     where
         F: Fn(ModuleId, SpecFunId) -> bool,
     {
@@ -1484,7 +1512,14 @@ impl ExpData {
         let mut no_use = true;
         self.visit(&mut |exp: &ExpData| {
             if let Call(_, oper, _) = exp {
-                no_use = no_use && oper.uses_memory(check_pure);
+                if !oper.uses_no_memory(check_pure) {
+                    no_use = false;
+                    Err(()) // we're done, stop visiting
+                } else {
+                    Ok(()) // keep looking
+                }
+            } else {
+                Ok(()) // keep looking
             }
         });
         no_use
@@ -1503,6 +1538,7 @@ impl ExpData {
                 Temporary(id, _) => {
                     if env.get_node_type(*id).is_mutable_reference() {
                         is_pure = false;
+                        return Err(()); // done visiting
                     }
                 },
                 Call(_, oper, _) => match oper {
@@ -1512,12 +1548,14 @@ impl ExpData {
                         let fun = module.get_spec_fun(*fid);
                         if !fun.used_memory.is_empty() {
                             is_pure = false;
+                            return Err(()); // done visiting
                         }
                     },
                     _ => {},
                 },
                 _ => {},
             }
+            Ok(()) // keep going
         };
         self.visit(&mut visitor);
         is_pure
