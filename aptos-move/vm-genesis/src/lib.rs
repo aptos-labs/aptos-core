@@ -441,6 +441,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
         FeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
         FeatureFlag::BN254_STRUCTURES,
+        FeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL,
     ]
 }
 
