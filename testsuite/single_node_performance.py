@@ -224,6 +224,7 @@ def execute_command(command):
 class RunResults:
     tps: float
     gps: float
+    effective_gps: float
     io_gps: float
     execution_gps: float
     gpt: float
@@ -253,6 +254,9 @@ def extract_run_results(
     if execution_only:
         tps = float(re.findall(r"Overall execution TPS: (\d+\.?\d*) txn/s", output)[-1])
         gps = float(re.findall(r"Overall execution GPS: (\d+\.?\d*) gas/s", output)[-1])
+        effective_gps = float(
+            re.findall(r"Overall execution effectiveGPS: (\d+\.?\d*) gas/s", output)[-1]
+        )
         io_gps = float(
             re.findall(r"Overall execution ioGPS: (\d+\.?\d*) gas/s", output)[-1]
         )
@@ -275,6 +279,7 @@ def extract_run_results(
             )
         )
         gps = 0
+        effective_gps = 0
         io_gps = 0
         execution_gps = 0
         gpt = 0
@@ -282,6 +287,9 @@ def extract_run_results(
     else:
         tps = float(get_only(re.findall(r"Overall TPS: (\d+\.?\d*) txn/s", output)))
         gps = float(get_only(re.findall(r"Overall GPS: (\d+\.?\d*) gas/s", output)))
+        effective_gps = float(
+            get_only(re.findall(r"Overall effectiveGPS: (\d+\.?\d*) gas/s", output))
+        )
         io_gps = float(
             get_only(re.findall(r"Overall ioGPS: (\d+\.?\d*) gas/s", output))
         )
@@ -313,6 +321,7 @@ def extract_run_results(
     return RunResults(
         tps=tps,
         gps=gps,
+        effective_gps=effective_gps,
         io_gps=io_gps,
         execution_gps=execution_gps,
         gpt=gpt,
@@ -353,6 +362,7 @@ def print_table(
                 "vm/exe",
                 "commit/total",
                 "g/s",
+                "eff g/s",
                 "io g/s",
                 "exe g/s",
                 "g/t",
@@ -386,6 +396,7 @@ def print_table(
             row.append(round(result.single_node_result.fraction_of_execution_in_vm, 3))
             row.append(round(result.single_node_result.fraction_in_commit, 3))
             row.append(int(round(result.single_node_result.gps)))
+            row.append(int(round(result.single_node_result.effective_gps)))
             row.append(int(round(result.single_node_result.io_gps)))
             row.append(int(round(result.single_node_result.execution_gps)))
             row.append(int(round(result.single_node_result.gpt)))
@@ -402,7 +413,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
     execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
 
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")
-    create_db_command = f"{BUILD_FOLDER}/aptos-executor-benchmark --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
+    create_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
 
     results = []
@@ -459,14 +470,14 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         number_of_threads_results = {}
 
         for execution_threads in EXECUTION_ONLY_NUMBER_OF_THREADS:
-            test_db_command = f"{BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {execution_threads} {common_command_suffix} --skip-commit --blocks {NUM_BLOCKS_DETAILED}"
+            test_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {execution_threads} {common_command_suffix} --skip-commit --blocks {NUM_BLOCKS_DETAILED}"
             output = execute_command(test_db_command)
 
             number_of_threads_results[execution_threads] = extract_run_results(
                 output, execution_only=True
             )
 
-        test_db_command = f"{BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {NUMBER_OF_EXECUTION_THREADS} {common_command_suffix} --blocks {NUM_BLOCKS}"
+        test_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {NUMBER_OF_EXECUTION_THREADS} {common_command_suffix} --blocks {NUM_BLOCKS}"
         output = execute_command(test_db_command)
 
         single_node_result = extract_run_results(output, execution_only=False)
