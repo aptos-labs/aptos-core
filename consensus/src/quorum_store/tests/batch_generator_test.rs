@@ -365,6 +365,67 @@ async fn test_max_batch_txns() {
 }
 
 #[tokio::test]
+async fn test_max_batch_bytes() {
+    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
+    let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
+
+    let txn_bytes_len = 168;
+    assert_eq!(
+        create_vec_signed_transactions(1)[0].txn_bytes_len(),
+        txn_bytes_len
+    );
+    let config = QuorumStoreConfig {
+        sender_max_batch_bytes: txn_bytes_len * 10,
+        ..Default::default()
+    };
+
+    let author = AccountAddress::random();
+    let mut batch_generator = BatchGenerator::new(
+        0,
+        author,
+        config,
+        Arc::new(MockQuorumStoreDB::new()),
+        quorum_store_to_mempool_tx,
+        1000,
+    );
+
+    let join_handle = tokio::spawn(async move {
+        let signed_txns = create_vec_signed_transactions(25);
+        queue_mempool_batch_response(
+            signed_txns.clone(),
+            txn_bytes_len * 25,
+            &mut quorum_store_to_mempool_rx,
+        )
+        .await;
+
+        let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
+        if let BatchCoordinatorCommand::NewBatches(_, result) = quorum_store_command {
+            assert_eq!(result.len(), 3);
+            assert_eq!(result[0].num_txns(), 10);
+            assert_eq!(result[1].num_txns(), 10);
+            assert_eq!(result[2].num_txns(), 5);
+
+            assert_eq!(&result[0].clone().into_transactions(), &signed_txns[0..10]);
+            assert_eq!(&result[1].clone().into_transactions(), &signed_txns[10..20]);
+            assert_eq!(&result[2].clone().into_transactions(), &signed_txns[20..]);
+        } else {
+            panic!("Unexpected variant")
+        }
+    });
+
+    let result = batch_generator.handle_scheduled_pull(300).await;
+    batch_coordinator_cmd_tx
+        .send(BatchCoordinatorCommand::NewBatches(author, result))
+        .await
+        .unwrap();
+
+    timeout(Duration::from_millis(10_000), join_handle)
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
 async fn test_last_bucketed_batch() {
     let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
     let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
