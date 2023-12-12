@@ -8,6 +8,8 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V13
+///   - Added BN254 operations.
 /// - V12
 ///   - Making resource group charge on first read independent of BTreeMap serialization.
 /// - V11
@@ -44,4 +46,4 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 12;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 13;
