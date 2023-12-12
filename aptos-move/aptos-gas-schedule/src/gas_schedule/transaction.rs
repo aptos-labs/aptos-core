@@ -15,6 +15,15 @@ use move_core_types::gas_algebra::{
 
 const GAS_SCALING_FACTOR: u64 = 1_000_000;
 
+const GAS_INTRINSIC_MULTIPLIER: u64 = 8_400_000;
+const GAS_EXECUTION_MULTIPLIER: u64 = 1_000_000;
+const GAS_IO_READ_MULTIPLIER: u64 = 2_850_000;
+const GAS_IO_WRITE_MULTIPLIER: u64 = 2_382_000;
+
+const fn adjust(value: u64, factor: u64) -> u64 {
+    (value as u128 * factor as u128 / 1_000_000) as u64
+}
+
 crate::gas_schedule::macros::define_gas_parameters!(
     TransactionGasParameters,
     "txn",
@@ -25,7 +34,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             min_transaction_gas_units: InternalGas,
             "min_transaction_gas_units",
-            1_500_000
+            adjust(1_500_000, GAS_INTRINSIC_MULTIPLIER),
         ],
         // Any transaction over this size will be charged an additional amount per byte.
         [
@@ -38,7 +47,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             intrinsic_gas_per_byte: InternalGasPerByte,
             "intrinsic_gas_per_byte",
-            2_000
+            adjust(2_000, GAS_INTRINSIC_MULTIPLIER),
         ],
         // ~5 microseconds should equal one unit of computational gas. We bound the maximum
         // computational time of any given transaction at roughly 20 seconds. We want this number and
@@ -80,7 +89,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
             // in cache, hence target charging 1-2 4k-sized pages for each read. Notice the cost
             // of seeking for the leaf node is covered by the first page of the "value size fee"
             // (storage_io_per_state_byte_read) defined below.
-            800_000,
+            adjust(800_000, GAS_IO_READ_MULTIPLIER),
         ],
         [
             storage_io_per_state_byte_read: InternalGasPerByte,
@@ -88,7 +97,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
             // Notice in the latest IoPricing, bytes are charged at 4k intervals (even the smallest
             // read will be charged for 4KB) to reflect the assumption that every roughly 4k bytes
             // might require a separate random IO upon the FS.
-            100,
+            adjust(100, GAS_IO_READ_MULTIPLIER),
         ],
         [load_data_failure: InternalGas, "load_data.failure", 0],
         // Gas parameters for writing data to storage.
@@ -100,7 +109,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
             // to each transactions assuming they don't touch exactly the same leaves. It's fair to
             // target roughly 1-2 full internal JMT nodes (about 0.5-1KB in total) worth of writes
             // for each write op.
-            100_000,
+            adjust(100_000, GAS_IO_WRITE_MULTIPLIER),
         ],
         [
             legacy_write_data_per_new_item: InternalGasPerArg,
@@ -110,7 +119,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             storage_io_per_state_byte_write: InternalGasPerByte,
             { 0..=9 => "write_data.per_byte_in_key", 10.. => "storage_io_per_state_byte_write"},
-            100,
+            adjust(100, GAS_IO_WRITE_MULTIPLIER),
         ],
         [
             legacy_write_data_per_byte_in_val: InternalGasPerByte,
