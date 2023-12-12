@@ -25,9 +25,8 @@ use arithmetics::{
     inv::inv_internal,
     scalar_mul::{multi_scalar_mul_internal, scalar_mul_internal},
 };
-use ark_ec::{pairing::Pairing, AffineRepr};
 use ark_ff::{BigInteger, PrimeField};
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_serialize::CanonicalDeserialize;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{language_storage::TypeTag, vm_status::StatusCode};
