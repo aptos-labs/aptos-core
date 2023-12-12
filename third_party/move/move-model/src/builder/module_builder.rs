@@ -1233,7 +1233,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 Ability::Store => {
                     let mut abilities = Vec::new();
                     if field_abilities.has_store() {
-                        abilities.push("copy");
+                        abilities.push("store");
                     }
                     if field_abilities.has_key() {
                         abilities.push("key");
