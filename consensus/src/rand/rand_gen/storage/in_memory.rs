@@ -49,7 +49,7 @@ impl<S: Share, P: Proof<Share = S>, D: AugmentedData> RandStorage<S, P> for InMe
         Ok(self.shares.read().clone().into_iter().collect())
     }
 
-    fn get_all_decision(&self) -> anyhow::Result<Vec<(RandMetadata, RandDecision<P>)>> {
+    fn get_all_decisions(&self) -> anyhow::Result<Vec<(RandMetadata, RandDecision<P>)>> {
         Ok(self.decisions.read().clone().into_iter().collect())
     }
 

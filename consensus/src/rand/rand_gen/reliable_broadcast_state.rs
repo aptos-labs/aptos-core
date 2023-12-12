@@ -9,7 +9,8 @@ use crate::rand::rand_gen::{
     },
 };
 use anyhow::ensure;
-use aptos_consensus_types::common::Author;
+use aptos_consensus_types::{common::Author, randomness::RandMetadata};
+use aptos_logger::error;
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{aggregate_signature::PartialSignatures, epoch_state::EpochState};
 use std::{collections::HashSet, sync::Arc};
@@ -94,8 +95,25 @@ impl<S: Share, P: Proof<Share = S>, D: AugmentedData>
 
 pub struct ShareAckState<P> {
     validators: HashSet<Author>,
+    rand_metadata: RandMetadata,
     rand_config: RandConfig,
     decision_tx: UnboundedSender<RandDecision<P>>,
+}
+
+impl<P> ShareAckState<P> {
+    pub fn new(
+        validators: impl Iterator<Item = Author>,
+        metadata: RandMetadata,
+        rand_config: RandConfig,
+        decision_tx: UnboundedSender<RandDecision<P>>,
+    ) -> Self {
+        Self {
+            validators: validators.collect(),
+            rand_metadata: metadata,
+            rand_config,
+            decision_tx,
+        }
+    }
 }
 
 impl<S: Share, P: Proof<Share = S>, D: AugmentedData>
@@ -113,9 +131,12 @@ impl<S: Share, P: Proof<Share = S>, D: AugmentedData>
         );
         // If receive a decision, verify it and send it to the randomness manager and stop the reliable broadcast
         if let Some(decision) = ack.into_maybe_decision() {
-            if decision.verify(&self.rand_config).is_ok() {
-                let _ = self.decision_tx.send(decision);
-                return Ok(Some(()));
+            match decision.verify(&self.rand_config, &self.rand_metadata) {
+                Ok(_) => {
+                    let _ = self.decision_tx.send(decision);
+                    return Ok(Some(()));
+                },
+                Err(e) => error!("[RandManager] Failed to verify decision: {}", e),
             }
         }
         // If receive from all validators, stop the reliable broadcast
