@@ -140,7 +140,7 @@ mod tests {
         // We overestimate the ULEB128 encoding of the number of transactions as 128 bytes.
         assert_eq!(
             empty_batch_payload.num_bytes() + 127,
-            config::SENDER_BATCH_PADDING_BYTES
+            config::BATCH_PADDING_BYTES
         );
     }
 }
