@@ -36,8 +36,8 @@ use aptos_types::{
     block_executor::config::BlockExecutorConfig,
     contract_event::TransactionEvent,
     executable::Executable,
-    state_store::TStateView,
     on_chain_config::BlockGasLimitType,
+    state_store::TStateView,
     transaction::BlockExecutableTransaction as Transaction,
     write_set::{TransactionWrite, WriteOp},
 };

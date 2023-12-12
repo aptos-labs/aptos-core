@@ -1,6 +1,6 @@
 processed 7 tasks
 
-task 4 'run'. lines 37-37:
+task 4 'run'. lines 33-33:
 Error: Function execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(0),
