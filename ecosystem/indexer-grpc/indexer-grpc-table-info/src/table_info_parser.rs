@@ -1,12 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::counters::{IndexerTableInfoStep, DURATION_IN_SECS, SERVICE_TYPE, TOTAL_SIZE_IN_BYTES};
 use anyhow::Error;
 use aptos_api::context::Context;
 use aptos_api_types::TransactionOnChainData;
-use aptos_db_indexer_async_v2::counters::{
-    IndexerTableInfoStep, DURATION_IN_SECS, SERVICE_TYPE, TOTAL_SIZE_IN_BYTES,
-};
 use aptos_logger::{debug, error, info, sample, sample::SampleRate};
 use aptos_sdk::bcs;
 use aptos_storage_interface::{DbReaderWriter, DbWriter};
@@ -95,7 +93,11 @@ impl TableInfoParser {
             Ok(res) => {
                 let db_reader = db.reader.clone();
                 let mut retried: u64 = 0;
-                while !db_reader.clone().is_indexer_async_v2_pending_on_empty().unwrap() {
+                while !db_reader
+                    .clone()
+                    .is_indexer_async_v2_pending_on_empty()
+                    .unwrap()
+                {
                     retried += 1;
                     let retry_batch = TransactionBatchInfo {
                         start_version: self.current_version,
@@ -103,8 +105,12 @@ impl TableInfoParser {
                     };
                     let context = self.context.clone();
                     let ledger_version = self.highest_known_version;
-                    let raw_txns =
-                        Self::fetch_raw_txns_with_retries(context.clone(), ledger_version, retry_batch).await;
+                    let raw_txns = Self::fetch_raw_txns_with_retries(
+                        context.clone(),
+                        ledger_version,
+                        retry_batch,
+                    )
+                    .await;
                     Self::parse_table_info(context.clone(), raw_txns.clone(), db_writer.clone())
                         .expect("Failed to parse table info");
                     info!(

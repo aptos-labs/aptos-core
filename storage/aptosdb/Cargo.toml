@@ -18,7 +18,6 @@ aptos-accumulator = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-db-indexer = { workspace = true }
-aptos-db-indexer-async-v2 = { workspace = true }
 aptos-executor = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-experimental-runtimes = { workspace = true }

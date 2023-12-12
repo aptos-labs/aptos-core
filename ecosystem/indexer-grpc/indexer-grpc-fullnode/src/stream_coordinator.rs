@@ -87,10 +87,12 @@ impl IndexerStreamCoordinator {
         let mut tasks = vec![];
         let batches = self.get_batches().await;
         let output_batch_size = self.output_batch_size;
+
         for batch in batches {
             let context = self.context.clone();
             let ledger_version = self.highest_known_version;
             let transaction_sender = self.transactions_sender.clone();
+
             let task = tokio::spawn(async move {
                 let batch_start_time = std::time::Instant::now();
                 // Fetch and convert transactions from API
@@ -119,15 +121,7 @@ impl IndexerStreamCoordinator {
                     Some(raw_txns.len() as i64),
                 );
                 let api_txns = Self::convert_to_api_txns(context, raw_txns).await;
-                DURATION_IN_SECS
-                    .with_label_values(&[
-                        SERVICE_TYPE,
-                        IndexerGrpcStep::FullnodeAPITxnConvertedBatch.get_step(),
-                        IndexerGrpcStep::FullnodeAPITxnConvertedBatch.get_label(),
-                    ])
-                    .set(start_time.elapsed().as_secs_f64());
                 api_txns.last().map(record_fetched_transaction_latency);
-                start_time = std::time::Instant::now();
                 let pb_txns = Self::convert_to_pb_txns(api_txns);
                 let start_transaction = pb_txns.first().unwrap();
                 let end_transaction = pb_txns.last().unwrap();
@@ -284,7 +278,7 @@ impl IndexerStreamCoordinator {
         if raw_txns.is_empty() {
             return vec![];
         }
-        let start_time = std::time::Instant::now();
+        let start_millis = chrono::Utc::now().naive_utc();
 
         let first_version = raw_txns.first().map(|txn| txn.version).unwrap();
         let state_view = context.latest_state_view().unwrap();
@@ -371,7 +365,7 @@ impl IndexerStreamCoordinator {
             panic!("[Indexer Fullnode] No transactions!");
         }
 
-        let fetch_millis = start_time.elapsed().as_millis();
+        let fetch_millis = (chrono::Utc::now().naive_utc() - start_millis).num_milliseconds();
 
         info!(
             start_version = first_version,

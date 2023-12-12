@@ -450,9 +450,11 @@ pub trait DbReader: Send + Sync {
         /// Returns whether the internal indexer async v2 DB has been enabled or not
         fn indexer_async_v2_enabled(&self) -> bool;
 
-        /// Returns  the next version which internal indexer async v2 DB should parse
+        /// Returns the next version which internal indexer async v2 DB should parse
         fn get_indexer_async_v2_next_version(&self) -> Result<Version>;
 
+        /// Returns boolean whether indexer async v2 pending on items are empty
+        /// if so, the whole batches are processed completely, if not, need to retry
         fn is_indexer_async_v2_pending_on_empty(&self) -> Result<bool>;
 
         /// Returns state storage usage at the end of an epoch.

@@ -1,13 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::table_info_parser::TableInfoParser;
+use crate::{
+    counters::{
+        IndexerTableInfoStep, DURATION_IN_SECS, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_COUNT,
+        SERVICE_TYPE,
+    },
+    table_info_parser::TableInfoParser,
+};
 use aptos_api::context::Context;
 use aptos_config::config::NodeConfig;
-use aptos_db_indexer_async_v2::counters::{
-    IndexerTableInfoStep, DURATION_IN_SECS, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_COUNT,
-    SERVICE_TYPE,
-};
 use aptos_logger::{error, info};
 use aptos_mempool::MempoolClientSender;
 use aptos_moving_average::MovingAverage;

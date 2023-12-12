@@ -1,21 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod counters;
 /// This file is a copy of the file storage/indexer/src/lib.rs.
 /// At the end of the migration to migrate table info mapping
-/// from storage critical path to indexer, the other file will be removed.
-pub mod db;
-mod metadata;
-mod schema;
+/// from storage critical path to indexer, the other file will be removed
+/// and this file will be moved to /ecosystem/indexer-grpc/indexer-grpc-table-info.
 use crate::{
-    counters::{IndexerTableInfoStep, DURATION_IN_SECS, SERVICE_TYPE},
-    db::INDEX_ASYNC_V2_DB_NAME,
     metadata::{MetadataKey, MetadataValue},
-    schema::{column_families, table_info::TableInfoSchema},
+    schema::{
+        column_families, indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema,
+    },
 };
 use anyhow::{bail, Result};
 use aptos_config::config::RocksdbConfig;
+use aptos_logger::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{state_view::DbStateView, DbReader};
@@ -38,7 +36,6 @@ use move_core_types::{
     resolver::MoveResolver,
 };
 use move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
-use schema::indexer_metadata::IndexerMetadataSchema;
 use std::{
     collections::{BTreeMap, HashMap},
     sync::{
@@ -47,8 +44,8 @@ use std::{
     },
     time::Duration,
 };
-use tracing::info;
 
+pub const INDEX_ASYNC_V2_DB_NAME: &str = "index_indexer_async_v2_db";
 const TABLE_INFO_RETRY_TIME_MILLIS: u64 = 10;
 
 #[derive(Debug)]
@@ -121,7 +118,6 @@ impl IndexerAsyncV2 {
         first_version: Version,
         write_sets: &[&WriteSet],
     ) -> Result<()> {
-        let mut start_time = std::time::Instant::now();
         let end_version = first_version + write_sets.len() as Version;
         let mut table_info_parser = TableInfoParser::new(self, annotator, &self.pending_on);
         for write_set in write_sets {
@@ -129,16 +125,6 @@ impl IndexerAsyncV2 {
                 table_info_parser.parse_write_op(state_key, write_op)?;
             }
         }
-
-        DURATION_IN_SECS
-            .with_label_values(&[
-                SERVICE_TYPE,
-                IndexerTableInfoStep::TableInfoParsedBatch.get_step(),
-                IndexerTableInfoStep::TableInfoParsedBatch.get_label(),
-            ])
-            .set(start_time.elapsed().as_secs_f64());
-
-        start_time = std::time::Instant::now();
         let mut batch = SchemaBatch::new();
         match table_info_parser.finish(&mut batch) {
             Ok(_) => {},
@@ -159,14 +145,6 @@ impl IndexerAsyncV2 {
         )?;
         self.db.write_schemas(batch)?;
         self.next_version.store(end_version, Ordering::Relaxed);
-
-        DURATION_IN_SECS
-            .with_label_values(&[
-                SERVICE_TYPE,
-                IndexerTableInfoStep::TableInfoWrittenBatch.get_step(),
-                IndexerTableInfoStep::TableInfoWrittenBatch.get_label(),
-            ])
-            .set(start_time.elapsed().as_secs_f64());
         Ok(())
     }
 
@@ -227,7 +205,7 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
                     self.parse_table_item(handle, &bytes)?;
                 }
             }
-        };
+        }
         Ok(())
     }
 

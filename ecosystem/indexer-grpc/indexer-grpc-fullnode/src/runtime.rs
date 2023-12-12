@@ -52,7 +52,6 @@ pub fn bootstrap(
 
     runtime.spawn(async move {
         let context = Arc::new(Context::new(chain_id, db, mp_sender, node_config));
-
         let service_context = ServiceContext {
             context: context.clone(),
             processor_task_count,

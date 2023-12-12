@@ -30,8 +30,7 @@ use aptos_config::config::{
     PrunerConfig, RocksdbConfig, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::HashValue;
-use aptos_db_indexer::Indexer;
-use aptos_db_indexer_async_v2::IndexerAsyncV2;
+use aptos_db_indexer::{db_v2::IndexerAsyncV2, Indexer};
 use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;

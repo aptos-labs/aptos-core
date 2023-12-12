@@ -70,10 +70,9 @@ impl Default for IndexerGrpcConfig {
         Self {
             enabled: false,
             use_data_service_interface: false,
-            address: SocketAddr::V4(SocketAddrV4::new(
-                Ipv4Addr::new(0, 0, 0, 0),
-                DEFAULT_GRPC_STREAM_PORT,
-            )),
+            address: SocketAddr::V4(
+                SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), DEFAULT_GRPC_STREAM_PORT)
+            ),
             processor_task_count: DEFAULT_PROCESSOR_TASK_COUNT,
             processor_batch_size: DEFAULT_PROCESSOR_BATCH_SIZE,
             output_batch_size: DEFAULT_OUTPUT_BATCH_SIZE,
@@ -137,17 +136,20 @@ impl ConfigOptimizer for IndexerGrpcConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::StorageConfig;
+    use crate::config::{IndexerTableInfoConfig, StorageConfig};
 
     #[test]
     fn test_sanitize_enable_indexer() {
         // Create a storage config and disable the storage indexer
         let mut storage_config = StorageConfig::default();
+        let mut table_info_config = IndexerTableInfoConfig::default();
         storage_config.enable_indexer = false;
+        table_info_config.enabled = false;
 
         // Create a node config with the indexer enabled, but the storage indexer disabled
         let mut node_config = NodeConfig {
             storage: storage_config,
+            indexer_table_info: table_info_config,
             indexer_grpc: IndexerGrpcConfig {
                 enabled: true,
                 ..Default::default()
@@ -166,6 +168,25 @@ mod tests {
 
         // Enable the storage indexer
         node_config.storage.enable_indexer = true;
+
+        // Sanitize the config and verify that it now succeeds
+        IndexerGrpcConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
+            .unwrap();
+
+        // Disable the storage indexer and enable the table info service
+        node_config.storage.enable_indexer = false;
+
+        // Sanitize the config and verify that it fails
+        let error = IndexerGrpcConfig::sanitize(
+            &node_config,
+            NodeType::Validator,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+
+        // Enable the table info service
+        node_config.indexer_table_info.enabled = true;
 
         // Sanitize the config and verify that it now succeeds
         IndexerGrpcConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))

@@ -300,7 +300,6 @@ aptos-data-client = { path = "state-sync/aptos-data-client" }
 aptos-data-streaming-service = { path = "state-sync/data-streaming-service" }
 aptos-db = { path = "storage/aptosdb" }
 aptos-db-indexer = { path = "storage/indexer" }
-aptos-db-indexer-async-v2 =  { path = "ecosystem/indexer-grpc/indexer-grpc-table-info/src/indexer-async-v2" }
 aptos-db-tool = { path = "storage/db-tool" }
 aptos-debugger = { path = "crates/aptos-debugger" }
 aptos-drop-helper = { path = "crates/aptos-drop-helper" }

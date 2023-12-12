@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod db;
+pub mod db_v2;
 mod metadata;
 mod schema;
 

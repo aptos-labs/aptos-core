@@ -7,30 +7,20 @@ use once_cell::sync::Lazy;
 pub const SERVICE_TYPE: &str = "indexer_table_info";
 
 pub enum IndexerTableInfoStep {
-    TableInfoParsedBatch, // [Indexer Table Info] Parsed batch of write sets from transactions to table info mapping
-    TableInfoWrittenBatch, // [Indexer Table Info] Wrote batch of table info mapping to rocksdb
     TableInfoProcessedBatch, // [Indexer Table Info] Processed batch of transactions from fullnode
-    TableInfoProcessed,   // [Indexer Table Info] Processed transactions from fullnode
+    TableInfoProcessed,      // [Indexer Table Info] Processed transactions from fullnode
 }
 
 impl IndexerTableInfoStep {
     pub fn get_step(&self) -> &'static str {
         match self {
-            IndexerTableInfoStep::TableInfoParsedBatch => "1",
-            IndexerTableInfoStep::TableInfoWrittenBatch => "2",
-            IndexerTableInfoStep::TableInfoProcessedBatch => "3",
-            IndexerTableInfoStep::TableInfoProcessed => "4",
+            IndexerTableInfoStep::TableInfoProcessedBatch => "1",
+            IndexerTableInfoStep::TableInfoProcessed => "2",
         }
     }
 
     pub fn get_label(&self) -> &'static str {
         match self {
-            IndexerTableInfoStep::TableInfoParsedBatch => {
-                "[Indexer Table Info] Parsed batch Successfully"
-            },
-            IndexerTableInfoStep::TableInfoWrittenBatch => {
-                "[Indexer Table Info] Wrote batch successfully"
-            },
             IndexerTableInfoStep::TableInfoProcessedBatch => {
                 "[Indexer Table Info] Processed batch successfully"
             },
