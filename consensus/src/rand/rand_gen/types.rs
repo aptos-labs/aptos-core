@@ -30,6 +30,13 @@ impl Share for MockShare {
     ) -> anyhow::Result<()> {
         Ok(())
     }
+
+    fn generate(rand_config: &RandConfig, rand_metadata: RandMetadata) -> RandShare<Self>
+    where
+        Self: Sized,
+    {
+        RandShare::new(rand_config.author(), rand_metadata, Self)
+    }
 }
 
 impl Proof for MockProof {
@@ -52,12 +59,23 @@ impl Proof for MockProof {
     }
 }
 
-impl AugmentedData for MockAugData {}
+impl AugmentedData for MockAugData {
+    fn generate(rand_config: &RandConfig) -> AugData<Self>
+    where
+        Self: Sized,
+    {
+        AugData::new(rand_config.epoch(), rand_config.author(), Self)
+    }
+}
 
 pub trait Share:
     Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned + 'static
 {
     fn verify(&self, rand_config: &RandConfig, rand_metadata: &RandMetadata) -> anyhow::Result<()>;
+
+    fn generate(rand_config: &RandConfig, rand_metadata: RandMetadata) -> RandShare<Self>
+    where
+        Self: Sized;
 }
 
 pub trait Proof:
@@ -78,6 +96,9 @@ pub trait Proof:
 pub trait AugmentedData:
     Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned + 'static
 {
+    fn generate(rand_config: &RandConfig) -> AugData<Self>
+    where
+        Self: Sized;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -143,8 +164,22 @@ impl<P: Proof> RandDecision<P> {
         Self { randomness, proof }
     }
 
-    pub fn verify(&self, rand_config: &RandConfig) -> anyhow::Result<()> {
-        self.proof.verify(rand_config, self.randomness.metadata())
+    pub fn verify(&self, rand_config: &RandConfig, metadata: &RandMetadata) -> anyhow::Result<()> {
+        ensure!(
+            metadata.round() == self.randomness.metadata().round(),
+            "Round does not match: local {}, received {}",
+            metadata.round(),
+            self.randomness.metadata().round()
+        );
+        self.proof.verify(rand_config, self.randomness.metadata())?;
+        // this is a sanity check in case we receive different ordered blocks from consensus
+        ensure!(
+            metadata == self.randomness.metadata(),
+            "Metadata does not match: local {:?}, received {:?}",
+            metadata,
+            self.randomness.metadata()
+        );
+        Ok(())
     }
 
     pub fn randomness(&self) -> &Randomness {
@@ -314,6 +349,7 @@ impl CertifiedAugDataAck {
 
 #[derive(Clone)]
 pub struct RandConfig {
+    epoch: u64,
     author: Author,
     threshold: u64,
     weights: HashMap<Author, u64>,
@@ -321,14 +357,23 @@ pub struct RandConfig {
 }
 
 impl RandConfig {
-    pub fn new(author: Author, weights: HashMap<Author, u64>) -> Self {
+    pub fn new(epoch: u64, author: Author, weights: HashMap<Author, u64>) -> Self {
         let sum = weights.values().sum::<u64>();
         Self {
+            epoch,
             author,
             weights,
             threshold: sum * 2 / 3 + 1,
             certified_data: Arc::new(RwLock::new(HashMap::new())),
         }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
+    pub fn author(&self) -> Author {
+        self.author
     }
 
     pub fn get_peer_weight(&self, author: &Author) -> u64 {
