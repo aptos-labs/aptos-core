@@ -124,12 +124,11 @@ impl Worker {
                     LocalFileStoreOperator::new(local_file_store.local_file_store_path.clone()),
                 ),
             };
-
+            // TODO: this is unnecessary
+            // TODO: move chain id check somewhere around here
             file_store_operator.verify_storage_bucket_existence().await;
-            let starting_version = file_store_operator
-                .get_starting_version()
-                .await
-                .unwrap_or(0);
+            // TODO: Let's change this to ensure that the filestore metadata is already there to avoid a conflict
+            let starting_version = file_store_operator.get_latest_version().await.unwrap_or(0);
 
             let file_store_metadata = file_store_operator.get_file_store_metadata().await;
 
@@ -293,7 +292,6 @@ async fn setup_cache_with_init_signal(
 async fn process_streaming_response(
     conn: redis::aio::ConnectionManager,
     file_store_metadata: Option<FileStoreMetadata>,
-    file_store_operator: Box<dyn FileStoreOperator>,
     mut resp_stream: impl futures_core::Stream<Item = Result<TransactionsFromNodeResponse, tonic::Status>>
         + std::marker::Unpin,
     enable_verbose_logging: bool,
@@ -432,27 +430,26 @@ async fn process_streaming_response(
             },
         }
 
-        // Check if the file store has been updated.
+        // Check if the file store isn't too far away
         loop {
-            let file_store_metadata = file_store_operator.get_file_store_metadata().await;
-            if let Some(file_store_metadata) = file_store_metadata {
-                if file_store_metadata.version + FILE_STORE_VERSIONS_RESERVED < current_version {
-                    tokio::time::sleep(std::time::Duration::from_secs(
-                        CACHE_WORKER_WAIT_FOR_FILE_STORE_IN_SECS,
-                    ))
-                    .await;
-                    tracing::warn!(
-                        current_version = current_version,
-                        file_store_version = file_store_metadata.version,
-                        "[Indexer Cache] File store version is behind current version too much."
-                    );
-                    WAIT_FOR_FILE_STORE_COUNTER.inc();
-                } else {
-                    // File store is up to date, continue cache update.
-                    break;
-                }
+            // TODO: similar todo as above, ensure that the filestore metadata is already there to avoid a conflict
+            let file_store_version = cache_operator
+                .get_file_store_latest_version()
+                .await
+                .unwrap();
+            if file_store_version + FILE_STORE_VERSIONS_RESERVED < current_version {
+                tokio::time::sleep(std::time::Duration::from_secs(
+                    CACHE_WORKER_WAIT_FOR_FILE_STORE_IN_SECS,
+                ))
+                .await;
+                tracing::warn!(
+                    current_version = current_version,
+                    file_store_version = file_store_version,
+                    "[Indexer Cache] File store version is behind current version too much."
+                );
+                WAIT_FOR_FILE_STORE_COUNTER.inc();
             } else {
-                // If metadata doesn't exist, procceed and file store will be updated later.
+                // File store is up to date, continue cache update.
                 break;
             }
         }

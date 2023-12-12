@@ -24,6 +24,7 @@ const BASE_EXPIRATION_EPOCH_TIME_IN_SECONDS: u64 = 253_402_300_799;
 
 // Default values for cache.
 const CACHE_DEFAULT_LATEST_VERSION_NUMBER: &str = "0";
+const FILE_STORE_LATEST_VERSION: &str = "file_store_latest_version";
 
 // Returns 1 if the chain id is updated or verified. Otherwise(chain id not match), returns 0.
 // TODO(larry): add a test for this script.
@@ -169,6 +170,24 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
             .context("Redis latest_version is not a number.")
     }
 
+    pub async fn get_file_store_latest_version(&mut self) -> anyhow::Result<u64> {
+        self.conn
+            .get::<&str, String>(FILE_STORE_LATEST_VERSION)
+            .await?
+            .parse::<u64>()
+            .context("Redis file_store_latest_version is not a number.")
+    }
+
+    pub async fn update_file_store_latest_version(
+        &mut self,
+        latest_version: u64,
+    ) -> anyhow::Result<()> {
+        self.conn
+            .set(FILE_STORE_LATEST_VERSION, latest_version)
+            .await?;
+        Ok(())
+    }
+
     // Internal function to get the latest version from cache.
     pub(crate) async fn check_cache_coverage_status(
         &mut self,
@@ -259,6 +278,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         }
     }
 
+    // TODO: Remove this
     pub async fn batch_get_encoded_proto_data(
         &mut self,
         start_version: u64,

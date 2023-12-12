@@ -190,7 +190,11 @@ impl Processor {
                 "[Filestore] Batch must be multiple of 1000"
             );
 
-            // write to filestore
+            // Update filestore metadata. First do it in cache for performance then update metadata file
+            let start_time = std::time::Instant::now();
+            self.cache_operator
+                .update_file_store_latest_version(batch_start_version)
+                .await?;
             while self
                 .file_store_operator
                 .update_file_store_metadata_with_timeout(cache_chain_id, batch_start_version)
@@ -199,11 +203,32 @@ impl Processor {
             {
                 tracing::error!(
                     batch_start_version = batch_start_version,
-                    "Failed to update file store metadata. Retrying in 500ms."
+                    "Failed to update file store metadata. Retrying."
                 );
                 std::thread::sleep(std::time::Duration::from_millis(500));
                 METADATA_UPLOAD_FAILURE_COUNT.inc();
             }
+            info!(
+                end_version = batch_start_version,
+                duration_in_secs = start_time.elapsed().as_secs_f64(),
+                service_type = SERVICE_TYPE,
+                "{}",
+                IndexerGrpcStep::FilestoreUpdateMetadata.get_label()
+            );
+            LATEST_PROCESSED_VERSION
+                .with_label_values(&[
+                    SERVICE_TYPE,
+                    IndexerGrpcStep::FilestoreUpdateMetadata.get_step(),
+                    IndexerGrpcStep::FilestoreUpdateMetadata.get_label(),
+                ])
+                .set(batch_start_version as i64);
+            DURATION_IN_SECS
+                .with_label_values(&[
+                    SERVICE_TYPE,
+                    IndexerGrpcStep::FilestoreUpdateMetadata.get_step(),
+                    IndexerGrpcStep::FilestoreUpdateMetadata.get_label(),
+                ])
+                .set(start_time.elapsed().as_secs_f64());
             let size = last_version - first_version + 1;
             PROCESSED_VERSIONS_COUNT.inc_by(size);
             tps_calculator.tick_now(size);

@@ -80,7 +80,8 @@ pub trait FileStoreOperator: Send + Sync {
         batch: Vec<EncodedTransactionWithVersion>,
     ) -> anyhow::Result<(u64, u64)>;
 
-    async fn get_starting_version(&self) -> Option<u64> {
+    /// This is updated by the filestore worker whenever it updates the filestore metadata
+    async fn get_latest_version(&self) -> Option<u64> {
         let metadata = self.get_file_store_metadata().await;
         metadata.map(|metadata| metadata.version)
     }
