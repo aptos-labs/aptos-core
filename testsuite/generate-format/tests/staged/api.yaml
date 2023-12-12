@@ -194,6 +194,11 @@ Identifier:
 Module:
   STRUCT:
     - code: BYTES
+ModuleBundle:
+  STRUCT:
+    - codes:
+        SEQ:
+          TYPENAME: Module
 ModuleId:
   STRUCT:
     - address:
@@ -483,10 +488,14 @@ TransactionPayload:
         NEWTYPE:
           TYPENAME: Script
     1:
+      ModuleBundle:
+        NEWTYPE:
+          TYPENAME: ModuleBundle
+    3:
       EntryFunction:
         NEWTYPE:
           TYPENAME: EntryFunction
-    2:
+    4:
       Multisig:
         NEWTYPE:
           TYPENAME: Multisig
