@@ -121,8 +121,8 @@ impl FileStoreOperator for GcsFileStoreOperator {
         if let Some(metadata) = self.get_file_store_metadata().await {
             anyhow::ensure!(metadata.chain_id == expected_chain_id, "Chain ID mismatch.");
         }
-        if (self.file_store_metadata_last_updated.elapsed().as_millis()
-            < FILE_STORE_METADATA_TIMEOUT_MILLIS)
+        if self.file_store_metadata_last_updated.elapsed().as_millis()
+            < FILE_STORE_METADATA_TIMEOUT_MILLIS
         {
             bail!("File store metadata is updated too frequently.")
         }
