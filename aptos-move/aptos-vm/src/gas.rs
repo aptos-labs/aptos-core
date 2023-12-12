@@ -58,6 +58,7 @@ pub(crate) fn get_gas_parameters(
             let storage_gas_params =
                 StorageGasParameters::new(gas_feature_version, gas_params, config_storage);
 
+            // TODO(gas): Table extension utilizes IoPricing directly.
             // Overwrite table io gas parameters with global io pricing.
             let g = &mut gas_params.natives.table;
             match gas_feature_version {
