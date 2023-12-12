@@ -449,13 +449,13 @@ impl<'env> Generator<'env> {
 impl<'env> Generator<'env> {
     fn gen_value(&mut self, target: Vec<TempIndex>, id: NodeId, val: &Value) {
         let target = self.require_unary_target(id, target);
-        let cons = self.to_constant(id, val);
+        let ty = self.get_node_type(id);
+        let cons = self.to_constant(id, ty, val);
         self.emit_with(id, |attr| Bytecode::Load(attr, target, cons))
     }
 
     /// Convert a value from AST world into a constant as expected in bytecode.
-    fn to_constant(&self, id: NodeId, val: &Value) -> Constant {
-        let ty = self.get_node_type(id);
+    fn to_constant(&self, id: NodeId, ty: Type, val: &Value) -> Constant {
         match val {
             Value::Address(x) => Constant::Address(x.clone()),
             Value::Number(x) => match ty {
@@ -488,7 +488,16 @@ impl<'env> Generator<'env> {
             Value::ByteArray(x) => Constant::ByteArray(x.clone()),
             Value::AddressArray(x) => Constant::AddressArray(x.clone()),
             Value::Vector(x) => {
-                Constant::Vector(x.iter().map(|v| self.to_constant(id, v)).collect())
+                if let Some(inner_ty) = ty.get_vector_element_type() {
+                    Constant::Vector(
+                        x.iter()
+                            .map(|v| self.to_constant(id, inner_ty.clone(), v))
+                            .collect(),
+                    )
+                } else {
+                    self.internal_error(id, format!("inconsistent vector type: {:?}", ty));
+                    Constant::Bool(false)
+                }
             },
         }
     }
