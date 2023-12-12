@@ -17,6 +17,23 @@ pub struct IndexerGrpcCacheWorkerConfig {
     pub fullnode_grpc_address: Url,
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub redis_main_instance_address: RedisUrl,
+    pub enable_verbose_logging: bool,
+}
+
+impl IndexerGrpcCacheWorkerConfig {
+    pub fn new(
+        fullnode_grpc_address: Url,
+        file_store_config: IndexerGrpcFileStoreConfig,
+        redis_main_instance_address: RedisUrl,
+        enable_verbose_logging: Option<bool>,
+    ) -> Self {
+        Self {
+            fullnode_grpc_address,
+            file_store_config,
+            redis_main_instance_address,
+            enable_verbose_logging: enable_verbose_logging.unwrap_or(false),
+        }
+    }
 }
 
 #[async_trait::async_trait]
@@ -26,6 +43,7 @@ impl RunnableConfig for IndexerGrpcCacheWorkerConfig {
             self.fullnode_grpc_address.clone(),
             self.redis_main_instance_address.clone(),
             self.file_store_config.clone(),
+            self.enable_verbose_logging,
         )
         .await
         .context("Failed to create cache worker")?;
