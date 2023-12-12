@@ -142,7 +142,7 @@ impl GroupWrite {
     /// and ensures inner ops do not contain any metadata.
     pub fn new(
         metadata_op: WriteOp,
-        inner_ops: Vec<(StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>))>,
+        inner_ops: BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
         group_size: u64,
     ) -> Self {
         assert!(
@@ -150,7 +150,7 @@ impl GroupWrite {
             "Metadata op should have empty bytes. metadata_op: {:?}",
             metadata_op
         );
-        for (_tag, (v, _layout)) in &inner_ops {
+        for (v, _layout) in inner_ops.values() {
             assert_none!(v.metadata(), "Group inner ops must have no metadata");
         }
 
@@ -158,10 +158,7 @@ impl GroupWrite {
 
         Self {
             metadata_op,
-            // TODO[agg_v2](optimize): We are using BTreeMap and Vec in different places to
-            // store resources in resources groups. Inefficient to convert the datastructures
-            // back and forth. Need to optimize this.
-            inner_ops: inner_ops.into_iter().collect(),
+            inner_ops,
             maybe_group_op_size,
         }
     }
