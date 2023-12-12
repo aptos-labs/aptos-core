@@ -2116,33 +2116,35 @@ impl fmt::Display for PrimitiveType {
     }
 }
 
-/// Infers the (conditional) abilities of a struct
-pub fn inst_abilities(
+/// Infers the abilities of a struct type given
+/// `struct_abilities`: the declared abilities of a struct
+/// `ty_args_abilities_meet`: the meet of the abilities of the type arguments
+pub fn instantiate_abilities(
     struct_abilities: AbilitySet,
-    insts_abilities_meet: AbilitySet,
+    ty_args_abilities_meet: AbilitySet,
 ) -> AbilitySet {
     if struct_abilities.has_ability(Ability::Key)
-        && insts_abilities_meet.has_ability(Ability::Store)
+        && ty_args_abilities_meet.has_ability(Ability::Store)
     {
         struct_abilities
-            .intersect(insts_abilities_meet)
+            .intersect(ty_args_abilities_meet)
             .add(Ability::Key)
     } else {
         struct_abilities
-            .intersect(insts_abilities_meet)
+            .intersect(ty_args_abilities_meet)
             .remove(Ability::Key)
     }
 }
 
+/// See `infer_abilities_opt_check`
+/// but this is for struct types
 pub fn check_struct_inst<F, G, H>(
     mid: ModuleId,
     sid: StructId,
-    insts: &[Type],
-    loc: Option<&Loc>,
+    ty_args: &[Type],
     ty_param_abilities: F,
     get_abilities: G,
-    on_err: H,
-    check: bool,
+    on_err: Option<(&Loc, H)>,
 ) -> AbilitySet
 where
     F: Fn(u16) -> AbilitySet + Copy,
@@ -2150,42 +2152,35 @@ where
     H: Fn(&Loc, &str) -> () + Copy,
 {
     let (generic_constraints, struct_abilities) = get_abilities(mid, sid);
-    let insts_abilities_meet = insts
+    let ty_args_abilities_meet = ty_args
         .iter()
         .zip(generic_constraints)
-        .map(|(inst_ty, constraints)| {
-            let inst_abilities = check_instantiation(
-                inst_ty,
-                loc,
-                ty_param_abilities,
-                get_abilities,
-                on_err,
-                check,
-            );
-            if check {
-                if !constraints.is_subset(inst_abilities) {
-                    on_err(loc.expect("loc"), &format!("Invalid instantiation"))
+        .map(|(ty_arg, constraints)| {
+            let ty_arg_abilities =
+                infer_abilities_opt_check(ty_arg, ty_param_abilities, get_abilities, on_err);
+            if let Some((loc, on_err)) = on_err {
+                if !constraints.is_subset(ty_arg_abilities) {
+                    on_err(loc, &format!("Invalid instantiation"))
                 }
             }
-            inst_abilities
+            ty_arg_abilities
         })
         .fold(AbilitySet::ALL, AbilitySet::intersect);
-    inst_abilities(struct_abilities, insts_abilities_meet)
+    instantiate_abilities(struct_abilities, ty_args_abilities_meet)
 }
 
-/// checks for type instantiations if `check` is set
+/// Returns the abilities of the type, optionally checking for type instantiation,
+/// If `on_err` is not None, then checks for type
 /// - the type arguments given to the struct are instantiated properly
 /// - the type arguments satisfy the ability constraints defined on the struct generics
-/// and returns the abilities of the type
 /// `ty_param_abilities` specify the abilities of type parameters
-/// `get_abilities` returns the abilities for the geneircs, and the abilities of the struct
-pub fn check_instantiation<F, G, H>(
+/// `get_abilities` returns the abilities for the generics and the abilities of the struct
+/// `on_err` contains a location, and a function for err handling
+pub fn infer_abilities_opt_check<F, G, H>(
     ty: &Type,
-    loc: Option<&Loc>,
     ty_param_abilities: F,
     get_abilities: G,
-    on_err: H,
-    check: bool,
+    on_err: Option<(&Loc, H)>,
 ) -> AbilitySet
 where
     F: Fn(u16) -> AbilitySet + Copy,
@@ -2207,23 +2202,19 @@ where
             | PrimitiveType::Address => AbilitySet::PRIMITIVES,
             PrimitiveType::Signer => AbilitySet::SIGNER,
         },
-        Type::Vector(et) => AbilitySet::VECTOR.intersect(check_instantiation(
+        Type::Vector(et) => AbilitySet::VECTOR.intersect(infer_abilities_opt_check(
             et,
-            loc,
             ty_param_abilities,
             get_abilities,
             on_err,
-            check,
         )),
-        Type::Struct(mid, sid, insts) => check_struct_inst(
+        Type::Struct(mid, sid, ty_args) => check_struct_inst(
             *mid,
             *sid,
-            insts,
-            loc,
+            ty_args,
             ty_param_abilities,
             get_abilities,
             on_err,
-            check,
         ),
         Type::TypeParameter(i) => ty_param_abilities(*i),
         Type::Reference(_, _) => AbilitySet::REFERENCES,
@@ -2234,4 +2225,39 @@ where
         | Type::Error
         | Type::Var(_) => AbilitySet::EMPTY,
     }
+}
+
+/// Returns the abilities of the type, and checks for type instantiation
+// note that checking and inferring are coupled, because to check the instantiations
+// you need to infer the abilities of the given type arguments, and check if the give
+// type arguments themselves are instantiated properly
+pub fn infer_and_check_abilities<F, G, H>(
+    ty: &Type,
+    ty_param_abilities: F,
+    get_abilities: G,
+    loc: &Loc,
+    on_err: H,
+) -> AbilitySet
+where
+    F: Fn(u16) -> AbilitySet + Copy,
+    G: Fn(ModuleId, StructId) -> (Vec<AbilitySet>, AbilitySet) + Copy,
+    H: Fn(&Loc, &str) -> () + Copy,
+{
+    infer_abilities_opt_check(ty, ty_param_abilities, get_abilities, Some((loc, on_err)))
+}
+
+/// Infers the abilities of the given type
+/// `ty_param_abilities` specify the abilities of type parameters
+/// `get_abilities` returns the abilities for the generics and the abilities of the struct
+pub fn infer_abilities<F, G>(ty: &Type, ty_param_abilities: F, get_abilities: G) -> AbilitySet
+where
+    F: Fn(u16) -> AbilitySet + Copy,
+    G: Fn(ModuleId, StructId) -> (Vec<AbilitySet>, AbilitySet) + Copy,
+{
+    infer_abilities_opt_check(
+        ty,
+        ty_param_abilities,
+        get_abilities,
+        None::<(&Loc, fn(&Loc, &str))>,
+    )
 }
