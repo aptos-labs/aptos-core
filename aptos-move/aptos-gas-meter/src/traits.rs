@@ -8,7 +8,7 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
     write_set::WriteOpSize,
 };
-use aptos_vm_types::{change_set::VMChangeSet, storage::StorageGasParameters};
+use aptos_vm_types::{change_set::VMChangeSet, storage::io_pricing::IoPricing};
 use move_binary_format::errors::{Location, PartialVMResult, VMResult};
 use move_core_types::gas_algebra::{InternalGas, InternalGasUnit, NumBytes};
 use move_vm_types::gas::GasMeter as MoveGasMeter;
@@ -24,7 +24,7 @@ pub trait GasAlgebra {
     fn vm_gas_params(&self) -> &VMGasParameters;
 
     /// Returns the struct containing the storage-specific gas parameters.
-    fn storage_gas_params(&self) -> &StorageGasParameters;
+    fn io_pricing(&self) -> &IoPricing;
 
     /// Returns the current balance, measured in internal gas units.
     fn balance_internal(&self) -> InternalGas;
@@ -212,8 +212,8 @@ pub trait AptosGasMeter: MoveGasMeter {
     }
 
     // Returns a reference to the struct containing all storage gas parameters.
-    fn storage_gas_params(&self) -> &StorageGasParameters {
-        self.algebra().storage_gas_params()
+    fn io_pricing(&self) -> &IoPricing {
+        self.algebra().io_pricing()
     }
 
     /// Returns the remaining balance, measured in (external) gas units.
