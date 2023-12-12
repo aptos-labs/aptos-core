@@ -107,7 +107,7 @@ impl<'a> ExplicitDropTransformer<'a> {
         let bytecode = &self.target.get_bytecode()[code_offset as usize];
         released_temps(live_var_info, lifetime_info, bytecode)
             .into_iter()
-            .filter(|t| matches!(self.target.get_local_type(*t), Type::Primitive(_)))
+            .filter(|t| !matches!(self.target.get_local_type(*t), Type::Primitive(_)))
             .collect()
     }
 
