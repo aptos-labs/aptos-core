@@ -17,7 +17,7 @@ from time import time
 
 # Typically you are making a new version of gas schedule,
 # so this should be larger than `LATEST_GAS_FEATURE_VERSION` in `aptos-move/aptos-gas/src/gas_meter.rs`.
-TARGET_GAS_VERSION = 13
+TARGET_GAS_VERSION = 12
 
 def get_bench_ns_linear(bench_path):
     datapoints = load_bench_datapoints.main(bench_path)
