@@ -592,7 +592,7 @@ B3:
 B4:
 	29: Branch(9)
 B5:
-	30: MoveLoc[1](loc0: vector<u64>)
+	30: CopyLoc[1](loc0: vector<u64>)
 	31: StLoc[7](loc6: vector<u64>)
 	32: MoveLoc[7](loc6: vector<u64>)
 	33: Ret

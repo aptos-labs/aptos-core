@@ -85,7 +85,7 @@ fun globals::read($t0: address): u64 {
      # live vars: $t0
   0: $t3 := borrow_global<globals::R>($t0)
      # live vars: $t3
-  1: $t2 := move($t3)
+  1: $t2 := copy($t3)
      # live vars: $t2
   2: $t4 := borrow_field<globals::R>.f($t2)
      # live vars: $t4

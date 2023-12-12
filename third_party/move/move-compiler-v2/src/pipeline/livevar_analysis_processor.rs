@@ -258,7 +258,11 @@ impl<'a> CopyTransformation<'a> {
         match bc {
             Assign(id, dst, src, kind) => match kind {
                 AssignKind::Inferred => {
-                    if self.check_implicit_copy(alive, id, false, src) {
+                    // TODO(#11223): Until we have info about whether a var may have had a reference
+                    // taken, be very conservative here and assume var is live.  Remove this hack
+                    // after fixing that bug.
+                    let force_copy_hack = !self.target().get_local_type(src).is_mutable_reference();
+                    if force_copy_hack || self.check_implicit_copy(alive, id, false, src) {
                         self.data.code.push(Assign(id, dst, src, AssignKind::Copy))
                     } else {
                         self.data.code.push(Assign(id, dst, src, AssignKind::Move))
