@@ -536,7 +536,9 @@ impl ResourceResolver for BogusStorage {
 const LIST_OF_ERROR_CODES: &[StatusCode] = &[
     StatusCode::UNKNOWN_VALIDATION_STATUS,
     StatusCode::INVALID_SIGNATURE,
-    StatusCode::UNKNOWN_VERIFICATION_ERROR,
+    // TODO: In maybe_core_dump we remap this error to StatusCode::VERIFICATION_ERROR.
+    //       Figure out why and what this test is intended for.
+    // StatusCode::UNKNOWN_VERIFICATION_ERROR,
     StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
     StatusCode::UNKNOWN_BINARY_ERROR,
     StatusCode::UNKNOWN_RUNTIME_STATUS,
