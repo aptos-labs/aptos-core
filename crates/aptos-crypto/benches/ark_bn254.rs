@@ -13,18 +13,13 @@ use crate::bench_utils::{
     bench_function_pow_u256, bench_function_serialize_uncomp, bench_function_square,
     bench_function_sub,
 };
-use aptos_crypto::test_utils::random_bytes;
-use ark_bls12_381::{Fq12, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
-use ark_ec::{
-    hashing::HashToCurve, pairing::Pairing, short_weierstrass::Projective, AffineRepr, CurveGroup,
-    Group,
-};
-use ark_ff::{One, UniformRand, Zero};
+use ark_bn254::{Fq, Fq12, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
+use ark_ec::{pairing::Pairing, short_weierstrass::Projective, AffineRepr, CurveGroup, Group};
+use ark_ff::{UniformRand, Zero};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::test_rng;
 use criterion::{BenchmarkId, Criterion};
-use rand::thread_rng;
-use std::ops::{Add, Mul, Neg};
+use std::ops::{Mul, Neg};
 
 mod bench_utils;
 
@@ -53,39 +48,11 @@ macro_rules! serialize {
 }
 
 fn bench_group(c: &mut Criterion) {
-    let mut group = c.benchmark_group("ark_bls12_381");
+    let mut group = c.benchmark_group("ark_bn254");
 
     group.bench_function("fr_add", bench_function_add::<Fr>);
-
+    group.bench_function("fr_clone", bench_function_clone::<Fr>);
     group.bench_function("fr_deser", bench_function_deser_uncomp::<Fr>);
-
-    group.bench_function("fr_deser_invalid_4_bytes", move |b| {
-        b.iter_with_setup(
-            || vec![0xFF_u8; 4],
-            |buf| {
-                let _k = Fr::deserialize_uncompressed(buf.as_slice());
-            },
-        )
-    });
-
-    group.bench_function("fr_deser_invalid_4000_bytes", move |b| {
-        b.iter_with_setup(
-            || vec![0xFF_u8; 4000],
-            |buf| {
-                let _k = Fr::deserialize_uncompressed(buf.as_slice());
-            },
-        )
-    });
-
-    group.bench_function("fr_deser_invalid_4000000_bytes", move |b| {
-        b.iter_with_setup(
-            || vec![0xFF_u8; 4000000],
-            |buf| {
-                let _k = Fr::deserialize_uncompressed(buf.as_slice());
-            },
-        )
-    });
-
     group.bench_function("fr_div", bench_function_div::<Fr>);
     group.bench_function("fr_double", bench_function_double::<Fr>);
     group.bench_function("fr_eq", bench_function_eq::<Fr>);
@@ -98,32 +65,21 @@ fn bench_group(c: &mut Criterion) {
     group.bench_function("fr_square", bench_function_square::<Fr>);
     group.bench_function("fr_sub", bench_function_sub::<Fr>);
 
-    group.bench_function("fr_mul_self", move |b| {
-        b.iter_with_setup(
-            || rand!(Fr),
-            |k| {
-                let _k2 = k.mul(&k);
-            },
-        )
-    });
+    group.bench_function("fq_add", bench_function_add::<Fq>);
+    group.bench_function("fq_clone", bench_function_clone::<Fq>);
+    group.bench_function("fq_deser", bench_function_deser_uncomp::<Fq>);
+    group.bench_function("fq_div", bench_function_div::<Fq>);
+    group.bench_function("fq_double", bench_function_double::<Fq>);
+    group.bench_function("fq_eq", bench_function_eq::<Fq>);
+    group.bench_function("fq_from_u64", bench_function_from_u64::<Fq>);
+    group.bench_function("fq_inv", bench_function_inv::<Fq>);
+    group.bench_function("fq_mul", bench_function_mul::<Fq>);
+    group.bench_function("fq_neg", bench_function_neg::<Fq>);
+    group.bench_function("fq_pow_u256", bench_function_pow_u256::<Fq>);
+    group.bench_function("fq_serialize", bench_function_serialize_uncomp::<Fq>);
+    group.bench_function("fq_square", bench_function_square::<Fq>);
+    group.bench_function("fq_sub", bench_function_sub::<Fq>);
 
-    group.bench_function("fr_one", move |b| {
-        b.iter_with_setup(
-            || {},
-            |_| {
-                let _k = Fr::one();
-            },
-        )
-    });
-
-    group.bench_function("fr_zero", move |b| {
-        b.iter_with_setup(
-            || {},
-            |_| {
-                let _k = Fr::zero();
-            },
-        )
-    });
     group.bench_function("fq12_add", bench_function_add::<Fq12>);
     group.bench_function("fq12_clone", bench_function_clone::<Fq12>);
     group.bench_function("fq12_deser", bench_function_deser_uncomp::<Fq12>);
@@ -139,39 +95,6 @@ fn bench_group(c: &mut Criterion) {
     group.bench_function("fq12_square", bench_function_square::<Fq12>);
     group.bench_function("fq12_sub", bench_function_sub::<Fq12>);
 
-    group.bench_function("fq12_add_self", move |b| {
-        b.iter_with_setup(
-            || rand!(Fq12),
-            |e| {
-                let _e_2 = e.add(&e);
-            },
-        )
-    });
-
-    group.bench_function("fq12_mul_self", move |b| {
-        b.iter_with_setup(
-            || rand!(Fq12),
-            |e| {
-                let _e_2 = e.mul(&e);
-            },
-        )
-    });
-
-    group.bench_function("fq12_one", move |b| {
-        b.iter(|| {
-            let _e = Fq12::one();
-        })
-    });
-
-    group.bench_function("fq12_zero", move |b| {
-        b.iter_with_setup(
-            || (),
-            |_| {
-                let _res = Fq12::zero();
-            },
-        )
-    });
-
     group.bench_function("g1_affine_add", bench_function_add::<G1Affine>);
     group.bench_function(
         "g1_affine_deser_comp",
@@ -182,7 +105,6 @@ fn bench_group(c: &mut Criterion) {
         bench_function_deser_uncomp::<G1Affine>,
     );
     group.bench_function("g1_affine_eq", bench_function_eq::<G1Affine>);
-
     group.bench_function("g1_affine_generator", move |b| {
         b.iter(|| {
             let _res = G1Affine::generator();
@@ -529,7 +451,7 @@ fn bench_group(c: &mut Criterion) {
         b.iter_with_setup(
             || (rand!(G1Affine), rand!(G2Affine)),
             |(g1e, g2e)| {
-                let _res = ark_bls12_381::Bls12_381::pairing(g1e, g2e).0;
+                let _res = ark_bn254::Bn254::pairing(g1e, g2e).0;
             },
         )
     });
@@ -548,8 +470,7 @@ fn bench_group(c: &mut Criterion) {
                     (g1_elements, g2_elements)
                 },
                 |(g1_elements, g2_elements)| {
-                    let _product =
-                        ark_bls12_381::Bls12_381::multi_pairing(g1_elements, g2_elements).0;
+                    let _product = ark_bn254::Bn254::multi_pairing(g1_elements, g2_elements).0;
                 },
             );
         });
@@ -593,59 +514,11 @@ fn bench_group(c: &mut Criterion) {
         });
     }
 
-    let hash_to_curve_max_msg_len = 1048576;
-
-    for msg_len in (0..hash_to_curve_max_msg_len)
-        .step_by(hash_to_curve_max_msg_len / linear_regression_max_num_datapoints)
-    {
-        group.bench_function(BenchmarkId::new("hash_to_g1_proj", msg_len), |b| {
-            b.iter_with_setup(
-                || {
-                    let dst = random_bytes(&mut thread_rng(), 255);
-                    let msg = random_bytes(&mut thread_rng(), msg_len);
-                    (dst, msg)
-                },
-                |(dst, msg)| {
-                    let mapper = ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher::<
-                        Projective<ark_bls12_381::g1::Config>,
-                        ark_ff::fields::field_hashers::DefaultFieldHasher<sha2_0_10_6::Sha256, 128>,
-                        ark_ec::hashing::curve_maps::wb::WBMap<ark_bls12_381::g1::Config>,
-                    >::new(dst.as_slice())
-                    .unwrap();
-                    let _new_element = <G1Projective>::from(mapper.hash(msg.as_slice()).unwrap());
-                },
-            );
-        });
-    }
-
-    for msg_len in (0..hash_to_curve_max_msg_len)
-        .step_by(hash_to_curve_max_msg_len / linear_regression_max_num_datapoints)
-    {
-        group.bench_function(BenchmarkId::new("hash_to_g2_proj", msg_len), |b| {
-            b.iter_with_setup(
-                || {
-                    let dst = random_bytes(&mut thread_rng(), 255);
-                    let msg = random_bytes(&mut thread_rng(), msg_len);
-                    (dst, msg)
-                },
-                |(dst, msg)| {
-                    let mapper = ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher::<
-                        Projective<ark_bls12_381::g2::Config>,
-                        ark_ff::fields::field_hashers::DefaultFieldHasher<sha2_0_10_6::Sha256, 128>,
-                        ark_ec::hashing::curve_maps::wb::WBMap<ark_bls12_381::g2::Config>,
-                    >::new(dst.as_slice())
-                    .unwrap();
-                    let _new_element = <G2Projective>::from(mapper.hash(msg.as_slice()).unwrap());
-                },
-            );
-        });
-    }
-
     group.finish();
 }
 
 criterion_group!(
-    name = ark_bls12_381_benches;
+    name = ark_bn254_benches;
     config = Criterion::default(); //.measurement_time(Duration::from_secs(100));
     targets = bench_group);
-criterion_main!(ark_bls12_381_benches);
+criterion_main!(ark_bn254_benches);

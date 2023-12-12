@@ -440,6 +440,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
         FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
         FeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
+        FeatureFlag::BN254_STRUCTURES,
     ]
 }
 
