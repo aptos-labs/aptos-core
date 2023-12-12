@@ -2150,7 +2150,7 @@ pub fn check_struct_inst<F, G, H>(
 where
     F: Fn(u16) -> AbilitySet + Copy,
     G: Fn(ModuleId, StructId) -> (Vec<AbilitySet>, AbilitySet) + Copy,
-    H: Fn(&Loc, &str) -> () + Copy,
+    H: Fn(&Loc, &str) + Copy,
 {
     let (generic_constraints, struct_abilities) = get_abilities(mid, sid);
     let ty_args_abilities_meet = ty_args
