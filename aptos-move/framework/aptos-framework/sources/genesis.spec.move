@@ -1,8 +1,6 @@
 spec aptos_framework::genesis {
     spec module {
         pragma verify = true;
-        // property 4
-        // invariant chain_status::is_genesis() ==> len(global<stake::ValidatorSet>(@aptos_framework).active_validators) >= 1;
     }
 
     spec initialize {
@@ -89,6 +87,9 @@ spec aptos_framework::genesis {
     }
 
     spec set_genesis_end {
+        // property 4: An initial set of validators should exist before the end of genesis.
+        requires len(global<stake::ValidatorSet>(@aptos_framework).active_validators) >= 1;
+
         // property 5: The end of genesis should be marked on chain.
         let addr = std::signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
