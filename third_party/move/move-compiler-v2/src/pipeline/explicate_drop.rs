@@ -3,7 +3,7 @@ use super::{
     reference_safety_processor::{LifetimeAnnotation, LifetimeInfoAtCodeOffset},
 };
 use move_binary_format::file_format::CodeOffset;
-use move_model::{ast::TempIndex, model::FunctionEnv};
+use move_model::{ast::TempIndex, model::FunctionEnv, ty::Type};
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
@@ -100,11 +100,15 @@ impl<'a> ExplicateDropTransformer<'a> {
     }
 
     // Returns a set of locals that can be dropped at given code offset
+    // Primitives are filtered out
     fn released_temps_at(&self, code_offset: CodeOffset) -> BTreeSet<TempIndex> {
         let live_var_info = self.get_live_var_info(code_offset);
         let lifetime_info = self.get_lifetime_info(code_offset);
         let bytecode = &self.target.get_bytecode()[code_offset as usize];
         released_temps(live_var_info, lifetime_info, bytecode)
+            .into_iter()
+            .filter(|t| matches!(self.target.get_local_type(*t), Type::Primitive(_)))
+            .collect()
     }
 
     fn get_live_var_info(&self, code_offset: CodeOffset) -> &'a LiveVarInfoAtCodeOffset {
@@ -135,6 +139,7 @@ impl<'a> ExplicateDropTransformer<'a> {
 
 // Returns a set of locals that can be dropped
 // these are the ones no longer alive or borrowed
+// including locals of primitives
 fn released_temps(
     live_var_info: &LiveVarInfoAtCodeOffset,
     life_time_info: &LifetimeInfoAtCodeOffset,
@@ -181,6 +186,8 @@ fn released_temps(
 fn moved_srcs(bytecode: &Bytecode) -> Vec<TempIndex> {
     match bytecode {
         Bytecode::Assign(_, _, src, AssignKind::Move) => vec![*src],
+        // all srcs of a call are move into the call
+        // explicit copy has been introduced in copy transformation
         Bytecode::Call(_, _, _, srcs, _) => srcs.clone(),
         Bytecode::Branch(_, _, _, src) => vec![*src],
         Bytecode::Ret(_, srcs) => srcs.clone(),
