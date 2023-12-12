@@ -11,7 +11,7 @@ use move_compiler_v2::{
     pipeline::{
         livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety_processor::ReferenceSafetyProcessor,
-        visibility_checker::VisibilityChecker, explicate_drop::ExplicateDrop, ability_checker::AbilityChecker,
+        visibility_checker::VisibilityChecker, ability_checker::AbilityChecker, explicit_drop::ExplicitDrop,
     },
     run_file_format_gen, Options,
 };
@@ -155,10 +155,10 @@ impl TestConfig {
                 generate_file_format: false,
                 dump_annotated_targets: verbose,
             }
-        } else if path.contains("/explicate-drop/") {
+        } else if path.contains("/explicit-drop/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
-            pipeline.add_processor(Box::new(ExplicateDrop {}));
+            pipeline.add_processor(Box::new(ExplicitDrop {}));
             Self {
                 type_check_only: false,
                 dump_ast: false,
@@ -169,7 +169,7 @@ impl TestConfig {
         } else if path.contains("/ability-checker/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
-            pipeline.add_processor(Box::new(ExplicateDrop {}));
+            pipeline.add_processor(Box::new(ExplicitDrop {}));
             pipeline.add_processor(Box::new(AbilityChecker {}));
             Self {
                 type_check_only: false,

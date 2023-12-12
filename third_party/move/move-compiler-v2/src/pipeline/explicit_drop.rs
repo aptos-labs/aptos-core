@@ -11,9 +11,9 @@ use move_stackless_bytecode::{
 };
 use std::collections::BTreeSet;
 
-pub struct ExplicateDrop {}
+pub struct ExplicitDrop {}
 
-impl FunctionTargetProcessor for ExplicateDrop {
+impl FunctionTargetProcessor for ExplicitDrop {
     fn process(
         &self,
         _targets: &mut FunctionTargetsHolder,
@@ -25,7 +25,7 @@ impl FunctionTargetProcessor for ExplicateDrop {
             return data;
         }
         let target = FunctionTarget::new(fun_env, &data);
-        let mut transformer = ExplicateDropTransformer::new(target);
+        let mut transformer = ExplicitDropTransformer::new(target);
         transformer.transform();
         data.code = transformer.transformed;
         data.annotations.remove::<LiveVarAnnotation>();
@@ -34,11 +34,11 @@ impl FunctionTargetProcessor for ExplicateDrop {
     }
 
     fn name(&self) -> String {
-        "ExplicateDrop".to_owned()
+        "ExplicitDrop".to_owned()
     }
 }
 
-struct ExplicateDropTransformer<'a> {
+struct ExplicitDropTransformer<'a> {
     target: FunctionTarget<'a>,
     // result of the transformation
     transformed: Vec<Bytecode>,
@@ -46,7 +46,7 @@ struct ExplicateDropTransformer<'a> {
     lifetime_annot: &'a LifetimeAnnotation,
 }
 
-impl<'a> ExplicateDropTransformer<'a> {
+impl<'a> ExplicitDropTransformer<'a> {
     pub fn new(target: FunctionTarget<'a>) -> Self {
         let live_var_annot = target
             .get_annotations()
@@ -56,7 +56,7 @@ impl<'a> ExplicateDropTransformer<'a> {
             .get_annotations()
             .get::<LifetimeAnnotation>()
             .expect("lifetime annotation");
-        ExplicateDropTransformer {
+        ExplicitDropTransformer {
             target,
             transformed: Vec::new(),
             live_var_annot,
