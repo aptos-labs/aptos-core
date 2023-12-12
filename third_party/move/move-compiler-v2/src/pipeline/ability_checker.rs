@@ -189,6 +189,7 @@ impl FunctionTargetProcessor for AbilityChecker {
             return data;
         }
         let target = FunctionTarget::new(fun_env, &data);
+        check_fun_signature(&target);
         for bytecode in target.get_bytecode() {
             check_bytecode(&target, bytecode)
         }
@@ -198,6 +199,15 @@ impl FunctionTargetProcessor for AbilityChecker {
     fn name(&self) -> String {
         "AbilityChecker".to_owned()
     }
+}
+
+fn check_fun_signature(target: &FunctionTarget) {
+    for param in target.get_parameters() {
+        let param_ty = target.get_local_type(param);
+        // TODO: provide more accurate location
+        check_instantiation(target, param_ty, &target.get_loc());
+    }
+    // return type is checked in function body
 }
 
 fn check_bytecode(target: &FunctionTarget, bytecode: &Bytecode) {
