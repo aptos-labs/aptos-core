@@ -771,17 +771,14 @@ impl SignedTransaction {
 
     pub fn raw_txn_bytes_len(&self) -> usize {
         *self.raw_txn_size.get_or_init(|| {
-            bcs::to_bytes(&self.raw_txn)
-                .expect("Unable to serialize RawTransaction")
-                .len()
+            bcs::serialized_size(&self.raw_txn).expect("Unable to serialize RawTransaction")
         })
     }
 
     pub fn txn_bytes_len(&self) -> usize {
         let authenticator_size = *self.authenticator_size.get_or_init(|| {
-            bcs::to_bytes(&self.authenticator)
+            bcs::serialized_size(&self.authenticator)
                 .expect("Unable to serialize TransactionAuthenticator")
-                .len()
         });
         self.raw_txn_bytes_len() + authenticator_size
     }
