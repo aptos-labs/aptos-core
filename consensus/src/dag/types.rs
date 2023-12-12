@@ -838,6 +838,13 @@ impl TConsensusMsg for DAGMessage {
         }
     }
 
+    fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self> {
+        match msg {
+            ConsensusMsg::DAGMessage(msg) => Ok(bcs::from_bytes(&msg.data)?),
+            _ => bail!("unexpected consensus message type {:?}", msg),
+        }
+    }
+
     fn into_network_message(self) -> ConsensusMsg {
         ConsensusMsg::DAGMessage(DAGNetworkMessage {
             epoch: self.epoch(),
@@ -870,6 +877,13 @@ impl TConsensusMsg for DAGRpcResult {
         match &self.0 {
             Ok(dag_message) => dag_message.epoch(),
             Err(error) => error.epoch(),
+        }
+    }
+
+    fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self> {
+        match msg {
+            ConsensusMsg::DAGMessage(msg) => Ok(bcs::from_bytes(&msg.data)?),
+            _ => bail!("unexpected consensus message type {:?}", msg),
         }
     }
 

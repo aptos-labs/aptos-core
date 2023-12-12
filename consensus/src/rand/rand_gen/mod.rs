@@ -9,5 +9,9 @@ mod network_messages;
 mod rand_store;
 mod types;
 
+mod aug_data_store;
+mod rand_manager;
 mod reliable_broadcast_state;
 mod storage;
+
+pub use network_messages::RandGenMessage;

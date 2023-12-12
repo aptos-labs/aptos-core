@@ -10,7 +10,8 @@ mod options;
 pub mod pipeline;
 
 use crate::pipeline::{
-    livevar_analysis_processor::LiveVarAnalysisProcessor, visibility_checker::VisibilityChecker,
+    livevar_analysis_processor::LiveVarAnalysisProcessor,
+    reference_safety_processor::ReferenceSafetyProcessor, visibility_checker::VisibilityChecker,
 };
 use anyhow::bail;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
@@ -65,7 +66,7 @@ pub fn run_move_compiler(
     check_errors(&env, error_writer, "code generation errors")?;
     // Run transformation pipeline
     let pipeline = bytecode_pipeline(&env);
-    if options.dump_bytecode {
+    if options.debug || options.dump_bytecode {
         // Dump bytecode to files, using a basename for the individual sources derived
         // from the first input file.
         let dump_base_name = options
@@ -77,7 +78,7 @@ pub fn run_move_compiler(
                     .map(|f| f.to_string_lossy().as_ref().to_owned())
             })
             .unwrap_or_else(|| "dump".to_owned());
-        pipeline.run_with_dump(&env, &mut targets, &dump_base_name, false)
+        pipeline.run_with_dump(&env, &mut targets, &dump_base_name, options.debug)
     } else {
         pipeline.run(&env, &mut targets)
     }
@@ -157,10 +158,17 @@ pub fn run_file_format_gen(env: &GlobalEnv, targets: &FunctionTargetsHolder) -> 
 }
 
 /// Returns the bytecode processing pipeline.
-pub fn bytecode_pipeline(_env: &GlobalEnv) -> FunctionTargetPipeline {
+pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
+    let options = env.get_extension::<Options>().expect("options");
+    let safety_on = !options.experiment_on(Experiment::NO_SAFETY);
     let mut pipeline = FunctionTargetPipeline::default();
+    if safety_on {
+        pipeline.add_processor(Box::new(VisibilityChecker()));
+    }
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor()));
-    pipeline.add_processor(Box::new(VisibilityChecker()));
+    if safety_on {
+        pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+    }
     pipeline
 }
 

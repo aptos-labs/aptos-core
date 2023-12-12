@@ -5,7 +5,7 @@ use crate::{
     error::DbError,
     rand::rand_gen::{
         storage::{
-            interface::RandStorage,
+            interface::{AugDataStorage, RandStorage},
             schema::{
                 AugDataSchema, CertifiedAugDataSchema, RandDecisionSchema, RandShareSchema,
                 AUG_DATA_CF_NAME, CERTIFIED_AUG_DATA_CF_NAME, DECISION_CF_NAME, SHARE_CF_NAME,
@@ -82,7 +82,7 @@ impl RandDb {
     }
 }
 
-impl<S: Share, P: Proof<Share = S>, D: AugmentedData> RandStorage<S, P, D> for RandDb {
+impl<S: Share, P: Proof<Share = S>> RandStorage<S, P> for RandDb {
     fn save_share(&self, share: &RandShare<S>) -> anyhow::Result<()> {
         Ok(self.put::<RandShareSchema<S>>(&share.share_id(), share)?)
     }
@@ -91,31 +91,12 @@ impl<S: Share, P: Proof<Share = S>, D: AugmentedData> RandStorage<S, P, D> for R
         Ok(self.put::<RandDecisionSchema<P>>(decision.rand_metadata(), decision)?)
     }
 
-    fn save_aug_data(&self, aug_data: &AugData<D>) -> anyhow::Result<()> {
-        Ok(self.put::<AugDataSchema<D>>(&aug_data.id(), aug_data)?)
-    }
-
-    fn save_certified_aug_data(
-        &self,
-        certified_aug_data: &CertifiedAugData<D>,
-    ) -> anyhow::Result<()> {
-        Ok(self.put::<CertifiedAugDataSchema<D>>(&certified_aug_data.id(), certified_aug_data)?)
-    }
-
     fn get_all_shares(&self) -> anyhow::Result<Vec<(ShareId, RandShare<S>)>> {
         Ok(self.get_all::<RandShareSchema<S>>()?)
     }
 
-    fn get_all_decision(&self) -> anyhow::Result<Vec<(RandMetadata, RandDecision<P>)>> {
+    fn get_all_decisions(&self) -> anyhow::Result<Vec<(RandMetadata, RandDecision<P>)>> {
         Ok(self.get_all::<RandDecisionSchema<P>>()?)
-    }
-
-    fn get_all_aug_data(&self) -> anyhow::Result<Vec<(AugDataId, AugData<D>)>> {
-        Ok(self.get_all::<AugDataSchema<D>>()?)
-    }
-
-    fn get_all_certified_aug_data(&self) -> anyhow::Result<Vec<(AugDataId, CertifiedAugData<D>)>> {
-        Ok(self.get_all::<CertifiedAugDataSchema<D>>()?)
     }
 
     fn remove_shares(&self, shares: impl Iterator<Item = RandShare<S>>) -> anyhow::Result<()> {
@@ -127,6 +108,27 @@ impl<S: Share, P: Proof<Share = S>, D: AugmentedData> RandStorage<S, P, D> for R
         decisions: impl Iterator<Item = RandDecision<P>>,
     ) -> anyhow::Result<()> {
         Ok(self.delete::<RandDecisionSchema<P>>(decisions.map(|d| d.rand_metadata().clone()))?)
+    }
+}
+
+impl<D: AugmentedData> AugDataStorage<D> for RandDb {
+    fn save_aug_data(&self, aug_data: &AugData<D>) -> anyhow::Result<()> {
+        Ok(self.put::<AugDataSchema<D>>(&aug_data.id(), aug_data)?)
+    }
+
+    fn save_certified_aug_data(
+        &self,
+        certified_aug_data: &CertifiedAugData<D>,
+    ) -> anyhow::Result<()> {
+        Ok(self.put::<CertifiedAugDataSchema<D>>(&certified_aug_data.id(), certified_aug_data)?)
+    }
+
+    fn get_all_aug_data(&self) -> anyhow::Result<Vec<(AugDataId, AugData<D>)>> {
+        Ok(self.get_all::<AugDataSchema<D>>()?)
+    }
+
+    fn get_all_certified_aug_data(&self) -> anyhow::Result<Vec<(AugDataId, CertifiedAugData<D>)>> {
+        Ok(self.get_all::<CertifiedAugDataSchema<D>>()?)
     }
 
     fn remove_aug_data(&self, aug_data: impl Iterator<Item = AugData<D>>) -> anyhow::Result<()> {

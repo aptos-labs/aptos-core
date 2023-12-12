@@ -5,7 +5,7 @@ use aptos_consensus_types::common::Author;
 use aptos_logger::info;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use async_trait::async_trait;
-use futures::{stream::FuturesUnordered, Future, StreamExt};
+use futures::{future::AbortHandle, stream::FuturesUnordered, Future, StreamExt};
 use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
 
 pub trait RBMessage: Send + Sync + Clone {}
@@ -118,6 +118,22 @@ where
             }
             unreachable!("Should aggregate with all responses");
         }
+    }
+}
+
+pub struct DropGuard {
+    abort_handle: AbortHandle,
+}
+
+impl DropGuard {
+    pub fn new(abort_handle: AbortHandle) -> Self {
+        Self { abort_handle }
+    }
+}
+
+impl Drop for DropGuard {
+    fn drop(&mut self) {
+        self.abort_handle.abort();
     }
 }
 

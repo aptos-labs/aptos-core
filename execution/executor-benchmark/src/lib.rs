@@ -268,6 +268,10 @@ pub fn run_benchmark<V>(
     );
     info!("Overall TPS: {} txn/s", delta_v / elapsed);
     info!("Overall GPS: {} gas/s", delta_gas.gas / elapsed);
+    info!(
+        "Overall effectiveGPS: {} gas/s",
+        delta_gas.effective_block_gas / elapsed
+    );
     info!("Overall ioGPS: {} gas/s", delta_gas.io_gas / elapsed);
     info!(
         "Overall executionGPS: {} gas/s",
@@ -276,6 +280,10 @@ pub fn run_benchmark<V>(
     info!(
         "Overall GPT: {} gas/txn",
         delta_gas.gas / (delta_gas.gas_count as f64).max(1.0)
+    );
+    info!(
+        "Overall approx_output: {} bytes/s",
+        delta_gas.approx_block_output / elapsed
     );
     info!("Overall output: {} bytes/s", delta_output_size / elapsed);
 
@@ -503,9 +511,12 @@ fn add_accounts_impl<V>(
 
 struct GasMeasurement {
     pub gas: f64,
+    pub effective_block_gas: f64,
 
     pub io_gas: f64,
     pub execution_gas: f64,
+
+    pub approx_block_output: f64,
 
     pub gas_count: u64,
 }
@@ -532,10 +543,26 @@ impl GasMeasurement {
         let gas_count = Self::sequential_gas_counter(GasType::NON_STORAGE_GAS).get_sample_count()
             + Self::parallel_gas_counter(GasType::NON_STORAGE_GAS).get_sample_count();
 
+        let effective_block_gas = block_executor_counters::EFFECTIVE_BLOCK_GAS
+            .with_label_values(&[block_executor_counters::Mode::SEQUENTIAL])
+            .get_sample_sum()
+            + block_executor_counters::EFFECTIVE_BLOCK_GAS
+                .with_label_values(&[block_executor_counters::Mode::PARALLEL])
+                .get_sample_sum();
+
+        let approx_block_output = block_executor_counters::APPROX_BLOCK_OUTPUT_SIZE
+            .with_label_values(&[block_executor_counters::Mode::SEQUENTIAL])
+            .get_sample_sum()
+            + block_executor_counters::APPROX_BLOCK_OUTPUT_SIZE
+                .with_label_values(&[block_executor_counters::Mode::PARALLEL])
+                .get_sample_sum();
+
         Self {
             gas,
+            effective_block_gas,
             io_gas,
             execution_gas,
+            approx_block_output,
             gas_count,
         }
     }
@@ -557,8 +584,10 @@ impl GasMeasuring {
 
         GasMeasurement {
             gas: end.gas - self.start.gas,
+            effective_block_gas: end.effective_block_gas - self.start.effective_block_gas,
             io_gas: end.io_gas - self.start.io_gas,
             execution_gas: end.execution_gas - self.start.execution_gas,
+            approx_block_output: end.approx_block_output - self.start.approx_block_output,
             gas_count: end.gas_count - self.start.gas_count,
         }
     }

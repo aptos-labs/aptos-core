@@ -51,9 +51,9 @@ fun pack_unpack::unpack($t0: pack_unpack::S): (u64, u64) {
      # live vars: $t3, $t5
   1: $t4 := unpack pack_unpack::T($t5)
      # live vars: $t3, $t4
-  2: $t1 := move($t3)
+  2: $t1 := copy($t3)
      # live vars: $t1, $t4
-  3: $t2 := move($t4)
+  3: $t2 := copy($t4)
      # live vars: $t1, $t2
   4: return ($t1, $t2)
 }
@@ -90,9 +90,9 @@ B0:
 	2: Unpack[0](T)
 	3: StLoc[1](loc0: u64)
 	4: StLoc[2](loc1: u64)
-	5: MoveLoc[2](loc1: u64)
+	5: CopyLoc[2](loc1: u64)
 	6: StLoc[3](loc2: u64)
-	7: MoveLoc[1](loc0: u64)
+	7: CopyLoc[1](loc0: u64)
 	8: StLoc[4](loc3: u64)
 	9: MoveLoc[3](loc2: u64)
 	10: MoveLoc[4](loc3: u64)

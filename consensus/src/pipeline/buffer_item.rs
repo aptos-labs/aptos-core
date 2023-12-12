@@ -2,10 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    pipeline::{commit_reliable_broadcast::DropGuard, hashable::Hashable},
-    state_replication::StateComputerCommitCallBackType,
-};
+use crate::{pipeline::hashable::Hashable, state_replication::StateComputerCommitCallBackType};
 use anyhow::anyhow;
 use aptos_consensus_types::{
     common::Author, executed_block::ExecutedBlock, pipeline::commit_vote::CommitVote,
@@ -13,6 +10,7 @@ use aptos_consensus_types::{
 use aptos_crypto::{bls12381, HashValue};
 use aptos_executor_types::ExecutorResult;
 use aptos_logger::prelude::*;
+use aptos_reliable_broadcast::DropGuard;
 use aptos_types::{
     aggregate_signature::PartialSignatures,
     block_info::BlockInfo,

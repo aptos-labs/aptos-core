@@ -60,13 +60,22 @@ impl LiveVarInfoAtCodeOffset {
             .keys()
             .filter(|t| !self.after.contains_key(t))
             .cloned()
+
+    /// Creates a set of the temporaries alive before this program point.
+    pub fn before_set(&self) -> BTreeSet<TempIndex> {
+        self.before.keys().cloned().collect()
+    }
+
+    /// Creates a set of the temporaries alive after this program point.
+    pub fn after_set(&self) -> BTreeSet<TempIndex> {
+        self.after.keys().cloned().collect()
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
 pub struct LiveVarInfo {
     /// The usage of a given temporary after this program point, inclusive of locations where
-    /// the usage happens.
+    /// the usage happens. This set contains at least one element.
     pub usages: BTreeSet<Loc>,
 }
 
@@ -253,7 +262,11 @@ impl<'a> CopyTransformation<'a> {
         match bc {
             Assign(id, dst, src, kind) => match kind {
                 AssignKind::Inferred => {
-                    if self.check_implicit_copy(alive, id, false, src) {
+                    // TODO(#11223): Until we have info about whether a var may have had a reference
+                    // taken, be very conservative here and assume var is live.  Remove this hack
+                    // after fixing that bug.
+                    let force_copy_hack = !self.target().get_local_type(src).is_mutable_reference();
+                    if force_copy_hack || self.check_implicit_copy(alive, id, false, src) {
                         self.data.code.push(Assign(id, dst, src, AssignKind::Copy))
                     } else {
                         self.data.code.push(Assign(id, dst, src, AssignKind::Move))
@@ -312,37 +325,14 @@ impl<'a> CopyTransformation<'a> {
     fn check_implicit_copy(
         &self,
         alive: &LiveVarInfoAtCodeOffset,
-        id: AttrId,
-        is_updated: bool,
+        _id: AttrId,
+        _is_updated: bool,
         temp: TempIndex,
     ) -> bool {
-        if let Some(info) = alive.after.get(&temp) {
-            let target = self.target();
-            if target.get_local_type(temp).is_mutable_reference() {
-                if !is_updated {
-                    // If this is a &mut which is not updated (e.g. a function call argument)
-                    // produce an error. &mut arguments play a special role, they are used
-                    // and updated at the same time. Therefore subsequent usage without copy is
-                    // fine, as it conceptually refers to a new instance for the same variable.
-                    self.error_with_hints(
-                        &target.get_bytecode_loc(id),
-                        format!(
-                            "implicit copy of mutable reference in {} which is used later",
-                            target.get_local_name_for_error_message(temp)
-                        ),
-                        "implicitly copied here",
-                        self.make_hints_from_usage(info),
-                    );
-                }
-                // Don't copy &mut
-                false
-            } else {
-                // TODO(#10723): insert ability check here
-                true
-            }
-        } else {
-            false
-        }
+        // TODO(#10723): insert ability check here
+        // Notice we do allow copy of &mut. Those copies are checked for validity in
+        // reference safety.
+        alive.after.contains_key(&temp)
     }
 
     fn make_hints_from_usage(

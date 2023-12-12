@@ -10,6 +10,7 @@
 /// Change log:
 /// - V12
 ///   - Making resource group charge on first read independent of BTreeMap serialization.
+///   - Added BN254 operations.
 /// - V11
 ///   - Ristretto255 natives (point cloning & double-scalar multiplication) and Bulletproofs natives
 ///   - Hard limit on the number of write ops per transaction
@@ -44,4 +45,4 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 12;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 13;

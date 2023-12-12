@@ -52,6 +52,15 @@ pub fn inv_internal(
             ark_bls12_381::Fq12,
             ALGEBRA_ARK_BLS12_381_FQ12_INV
         ),
+        Some(Structure::BN254Fr) => {
+            ark_inverse_internal!(context, args, ark_bn254::Fr, ALGEBRA_ARK_BN254_FR_INV)
+        },
+        Some(Structure::BN254Fq) => {
+            ark_inverse_internal!(context, args, ark_bn254::Fq, ALGEBRA_ARK_BN254_FQ_INV)
+        },
+        Some(Structure::BN254Fq12) => {
+            ark_inverse_internal!(context, args, ark_bn254::Fq12, ALGEBRA_ARK_BN254_FQ12_INV)
+        },
         _ => Err(SafeNativeError::Abort {
             abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         }),

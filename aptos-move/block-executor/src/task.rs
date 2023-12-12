@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::types::InputOutputKey;
 use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
 };
@@ -12,7 +13,11 @@ use aptos_types::{
 };
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
 use move_core_types::value::MoveTypeLayout;
-use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashSet},
+    fmt::Debug,
+    sync::Arc,
+};
 
 /// The execution result of a transaction
 #[derive(Debug)]
@@ -182,4 +187,20 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     /// Return the fee statement of the transaction.
     fn fee_statement(&self) -> FeeStatement;
+
+    /// Deterministic, but approximate size of the output, as
+    /// before creating actual TransactionOutput, we don't know the exact size of it.
+    ///
+    /// Sum of all sizes of writes (keys + write_ops) and events.
+    fn output_approx_size(&self) -> u64;
+
+    fn get_write_summary(
+        &self,
+    ) -> HashSet<
+        InputOutputKey<
+            <Self::Txn as Transaction>::Key,
+            <Self::Txn as Transaction>::Tag,
+            <Self::Txn as Transaction>::Identifier,
+        >,
+    >;
 }

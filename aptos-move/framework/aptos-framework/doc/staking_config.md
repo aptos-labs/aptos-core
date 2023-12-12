@@ -965,7 +965,7 @@ Can only be called as part of the Aptos governance proposal process established 
 
 
 
-<pre><code><b>invariant</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
+<pre><code><b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
 <b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
 </code></pre>
@@ -1032,6 +1032,8 @@ Can only be called as part of the Aptos governance proposal process established 
 <pre><code><b>invariant</b> rewards_rate &lt;= <a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">MAX_REWARDS_RATE</a>;
 <b>invariant</b> rewards_rate_denominator &gt; 0;
 <b>invariant</b> rewards_rate &lt;= rewards_rate_denominator;
+<b>invariant</b> recurring_lockup_duration_secs &gt; 0;
+<b>invariant</b> voting_power_increase_limit &gt; 0 && voting_power_increase_limit &lt;= 50;
 </code></pre>
 
 

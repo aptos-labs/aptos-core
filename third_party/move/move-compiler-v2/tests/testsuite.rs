@@ -81,15 +81,27 @@ impl TestConfig {
         let path = path.to_string_lossy();
         let verbose = cfg!(feature = "verbose-debug-print");
         let mut pipeline = FunctionTargetPipeline::default();
-        if path.contains("/folding/") || path.contains("/inlining/") {
+        if path.contains("/inlining/bug_") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
             pipeline.add_processor(Box::new(VisibilityChecker {}));
+            pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             Self {
                 type_check_only: false,
                 dump_ast: true,
                 pipeline,
                 generate_file_format: false,
-                dump_annotated_targets: false,
+                dump_annotated_targets: true,
+            }
+        } else if path.contains("/inlining/") || path.contains("/folding/") {
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(VisibilityChecker {}));
+            pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+            Self {
+                type_check_only: false,
+                dump_ast: true,
+                pipeline,
+                generate_file_format: false,
+                dump_annotated_targets: verbose,
             }
         } else if path.contains("/unit_test/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
@@ -100,7 +112,7 @@ impl TestConfig {
                 dump_ast: true,
                 pipeline,
                 generate_file_format: false,
-                dump_annotated_targets: false,
+                dump_annotated_targets: verbose,
             }
         } else if path.contains("/checking/") {
             Self {
@@ -108,7 +120,7 @@ impl TestConfig {
                 dump_ast: true,
                 pipeline,
                 generate_file_format: false,
-                dump_annotated_targets: false,
+                dump_annotated_targets: verbose,
             }
         } else if path.contains("/bytecode-generator/") {
             Self {
@@ -134,7 +146,7 @@ impl TestConfig {
                 dump_ast: false,
                 pipeline,
                 generate_file_format: false,
-                dump_annotated_targets: false,
+                dump_annotated_targets: verbose,
             }
         } else if path.contains("/live-var/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));

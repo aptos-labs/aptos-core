@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: cannot copy mutable reference in local `s` which is still borrowed
+   ┌─ tests/reference-safety/v1-tests/dereference_field.move:18:9
+   │
+17 │         let f = &s.f;
+   │                 ---- previous field borrow
+18 │         *s;
+   │         ^^ copied here

@@ -1,21 +1,26 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use anyhow::ensure;
 use aptos_consensus_types::{
     common::{Author, Round},
     randomness::{RandMetadata, Randomness},
 };
 use aptos_crypto::bls12381::Signature;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_infallible::RwLock;
 use aptos_types::{aggregate_signature::AggregateSignature, validator_verifier::ValidatorVerifier};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug};
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub(super) struct MockShare;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub(super) struct MockProof;
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub(super) struct MockAugData;
 
 impl Share for MockShare {
     fn verify(
@@ -24,6 +29,13 @@ impl Share for MockShare {
         _rand_metadata: &RandMetadata,
     ) -> anyhow::Result<()> {
         Ok(())
+    }
+
+    fn generate(rand_config: &RandConfig, rand_metadata: RandMetadata) -> RandShare<Self>
+    where
+        Self: Sized,
+    {
+        RandShare::new(rand_config.author(), rand_metadata, Self)
     }
 }
 
@@ -47,10 +59,23 @@ impl Proof for MockProof {
     }
 }
 
+impl AugmentedData for MockAugData {
+    fn generate(rand_config: &RandConfig) -> AugData<Self>
+    where
+        Self: Sized,
+    {
+        AugData::new(rand_config.epoch(), rand_config.author(), Self)
+    }
+}
+
 pub trait Share:
     Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned + 'static
 {
     fn verify(&self, rand_config: &RandConfig, rand_metadata: &RandMetadata) -> anyhow::Result<()>;
+
+    fn generate(rand_config: &RandConfig, rand_metadata: RandMetadata) -> RandShare<Self>
+    where
+        Self: Sized;
 }
 
 pub trait Proof:
@@ -71,9 +96,12 @@ pub trait Proof:
 pub trait AugmentedData:
     Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned + 'static
 {
+    fn generate(rand_config: &RandConfig) -> AugData<Self>
+    where
+        Self: Sized;
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct ShareId {
     epoch: u64,
     round: Round,
@@ -136,8 +164,22 @@ impl<P: Proof> RandDecision<P> {
         Self { randomness, proof }
     }
 
-    pub fn verify(&self, rand_config: &RandConfig) -> anyhow::Result<()> {
-        self.proof.verify(rand_config, self.randomness.metadata())
+    pub fn verify(&self, rand_config: &RandConfig, metadata: &RandMetadata) -> anyhow::Result<()> {
+        ensure!(
+            metadata.round() == self.randomness.metadata().round(),
+            "Round does not match: local {}, received {}",
+            metadata.round(),
+            self.randomness.metadata().round()
+        );
+        self.proof.verify(rand_config, self.randomness.metadata())?;
+        // this is a sanity check in case we receive different ordered blocks from consensus
+        ensure!(
+            metadata == self.randomness.metadata(),
+            "Metadata does not match: local {:?}, received {:?}",
+            metadata,
+            self.randomness.metadata()
+        );
+        Ok(())
     }
 
     pub fn randomness(&self) -> &Randomness {
@@ -163,15 +205,33 @@ impl<P> ShareAck<P> {
         }
     }
 
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
     pub fn into_maybe_decision(self) -> Option<RandDecision<P>> {
         self.maybe_decision
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Hash, Eq)]
 pub struct AugDataId {
     epoch: u64,
     author: Author,
+}
+
+impl AugDataId {
+    pub fn new(epoch: u64, author: Author) -> Self {
+        Self { epoch, author }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
+    pub fn author(&self) -> Author {
+        self.author
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
@@ -190,22 +250,40 @@ impl<D> AugData<D> {
         }
     }
 
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
     pub fn id(&self) -> AugDataId {
         AugDataId {
             epoch: self.epoch,
             author: self.author,
         }
     }
+
+    pub fn author(&self) -> Author {
+        self.author
+    }
+
+    pub fn verify(&self, sender: Author) -> anyhow::Result<()> {
+        ensure!(self.author == sender, "Invalid author");
+        Ok(())
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct AugDataSignature {
+    epoch: u64,
     signature: Signature,
 }
 
 impl AugDataSignature {
-    pub fn new(signature: Signature) -> Self {
-        Self { signature }
+    pub fn new(epoch: u64, signature: Signature) -> Self {
+        Self { epoch, signature }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
     }
 
     pub fn verify<D: AugmentedData>(
@@ -228,7 +306,7 @@ pub struct CertifiedAugData<D> {
     signatures: AggregateSignature,
 }
 
-impl<D> CertifiedAugData<D> {
+impl<D: AugmentedData> CertifiedAugData<D> {
     pub fn new(aug_data: AugData<D>, signatures: AggregateSignature) -> Self {
         Self {
             aug_data,
@@ -236,8 +314,21 @@ impl<D> CertifiedAugData<D> {
         }
     }
 
+    pub fn epoch(&self) -> u64 {
+        self.aug_data.epoch()
+    }
+
     pub fn id(&self) -> AugDataId {
         self.aug_data.id()
+    }
+
+    pub fn author(&self) -> Author {
+        self.aug_data.author()
+    }
+
+    pub fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        verifier.verify_multi_signatures(&self.aug_data, &self.signatures)?;
+        Ok(())
     }
 }
 
@@ -246,20 +337,43 @@ pub struct CertifiedAugDataAck {
     epoch: u64,
 }
 
+impl CertifiedAugDataAck {
+    pub fn new(epoch: u64) -> Self {
+        Self { epoch }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+}
+
+#[derive(Clone)]
 pub struct RandConfig {
+    epoch: u64,
     author: Author,
     threshold: u64,
     weights: HashMap<Author, u64>,
+    certified_data: Arc<RwLock<HashMap<Author, Vec<u8>>>>,
 }
 
 impl RandConfig {
-    pub fn new(author: Author, weights: HashMap<Author, u64>) -> Self {
+    pub fn new(epoch: u64, author: Author, weights: HashMap<Author, u64>) -> Self {
         let sum = weights.values().sum::<u64>();
         Self {
+            epoch,
             author,
             weights,
             threshold: sum * 2 / 3 + 1,
+            certified_data: Arc::new(RwLock::new(HashMap::new())),
         }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
+    pub fn author(&self) -> Author {
+        self.author
     }
 
     pub fn get_peer_weight(&self, author: &Author) -> u64 {
@@ -271,5 +385,9 @@ impl RandConfig {
 
     pub fn threshold_weight(&self) -> u64 {
         self.threshold
+    }
+
+    pub fn add_certified_data(&self, author: Author, data: Vec<u8>) {
+        self.certified_data.write().insert(author, data);
     }
 }
