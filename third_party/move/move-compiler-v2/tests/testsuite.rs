@@ -161,7 +161,7 @@ impl TestConfig {
             pipeline.add_processor(Box::new(ExplicitDrop {}));
             Self {
                 type_check_only: false,
-                dump_ast: false,
+                dump_ast: verbose,
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: true,
