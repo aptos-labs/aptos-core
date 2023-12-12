@@ -2123,16 +2123,17 @@ pub fn instantiate_abilities(
     struct_abilities: AbilitySet,
     ty_args_abilities_meet: AbilitySet,
 ) -> AbilitySet {
+    let intersects = struct_abilities.intersect(ty_args_abilities_meet);
+    // a struct has copy/drop/store if it's declared with the ability
+    // and all it's fields have the ability
+    // a struct has key if it's declared with key
+    // and all fields have store
     if struct_abilities.has_ability(Ability::Key)
         && ty_args_abilities_meet.has_ability(Ability::Store)
     {
-        struct_abilities
-            .intersect(ty_args_abilities_meet)
-            .add(Ability::Key)
+        intersects.add(Ability::Key)
     } else {
-        struct_abilities
-            .intersect(ty_args_abilities_meet)
-            .remove(Ability::Key)
+        intersects.remove(Ability::Key)
     }
 }
 
