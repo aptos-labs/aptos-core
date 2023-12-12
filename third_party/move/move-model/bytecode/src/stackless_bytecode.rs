@@ -484,6 +484,7 @@ impl Bytecode {
         self.is_conditional_branch() || self.is_unconditional_branch()
     }
 
+    /// Return the destinations of the instruction
     pub fn dests(&self) -> Vec<TempIndex> {
         match self {
             Bytecode::Assign(_, dst, _, _) => {
