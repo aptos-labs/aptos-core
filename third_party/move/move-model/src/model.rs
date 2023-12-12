@@ -50,7 +50,7 @@ use move_binary_format::{
     file_format::{
         AccessKind, Bytecode, CodeOffset, Constant as VMConstant, ConstantPoolIndex,
         FunctionDefinitionIndex, FunctionHandleIndex, SignatureIndex, SignatureToken,
-        StructDefinitionIndex, Ability,
+        StructDefinitionIndex
     },
     normalized::Type as MType,
     views::{FunctionDefinitionView, FunctionHandleView, StructHandleView},
