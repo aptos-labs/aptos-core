@@ -76,38 +76,50 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             storage_io_per_state_slot_read: InternalGasPerArg,
             { 0..=9 => "load_data.base", 10.. => "storage_io_per_state_slot_read"},
-            300_000,
+            // At the current mainnet scale, we should assume most levels of the (hexary) JMT nodes
+            // in cache, hence target charging 1-2 4k-sized pages for each read. Notice the cost
+            // of seeking for the leaf node is covered by the first page of the "value size fee"
+            // (storage_io_per_state_byte_read) defined below.
+            800_000,
         ],
         [
             storage_io_per_state_byte_read: InternalGasPerByte,
             { 0..=9 => "load_data.per_byte", 10.. => "storage_io_per_state_byte_read"},
-            300,
+            // Notice in the latest IoPricing, bytes are charged at 4k intervals (even the smallest
+            // read will be charged for 4KB) to reflect the assumption that every roughly 4k bytes
+            // might require a separate random IO upon the FS.
+            100,
         ],
         [load_data_failure: InternalGas, "load_data.failure", 0],
         // Gas parameters for writing data to storage.
         [
             storage_io_per_state_slot_write: InternalGasPerArg,
             { 0..=9 => "write_data.per_op", 10.. => "storage_io_per_state_slot_write"},
-            300_000,
+            // The cost of writing down the upper level new JMT nodes are shared between transactions
+            // because we write down the JMT in batches, however the bottom levels will be specific
+            // to each transactions assuming they don't touch exactly the same leaves. It's fair to
+            // target roughly 1-2 full internal JMT nodes (about 0.5-1KB in total) worth of writes
+            // for each write op.
+            100_000,
         ],
         [
-            write_data_per_new_item: InternalGasPerArg,
-            "write_data.new_item",
-            1_280_000
+            legacy_write_data_per_new_item: InternalGasPerArg,
+            {0..=9 => "write_data.new_item"},
+            1_280_000,
         ],
         [
             storage_io_per_state_byte_write: InternalGasPerByte,
             { 0..=9 => "write_data.per_byte_in_key", 10.. => "storage_io_per_state_byte_write"},
-            5_000
+            100,
         ],
         [
-            write_data_per_byte_in_val: InternalGasPerByte,
-            "write_data.per_byte_in_val",
+            legacy_write_data_per_byte_in_val: InternalGasPerByte,
+            { 0..=9 => "write_data.per_byte_in_val" },
             10_000
         ],
         [memory_quota: AbstractValueSize, { 1.. => "memory_quota" }, 10_000_000],
         [
-            free_write_bytes_quota: NumBytes,
+            legacy_free_write_bytes_quota: NumBytes,
             { 5.. => "free_write_bytes_quota" },
             1024, // 1KB free per state write
         ],

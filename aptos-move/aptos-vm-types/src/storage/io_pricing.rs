@@ -34,9 +34,9 @@ impl IoPricingV1 {
     fn new(gas_params: &AptosGasParameters) -> Self {
         Self {
             write_data_per_op: gas_params.vm.txn.storage_io_per_state_slot_write,
-            write_data_per_new_item: gas_params.vm.txn.write_data_per_new_item,
+            write_data_per_new_item: gas_params.vm.txn.legacy_write_data_per_new_item,
             write_data_per_byte_in_key: gas_params.vm.txn.storage_io_per_state_byte_write,
-            write_data_per_byte_in_val: gas_params.vm.txn.write_data_per_byte_in_val,
+            write_data_per_byte_in_val: gas_params.vm.txn.legacy_write_data_per_byte_in_val,
             load_data_base: gas_params.vm.txn.storage_io_per_state_slot_read * NumArgs::new(1),
             load_data_per_byte: gas_params.vm.txn.storage_io_per_state_byte_read,
             load_data_failure: gas_params.vm.txn.load_data_failure,
@@ -120,7 +120,7 @@ impl IoPricingV2 {
             0 => unreachable!("PricingV2 not applicable for feature version 0"),
             1..=2 => 0.into(),
             3..=4 => 1024.into(),
-            5.. => gas_params.vm.txn.free_write_bytes_quota,
+            5.. => gas_params.vm.txn.legacy_free_write_bytes_quota,
         }
     }
 
@@ -167,7 +167,7 @@ impl IoPricingV2 {
 #[derive(Debug, Clone)]
 pub struct IoPricingV3 {
     pub feature_version: u64,
-    pub free_write_bytes_quota: NumBytes,
+    pub legacy_free_write_bytes_quota: NumBytes,
 }
 
 impl IoPricingV3 {
@@ -183,7 +183,7 @@ impl IoPricingV3 {
         let value_size = NumBytes::new(value_size);
 
         (key_size + value_size)
-            .checked_sub(self.free_write_bytes_quota)
+            .checked_sub(self.legacy_free_write_bytes_quota)
             .unwrap_or(NumBytes::zero())
     }
 
@@ -204,11 +204,45 @@ impl IoPricingV3 {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct IoPricingV4;
+
+impl IoPricingV4 {
+    fn calculate_read_gas(
+        &self,
+        loaded: NumBytes,
+    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
+        // Round up bytes to whole pages
+        // TODO(gas): make PAGE_SIZE configurable
+        const PAGE_SIZE: u64 = 4096;
+
+        let loaded_u64: u64 = loaded.into();
+        let r = loaded_u64 % PAGE_SIZE;
+        let rounded_up = loaded_u64 + if r == 0 { 0 } else { PAGE_SIZE - r };
+
+        STORAGE_IO_PER_STATE_SLOT_READ * NumArgs::from(1)
+            + STORAGE_IO_PER_STATE_BYTE_READ * NumBytes::new(rounded_up)
+    }
+
+    fn io_gas_per_write(
+        &self,
+        key: &StateKey,
+        op_size: &WriteOpSize,
+    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
+        let key_size = NumBytes::new(key.size() as u64);
+        let value_size = NumBytes::new(op_size.write_len().unwrap_or(0));
+        let size = key_size + value_size;
+
+        STORAGE_IO_PER_STATE_SLOT_WRITE * NumArgs::new(1) + STORAGE_IO_PER_STATE_BYTE_WRITE * size
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum IoPricing {
     V1(IoPricingV1),
     V2(IoPricingV2),
     V3(IoPricingV3),
+    V4(IoPricingV4),
 }
 
 impl IoPricing {
@@ -230,10 +264,11 @@ impl IoPricing {
                     gas_params,
                 )),
             },
-            10.. => V3(IoPricingV3 {
+            10..=11 => V3(IoPricingV3 {
                 feature_version,
-                free_write_bytes_quota: gas_params.vm.txn.free_write_bytes_quota,
+                legacy_free_write_bytes_quota: gas_params.vm.txn.legacy_free_write_bytes_quota,
             }),
+            12.. => V4(IoPricingV4),
         }
     }
 
@@ -253,7 +288,8 @@ impl IoPricing {
                 },
             )),
             V2(v2) => Either::Left(v2.calculate_read_gas(bytes_loaded)),
-            V3(v3) => Either::Right(v3.calculate_read_gas(bytes_loaded)),
+            V3(v3) => Either::Right(Either::Left(v3.calculate_read_gas(bytes_loaded))),
+            V4(v4) => Either::Right(Either::Right(v4.calculate_read_gas(bytes_loaded))),
         }
     }
 
@@ -269,7 +305,8 @@ impl IoPricing {
         match self {
             V1(v1) => Either::Left(v1.io_gas_per_write(key, op_size)),
             V2(v2) => Either::Left(v2.io_gas_per_write(key, op_size)),
-            V3(v3) => Either::Right(v3.io_gas_per_write(key, op_size)),
+            V3(v3) => Either::Right(Either::Left(v3.io_gas_per_write(key, op_size))),
+            V4(v4) => Either::Right(Either::Right(v4.io_gas_per_write(key, op_size))),
         }
     }
 }
