@@ -221,10 +221,6 @@ pub struct DataStreamingServiceConfig {
     /// messages will be retrieved using FIFO ordering.
     pub max_data_stream_channel_sizes: u64,
 
-    /// Maximum number of retries for a single client request before a data
-    /// stream will terminate.
-    pub max_request_retry: u64,
-
     /// Maximum number of notification ID to response context mappings held in
     /// memory. Once the number grows beyond this value, garbage collection occurs.
     pub max_notification_id_mappings: u64,
@@ -232,6 +228,15 @@ pub struct DataStreamingServiceConfig {
     /// Maximum number of consecutive subscriptions that can be made before
     /// the subscription stream is terminated and a new stream must be created.
     pub max_num_consecutive_subscriptions: u64,
+
+    /// Maximum number of pending requests per data stream. This includes the
+    /// requests that have already succeeded but have not yet been consumed
+    /// because they're head-of-line blocked by other requests.
+    pub max_pending_requests: u64,
+
+    /// Maximum number of retries for a single client request before a data
+    /// stream will terminate.
+    pub max_request_retry: u64,
 
     /// Maximum lag (in seconds) we'll tolerate when sending subscription requests
     pub max_subscription_stream_lag_secs: u64,
@@ -248,10 +253,11 @@ impl Default for DataStreamingServiceConfig {
             max_concurrent_requests: MAX_CONCURRENT_REQUESTS,
             max_concurrent_state_requests: MAX_CONCURRENT_STATE_REQUESTS,
             max_data_stream_channel_sizes: 300,
-            max_request_retry: 5,
             max_notification_id_mappings: 300,
             max_num_consecutive_subscriptions: 40, // At ~4 blocks per second, this should last 10 seconds
-            max_subscription_stream_lag_secs: 15,  // 15 seconds
+            max_pending_requests: 50,
+            max_request_retry: 5,
+            max_subscription_stream_lag_secs: 15, // 15 seconds
             progress_check_interval_ms: 50,
         }
     }

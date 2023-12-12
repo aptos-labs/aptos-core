@@ -1,48 +1,728 @@
-comparison between v1 and v2 failed:
-= processed 5 tasks
-= 
-= task 0 'publish'. lines 1-130:
-+ Error: Unable to publish module '000000000000000000000000000000000000000000000000000000000000cafe::vectors'. Got VMError: {
-+     major_status: MOVELOC_UNAVAILABLE_ERROR,
-+     sub_status: None,
-+     location: 0xcafe::vectors,
-+     indices: redacted,
-+     offsets: redacted,
-+ }
-= 
-+ task 1 'run'. lines 132-132:
-+ Error: Function execution failed with VMError: {
-+     major_status: LINKER_ERROR,
-+     sub_status: None,
-+     location: undefined,
-+     indices: redacted,
-+     offsets: redacted,
-+ }
-= 
-+ task 2 'run'. lines 134-134:
-+ Error: Function execution failed with VMError: {
-+     major_status: LINKER_ERROR,
-+     sub_status: None,
-+     location: undefined,
-+     indices: redacted,
-+     offsets: redacted,
-+ }
-= 
-+ task 3 'run'. lines 136-136:
-+ Error: Function execution failed with VMError: {
-+     major_status: LINKER_ERROR,
-+     sub_status: None,
-+     location: undefined,
-+     indices: redacted,
-+     offsets: redacted,
-+ }
-+ 
-+ task 4 'run'. lines 138-138:
-+ Error: Function execution failed with VMError: {
-+     major_status: LINKER_ERROR,
-+     sub_status: None,
-+     location: undefined,
-+     indices: redacted,
-+     offsets: redacted,
-+ }
-+ 
+processed 5 tasks
+
+task 0 'publish'. lines 1-130:
+
+
+
+==> Compiler v2 delivered same results!
+
+>>> V1 Compiler {
+== BEGIN Bytecode ==
+// Move bytecode v6
+module cafe.vectors {
+
+
+entry public entry_test_guess_flips_abort() {
+B0:
+	0: LdConst[0](Vector(U8): [4, 0, 0, 0, 0])
+	1: Call guess_flips_abort(vector<u8>)
+	2: Ret
+}
+entry public entry_test_guess_flips_break() {
+B0:
+	0: LdConst[0](Vector(U8): [4, 0, 0, 0, 0])
+	1: Call guess_flips_break(vector<u8>)
+	2: Ret
+}
+entry public entry_test_guess_flips_break2() {
+B0:
+	0: LdConst[0](Vector(U8): [4, 0, 0, 0, 0])
+	1: Call guess_flips_break2(vector<u8>)
+	2: Ret
+}
+entry public entry_test_guess_flips_continue() {
+B0:
+	0: LdConst[0](Vector(U8): [4, 0, 0, 0, 0])
+	1: Call guess_flips_continue(vector<u8>)
+	2: Ret
+}
+entry public entry_test_guess_flips_nocheck() {
+B0:
+	0: LdConst[0](Vector(U8): [4, 0, 0, 0, 0])
+	1: Call guess_flips_nocheck(vector<u8>)
+	2: Ret
+}
+entry public guess_flips_abort(Arg0: vector<u8>) {
+L0:	loc1: u64
+B0:
+	0: LdU64(0)
+	1: StLoc[2](loc1: u64)
+	2: ImmBorrowLoc[0](Arg0: vector<u8>)
+	3: StLoc[1](loc0: &vector<u8>)
+B1:
+	4: CopyLoc[2](loc1: u64)
+	5: CopyLoc[1](loc0: &vector<u8>)
+	6: VecLen(3)
+	7: Lt
+	8: BrFalse(27)
+B2:
+	9: Branch(10)
+B3:
+	10: CopyLoc[1](loc0: &vector<u8>)
+	11: CopyLoc[2](loc1: u64)
+	12: VecImmBorrow(3)
+	13: ReadRef
+	14: LdU8(0)
+	15: Eq
+	16: BrFalse(18)
+B4:
+	17: Branch(22)
+B5:
+	18: MoveLoc[1](loc0: &vector<u8>)
+	19: Pop
+	20: LdU64(3)
+	21: Abort
+B6:
+	22: MoveLoc[2](loc1: u64)
+	23: LdU64(1)
+	24: Add
+	25: StLoc[2](loc1: u64)
+	26: Branch(4)
+B7:
+	27: MoveLoc[1](loc0: &vector<u8>)
+	28: Pop
+	29: CopyLoc[0](Arg0: vector<u8>)
+	30: Pop
+	31: MoveLoc[0](Arg0: vector<u8>)
+	32: Pop
+	33: Ret
+}
+entry public guess_flips_break(Arg0: vector<u8>) {
+L0:	loc1: u64
+B0:
+	0: LdU64(0)
+	1: StLoc[2](loc1: u64)
+	2: ImmBorrowLoc[0](Arg0: vector<u8>)
+	3: StLoc[1](loc0: &vector<u8>)
+B1:
+	4: CopyLoc[2](loc1: u64)
+	5: CopyLoc[1](loc0: &vector<u8>)
+	6: VecLen(3)
+	7: Lt
+	8: BrFalse(30)
+B2:
+	9: Branch(10)
+B3:
+	10: CopyLoc[1](loc0: &vector<u8>)
+	11: CopyLoc[2](loc1: u64)
+	12: VecImmBorrow(3)
+	13: ReadRef
+	14: LdU8(0)
+	15: Neq
+	16: BrFalse(20)
+B4:
+	17: MoveLoc[1](loc0: &vector<u8>)
+	18: Pop
+	19: Branch(25)
+B5:
+	20: MoveLoc[2](loc1: u64)
+	21: LdU64(1)
+	22: Add
+	23: StLoc[2](loc1: u64)
+	24: Branch(4)
+B6:
+	25: CopyLoc[0](Arg0: vector<u8>)
+	26: Pop
+	27: MoveLoc[0](Arg0: vector<u8>)
+	28: Pop
+	29: Ret
+B7:
+	30: MoveLoc[1](loc0: &vector<u8>)
+	31: Pop
+	32: Branch(25)
+}
+entry public guess_flips_break2(Arg0: vector<u8>) {
+L0:	loc1: u64
+B0:
+	0: LdU64(0)
+	1: StLoc[2](loc1: u64)
+	2: ImmBorrowLoc[0](Arg0: vector<u8>)
+	3: StLoc[1](loc0: &vector<u8>)
+B1:
+	4: CopyLoc[2](loc1: u64)
+	5: CopyLoc[1](loc0: &vector<u8>)
+	6: VecLen(3)
+	7: Lt
+	8: BrFalse(40)
+B2:
+	9: Branch(10)
+B3:
+	10: CopyLoc[1](loc0: &vector<u8>)
+	11: CopyLoc[2](loc1: u64)
+	12: VecImmBorrow(3)
+	13: ReadRef
+	14: LdU8(0)
+	15: Neq
+	16: BrFalse(20)
+B4:
+	17: MoveLoc[1](loc0: &vector<u8>)
+	18: Pop
+	19: Branch(35)
+B5:
+	20: MoveLoc[2](loc1: u64)
+	21: LdU64(1)
+	22: Add
+	23: StLoc[2](loc1: u64)
+	24: CopyLoc[1](loc0: &vector<u8>)
+	25: CopyLoc[2](loc1: u64)
+	26: VecImmBorrow(3)
+	27: ReadRef
+	28: LdU8(5)
+	29: Eq
+	30: BrFalse(34)
+B6:
+	31: MoveLoc[1](loc0: &vector<u8>)
+	32: Pop
+	33: Branch(35)
+B7:
+	34: Branch(4)
+B8:
+	35: CopyLoc[0](Arg0: vector<u8>)
+	36: Pop
+	37: MoveLoc[0](Arg0: vector<u8>)
+	38: Pop
+	39: Ret
+B9:
+	40: MoveLoc[1](loc0: &vector<u8>)
+	41: Pop
+	42: Branch(35)
+}
+entry public guess_flips_continue(Arg0: vector<u8>) {
+L0:	loc1: u64
+B0:
+	0: LdU64(0)
+	1: StLoc[2](loc1: u64)
+	2: ImmBorrowLoc[0](Arg0: vector<u8>)
+	3: StLoc[1](loc0: &vector<u8>)
+B1:
+	4: CopyLoc[2](loc1: u64)
+	5: CopyLoc[1](loc0: &vector<u8>)
+	6: VecLen(3)
+	7: Lt
+	8: BrFalse(23)
+B2:
+	9: Branch(10)
+B3:
+	10: CopyLoc[1](loc0: &vector<u8>)
+	11: CopyLoc[2](loc1: u64)
+	12: VecImmBorrow(3)
+	13: ReadRef
+	14: LdU8(0)
+	15: Neq
+	16: BrFalse(18)
+B4:
+	17: Branch(4)
+B5:
+	18: MoveLoc[2](loc1: u64)
+	19: LdU64(1)
+	20: Add
+	21: StLoc[2](loc1: u64)
+	22: Branch(4)
+B6:
+	23: MoveLoc[1](loc0: &vector<u8>)
+	24: Pop
+	25: CopyLoc[0](Arg0: vector<u8>)
+	26: Pop
+	27: MoveLoc[0](Arg0: vector<u8>)
+	28: Pop
+	29: Ret
+}
+entry public guess_flips_nocheck(Arg0: vector<u8>) {
+L0:	loc1: u64
+B0:
+	0: LdU64(0)
+	1: StLoc[2](loc1: u64)
+	2: ImmBorrowLoc[0](Arg0: vector<u8>)
+	3: StLoc[1](loc0: &vector<u8>)
+B1:
+	4: CopyLoc[2](loc1: u64)
+	5: CopyLoc[1](loc0: &vector<u8>)
+	6: VecLen(3)
+	7: Lt
+	8: BrFalse(15)
+B2:
+	9: Branch(10)
+B3:
+	10: MoveLoc[2](loc1: u64)
+	11: LdU64(1)
+	12: Add
+	13: StLoc[2](loc1: u64)
+	14: Branch(4)
+B4:
+	15: MoveLoc[1](loc0: &vector<u8>)
+	16: Pop
+	17: CopyLoc[0](Arg0: vector<u8>)
+	18: Pop
+	19: MoveLoc[0](Arg0: vector<u8>)
+	20: Pop
+	21: Ret
+}
+test_guess_flips_abort() {
+B0:
+	0: LdConst[0](Vector(U8): [4, 0, 0, 0, 0])
+	1: Call guess_flips_abort(vector<u8>)
+	2: Ret
+}
+test_guess_flips_break() {
+B0:
+	0: LdConst[0](Vector(U8): [4, 0, 0, 0, 0])
+	1: Call guess_flips_break(vector<u8>)
+	2: Ret
+}
+test_guess_flips_break2() {
+B0:
+	0: LdConst[0](Vector(U8): [4, 0, 0, 0, 0])
+	1: Call guess_flips_break2(vector<u8>)
+	2: Ret
+}
+test_guess_flips_continue() {
+B0:
+	0: LdConst[0](Vector(U8): [4, 0, 0, 0, 0])
+	1: Call guess_flips_continue(vector<u8>)
+	2: Ret
+}
+test_guess_flips_nocheck() {
+B0:
+	0: LdConst[0](Vector(U8): [4, 0, 0, 0, 0])
+	1: Call guess_flips_nocheck(vector<u8>)
+	2: Ret
+}
+}
+== END Bytecode ==
+}
+
+>>> V2 Compiler {
+== BEGIN Bytecode ==
+// Move bytecode v7
+module cafe.vectors {
+
+
+entry public entry_test_guess_flips_abort() {
+L0:	loc0: vector<u8>
+B0:
+	0: LdU8(0)
+	1: LdU8(0)
+	2: LdU8(0)
+	3: LdU8(0)
+	4: VecPack(1, 4)
+	5: StLoc[0](loc0: vector<u8>)
+	6: MoveLoc[0](loc0: vector<u8>)
+	7: Call guess_flips_abort(vector<u8>)
+	8: Ret
+}
+entry public entry_test_guess_flips_break() {
+L0:	loc0: vector<u8>
+B0:
+	0: LdU8(0)
+	1: LdU8(0)
+	2: LdU8(0)
+	3: LdU8(0)
+	4: VecPack(1, 4)
+	5: StLoc[0](loc0: vector<u8>)
+	6: MoveLoc[0](loc0: vector<u8>)
+	7: Call guess_flips_break(vector<u8>)
+	8: Ret
+}
+entry public entry_test_guess_flips_break2() {
+L0:	loc0: vector<u8>
+B0:
+	0: LdU8(0)
+	1: LdU8(0)
+	2: LdU8(0)
+	3: LdU8(0)
+	4: VecPack(1, 4)
+	5: StLoc[0](loc0: vector<u8>)
+	6: MoveLoc[0](loc0: vector<u8>)
+	7: Call guess_flips_break2(vector<u8>)
+	8: Ret
+}
+entry public entry_test_guess_flips_continue() {
+L0:	loc0: vector<u8>
+B0:
+	0: LdU8(0)
+	1: LdU8(0)
+	2: LdU8(0)
+	3: LdU8(0)
+	4: VecPack(1, 4)
+	5: StLoc[0](loc0: vector<u8>)
+	6: MoveLoc[0](loc0: vector<u8>)
+	7: Call guess_flips_continue(vector<u8>)
+	8: Ret
+}
+entry public entry_test_guess_flips_nocheck() {
+L0:	loc0: vector<u8>
+B0:
+	0: LdU8(0)
+	1: LdU8(0)
+	2: LdU8(0)
+	3: LdU8(0)
+	4: VecPack(1, 4)
+	5: StLoc[0](loc0: vector<u8>)
+	6: MoveLoc[0](loc0: vector<u8>)
+	7: Call guess_flips_nocheck(vector<u8>)
+	8: Ret
+}
+entry public guess_flips_abort(Arg0: vector<u8>) {
+L0:	loc1: &vector<u8>
+L1:	loc2: &vector<u8>
+L2:	loc3: u64
+L3:	loc4: &vector<u8>
+L4:	loc5: u64
+L5:	loc6: vector<u8>
+L6:	loc7: vector<u8>
+L7:	loc8: vector<u8>
+B0:
+	0: LdU64(0)
+	1: StLoc[1](loc0: u64)
+	2: ImmBorrowLoc[0](Arg0: vector<u8>)
+	3: StLoc[2](loc1: &vector<u8>)
+B1:
+	4: CopyLoc[2](loc1: &vector<u8>)
+	5: StLoc[3](loc2: &vector<u8>)
+	6: MoveLoc[3](loc2: &vector<u8>)
+	7: VecLen(1)
+	8: StLoc[4](loc3: u64)
+	9: CopyLoc[1](loc0: u64)
+	10: MoveLoc[4](loc3: u64)
+	11: Lt
+	12: BrFalse(32)
+B2:
+	13: CopyLoc[2](loc1: &vector<u8>)
+	14: StLoc[5](loc4: &vector<u8>)
+	15: MoveLoc[5](loc4: &vector<u8>)
+	16: CopyLoc[1](loc0: u64)
+	17: VecImmBorrow(1)
+	18: ReadRef
+	19: LdU8(0)
+	20: Eq
+	21: BrFalse(23)
+B3:
+	22: Branch(25)
+B4:
+	23: LdU64(3)
+	24: Abort
+B5:
+	25: LdU64(1)
+	26: StLoc[6](loc5: u64)
+	27: MoveLoc[1](loc0: u64)
+	28: MoveLoc[6](loc5: u64)
+	29: Add
+	30: StLoc[1](loc0: u64)
+	31: Branch(33)
+B6:
+	32: Branch(34)
+B7:
+	33: Branch(4)
+B8:
+	34: CopyLoc[0](Arg0: vector<u8>)
+	35: StLoc[7](loc6: vector<u8>)
+	36: CopyLoc[7](loc6: vector<u8>)
+	37: StLoc[8](loc7: vector<u8>)
+	38: CopyLoc[0](Arg0: vector<u8>)
+	39: StLoc[9](loc8: vector<u8>)
+	40: Ret
+}
+entry public guess_flips_break(Arg0: vector<u8>) {
+L0:	loc1: &vector<u8>
+L1:	loc2: &vector<u8>
+L2:	loc3: u64
+L3:	loc4: &vector<u8>
+L4:	loc5: u64
+L5:	loc6: vector<u8>
+L6:	loc7: vector<u8>
+L7:	loc8: vector<u8>
+B0:
+	0: LdU64(0)
+	1: StLoc[1](loc0: u64)
+	2: ImmBorrowLoc[0](Arg0: vector<u8>)
+	3: StLoc[2](loc1: &vector<u8>)
+B1:
+	4: CopyLoc[2](loc1: &vector<u8>)
+	5: StLoc[3](loc2: &vector<u8>)
+	6: MoveLoc[3](loc2: &vector<u8>)
+	7: VecLen(1)
+	8: StLoc[4](loc3: u64)
+	9: CopyLoc[1](loc0: u64)
+	10: MoveLoc[4](loc3: u64)
+	11: Lt
+	12: BrFalse(31)
+B2:
+	13: CopyLoc[2](loc1: &vector<u8>)
+	14: StLoc[5](loc4: &vector<u8>)
+	15: MoveLoc[5](loc4: &vector<u8>)
+	16: CopyLoc[1](loc0: u64)
+	17: VecImmBorrow(1)
+	18: ReadRef
+	19: LdU8(0)
+	20: Neq
+	21: BrFalse(24)
+B3:
+	22: Branch(33)
+B4:
+	23: Branch(24)
+B5:
+	24: LdU64(1)
+	25: StLoc[6](loc5: u64)
+	26: MoveLoc[1](loc0: u64)
+	27: MoveLoc[6](loc5: u64)
+	28: Add
+	29: StLoc[1](loc0: u64)
+	30: Branch(32)
+B6:
+	31: Branch(33)
+B7:
+	32: Branch(4)
+B8:
+	33: CopyLoc[0](Arg0: vector<u8>)
+	34: StLoc[7](loc6: vector<u8>)
+	35: CopyLoc[7](loc6: vector<u8>)
+	36: StLoc[8](loc7: vector<u8>)
+	37: CopyLoc[0](Arg0: vector<u8>)
+	38: StLoc[9](loc8: vector<u8>)
+	39: Ret
+}
+entry public guess_flips_break2(Arg0: vector<u8>) {
+L0:	loc1: &vector<u8>
+L1:	loc2: &vector<u8>
+L2:	loc3: u64
+L3:	loc4: &vector<u8>
+L4:	loc5: u64
+L5:	loc6: &vector<u8>
+L6:	loc7: vector<u8>
+L7:	loc8: vector<u8>
+L8:	loc9: vector<u8>
+B0:
+	0: LdU64(0)
+	1: StLoc[1](loc0: u64)
+	2: ImmBorrowLoc[0](Arg0: vector<u8>)
+	3: StLoc[2](loc1: &vector<u8>)
+B1:
+	4: CopyLoc[2](loc1: &vector<u8>)
+	5: StLoc[3](loc2: &vector<u8>)
+	6: MoveLoc[3](loc2: &vector<u8>)
+	7: VecLen(1)
+	8: StLoc[4](loc3: u64)
+	9: CopyLoc[1](loc0: u64)
+	10: MoveLoc[4](loc3: u64)
+	11: Lt
+	12: BrFalse(42)
+B2:
+	13: CopyLoc[2](loc1: &vector<u8>)
+	14: StLoc[5](loc4: &vector<u8>)
+	15: MoveLoc[5](loc4: &vector<u8>)
+	16: CopyLoc[1](loc0: u64)
+	17: VecImmBorrow(1)
+	18: ReadRef
+	19: LdU8(0)
+	20: Neq
+	21: BrFalse(24)
+B3:
+	22: Branch(44)
+B4:
+	23: Branch(24)
+B5:
+	24: LdU64(1)
+	25: StLoc[6](loc5: u64)
+	26: MoveLoc[1](loc0: u64)
+	27: MoveLoc[6](loc5: u64)
+	28: Add
+	29: StLoc[1](loc0: u64)
+	30: CopyLoc[2](loc1: &vector<u8>)
+	31: StLoc[7](loc6: &vector<u8>)
+	32: MoveLoc[7](loc6: &vector<u8>)
+	33: CopyLoc[1](loc0: u64)
+	34: VecImmBorrow(1)
+	35: ReadRef
+	36: LdU8(5)
+	37: Eq
+	38: BrFalse(41)
+B6:
+	39: Branch(44)
+B7:
+	40: Branch(41)
+B8:
+	41: Branch(43)
+B9:
+	42: Branch(44)
+B10:
+	43: Branch(4)
+B11:
+	44: CopyLoc[0](Arg0: vector<u8>)
+	45: StLoc[8](loc7: vector<u8>)
+	46: CopyLoc[8](loc7: vector<u8>)
+	47: StLoc[9](loc8: vector<u8>)
+	48: CopyLoc[0](Arg0: vector<u8>)
+	49: StLoc[10](loc9: vector<u8>)
+	50: Ret
+}
+entry public guess_flips_continue(Arg0: vector<u8>) {
+L0:	loc1: &vector<u8>
+L1:	loc2: &vector<u8>
+L2:	loc3: u64
+L3:	loc4: &vector<u8>
+L4:	loc5: u64
+L5:	loc6: vector<u8>
+L6:	loc7: vector<u8>
+L7:	loc8: vector<u8>
+B0:
+	0: LdU64(0)
+	1: StLoc[1](loc0: u64)
+	2: ImmBorrowLoc[0](Arg0: vector<u8>)
+	3: StLoc[2](loc1: &vector<u8>)
+B1:
+	4: CopyLoc[2](loc1: &vector<u8>)
+	5: StLoc[3](loc2: &vector<u8>)
+	6: MoveLoc[3](loc2: &vector<u8>)
+	7: VecLen(1)
+	8: StLoc[4](loc3: u64)
+	9: CopyLoc[1](loc0: u64)
+	10: MoveLoc[4](loc3: u64)
+	11: Lt
+	12: BrFalse(31)
+B2:
+	13: CopyLoc[2](loc1: &vector<u8>)
+	14: StLoc[5](loc4: &vector<u8>)
+	15: MoveLoc[5](loc4: &vector<u8>)
+	16: CopyLoc[1](loc0: u64)
+	17: VecImmBorrow(1)
+	18: ReadRef
+	19: LdU8(0)
+	20: Neq
+	21: BrFalse(24)
+B3:
+	22: Branch(4)
+B4:
+	23: Branch(24)
+B5:
+	24: LdU64(1)
+	25: StLoc[6](loc5: u64)
+	26: MoveLoc[1](loc0: u64)
+	27: MoveLoc[6](loc5: u64)
+	28: Add
+	29: StLoc[1](loc0: u64)
+	30: Branch(32)
+B6:
+	31: Branch(33)
+B7:
+	32: Branch(4)
+B8:
+	33: CopyLoc[0](Arg0: vector<u8>)
+	34: StLoc[7](loc6: vector<u8>)
+	35: CopyLoc[7](loc6: vector<u8>)
+	36: StLoc[8](loc7: vector<u8>)
+	37: CopyLoc[0](Arg0: vector<u8>)
+	38: StLoc[9](loc8: vector<u8>)
+	39: Ret
+}
+entry public guess_flips_nocheck(Arg0: vector<u8>) {
+L0:	loc1: &vector<u8>
+L1:	loc2: &vector<u8>
+L2:	loc3: u64
+L3:	loc4: u64
+L4:	loc5: vector<u8>
+L5:	loc6: vector<u8>
+L6:	loc7: vector<u8>
+B0:
+	0: LdU64(0)
+	1: StLoc[1](loc0: u64)
+	2: ImmBorrowLoc[0](Arg0: vector<u8>)
+	3: StLoc[2](loc1: &vector<u8>)
+B1:
+	4: CopyLoc[2](loc1: &vector<u8>)
+	5: StLoc[3](loc2: &vector<u8>)
+	6: MoveLoc[3](loc2: &vector<u8>)
+	7: VecLen(1)
+	8: StLoc[4](loc3: u64)
+	9: CopyLoc[1](loc0: u64)
+	10: MoveLoc[4](loc3: u64)
+	11: Lt
+	12: BrFalse(20)
+B2:
+	13: LdU64(1)
+	14: StLoc[5](loc4: u64)
+	15: MoveLoc[1](loc0: u64)
+	16: MoveLoc[5](loc4: u64)
+	17: Add
+	18: StLoc[1](loc0: u64)
+	19: Branch(21)
+B3:
+	20: Branch(22)
+B4:
+	21: Branch(4)
+B5:
+	22: CopyLoc[0](Arg0: vector<u8>)
+	23: StLoc[6](loc5: vector<u8>)
+	24: CopyLoc[6](loc5: vector<u8>)
+	25: StLoc[7](loc6: vector<u8>)
+	26: CopyLoc[0](Arg0: vector<u8>)
+	27: StLoc[8](loc7: vector<u8>)
+	28: Ret
+}
+test_guess_flips_abort() {
+L0:	loc0: vector<u8>
+B0:
+	0: LdU8(0)
+	1: LdU8(0)
+	2: LdU8(0)
+	3: LdU8(0)
+	4: VecPack(1, 4)
+	5: StLoc[0](loc0: vector<u8>)
+	6: MoveLoc[0](loc0: vector<u8>)
+	7: Call guess_flips_abort(vector<u8>)
+	8: Ret
+}
+test_guess_flips_break() {
+L0:	loc0: vector<u8>
+B0:
+	0: LdU8(0)
+	1: LdU8(0)
+	2: LdU8(0)
+	3: LdU8(0)
+	4: VecPack(1, 4)
+	5: StLoc[0](loc0: vector<u8>)
+	6: MoveLoc[0](loc0: vector<u8>)
+	7: Call guess_flips_break(vector<u8>)
+	8: Ret
+}
+test_guess_flips_break2() {
+L0:	loc0: vector<u8>
+B0:
+	0: LdU8(0)
+	1: LdU8(0)
+	2: LdU8(0)
+	3: LdU8(0)
+	4: VecPack(1, 4)
+	5: StLoc[0](loc0: vector<u8>)
+	6: MoveLoc[0](loc0: vector<u8>)
+	7: Call guess_flips_break2(vector<u8>)
+	8: Ret
+}
+test_guess_flips_continue() {
+L0:	loc0: vector<u8>
+B0:
+	0: LdU8(0)
+	1: LdU8(0)
+	2: LdU8(0)
+	3: LdU8(0)
+	4: VecPack(1, 4)
+	5: StLoc[0](loc0: vector<u8>)
+	6: MoveLoc[0](loc0: vector<u8>)
+	7: Call guess_flips_continue(vector<u8>)
+	8: Ret
+}
+test_guess_flips_nocheck() {
+L0:	loc0: vector<u8>
+B0:
+	0: LdU8(0)
+	1: LdU8(0)
+	2: LdU8(0)
+	3: LdU8(0)
+	4: VecPack(1, 4)
+	5: StLoc[0](loc0: vector<u8>)
+	6: MoveLoc[0](loc0: vector<u8>)
+	7: Call guess_flips_nocheck(vector<u8>)
+	8: Ret
+}
+}
+== END Bytecode ==
+}

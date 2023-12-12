@@ -40,6 +40,7 @@ use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
 pub mod async_proof_fetcher;
+pub mod block_info;
 pub mod cached_state_view;
 mod executed_trees;
 mod metrics;

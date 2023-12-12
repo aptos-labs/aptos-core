@@ -9,7 +9,7 @@ use crate::{
     latency_monitor::LatencyMonitor,
     logging::{LogEntry, LogEvent, LogSchema},
     metrics,
-    metrics::{set_gauge, start_request_timer, DataType, PRIORITIZED_PEER, REGULAR_PEER},
+    metrics::{set_gauge, DataType, PRIORITIZED_PEER, REGULAR_PEER},
     utils,
     utils::choose_peers_by_latency,
 };
@@ -408,13 +408,6 @@ pub(crate) fn poll_peer(
         let use_compression = data_summary_poller.data_client_config.use_compression;
         let storage_request = StorageServiceRequest::new(data_request, use_compression);
 
-        // Start the peer polling timer
-        let timer = start_request_timer(
-            &metrics::REQUEST_LATENCIES,
-            &storage_request.get_label(),
-            peer,
-        );
-
         // Fetch the storage summary for the peer and stop the timer
         let request_timeout = data_summary_poller.data_client_config.response_timeout_ms;
         let result: crate::error::Result<StorageServerSummary> = data_summary_poller
@@ -422,7 +415,6 @@ pub(crate) fn poll_peer(
             .send_request_to_peer_and_decode(peer, storage_request, request_timeout)
             .await
             .map(Response::into_payload);
-        drop(timer);
 
         // Mark the in-flight poll as now complete
         data_summary_poller.in_flight_request_complete(&peer);

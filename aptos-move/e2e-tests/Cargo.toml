@@ -30,6 +30,7 @@ aptos-memory-usage-tracker = { workspace = true }
 aptos-native-interface = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
 aptos-state-view = { workspace = true }
+aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-genesis = { workspace = true }

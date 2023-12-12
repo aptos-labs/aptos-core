@@ -1,7 +1,7 @@
 spec aptos_framework::timestamp {
     spec module {
         use aptos_framework::chain_status;
-        invariant chain_status::is_operating() ==> exists<CurrentTimeMicroseconds>(@aptos_framework);
+        invariant [suspendable] chain_status::is_operating() ==> exists<CurrentTimeMicroseconds>(@aptos_framework);
     }
 
     spec update_global_time {

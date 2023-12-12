@@ -19,6 +19,7 @@ A module for generating globally unique identifiers
 -  [Function `eq_id`](#0x1_guid_eq_id)
 -  [Specification](#@Specification_1)
     -  [Function `create`](#@Specification_1_create)
+    -  [Function `create_id`](#@Specification_1_create_id)
     -  [Function `id`](#@Specification_1_id)
     -  [Function `creator_address`](#@Specification_1_creator_address)
     -  [Function `id_creator_address`](#@Specification_1_id_creator_address)
@@ -341,6 +342,22 @@ Return true if the GUID's ID is <code>id</code>
 <pre><code><b>aborts_if</b> creation_num_ref + 1 &gt; MAX_U64;
 <b>ensures</b> result.id.creation_num == <b>old</b>(creation_num_ref);
 <b>ensures</b> creation_num_ref == <b>old</b>(creation_num_ref) + 1;
+</code></pre>
+
+
+
+<a id="@Specification_1_create_id"></a>
+
+### Function `create_id`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_create_id">create_id</a>(addr: <b>address</b>, creation_num: u64): <a href="guid.md#0x1_guid_ID">guid::ID</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 

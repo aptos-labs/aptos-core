@@ -5,13 +5,13 @@ use crate::{block::Block, common::Round};
 use aptos_crypto::HashValue;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 struct RandMetadataToSign {
     epoch: u64,
     round: Round,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct RandMetadata {
     metadata_to_sign: RandMetadataToSign,
     // not used for signing

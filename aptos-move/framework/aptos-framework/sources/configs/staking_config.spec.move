@@ -1,7 +1,7 @@
 spec aptos_framework::staking_config {
     spec module {
         use aptos_framework::chain_status;
-        invariant chain_status::is_operating() ==> exists<StakingConfig>(@aptos_framework);
+        invariant [suspendable] chain_status::is_operating() ==> exists<StakingConfig>(@aptos_framework);
         pragma verify = true;
         pragma aborts_if_is_strict;
     }
@@ -13,6 +13,8 @@ spec aptos_framework::staking_config {
         invariant rewards_rate <= MAX_REWARDS_RATE;
         invariant rewards_rate_denominator > 0;
         invariant rewards_rate <= rewards_rate_denominator;
+        invariant recurring_lockup_duration_secs > 0;
+        invariant voting_power_increase_limit > 0 && voting_power_increase_limit <= 50;
     }
 
     spec StakingRewardsConfig {

@@ -2409,6 +2409,7 @@ dependencies = [
  "aptos-native-interface",
  "aptos-proptest-helpers",
  "aptos-state-view",
+ "aptos-temppath",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
@@ -3652,6 +3653,8 @@ dependencies = [
  "move-core-types",
  "once_cell",
  "parking_lot 0.12.1",
+ "proptest",
+ "proptest-derive",
  "rayon",
  "serde",
  "thiserror",
@@ -9909,7 +9912,9 @@ name = "move-compiler-v2-transactional-tests"
 version = "0.1.0"
 dependencies = [
  "datatest-stable",
+ "move-command-line-common",
  "move-transactional-test-runner",
+ "once_cell",
 ]
 
 [[package]]

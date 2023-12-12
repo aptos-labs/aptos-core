@@ -73,6 +73,7 @@ use move_core_types::{
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
 use std::{
+    collections::BTreeSet,
     env,
     fs::{self, OpenOptions},
     io::Write,
@@ -543,20 +544,11 @@ impl FakeExecutor {
 
             // make more granular comparison, to be able to understand test failures better
             if sequential_output.is_ok() && parallel_output.is_ok() {
-                let seq_txn_output = sequential_output.as_ref().unwrap();
-                let par_txn_output = parallel_output.as_ref().unwrap();
-                assert_eq!(seq_txn_output.len(), par_txn_output.len());
-                for (idx, (seq_output, par_output)) in
-                    seq_txn_output.iter().zip(par_txn_output.iter()).enumerate()
-                {
-                    assert_eq!(
-                        seq_output, par_output,
-                        "first transaction output mismatch at index {}",
-                        idx
-                    );
-                }
+                let txns_output_1 = sequential_output.as_ref().unwrap();
+                let txns_output_2 = parallel_output.as_ref().unwrap();
+                assert_outputs_equal(txns_output_1, "sequential", txns_output_2, "parallel");
             } else {
-                assert_eq!(sequential_output, parallel_output);
+                assert_eq!(sequential_output, parallel_output, "Output mismatch");
             }
         }
 
@@ -1113,5 +1105,74 @@ impl FakeExecutor {
             arguments,
             u64::MAX,
         )
+    }
+}
+
+pub fn assert_outputs_equal(
+    txns_output_1: &Vec<TransactionOutput>,
+    name1: &str,
+    txns_output_2: &Vec<TransactionOutput>,
+    name2: &str,
+) {
+    assert_eq!(
+        txns_output_1.len(),
+        txns_output_2.len(),
+        "Transaction outputs size mismatch: in {:?} and in {:?}",
+        name1,
+        name2,
+    );
+
+    for (idx, (txn_output_1, txn_output_2)) in
+        txns_output_1.iter().zip(txns_output_2.iter()).enumerate()
+    {
+        // Gas is usually the problem, so check it separately to
+        // have a concise error message.
+        assert_eq!(
+            txn_output_1.try_extract_fee_statement().unwrap_or_default(),
+            txn_output_2.try_extract_fee_statement().unwrap_or_default(),
+            "Different gas used for {:?} and {:?} for transaction outputs at index {}",
+            name1,
+            name2,
+            idx,
+        );
+
+        // Identify differences in write sets, if any.
+
+        let keys = txn_output_1
+            .write_set()
+            .iter()
+            .chain(txn_output_2.write_set().iter())
+            .map(|(k, _)| k)
+            .collect::<BTreeSet<_>>();
+        let mut differences = vec![];
+        for key in keys {
+            let write1 = txn_output_1.write_set().get(key);
+            let write2 = txn_output_2.write_set().get(key);
+
+            if write1 != write2 {
+                differences.push(format!(
+                    "Write for {:?} differs: {:?} vs {:?}",
+                    key, write1, write2
+                ));
+            }
+        }
+        if !differences.is_empty() {
+            println!("Differences:\n{}", differences.join("\n"));
+        }
+        assert!(
+            differences.is_empty(),
+            "First write op mismatch for transaction output at index {}, between {} and {}",
+            idx,
+            name1,
+            name2,
+        );
+
+        // Still perform comparison on all fields in transaction
+        // outputs to catch other inconsistencies.
+        assert_eq!(
+            txn_output_1, txn_output_2,
+            "first transaction output mismatch at index {}, for {} and {}",
+            idx, name1, name2,
+        );
     }
 }
