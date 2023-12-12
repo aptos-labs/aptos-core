@@ -78,7 +78,6 @@ fn check_drop_for_temp_with_msg(
 /// `t` is the local containing the reference being written to
 fn check_write_ref(target: &FunctionTarget, t: TempIndex, loc: &Loc) {
     if let Type::Reference(_, ty) = target.get_local_type(t) {
-        // TODO: check key, store
         check_drop(target, ty, loc, "write_ref: cannot drop")
     } else {
         panic!("ICE typing error")
@@ -206,9 +205,19 @@ fn check_bytecode(target: &FunctionTarget, bytecode: &Bytecode) {
     match bytecode {
         // drop of dst during the assignment has been made explicit
         // so we don't check it here, plus this could be an initialization
-        Bytecode::Assign(_, src, _, kind) => {
-            if matches!(kind, AssignKind::Copy | AssignKind::Store) {
-                check_copy_for_temp_with_msg(target, *src, &loc, "cannot copy");
+        Bytecode::Assign(_, dst, src, kind) => {
+            match kind {
+                AssignKind::Copy | AssignKind::Store => {
+                    check_copy_for_temp_with_msg(target, *src, &loc, "cannot copy");
+                    // dst is not dropped in advande in this case, since it's read by src
+                    if *dst == *src {
+                        check_drop_for_temp_with_msg(target, *dst, &loc, "invalid implicit drop")
+                    }
+                }
+                AssignKind::Move => (),
+                AssignKind::Inferred => {
+                    panic!("ICE ability checker given inferred assignment")
+                }
             }
         },
         Bytecode::Call(attr_id, _, op, srcs, _) => {

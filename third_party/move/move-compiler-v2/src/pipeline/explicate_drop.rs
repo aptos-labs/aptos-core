@@ -166,7 +166,7 @@ fn released_temps(
             && !life_time_info.before.is_borrowed(dst)
             && !life_time_info.after.is_borrowed(dst)
         {
-            // todo: triggered in ability-checker/ability_violation.move
+            // TODO: triggered in ability-checker/ability_violation.move
             // debug_assert!(
             //     !life_time_info.after.is_borrowed(dst),
             //     "dead assignment borrowed later"
