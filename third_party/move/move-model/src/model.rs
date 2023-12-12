@@ -31,7 +31,7 @@ use crate::{
     symbol::{Symbol, SymbolPool},
     ty::{
         NoUnificationContext, PrimitiveType, ReferenceKind, Type, TypeDisplayContext,
-        TypeUnificationAdapter, Variance,
+        TypeUnificationAdapter, Variance, infer_abilities,
     },
     well_known,
 };
@@ -1218,49 +1218,26 @@ impl GlobalEnv {
 
     /// Computes the abilities associated with the given type.
     pub fn type_abilities(&self, ty: &Type, ty_params: &[TypeParameter]) -> AbilitySet {
-        match ty {
-            Type::Primitive(p) => match p {
-                PrimitiveType::Bool
-                | PrimitiveType::U8
-                | PrimitiveType::U16
-                | PrimitiveType::U32
-                | PrimitiveType::U64
-                | PrimitiveType::U128
-                | PrimitiveType::U256
-                | PrimitiveType::Num
-                | PrimitiveType::Range
-                | PrimitiveType::EventStore
-                | PrimitiveType::Address => AbilitySet::PRIMITIVES,
-                PrimitiveType::Signer => AbilitySet::SIGNER,
-            },
-            Type::Vector(et) => AbilitySet::VECTOR.intersect(self.type_abilities(et, ty_params)),
-            Type::Struct(mid, sid, inst) => {
-                let struct_env = self.get_struct(mid.qualified(*sid));
-                let struct_abilities = struct_env.get_abilities();
-                let ty_args_abilities_meet = inst.iter().fold(AbilitySet::ALL, |acc, ty| {
-                    acc.intersect(self.type_abilities(ty, ty_params))
-                });
-                if struct_abilities.has_ability(Ability::Key) && ty_args_abilities_meet.has_ability(Ability::Store) {
-                    struct_abilities.intersect(ty_args_abilities_meet).add(Ability::Key)
-                } else {
-                    struct_abilities.intersect(ty_args_abilities_meet).remove(Ability::Key)
-                }
-            },
-            Type::TypeParameter(i) => {
-                if let Some(tp) = ty_params.get(*i as usize) {
+        infer_abilities(
+            ty,
+            |i| {
+                if let Some(tp) = ty_params.get(i as usize) {
                     tp.1.abilities
                 } else {
                     panic!("ICE unbound type parameter")
                 }
             },
-            Type::Reference(_, _) => AbilitySet::REFERENCES,
-            Type::Fun(_, _)
-            | Type::Tuple(_)
-            | Type::TypeDomain(_)
-            | Type::ResourceDomain(_, _, _)
-            | Type::Error
-            | Type::Var(_) => AbilitySet::EMPTY,
-        }
+            |mid, sid| {
+                let struct_env = self.get_struct(mid.qualified(sid));
+                let struct_abilities = struct_env.get_abilities();
+                let params_ability_constraints = struct_env
+                    .get_type_parameters()
+                    .iter()
+                    .map(|tp| tp.1.abilities)
+                    .collect_vec();
+                (params_ability_constraints, struct_abilities)
+            }
+        )
     }
 
     /// Returns associated intrinsics.
