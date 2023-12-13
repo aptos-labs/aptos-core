@@ -272,7 +272,7 @@ async fn get_epoch_ending_ledger_infos_network_limit(network_limit_bytes: u64) {
         // Verify the response adheres to the network limits
         match response.get_data_response().unwrap() {
             DataResponse::EpochEndingLedgerInfos(epoch_change_proof) => {
-                let num_response_bytes = bcs::to_bytes(&response).unwrap().len() as u64;
+                let num_response_bytes = bcs::serialized_size(&response).unwrap() as u64;
                 let num_ledger_infos = epoch_change_proof.ledger_info_with_sigs.len() as u64;
                 if num_response_bytes > network_limit_bytes {
                     assert_eq!(num_ledger_infos, 1); // Data cannot be reduced more than a single item
