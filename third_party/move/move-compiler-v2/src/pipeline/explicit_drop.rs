@@ -95,10 +95,12 @@ impl<'a> ExplicitDropTransformer<'a> {
         let live_var_info = self.get_live_var_info(start_code_offset);
         let lifetime_info = self.get_lifetime_info(start_code_offset);
         for arg in self.target.get_parameters() {
-            if !live_var_info.before.contains_key(&arg) && !lifetime_info.before.is_borrowed(arg) {
-                // a non-native function has at least one instruction; a single return or abort at minimum
-                let attr_id = self.target.get_bytecode()[start_code_offset as usize].get_attr_id();
-                self.drop_temp(arg, attr_id)
+            if !matches!(self.target.get_local_type(arg), Type::Primitive(_)) {
+                if !live_var_info.before.contains_key(&arg) && !lifetime_info.before.is_borrowed(arg) {
+                    // a non-native function has at least one instruction; a single return or abort at minimum
+                    let attr_id = self.target.get_bytecode()[start_code_offset as usize].get_attr_id();
+                    self.drop_temp(arg, attr_id)
+                }
             }
         }
     }
