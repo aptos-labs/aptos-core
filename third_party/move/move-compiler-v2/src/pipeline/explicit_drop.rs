@@ -96,7 +96,7 @@ impl<'a> ExplicitDropTransformer<'a> {
         let lifetime_info = self.get_lifetime_info(start_code_offset);
         for arg in self.target.get_parameters() {
             if !live_var_info.before.contains_key(&arg) && !lifetime_info.before.is_borrowed(arg) {
-                let attr_id = self.target.get_bytecode()[0].get_attr_id();
+                let attr_id = self.target.get_bytecode()[start_code_offset as usize].get_attr_id();
                 self.drop_temp(arg, attr_id)
             }
         }
