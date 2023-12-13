@@ -53,6 +53,7 @@
 -  [Function `get_signer_capability_address`](#0x1_account_get_signer_capability_address)
 -  [Function `verify_signed_message`](#0x1_account_verify_signed_message)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `create_account_if_does_not_exist`](#@Specification_1_create_account_if_does_not_exist)
     -  [Function `create_account`](#@Specification_1_create_account)
@@ -2087,6 +2088,11 @@ Capability based functions for efficient use.
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 

@@ -29,6 +29,7 @@ aggregator (parallelizable) or via normal integers.
 -  [Function `read`](#0x1_optional_aggregator_read)
 -  [Function `is_parallelizable`](#0x1_optional_aggregator_is_parallelizable)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Struct `OptionalAggregator`](#@Specification_1_OptionalAggregator)
     -  [Function `new_integer`](#@Specification_1_new_integer)
     -  [Function `add_integer`](#@Specification_1_add_integer)
@@ -674,6 +675,11 @@ Returns true if optional aggregator uses parallelizable implementation.
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 

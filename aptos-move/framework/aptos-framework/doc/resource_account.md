@@ -85,6 +85,7 @@ module.resource_signer_cap = option::some(resource_signer_cap);
 -  [Function `rotate_account_authentication_key_and_store_capability`](#0x1_resource_account_rotate_account_authentication_key_and_store_capability)
 -  [Function `retrieve_resource_account_cap`](#0x1_resource_account_retrieve_resource_account_cap)
 -  [Specification](#@Specification_3)
+    -  [Module-level Specification](#@Module-level_Specification_4)
     -  [Function `create_resource_account`](#@Specification_3_create_resource_account)
     -  [Function `create_resource_account_and_fund`](#@Specification_3_create_resource_account_and_fund)
     -  [Function `create_resource_account_and_publish_package`](#@Specification_3_create_resource_account_and_publish_package)
@@ -375,6 +376,11 @@ the SignerCapability.
 <a id="@Specification_3"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_4"></a>
+
+### Module-level Specification
 
 
 

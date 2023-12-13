@@ -30,6 +30,7 @@ assert!(from_bcs::to_address(bcs::to_bytes(&@0xabcdef)) == @0xabcdef, 0);
 -  [Function `to_string`](#0x1_from_bcs_to_string)
 -  [Function `from_bytes`](#0x1_from_bcs_from_bytes)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `from_bytes`](#@Specification_1_from_bytes)
 
 
@@ -326,6 +327,11 @@ owned.
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 

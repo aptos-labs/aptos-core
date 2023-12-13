@@ -1470,6 +1470,11 @@ impl<'env> Docgen<'env> {
         let section_label = self.label_for_section("Specification");
         self.section_header("Specification", &section_label);
         self.increment_section_nest();
+        // Add a header for module-level specification if there is one
+        if spec_block_map.contains_key(&SpecBlockTarget::Module) {
+            let section_label = self.label_for_section("Module-level Specification");
+            self.section_header("Module-level Specification", &section_label);
+        }
         self.gen_spec_blocks(module_env, "", &SpecBlockTarget::Module, spec_block_map);
         for struct_env in module_env
             .get_structs()

@@ -21,6 +21,7 @@ This module provides the foundation for transferring of Tokens
 -  [Function `cancel_offer_script`](#0x3_token_transfers_cancel_offer_script)
 -  [Function `cancel_offer`](#0x3_token_transfers_cancel_offer)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `initialize_token_transfers`](#@Specification_1_initialize_token_transfers)
     -  [Function `create_token_offer_id`](#@Specification_1_create_token_offer_id)
     -  [Function `offer_script`](#@Specification_1_offer_script)
@@ -551,6 +552,11 @@ Token offer doesn't exist
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 

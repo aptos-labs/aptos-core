@@ -59,6 +59,7 @@ This module provides the foundation for typesafe Coins.
 -  [Function `destroy_mint_cap`](#0x1_coin_destroy_mint_cap)
 -  [Function `destroy_burn_cap`](#0x1_coin_destroy_burn_cap)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Struct `AggregatableCoin`](#@Specification_1_AggregatableCoin)
     -  [Function `initialize_supply_config`](#@Specification_1_initialize_supply_config)
     -  [Function `allow_supply_upgrades`](#@Specification_1_allow_supply_upgrades)
@@ -1942,6 +1943,11 @@ Destroy a burn capability.
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 

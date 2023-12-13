@@ -21,6 +21,7 @@ modified from https://github.com/move-language/move/tree/main/language/documenta
 -  [Function `claim_mint_capability`](#0x1_aptos_coin_claim_mint_capability)
 -  [Function `find_delegation`](#0x1_aptos_coin_find_delegation)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `destroy_mint_cap`](#@Specification_1_destroy_mint_cap)
     -  [Function `configure_accounts_for_test`](#@Specification_1_configure_accounts_for_test)
@@ -463,6 +464,11 @@ Claim the delegated mint capability and destroy the delegated token.
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 
