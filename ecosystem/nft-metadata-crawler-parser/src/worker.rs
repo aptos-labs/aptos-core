@@ -47,7 +47,6 @@ pub struct ParserConfig {
     pub database_url: String,
     pub cdn_prefix: String,
     pub ipfs_prefix: String,
-    pub num_parsers: usize,
     pub max_file_size_bytes: u32,
     pub image_quality: u8, // Quality up to 100
     pub ack_parsed_uris: Option<bool>,
