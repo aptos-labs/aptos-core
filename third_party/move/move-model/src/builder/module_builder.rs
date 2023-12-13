@@ -3821,8 +3821,8 @@ fn field_missing_abilities(struct_abilities: AbilitySet, field_abilities: Abilit
     if struct_abilities.has_copy() && !field_abilities.has_copy() {
         missing_abilities = missing_abilities.add(Ability::Copy);
     }
-    if struct_abilities.has_copy() && !field_abilities.has_copy() {
-        missing_abilities = missing_abilities.add(Ability::Copy);
+    if struct_abilities.has_drop() && !field_abilities.has_drop() {
+        missing_abilities = missing_abilities.add(Ability::Drop);
     }
     if (struct_abilities.has_store() || struct_abilities.has_key()) && !field_abilities.has_store() {
         missing_abilities = missing_abilities.add(Ability::Store)
