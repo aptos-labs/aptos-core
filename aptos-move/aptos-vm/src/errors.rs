@@ -4,7 +4,9 @@
 
 use crate::transaction_validation::APTOS_TRANSACTION_VALIDATION;
 use aptos_logger::{enabled, Level};
+use aptos_types::transaction::TransactionStatus;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
+use aptos_vm_types::output::VMOutput;
 use move_binary_format::errors::VMError;
 use move_core_types::vm_status::{StatusCode, VMStatus};
 
@@ -230,4 +232,8 @@ pub fn expect_only_successful_execution(
             }
         },
     })
+}
+
+pub(crate) fn discarded_output(status_code: StatusCode) -> VMOutput {
+    VMOutput::empty_with_status(TransactionStatus::Discard(status_code))
 }

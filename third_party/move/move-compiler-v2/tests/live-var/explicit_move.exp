@@ -66,11 +66,11 @@ fun m::f1_fail() {
      # live vars: $t2
   1: $t1 := pack m::R($t2)
      # live vars: $t1
-  2: $t0 := move($t1)
+  2: $t0 := copy($t1)
      # live vars: $t0
   3: $t4 := move($t0)
      # live vars: $t0, $t4
-  4: $t3 := move($t4)
+  4: $t3 := copy($t4)
      # live vars: $t0, $t3
   5: m::some($t3)
      # live vars: $t0
@@ -93,11 +93,11 @@ fun m::f1_ok() {
      # live vars: $t2
   1: $t1 := pack m::R($t2)
      # live vars: $t1
-  2: $t0 := move($t1)
+  2: $t0 := copy($t1)
      # live vars: $t0
   3: $t4 := move($t0)
      # live vars: $t4
-  4: $t3 := move($t4)
+  4: $t3 := copy($t4)
      # live vars: $t3
   5: $t5 := copy($t3)
      # live vars: $t3, $t5

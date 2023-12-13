@@ -368,6 +368,15 @@ impl Type {
         matches!(self, Type::Vector(..))
     }
 
+    /// Get the element type of a vector
+    pub fn get_vector_element_type(&self) -> Option<Type> {
+        if let Type::Vector(e) = self {
+            Some(e.as_ref().clone())
+        } else {
+            None
+        }
+    }
+
     /// Determines whether this is a struct, or a vector of structs, or a reference to any of
     /// those.
     pub fn is_struct_or_vector_of_struct(&self) -> bool {

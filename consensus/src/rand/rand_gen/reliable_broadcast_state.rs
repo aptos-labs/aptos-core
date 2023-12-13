@@ -3,20 +3,26 @@
 
 use crate::rand::rand_gen::{
     network_messages::RandMessage,
-    types::{AugData, AugDataSignature, AugmentedData, CertifiedAugData, Proof, Share},
+    types::{
+        AugData, AugDataSignature, AugmentedData, CertifiedAugData, CertifiedAugDataAck, Proof,
+        RandConfig, RandDecision, RandShare, Share, ShareAck,
+    },
 };
-use aptos_consensus_types::common::Author;
+use anyhow::ensure;
+use aptos_consensus_types::{common::Author, randomness::RandMetadata};
+use aptos_logger::error;
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{aggregate_signature::PartialSignatures, epoch_state::EpochState};
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
+use tokio::sync::mpsc::UnboundedSender;
 
-pub struct SignatureBuilder<D> {
+pub struct AugDataCertBuilder<D> {
     epoch_state: Arc<EpochState>,
     aug_data: AugData<D>,
     partial_signatures: PartialSignatures,
 }
 
-impl<D> SignatureBuilder<D> {
+impl<D> AugDataCertBuilder<D> {
     pub fn new(aug_data: AugData<D>, epoch_state: Arc<EpochState>) -> Self {
         Self {
             epoch_state,
@@ -27,7 +33,7 @@ impl<D> SignatureBuilder<D> {
 }
 
 impl<S: Share, P: Proof<Share = S>, D: AugmentedData>
-    BroadcastStatus<RandMessage<S, P, D>, RandMessage<S, P, D>> for SignatureBuilder<D>
+    BroadcastStatus<RandMessage<S, P, D>, RandMessage<S, P, D>> for AugDataCertBuilder<D>
 {
     type Ack = AugDataSignature;
     type Aggregated = CertifiedAugData<D>;
@@ -50,5 +56,94 @@ impl<S: Share, P: Proof<Share = S>, D: AugmentedData>
                     .expect("Signature aggregation should succeed");
                 CertifiedAugData::new(self.aug_data.clone(), aggregated_signature)
             }))
+    }
+}
+
+pub struct CertifiedAugDataAckState {
+    validators: HashSet<Author>,
+}
+
+impl CertifiedAugDataAckState {
+    pub fn new(validators: impl Iterator<Item = Author>) -> Self {
+        Self {
+            validators: validators.collect(),
+        }
+    }
+}
+
+impl<S: Share, P: Proof<Share = S>, D: AugmentedData>
+    BroadcastStatus<RandMessage<S, P, D>, RandMessage<S, P, D>> for CertifiedAugDataAckState
+{
+    type Ack = CertifiedAugDataAck;
+    type Aggregated = ();
+    type Message = CertifiedAugData<D>;
+
+    fn add(&mut self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
+        ensure!(
+            self.validators.remove(&peer),
+            "[RandMessage] Unknown author: {}",
+            peer
+        );
+        // If receive from all validators, stop the reliable broadcast
+        if self.validators.is_empty() {
+            Ok(Some(()))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+pub struct ShareAckState<P> {
+    validators: HashSet<Author>,
+    rand_metadata: RandMetadata,
+    rand_config: RandConfig,
+    decision_tx: UnboundedSender<RandDecision<P>>,
+}
+
+impl<P> ShareAckState<P> {
+    pub fn new(
+        validators: impl Iterator<Item = Author>,
+        metadata: RandMetadata,
+        rand_config: RandConfig,
+        decision_tx: UnboundedSender<RandDecision<P>>,
+    ) -> Self {
+        Self {
+            validators: validators.collect(),
+            rand_metadata: metadata,
+            rand_config,
+            decision_tx,
+        }
+    }
+}
+
+impl<S: Share, P: Proof<Share = S>, D: AugmentedData>
+    BroadcastStatus<RandMessage<S, P, D>, RandMessage<S, P, D>> for ShareAckState<P>
+{
+    type Ack = ShareAck<P>;
+    type Aggregated = ();
+    type Message = RandShare<S>;
+
+    fn add(&mut self, peer: Author, ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
+        ensure!(
+            self.validators.remove(&peer),
+            "[RandMessage] Unknown author: {}",
+            peer
+        );
+        // If receive a decision, verify it and send it to the randomness manager and stop the reliable broadcast
+        if let Some(decision) = ack.into_maybe_decision() {
+            match decision.verify(&self.rand_config, &self.rand_metadata) {
+                Ok(_) => {
+                    let _ = self.decision_tx.send(decision);
+                    return Ok(Some(()));
+                },
+                Err(e) => error!("[RandManager] Failed to verify decision: {}", e),
+            }
+        }
+        // If receive from all validators, stop the reliable broadcast
+        if self.validators.is_empty() {
+            Ok(Some(()))
+        } else {
+            Ok(None)
+        }
     }
 }

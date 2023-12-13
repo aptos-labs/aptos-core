@@ -43,7 +43,6 @@ spec aptos_framework::object {
     }
 
     spec create_sticky_object(owner_address: address): ConstructorRef {
-        use std::features;
         pragma aborts_if_is_partial;
 
         let unique_address = transaction_context::spec_generate_unique_address();

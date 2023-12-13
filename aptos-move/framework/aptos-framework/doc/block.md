@@ -19,6 +19,7 @@ This module defines a struct storing the metadata of the block and new block eve
 -  [Function `emit_genesis_block_event`](#0x1_block_emit_genesis_block_event)
 -  [Function `emit_writeset_block_event`](#0x1_block_emit_writeset_block_event)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Resource `BlockResource`](#@Specification_1_BlockResource)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `update_epoch_interval_microsecs`](#@Specification_1_update_epoch_interval_microsecs)
@@ -562,6 +563,11 @@ new block event for WriteSetPayload.
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 

@@ -12,6 +12,7 @@ This code provides a container for storing a chain id and functions to initializ
 -  [Function `initialize`](#0x1_chain_id_initialize)
 -  [Function `get`](#0x1_chain_id_get)
 -  [Specification](#@Specification_0)
+    -  [Module-level Specification](#@Module-level_Specification_1)
     -  [Function `initialize`](#@Specification_0_initialize)
     -  [Function `get`](#@Specification_0_get)
 
@@ -106,6 +107,11 @@ Return the chain ID of this instance.
 ## Specification
 
 
+<a id="@Module-level_Specification_1"></a>
+
+### Module-level Specification
+
+
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
@@ -128,6 +134,7 @@ Return the chain ID of this instance.
 <b>aborts_if</b> addr != @aptos_framework;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="chain_id.md#0x1_chain_id_ChainId">ChainId</a>&gt;(@aptos_framework);
 <b>ensures</b> <b>exists</b>&lt;<a href="chain_id.md#0x1_chain_id_ChainId">ChainId</a>&gt;(addr);
+<b>ensures</b> <b>global</b>&lt;<a href="chain_id.md#0x1_chain_id_ChainId">ChainId</a>&gt;(addr).id == id;
 </code></pre>
 
 

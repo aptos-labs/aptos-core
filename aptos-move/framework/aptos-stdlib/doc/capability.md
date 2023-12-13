@@ -108,6 +108,7 @@ is_valid_delegate_for_feature(d);
 -  [Function `remove_element`](#0x1_capability_remove_element)
 -  [Function `add_element`](#0x1_capability_add_element)
 -  [Specification](#@Specification_4)
+    -  [Module-level Specification](#@Module-level_Specification_5)
     -  [Function `create`](#@Specification_4_create)
     -  [Function `acquire`](#@Specification_4_acquire)
     -  [Function `acquire_linear`](#@Specification_4_acquire_linear)
@@ -560,6 +561,11 @@ Helper to add an element to a vector.
 <a id="@Specification_4"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_5"></a>
+
+### Module-level Specification
 
 Helper specification function to check whether a capability exists at address.
 

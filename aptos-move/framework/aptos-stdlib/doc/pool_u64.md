@@ -45,6 +45,7 @@ shares left.
 -  [Function `multiply_then_divide`](#0x1_pool_u64_multiply_then_divide)
 -  [Function `to_u128`](#0x1_pool_u64_to_u128)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Struct `Pool`](#@Specification_1_Pool)
     -  [Function `contains`](#@Specification_1_contains)
     -  [Function `shares`](#@Specification_1_shares)
@@ -891,6 +892,11 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 

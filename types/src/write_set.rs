@@ -159,7 +159,6 @@ pub enum WriteOpSize {
     Creation { write_len: u64 },
     Modification { write_len: u64 },
     Deletion,
-    DeletionWithDeposit { deposit: u64 },
 }
 
 impl From<&WriteOp> for WriteOpSize {
@@ -174,10 +173,7 @@ impl From<&WriteOp> for WriteOpSize {
                     write_len: data.len() as u64,
                 }
             },
-            Deletion => WriteOpSize::Deletion,
-            DeletionWithMetadata { metadata } => WriteOpSize::DeletionWithDeposit {
-                deposit: metadata.deposit(),
-            },
+            Deletion | DeletionWithMetadata { .. } => WriteOpSize::Deletion,
         }
     }
 }
@@ -188,16 +184,7 @@ impl WriteOpSize {
             WriteOpSize::Creation { write_len } | WriteOpSize::Modification { write_len } => {
                 Some(*write_len)
             },
-            WriteOpSize::Deletion | WriteOpSize::DeletionWithDeposit { .. } => None,
-        }
-    }
-
-    pub fn deletion_deposit(&self) -> Option<u64> {
-        match self {
-            WriteOpSize::DeletionWithDeposit { deposit } => Some(*deposit),
-            WriteOpSize::Creation { .. }
-            | WriteOpSize::Modification { .. }
-            | WriteOpSize::Deletion => None,
+            WriteOpSize::Deletion => None,
         }
     }
 }

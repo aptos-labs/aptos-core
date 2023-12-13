@@ -7,10 +7,8 @@ use crate::log::{
 };
 use aptos_gas_algebra::{Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes};
 use aptos_gas_meter::AptosGasMeter;
-use aptos_types::{
-    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
-};
-use aptos_vm_types::change_set::VMChangeSet;
+use aptos_types::{state_store::state_key::StateKey, write_set::WriteOpSize};
+use aptos_vm_types::{change_set::VMChangeSet, storage::space_pricing::ChargeAndRefund};
 use move_binary_format::{
     errors::{Location, PartialVMResult, VMResult},
     file_format::CodeOffset,
@@ -467,7 +465,7 @@ fn write_op_type(op: &WriteOpSize) -> WriteOpType {
     match op {
         O::Creation { .. } => T::Creation,
         O::Modification { .. } => T::Modification,
-        O::Deletion | O::DeletionWithDeposit { .. } => T::Deletion,
+        O::Deletion => T::Deletion,
     }
 }
 
@@ -479,18 +477,6 @@ where
 
     delegate! {
         fn algebra(&self) -> &Self::Algebra;
-
-        fn storage_fee_for_state_slot(&self, op: &WriteOpSize) -> Fee;
-
-        fn storage_fee_refund_for_state_slot(&self, op: &WriteOpSize) -> Fee;
-
-        fn storage_fee_for_state_bytes(&self, key: &StateKey, op: &WriteOpSize) -> Fee;
-
-        fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee;
-
-        fn storage_discount_for_events(&self, total_cost: Fee) -> Fee;
-
-        fn storage_fee_for_transaction_storage(&self, txn_size: NumBytes) -> Fee;
     }
 
     delegate_mut! {
@@ -534,47 +520,45 @@ where
             return Ok(0.into());
         }
 
+        let pricing = self.disk_space_pricing();
+        let params = &self.vm_gas_params().txn;
+
         // Writes
         let mut write_fee = Fee::new(0);
         let mut write_set_storage = vec![];
         let mut total_refund = Fee::new(0);
-        for (key, op_size, op_creation_metadata) in change_set.write_set_iter_mut() {
-            let slot_fee = self.storage_fee_for_state_slot(&op_size);
-            let slot_refund = self.storage_fee_refund_for_state_slot(&op_size);
-            let bytes_fee = self.storage_fee_for_state_bytes(key, &op_size);
+        for (key, op_size, metadata_opt) in change_set.write_set_iter_mut() {
+            let ChargeAndRefund { charge, refund } =
+                pricing.charge_refund_write_op(params, key, &op_size, metadata_opt);
+            write_fee += charge;
+            total_refund += refund;
 
-            Self::maybe_record_storage_deposit(op_creation_metadata, slot_fee);
-            total_refund += slot_refund;
-
-            let fee = slot_fee + bytes_fee;
             write_set_storage.push(WriteStorage {
                 key: key.clone(),
                 op_type: write_op_type(&op_size),
-                cost: fee,
-                refund: slot_refund,
+                cost: charge,
+                refund,
             });
-            // TODO(gas): track storage refund in the profiler
-            write_fee += fee;
         }
 
         // Events
         let mut event_fee = Fee::new(0);
         let mut event_fees = vec![];
         for (event, _) in change_set.events().iter() {
-            let fee = self.storage_fee_per_event(event);
+            let fee = pricing.storage_fee_per_event(params, event);
             event_fees.push(EventStorage {
                 ty: event.type_tag().clone(),
                 cost: fee,
             });
             event_fee += fee;
         }
-        let event_discount = self.storage_discount_for_events(event_fee);
+        let event_discount = pricing.storage_discount_for_events(params, event_fee);
         let event_fee_with_discount = event_fee
             .checked_sub(event_discount)
             .expect("discount should always be less than or equal to total amount");
 
         // Txn
-        let txn_fee = self.storage_fee_for_transaction_storage(txn_size);
+        let txn_fee = pricing.storage_fee_for_transaction_storage(params, txn_size);
 
         self.storage_fees = Some(StorageFees {
             total: write_fee + event_fee + txn_fee,

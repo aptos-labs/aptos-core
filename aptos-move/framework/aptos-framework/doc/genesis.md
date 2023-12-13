@@ -23,6 +23,7 @@
 -  [Function `set_genesis_end`](#0x1_genesis_set_genesis_end)
 -  [Function `initialize_for_verification`](#0x1_genesis_initialize_for_verification)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `initialize_aptos_coin`](#@Specification_1_initialize_aptos_coin)
     -  [Function `create_initialize_validators_with_commission`](#@Specification_1_create_initialize_validators_with_commission)
@@ -895,6 +896,11 @@ The last step of genesis.
 ## Specification
 
 
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
+
+
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
 </code></pre>
@@ -1025,6 +1031,22 @@ The last step of genesis.
 
 
 <pre><code><b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">stake::ResourceRequirement</a>;
+</code></pre>
+
+
+
+<a id="@Specification_1_set_genesis_end"></a>
+
+### Function `set_genesis_end`
+
+
+<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_set_genesis_end">set_genesis_end</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> delegate_invariants_to_caller;
 </code></pre>
 
 

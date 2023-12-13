@@ -59,6 +59,7 @@ This module provides the foundation for typesafe Coins.
 -  [Function `destroy_mint_cap`](#0x1_coin_destroy_mint_cap)
 -  [Function `destroy_burn_cap`](#0x1_coin_destroy_burn_cap)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Struct `AggregatableCoin`](#@Specification_1_AggregatableCoin)
     -  [Function `initialize_supply_config`](#@Specification_1_initialize_supply_config)
     -  [Function `allow_supply_upgrades`](#@Specification_1_allow_supply_upgrades)
@@ -1944,6 +1945,11 @@ Destroy a burn capability.
 ## Specification
 
 
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
+
+
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <a id="0x1_coin_supply"></a>
@@ -2463,7 +2469,6 @@ Get address by reflection.
 
 <pre><code><b>schema</b> <a href="coin.md#0x1_coin_DepositAbortsIf">DepositAbortsIf</a>&lt;CoinType&gt; {
     account_addr: <b>address</b>;
-    <a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;;
     <b>let</b> coin_store = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
     <b>aborts_if</b> coin_store.frozen;

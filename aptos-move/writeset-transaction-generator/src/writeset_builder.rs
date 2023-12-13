@@ -16,7 +16,7 @@ use aptos_vm::{
     data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
-use aptos_vm_types::storage::ChangeSetConfigs;
+use aptos_vm_types::storage::change_set_configs::ChangeSetConfigs;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},

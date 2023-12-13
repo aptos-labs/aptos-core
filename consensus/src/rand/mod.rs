@@ -3,5 +3,5 @@
 
 #![allow(dead_code)]
 
-mod dkg;
-mod rand_gen;
+pub mod dkg;
+pub mod rand_gen;

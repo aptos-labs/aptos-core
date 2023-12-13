@@ -16,6 +16,7 @@ It interacts with the other modules in the following ways:
 -  [Function `now_microseconds`](#0x1_timestamp_now_microseconds)
 -  [Function `now_seconds`](#0x1_timestamp_now_seconds)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `update_global_time`](#@Specification_1_update_global_time)
 
 
@@ -213,8 +214,24 @@ Gets the current time in seconds.
 ## Specification
 
 
+<a id="@Module-level_Specification_2"></a>
 
-<pre><code><b>invariant</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
+### Module-level Specification
+
+
+
+<pre><code><b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+
+<a id="0x1_timestamp_spec_now_seconds"></a>
+
+
+<pre><code><b>fun</b> <a href="timestamp.md#0x1_timestamp_spec_now_seconds">spec_now_seconds</a>(): u64 {
+   <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">spec_now_microseconds</a>() / <a href="timestamp.md#0x1_timestamp_MICRO_CONVERSION_FACTOR">MICRO_CONVERSION_FACTOR</a>
+}
 </code></pre>
 
 
@@ -259,17 +276,6 @@ Gets the current time in seconds.
 
 <pre><code><b>fun</b> <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">spec_now_microseconds</a>(): u64 {
    <b>global</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a>&gt;(@aptos_framework).microseconds
-}
-</code></pre>
-
-
-
-
-<a id="0x1_timestamp_spec_now_seconds"></a>
-
-
-<pre><code><b>fun</b> <a href="timestamp.md#0x1_timestamp_spec_now_seconds">spec_now_seconds</a>(): u64 {
-   <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">spec_now_microseconds</a>() / <a href="timestamp.md#0x1_timestamp_MICRO_CONVERSION_FACTOR">MICRO_CONVERSION_FACTOR</a>
 }
 </code></pre>
 

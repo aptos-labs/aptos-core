@@ -21,8 +21,7 @@
 pub struct Experiment();
 
 impl Experiment {
-    // Example
-    // /// Whether to exit after type checking.
-    // /// Retention: permanent
-    // pub const CHECK_ONLY: &'static str = "check-only";
+    /// A flag which allows to turn off safety checks, like reference safety.
+    /// Rentention: permanent.
+    pub const NO_SAFETY: &'static str = "no-safety";
 }
