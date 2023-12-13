@@ -29,7 +29,6 @@ jobs:
   # triggered the workflow or on 'pull_request's which have set auto_merge=true
   # or have the label "CICD:run-e2e-tests".
   permission-check:
-    if: github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Check repository permission for user which triggered workflow
