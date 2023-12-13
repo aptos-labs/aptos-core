@@ -89,6 +89,7 @@ impl<'a> ExplicitDropTransformer<'a> {
         }
     }
 
+    /// Drops unused function arguments
     fn drop_unused_args(&mut self) {
         let start_code_offset = 0;
         let live_var_info = self.get_live_var_info(start_code_offset);
