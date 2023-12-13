@@ -147,40 +147,35 @@ impl BatchGenerator {
         expiry_time: u64,
         bucket_start: u64,
         total_batches_remaining: &mut u64,
-        total_txns_remaining: &mut u64,
-        total_bytes_remaining: &mut u64,
-    ) -> bool {
-        let mut remaining_txns = num_txns_in_bucket;
-        while remaining_txns > 0 {
-            if *total_batches_remaining == 0
-                || *total_txns_remaining == 0
-                || *total_bytes_remaining == 0
-            {
-                return false;
+    ) {
+        let mut txns_remaining = num_txns_in_bucket;
+        while txns_remaining > 0 {
+            if *total_batches_remaining == 0 {
+                return;
             }
-            let num_take_txns = std::cmp::min(self.config.sender_max_batch_txns, remaining_txns);
-            let mut batch_bytes: u64 = 0;
+            let num_take_txns = std::cmp::min(self.config.sender_max_batch_txns, txns_remaining);
+            let mut batch_bytes_remaining = self.config.sender_max_batch_bytes as u64;
             let num_batch_txns = txns
                 .iter()
                 .take(num_take_txns)
                 .take_while(|txn| {
                     let txn_bytes = txn.txn_bytes_len() as u64;
-                    batch_bytes += txn_bytes;
-                    *total_txns_remaining = total_txns_remaining.saturating_sub(1);
-                    *total_bytes_remaining = total_bytes_remaining.saturating_sub(txn_bytes);
-
-                    batch_bytes <= self.config.sender_max_batch_bytes as u64
-                        && *total_txns_remaining > 0
-                        && *total_bytes_remaining > 0
+                    if batch_bytes_remaining.checked_sub(txn_bytes).is_some() {
+                        batch_bytes_remaining -= txn_bytes;
+                        true
+                    } else {
+                        false
+                    }
                 })
                 .count();
-            let batch_txns: Vec<_> = txns.drain(0..num_batch_txns).collect();
-            let batch = self.create_new_batch(batch_txns, expiry_time, bucket_start);
-            batches.push(batch);
-            *total_batches_remaining = total_batches_remaining.saturating_sub(1);
-            remaining_txns -= num_batch_txns;
+            if num_batch_txns > 0 {
+                let batch_txns: Vec<_> = txns.drain(0..num_batch_txns).collect();
+                let batch = self.create_new_batch(batch_txns, expiry_time, bucket_start);
+                batches.push(batch);
+                *total_batches_remaining = total_batches_remaining.saturating_sub(1);
+                txns_remaining -= num_batch_txns;
+            }
         }
-        true
     }
 
     fn bucket_into_batches(
@@ -192,10 +187,6 @@ impl BatchGenerator {
         // so will not reorder accounts or their sequence numbers as long as they have the same gas.
         pulled_txns.sort_by_key(|txn| u64::MAX - txn.gas_unit_price());
 
-        let mut max_batches_remaining = self.config.sender_max_num_batches as u64;
-        let mut max_txns_remaining = self.config.sender_max_total_txns as u64;
-        let mut max_bytes_remaining = self.config.sender_max_total_bytes as u64;
-
         let reverse_buckets_excluding_zero: Vec<_> = self
             .config
             .batch_buckets
@@ -204,10 +195,12 @@ impl BatchGenerator {
             .rev()
             .cloned()
             .collect();
+
+        let mut max_batches_remaining = self.config.sender_max_num_batches as u64;
         let mut batches = vec![];
         for bucket_start in &reverse_buckets_excluding_zero {
-            if pulled_txns.is_empty() {
-                break;
+            if pulled_txns.is_empty() || max_batches_remaining == 0 {
+                return batches;
             }
 
             // Search for key in descending gas order
@@ -222,21 +215,16 @@ impl BatchGenerator {
                 continue;
             }
 
-            let batches_space_remaining = self.push_bucket_to_batches(
+            self.push_bucket_to_batches(
                 &mut batches,
                 pulled_txns,
                 num_txns_in_bucket,
                 expiry_time,
                 *bucket_start,
                 &mut max_batches_remaining,
-                &mut max_txns_remaining,
-                &mut max_bytes_remaining,
             );
-            if !batches_space_remaining {
-                return batches;
-            }
         }
-        if !pulled_txns.is_empty() {
+        if !pulled_txns.is_empty() && max_batches_remaining > 0 {
             self.push_bucket_to_batches(
                 &mut batches,
                 pulled_txns,
@@ -244,8 +232,6 @@ impl BatchGenerator {
                 expiry_time,
                 0,
                 &mut max_batches_remaining,
-                &mut max_txns_remaining,
-                &mut max_bytes_remaining,
             );
         }
         batches
@@ -308,7 +294,7 @@ impl BatchGenerator {
             .mempool_proxy
             .pull_internal(
                 max_count,
-                self.config.mempool_txn_pull_max_bytes,
+                self.config.sender_max_batch_bytes as u64,
                 self.txns_in_progress_sorted.clone(),
             )
             .await

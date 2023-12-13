@@ -426,6 +426,62 @@ async fn test_max_batch_bytes() {
 }
 
 #[tokio::test]
+async fn test_max_num_batches() {
+    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
+    let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
+
+    let config = QuorumStoreConfig {
+        sender_max_batch_txns: 10,
+        sender_max_num_batches: 2,
+        ..Default::default()
+    };
+    let max_batch_bytes = config.sender_max_batch_bytes;
+
+    let author = AccountAddress::random();
+    let mut batch_generator = BatchGenerator::new(
+        0,
+        author,
+        config,
+        Arc::new(MockQuorumStoreDB::new()),
+        quorum_store_to_mempool_tx,
+        1000,
+    );
+
+    let join_handle = tokio::spawn(async move {
+        let signed_txns = create_vec_signed_transactions(25);
+        queue_mempool_batch_response(
+            signed_txns.clone(),
+            max_batch_bytes,
+            &mut quorum_store_to_mempool_rx,
+        )
+        .await;
+
+        let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
+        if let BatchCoordinatorCommand::NewBatches(_, result) = quorum_store_command {
+            assert_eq!(result.len(), 2);
+            assert_eq!(result[0].num_txns(), 10);
+            assert_eq!(result[1].num_txns(), 10);
+
+            assert_eq!(&result[0].clone().into_transactions(), &signed_txns[0..10]);
+            assert_eq!(&result[1].clone().into_transactions(), &signed_txns[10..20]);
+        } else {
+            panic!("Unexpected variant")
+        }
+    });
+
+    let result = batch_generator.handle_scheduled_pull(300).await;
+    batch_coordinator_cmd_tx
+        .send(BatchCoordinatorCommand::NewBatches(author, result))
+        .await
+        .unwrap();
+
+    timeout(Duration::from_millis(10_000), join_handle)
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
 async fn test_last_bucketed_batch() {
     let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
     let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);

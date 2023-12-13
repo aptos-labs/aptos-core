@@ -68,7 +68,6 @@ pub struct QuorumStoreConfig {
     pub memory_quota: usize,
     pub db_quota: usize,
     pub batch_quota: usize,
-    pub mempool_txn_pull_max_bytes: u64,
     pub back_pressure: QuorumStoreBackPressureConfig,
     pub num_workers_for_remote_batches: usize,
     pub batch_buckets: Vec<u64>,
@@ -104,7 +103,6 @@ impl Default for QuorumStoreConfig {
             memory_quota: 120_000_000,
             db_quota: 300_000_000,
             batch_quota: 300_000,
-            mempool_txn_pull_max_bytes: 4 * 1024 * 1024,
             back_pressure: QuorumStoreBackPressureConfig::default(),
             // number of batch coordinators to handle QS batch messages, should be >= 1
             num_workers_for_remote_batches: 10,
