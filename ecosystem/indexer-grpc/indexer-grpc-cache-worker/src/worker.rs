@@ -3,7 +3,7 @@
 
 use crate::metrics::{
     ERROR_COUNT, LATEST_PROCESSED_VERSION as LATEST_PROCESSED_VERSION_OLD, PROCESSED_BATCH_SIZE,
-    PROCESSED_LATENCY_IN_SECS, PROCESSED_VERSIONS_COUNT, WAIT_FOR_FILE_STORE_COUNTER,
+    PROCESSED_VERSIONS_COUNT, WAIT_FOR_FILE_STORE_COUNTER,
 };
 use anyhow::{bail, Context, Result};
 use aptos_indexer_grpc_utils::{
@@ -180,7 +180,7 @@ impl Worker {
 async fn process_transactions_from_node_response(
     response: TransactionsFromNodeResponse,
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
-    enable_verbose_logging: bool,
+    _enable_verbose_logging: bool,
 ) -> Result<GrpcDataStatus> {
     let size_in_bytes = response.encoded_len();
     match response.response.unwrap() {
