@@ -38,6 +38,7 @@ impl Cluster {
         coin_source_key: Ed25519PrivateKey,
         coin_source_is_root: bool,
         chain_id: ChainId,
+        api_key: Option<String>,
     ) -> Result<Self> {
         let num_peers = peers.len();
 
@@ -54,6 +55,7 @@ impl Cluster {
                 ), /* short_hash */
                 url.clone(),
                 None,
+                api_key.clone(),
             );
             futures.push(async move {
                 let result = instance.rest_client().get_ledger_information().await;
@@ -152,9 +154,15 @@ impl Cluster {
 
         let (coin_source_key, is_root) = args.coin_source_args.get_private_key()?;
 
-        let cluster = Cluster::from_host_port(urls, coin_source_key, is_root, args.chain_id)
-            .await
-            .map_err(|e| format_err!("failed to create a cluster from host and port: {:?}", e))?;
+        let cluster = Cluster::from_host_port(
+            urls,
+            coin_source_key,
+            is_root,
+            args.chain_id,
+            args.node_api_key.clone(),
+        )
+        .await
+        .map_err(|e| format_err!("failed to create a cluster from host and port: {:?}", e))?;
 
         Ok(cluster)
     }
