@@ -61,6 +61,7 @@ aptos-gas-schedule = { workspace = true, features = ["testing"] }
 aptos-proptest-helpers = { workspace = true }
 aptos-sdk = { workspace = true }
 move-package = { workspace = true }
+passkey-types = { workspace = true }
 percent-encoding = { workspace = true }
 proptest = { workspace = true }
 rand = { workspace = true }
