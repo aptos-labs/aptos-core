@@ -2195,7 +2195,7 @@ pub fn infer_abilities_opt_check<F, G, H>(
 where
     F: Fn(u16) -> AbilitySet + Copy,
     G: Fn(ModuleId, StructId) -> (Vec<AbilitySet>, AbilitySet) + Copy,
-    H: Fn(&Loc, &str) -> () + Copy,
+    H: Fn(&Loc, &str) + Copy,
 {
     match ty {
         Type::Primitive(p) => match p {
@@ -2251,7 +2251,7 @@ pub fn infer_and_check_abilities<F, G, H>(
 where
     F: Fn(u16) -> AbilitySet + Copy,
     G: Fn(ModuleId, StructId) -> (Vec<AbilitySet>, AbilitySet) + Copy,
-    H: Fn(&Loc, &str) -> () + Copy,
+    H: Fn(&Loc, &str) + Copy,
 {
     infer_abilities_opt_check(ty, ty_param_abilities, get_abilities, Some((loc, on_err)))
 }
