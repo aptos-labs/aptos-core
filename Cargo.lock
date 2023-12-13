@@ -427,6 +427,7 @@ dependencies = [
  "move-package",
  "num_cpus",
  "once_cell",
+ "passkey-types",
  "paste",
  "percent-encoding",
  "poem",
