@@ -76,7 +76,7 @@ impl<'a> ExplicitDropTransformer<'a> {
         }
     }
 
-    // add drops at given code offset
+    /// Add explicit drops at the given code offset.
     fn explicate_drops_at(&mut self, code_offset: CodeOffset, bytecode: &Bytecode) {
         match bytecode {
             Bytecode::Ret(..) | Bytecode::Jump(..) | Bytecode::Abort(..) | Bytecode::Branch(..) => {
