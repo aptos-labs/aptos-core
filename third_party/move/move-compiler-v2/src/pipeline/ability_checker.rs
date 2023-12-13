@@ -24,16 +24,21 @@ fn type_abilities(func_target: &FunctionTarget, ty: &Type) -> AbilitySet {
     global_env.type_abilities(ty, &ty_params)
 }
 
-/// Determines if the given type has constraint copy.
-fn has_copy(func_target: &FunctionTarget, ty: &Type) -> bool {
-    type_abilities(func_target, ty).has_ability(Ability::Copy)
+/// Determines if the given type has the given ability
+fn has_ability(target: &FunctionTarget, ty: &Type, ability: Ability) -> bool {
+    type_abilities(target, ty).has_ability(ability)
+}
+
+/// Checks if the given type has the given ability, and add diagnostics if not.
+fn check_ability(target: &FunctionTarget, ty: &Type, ability: Ability, loc: &Loc, err_msg: &str) {
+    if !has_ability(target, ty, ability) {
+        target.global_env().error(loc, err_msg)
+    }
 }
 
 /// Checks if the given type has constraint copy, and add diagnostics if not.
 fn check_copy(func_target: &FunctionTarget, ty: &Type, loc: &Loc, err_msg: &str) {
-    if !has_copy(func_target, ty) {
-        func_target.global_env().error(loc, err_msg)
-    }
+    check_ability(func_target, ty, Ability::Copy, loc, err_msg)
 }
 
 /// Checks if the given temporary variable has constraint copy, and add diagnostics if not.
@@ -56,16 +61,9 @@ fn check_read_ref(target: &FunctionTarget, t: TempIndex, loc: &Loc) {
     }
 }
 
-/// Determines if the given type has the drop constraint.
-fn has_drop(func_target: &FunctionTarget, ty: &Type) -> bool {
-    type_abilities(func_target, ty).has_ability(Ability::Drop)
-}
-
 /// Checks if the given type has constraint drop, and add diagnostics if not.
 fn check_drop(func_target: &FunctionTarget, ty: &Type, loc: &Loc, err_msg: &str) {
-    if !has_drop(func_target, ty) {
-        func_target.global_env().error(loc, err_msg)
-    }
+    check_ability(func_target, ty, Ability::Drop, loc, err_msg)
 }
 
 /// Checks if the given temporary variable has constraint drop, and add diagnostics if not.
