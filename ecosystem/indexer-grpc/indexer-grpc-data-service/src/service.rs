@@ -154,7 +154,6 @@ impl RawData for RawDataServerWrapper {
         log_grpc_step(
             SERVICE_TYPE,
             IndexerGrpcStep::DataServiceNewRequestReceived,
-            self.enable_verbose_logging,
             Some(current_version as i64),
             None,
             None,
@@ -473,7 +472,6 @@ fn get_transactions_responses_builder(
     log_grpc_step(
         SERVICE_TYPE,
         IndexerGrpcStep::DataServiceTxnsDecoded,
-        enable_logging,
         Some(overall_start_version as i64),
         Some(overall_end_version as i64),
         overall_start_txn_timestamp.as_ref(),
@@ -528,7 +526,6 @@ async fn data_fetch(
             log_grpc_step(
                 SERVICE_TYPE,
                 IndexerGrpcStep::DataServiceDataFetchedCache,
-                enable_logging,
                 Some(starting_version as i64),
                 Some(starting_version as i64 + num_of_transactions as i64 - 1),
                 start_version_timestamp.as_ref(),
@@ -573,7 +570,6 @@ async fn data_fetch(
                     log_grpc_step(
                         SERVICE_TYPE,
                         IndexerGrpcStep::DataServiceDataFetchedFilestore,
-                        enable_logging,
                         Some(starting_version as i64),
                         Some(starting_version as i64 + num_of_transactions as i64 - 1),
                         start_version_timestamp.as_ref(),
@@ -717,7 +713,6 @@ async fn channel_send_multiple_with_timeout(
         log_grpc_step(
             SERVICE_TYPE,
             IndexerGrpcStep::DataServiceChunkSent,
-            enable_logging,
             Some(start_version as i64),
             Some(end_version as i64),
             Some(start_version_txn_timestamp),
@@ -732,7 +727,6 @@ async fn channel_send_multiple_with_timeout(
     log_grpc_step(
         SERVICE_TYPE,
         IndexerGrpcStep::DataServiceAllChunksSent,
-        enable_logging,
         Some(overall_start_version as i64),
         Some(overall_end_version as i64),
         overall_start_txn_timestamp.as_ref(),

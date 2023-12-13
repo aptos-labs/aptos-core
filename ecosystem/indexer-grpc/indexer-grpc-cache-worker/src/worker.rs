@@ -169,7 +169,6 @@ impl Worker {
             process_streaming_response(
                 conn,
                 file_store_metadata,
-                file_store_operator,
                 response.into_inner(),
                 self.enable_verbose_logging,
             )
@@ -241,7 +240,6 @@ async fn process_transactions_from_node_response(
                     log_grpc_step(
                         SERVICE_TYPE,
                         IndexerGrpcStep::CacheWorkerTxnsProcessed,
-                        enable_verbose_logging,
                         Some(first_transaction.version as i64),
                         Some(last_transaction.version as i64),
                         first_transaction_pb_timestamp.as_ref(),
@@ -421,7 +419,6 @@ async fn process_streaming_response(
                     log_grpc_step(
                         SERVICE_TYPE,
                         IndexerGrpcStep::CacheWorkerBatchProcessed,
-                        enable_verbose_logging,
                         Some(start_version as i64),
                         Some((start_version + num_of_transactions - 1) as i64),
                         None,
