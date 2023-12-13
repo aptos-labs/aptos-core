@@ -715,8 +715,11 @@ function install_lld {
 
 function install_libdw {
   # Right now, only install libdw for linux
-  if [[ "$(uname)" == "Linux" ]]; then
+  if [[ "$(uname)" == "Linux" && "$PACKAGE_MANAGER" != "pacman"]]; then
     install_pkg libdw-dev "$PACKAGE_MANAGER"
+  fi
+  if [[ "$(uname)" == "Linux" && "$PACKAGE_MANAGER" == "pacman"]]; then
+    install_pkg libelf "$PACKAGE_MANAGER"
   fi
 }
 
