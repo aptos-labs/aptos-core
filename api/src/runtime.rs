@@ -41,8 +41,31 @@ pub fn bootstrap(
 
     let context = Context::new(chain_id, db, mp_sender, config.clone());
 
-    attach_poem_to_runtime(runtime.handle(), context, config, false)
+    attach_poem_to_runtime(runtime.handle(), context.clone(), config, false)
         .context("Failed to attach poem to runtime")?;
+
+    if let Some(period_ms) = config.api.periodic_gas_estimation_ms {
+        runtime.spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(period_ms));
+            loop {
+                interval.tick().await;
+                let context_cloned = context.clone();
+                tokio::task::spawn_blocking(move || {
+                    if let Ok(latest_ledger_info) =
+                        context_cloned.get_latest_ledger_info::<crate::response::BasicError>()
+                    {
+                        if let Ok(gas_estimation) = context_cloned
+                            .estimate_gas_price::<crate::response::BasicError>(&latest_ledger_info)
+                        {
+                            TransactionsApi::log_gas_estimation(&gas_estimation);
+                        }
+                    }
+                })
+                .await
+                .unwrap_or(());
+            }
+        });
+    }
 
     Ok(runtime)
 }
