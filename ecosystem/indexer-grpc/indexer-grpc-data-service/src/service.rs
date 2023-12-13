@@ -440,7 +440,7 @@ fn get_transactions_responses_builder(
     chain_id: u32,
     current_batch_start_time: Instant,
     request_metadata: IndexerGrpcRequestMetadata,
-    enable_logging: bool,
+    _enable_logging: bool,
 ) -> Vec<TransactionsResponse> {
     let transactions: Vec<Transaction> = data
         .into_iter()
@@ -492,7 +492,7 @@ async fn data_fetch(
     file_store_operator: &dyn FileStoreOperator,
     current_batch_start_time: Instant,
     request_metadata: IndexerGrpcRequestMetadata,
-    enable_logging: bool,
+    _enable_logging: bool,
 ) -> anyhow::Result<TransactionsDataStatus> {
     let batch_get_result = cache_operator
         .batch_get_encoded_proto_data(starting_version)
@@ -671,7 +671,7 @@ async fn channel_send_multiple_with_timeout(
     tx: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
     current_batch_start_time: Instant,
     request_metadata: IndexerGrpcRequestMetadata,
-    enable_logging: bool,
+    _enable_logging: bool,
 ) -> Result<(), SendTimeoutError<Result<TransactionsResponse, Status>>> {
     let overall_size_in_bytes = resp_items
         .iter()
