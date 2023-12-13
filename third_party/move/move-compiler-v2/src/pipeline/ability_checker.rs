@@ -216,9 +216,9 @@ fn check_fun_signature(target: &FunctionTarget) {
 fn check_bytecode(target: &FunctionTarget, bytecode: &Bytecode) {
     let loc = target.get_bytecode_loc(bytecode.get_attr_id());
     match bytecode {
-        // drop of dst during the assignment has been made explicit
-        // so we don't check it here, plus this could be an initialization
         Bytecode::Assign(_, dst, src, kind) => {
+            // drop of dst during the assignment has been made explicit
+            // so we don't check it here, plus this could be an initialization
             match kind {
                 AssignKind::Copy | AssignKind::Store => {
                     check_copy_for_temp_with_msg(target, *src, &loc, "cannot copy");
