@@ -350,7 +350,6 @@ fn create_transaction_chunks(
         let txn = encode_mint_transaction(gen_address(i), 100);
         txns.push(txn.into());
     }
-    txns.push(Transaction::StateCheckpoint(HashValue::random()).into());
 
     let id = gen_block_id(1);
 
@@ -362,7 +361,8 @@ fn create_transaction_chunks(
         )
         .unwrap();
 
-    let ledger_version = txns.len() as u64;
+    let ledger_version = txns.len() as u64 + 1;
+    assert_eq!(ledger_version, output.transactions_to_commit_len() as u64);
     let ledger_info = gen_ledger_info(ledger_version, output.root_hash(), id, 1);
     executor
         .commit_blocks(vec![id], ledger_info.clone())
@@ -817,7 +817,8 @@ proptest! {
                 (block_a.id, block_a.txns.clone()).into(), parent_block_id, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG
             ).unwrap();
             root_hash = output_a.root_hash();
-            let ledger_info = gen_ledger_info(block_a.txns.len() as u64, root_hash, block_a.id, 1);
+            // Add one transaction for the state checkpoint.
+            let ledger_info = gen_ledger_info(block_a.txns.len() as u64 + 1, root_hash, block_a.id, 1);
             executor.commit_blocks(vec![block_a.id], ledger_info).unwrap();
             parent_block_id = block_a.id;
             drop(executor);
@@ -829,7 +830,8 @@ proptest! {
             let output_b = executor.execute_block((block_b.id, block_b.txns.clone()).into(), parent_block_id, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG).unwrap();
             root_hash = output_b.root_hash();
             let ledger_info = gen_ledger_info(
-                (block_a.txns.len() + block_b.txns.len()) as u64,
+                // add two transactions for the state checkpoints
+                (block_a.txns.len() + block_b.txns.len() + 2) as u64,
                 root_hash,
                 block_b.id,
                 2,
@@ -840,7 +842,9 @@ proptest! {
         let expected_root_hash = run_transactions_naive({
             let mut txns = vec![];
             txns.extend(block_a.txns.iter().cloned());
+            txns.push(SignatureVerifiedTransaction::Valid(Transaction::StateCheckpoint(block_a.id)));
             txns.extend(block_b.txns.iter().cloned());
+            txns.push(SignatureVerifiedTransaction::Valid(Transaction::StateCheckpoint(block_b.id)));
             txns
         }, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG);
         prop_assert_eq!(root_hash, expected_root_hash);

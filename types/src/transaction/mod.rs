@@ -43,6 +43,7 @@ use std::{
 
 pub mod analyzed_transaction;
 pub mod authenticator;
+mod block_output;
 mod change_set;
 mod module;
 mod multisig;
@@ -54,6 +55,7 @@ use crate::{
     proof::accumulator::InMemoryEventAccumulator, validator_txn::ValidatorTransaction,
     write_set::TransactionWrite,
 };
+pub use block_output::BlockOutput;
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 pub use move_core_types::transaction_argument::TransactionArgument;
@@ -1249,38 +1251,6 @@ pub trait TransactionOutputProvider {
 impl TransactionOutputProvider for TransactionOutput {
     fn get_transaction_output(&self) -> &TransactionOutput {
         self
-    }
-}
-
-#[derive(Debug)]
-pub struct BlockOutput<Output: Debug> {
-    transaction_outputs: Vec<Output>,
-    // TODO add block_limit_info
-}
-
-impl<Output: Debug> BlockOutput<Output> {
-    pub fn new(transaction_outputs: Vec<Output>) -> Self {
-        Self {
-            transaction_outputs,
-        }
-    }
-
-    /// If block limit is not set (i.e. in tests), we can safely unwrap here
-    pub fn into_transaction_outputs_forced(self) -> Vec<Output> {
-        // TODO assert there is no block limit info?
-        // assert!(self.block_limit_info_transaction.is_none());
-        self.transaction_outputs
-    }
-
-    // TODO add block_limit_info
-    pub fn into_inner(self) -> Vec<Output> {
-        self.transaction_outputs
-    }
-
-    pub fn get_transaction_outputs_forced(&self) -> &[Output] {
-        // TODO assert there is no block limit info?
-        // assert!(self.block_limit_info_transaction.is_none());
-        &self.transaction_outputs
     }
 }
 
