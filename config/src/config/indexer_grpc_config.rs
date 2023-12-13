@@ -128,7 +128,6 @@ impl ConfigOptimizer for IndexerGrpcConfig {
             Some(indexer_config.enable_verbose_logging),
             None,
         )
-        .map(|v| v)
         .unwrap_or(false);
 
         Ok(true)
