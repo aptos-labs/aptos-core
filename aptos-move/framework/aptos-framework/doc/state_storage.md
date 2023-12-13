@@ -15,6 +15,7 @@
 -  [Function `get_state_storage_usage_only_at_epoch_beginning`](#0x1_state_storage_get_state_storage_usage_only_at_epoch_beginning)
 -  [Function `on_reconfig`](#0x1_state_storage_on_reconfig)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `on_new_block`](#@Specification_1_on_new_block)
     -  [Function `current_items_and_bytes`](#@Specification_1_current_items_and_bytes)
@@ -286,6 +287,11 @@ guarantees a fresh state view then.
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 

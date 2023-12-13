@@ -28,6 +28,7 @@ This module supports functionality related to code management.
 -  [Function `request_publish`](#0x1_code_request_publish)
 -  [Function `request_publish_with_allowed_deps`](#0x1_code_request_publish_with_allowed_deps)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `publish_package`](#@Specification_1_publish_package)
     -  [Function `publish_package_txn`](#@Specification_1_publish_package_txn)
@@ -883,6 +884,11 @@ Native function to initiate module loading, including a list of allowed dependen
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 

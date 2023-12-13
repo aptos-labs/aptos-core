@@ -13,6 +13,7 @@ Maintains the version number for the blockchain.
 -  [Function `set_version`](#0x1_version_set_version)
 -  [Function `initialize_for_test`](#0x1_version_initialize_for_test)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `set_version`](#@Specification_1_set_version)
     -  [Function `initialize_for_test`](#@Specification_1_initialize_for_test)
@@ -201,6 +202,11 @@ to update the version.
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 

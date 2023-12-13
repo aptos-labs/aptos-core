@@ -56,6 +56,7 @@ on a proposal multiple times as long as the total voting power of these votes do
 -  [Function `assert_voting_initialization`](#0x1_aptos_governance_assert_voting_initialization)
 -  [Function `initialize_for_verification`](#0x1_aptos_governance_initialize_for_verification)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `store_signer_cap`](#@Specification_1_store_signer_cap)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `update_governance_config`](#@Specification_1_update_governance_config)
@@ -1687,6 +1688,11 @@ Return a signer for making changes to 0x1 as part of on-chain governance proposa
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 

@@ -22,6 +22,7 @@ a 32-bit fractional part.
 -  [Function `ceil`](#0x1_fixed_point32_ceil)
 -  [Function `round`](#0x1_fixed_point32_round)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `multiply_u64`](#@Specification_1_multiply_u64)
     -  [Function `divide_u64`](#@Specification_1_divide_u64)
     -  [Function `create_from_rational`](#@Specification_1_create_from_rational)
@@ -508,6 +509,11 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 

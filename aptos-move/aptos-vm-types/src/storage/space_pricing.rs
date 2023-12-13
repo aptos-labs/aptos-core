@@ -89,7 +89,7 @@ impl DiskSpacePricing {
         value_size: u64,
     ) -> NumBytes {
         let size = NumBytes::new(key.size() as u64) + NumBytes::new(value_size);
-        size.checked_sub(params.free_write_bytes_quota)
+        size.checked_sub(params.legacy_free_write_bytes_quota)
             .unwrap_or(NumBytes::zero())
     }
 

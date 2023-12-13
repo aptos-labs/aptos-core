@@ -72,6 +72,8 @@ pub struct ApiConfig {
     pub runtime_worker_multiplier: usize,
     /// Configs for computing unit gas price estimation
     pub gas_estimation: GasEstimationConfig,
+    /// Periodically call gas estimation
+    pub periodic_gas_estimation_ms: Option<u64>,
 }
 
 const DEFAULT_ADDRESS: &str = "127.0.0.1";
@@ -116,6 +118,7 @@ impl Default for ApiConfig {
             max_runtime_workers: None,
             runtime_worker_multiplier: 2,
             gas_estimation: GasEstimationConfig::default(),
+            periodic_gas_estimation_ms: Some(30_000),
         }
     }
 }
