@@ -36,7 +36,10 @@ export class TransactionAuthenticatorEd25519 extends TransactionAuthenticator {
    * @see {@link https://aptos.dev/guides/creating-a-signed-transaction/ | Creating a Signed Transaction}
    * for details about generating a signature.
    */
-  constructor(public readonly public_key: Ed25519PublicKey, public readonly signature: Ed25519Signature) {
+  constructor(
+    public readonly public_key: Ed25519PublicKey,
+    public readonly signature: Ed25519Signature,
+  ) {
     super();
   }
 
@@ -61,7 +64,10 @@ export class TransactionAuthenticatorMultiEd25519 extends TransactionAuthenticat
    * @param signature
    *
    */
-  constructor(public readonly public_key: MultiEd25519PublicKey, public readonly signature: MultiEd25519Signature) {
+  constructor(
+    public readonly public_key: MultiEd25519PublicKey,
+    public readonly signature: MultiEd25519Signature,
+  ) {
     super();
   }
 
@@ -149,7 +155,10 @@ export abstract class AccountAuthenticator {
 }
 
 export class AccountAuthenticatorEd25519 extends AccountAuthenticator {
-  constructor(public readonly public_key: Ed25519PublicKey, public readonly signature: Ed25519Signature) {
+  constructor(
+    public readonly public_key: Ed25519PublicKey,
+    public readonly signature: Ed25519Signature,
+  ) {
     super();
   }
 
@@ -167,7 +176,10 @@ export class AccountAuthenticatorEd25519 extends AccountAuthenticator {
 }
 
 export class AccountAuthenticatorMultiEd25519 extends AccountAuthenticator {
-  constructor(public readonly public_key: MultiEd25519PublicKey, public readonly signature: MultiEd25519Signature) {
+  constructor(
+    public readonly public_key: MultiEd25519PublicKey,
+    public readonly signature: MultiEd25519Signature,
+  ) {
     super();
   }
 
