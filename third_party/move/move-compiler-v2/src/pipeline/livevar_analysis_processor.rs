@@ -60,6 +60,7 @@ impl LiveVarInfoAtCodeOffset {
             .keys()
             .filter(|t| !self.after.contains_key(t))
             .cloned()
+    }
 
     /// Creates a set of the temporaries alive before this program point.
     pub fn before_set(&self) -> BTreeSet<TempIndex> {
