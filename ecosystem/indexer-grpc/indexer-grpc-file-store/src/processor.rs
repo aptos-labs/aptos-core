@@ -103,7 +103,7 @@ impl Processor {
 
         let mut tps_calculator = MovingAverage::new(10_000);
         loop {
-            let latest_time = std::time::Instant::now();
+            let latest_loop_time = std::time::Instant::now();
             let cache_worker_latest = self.cache_operator.get_latest_version().await?;
 
             // batches tracks the start version of the batches to fetch. 1000 at the time
@@ -147,7 +147,7 @@ impl Processor {
                 });
                 tasks.push(task);
             }
-            let (first_version, last_version, last_version_encoded) =
+            let (first_version, last_version, first_version_encoded, last_version_encoded) =
                 match futures::future::try_join_all(tasks).await {
                     Ok(mut res) => {
                         // Check for gaps
@@ -157,8 +157,9 @@ impl Processor {
 
                         let first_version = res.first().unwrap().0;
                         let last_version = res.last().unwrap().1;
+                        let first_version_encoded = res.first().unwrap().2.clone();
                         let last_version_encoded = res.last().unwrap().2.clone();
-                        let versoins: Vec<u64> = res.iter().map(|x| x.0).collect();
+                        let versions: Vec<u64> = res.iter().map(|x| x.0).collect();
                         for result in res {
                             let start = result.0;
                             let end = result.1;
@@ -168,7 +169,7 @@ impl Processor {
                             } else {
                                 if prev_end.unwrap() + 1 != start {
                                     tracing::error!(
-                                        processed_versions = ?versoins,
+                                        processed_versions = ?versions,
                                         "[Filestore] Gaps in processing data"
                                     );
                                     panic!("[Filestore] Gaps in processing data");
@@ -178,7 +179,12 @@ impl Processor {
                             }
                         }
 
-                        (first_version, last_version, last_version_encoded)
+                        (
+                            first_version,
+                            last_version,
+                            first_version_encoded,
+                            last_version_encoded,
+                        )
                     },
                     Err(err) => panic!("Error processing transaction batches: {:?}", err),
                 };
@@ -189,9 +195,12 @@ impl Processor {
                 batch_start_version % BLOB_STORAGE_SIZE as u64 == 0,
                 "[Filestore] Batch must be multiple of 1000"
             );
+            let size = last_version - first_version + 1;
+            PROCESSED_VERSIONS_COUNT.inc_by(size);
+            tps_calculator.tick_now(size);
 
             // Update filestore metadata. First do it in cache for performance then update metadata file
-            let start_time = std::time::Instant::now();
+            let start_metadata_upload_time = std::time::Instant::now();
             self.cache_operator
                 .update_file_store_latest_version(batch_start_version)
                 .await?;
@@ -208,84 +217,51 @@ impl Processor {
                 std::thread::sleep(std::time::Duration::from_millis(500));
                 METADATA_UPLOAD_FAILURE_COUNT.inc();
             }
-            info!(
-                end_version = batch_start_version,
-                duration_in_secs = start_time.elapsed().as_secs_f64(),
-                service_type = SERVICE_TYPE,
-                "{}",
-                IndexerGrpcStep::FilestoreUpdateMetadata.get_label()
-            );
-            LATEST_PROCESSED_VERSION
-                .with_label_values(&[
-                    SERVICE_TYPE,
-                    IndexerGrpcStep::FilestoreUpdateMetadata.get_step(),
-                    IndexerGrpcStep::FilestoreUpdateMetadata.get_label(),
-                ])
-                .set(batch_start_version as i64);
-            DURATION_IN_SECS
-                .with_label_values(&[
-                    SERVICE_TYPE,
-                    IndexerGrpcStep::FilestoreUpdateMetadata.get_step(),
-                    IndexerGrpcStep::FilestoreUpdateMetadata.get_label(),
-                ])
-                .set(start_time.elapsed().as_secs_f64());
-            let size = last_version - first_version + 1;
-            PROCESSED_VERSIONS_COUNT.inc_by(size);
-            tps_calculator.tick_now(size);
-            // This decoding may be inefficient, but this is the file store so we don't have to be overly
-            // concerned with efficiency.
-            let end_version_timestamp = {
-                let decoded_transaction =
-                    base64::decode(last_version_encoded).expect("Failed to decode base64.");
-                let transaction =
-                    Transaction::decode(&*decoded_transaction).expect("Failed to decode protobuf.");
-                transaction.timestamp
-            };
-
-            let duration = latest_time.elapsed().as_secs_f64();
-            info!(
-                tps = (tps_calculator.avg() * 1000.0) as u64,
-                start_version = first_version,
-                end_version = last_version,
-                duration_in_secs = duration,
-                service_type = SERVICE_TYPE,
-                num_transactions = size,
-                "{}",
-                IndexerGrpcStep::FilestoreUploadTxns.get_label()
+            log_grpc_step(
+                SERVICE_TYPE,
+                IndexerGrpcStep::FilestoreUpdateMetadata,
+                Some(first_version as i64),
+                Some(last_version as i64),
+                None,
+                None,
+                Some(start_metadata_upload_time.elapsed().as_secs_f64()),
+                None,
+                Some(size as i64),
+                None,
             );
 
-            LATEST_PROCESSED_VERSION
-                .with_label_values(&[
-                    SERVICE_TYPE,
-                    IndexerGrpcStep::FilestoreUploadTxns.get_step(),
-                    IndexerGrpcStep::FilestoreUploadTxns.get_label(),
-                ])
-                .set(last_version as i64);
-            TRANSACTION_UNIX_TIMESTAMP
-                .with_label_values(&[
-                    SERVICE_TYPE,
-                    IndexerGrpcStep::FilestoreUploadTxns.get_step(),
-                    IndexerGrpcStep::FilestoreUploadTxns.get_label(),
-                ])
-                .set(
-                    end_version_timestamp
-                        .map(|t| timestamp_to_unixtime(&t))
-                        .unwrap_or_default(),
-                );
-            NUM_TRANSACTIONS_COUNT
-                .with_label_values(&[
-                    SERVICE_TYPE,
-                    IndexerGrpcStep::FilestoreUploadTxns.get_step(),
-                    IndexerGrpcStep::FilestoreUploadTxns.get_label(),
-                ])
-                .set(size as i64);
-            DURATION_IN_SECS
-                .with_label_values(&[
-                    SERVICE_TYPE,
-                    IndexerGrpcStep::FilestoreUploadTxns.get_step(),
-                    IndexerGrpcStep::FilestoreUploadTxns.get_label(),
-                ])
-                .set(duration);
+            let (mut start_version_timestamp, mut end_version_timestamp) = (None, None);
+            if self.enable_verbose_logging {
+                // This decoding may be inefficient, but this is the file store so we don't have to be overly
+                // concerned with efficiency.
+                start_version_timestamp = {
+                    let decoded_transaction =
+                        base64::decode(first_version_encoded).expect("Failed to decode base64.");
+                    let transaction = Transaction::decode(&*decoded_transaction)
+                        .expect("Failed to decode protobuf.");
+                    transaction.timestamp
+                };
+                end_version_timestamp = {
+                    let decoded_transaction =
+                        base64::decode(last_version_encoded).expect("Failed to decode base64.");
+                    let transaction = Transaction::decode(&*decoded_transaction)
+                        .expect("Failed to decode protobuf.");
+                    transaction.timestamp
+                };
+            }
+            let full_loop_duration = latest_loop_time.elapsed().as_secs_f64();
+            log_grpc_step(
+                SERVICE_TYPE,
+                IndexerGrpcStep::FilestoreUploadTxns,
+                Some(first_version as i64),
+                Some(last_version as i64),
+                start_version_timestamp.as_ref(),
+                end_version_timestamp.as_ref(),
+                Some(full_loop_duration),
+                None,
+                Some(size as i64),
+                None,
+            );
         }
     }
 }
