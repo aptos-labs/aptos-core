@@ -81,7 +81,7 @@ impl IndexerStreamCoordinator {
     /// 4. Encode protobuf objects (base64)
     pub async fn process_next_batch(
         &mut self,
-        enable_verbose_logging: bool,
+        enable_expensive_logging: bool,
     ) -> Vec<Result<EndVersion, Status>> {
         let ledger_chain_id = self.context.chain_id().id();
         let mut tasks = vec![];
@@ -98,12 +98,23 @@ impl IndexerStreamCoordinator {
                 // Fetch and convert transactions from API
                 let raw_txns =
                     Self::fetch_raw_txns_with_retries(context.clone(), ledger_version, batch).await;
+                let first_raw_transaction = raw_txns.first().unwrap();
+                let last_raw_transaction = raw_txns.last().unwrap();
+                let mut last_transaction_timestamp = None;
+                if enable_expensive_logging {
+                    // Reusing the conversion methods which need a vec, so make a vec of size 1
+                    let api_txn = Self::convert_to_api_txns(context.clone(), vec![
+                        last_raw_transaction.clone(),
+                    ])
+                    .await;
+                    let pb_txn = Self::convert_to_pb_txns(api_txn);
+                    last_transaction_timestamp = pb_txn.first().unwrap().timestamp.clone();
+                }
                 log_grpc_step_fullnode(
                     IndexerGrpcStep::FullnodeFetchedBatch,
-                    enable_verbose_logging,
-                    None,
-                    None,
-                    None,
+                    Some(first_raw_transaction.version as i64),
+                    Some(last_raw_transaction.version as i64),
+                    last_transaction_timestamp.as_ref(),
                     Some(ledger_version as i64),
                     None,
                     Some(batch_start_time.elapsed().as_secs_f64()),
@@ -118,7 +129,6 @@ impl IndexerStreamCoordinator {
 
                 log_grpc_step_fullnode(
                     IndexerGrpcStep::FullnodeDecodedBatch,
-                    enable_verbose_logging,
                     Some(start_transaction.version as i64),
                     Some(end_transaction.version as i64),
                     end_txn_timestamp.as_ref(),
@@ -153,7 +163,6 @@ impl IndexerStreamCoordinator {
 
                 log_grpc_step_fullnode(
                     IndexerGrpcStep::FullnodeSentBatch,
-                    enable_verbose_logging,
                     Some(start_transaction.version as i64),
                     Some(end_transaction.version as i64),
                     end_txn_timestamp.as_ref(),
