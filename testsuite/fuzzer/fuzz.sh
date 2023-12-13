@@ -81,7 +81,7 @@ function build-oss-fuzz() {
         env
         error "Build failed. Exiting."
     fi
-    find ./target/*/release/ -maxdepth 1 -type f -executable -exec cp {} $oss_fuzz_out \;
+    find ./target/*/release/ -maxdepth 1 -type f -perm +111 -exec cp {} $oss_fuzz_out \;
 }
 
 function run() {
