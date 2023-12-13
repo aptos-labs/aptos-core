@@ -279,7 +279,6 @@ impl From<Batch> for PersistedValue {
 pub enum BatchResponse {
     Batch(Batch),
     NotFound(LedgerInfoWithSignatures),
-    Uninitialized,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

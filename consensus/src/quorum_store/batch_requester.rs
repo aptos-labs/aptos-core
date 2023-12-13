@@ -185,7 +185,10 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
                                     return None;
                                 }
                             }
-                            _ => (),
+                            Err(e) => {
+                                counters::RECEIVED_BATCH_RESPONSE_ERROR_COUNT.inc();
+                                debug!("QS: batch request error, digest:{}, error:{:?}", digest, e);
+                            }
                         }
                     },
                 }

@@ -392,8 +392,8 @@ impl InnerBuilder {
                     match aptos_db_clone.get_latest_ledger_info() {
                         Ok(ledger_info) => BatchResponse::NotFound(ledger_info),
                         Err(e) => {
-                            warn!(epoch = epoch, error = ?e, kind = error_kind(&e));
-                            BatchResponse::Uninitialized
+                            error!(epoch = epoch, error = ?e, kind = error_kind(&e));
+                            continue;
                         },
                     }
                 };

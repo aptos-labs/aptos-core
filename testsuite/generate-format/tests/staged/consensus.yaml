@@ -124,8 +124,6 @@ BatchResponse:
       NotFound:
         NEWTYPE:
           TYPENAME: LedgerInfoWithSignatures
-    2:
-      Uninitialized: UNIT
 BitVec:
   STRUCT:
     - inner: BYTES

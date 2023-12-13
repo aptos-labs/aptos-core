@@ -518,6 +518,15 @@ pub static RECEIVED_BATCH_EXPIRED_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the number of error batches received from other nodes.
+pub static RECEIVED_BATCH_RESPONSE_ERROR_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_received_batch_response_error_count",
+        "Count of the number of error batches received from other nodes."
+    )
+    .unwrap()
+});
+
 pub static QS_BACKPRESSURE_TXN_COUNT: Lazy<Histogram> = Lazy::new(|| {
     register_avg_counter(
         "quorum_store_backpressure_txn_count",
