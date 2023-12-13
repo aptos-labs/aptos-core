@@ -600,8 +600,8 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             private_key_mapping.insert(name, private_key);
         }
 
-        // Initial coins to mint, defaults to 5000
-        let mut coins_to_mint = 5000;
+        // Initial coins to mint, defaults to 5,000,000
+        let mut coins_to_mint = 5000000;
 
         if let Some(TaskInput {
             command: (_, init_args),

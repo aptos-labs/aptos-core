@@ -1,10 +1,17 @@
 processed 4 tasks
 
-task 1 'publish'. lines 4-30:
-Error: Failed to execute transaction. ExecutionStatus: OutOfGas
-
 task 2 'run'. lines 33-33:
-Error: Transaction discarded. VM status code: MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS
+Events:
+{
+    type:    0x1::transaction_fee::FeeStatement
+    data:    "03000000000000000200000000000000010000000000000000000000000000000000000000000000"
+}mutable inputs after call: local#0: 0
+return values: 0
 
 task 3 'view'. lines 35-35:
-[No Resource Exists]
+store key 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::hello_world::ModuleData {
+    global_counter: 0
+    state: copy drop store 0x1::string::String {
+        bytes: 68656c6c6f20776f726c64
+    }
+}
