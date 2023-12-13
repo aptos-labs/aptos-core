@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct IndexerGrpcFileStoreWorkerConfig {
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub redis_main_instance_address: RedisUrl,
-    pub enable_verbose_logging: bool,
+    pub enable_verbose_logging: Option<bool>,
 }
 
 impl IndexerGrpcFileStoreWorkerConfig {
@@ -27,7 +27,7 @@ impl IndexerGrpcFileStoreWorkerConfig {
         Self {
             file_store_config,
             redis_main_instance_address,
-            enable_verbose_logging: enable_verbose_logging.unwrap_or(false),
+            enable_verbose_logging,
         }
     }
 }
@@ -38,7 +38,7 @@ impl RunnableConfig for IndexerGrpcFileStoreWorkerConfig {
         let mut processor = Processor::new(
             self.redis_main_instance_address.clone(),
             self.file_store_config.clone(),
-            self.enable_verbose_logging,
+            self.enable_verbose_logging.unwrap_or(false),
         )
         .await
         .context("Failed to create processor for file store worker")?;
