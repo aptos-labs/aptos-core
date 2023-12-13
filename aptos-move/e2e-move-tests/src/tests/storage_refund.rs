@@ -23,7 +23,9 @@ fn test_refunds() {
         ],
         vec![],
     );
-    h.modify_gas_schedule(|params| params.vm.txn.max_execution_gas = 10_000_000_000.into());
+    // Note: This test uses a lot of execution gas so we need to bump the limit in order for it
+    //       to pass.
+    h.modify_gas_schedule(|params| params.vm.txn.max_execution_gas = 40_000_000_000.into());
     let mod_addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
     let user_addr = AccountAddress::from_hex_literal("0x100").unwrap();
     let mod_acc = h.new_account_at(mod_addr);

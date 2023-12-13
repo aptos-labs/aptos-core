@@ -100,6 +100,7 @@ impl ExecutionAndIOCosts {
                     ty,
                     cost,
                 } => insert_or_add(&mut storage_reads, format!("{}", ty), *cost),
+                CreateTy { cost } => insert_or_add(&mut ops, "create_ty".to_string(), *cost),
             }
         }
 

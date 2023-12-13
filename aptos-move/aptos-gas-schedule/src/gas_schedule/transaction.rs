@@ -187,7 +187,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
             max_storage_fee: Fee,
             { 7.. => "max_storage_fee" },
             2_0000_0000, // 2 APT
-        ]
+        ],
     ]
 );
 
