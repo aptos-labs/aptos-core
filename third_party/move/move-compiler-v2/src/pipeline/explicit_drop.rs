@@ -1,3 +1,5 @@
+//! Adds implicit destroy instructions for non-primitive types.
+
 use super::{
     livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
     reference_safety_processor::{LifetimeAnnotation, LifetimeInfoAtCodeOffset},
