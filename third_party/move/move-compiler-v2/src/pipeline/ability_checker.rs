@@ -1,4 +1,7 @@
 //! Checks for ability violations.
+//! prerequisite:
+//! - liveness analysis and lifetime analysis have been performed
+//! - Copies and moves have been made explicit in assignment instructions
 
 use itertools::Itertools;
 use move_binary_format::file_format::{Ability, AbilitySet};
