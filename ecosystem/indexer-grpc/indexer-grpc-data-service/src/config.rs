@@ -4,7 +4,9 @@
 use crate::service::RawDataServerWrapper;
 use anyhow::{bail, Result};
 use aptos_indexer_grpc_server_framework::RunnableConfig;
-use aptos_indexer_grpc_utils::{config::IndexerGrpcFileStoreConfig, types::RedisUrl};
+use aptos_indexer_grpc_utils::{
+    config::IndexerGrpcFileStoreConfig, storage_format::StorageFormat, types::RedisUrl,
+};
 use aptos_protos::{
     indexer::v1::FILE_DESCRIPTOR_SET as INDEXER_V1_FILE_DESCRIPTOR_SET,
     transaction::v1::FILE_DESCRIPTOR_SET as TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
@@ -66,6 +68,21 @@ pub struct IndexerGrpcDataServiceConfig {
     pub file_store_config: IndexerGrpcFileStoreConfig,
     /// Redis read replica address.
     pub redis_read_replica_address: RedisUrl,
+
+    /// Cache storage format.
+    #[serde(default = "default_cache_storage_format")]
+    pub cache_storage_format: StorageFormat,
+    /// File storage format.
+    #[serde(default = "default_file_storage_format")]
+    pub file_storage_format: StorageFormat,
+}
+
+fn default_cache_storage_format() -> StorageFormat {
+    StorageFormat::Base64UncompressedProto
+}
+
+fn default_file_storage_format() -> StorageFormat {
+    StorageFormat::JsonBase64UncompressedProto
 }
 
 impl IndexerGrpcDataServiceConfig {
@@ -77,6 +94,8 @@ impl IndexerGrpcDataServiceConfig {
         disable_auth_check: bool,
         file_store_config: IndexerGrpcFileStoreConfig,
         redis_read_replica_address: RedisUrl,
+        cache_storage_format: StorageFormat,
+        file_storage_format: StorageFormat,
     ) -> Self {
         Self {
             data_service_grpc_tls_config,
@@ -87,6 +106,8 @@ impl IndexerGrpcDataServiceConfig {
             disable_auth_check,
             file_store_config,
             redis_read_replica_address,
+            cache_storage_format,
+            file_storage_format,
         }
     }
 
@@ -150,6 +171,8 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             self.redis_read_replica_address.clone(),
             self.file_store_config.clone(),
             self.data_service_response_channel_size,
+            self.cache_storage_format,
+            self.file_storage_format,
         )?;
         let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::new(server)
             .send_compressed(CompressionEncoding::Gzip)

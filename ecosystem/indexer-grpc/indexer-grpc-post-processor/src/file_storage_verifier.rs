@@ -5,13 +5,9 @@ use anyhow::{bail, ensure};
 use aptos_indexer_grpc_utils::{
     config::IndexerGrpcFileStoreConfig,
     constants::BLOB_STORAGE_SIZE,
-    file_store_operator::{
-        FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator, TransactionsFile,
-    },
+    file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
+    storage_format::StorageFormat,
 };
-use aptos_protos::transaction::v1::Transaction;
-use prost::Message;
-
 pub struct FileStorageVerifier {
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub chain_id: u64,
@@ -33,11 +29,15 @@ impl FileStorageVerifier {
                     gcs_file_store
                         .gcs_file_store_service_account_key_path
                         .clone(),
+                    StorageFormat::JsonBase64UncompressedProto,
                 ))
             },
-            IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => Box::new(
-                LocalFileStoreOperator::new(local_file_store.local_file_store_path.clone()),
-            ),
+            IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => {
+                Box::new(LocalFileStoreOperator::new(
+                    local_file_store.local_file_store_path.clone(),
+                    StorageFormat::JsonBase64UncompressedProto,
+                ))
+            },
         };
         // Verify the existence of the storage bucket.
         file_store_operator.verify_storage_bucket_existence().await;
@@ -78,32 +78,31 @@ impl FileStorageVerifier {
             }
 
             // Verify the next version.
-            let txn_file: TransactionsFile = file_store_operator
-                .get_raw_transactions(next_version_to_verify)
+            let transactions = file_store_operator
+                .get_transactions(next_version_to_verify)
                 .await?;
-            if txn_file.starting_version != next_version_to_verify {
+            let starting_version = transactions.first().unwrap().version;
+            if starting_version != next_version_to_verify {
                 VERIFICATION_ERROR_COUNT.inc();
                 bail!("Starting version of transaction file {} does not match with next version to verify {}.",
-                    txn_file.starting_version, next_version_to_verify);
+                    starting_version, next_version_to_verify);
             }
 
-            if txn_file.transactions.len() != BLOB_STORAGE_SIZE {
+            if transactions.len() != BLOB_STORAGE_SIZE {
                 VERIFICATION_ERROR_COUNT.inc();
                 bail!(
                     "File size is not {} but {} actually",
                     BLOB_STORAGE_SIZE,
-                    txn_file.transactions.len()
+                    transactions.len()
                 );
             }
-            for (index, txn) in txn_file.transactions.iter().enumerate() {
-                let txn_bytes = base64::decode(txn)?;
-                let txn: Transaction = Transaction::decode(&*txn_bytes)?;
-                if txn.version != txn_file.starting_version + index as u64 {
+            for (index, txn) in transactions.iter().enumerate() {
+                if txn.version != starting_version + index as u64 {
                     VERIFICATION_ERROR_COUNT.inc();
                     bail!(
                         "Transaction version {} does not match with starting version {}.",
                         txn.version,
-                        txn_file.starting_version + index as u64
+                        starting_version + index as u64
                     );
                 }
             }

@@ -1,14 +1,21 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{constants::BLOB_STORAGE_SIZE, file_store_operator::*, EncodedTransactionWithVersion};
+use crate::{
+    constants::BLOB_STORAGE_SIZE,
+    file_store_operator::*,
+    storage_format::{FileEntryKey, StorageFormat},
+};
+use aptos_protos::indexer::v1::TransactionsInStorage;
 use cloud_storage::{Bucket, Object};
 use itertools::{any, Itertools};
 use std::env;
 
 const JSON_FILE_TYPE: &str = "application/json";
+const BINARY_FILE_TYPE: &str = "application/octet-stream";
 // The environment variable to set the service account path.
 const SERVICE_ACCOUNT_ENV_VAR: &str = "SERVICE_ACCOUNT";
+const SERVICE_TYPE: &str = "file_worker";
 
 pub struct GcsFileStoreOperator {
     bucket_name: String,
@@ -17,15 +24,21 @@ pub struct GcsFileStoreOperator {
 
     /// The timestamp of the latest verification metadata update; this is to avoid too frequent metadata update.
     latest_verification_metadata_update_timestamp: Option<std::time::Instant>,
+    storage_format: StorageFormat,
 }
 
 impl GcsFileStoreOperator {
-    pub fn new(bucket_name: String, service_account_path: String) -> Self {
+    pub fn new(
+        bucket_name: String,
+        service_account_path: String,
+        storage_format: StorageFormat,
+    ) -> Self {
         env::set_var(SERVICE_ACCOUNT_ENV_VAR, service_account_path);
         Self {
             bucket_name,
             latest_metadata_update_timestamp: None,
             latest_verification_metadata_update_timestamp: None,
+            storage_format,
         }
     }
 }
@@ -45,18 +58,30 @@ impl FileStoreOperator for GcsFileStoreOperator {
     }
 
     /// Gets the transactions files from the file store. version has to be a multiple of BLOB_STORAGE_SIZE.
-    async fn get_transactions(&self, version: u64) -> anyhow::Result<Vec<String>> {
-        let batch_start_version = version / BLOB_STORAGE_SIZE as u64 * BLOB_STORAGE_SIZE as u64;
-        let current_file_name = generate_blob_name(batch_start_version);
-        match Object::download(&self.bucket_name, current_file_name.as_str()).await {
+    async fn get_transactions(&self, version: u64) -> anyhow::Result<Vec<Transaction>> {
+        let start_time = std::time::Instant::now();
+        let file_entry_key = FileEntryKey::new(version, self.storage_format);
+        let key_name = file_entry_key.to_string();
+        let downloaded_file = Object::download(&self.bucket_name, key_name.as_str()).await;
+        tracing::info!(
+            start_version = version,
+            duration_in_secs = start_time.elapsed().as_secs_f64(),
+            service_type = SERVICE_TYPE,
+            "{}",
+            "Fetched data from GCS."
+        );
+        match downloaded_file {
             Ok(file) => {
-                let file: TransactionsFile =
-                    serde_json::from_slice(&file).map_err(|e| anyhow::anyhow!(e.to_string()))?;
-                Ok(file
-                    .transactions
-                    .into_iter()
-                    .skip((version % BLOB_STORAGE_SIZE as u64) as usize)
-                    .collect())
+                let file_entry: FileEntry = FileEntry::from_bytes(file, self.storage_format);
+                let transactions_in_storage: TransactionsInStorage = file_entry.try_into()?;
+                tracing::info!(
+                    start_version = version,
+                    duration_in_secs = start_time.elapsed().as_secs_f64(),
+                    service_type = SERVICE_TYPE,
+                    "{}",
+                    "Deserialized data from GCS."
+                );
+                Ok(transactions_in_storage.transactions)
             },
             Err(cloud_storage::Error::Other(err)) => {
                 if err.contains("No such object: ") {
@@ -75,15 +100,6 @@ impl FileStoreOperator for GcsFileStoreOperator {
                 );
             },
         }
-    }
-
-    /// Gets the raw transactions file from the file store. Mainly for verification purpose.
-    async fn get_raw_transactions(&self, version: u64) -> anyhow::Result<TransactionsFile> {
-        let batch_start_version = version / BLOB_STORAGE_SIZE as u64 * BLOB_STORAGE_SIZE as u64;
-        let current_file_name = generate_blob_name(batch_start_version);
-        let bytes = Object::download(&self.bucket_name, current_file_name.as_str()).await?;
-        serde_json::from_slice(&bytes)
-            .map_err(|e| anyhow::anyhow!("Failed to deserialize transactions file: {}", e))
     }
 
     /// Gets the metadata from the file store. Operator will panic if error happens when accessing the metadata file(except not found).
@@ -130,10 +146,14 @@ impl FileStoreOperator for GcsFileStoreOperator {
                 let is_file_missing = err.contains("No such object: ");
                 if is_file_missing {
                     // If the metadata is not found, it means the file store is empty.
-                    self.update_file_store_metadata(expected_chain_id, 0)
+                    self.update_file_store_metadata(expected_chain_id, 0, self.storage_format)
                         .await
                         .expect("[Indexer File] Update metadata failed.");
-                    Ok(FileStoreMetadata::new(expected_chain_id, 0))
+                    Ok(FileStoreMetadata::new(
+                        expected_chain_id,
+                        0,
+                        self.storage_format,
+                    ))
                 } else {
                     // If not in write mode, the metadata must exist.
                     Err(anyhow::Error::msg(format!(
@@ -151,8 +171,9 @@ impl FileStoreOperator for GcsFileStoreOperator {
         &mut self,
         chain_id: u64,
         version: u64,
+        storage_format: StorageFormat,
     ) -> anyhow::Result<()> {
-        let metadata = FileStoreMetadata::new(chain_id, version);
+        let metadata = FileStoreMetadata::new(chain_id, version, storage_format);
         // If the metadata is not updated, the indexer will be restarted.
         match Object::create(
             self.bucket_name.as_str(),
@@ -209,9 +230,9 @@ impl FileStoreOperator for GcsFileStoreOperator {
     async fn upload_transactions(
         &mut self,
         chain_id: u64,
-        transactions: Vec<EncodedTransactionWithVersion>,
+        transactions: Vec<Transaction>,
     ) -> anyhow::Result<()> {
-        let start_version = transactions.first().unwrap().1;
+        let start_version = transactions.first().unwrap().version;
         let batch_size = transactions.len();
         anyhow::ensure!(
             start_version % BLOB_STORAGE_SIZE as u64 == 0,
@@ -221,28 +242,46 @@ impl FileStoreOperator for GcsFileStoreOperator {
             batch_size % BLOB_STORAGE_SIZE == 0,
             "The number of transactions to upload has to be multiplier of BLOB_STORAGE_SIZE."
         );
-        let mut tasks = vec![];
 
-        // Split the transactions into batches of BLOB_STORAGE_SIZE.
-        for i in transactions.chunks(BLOB_STORAGE_SIZE) {
-            let bucket_name = self.bucket_name.clone();
-            let current_batch = i.iter().cloned().collect_vec();
-            let transactions_file = build_transactions_file(current_batch).unwrap();
-            let task = tokio::spawn(async move {
-                match Object::create(
-                    bucket_name.clone().as_str(),
-                    serde_json::to_vec(&transactions_file).unwrap(),
-                    generate_blob_name(transactions_file.starting_version).as_str(),
-                    JSON_FILE_TYPE,
-                )
-                .await
-                {
-                    Ok(_) => Ok(()),
-                    Err(err) => Err(anyhow::Error::from(err)),
-                }
-            });
-            tasks.push(task);
-        }
+        let files_to_upload = transactions
+            .into_iter()
+            .chunks(BLOB_STORAGE_SIZE)
+            .into_iter()
+            .map(|i| {
+                let transactions = i.collect_vec();
+                let file_key =
+                    FileEntryKey::new(transactions.first().unwrap().version, self.storage_format);
+                let file_key_string = file_key.to_string();
+
+                let file_entry_builder = FileEntryBuilder::new(transactions, self.storage_format);
+                let file_entry: FileEntry = file_entry_builder
+                    .try_into()
+                    .expect("Failed to serialize file entry");
+                (file_key_string, file_entry.into_inner())
+            })
+            .collect_vec();
+
+        let tasks = files_to_upload
+            .into_iter()
+            .map(|(file_key_string, file_entry)| {
+                let bucket_name = self.bucket_name.clone();
+                tokio::spawn(async move {
+                    match Object::create(
+                        bucket_name.as_str(),
+                        file_entry,
+                        file_key_string.as_str(),
+                        // Upload json as binary as well.
+                        BINARY_FILE_TYPE,
+                    )
+                    .await
+                    {
+                        Ok(_) => Ok(()),
+                        Err(err) => Err(anyhow::Error::from(err)),
+                    }
+                })
+            })
+            .collect_vec();
+
         let results = match futures::future::try_join_all(tasks).await {
             Ok(res) => res,
             Err(err) => panic!("Error processing transaction batches: {:?}", err),
@@ -255,13 +294,21 @@ impl FileStoreOperator for GcsFileStoreOperator {
         if let Some(ts) = self.latest_metadata_update_timestamp {
             // a periodic metadata update
             if ts.elapsed().as_secs() > FILE_STORE_UPDATE_FREQUENCY_SECS {
-                self.update_file_store_metadata(chain_id, start_version + batch_size as u64)
-                    .await?;
+                self.update_file_store_metadata(
+                    chain_id,
+                    start_version + batch_size as u64,
+                    self.storage_format,
+                )
+                .await?;
             }
         } else {
             // the first metadata update
-            self.update_file_store_metadata(chain_id, start_version + batch_size as u64)
-                .await?;
+            self.update_file_store_metadata(
+                chain_id,
+                start_version + batch_size as u64,
+                self.storage_format,
+            )
+            .await?;
         }
 
         Ok(())
