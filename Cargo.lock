@@ -6693,6 +6693,7 @@ dependencies = [
  "hex",
  "itertools 0.10.5",
  "move-binary-format",
+ "move-command-line-common",
  "move-core-types",
  "move-package",
  "move-symbol-pool",
