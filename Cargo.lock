@@ -253,7 +253,7 @@ dependencies = [
  "aptos-move-debugger",
  "aptos-network-checker",
  "aptos-node",
- "aptos-protos 1.1.2",
+ "aptos-protos 1.3.0",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-storage-interface",
@@ -2018,7 +2018,7 @@ dependencies = [
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
  "aptos-moving-average 0.1.0",
- "aptos-protos 1.1.2",
+ "aptos-protos 1.3.0",
  "aptos-runtimes",
  "async-trait",
  "backoff",
@@ -2046,7 +2046,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-metrics-core",
- "aptos-protos 1.1.2",
+ "aptos-protos 1.3.0",
  "async-trait",
  "backoff",
  "backtrace",
@@ -2091,7 +2091,7 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-moving-average 0.1.0",
- "aptos-protos 1.1.2",
+ "aptos-protos 1.3.0",
  "aptos-runtimes",
  "async-trait",
  "base64 0.13.0",
@@ -2120,7 +2120,7 @@ dependencies = [
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
  "aptos-moving-average 0.1.0",
- "aptos-protos 1.1.2",
+ "aptos-protos 1.3.0",
  "aptos-runtimes",
  "async-trait",
  "base64 0.13.0",
@@ -2160,7 +2160,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-moving-average 0.1.0",
  "aptos-proptest-helpers",
- "aptos-protos 1.1.2",
+ "aptos-protos 1.3.0",
  "aptos-runtimes",
  "aptos-sdk",
  "aptos-secure-storage",
@@ -2204,7 +2204,7 @@ dependencies = [
  "aptos-indexer-grpc-utils",
  "aptos-inspection-service",
  "aptos-logger",
- "aptos-protos 1.1.2",
+ "aptos-protos 1.3.0",
  "aptos-runtimes",
  "aptos-transaction-emitter-lib",
  "aptos-transaction-generator-lib",
@@ -2242,7 +2242,7 @@ dependencies = [
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
- "aptos-protos 1.1.2",
+ "aptos-protos 1.3.0",
  "aptos-runtimes",
  "async-trait",
  "backtrace",
@@ -2291,14 +2291,16 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-metrics-core",
- "aptos-protos 1.1.2",
+ "aptos-protos 1.3.0",
  "async-trait",
  "backoff",
  "backtrace",
  "base64 0.13.0",
+ "bzip2",
  "chrono",
  "clap 4.3.21",
  "cloud-storage",
+ "flate2",
  "futures",
  "futures-core",
  "futures-util",
@@ -2308,6 +2310,7 @@ dependencies = [
  "prost 0.12.1",
  "redis",
  "redis-test",
+ "ripemd",
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
@@ -3170,6 +3173,7 @@ dependencies = [
 [[package]]
 name = "aptos-protos"
 version = "1.1.2"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=14c8813c9a0c31437a679c2601d1c828060c4a3c#14c8813c9a0c31437a679c2601d1c828060c4a3c"
 dependencies = [
  "futures-core",
  "pbjson",
@@ -3181,8 +3185,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-protos"
-version = "1.1.2"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=14c8813c9a0c31437a679c2601d1c828060c4a3c#14c8813c9a0c31437a679c2601d1c828060c4a3c"
+version = "1.3.0"
 dependencies = [
  "futures-core",
  "pbjson",
@@ -3508,7 +3511,7 @@ dependencies = [
  "aptos-config",
  "aptos-logger",
  "aptos-metrics-core",
- "aptos-protos 1.1.2",
+ "aptos-protos 1.3.0",
  "aptos-retrier",
  "bcs 0.1.4",
  "crossbeam-channel",
@@ -5336,6 +5339,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "89b2fd2a0dcf38d7971e2194b6b6eebab45ae01067456a7fd93d5547a61b70be"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "bzip2"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bdb116a6ef3f6c3698828873ad02c3014b3c85cadb88496095628e3ef1e347f8"
+dependencies = [
+ "bzip2-sys",
+ "libc",
 ]
 
 [[package]]
@@ -12070,7 +12083,7 @@ source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=2d5
 dependencies = [
  "anyhow",
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=2d5cb211a89a8705674e9e1e741c841dd899c558)",
- "aptos-protos 1.1.2 (git+https://github.com/aptos-labs/aptos-core.git?rev=14c8813c9a0c31437a679c2601d1c828060c4a3c)",
+ "aptos-protos 1.1.2",
  "async-trait",
  "base64 0.13.0",
  "bcs 0.1.4",

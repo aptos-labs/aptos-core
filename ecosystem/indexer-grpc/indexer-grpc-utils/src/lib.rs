@@ -6,6 +6,7 @@ pub mod config;
 pub mod constants;
 pub mod counters;
 pub mod file_store_operator;
+pub mod storage_format;
 pub mod types;
 
 use anyhow::{Context, Result};

@@ -1,7 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{constants::BLOB_STORAGE_SIZE, file_store_operator::*, EncodedTransactionWithVersion};
+use crate::{
+    constants::BLOB_STORAGE_SIZE,
+    file_store_operator::*,
+    storage_format::{FileEntryKey, StorageFormat},
+};
+use aptos_protos::indexer::v1::TransactionsInStorage;
 use itertools::{any, Itertools};
 use std::path::PathBuf;
 use tracing::info;
@@ -10,13 +15,15 @@ pub struct LocalFileStoreOperator {
     path: PathBuf,
     /// The timestamp of the latest metadata update; this is to avoid too frequent metadata update.
     latest_metadata_update_timestamp: Option<std::time::Instant>,
+    storage_format: StorageFormat,
 }
 
 impl LocalFileStoreOperator {
-    pub fn new(path: PathBuf) -> Self {
+    pub fn new(path: PathBuf, storage_format: StorageFormat) -> Self {
         Self {
             path,
             latest_metadata_update_timestamp: None,
+            storage_format,
         }
     }
 }
@@ -33,19 +40,15 @@ impl FileStoreOperator for LocalFileStoreOperator {
         }
     }
 
-    async fn get_transactions(&self, version: u64) -> anyhow::Result<Vec<String>> {
-        let batch_start_version = version / BLOB_STORAGE_SIZE as u64 * BLOB_STORAGE_SIZE as u64;
-        let current_file_name = generate_blob_name(batch_start_version);
+    async fn get_transactions(&self, version: u64) -> anyhow::Result<Vec<Transaction>> {
+        let file_entry_key = FileEntryKey::new(version, self.storage_format);
+        let current_file_name = file_entry_key.to_string();
         let file_path = self.path.join(current_file_name);
         match tokio::fs::read(file_path).await {
             Ok(file) => {
-                let file: TransactionsFile =
-                    serde_json::from_slice(&file).expect("Expected file to be valid JSON.");
-                Ok(file
-                    .transactions
-                    .into_iter()
-                    .skip((version % BLOB_STORAGE_SIZE as u64) as usize)
-                    .collect())
+                let file_entry = FileEntry::from_bytes(file, self.storage_format);
+                let transactions_in_storage: TransactionsInStorage = file_entry.try_into()?;
+                Ok(transactions_in_storage.transactions)
             },
             Err(err) => {
                 if err.kind() == std::io::ErrorKind::NotFound {
@@ -98,10 +101,14 @@ impl FileStoreOperator for LocalFileStoreOperator {
                 if err.kind() == std::io::ErrorKind::NotFound {
                     // If the metadata is not found, it means the file store is empty.
                     info!("File store is empty. Creating metadata file.");
-                    self.update_file_store_metadata(expected_chain_id, 0)
+                    self.update_file_store_metadata(expected_chain_id, 0, self.storage_format)
                         .await
                         .expect("[Indexer File] Update metadata failed.");
-                    Ok(FileStoreMetadata::new(expected_chain_id, 0))
+                    Ok(FileStoreMetadata::new(
+                        expected_chain_id,
+                        0,
+                        self.storage_format,
+                    ))
                 } else {
                     // If not in write mode, the metadata must exist.
                     Err(anyhow::Error::msg(format!(
@@ -117,8 +124,9 @@ impl FileStoreOperator for LocalFileStoreOperator {
         &mut self,
         chain_id: u64,
         version: u64,
+        storage_format: StorageFormat,
     ) -> anyhow::Result<()> {
-        let metadata = FileStoreMetadata::new(chain_id, version);
+        let metadata = FileStoreMetadata::new(chain_id, version, storage_format);
         // If the metadata is not updated, the indexer will be restarted.
         let metadata_path = self.path.join(METADATA_FILE_NAME);
         info!(
@@ -138,9 +146,9 @@ impl FileStoreOperator for LocalFileStoreOperator {
     async fn upload_transactions(
         &mut self,
         chain_id: u64,
-        transactions: Vec<EncodedTransactionWithVersion>,
+        transactions: Vec<Transaction>,
     ) -> anyhow::Result<()> {
-        let start_version = transactions.first().unwrap().1;
+        let start_version = transactions.first().unwrap().version;
         let batch_size = transactions.len();
         anyhow::ensure!(
             start_version % BLOB_STORAGE_SIZE as u64 == 0,
@@ -150,37 +158,36 @@ impl FileStoreOperator for LocalFileStoreOperator {
             batch_size % BLOB_STORAGE_SIZE == 0,
             "The number of transactions to upload has to be multiplier of BLOB_STORAGE_SIZE."
         );
-        let mut tasks = vec![];
 
-        // create files directory
-        let files_dir = self.path.join(FILE_FOLDER_NAME);
-        if !files_dir.exists() {
-            tracing::info!("Creating files directory {:?}", files_dir.clone());
-            tokio::fs::create_dir(files_dir.clone()).await?;
-        }
+        let files_to_upload = transactions
+            .into_iter()
+            .chunks(BLOB_STORAGE_SIZE)
+            .into_iter()
+            .map(|i| {
+                let transactions = i.collect_vec();
+                let file_key =
+                    FileEntryKey::new(transactions.first().unwrap().version, self.storage_format);
+                let file_key_string = file_key.to_string();
 
-        // Split the transactions into batches of BLOB_STORAGE_SIZE.
-        for i in transactions.chunks(BLOB_STORAGE_SIZE) {
-            let current_batch = i.iter().cloned().collect_vec();
-            let transactions_file = build_transactions_file(current_batch).unwrap();
-            let txns_path = self
-                .path
-                .join(generate_blob_name(transactions_file.starting_version).as_str());
-
-            tracing::debug!(
-                "Uploading transactions to {:?}",
-                txns_path.to_str().unwrap()
-            );
-            let task = tokio::spawn(async move {
-                match tokio::fs::write(txns_path, serde_json::to_vec(&transactions_file).unwrap())
-                    .await
-                {
-                    Ok(_) => Ok(()),
-                    Err(err) => Err(anyhow::Error::from(err)),
-                }
-            });
-            tasks.push(task);
-        }
+                let file_entry_builder = FileEntryBuilder::new(transactions, self.storage_format);
+                let file_entry: FileEntry = file_entry_builder
+                    .try_into()
+                    .expect("Failed to serialize file entry");
+                (file_key_string, file_entry.into_inner())
+            })
+            .collect_vec();
+        let tasks = files_to_upload
+            .into_iter()
+            .map(|(file_key_string, file_entry)| {
+                let file_path = self.path.join(file_key_string.as_str());
+                tokio::spawn(async move {
+                    match tokio::fs::write(file_path, file_entry).await {
+                        Ok(_) => Ok(()),
+                        Err(err) => Err(anyhow::Error::from(err)),
+                    }
+                })
+            })
+            .collect_vec();
         let results = match futures::future::try_join_all(tasks).await {
             Ok(res) => res,
             Err(err) => panic!("Error processing transaction batches: {:?}", err),
@@ -198,13 +205,21 @@ impl FileStoreOperator for LocalFileStoreOperator {
         if let Some(ts) = self.latest_metadata_update_timestamp {
             // a periodic metadata update
             if (std::time::Instant::now() - ts).as_secs() > FILE_STORE_UPDATE_FREQUENCY_SECS {
-                self.update_file_store_metadata(chain_id, start_version + batch_size as u64)
-                    .await?;
+                self.update_file_store_metadata(
+                    chain_id,
+                    start_version + batch_size as u64,
+                    self.storage_format,
+                )
+                .await?;
             }
         } else {
             // the first metadata update
-            self.update_file_store_metadata(chain_id, start_version + batch_size as u64)
-                .await?;
+            self.update_file_store_metadata(
+                chain_id,
+                start_version + batch_size as u64,
+                self.storage_format,
+            )
+            .await?;
         }
 
         Ok(())
@@ -223,9 +238,5 @@ impl FileStoreOperator for LocalFileStoreOperator {
         _next_version_to_verify: u64,
     ) -> Result<()> {
         anyhow::bail!("Verification is not impelemented for local file store.")
-    }
-
-    async fn get_raw_transactions(&self, _version: u64) -> anyhow::Result<TransactionsFile> {
-        anyhow::bail!("Unimplemented");
     }
 }

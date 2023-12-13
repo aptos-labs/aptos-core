@@ -11,9 +11,8 @@ use aptos_indexer_grpc_utils::{
     config::IndexerGrpcFileStoreConfig,
     counters::{log_grpc_step, IndexerGrpcStep},
     create_grpc_client,
-    file_store_operator::{
-        FileStoreMetadata, FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator,
-    },
+    file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
+    storage_format::{FileStoreMetadata, StorageFormat},
     types::RedisUrl,
 };
 use aptos_moving_average::MovingAverage;
@@ -45,6 +44,7 @@ pub struct Worker {
     /// File store config
     file_store: IndexerGrpcFileStoreConfig,
     enable_verbose_logging: bool,
+    storage_format: StorageFormat,
 }
 
 /// GRPC data status enum is to identify the data frame.
@@ -74,6 +74,7 @@ impl Worker {
         redis_main_instance_address: RedisUrl,
         file_store: IndexerGrpcFileStoreConfig,
         enable_verbose_logging: bool,
+        storage_format: StorageFormat,
     ) -> Result<Self> {
         let redis_client = redis::Client::open(redis_main_instance_address.0.clone())
             .with_context(|| {
@@ -87,6 +88,7 @@ impl Worker {
             file_store,
             fullnode_grpc_address,
             enable_verbose_logging,
+            storage_format,
         })
     }
 
@@ -117,11 +119,15 @@ impl Worker {
                         gcs_file_store
                             .gcs_file_store_service_account_key_path
                             .clone(),
+                        self.storage_format,
                     ))
                 },
-                IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => Box::new(
-                    LocalFileStoreOperator::new(local_file_store.local_file_store_path.clone()),
-                ),
+                IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => {
+                    Box::new(LocalFileStoreOperator::new(
+                        local_file_store.local_file_store_path.clone(),
+                        self.storage_format,
+                    ))
+                },
             };
 
             file_store_operator.verify_storage_bucket_existence().await;
@@ -155,6 +161,7 @@ impl Worker {
                 file_store_operator,
                 response.into_inner(),
                 self.enable_verbose_logging,
+                self.storage_format,
             )
             .await?;
         }
@@ -189,37 +196,29 @@ async fn process_transactions_from_node_response(
         },
         Response::Data(data) => {
             let starting_time = std::time::Instant::now();
+            let start_version = data
+                .transactions
+                .first()
+                .context("There were unexpectedly no transactions in the response")?
+                .version;
             let transaction_len = data.transactions.len();
             let first_transaction = data
                 .transactions
                 .first()
-                .context("There were unexpectedly no transactions in the response")?;
+                .context("There were unexpectedly no transactions in the response")?
+                .clone();
             let last_transaction = data
                 .transactions
                 .last()
-                .context("There were unexpectedly no transactions in the response")?;
-            let start_version = first_transaction.version;
+                .context("There were unexpectedly no transactions in the response")?
+                .clone();
             let first_transaction_pb_timestamp = first_transaction.timestamp.clone();
             let last_transaction_pb_timestamp = last_transaction.timestamp.clone();
-            let transactions = data
-                .transactions
-                .clone()
-                .into_iter()
-                .map(|tx| {
-                    let timestamp_in_seconds = match tx.timestamp {
-                        Some(ref timestamp) => timestamp.seconds as u64,
-                        None => 0,
-                    };
-                    let mut encoded_proto_data = vec![];
-                    tx.encode(&mut encoded_proto_data)
-                        .context("Encode transaction failed.")?;
-                    let base64_encoded_proto_data = base64::encode(encoded_proto_data);
-                    Ok((tx.version, base64_encoded_proto_data, timestamp_in_seconds))
-                })
-                .collect::<Result<Vec<(u64, String, u64)>>>()?;
-
             // Push to cache.
-            match cache_operator.update_cache_transactions(transactions).await {
+            match cache_operator
+                .update_cache_transactions(data.transactions)
+                .await
+            {
                 Ok(_) => {
                     log_grpc_step(
                         SERVICE_TYPE,
@@ -254,6 +253,7 @@ async fn process_transactions_from_node_response(
 async fn setup_cache_with_init_signal(
     conn: redis::aio::ConnectionManager,
     init_signal: TransactionsFromNodeResponse,
+    storage_format: StorageFormat,
 ) -> Result<(
     CacheOperator<redis::aio::ConnectionManager>,
     ChainID,
@@ -278,7 +278,7 @@ async fn setup_cache_with_init_signal(
         },
     };
 
-    let mut cache_operator = CacheOperator::new(conn);
+    let mut cache_operator = CacheOperator::new(conn, storage_format);
     cache_operator.cache_setup_if_needed().await?;
     cache_operator
         .update_or_verify_chain_id(fullnode_chain_id as u64)
@@ -296,6 +296,7 @@ async fn process_streaming_response(
     mut resp_stream: impl futures_core::Stream<Item = Result<TransactionsFromNodeResponse, tonic::Status>>
         + std::marker::Unpin,
     enable_verbose_logging: bool,
+    storage_format: StorageFormat,
 ) -> Result<()> {
     let mut tps_calculator = MovingAverage::new(10_000);
     let mut transaction_count = 0;
@@ -307,7 +308,7 @@ async fn process_streaming_response(
         },
     };
     let (mut cache_operator, fullnode_chain_id, starting_version) =
-        setup_cache_with_init_signal(conn, init_signal)
+        setup_cache_with_init_signal(conn, init_signal, storage_format)
             .await
             .context("[Indexer Cache] Failed to setup cache")?;
     // It's required to start the worker with the same version as file store.
