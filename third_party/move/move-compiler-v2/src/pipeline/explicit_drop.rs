@@ -72,12 +72,12 @@ impl<'a> ExplicitDropTransformer<'a> {
         self.drop_unused_args();
         for (code_offset, bytecode) in self.target.get_bytecode().to_vec().iter().enumerate() {
             self.emit_bytecode(bytecode.clone());
-            self.explicate_drops_at(code_offset as CodeOffset, bytecode);
+            self.explicit_drops_at(code_offset as CodeOffset, bytecode);
         }
     }
 
     /// Add explicit drops at the given code offset.
-    fn explicate_drops_at(&mut self, code_offset: CodeOffset, bytecode: &Bytecode) {
+    fn explicit_drops_at(&mut self, code_offset: CodeOffset, bytecode: &Bytecode) {
         match bytecode {
             Bytecode::Ret(..) | Bytecode::Jump(..) | Bytecode::Abort(..) | Bytecode::Branch(..) => {
                 ()
