@@ -913,6 +913,10 @@ mod test {
         type Key = KeyType<u32>;
         type Tag = u32;
         type Value = ValueType;
+
+        fn user_txn_bytes_len(&self) -> usize {
+            0
+        }
     }
 
     macro_rules! assert_update_incorrect_use {
