@@ -1984,7 +1984,7 @@ dependencies = [
  "aptos-vm",
  "async-trait",
  "bcs 0.1.4",
- "bigdecimal 0.3.1",
+ "bigdecimal",
  "chrono",
  "clap 4.4.11",
  "diesel",
@@ -2709,7 +2709,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=2eea8d1d71ea195558d571202d3003071af8766b#2eea8d1d71ea195558d571202d3003071af8766b"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=af795c0a082385908d8ff3c72e54d53810e337fc#af795c0a082385908d8ff3c72e54d53810e337fc"
 dependencies = [
  "chrono",
 ]
@@ -3539,7 +3539,7 @@ dependencies = [
  "once_cell",
  "regex",
  "serde-generate",
- "serde-reflection",
+ "serde-reflection 0.3.5",
  "serde_yaml 0.8.26",
  "tempfile",
  "textwrap 0.15.2",
@@ -5126,18 +5126,6 @@ dependencies = [
 
 [[package]]
 name = "bigdecimal"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6773ddc0eafc0e509fb60e48dff7f450f8e674a0686ae8605e8d9901bd5eefa"
-dependencies = [
- "num-bigint 0.4.4",
- "num-integer",
- "num-traits",
- "serde",
-]
-
-[[package]]
-name = "bigdecimal"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c06619be423ea5bb86c95f087d5707942791a08a85530df0db2209a3ecfb8bc9"
@@ -5147,6 +5135,7 @@ dependencies = [
  "num-bigint 0.4.4",
  "num-integer",
  "num-traits",
+ "serde",
 ]
 
 [[package]]
@@ -6629,7 +6618,7 @@ version = "2.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62c6fcf842f17f8c78ecf7c81d75c5ce84436b41ee07e03f490fbb5f5a8731d8"
 dependencies = [
- "bigdecimal 0.4.2",
+ "bigdecimal",
  "bitflags 2.4.1",
  "byteorder",
  "chrono",
@@ -7839,7 +7828,7 @@ dependencies = [
  "move-core-types",
  "rand 0.7.3",
  "serde",
- "serde-reflection",
+ "serde-reflection 0.3.5",
  "serde_yaml 0.8.26",
 ]
 
@@ -10007,7 +9996,7 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "petgraph 0.5.1",
- "serde-reflection",
+ "serde-reflection 0.3.6",
 ]
 
 [[package]]
@@ -12387,15 +12376,15 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=2eea8d1d71ea195558d571202d3003071af8766b#2eea8d1d71ea195558d571202d3003071af8766b"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=af795c0a082385908d8ff3c72e54d53810e337fc#af795c0a082385908d8ff3c72e54d53810e337fc"
 dependencies = [
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=2eea8d1d71ea195558d571202d3003071af8766b)",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=af795c0a082385908d8ff3c72e54d53810e337fc)",
  "aptos-protos 1.1.2 (git+https://github.com/aptos-labs/aptos-core.git?rev=af0dcea7144225a709e4f595e58f8026b99e901c)",
  "async-trait",
  "base64 0.13.1",
  "bcs 0.1.4",
- "bigdecimal 0.3.1",
+ "bigdecimal",
  "chrono",
  "clap 4.4.11",
  "diesel",
@@ -13732,7 +13721,7 @@ dependencies = [
 [[package]]
 name = "serde-generate"
 version = "0.20.6"
-source = "git+https://github.com/aptos-labs/serde-reflection?rev=f2b5fb605dee0d2f8fd42a6d7faca177e524ea14#f2b5fb605dee0d2f8fd42a6d7faca177e524ea14"
+source = "git+https://github.com/aptos-labs/serde-reflection?rev=73b6bbf748334b71ff6d7d09d06a29e3062ca075#73b6bbf748334b71ff6d7d09d06a29e3062ca075"
 dependencies = [
  "bcs 0.1.6",
  "bincode",
@@ -13740,7 +13729,7 @@ dependencies = [
  "include_dir 0.6.2",
  "maplit",
  "serde",
- "serde-reflection",
+ "serde-reflection 0.3.5",
  "serde_bytes",
  "serde_yaml 0.8.26",
  "structopt",
@@ -13760,7 +13749,18 @@ dependencies = [
 [[package]]
 name = "serde-reflection"
 version = "0.3.5"
-source = "git+https://github.com/aptos-labs/serde-reflection?rev=f2b5fb605dee0d2f8fd42a6d7faca177e524ea14#f2b5fb605dee0d2f8fd42a6d7faca177e524ea14"
+source = "git+https://github.com/aptos-labs/serde-reflection?rev=73b6bbf748334b71ff6d7d09d06a29e3062ca075#73b6bbf748334b71ff6d7d09d06a29e3062ca075"
+dependencies = [
+ "once_cell",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "serde-reflection"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f05a5f801ac62a51a49d378fdb3884480041b99aced450b28990673e8ff99895"
 dependencies = [
  "once_cell",
  "serde",
@@ -13936,7 +13936,7 @@ dependencies = [
 [[package]]
 name = "server-framework"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=2eea8d1d71ea195558d571202d3003071af8766b#2eea8d1d71ea195558d571202d3003071af8766b"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=af795c0a082385908d8ff3c72e54d53810e337fc#af795c0a082385908d8ff3c72e54d53810e337fc"
 dependencies = [
  "anyhow",
  "async-trait",

@@ -461,7 +461,7 @@ backoff = { version = "0.4.0", features = ["tokio"] }
 backtrace = "0.3.58"
 bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
 better_any = "0.1.1"
-bigdecimal = { version = "0.3.0", features = ["serde"] }
+bigdecimal = { version = "0.4.0", features = ["serde"] }
 version-compare = "0.1.1"
 bitvec = "1.0.1"
 blake2 = "0.10.4"
@@ -635,8 +635,8 @@ serde_json = { version = "1.0.81", features = ["preserve_order", "arbitrary_prec
 serde_repr = "0.1"
 serde_merge = "0.1.3"
 serde-name = "0.1.1"
-serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev = "f2b5fb605dee0d2f8fd42a6d7faca177e524ea14" }
-serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "f2b5fb605dee0d2f8fd42a6d7faca177e524ea14" }
+serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
+serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 serde_yaml = "0.8.24"
 shadow-rs = "0.16.2"
 smallvec = "1.8.0"
@@ -760,7 +760,6 @@ debug-assertions = true
 debug = true
 
 [patch.crates-io]
-serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "f2b5fb605dee0d2f8fd42a6d7faca177e524ea14" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
 x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", branch = "zeroize_v1" }
 # More context here: https://github.com/weiznich/diesel_async/pull/121.

@@ -120,7 +120,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<CoinStoreResource>(&samples)?;
 
     // aliases within StructTag
-    tracer.ignore_aliases("StructTag", "type_args", &["type_params"])?;
+    tracer.ignore_aliases("StructTag", &["type_params"])?;
 
     tracer.registry()
 }
