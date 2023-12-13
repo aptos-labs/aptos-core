@@ -202,7 +202,6 @@ impl Processor {
             log_grpc_step(
                 SERVICE_TYPE,
                 IndexerGrpcStep::FilestoreUploadTxns,
-                self.enable_verbose_logging,
                 Some(current_file_store_version as i64),
                 Some(end_version as i64),
                 start_version_timestamp.as_ref(),

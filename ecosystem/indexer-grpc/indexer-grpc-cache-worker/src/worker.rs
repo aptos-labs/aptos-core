@@ -164,7 +164,7 @@ impl Worker {
 async fn process_transactions_from_node_response(
     response: TransactionsFromNodeResponse,
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
-    enable_verbose_logging: bool,
+    _enable_verbose_logging: bool,
 ) -> Result<GrpcDataStatus> {
     let size_in_bytes = response.encoded_len();
     match response.response.unwrap() {
@@ -224,7 +224,6 @@ async fn process_transactions_from_node_response(
                     log_grpc_step(
                         SERVICE_TYPE,
                         IndexerGrpcStep::CacheWorkerTxnsProcessed,
-                        enable_verbose_logging,
                         Some(first_transaction.version as i64),
                         Some(last_transaction.version as i64),
                         first_transaction_pb_timestamp.as_ref(),
@@ -406,7 +405,6 @@ async fn process_streaming_response(
                     log_grpc_step(
                         SERVICE_TYPE,
                         IndexerGrpcStep::CacheWorkerBatchProcessed,
-                        enable_verbose_logging,
                         Some(start_version as i64),
                         Some((start_version + num_of_transactions - 1) as i64),
                         None,

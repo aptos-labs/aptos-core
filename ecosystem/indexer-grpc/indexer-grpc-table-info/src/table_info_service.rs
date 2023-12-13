@@ -23,6 +23,7 @@ pub struct TableInfoService {
     pub parser_task_count: u16,
     pub parser_batch_size: u16,
     pub context: Arc<Context>,
+    // todo: remove this flag
     pub enable_expensive_logging: bool,
 }
 
@@ -63,7 +64,6 @@ impl TableInfoService {
             log_grpc_step(
                 SERVICE_TYPE,
                 IndexerGrpcStep::TableInfoProcessed,
-                self.enable_expensive_logging,
                 Some(self.current_version as i64),
                 Some(max_version as i64),
                 None,
@@ -184,7 +184,7 @@ impl TableInfoService {
         ledger_version: u64,
         batch: TransactionBatchInfo,
         end_early_if_pending_on_empty: bool,
-        enable_verbose_logging: bool,
+        _enable_verbose_logging: bool,
     ) -> Result<EndVersion, Status> {
         let start_time = std::time::Instant::now();
 
@@ -206,7 +206,6 @@ impl TableInfoService {
         log_grpc_step(
             SERVICE_TYPE,
             IndexerGrpcStep::TableInfoProcessedBatch,
-            enable_verbose_logging,
             Some(batch.start_version as i64),
             Some((batch.start_version + batch.num_transactions_to_fetch as u64) as i64),
             None,

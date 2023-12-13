@@ -66,7 +66,7 @@ pub struct IndexerGrpcDataServiceConfig {
     pub file_store_config: IndexerGrpcFileStoreConfig,
     /// Redis read replica address.
     pub redis_read_replica_address: RedisUrl,
-    pub enable_verbose_logging: Option<bool>,
+    pub enable_expensive_logging: Option<bool>,
 }
 
 impl IndexerGrpcDataServiceConfig {
@@ -78,7 +78,7 @@ impl IndexerGrpcDataServiceConfig {
         disable_auth_check: bool,
         file_store_config: IndexerGrpcFileStoreConfig,
         redis_read_replica_address: RedisUrl,
-        enable_verbose_logging: Option<bool>,
+        enable_expensive_logging: Option<bool>,
     ) -> Self {
         Self {
             data_service_grpc_tls_config,
@@ -89,7 +89,7 @@ impl IndexerGrpcDataServiceConfig {
             disable_auth_check,
             file_store_config,
             redis_read_replica_address,
-            enable_verbose_logging,
+            enable_expensive_logging,
         }
     }
 
@@ -153,7 +153,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             self.redis_read_replica_address.clone(),
             self.file_store_config.clone(),
             self.data_service_response_channel_size,
-            self.enable_verbose_logging.unwrap_or(false),
+            self.enable_expensive_logging.unwrap_or(false),
         )?;
         let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::new(server)
             .send_compressed(CompressionEncoding::Gzip)

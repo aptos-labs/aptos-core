@@ -67,7 +67,7 @@ pub struct RawDataServerWrapper {
     pub redis_client: Arc<redis::Client>,
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub data_service_response_channel_size: usize,
-    pub enable_verbose_logging: bool,
+    pub enable_expensive_logging: bool,
 }
 
 impl RawDataServerWrapper {
@@ -75,7 +75,7 @@ impl RawDataServerWrapper {
         redis_address: RedisUrl,
         file_store_config: IndexerGrpcFileStoreConfig,
         data_service_response_channel_size: usize,
-        enable_verbose_logging: bool,
+        enable_expensive_logging: bool,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             redis_client: Arc::new(
@@ -85,7 +85,7 @@ impl RawDataServerWrapper {
             ),
             file_store_config,
             data_service_response_channel_size,
-            enable_verbose_logging,
+            enable_expensive_logging,
         })
     }
 }
@@ -154,7 +154,6 @@ impl RawData for RawDataServerWrapper {
         log_grpc_step(
             SERVICE_TYPE,
             IndexerGrpcStep::DataServiceNewRequestReceived,
-            self.enable_verbose_logging,
             Some(current_version as i64),
             None,
             None,
@@ -166,7 +165,7 @@ impl RawData for RawDataServerWrapper {
         );
 
         let redis_client = self.redis_client.clone();
-        let enable_verbose_logging = self.enable_verbose_logging;
+        let enable_expensive_logging = self.enable_expensive_logging;
         tokio::spawn({
             let request_metadata = request_metadata.clone();
             async move {
@@ -248,26 +247,26 @@ impl RawData for RawDataServerWrapper {
                         file_store_operator.as_ref(),
                         current_batch_start_time,
                         request_metadata.clone(),
-                        enable_verbose_logging,
+                        enable_expensive_logging,
                     )
                     .await
                     {
                         Ok(TransactionsDataStatus::Success(transactions)) => transactions,
                         Ok(TransactionsDataStatus::AheadOfCache) => {
-                            info!(
-                                start_version = current_version,
-                                request_name = request_metadata.processor_name.as_str(),
-                                request_email = request_metadata.request_email.as_str(),
-                                request_api_key_name = request_metadata.request_api_key_name.as_str(),
-                                processor_name = request_metadata.processor_name.as_str(),
-                                connection_id = request_metadata.request_connection_id.as_str(),
-                    request_user_classification =
-                        request_metadata.request_user_classification.as_str(),
-                                duration_in_secs = current_batch_start_time.elapsed().as_secs_f64(),
-                                service_type = SERVICE_TYPE,
-                                "[Data Service] Requested data is ahead of cache. Sleeping for {} ms.",
-                                AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS,
-                            );
+                            if enable_expensive_logging {
+                                log_grpc_step(
+                                    SERVICE_TYPE,
+                                    IndexerGrpcStep::DataServiceWaitingForCacheData,
+                                    Some(current_version as i64),
+                                    None,
+                                    None,
+                                    None,
+                                    Some(current_batch_start_time.elapsed().as_secs_f64()),
+                                    None,
+                                    None,
+                                    Some(request_metadata.clone()),
+                                );
+                            }
                             ahead_of_cache_data_handling().await;
                             // Retry after a short sleep.
                             continue;
@@ -322,7 +321,7 @@ impl RawData for RawDataServerWrapper {
                         chain_id as u32,
                         current_batch_start_time,
                         request_metadata.clone(),
-                        enable_verbose_logging,
+                        enable_expensive_logging,
                     );
                     let data_latency_in_secs = resp_items
                         .last()
@@ -339,7 +338,7 @@ impl RawData for RawDataServerWrapper {
                         tx.clone(),
                         current_batch_start_time,
                         request_metadata.clone(),
-                        enable_verbose_logging,
+                        enable_expensive_logging,
                     )
                     .await
                     {
@@ -441,7 +440,7 @@ fn get_transactions_responses_builder(
     chain_id: u32,
     current_batch_start_time: Instant,
     request_metadata: IndexerGrpcRequestMetadata,
-    enable_logging: bool,
+    enable_expensive_logging: bool,
 ) -> Vec<TransactionsResponse> {
     let transactions: Vec<Transaction> = data
         .into_iter()
@@ -470,19 +469,22 @@ fn get_transactions_responses_builder(
     let overall_end_version = overall_end_txn.version;
     let overall_start_txn_timestamp = overall_start_txn.clone().timestamp;
     let overall_end_txn_timestamp = overall_end_txn.clone().timestamp;
-    log_grpc_step(
-        SERVICE_TYPE,
-        IndexerGrpcStep::DataServiceTxnsDecoded,
-        enable_logging,
-        Some(overall_start_version as i64),
-        Some(overall_end_version as i64),
-        overall_start_txn_timestamp.as_ref(),
-        overall_end_txn_timestamp.as_ref(),
-        Some(current_batch_start_time.elapsed().as_secs_f64()),
-        Some(overall_size_in_bytes),
-        Some((overall_end_version - overall_start_version + 1) as i64),
-        Some(request_metadata.clone()),
-    );
+
+    if enable_expensive_logging {
+        log_grpc_step(
+            SERVICE_TYPE,
+            IndexerGrpcStep::DataServiceTxnsDecoded,
+            Some(overall_start_version as i64),
+            Some(overall_end_version as i64),
+            overall_start_txn_timestamp.as_ref(),
+            overall_end_txn_timestamp.as_ref(),
+            Some(current_batch_start_time.elapsed().as_secs_f64()),
+            Some(overall_size_in_bytes),
+            Some((overall_end_version - overall_start_version + 1) as i64),
+            Some(request_metadata.clone()),
+        );
+    }
+
     resp_items
 }
 
@@ -494,7 +496,7 @@ async fn data_fetch(
     file_store_operator: &dyn FileStoreOperator,
     current_batch_start_time: Instant,
     request_metadata: IndexerGrpcRequestMetadata,
-    enable_logging: bool,
+    enable_expensive_logging: bool,
 ) -> anyhow::Result<TransactionsDataStatus> {
     let batch_get_result = cache_operator
         .batch_get_encoded_proto_data(starting_version)
@@ -525,19 +527,20 @@ async fn data_fetch(
                 transaction.timestamp
             };
 
-            log_grpc_step(
-                SERVICE_TYPE,
-                IndexerGrpcStep::DataServiceDataFetchedCache,
-                enable_logging,
-                Some(starting_version as i64),
-                Some(starting_version as i64 + num_of_transactions as i64 - 1),
-                start_version_timestamp.as_ref(),
-                end_version_timestamp.as_ref(),
-                Some(duration_in_secs),
-                Some(size_in_bytes),
-                Some(num_of_transactions as i64),
-                Some(request_metadata.clone()),
-            );
+            if enable_expensive_logging {
+                log_grpc_step(
+                    SERVICE_TYPE,
+                    IndexerGrpcStep::DataServiceDataFetchedCache,
+                    Some(starting_version as i64),
+                    Some(starting_version as i64 + num_of_transactions as i64 - 1),
+                    start_version_timestamp.as_ref(),
+                    end_version_timestamp.as_ref(),
+                    Some(duration_in_secs),
+                    Some(size_in_bytes),
+                    Some(num_of_transactions as i64),
+                    Some(request_metadata.clone()),
+                );
+            }
 
             Ok(TransactionsDataStatus::Success(
                 build_protobuf_encoded_transaction_wrappers(transactions, starting_version),
@@ -570,19 +573,20 @@ async fn data_fetch(
                         transaction.timestamp
                     };
 
-                    log_grpc_step(
-                        SERVICE_TYPE,
-                        IndexerGrpcStep::DataServiceDataFetchedFilestore,
-                        enable_logging,
-                        Some(starting_version as i64),
-                        Some(starting_version as i64 + num_of_transactions as i64 - 1),
-                        start_version_timestamp.as_ref(),
-                        end_version_timestamp.as_ref(),
-                        Some(duration_in_secs),
-                        Some(size_in_bytes),
-                        Some(num_of_transactions as i64),
-                        Some(request_metadata.clone()),
-                    );
+                    if enable_expensive_logging {
+                        log_grpc_step(
+                            SERVICE_TYPE,
+                            IndexerGrpcStep::DataServiceDataFetchedFilestore,
+                            Some(starting_version as i64),
+                            Some(starting_version as i64 + num_of_transactions as i64 - 1),
+                            start_version_timestamp.as_ref(),
+                            end_version_timestamp.as_ref(),
+                            Some(duration_in_secs),
+                            Some(size_in_bytes),
+                            Some(num_of_transactions as i64),
+                            Some(request_metadata.clone()),
+                        );
+                    }
 
                     Ok(TransactionsDataStatus::Success(
                         build_protobuf_encoded_transaction_wrappers(transactions, starting_version),
@@ -675,7 +679,7 @@ async fn channel_send_multiple_with_timeout(
     tx: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
     current_batch_start_time: Instant,
     request_metadata: IndexerGrpcRequestMetadata,
-    enable_logging: bool,
+    enable_expensive_logging: bool,
 ) -> Result<(), SendTimeoutError<Result<TransactionsResponse, Status>>> {
     let overall_size_in_bytes = resp_items
         .iter()
@@ -714,25 +718,25 @@ async fn channel_send_multiple_with_timeout(
         )
         .await?;
 
-        log_grpc_step(
-            SERVICE_TYPE,
-            IndexerGrpcStep::DataServiceChunkSent,
-            enable_logging,
-            Some(start_version as i64),
-            Some(end_version as i64),
-            Some(start_version_txn_timestamp),
-            Some(end_version_txn_timestamp),
-            Some(current_batch_start_time.elapsed().as_secs_f64()),
-            Some(response_size),
-            Some(num_of_transactions as i64),
-            Some(request_metadata.clone()),
-        );
+        if enable_expensive_logging {
+            log_grpc_step(
+                SERVICE_TYPE,
+                IndexerGrpcStep::DataServiceChunkSent,
+                Some(start_version as i64),
+                Some(end_version as i64),
+                Some(start_version_txn_timestamp),
+                Some(end_version_txn_timestamp),
+                Some(current_batch_start_time.elapsed().as_secs_f64()),
+                Some(response_size),
+                Some(num_of_transactions as i64),
+                Some(request_metadata.clone()),
+            );
+        }
     }
 
     log_grpc_step(
         SERVICE_TYPE,
         IndexerGrpcStep::DataServiceAllChunksSent,
-        enable_logging,
         Some(overall_start_version as i64),
         Some(overall_end_version as i64),
         overall_start_txn_timestamp.as_ref(),
