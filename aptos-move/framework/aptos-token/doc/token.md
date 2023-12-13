@@ -112,6 +112,7 @@ Checkout our developer doc on our token standard https://aptos.dev/standards
 -  [Function `initialize_token_script`](#0x3_token_initialize_token_script)
 -  [Function `initialize_token`](#0x3_token_initialize_token)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `create_collection_script`](#@Specification_1_create_collection_script)
     -  [Function `create_token_script`](#@Specification_1_create_token_script)
     -  [Function `mint_script`](#@Specification_1_mint_script)
@@ -4584,6 +4585,11 @@ Deposit the token balance into the recipients account and emit an event.
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 

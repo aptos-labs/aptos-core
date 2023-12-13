@@ -14,6 +14,7 @@
 -  [Function `set_staking_contract_voter`](#0x1_staking_proxy_set_staking_contract_voter)
 -  [Function `set_stake_pool_voter`](#0x1_staking_proxy_set_stake_pool_voter)
 -  [Specification](#@Specification_0)
+    -  [Module-level Specification](#@Module-level_Specification_1)
     -  [Function `set_operator`](#@Specification_0_set_operator)
     -  [Function `set_voter`](#@Specification_0_set_voter)
     -  [Function `set_vesting_contract_operator`](#@Specification_0_set_vesting_contract_operator)
@@ -258,6 +259,11 @@
 <a id="@Specification_0"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_1"></a>
+
+### Module-level Specification
 
 
 

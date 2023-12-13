@@ -60,6 +60,7 @@ the resolution process.
 -  [Function `is_voting_period_over`](#0x1_voting_is_voting_period_over)
 -  [Function `get_proposal`](#0x1_voting_get_proposal)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `register`](#@Specification_1_register)
     -  [Function `create_proposal`](#@Specification_1_create_proposal)
     -  [Function `create_proposal_v2`](#@Specification_1_create_proposal_v2)
@@ -1650,6 +1651,11 @@ Return true if the voting period of the given proposal has already ended.
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 

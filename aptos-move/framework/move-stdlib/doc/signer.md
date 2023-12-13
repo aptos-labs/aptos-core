@@ -8,6 +8,7 @@
 -  [Function `borrow_address`](#0x1_signer_borrow_address)
 -  [Function `address_of`](#0x1_signer_address_of)
 -  [Specification](#@Specification_0)
+    -  [Module-level Specification](#@Module-level_Specification_1)
 
 
 <pre><code></code></pre>
@@ -70,6 +71,11 @@ struct signer has drop { addr: address }
 <a id="@Specification_0"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_1"></a>
+
+### Module-level Specification
 
 Return true only if <code>s</code> is a transaction signer. This is a spec function only available in spec.
 

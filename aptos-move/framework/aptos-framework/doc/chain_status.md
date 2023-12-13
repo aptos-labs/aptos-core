@@ -17,6 +17,7 @@ which reflect that the system has been successfully initialized.
 -  [Function `assert_operating`](#0x1_chain_status_assert_operating)
 -  [Function `assert_genesis`](#0x1_chain_status_assert_genesis)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `set_genesis_end`](#@Specification_1_set_genesis_end)
     -  [Function `assert_operating`](#@Specification_1_assert_operating)
     -  [Function `assert_genesis`](#@Specification_1_assert_genesis)
@@ -214,6 +215,11 @@ Helper function to assert genesis state.
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 
