@@ -249,6 +249,7 @@ impl Processor {
                 end_version = last_version,
                 duration_in_secs = duration,
                 service_type = SERVICE_TYPE,
+                num_transactions = size,
                 "{}",
                 IndexerGrpcStep::FilestoreUploadTxns.get_label()
             );

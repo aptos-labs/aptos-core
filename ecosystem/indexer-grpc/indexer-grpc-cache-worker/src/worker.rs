@@ -32,8 +32,11 @@ type StartingVersion = u64;
 const FILE_STORE_VERSIONS_RESERVED: u64 = 150_000;
 // Cache worker will wait if filestore is behind by
 // `FILE_STORE_VERSIONS_RESERVED` versions
-// Reducing this could spam the gcs metadata file so keeping it to once every 5 seconds for now (per cache worker)
-const CACHE_WORKER_WAIT_FOR_FILE_STORE_IN_SECS: u64 = 5;
+// This is pinging the cache so it's OK to be more aggressive
+const CACHE_WORKER_WAIT_FOR_FILE_STORE_MS: u64 = 100;
+// This is the time we wait for the file store to be ready. It should only be
+// kicked off when there's no metadata in the file store.
+const FILE_STORE_METADATA_WAIT_MS: u64 = 2000;
 
 const SERVICE_TYPE: &str = "cache_worker";
 
@@ -127,8 +130,22 @@ impl Worker {
             // TODO: this is unnecessary
             // TODO: move chain id check somewhere around here
             file_store_operator.verify_storage_bucket_existence().await;
-            // TODO: Let's change this to ensure that the filestore metadata is already there to avoid a conflict
-            let starting_version = file_store_operator.get_latest_version().await.unwrap_or(0);
+            // This ensures that metadata is created before we start the cache worker
+            let mut starting_version = file_store_operator.get_latest_version().await;
+            while starting_version.is_none() {
+                starting_version = file_store_operator.get_latest_version().await;
+                tracing::warn!(
+                    "[Indexer Cache] File store metadata not found. Waiting for {} ms.",
+                    FILE_STORE_METADATA_WAIT_MS
+                );
+                tokio::time::sleep(std::time::Duration::from_millis(
+                    FILE_STORE_METADATA_WAIT_MS,
+                ))
+                .await;
+            }
+
+            // There's a guarantee at this point that starting_version is not null
+            let starting_version = starting_version.unwrap();
 
             let file_store_metadata = file_store_operator.get_file_store_metadata().await;
 
@@ -432,14 +449,13 @@ async fn process_streaming_response(
 
         // Check if the file store isn't too far away
         loop {
-            // TODO: similar todo as above, ensure that the filestore metadata is already there to avoid a conflict
             let file_store_version = cache_operator
                 .get_file_store_latest_version()
                 .await
                 .unwrap();
             if file_store_version + FILE_STORE_VERSIONS_RESERVED < current_version {
-                tokio::time::sleep(std::time::Duration::from_secs(
-                    CACHE_WORKER_WAIT_FOR_FILE_STORE_IN_SECS,
+                tokio::time::sleep(std::time::Duration::from_millis(
+                    CACHE_WORKER_WAIT_FOR_FILE_STORE_MS,
                 ))
                 .await;
                 tracing::warn!(
