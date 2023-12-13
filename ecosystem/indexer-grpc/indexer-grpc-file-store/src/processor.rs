@@ -9,7 +9,7 @@ use aptos_indexer_grpc_utils::{
     config::IndexerGrpcFileStoreConfig,
     constants::BLOB_STORAGE_SIZE,
     counters::{log_grpc_step, IndexerGrpcStep},
-    file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
+    file_store_operator::FileStoreOperator,
     types::RedisUrl,
     EncodedTransactionWithVersion,
 };
@@ -60,19 +60,7 @@ impl Processor {
             .await
             .context("Get chain id failed.")?;
 
-        let file_store_operator: Box<dyn FileStoreOperator> = match &file_store_config {
-            IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => {
-                Box::new(GcsFileStoreOperator::new(
-                    gcs_file_store.gcs_file_store_bucket_name.clone(),
-                    gcs_file_store
-                        .gcs_file_store_service_account_key_path
-                        .clone(),
-                ))
-            },
-            IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => Box::new(
-                LocalFileStoreOperator::new(local_file_store.local_file_store_path.clone()),
-            ),
-        };
+        let file_store_operator: Box<dyn FileStoreOperator> = file_store_config.create();
         file_store_operator.verify_storage_bucket_existence().await;
 
         Ok(Self {
@@ -83,6 +71,19 @@ impl Processor {
         })
     }
 
+    pub async fn setup(&mut self) -> Result<()> {
+        let file_store_metadata = self.file_store_operator.get_file_store_metadata().await;
+        if file_store_metadata.is_none() {
+            self.file_store_operator
+                .update_file_store_metadata_with_timeout(self.cache_chain_id, 0)
+                .await?;
+            self.cache_operator
+                .update_file_store_latest_version(0)
+                .await?;
+        }
+        Ok(())
+    }
+
     /// Starts the processing. The steps are
     /// 1. Check chain id at the beginning and every step after
     /// 2. Get the batch start version from file store metadata
@@ -91,8 +92,8 @@ impl Processor {
     ///   3.2 If we're ready to process, create max of 10 threads and fetch / upload data
     ///   3.3 Update file store metadata at the end of a batch
     pub async fn run(&mut self) -> Result<()> {
+        self.setup().await?;
         let cache_chain_id = self.cache_chain_id;
-
         let mut batch_start_version =
             if let Some(metadata) = self.file_store_operator.get_file_store_metadata().await {
                 anyhow::ensure!(metadata.chain_id == cache_chain_id, "Chain ID mismatch.");

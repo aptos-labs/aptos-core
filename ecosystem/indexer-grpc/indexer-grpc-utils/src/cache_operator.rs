@@ -170,12 +170,16 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
             .context("Redis latest_version is not a number.")
     }
 
-    pub async fn get_file_store_latest_version(&mut self) -> anyhow::Result<u64> {
-        self.conn
-            .get::<&str, String>(FILE_STORE_LATEST_VERSION)
-            .await?
-            .parse::<u64>()
-            .context("Redis file_store_latest_version is not a number.")
+    pub async fn get_file_store_latest_version(&mut self) -> anyhow::Result<Option<u64>> {
+        let result = self.conn
+            .get::<&str, Vec<u8>>(FILE_STORE_LATEST_VERSION)
+            .await?;
+        if result.is_empty() {
+            Ok(None)
+        } else {
+            let version_string = String::from_utf8(result).unwrap();
+            Ok(Some(version_string.parse::<u64>().unwrap()))
+        }
     }
 
     pub async fn update_file_store_latest_version(
@@ -248,6 +252,16 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
             Ok(_) => Ok(()),
             Err(err) => Err(err.into()),
         }
+    }
+
+    // Overwrite the latest version in cache.
+    // Only call this function during cache worker startup.
+    pub async fn overwrite_cache_latest_version(&mut self, version: u64) -> anyhow::Result<()> {
+        self.conn
+            .set(CACHE_KEY_LATEST_VERSION, version)
+            .await
+            .context("Redis latest version overwrite failed.")?;
+        Ok(())
     }
 
     // Update the latest version in cache.
