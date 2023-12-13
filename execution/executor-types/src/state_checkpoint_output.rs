@@ -12,33 +12,33 @@ use itertools::zip_eq;
 
 #[derive(Default)]
 pub struct TransactionsByStatus {
-    statuses: Vec<TransactionStatus>,
-    to_keep: TransactionsWithParsedOutput,
+    // Statuses of the input transactions, in the same order as the input transactions.
+    // Contains BlockMetadata/Validator transactions,
+    // but doesn't contain StateCheckpoint/BlockEpilogue, as those get added during execution
+    statuses_for_input_txns: Vec<TransactionStatus>,
+    // List of all transactions to be committed, including StateCheckpoint/BlockEpilogue if needed.
+    to_commit: TransactionsWithParsedOutput,
     to_discard: TransactionsWithParsedOutput,
     to_retry: TransactionsWithParsedOutput,
 }
 
 impl TransactionsByStatus {
     pub fn new(
-        statuses: Vec<TransactionStatus>,
-        to_keep: TransactionsWithParsedOutput,
+        statuses_for_input_txns: Vec<TransactionStatus>,
+        to_commit: TransactionsWithParsedOutput,
         to_discard: TransactionsWithParsedOutput,
         to_retry: TransactionsWithParsedOutput,
     ) -> Self {
         Self {
-            statuses,
-            to_keep,
+            statuses_for_input_txns,
+            to_commit,
             to_discard,
             to_retry,
         }
     }
 
-    pub fn num_txns_to_keep(&self) -> usize {
-        self.to_keep.len()
-    }
-
-    pub fn txn_statuses(&self) -> &[TransactionStatus] {
-        &self.statuses
+    pub fn input_txns_len(&self) -> usize {
+        self.statuses_for_input_txns.len()
     }
 
     pub fn into_inner(
@@ -49,7 +49,12 @@ impl TransactionsByStatus {
         TransactionsWithParsedOutput,
         TransactionsWithParsedOutput,
     ) {
-        (self.statuses, self.to_keep, self.to_discard, self.to_retry)
+        (
+            self.statuses_for_input_txns,
+            self.to_commit,
+            self.to_discard,
+            self.to_retry,
+        )
     }
 }
 
@@ -79,12 +84,12 @@ impl StateCheckpointOutput {
         }
     }
 
-    pub fn txn_statuses(&self) -> &[TransactionStatus] {
-        self.txns.txn_statuses()
+    pub fn input_txns_len(&self) -> usize {
+        self.txns.input_txns_len()
     }
 
-    pub fn txns_to_keep_len(&self) -> usize {
-        self.txns.to_keep.len()
+    pub fn txns_to_commit_len(&self) -> usize {
+        self.txns.to_commit.len()
     }
 
     pub fn into_inner(

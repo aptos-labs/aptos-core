@@ -164,9 +164,8 @@ fn test_executor_status() {
             KEEP_STATUS.clone(),
             KEEP_STATUS.clone(),
             DISCARD_STATUS.clone(),
-            KEEP_STATUS.clone(),
         ],
-        output.compute_status()
+        output.compute_status_for_input_txns()
     );
 }
 
@@ -195,9 +194,8 @@ fn test_executor_status_consensus_only() {
             KEEP_STATUS.clone(),
             KEEP_STATUS.clone(),
             KEEP_STATUS.clone(),
-            KEEP_STATUS.clone(),
         ],
-        output.compute_status()
+        output.compute_status_for_input_txns()
     );
 }
 
@@ -487,7 +485,7 @@ fn apply_transaction_by_writeset(
         ledger_update_output,
     } = executed;
     let LedgerUpdateOutput {
-        status: _,
+        statuses_for_input_txns: _,
         to_commit,
         reconfig_events: _,
         transaction_info_hashes: _,
@@ -704,7 +702,7 @@ fn run_transactions_naive(
             ledger_update_output,
         } = executed;
         let LedgerUpdateOutput {
-            status: _,
+            statuses_for_input_txns: _,
             to_commit,
             reconfig_events: _,
             transaction_info_hashes: _,
@@ -745,7 +743,7 @@ proptest! {
 
             let block_id = gen_block_id(1);
             let mut block = TestBlock::new(num_user_txns, 10, block_id);
-            let num_txns = block.txns.len() as LeafCount;
+            let num_input_txns = block.txns.len() as LeafCount;
             block.txns[reconfig_txn_index as usize] = encode_reconfiguration_transaction().into();
 
             let parent_block_id = executor.committed_block_id();
@@ -754,11 +752,11 @@ proptest! {
             ).unwrap();
 
             // assert: txns after the reconfiguration are with status "Retry"
-            let retry_iter = output.compute_status().iter()
+            let retry_iter = output.compute_status_for_input_txns().iter()
             .skip_while(|status| matches!(*status, TransactionStatus::Keep(_)));
             prop_assert_eq!(
                 retry_iter.take_while(|status| matches!(*status,TransactionStatus::Retry)).count() as u64,
-                num_txns - reconfig_txn_index - 1
+                num_input_txns - reconfig_txn_index - 1
             );
 
             // commit
@@ -771,9 +769,10 @@ proptest! {
             let retry_output = executor.execute_block(
                 (retry_block_id, block.txns.iter().skip(reconfig_txn_index as usize + 1).cloned().collect::<Vec<SignatureVerifiedTransaction>>()).into(), parent_block_id, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG
             ).unwrap();
-            prop_assert!(retry_output.compute_status().iter().all(|s| matches!(*s, TransactionStatus::Keep(_))));
+            prop_assert!(retry_output.compute_status_for_input_txns().iter().all(|s| matches!(*s, TransactionStatus::Keep(_))));
 
-            let ledger_version = num_txns;
+            // Second block has StateCheckpoint/BlockPrologue transaction added.
+            let ledger_version = num_input_txns + 1;
 
             // commit
             let ledger_info = gen_ledger_info(ledger_version, retry_output.root_hash(), retry_block_id, 12345 /* timestamp */);
@@ -782,21 +781,21 @@ proptest! {
             // get txn_infos from db
             let db = executor.db.reader.clone();
             prop_assert_eq!(db.get_latest_version().unwrap(), ledger_version);
-            let txn_list = db.get_transactions(1 /* start version */, num_txns, ledger_version /* ledger version */, false /* fetch events */).unwrap();
-            prop_assert_eq!(&block.inner_txns(), &txn_list.transactions);
+            let txn_list = db.get_transactions(1 /* start version */, ledger_version, ledger_version /* ledger version */, false /* fetch events */).unwrap();
+            prop_assert_eq!(&block.inner_txns(), &txn_list.transactions[..num_input_txns as usize]);
             let txn_infos = txn_list.proof.transaction_infos;
-            let write_sets = db.get_write_set_iterator(1, num_txns).unwrap().collect::<Result<_>>().unwrap();
-            let event_vecs = db.get_events_iterator(1, num_txns).unwrap().collect::<Result<_>>().unwrap();
+            let write_sets = db.get_write_set_iterator(1, ledger_version).unwrap().collect::<Result<_>>().unwrap();
+            let event_vecs = db.get_events_iterator(1, ledger_version).unwrap().collect::<Result<_>>().unwrap();
 
             // replay txns in one batch across epoch boundary,
             // and the replayer should deal with `Retry`s automatically
             let replayer = chunk_executor_tests::TestExecutor::new();
-            replayer.executor.replay(block.inner_txns(), txn_infos, write_sets, event_vecs, &VerifyExecutionMode::verify_all()).unwrap();
+            replayer.executor.replay(txn_list.transactions, txn_infos, write_sets, event_vecs, &VerifyExecutionMode::verify_all()).unwrap();
             replayer.executor.commit().unwrap();
             let replayed_db = replayer.db.reader.clone();
             prop_assert_eq!(
-                replayed_db.get_accumulator_root_hash(num_txns).unwrap(),
-                db.get_accumulator_root_hash(num_txns).unwrap()
+                replayed_db.get_accumulator_root_hash(ledger_version).unwrap(),
+                db.get_accumulator_root_hash(ledger_version).unwrap()
             );
         }
 

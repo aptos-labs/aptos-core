@@ -425,6 +425,10 @@ impl Block {
             .collect()
     }
 
+    /// List of input transactions for each block.
+    /// Prepends BlockMetadata and validator txns, and then all user txns.
+    ///
+    /// It doesn't add StateCheckpoint/BlockEpilogue transaction - that gets added during execution.
     pub fn transactions_to_execute(
         &self,
         validators: &[AccountAddress],

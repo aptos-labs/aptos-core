@@ -173,6 +173,7 @@ impl ExecutedBlock {
             .block
             .transactions_to_execute(validators, validator_txns, txns);
 
+        // Adds StateCheckpoint/BlockEpilogue transaction if needed.
         self.state_compute_result
             .transactions_to_commit(input_txns, self.id())
     }
@@ -189,7 +190,10 @@ impl ExecutedBlock {
     /// from parent but has no transaction.
     pub fn is_reconfiguration_suffix(&self) -> bool {
         self.state_compute_result.has_reconfiguration()
-            && self.state_compute_result.compute_status().is_empty()
+            && self
+                .state_compute_result
+                .compute_status_for_input_txns()
+                .is_empty()
     }
 
     pub fn elapsed_in_pipeline(&self) -> Option<Duration> {
