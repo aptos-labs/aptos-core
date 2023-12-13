@@ -57,7 +57,7 @@ fn check_read_ref(target: &FunctionTarget, t: TempIndex, loc: &Loc) {
     if let Type::Reference(_, ty) = target.get_local_type(t) {
         check_copy(target, ty, loc, "cannot copy")
     } else {
-        panic!("ICE from ability checker: read_ref has non-reference argument")
+        panic!("ICE ability checker: read_ref has non-reference argument")
     }
 }
 
@@ -82,7 +82,7 @@ fn check_write_ref(target: &FunctionTarget, t: TempIndex, loc: &Loc) {
     if let Type::Reference(_, ty) = target.get_local_type(t) {
         check_drop(target, ty, loc, "write_ref: cannot drop")
     } else {
-        panic!("ICE typing error")
+        panic!("ICE ability checker: write_ref has non-reference destination")
     }
 }
 
@@ -104,7 +104,7 @@ fn ty_param_abilities(ty_params: &[TypeParameter]) -> impl Fn(u16) -> AbilitySet
         if let Some(tp) = ty_params.get(i as usize) {
             tp.1.abilities
         } else {
-            panic!("ICE unbound type parameter")
+            panic!("ICE ability checker: unbound type parameter")
         }
     }
 }
