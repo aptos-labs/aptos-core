@@ -11,6 +11,7 @@ use crate::{
     utils,
 };
 use aptos_crypto::{x25519, Uniform};
+use aptos_logger::warn;
 use aptos_secure_storage::{CryptoStorage, KVStorage, Storage};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{
@@ -67,11 +68,12 @@ pub struct NetworkConfig {
     pub network_channel_size: usize,
     /// Maximum number of concurrent network requests
     pub max_concurrent_network_reqs: usize,
-    /// Choose a protocol to discover and dial out to other peers on this network.
+    #[deprecated(since = "1.8.3", note = "Please use `discovery_methods` instead.")]
+    pub discovery_method: Option<DiscoveryMethod>,
+    /// Choose protocols to discover and dial out to other peers on this network.
+    /// This defaults to `DiscoveryMethod::Onchain`.
     /// `DiscoveryMethod::None` disables discovery and dialing out (unless you have
     /// seed peers configured).
-    pub discovery_method: DiscoveryMethod,
-    /// Same as `discovery_method` but allows for multiple
     pub discovery_methods: Vec<DiscoveryMethod>,
     /// Identity of this network
     pub identity: Identity,
@@ -134,11 +136,12 @@ impl Default for NetworkConfig {
 }
 
 impl NetworkConfig {
+    #[allow(deprecated)]
     pub fn network_with_id(network_id: NetworkId) -> NetworkConfig {
         let mutual_authentication = network_id.is_validator_network();
         let mut config = Self {
-            discovery_method: DiscoveryMethod::None,
-            discovery_methods: Vec::new(),
+            discovery_method: None,
+            discovery_methods: vec![DiscoveryMethod::Onchain],
             identity: Identity::None,
             listen_address: "/ip4/0.0.0.0/tcp/6180".parse().unwrap(),
             mutual_authentication,
@@ -215,18 +218,40 @@ impl NetworkConfig {
         }
     }
 
+    #[allow(deprecated)]
     pub fn discovery_methods(&self) -> Vec<&DiscoveryMethod> {
-        // TODO: This is a backwards compatibility feature.  Deprecate discovery_method
-        if self.discovery_method != DiscoveryMethod::None && !self.discovery_methods.is_empty() {
-            panic!("Can't specify discovery_method and discovery_methods")
-        } else if self.discovery_method != DiscoveryMethod::None {
-            vec![&self.discovery_method]
-        } else {
-            self.discovery_methods
-                .iter()
-                .filter(|method| &&DiscoveryMethod::None != method)
-                .collect()
+        if self.discovery_method.is_some() {
+            warn!("discovery_method is deprecated, use discovery_methods instead")
         }
+
+        // Check for invalid combinations of discovery methods.
+        let using_none_with_others = self
+            .discovery_methods
+            .iter()
+            .any(|method| matches!(method, DiscoveryMethod::None))
+            && self.discovery_methods.len() > 1;
+        let using_both_fields = self.discovery_method.is_some()
+            && self.discovery_method != Some(DiscoveryMethod::None)
+            && !self.discovery_methods.is_empty();
+
+        if using_none_with_others {
+            panic!("Can't use DiscoveryMethod::None with other discovery methods");
+        }
+        if using_both_fields {
+            panic!("Can't specify both discovery_method and discovery_methods");
+        }
+
+        // For backwards compatibility, if discovery_method is set, use that.
+        if let Some(method) = &self.discovery_method {
+            if method != &DiscoveryMethod::None {
+                return vec![method];
+            }
+        }
+
+        self.discovery_methods
+            .iter()
+            .filter(|method| &&DiscoveryMethod::None != method)
+            .collect()
     }
 
     pub fn set_listen_address_and_prepare_identity(&mut self) -> Result<(), Error> {

@@ -10,7 +10,7 @@ use crate::{
     },
 };
 use aptos_config::{
-    config::{DiscoveryMethod, NodeConfig, OverrideNodeConfig, Peer, PeerRole, HANDSHAKE_VERSION},
+    config::{NodeConfig, OverrideNodeConfig, Peer, PeerRole, HANDSHAKE_VERSION},
     network_id::NetworkId,
 };
 use aptos_forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
@@ -199,7 +199,6 @@ async fn test_private_full_node() {
     let user_network = user_config.full_node_networks.first_mut().unwrap();
     // Disallow fallbacks to VFNs
     user_network.max_outbound_connections = 1;
-    user_network.discovery_method = DiscoveryMethod::None;
 
     // The secret sauce, add the user as a downstream to the seeds
     add_node_to_seeds(

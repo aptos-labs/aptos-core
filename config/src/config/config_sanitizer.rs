@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::DiscoveryMethod;
 use crate::config::{
     node_config_loader::NodeType,
     utils::{are_failpoints_enabled, get_config_name},
@@ -141,6 +142,15 @@ fn sanitize_fullnode_network_configs(
                     network_id
                 ),
             ));
+        }
+
+        if fullnode_network_config
+            .discovery_methods
+            .iter()
+            .any(|method| matches!(method, DiscoveryMethod::None))
+            && fullnode_network_config.discovery_methods.len() > 1
+        {
+            panic!("Can't use DiscoveryMethod::None with other discovery methods")
         }
     }
 

@@ -2,11 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{create_single_node_test_config, network};
-use aptos_config::config::{NodeConfig, WaypointConfig};
+use aptos_config::config::{
+    merge_node_config, DiscoveryMethod, NodeConfig, RoleType, WaypointConfig,
+};
 use aptos_event_notifications::EventSubscriptionService;
 use aptos_infallible::RwLock;
+use aptos_network_builder::builder::NetworkBuilder;
 use aptos_storage_interface::{DbReader, DbReaderWriter, DbWriter};
 use aptos_temppath::TempPath;
+use aptos_time_service::TimeService;
 use aptos_types::{chain_id::ChainId, waypoint::Waypoint};
 use rand::SeedableRng;
 use std::{fs, sync::Arc};
@@ -109,4 +113,46 @@ fn test_create_single_node_test_config() {
             .state_sync_driver
             .bootstrapping_mode
     );
+}
+
+#[tokio::test]
+#[should_panic(expected = "Can't use DiscoveryMethod::None with other discovery methods")]
+async fn test_invalid_discovery_methods() {
+    let node_config = NodeConfig::get_default_validator_config();
+    let config_override: serde_yaml::Value = serde_yaml::from_str(
+        r#"
+        validator_network:
+            discovery_methods:
+            - "onchain"
+            - "none"
+            mutual_authentication: true
+        "#,
+    )
+    .unwrap();
+    let merged_config = merge_node_config(node_config, config_override).unwrap();
+
+    let mut event_subscription_service =
+        EventSubscriptionService::new(Arc::new(RwLock::new(DbReaderWriter::new(MockDatabase {}))));
+    let peers_and_metadata = network::create_peers_and_metadata(&merged_config);
+
+    NetworkBuilder::create(
+        ChainId::test(),
+        RoleType::Validator,
+        &merged_config.validator_network.unwrap(),
+        TimeService::real(),
+        Some(&mut event_subscription_service),
+        peers_and_metadata,
+    );
+}
+
+#[test]
+fn test_default_onchain_discovery_methods() {
+    let node_config = NodeConfig::get_default_validator_config();
+    let discovery_methods = node_config
+        .validator_network
+        .unwrap()
+        .discovery_methods
+        .clone();
+    assert_eq!(discovery_methods.len(), 1);
+    assert!(discovery_methods.contains(&DiscoveryMethod::Onchain));
 }

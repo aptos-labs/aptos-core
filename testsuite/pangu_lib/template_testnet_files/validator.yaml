@@ -32,7 +32,6 @@ full_node_networks:
 
 
 validator_network:
-  discovery_method: "onchain"
   mutual_authentication: true
   identity:
     type: "from_file"

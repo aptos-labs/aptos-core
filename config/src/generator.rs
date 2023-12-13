@@ -6,9 +6,7 @@
 //! genesis.blob.
 
 use crate::{
-    config::{
-        DiscoveryMethod, NetworkConfig, NodeConfig, Peer, PeerRole, PeerSet, HANDSHAKE_VERSION,
-    },
+    config::{NetworkConfig, NodeConfig, Peer, PeerRole, PeerSet, HANDSHAKE_VERSION},
     network_id::NetworkId,
 };
 use rand::{rngs::StdRng, SeedableRng};
@@ -35,7 +33,6 @@ pub fn validator_swarm(
 
         // For a validator node, any of its validator peers are considered an upstream peer
         let network = node.validator_network.as_mut().unwrap();
-        network.discovery_method = DiscoveryMethod::Onchain;
         network.mutual_authentication = true;
         network.network_id = NetworkId::Validator;
 

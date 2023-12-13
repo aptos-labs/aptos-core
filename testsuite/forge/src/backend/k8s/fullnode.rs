@@ -10,8 +10,8 @@ use crate::{
 use anyhow::Context;
 use aptos_config::{
     config::{
-        ApiConfig, BaseConfig, DiscoveryMethod, ExecutionConfig, NetworkConfig, NodeConfig,
-        OverrideNodeConfig, RoleType, WaypointConfig,
+        ApiConfig, BaseConfig, ExecutionConfig, NetworkConfig, NodeConfig, OverrideNodeConfig,
+        RoleType, WaypointConfig,
     },
     network_id::NetworkId,
 };
@@ -311,7 +311,6 @@ pub fn get_default_pfn_node_config() -> NodeConfig {
         },
         full_node_networks: vec![NetworkConfig {
             network_id: NetworkId::Public,
-            discovery_method: DiscoveryMethod::Onchain,
             // defaults to listening on "/ip4/0.0.0.0/tcp/6180"
             ..NetworkConfig::default()
         }],

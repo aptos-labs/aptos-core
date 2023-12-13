@@ -9,8 +9,8 @@ use crate::{
 use anyhow::ensure;
 use aptos_config::{
     config::{
-        DiscoveryMethod, Identity, IdentityBlob, InitialSafetyRulesConfig, NetworkConfig,
-        NodeConfig, OnDiskStorageConfig, OverrideNodeConfig, PeerRole, PersistableConfig, RoleType,
+        Identity, IdentityBlob, InitialSafetyRulesConfig, NetworkConfig, NodeConfig,
+        OnDiskStorageConfig, OverrideNodeConfig, PeerRole, PersistableConfig, RoleType,
         SafetyRulesService, SecureBackend, WaypointConfig,
     },
     generator::build_seed_for_network,
@@ -583,7 +583,6 @@ impl Builder {
             listen_address: fullnode_network_listen_address,
             network_id: NetworkId::Public,
             max_outbound_connections: 0,
-            discovery_method: DiscoveryMethod::Onchain,
             identity: Identity::from_file(vfn_identity_path.clone()),
             ..Default::default()
         };
