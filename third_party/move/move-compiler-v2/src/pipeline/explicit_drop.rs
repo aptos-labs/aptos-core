@@ -90,9 +90,9 @@ impl<'a> ExplicitDropTransformer<'a> {
     }
 
     fn drop_unused_args(&mut self) {
-        let code_offset = 0;
-        let live_var_info = self.get_live_var_info(code_offset);
-        let lifetime_info = self.get_lifetime_info(code_offset);
+        let start_code_offset = 0;
+        let live_var_info = self.get_live_var_info(start_code_offset);
+        let lifetime_info = self.get_lifetime_info(start_code_offset);
         for arg in self.target.get_parameters() {
             if !live_var_info.before.contains_key(&arg) && !lifetime_info.before.is_borrowed(arg) {
                 let attr_id = self.target.get_bytecode()[0].get_attr_id();
