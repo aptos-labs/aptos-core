@@ -55,6 +55,7 @@ pub struct LiveVarInfoAtCodeOffset {
 impl LiveVarInfoAtCodeOffset {
     /// Returns the temporaries that are alive before the program point and dead after.
     pub fn released_temps(&self) -> impl Iterator<Item = TempIndex> + '_ {
+        // TODO: make this linear
         self.before
             .keys()
             .filter(|t| !self.after.contains_key(t))
