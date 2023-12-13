@@ -1,0 +1,73 @@
+processed 3 tasks
+
+task 1 'publish'. lines 4-46:
+
+
+
+task 2 'run'. lines 48-48:
+mutable inputs after call: local#0: 0
+return values: 0
+
+>>> V1 Compiler {
+== BEGIN Bytecode ==
+// Move bytecode v6
+module f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6.game {
+use 0000000000000000000000000000000000000000000000000000000000000001::debug;
+use 0000000000000000000000000000000000000000000000000000000000000001::signer;
+
+
+struct InnerStruct has copy, store, key {
+	amount: u64
+}
+struct OuterStruct has key {
+	any_field: vector<InnerStruct>
+}
+
+entry public test_upgrade(Arg0: &signer) {
+L0:	loc1: u64
+L1:	loc2: u64
+L2:	loc3: &mut vector<InnerStruct>
+B0:
+	0: CopyLoc[0](Arg0: &signer)
+	1: Call signer::address_of(&signer): address
+	2: StLoc[1](loc0: address)
+	3: MoveLoc[0](Arg0: &signer)
+	4: VecPack(4, 0)
+	5: Pack[1](OuterStruct)
+	6: MoveTo[1](OuterStruct)
+	7: MoveLoc[1](loc0: address)
+	8: MutBorrowGlobal[1](OuterStruct)
+	9: MutBorrowField[0](OuterStruct.any_field: vector<InnerStruct>)
+	10: StLoc[4](loc3: &mut vector<InnerStruct>)
+	11: LdU64(0)
+	12: StLoc[2](loc1: u64)
+	13: CopyLoc[4](loc3: &mut vector<InnerStruct>)
+	14: FreezeRef
+	15: VecLen(4)
+	16: StLoc[3](loc2: u64)
+B1:
+	17: CopyLoc[2](loc1: u64)
+	18: CopyLoc[3](loc2: u64)
+	19: Lt
+	20: BrFalse(32)
+B2:
+	21: Branch(22)
+B3:
+	22: CopyLoc[4](loc3: &mut vector<InnerStruct>)
+	23: CopyLoc[2](loc1: u64)
+	24: VecMutBorrow(4)
+	25: FreezeRef
+	26: Call debug::print<InnerStruct>(&InnerStruct)
+	27: MoveLoc[2](loc1: u64)
+	28: LdU64(1)
+	29: Add
+	30: StLoc[2](loc1: u64)
+	31: Branch(17)
+B4:
+	32: MoveLoc[4](loc3: &mut vector<InnerStruct>)
+	33: Pop
+	34: Ret
+}
+}
+== END Bytecode ==
+}
