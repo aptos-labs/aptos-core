@@ -12,7 +12,6 @@ Reconfiguration, and may be updated by root.
 -  [Function `initialize`](#0x1_consensus_config_initialize)
 -  [Function `set`](#0x1_consensus_config_set)
 -  [Specification](#@Specification_1)
-    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `set`](#@Specification_1_set)
 
@@ -128,11 +127,6 @@ This can be called by on-chain governance to update on-chain consensus configs.
 <a id="@Specification_1"></a>
 
 ## Specification
-
-
-<a id="@Module-level_Specification_2"></a>
-
-### Module-level Specification
 
 
 
