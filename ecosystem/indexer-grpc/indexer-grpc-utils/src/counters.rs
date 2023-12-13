@@ -45,8 +45,8 @@ impl IndexerGrpcStep {
             // Fullnode steps
             IndexerGrpcStep::FullnodeFetchedBatch => "1",
             IndexerGrpcStep::FullnodeDecodedBatch => "2",
-            IndexerGrpcStep::FullnodeProcessedBatch => "3",
-            IndexerGrpcStep::FullnodeSentBatch => "4",
+            IndexerGrpcStep::FullnodeSentBatch => "3",
+            IndexerGrpcStep::FullnodeProcessedBatch => "4",
         }
     }
 
@@ -227,7 +227,6 @@ pub fn log_grpc_step(
 
 pub fn log_grpc_step_fullnode(
     step: IndexerGrpcStep,
-    enable_logging: bool,
     start_version: Option<i64>,
     end_version: Option<i64>,
     end_version_timestamp: Option<&Timestamp>,
@@ -260,18 +259,16 @@ pub fn log_grpc_step_fullnode(
             .set(end_txn_timestamp_unixtime);
     }
 
-    if enable_logging {
-        tracing::info!(
-            start_version,
-            end_version,
-            num_transactions,
-            duration_in_secs,
-            highest_known_version,
-            tps,
-            service_type,
-            step = step.get_step(),
-            "{}",
-            step.get_label(),
-        );
-    }
+    tracing::info!(
+        start_version,
+        end_version,
+        num_transactions,
+        duration_in_secs,
+        highest_known_version,
+        tps,
+        service_type,
+        step = step.get_step(),
+        "{}",
+        step.get_label(),
+    );
 }
