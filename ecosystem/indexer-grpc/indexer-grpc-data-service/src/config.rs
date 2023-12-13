@@ -66,7 +66,12 @@ pub struct IndexerGrpcDataServiceConfig {
     pub file_store_config: IndexerGrpcFileStoreConfig,
     /// Redis read replica address.
     pub redis_read_replica_address: RedisUrl,
+    #[serde(default = "default_enable_verbose_logging")]
     pub enable_verbose_logging: bool,
+}
+
+fn default_enable_verbose_logging() -> bool {
+    false
 }
 
 impl IndexerGrpcDataServiceConfig {

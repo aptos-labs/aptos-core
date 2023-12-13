@@ -16,7 +16,12 @@ use tonic::{Request, Response, Status};
 
 pub struct FullnodeDataService {
     pub service_context: ServiceContext,
+    #[serde(default = "default_enable_verbose_logging")]
     pub enable_verbose_logging: bool,
+}
+
+fn default_enable_verbose_logging() -> bool {
+    false
 }
 
 type FullnodeResponseStream =

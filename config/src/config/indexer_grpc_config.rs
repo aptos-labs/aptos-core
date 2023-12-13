@@ -42,7 +42,12 @@ pub struct IndexerGrpcConfig {
     /// Number of transactions returned in a single stream response
     pub output_batch_size: u16,
 
+    #[serde(default = "default_enable_verbose_logging")]
     pub enable_verbose_logging: bool,
+}
+
+fn default_enable_verbose_logging() -> bool {
+    false
 }
 
 impl Debug for IndexerGrpcConfig {

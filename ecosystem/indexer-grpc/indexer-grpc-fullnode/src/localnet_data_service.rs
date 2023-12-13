@@ -23,7 +23,12 @@ type TransactionResponseStream =
 
 pub struct LocalnetDataService {
     pub service_context: ServiceContext,
+    #[serde(default = "default_enable_verbose_logging")]
     pub enable_verbose_logging: bool,
+}
+
+fn default_enable_verbose_logging() -> bool {
+    false
 }
 
 /// External service on the fullnode is for testing/local development only.

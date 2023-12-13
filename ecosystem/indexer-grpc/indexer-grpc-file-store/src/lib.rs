@@ -15,7 +15,12 @@ use serde::{Deserialize, Serialize};
 pub struct IndexerGrpcFileStoreWorkerConfig {
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub redis_main_instance_address: RedisUrl,
+    #[serde(default = "default_enable_verbose_logging")]
     pub enable_verbose_logging: bool,
+}
+
+fn default_enable_verbose_logging() -> bool {
+    false
 }
 
 impl IndexerGrpcFileStoreWorkerConfig {
