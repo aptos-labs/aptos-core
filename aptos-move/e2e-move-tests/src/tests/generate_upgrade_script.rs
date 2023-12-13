@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{tests::common, MoveHarness};
-use aptos_framework::{BuildOptions, BuiltPackage, ReleasePackage};
+use crate::{build_package, tests::common, MoveHarness};
+use aptos_framework::{BuildOptions, ReleasePackage};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::account_address::AccountAddress;
 use move_package::compilation::package_layout::CompiledPackageLayout;
@@ -37,7 +37,7 @@ module 0x{}::test {{
     let proposal_dir = proposal.write_to_temp().unwrap();
 
     let upgrade_release = ReleasePackage::new(
-        BuiltPackage::build(upgrade_dir.path().to_path_buf(), BuildOptions::default()).unwrap(),
+        build_package(upgrade_dir.path().to_path_buf(), BuildOptions::default()).unwrap(),
     )
     .unwrap();
 
@@ -52,8 +52,7 @@ module 0x{}::test {{
                 .join("proposal.move"),
         )
         .unwrap();
-    let _ =
-        BuiltPackage::build(proposal_dir.path().to_path_buf(), BuildOptions::default()).unwrap();
+    let _ = build_package(proposal_dir.path().to_path_buf(), BuildOptions::default()).unwrap();
 
     // TODO: maybe execute the proposal.
 }

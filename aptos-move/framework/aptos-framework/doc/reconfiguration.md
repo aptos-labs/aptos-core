@@ -20,6 +20,7 @@ to synchronize configuration changes for the validators.
 -  [Function `current_epoch`](#0x1_reconfiguration_current_epoch)
 -  [Function `emit_genesis_reconfiguration_event`](#0x1_reconfiguration_emit_genesis_reconfiguration_event)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `disable_reconfiguration`](#@Specification_1_disable_reconfiguration)
     -  [Function `enable_reconfiguration`](#@Specification_1_enable_reconfiguration)
@@ -482,6 +483,11 @@ reconfiguration event.
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 

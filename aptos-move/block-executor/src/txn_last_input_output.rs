@@ -6,6 +6,7 @@ use crate::{
     errors::{Error, IntentionalFallbackToSequential},
     explicit_sync_wrapper::ExplicitSyncWrapper,
     task::{ExecutionStatus, TransactionOutput},
+    types::{InputOutputKey, ReadWriteSummary},
 };
 use aptos_aggregator::types::PanicOr;
 use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
@@ -18,7 +19,7 @@ use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
 use move_core_types::value::MoveTypeLayout;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     fmt::Debug,
     iter::{empty, Iterator},
     sync::{
@@ -173,6 +174,19 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                 Some(output.fee_statement())
+            },
+            _ => None,
+        }
+    }
+
+    pub(crate) fn output_approx_size(&self, txn_idx: TxnIndex) -> Option<u64> {
+        match &self.outputs[txn_idx as usize]
+            .load_full()
+            .expect("[BlockSTM]: Execution output must be recorded after execution")
+            .output_status
+        {
+            ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
+                Some(output.output_approx_size())
             },
             _ => None,
         }
@@ -418,6 +432,31 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             | ExecutionStatus::SpeculativeExecutionAbortError(_)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {},
         };
+    }
+
+    pub(crate) fn get_txn_read_write_summary(&self, txn_idx: TxnIndex) -> ReadWriteSummary<T> {
+        let read_set = self.read_set(txn_idx).expect("Read set must be recorded");
+
+        let reads = read_set.get_read_summary();
+        let writes = self.get_write_summary(txn_idx);
+        ReadWriteSummary::new(reads, writes)
+    }
+
+    pub(crate) fn get_write_summary(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>> {
+        match &self.outputs[txn_idx as usize]
+            .load_full()
+            .expect("Output must exist")
+            .output_status
+        {
+            ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t.get_write_summary(),
+            ExecutionStatus::Abort(_)
+            | ExecutionStatus::DirectWriteSetTransactionNotCapableError
+            | ExecutionStatus::SpeculativeExecutionAbortError(_)
+            | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => HashSet::new(),
+        }
     }
 
     // Must be executed after parallel execution is done, grabs outputs. Will panic if

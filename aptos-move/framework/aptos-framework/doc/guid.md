@@ -18,6 +18,7 @@ A module for generating globally unique identifiers
 -  [Function `id_creation_num`](#0x1_guid_id_creation_num)
 -  [Function `eq_id`](#0x1_guid_eq_id)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `create`](#@Specification_1_create)
     -  [Function `create_id`](#@Specification_1_create_id)
     -  [Function `id`](#@Specification_1_id)
@@ -319,6 +320,11 @@ Return true if the GUID's ID is <code>id</code>
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 

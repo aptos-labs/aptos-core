@@ -36,6 +36,7 @@ It also supports deserializing property value to it original type.
 -  [Function `create_property_value_raw`](#0x3_property_map_create_property_value_raw)
 -  [Function `create_property_value`](#0x3_property_map_create_property_value)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `new`](#@Specification_1_new)
     -  [Function `new_with_key_and_property_value`](#@Specification_1_new_with_key_and_property_value)
     -  [Function `empty`](#@Specification_1_empty)
@@ -902,6 +903,11 @@ create a property value from generic type data
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 

@@ -11,7 +11,7 @@ use aptos_types::on_chain_config::{
     ApprovedExecutionHashes, ConfigStorage, GasSchedule, GasScheduleV2, OnChainConfig,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_log, speculative_warn};
-use aptos_vm_types::storage::{StorageGasParameters, StoragePricing};
+use aptos_vm_types::storage::{io_pricing::IoPricing, StorageGasParameters};
 use move_core_types::{
     gas_algebra::NumArgs,
     language_storage::CORE_CODE_ADDRESS,
@@ -58,12 +58,13 @@ pub(crate) fn get_gas_parameters(
             let storage_gas_params =
                 StorageGasParameters::new(gas_feature_version, gas_params, config_storage);
 
+            // TODO(gas): Table extension utilizes IoPricing directly.
             // Overwrite table io gas parameters with global io pricing.
             let g = &mut gas_params.natives.table;
             match gas_feature_version {
                 0..=1 => (),
                 2..=6 => {
-                    if let StoragePricing::V2(pricing) = &storage_gas_params.pricing {
+                    if let IoPricing::V2(pricing) = &storage_gas_params.io_pricing {
                         g.common_load_base_legacy = pricing.per_item_read * NumArgs::new(1);
                         g.common_load_base_new = 0.into();
                         g.common_load_per_byte = pricing.per_byte_read;
@@ -71,7 +72,7 @@ pub(crate) fn get_gas_parameters(
                     }
                 }
                 7..=9 => {
-                    if let StoragePricing::V2(pricing) = &storage_gas_params.pricing {
+                    if let IoPricing::V2(pricing) = &storage_gas_params.io_pricing {
                         g.common_load_base_legacy = 0.into();
                         g.common_load_base_new = pricing.per_item_read * NumArgs::new(1);
                         g.common_load_per_byte = pricing.per_byte_read;

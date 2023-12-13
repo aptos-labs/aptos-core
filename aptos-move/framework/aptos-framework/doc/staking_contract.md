@@ -79,6 +79,7 @@ pool.
 -  [Function `create_resource_account_seed`](#0x1_staking_contract_create_resource_account_seed)
 -  [Function `new_staking_contracts_holder`](#0x1_staking_contract_new_staking_contracts_holder)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `stake_pool_address`](#@Specification_1_stake_pool_address)
     -  [Function `last_recorded_principal`](#@Specification_1_last_recorded_principal)
     -  [Function `commission_percentage`](#@Specification_1_commission_percentage)
@@ -2168,6 +2169,11 @@ Create a new staking_contracts resource.
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 

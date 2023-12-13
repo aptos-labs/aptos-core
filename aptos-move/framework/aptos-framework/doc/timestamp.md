@@ -16,6 +16,7 @@ It interacts with the other modules in the following ways:
 -  [Function `now_microseconds`](#0x1_timestamp_now_microseconds)
 -  [Function `now_seconds`](#0x1_timestamp_now_seconds)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `update_global_time`](#@Specification_1_update_global_time)
 
 
@@ -211,6 +212,11 @@ Gets the current time in seconds.
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 

@@ -16,11 +16,7 @@ use std::{
 };
 
 pub const BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG: BlockExecutorConfigFromOnchain =
-    BlockExecutorConfigFromOnchain {
-    block_gas_limit_type:
-        // present, but large to not limit blocks
-        aptos_types::on_chain_config::BlockGasLimitType::Limit(1_000_000_000),
-};
+    BlockExecutorConfigFromOnchain::on_but_large_for_test();
 
 pub struct TransactionExecutor<V> {
     num_blocks_processed: usize,

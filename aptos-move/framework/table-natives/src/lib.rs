@@ -287,6 +287,19 @@ fn charge_load_cost(
 
     match loaded {
         Some(Some(num_bytes)) => {
+            let num_bytes = if context.gas_feature_version() >= 12 {
+                // Round up bytes to whole pages
+                // TODO(gas): make PAGE_SIZE configurable
+                const PAGE_SIZE: u64 = 4096;
+
+                let loaded_u64: u64 = num_bytes.into();
+                let r = loaded_u64 % PAGE_SIZE;
+                let rounded_up = loaded_u64 + if r == 0 { 0 } else { PAGE_SIZE - r };
+
+                NumBytes::new(rounded_up)
+            } else {
+                num_bytes
+            };
             context.charge(COMMON_LOAD_BASE_NEW + COMMON_LOAD_PER_BYTE * num_bytes)
         },
         Some(None) => context.charge(COMMON_LOAD_BASE_NEW + COMMON_LOAD_FAILURE),

@@ -17,6 +17,7 @@ on account to have access to this.
 
 -  [Function `create_signer`](#0x1_create_signer_create_signer)
 -  [Specification](#@Specification_0)
+    -  [Module-level Specification](#@Module-level_Specification_1)
     -  [Function `create_signer`](#@Specification_0_create_signer)
 
 
@@ -49,6 +50,11 @@ on account to have access to this.
 <a id="@Specification_0"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_1"></a>
+
+### Module-level Specification
 
 
 

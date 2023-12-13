@@ -64,7 +64,8 @@ the return on investment didn't seem worth it for these simple functions.
 -  [Function `all`](#0x1_vector_all)
 -  [Function `destroy`](#0x1_vector_destroy)
 -  [Specification](#@Specification_1)
-    -  [Helper Functions](#@Helper_Functions_2)
+    -  [Module-level Specification](#@Module-level_Specification_2)
+    -  [Helper Functions](#@Helper_Functions_3)
     -  [Function `singleton`](#@Specification_1_singleton)
     -  [Function `reverse`](#@Specification_1_reverse)
     -  [Function `reverse_slice`](#@Specification_1_reverse_slice)
@@ -1587,8 +1588,13 @@ when used in the context of destroying a vector.
 ## Specification
 
 
+<a id="@Module-level_Specification_2"></a>
 
-<a id="@Helper_Functions_2"></a>
+### Module-level Specification
+
+
+
+<a id="@Helper_Functions_3"></a>
 
 ### Helper Functions
 

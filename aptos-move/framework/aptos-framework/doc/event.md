@@ -19,6 +19,7 @@ events emitted to a handle and emit events to the event store.
 -  [Function `write_to_event_store`](#0x1_event_write_to_event_store)
 -  [Function `destroy_handle`](#0x1_event_destroy_handle)
 -  [Specification](#@Specification_0)
+    -  [Module-level Specification](#@Module-level_Specification_1)
     -  [Function `emit`](#@Specification_0_emit)
     -  [Function `write_module_event_to_store`](#@Specification_0_write_module_event_to_store)
     -  [Function `emit_event`](#@Specification_0_emit_event)
@@ -283,6 +284,11 @@ Destroy a unique handle.
 <a id="@Specification_0"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_1"></a>
+
+### Module-level Specification
 
 
 

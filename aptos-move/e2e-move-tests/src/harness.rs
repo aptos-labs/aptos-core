@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, AptosPackageHooks};
+use crate::{assert_success, build_package, AptosPackageHooks};
 use anyhow::Error;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
@@ -398,7 +398,7 @@ impl MoveHarness {
         options: Option<BuildOptions>,
         patch_metadata: impl FnMut(&mut PackageMetadata),
     ) -> SignedTransaction {
-        let package = BuiltPackage::build(path.to_owned(), options.unwrap_or_default())
+        let package = build_package(path.to_owned(), options.unwrap_or_default())
             .expect("building package must succeed");
         self.create_publish_built_package(account, &package, patch_metadata)
     }
@@ -413,10 +413,7 @@ impl MoveHarness {
             let mut cache = CACHED_BUILT_PACKAGES.lock().unwrap();
 
             Arc::clone(cache.entry(path.to_owned()).or_insert_with(|| {
-                Arc::new(BuiltPackage::build(
-                    path.to_owned(),
-                    BuildOptions::default(),
-                ))
+                Arc::new(build_package(path.to_owned(), BuildOptions::default()))
             }))
         };
         let package_ref = package_arc

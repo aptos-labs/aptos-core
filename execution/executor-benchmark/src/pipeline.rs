@@ -181,6 +181,11 @@ where
                     executed
                 );
                 info!(
+                    "Overall execution effectiveGPS: {} gas/s (over {} txns)",
+                    delta_gas.effective_block_gas / elapsed,
+                    executed
+                );
+                info!(
                     "Overall execution ioGPS: {} gas/s (over {} txns)",
                     delta_gas.io_gas / elapsed,
                     executed
@@ -194,6 +199,10 @@ where
                     "Overall execution GPT: {} gas/txn (over {} txns)",
                     delta_gas.gas / (delta_gas.gas_count as f64).max(1.0),
                     executed
+                );
+                info!(
+                    "Overall execution approx_output: {} bytes/s",
+                    delta_gas.approx_block_output / elapsed
                 );
                 info!(
                     "Overall execution output: {} bytes/s",

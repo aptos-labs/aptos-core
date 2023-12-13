@@ -34,7 +34,7 @@ use aptos_vm_types::{
         ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TModuleView,
         TResourceGroupView, TResourceView,
     },
-    storage::ChangeSetConfigs,
+    storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
 use move_core_types::{

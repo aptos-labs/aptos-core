@@ -11,6 +11,7 @@ details on BCS.
 
 -  [Function `to_bytes`](#0x1_bcs_to_bytes)
 -  [Specification](#@Specification_0)
+    -  [Module-level Specification](#@Module-level_Specification_1)
 
 
 <pre><code></code></pre>
@@ -43,6 +44,11 @@ Return the binary representation of <code>v</code> in BCS (Binary Canonical Seri
 <a id="@Specification_0"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_1"></a>
+
+### Module-level Specification
 
 
 

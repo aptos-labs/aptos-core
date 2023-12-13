@@ -22,7 +22,10 @@ export class MultiEd25519PublicKey {
    * @param public_keys A list of public keys
    * @param threshold At least "threshold" signatures must be valid
    */
-  constructor(public readonly public_keys: Seq<Ed25519PublicKey>, public readonly threshold: Uint8) {
+  constructor(
+    public readonly public_keys: Seq<Ed25519PublicKey>,
+    public readonly threshold: Uint8,
+  ) {
     if (threshold > MAX_SIGNATURES_SUPPORTED) {
       throw new Error(`"threshold" cannot be larger than ${MAX_SIGNATURES_SUPPORTED}`);
     }
@@ -73,7 +76,10 @@ export class MultiEd25519Signature {
    * @param bitmap 4 bytes, at most 32 signatures are supported. If Nth bit value is `1`, the Nth
    * signature should be provided in `signatures`. Bits are read from left to right
    */
-  constructor(public readonly signatures: Seq<Ed25519Signature>, public readonly bitmap: Uint8Array) {
+  constructor(
+    public readonly signatures: Seq<Ed25519Signature>,
+    public readonly bitmap: Uint8Array,
+  ) {
     if (bitmap.length !== MultiEd25519Signature.BITMAP_LEN) {
       throw new Error(`"bitmap" length should be ${MultiEd25519Signature.BITMAP_LEN}`);
     }

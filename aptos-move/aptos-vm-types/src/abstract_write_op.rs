@@ -63,10 +63,7 @@ impl AbstractResourceWriteOp {
                             write_len: materialized_size.expect("Modification must have size"),
                         }
                     },
-                    Deletion => WriteOpSize::Deletion,
-                    DeletionWithMetadata { metadata } => WriteOpSize::DeletionWithDeposit {
-                        deposit: metadata.deposit(),
-                    },
+                    Deletion | DeletionWithMetadata { .. } => WriteOpSize::Deletion,
                 }
             },
             InPlaceDelayedFieldChange(InPlaceDelayedFieldChangeOp {

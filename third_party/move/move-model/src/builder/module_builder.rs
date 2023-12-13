@@ -459,7 +459,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let type_params = et.analyze_and_add_type_params(
             def.type_parameters
                 .iter()
-                .map(|s| (&s.name, &s.constraints)),
+                .map(|s| (&s.name, &s.constraints, s.is_phantom)),
         );
         et.parent.parent.define_struct(
             et.to_loc(&def.loc),
@@ -485,8 +485,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let attributes = self.translate_attributes(&def.attributes);
         let mut et = ExpTranslator::new(self);
         et.enter_scope();
-        let type_params = et
-            .analyze_and_add_type_params(def.signature.type_parameters.iter().map(|(n, a)| (n, a)));
+        let type_params = et.analyze_and_add_type_params(
+            def.signature
+                .type_parameters
+                .iter()
+                .map(|(n, a)| (n, a, false)),
+        );
         et.enter_scope();
         let params = et.analyze_and_add_params(&def.signature.parameters, true);
         let result_type = et.translate_type(&def.signature.return_type);
@@ -743,8 +747,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         for_move_fun: bool,
     ) -> (Vec<TypeParameter>, Vec<Parameter>, Type) {
         let et = &mut ExpTranslator::new(self);
-        let type_params =
-            et.analyze_and_add_type_params(signature.type_parameters.iter().map(|(n, a)| (n, a)));
+        let type_params = et.analyze_and_add_type_params(
+            signature.type_parameters.iter().map(|(n, a)| (n, a, false)),
+        );
         et.enter_scope();
         let params = et.analyze_and_add_params(&signature.parameters, for_move_fun);
         let result_type = et.translate_type(&signature.return_type);
@@ -764,7 +769,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let name = self.symbol_pool().make(name.value.as_str());
         let (type_params, type_) = {
             let et = &mut ExpTranslator::new(self);
-            let type_params = et.analyze_and_add_type_params(type_params);
+            let type_params =
+                et.analyze_and_add_type_params(type_params.into_iter().map(|(n, a)| (n, a, false)));
             let type_ = et.translate_type(type_);
             (type_params, type_)
         };
@@ -805,7 +811,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let qsym = self.qualified_by_module_from_name(name);
         let mut et = ExpTranslator::new(self);
         et.enter_scope();
-        let type_params = et.analyze_and_add_type_params(type_params);
+        let type_params =
+            et.analyze_and_add_type_params(type_params.into_iter().map(|(n, a)| (n, a, false)));
         // Extract local variables.
         let mut vars = vec![];
         for member in &block.value.members {
@@ -3236,7 +3243,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             .value
                             .type_parameters
                             .iter()
-                            .map(|(n, _)| (n, &ability_set)),
+                            .map(|(n, _)| (n, &ability_set, false)),
                     );
                     et.get_type_params()
                 };

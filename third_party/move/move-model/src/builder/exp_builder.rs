@@ -577,17 +577,24 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     /// them into the environment. Returns a vector for representing them in the target AST.
     pub fn analyze_and_add_type_params<'a, I>(&mut self, type_params: I) -> Vec<TypeParameter>
     where
-        I: IntoIterator<Item = (&'a Name, &'a EA::AbilitySet)>,
+        I: IntoIterator<Item = (&'a Name, &'a EA::AbilitySet, bool)>,
     {
         type_params
             .into_iter()
             .enumerate()
-            .map(|(i, (n, a))| {
+            .map(|(i, (n, a, is_phantom))| {
                 let ty = Type::new_param(i);
                 let sym = self.symbol_pool().make(n.value.as_str());
                 let abilities = self.parent.translate_abilities(a);
                 self.define_type_param(&self.to_loc(&n.loc), sym, ty, true /*report_errors*/);
-                TypeParameter(sym, TypeParameterKind::new(abilities))
+                TypeParameter(
+                    sym,
+                    if is_phantom {
+                        TypeParameterKind::new_phantom(abilities)
+                    } else {
+                        TypeParameterKind::new(abilities)
+                    },
+                )
             })
             .collect_vec()
     }

@@ -1,9 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(test)]
+use crate::types::InputOutputKey;
 use crate::{
     captured_reads::{
         CapturedReads, DataRead, DelayedFieldRead, DelayedFieldReadKind, GroupRead, ReadKind,
+        UnsyncReadSet,
     },
     counters,
     scheduler::{DependencyResult, DependencyStatus, Scheduler, TWaitForDependency},
@@ -744,8 +747,7 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
 
 pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
     pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-    pub(crate) resource_with_layout_read_set: RefCell<HashSet<T::Key>>,
-    pub(crate) group_read_set: RefCell<HashSet<T::Key>>,
+    pub(crate) read_set: RefCell<UnsyncReadSet<T>>,
     pub(crate) start_counter: u32,
     pub(crate) counter: &'a RefCell<u32>,
     pub(crate) dynamic_change_set_optimizations_enabled: bool,
@@ -761,8 +763,7 @@ impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
     ) -> Self {
         Self {
             unsync_map,
-            resource_with_layout_read_set: RefCell::new(HashSet::new()),
-            group_read_set: RefCell::new(HashSet::new()),
+            read_set: RefCell::new(UnsyncReadSet::default()),
             start_counter,
             counter,
             dynamic_change_set_optimizations_enabled,
@@ -822,14 +823,12 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for SequentialState<'a,
 
                 if let Some(ret) = ReadResult::from_value_with_layout(value, target_kind.clone()) {
                     if target_kind == ReadKind::Value {
-                        if let ReadResult::Value(v, l) = &ret {
-                            if v.is_some() && l.is_some() {
-                                self.resource_with_layout_read_set
-                                    .borrow_mut()
-                                    .insert(key.clone());
-                            }
-                        }
+                        self.read_set
+                            .borrow_mut()
+                            .resource_reads
+                            .insert(key.clone());
                     }
+
                     ret
                 } else {
                     *self.incorrect_use.borrow_mut() = true;
@@ -883,9 +882,12 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for SequentialStat
 
                 if let ValueWithLayout::Exchanged(v, l) = value {
                     let bytes = v.extract_raw_bytes();
-                    if bytes.is_some() && l.is_some() {
-                        self.group_read_set.borrow_mut().insert(group_key.clone());
-                    }
+                    self.read_set
+                        .borrow_mut()
+                        .group_reads
+                        .entry(group_key.clone())
+                        .or_default()
+                        .insert(resource_tag.clone());
                     Ok(GroupReadResult::Value(bytes, l.clone()))
                 } else {
                     *self.incorrect_use.borrow_mut() = true;
@@ -896,7 +898,15 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for SequentialStat
                 }
             },
             Err(UnsyncGroupError::Uninitialized) => Ok(GroupReadResult::Uninitialized),
-            Err(UnsyncGroupError::TagNotFound) => Ok(GroupReadResult::Value(None, None)),
+            Err(UnsyncGroupError::TagNotFound) => {
+                self.read_set
+                    .borrow_mut()
+                    .group_reads
+                    .entry(group_key.clone())
+                    .or_default()
+                    .insert(resource_tag.clone());
+                Ok(GroupReadResult::Value(None, None))
+            },
         }
     }
 }
@@ -947,22 +957,30 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     }
 
     #[cfg(test)]
-    fn get_resource_with_layout_read_set_sequential(&self) -> HashSet<T::Key> {
+    fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>> {
         match &self.latest_view {
-            ViewState::Sync(_) => {
-                unreachable!("Get resource read set called in parallel setting")
-            },
-            ViewState::Unsync(state) => state.resource_with_layout_read_set.borrow().clone(),
+            ViewState::Sync(state) => state.captured_reads.borrow().get_read_summary(),
+            ViewState::Unsync(state) => state.read_set.borrow().get_read_summary(),
         }
     }
 
-    /// Drains the captured reads.
-    pub(crate) fn take_reads(&self) -> CapturedReads<T> {
+    /// Drains the parallel captured reads.
+    pub(crate) fn take_parallel_reads(&self) -> CapturedReads<T> {
         match &self.latest_view {
             ViewState::Sync(state) => state.captured_reads.take(),
             ViewState::Unsync(_) => {
                 unreachable!("Take reads called in sequential setting (not captured)")
             },
+        }
+    }
+
+    /// Drains the unsync read set.
+    pub(crate) fn take_sequential_reads(&self) -> UnsyncReadSet<T> {
+        match &self.latest_view {
+            ViewState::Sync(_) => {
+                unreachable!("Take unsync reads called in parallel setting")
+            },
+            ViewState::Unsync(state) => state.read_set.take(),
         }
     }
 
@@ -1249,26 +1267,35 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
     fn get_group_reads_needing_exchange_sequential(
         &self,
-        group_read_set: &HashSet<T::Key>,
+        group_read_set: &HashMap<T::Key, HashSet<T::Tag>>,
         unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         delayed_write_set_keys: &HashSet<T::Identifier>,
         skip: &HashSet<T::Key>,
     ) -> Result<BTreeMap<T::Key, (T::Value, u64)>, PanicError> {
         group_read_set
             .iter()
-            .filter(|key| !skip.contains(key))
-            .flat_map(|key| {
+            .filter(|(key, _tags)| !skip.contains(key))
+            .flat_map(|(key, tags)| {
                 if let Some(value_vec) = unsync_map.fetch_group_data(key) {
+                    // TODO[agg_v2](cleanup) - can we use .any() instead?
                     let mut resources_needing_delayed_field_exchange = false;
-                    for (_, value_with_layout) in value_vec {
-                        if let ValueWithLayout::Exchanged(value, Some(layout)) = value_with_layout {
-                            if let Some(bytes) = value.bytes() {
-                                let identifiers_in_read = self
-                                    .extract_identifiers_from_value(bytes, layout.as_ref())
-                                    .unwrap();
-                                if !delayed_write_set_keys.is_disjoint(&identifiers_in_read) {
-                                    resources_needing_delayed_field_exchange = true;
-                                    break;
+                    for (tag, value_with_layout) in value_vec {
+                        if tags.contains(&tag) {
+                            if let ValueWithLayout::Exchanged(value, Some(layout)) =
+                                value_with_layout
+                            {
+                                if let Some(bytes) = value.bytes() {
+                                    let identifiers_in_read = self
+                                        .extract_identifiers_from_value(bytes, layout.as_ref())
+                                        .unwrap();
+                                    if !delayed_write_set_keys.is_disjoint(&identifiers_in_read) {
+                                        resources_needing_delayed_field_exchange = true;
+                                        break;
+                                    }
+                                } else {
+                                    return Some(Err(code_invariant_error(
+                                        "Delete shouldn't be in get_group_reads_needing_exchange_sequential",
+                                    )));
                                 }
                             }
                         }
@@ -1563,10 +1590,17 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
                     Err(NotFound) => self.get_raw_base_value(state_key),
                 }
             },
-            ViewState::Unsync(state) => state.unsync_map.fetch_module_data(state_key).map_or_else(
-                || self.get_raw_base_value(state_key),
-                |v| Ok(v.as_state_value()),
-            ),
+            ViewState::Unsync(state) => {
+                state
+                    .read_set
+                    .borrow_mut()
+                    .module_reads
+                    .insert(state_key.clone());
+                state.unsync_map.fetch_module_data(state_key).map_or_else(
+                    || self.get_raw_base_value(state_key),
+                    |v| Ok(v.as_state_value()),
+                )
+            },
         }
     }
 }
@@ -1621,10 +1655,19 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
         id: &Self::Identifier,
     ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
         match &self.latest_view {
-            ViewState::Sync(state) => get_delayed_field_value_impl(&state.captured_reads, state.versioned_map.delayed_fields(), state.scheduler, id, self.txn_idx),
-            ViewState::Unsync(state) => Ok(state.unsync_map.fetch_delayed_field(id).ok_or_else(|| {
-                code_invariant_error(format!("DelayedField {:?} not found in get_delayed_field_value in sequential execution", id))
-            })?),
+            ViewState::Sync(state) => get_delayed_field_value_impl(
+                &state.captured_reads,
+                state.versioned_map.delayed_fields(),
+                state.scheduler,
+                id,
+                self.txn_idx,
+            ),
+            ViewState::Unsync(state) => {
+                state.read_set.borrow_mut().delayed_field_reads.insert(*id);
+                Ok(state.unsync_map.fetch_delayed_field(id).ok_or_else(|| {
+                    code_invariant_error(format!("DelayedField {:?} not found in get_delayed_field_value in sequential execution", id))
+                })?)
+            },
         }
     }
 
@@ -1731,9 +1774,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
                 )
             },
             ViewState::Unsync(state) => {
-                let resource_with_layout_read_set = state.resource_with_layout_read_set.borrow();
+                let read_set = state.read_set.borrow();
                 self.get_reads_needing_exchange_sequential(
-                    &resource_with_layout_read_set,
+                    &read_set.resource_reads,
                     state.unsync_map,
                     delayed_write_set_keys,
                     skip,
@@ -1752,9 +1795,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
                 self.get_group_reads_needing_exchange_parallel(state, delayed_write_set_keys, skip)
             },
             ViewState::Unsync(state) => {
-                let group_read_set = state.group_read_set.borrow();
+                let read_set = state.read_set.borrow();
                 self.get_group_reads_needing_exchange_sequential(
-                    &group_read_set,
+                    &read_set.group_reads,
                     state.unsync_map,
                     delayed_write_set_keys,
                     skip,
@@ -2455,6 +2498,67 @@ mod test {
         );
     }
 
+    fn create_struct_layout(inner: MoveTypeLayout) -> MoveTypeLayout {
+        MoveTypeLayout::Struct(MoveStructLayout::new(vec![inner]))
+    }
+
+    fn create_vector_layout(inner: MoveTypeLayout) -> MoveTypeLayout {
+        MoveTypeLayout::Vector(Box::new(inner))
+    }
+
+    fn create_aggregator_layout(inner: MoveTypeLayout) -> MoveTypeLayout {
+        MoveTypeLayout::Struct(MoveStructLayout::new(vec![
+            MoveTypeLayout::Tagged(
+                LayoutTag::IdentifierMapping(IdentifierMappingKind::Aggregator),
+                Box::new(inner.clone()),
+            ),
+            inner.clone(),
+        ]))
+    }
+
+    fn create_aggregator_layout_u64() -> MoveTypeLayout {
+        create_aggregator_layout(MoveTypeLayout::U64)
+    }
+
+    fn create_snapshot_layout(inner: MoveTypeLayout) -> MoveTypeLayout {
+        MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Tagged(
+            LayoutTag::IdentifierMapping(IdentifierMappingKind::Snapshot),
+            Box::new(inner),
+        )]))
+    }
+
+    fn create_string_layout() -> MoveTypeLayout {
+        MoveTypeLayout::Struct(MoveStructLayout::Runtime(vec![MoveTypeLayout::Vector(
+            Box::new(MoveTypeLayout::U8),
+        )]))
+    }
+
+    fn create_aggregator_value_u64(value: u64, max_value: u64) -> Value {
+        Value::struct_(Struct::pack(vec![Value::u64(value), Value::u64(max_value)]))
+    }
+
+    fn create_snapshot_value(value: Value) -> Value {
+        Value::struct_(Struct::pack(vec![value]))
+    }
+
+    fn create_struct_value(inner: Value) -> Value {
+        Value::struct_(Struct::pack(vec![inner]))
+    }
+
+    fn create_vector_value(inner: Vec<Value>) -> Value {
+        Value::vector_for_testing_only(inner)
+    }
+
+    fn create_string_value(value: &str) -> Value {
+        Value::struct_(Struct::pack(vec![Value::vector_u8(
+            bcs::to_bytes(value).unwrap().to_vec(),
+        )]))
+    }
+
+    fn create_state_value(value: &Value, layout: &MoveTypeLayout) -> StateValue {
+        StateValue::new_legacy(value.simple_serialize(layout).unwrap().into())
+    }
+
     // TODO: Check how to import MockStateView from other tests
     // rather than rewriting it here again
     struct MockStateView {
@@ -2536,19 +2640,8 @@ mod test {
                 agg: Aggregator<u64>
             }
         */
-        let layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Struct(
-            MoveStructLayout::new(vec![
-                MoveTypeLayout::Tagged(
-                    LayoutTag::IdentifierMapping(IdentifierMappingKind::Aggregator),
-                    Box::new(MoveTypeLayout::U64),
-                ),
-                MoveTypeLayout::U64,
-            ]),
-        )]));
-        let value = Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
-            Value::u64(25),
-            Value::u64(30),
-        ]))]));
+        let layout = create_struct_layout(create_aggregator_layout_u64());
+        let value = create_struct_value(create_aggregator_value_u64(25, 30));
         let state_value = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
         let (patched_state_value, identifiers) = latest_view
             .replace_values_with_identifiers(state_value.clone(), &layout)
@@ -2575,20 +2668,12 @@ mod test {
                 aggregators: vec![Aggregator<u64>]
             }
         */
-        let layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Vector(
-            Box::new(MoveTypeLayout::Struct(MoveStructLayout::new(vec![
-                MoveTypeLayout::Tagged(
-                    LayoutTag::IdentifierMapping(IdentifierMappingKind::Aggregator),
-                    Box::new(MoveTypeLayout::U64),
-                ),
-                MoveTypeLayout::U64,
-            ]))),
-        )]));
-        let value = Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
-            Value::struct_(Struct::pack(vec![Value::u64(20), Value::u64(50)])),
-            Value::struct_(Struct::pack(vec![Value::u64(35), Value::u64(65)])),
-            Value::struct_(Struct::pack(vec![Value::u64(0), Value::u64(20)])),
-        ])]));
+        let layout = create_struct_layout(create_vector_layout(create_aggregator_layout_u64()));
+        let value = create_struct_value(create_vector_value(vec![
+            create_aggregator_value_u64(20, 50),
+            create_aggregator_value_u64(35, 65),
+            create_aggregator_value_u64(0, 20),
+        ]));
         let state_value = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
         let (patched_state_value, identifiers) = latest_view
             .replace_values_with_identifiers(state_value.clone(), &layout)
@@ -2625,19 +2710,14 @@ mod test {
                 aggregators: vec![AggregatorSnapshot<u128>]
             }
         */
-        let layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Vector(
-            Box::new(MoveTypeLayout::Struct(MoveStructLayout::new(vec![
-                MoveTypeLayout::Tagged(
-                    LayoutTag::IdentifierMapping(IdentifierMappingKind::Snapshot),
-                    Box::new(MoveTypeLayout::U128),
-                ),
-            ]))),
-        )]));
-        let value = Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
-            Value::struct_(Struct::pack(vec![Value::u128(20)])),
-            Value::struct_(Struct::pack(vec![Value::u128(35)])),
-            Value::struct_(Struct::pack(vec![Value::u128(0)])),
-        ])]));
+        let layout = create_struct_layout(create_vector_layout(create_snapshot_layout(
+            MoveTypeLayout::U128,
+        )));
+        let value = create_struct_value(create_vector_value(vec![
+            create_snapshot_value(Value::u128(20)),
+            create_snapshot_value(Value::u128(35)),
+            create_snapshot_value(Value::u128(0)),
+        ]));
         let state_value = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
         let (patched_state_value, identifiers) = latest_view
             .replace_values_with_identifiers(state_value.clone(), &layout)
@@ -2652,9 +2732,9 @@ mod test {
         );
         let patched_value =
             Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
-                Value::struct_(Struct::pack(vec![Value::u128(9)])),
-                Value::struct_(Struct::pack(vec![Value::u128(10)])),
-                Value::struct_(Struct::pack(vec![Value::u128(11)])),
+                create_snapshot_value(Value::u128(9)),
+                create_snapshot_value(Value::u128(10)),
+                create_snapshot_value(Value::u128(11)),
             ])]));
         assert_eq!(
             patched_state_value,
@@ -2675,27 +2755,14 @@ mod test {
                 snap: vec![AggregatorSnapshot<string>]
             }
         */
-        let layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Vector(
-            Box::new(MoveTypeLayout::Struct(MoveStructLayout::new(vec![
-                MoveTypeLayout::Tagged(
-                    LayoutTag::IdentifierMapping(IdentifierMappingKind::Snapshot),
-                    Box::new(MoveTypeLayout::Struct(MoveStructLayout::Runtime(vec![
-                        MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
-                    ]))),
-                ),
-            ]))),
-        )]));
-        let value = Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
-            Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
-                Value::vector_u8(bcs::to_bytes("hello").unwrap().to_vec()),
-            ]))])),
-            Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
-                Value::vector_u8(bcs::to_bytes("ab").unwrap().to_vec()),
-            ]))])),
-            Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
-                Value::vector_u8(bcs::to_bytes("c").unwrap().to_vec()),
-            ]))])),
-        ])]));
+        let layout = create_struct_layout(create_vector_layout(create_snapshot_layout(
+            create_string_layout(),
+        )));
+        let value = create_struct_value(create_vector_value(vec![
+            create_snapshot_value(create_string_value("hello")),
+            create_snapshot_value(create_string_value("ab")),
+            create_snapshot_value(create_string_value("c")),
+        ]));
         let state_value = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
         let (patched_state_value, identifiers) = latest_view
             .replace_values_with_identifiers(state_value.clone(), &layout)
@@ -2728,29 +2795,6 @@ mod test {
             "Three identifiers should have been replaced in this case"
         );
         assert_eq!(identifiers, identifiers2);
-    }
-
-    fn create_aggregator_layout() -> MoveTypeLayout {
-        MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Struct(
-            MoveStructLayout::new(vec![
-                MoveTypeLayout::Tagged(
-                    LayoutTag::IdentifierMapping(IdentifierMappingKind::Aggregator),
-                    Box::new(MoveTypeLayout::U64),
-                ),
-                MoveTypeLayout::U64,
-            ]),
-        )]))
-    }
-
-    fn create_aggregator_value(value: u64, max_value: u64) -> Value {
-        Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
-            Value::u64(value),
-            Value::u64(max_value),
-        ]))]))
-    }
-
-    fn create_state_value(value: &Value, layout: &MoveTypeLayout) -> StateValue {
-        StateValue::new_legacy(value.simple_serialize(layout).unwrap().into())
     }
 
     struct Holder {
@@ -2791,55 +2835,187 @@ mod test {
         )
     }
 
-    #[test]
-    fn test_sequential_missing_not_recorded() {
-        let h = Holder::new(HashMap::new(), 1000);
-        let latest_view = create_sequential_latest_view(&h, true);
+    struct ComparisonHolder {
+        start_counter: u32,
+        holder: Holder,
+        counter: AtomicU32,
+        base_view: MockStateView,
+        versioned_map: MVHashMap<KeyType<u32>, u32, ValueType, MockExecutable, DelayedFieldID>,
+        scheduler: Scheduler,
+    }
 
-        assert_ok_eq!(
-            latest_view.get_resource_state_value(&KeyType::<u32>(1, false), None),
-            None
-        );
-        assert!(latest_view
-            .get_resource_with_layout_read_set_sequential()
-            .is_empty());
+    impl ComparisonHolder {
+        fn new(data: HashMap<KeyType<u32>, StateValue>, start_counter: u32) -> Self {
+            let holder = Holder::new(data.clone(), start_counter);
+            let counter = AtomicU32::new(start_counter);
+            let base_view = MockStateView::new(data);
+            let versioned_map = MVHashMap::new();
+            let scheduler = Scheduler::new(30);
 
-        assert_ok_eq!(
-            latest_view.resource_exists(&KeyType::<u32>(1, false)),
-            false,
-        );
-        assert!(latest_view
-            .get_resource_with_layout_read_set_sequential()
-            .is_empty());
+            Self {
+                start_counter,
+                holder,
+                counter,
+                base_view,
+                versioned_map,
+                scheduler,
+            }
+        }
 
-        assert_ok_eq!(
-            latest_view.get_resource_state_value_metadata(&KeyType::<u32>(1, false)),
-            None,
-        );
-        assert!(latest_view
-            .get_resource_with_layout_read_set_sequential()
-            .is_empty());
+        fn new_view(&self) -> ViewsComparison<'_> {
+            let latest_view_seq = create_sequential_latest_view(&self.holder, true);
+            let latest_view_par =
+                LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
+                    &self.base_view,
+                    ViewState::Sync(ParallelState::new(
+                        &self.versioned_map,
+                        &self.scheduler,
+                        self.start_counter,
+                        &self.counter,
+                    )),
+                    1,
+                );
+
+            ViewsComparison {
+                latest_view_seq,
+                latest_view_par,
+            }
+        }
+    }
+
+    struct ViewsComparison<'a> {
+        latest_view_seq: LatestView<'a, TestTransactionType, MockStateView, MockExecutable>,
+        latest_view_par: LatestView<'a, TestTransactionType, MockStateView, MockExecutable>,
+    }
+
+    impl<'a> ViewsComparison<'a> {
+        fn assert_res_eq<T, E>(&self, res_seq: Result<T, E>, res_par: Result<T, E>) -> Result<T, E>
+        where
+            T: std::fmt::Debug + PartialEq,
+            E: std::fmt::Debug,
+        {
+            assert_eq!(res_seq.is_ok(), res_par.is_ok());
+            if let Ok(res_seq) = res_seq {
+                assert_ok_eq!(&res_par, &res_seq);
+            }
+
+            assert_eq!(
+                self.latest_view_par.get_read_summary(),
+                self.latest_view_seq.get_read_summary()
+            );
+
+            res_par
+        }
+
+        fn get_resource_state_value(
+            &self,
+            state_key: &KeyType<u32>,
+            maybe_layout: Option<&MoveTypeLayout>,
+        ) -> anyhow::Result<Option<StateValue>> {
+            let seq = self
+                .latest_view_seq
+                .get_resource_state_value(state_key, maybe_layout);
+            let par = self
+                .latest_view_par
+                .get_resource_state_value(state_key, maybe_layout);
+
+            self.assert_res_eq(seq, par)
+        }
+
+        fn resource_exists(&self, state_key: &KeyType<u32>) -> anyhow::Result<bool> {
+            let seq = self.latest_view_seq.resource_exists(state_key);
+            let par = self.latest_view_par.resource_exists(state_key);
+
+            self.assert_res_eq(seq, par)
+        }
+
+        fn get_resource_state_value_metadata(
+            &self,
+            state_key: &KeyType<u32>,
+        ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+            let seq = self
+                .latest_view_seq
+                .get_resource_state_value_metadata(state_key);
+            let par = self
+                .latest_view_par
+                .get_resource_state_value_metadata(state_key);
+
+            self.assert_res_eq(seq, par)
+        }
+
+        fn get_reads_needing_exchange(
+            &self,
+            delayed_write_set_keys: &HashSet<DelayedFieldID>,
+            skip: &HashSet<KeyType<u32>>,
+        ) -> Result<BTreeMap<KeyType<u32>, (ValueType, Arc<MoveTypeLayout>)>, PanicError> {
+            let seq = self
+                .latest_view_seq
+                .get_reads_needing_exchange(delayed_write_set_keys, skip);
+            let par = self
+                .latest_view_par
+                .get_reads_needing_exchange(delayed_write_set_keys, skip);
+
+            self.assert_res_eq(
+                seq.as_ref().map(|m| {
+                    m.iter()
+                        .map(|(k, (v, l))| (*k, (v.as_state_value(), l.clone())))
+                        .collect::<BTreeMap<_, _>>()
+                }),
+                par.as_ref().map(|m| {
+                    m.iter()
+                        .map(|(k, (v, l))| (*k, (v.as_state_value(), l.clone())))
+                        .collect::<BTreeMap<_, _>>()
+                }),
+            )
+            .unwrap();
+            par
+        }
+
+        fn get_delayed_field_value(
+            &self,
+            id: &DelayedFieldID,
+        ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
+            let seq = self.latest_view_seq.get_delayed_field_value(id);
+            let par = self.latest_view_par.get_delayed_field_value(id);
+
+            self.assert_res_eq(seq, par)
+        }
     }
 
     #[test]
-    fn test_sequential_non_value_reads_not_recorded() {
+    fn test_missing_same() {
+        let holder = ComparisonHolder::new(HashMap::new(), 1000);
+        let views = holder.new_view();
+
+        assert_ok_eq!(
+            views.get_resource_state_value(&KeyType::<u32>(1, false), None),
+            None
+        );
+
+        assert_ok_eq!(views.resource_exists(&KeyType::<u32>(1, false)), false,);
+
+        assert_ok_eq!(
+            views.get_resource_state_value_metadata(&KeyType::<u32>(1, false)),
+            None,
+        );
+    }
+
+    #[test]
+    fn test_non_value_reads_not_recorded() {
         let state_value = create_state_value(&Value::u64(12321), &MoveTypeLayout::U64);
         let data = HashMap::from([(KeyType::<u32>(1, false), state_value.clone())]);
-        let h = Holder::new(data, 1000);
-        let latest_view = create_sequential_latest_view(&h, true);
 
-        assert_ok_eq!(latest_view.resource_exists(&KeyType::<u32>(1, false)), true,);
-        assert!(latest_view
-            .get_resource_with_layout_read_set_sequential()
-            .is_empty());
+        let holder = ComparisonHolder::new(data, 1000);
+        let views = holder.new_view();
 
-        assert!(latest_view
+        assert_ok_eq!(views.resource_exists(&KeyType::<u32>(1, false)), true,);
+        assert!(views
             .get_resource_state_value_metadata(&KeyType::<u32>(1, false))
             .unwrap()
             .is_some(),);
-        assert!(latest_view
-            .get_resource_with_layout_read_set_sequential()
-            .is_empty());
+
+        assert_eq!(views.latest_view_par.get_read_summary(), HashSet::new());
+        assert_eq!(views.latest_view_seq.get_read_summary(), HashSet::new());
     }
 
     fn assert_fetch_eq<V: TransactionWrite>(
@@ -2867,22 +3043,23 @@ mod test {
     }
 
     #[test]
-    fn test_sequential_regular_read_operations() {
+    fn test_regular_read_operations() {
         let state_value = create_state_value(&Value::u64(12321), &MoveTypeLayout::U64);
         let data = HashMap::from([(KeyType::<u32>(1, false), state_value.clone())]);
-        let h = Holder::new(data, 1000);
-        let latest_view = create_sequential_latest_view(&h, true);
+
+        let holder = ComparisonHolder::new(data, 1000);
+        let views = holder.new_view();
 
         assert_ok_eq!(
-            latest_view.get_resource_state_value(&KeyType::<u32>(1, false), None),
+            views.get_resource_state_value(&KeyType::<u32>(1, false), None),
             Some(state_value.clone())
         );
-        assert!(latest_view
-            .get_resource_with_layout_read_set_sequential()
-            .is_empty());
 
         assert_fetch_eq(
-            h.unsync_map.fetch_data(&KeyType::<u32>(1, false)),
+            holder
+                .holder
+                .unsync_map
+                .fetch_data(&KeyType::<u32>(1, false)),
             Some(TransactionWrite::from_state_value(Some(state_value))),
             None,
         );
@@ -2891,38 +3068,46 @@ mod test {
     #[test_case(Some(true))]
     #[test_case(Some(false))]
     #[test_case(None)]
-    fn test_sequential_aggregator_read_operations(check_metadata: Option<bool>) {
-        let layout = create_aggregator_layout();
-        let value = create_aggregator_value(25, 30);
+    fn test_aggregator_read_operations(check_metadata: Option<bool>) {
+        let layout = create_struct_layout(create_aggregator_layout_u64());
+        let value = create_struct_value(create_aggregator_value_u64(25, 30));
         let state_value = create_state_value(&value, &layout);
         let data = HashMap::from([(KeyType::<u32>(1, false), state_value.clone())]);
-        let h = Holder::new(data, 1000);
-        let latest_view = create_sequential_latest_view(&h, true);
 
-        let patched_value = create_aggregator_value(1000, 30);
+        let holder = ComparisonHolder::new(data, 1000);
+        let views = holder.new_view();
+
+        let patched_value = create_struct_value(create_aggregator_value_u64(1000, 30));
         let patched_state_value = create_state_value(&patched_value, &layout);
 
         match check_metadata {
             Some(true) => {
-                latest_view
+                views
                     .get_resource_state_value_metadata(&KeyType::<u32>(1, false))
                     .unwrap();
             },
             Some(false) => {
-                assert_ok_eq!(latest_view.resource_exists(&KeyType::<u32>(1, false)), true,);
+                assert_ok_eq!(views.resource_exists(&KeyType::<u32>(1, false)), true,);
             },
             None => {},
         };
 
         assert_ok_eq!(
-            latest_view.get_resource_state_value(&KeyType::<u32>(1, false), Some(&layout)),
+            views.get_resource_state_value(&KeyType::<u32>(1, false), Some(&layout)),
             Some(patched_state_value.clone())
         );
-        assert!(latest_view
-            .get_resource_with_layout_read_set_sequential()
-            .contains(&KeyType(1, false)));
+        assert!(views
+            .get_reads_needing_exchange(
+                &HashSet::from([DelayedFieldID::new(1000)]),
+                &HashSet::new()
+            )
+            .unwrap()
+            .contains_key(&KeyType(1, false)));
         assert_fetch_eq(
-            h.unsync_map.fetch_data(&KeyType::<u32>(1, false)),
+            holder
+                .holder
+                .unsync_map
+                .fetch_data(&KeyType::<u32>(1, false)),
             Some(TransactionWrite::from_state_value(Some(
                 patched_state_value,
             ))),
@@ -2931,8 +3116,7 @@ mod test {
     }
 
     #[test]
-    fn test_read_operations_parallel() {
-        let counter = AtomicU32::new(5);
+    fn test_read_operations() {
         let state_value_3 = StateValue::new_legacy(Bytes::from(
             Value::u64(12321)
                 .simple_serialize(&MoveTypeLayout::U64)
@@ -2940,44 +3124,28 @@ mod test {
         ));
         let mut data = HashMap::new();
         data.insert(KeyType::<u32>(3, false), state_value_3.clone());
-        let layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Struct(
-            MoveStructLayout::new(vec![
-                MoveTypeLayout::Tagged(
-                    LayoutTag::IdentifierMapping(IdentifierMappingKind::Aggregator),
-                    Box::new(MoveTypeLayout::U64),
-                ),
-                MoveTypeLayout::U64,
-            ]),
-        )]));
-        let value = Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
-            Value::u64(25),
-            Value::u64(30),
-        ]))]));
+        let layout = create_struct_layout(create_aggregator_layout_u64());
+        let value = create_struct_value(create_aggregator_value_u64(25, 30));
         let state_value_4 = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
         data.insert(KeyType::<u32>(4, false), state_value_4);
-        let base_view = MockStateView::new(data);
-        let versioned_map = MVHashMap::new();
-        let scheduler = Scheduler::new(10);
-        let latest_view = LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
-            &base_view,
-            ViewState::Sync(ParallelState::new(&versioned_map, &scheduler, 5, &counter)),
-            1,
-        );
+
+        let holder = ComparisonHolder::new(data, 1000);
+        let views = holder.new_view();
 
         assert_eq!(
-            latest_view
+            views
                 .get_resource_state_value(&KeyType::<u32>(1, false), None)
                 .unwrap(),
             None
         );
         assert_eq!(
-            latest_view
+            views
                 .get_resource_state_value(&KeyType::<u32>(2, false), Some(&layout))
                 .unwrap(),
             None
         );
         assert_eq!(
-            latest_view
+            views
                 .get_resource_state_value(&KeyType::<u32>(3, false), None)
                 .unwrap(),
             Some(state_value_3.clone())
@@ -2987,26 +3155,35 @@ mod test {
         // Is Err(StorageVersion) expected here?
         println!(
             "data: {:?}",
-            versioned_map
+            holder
+                .versioned_map
                 .data()
                 .fetch_data(&KeyType::<u32>(3, false), 1)
         );
 
-        let patched_value = Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
-            Value::u64(5),
-            Value::u64(30),
-        ]))]));
+        let patched_value = create_struct_value(create_aggregator_value_u64(1000, 30));
         let state_value_4 =
             StateValue::new_legacy(patched_value.simple_serialize(&layout).unwrap().into());
         assert_eq!(
-            latest_view
+            views
                 .get_resource_state_value(&KeyType::<u32>(4, false), Some(&layout))
                 .unwrap(),
             Some(state_value_4.clone())
         );
 
-        let captured_reads = latest_view.take_reads();
-        assert!(captured_reads.validate_data_reads(versioned_map.data(), 1));
+        // When we throw exception, it is not required read summaries to match, as they will not be used
+        // assert_err_eq!(
+        //     views.get_delayed_field_value(&DelayedFieldID::new(1005)),
+        //     PanicOr::Or(DelayedFieldsSpeculativeError::NotFound(DelayedFieldID::new(1005))),
+        // );
+
+        assert_ok_eq!(
+            views.get_delayed_field_value(&DelayedFieldID::new(1000)),
+            DelayedFieldValue::Aggregator(25),
+        );
+
+        let captured_reads = views.latest_view_par.take_parallel_reads();
+        assert!(captured_reads.validate_data_reads(holder.versioned_map.data(), 1));
         let read_set_with_delayed_fields = captured_reads.get_read_values_with_delayed_fields();
 
         // TODO: This prints

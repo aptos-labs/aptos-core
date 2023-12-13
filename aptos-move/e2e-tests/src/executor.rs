@@ -40,8 +40,8 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     on_chain_config::{
-        BlockGasLimitType, FeatureFlag, Features, OnChainConfig, TimedFeatureOverride,
-        TimedFeaturesBuilder, ValidatorSet, Version,
+        FeatureFlag, Features, OnChainConfig, TimedFeatureOverride, TimedFeaturesBuilder,
+        ValidatorSet, Version,
     },
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
@@ -62,7 +62,7 @@ use aptos_vm::{
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::storage::{ChangeSetConfigs, StorageGasParameters};
+use aptos_vm_types::storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters};
 use bytes::Bytes;
 use move_core_types::{
     account_address::AccountAddress,
@@ -517,10 +517,8 @@ impl FakeExecutor {
             }
         });
 
-        let onchain_config = BlockExecutorConfigFromOnchain {
-            // TODO fetch values from state?
-            block_gas_limit_type: BlockGasLimitType::Limit(30000),
-        };
+        // TODO fetch values from state?
+        let onchain_config = BlockExecutorConfigFromOnchain::on_but_large_for_test();
 
         let sequential_output = if mode != ExecutorMode::ParallelOnly {
             Some(AptosVM::execute_block(

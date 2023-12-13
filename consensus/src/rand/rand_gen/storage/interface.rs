@@ -6,12 +6,12 @@ use crate::rand::rand_gen::types::{
 };
 use aptos_consensus_types::randomness::RandMetadata;
 
-pub trait RandStorage<S, P> {
+pub trait RandStorage<S, P>: 'static {
     fn save_share(&self, share: &RandShare<S>) -> anyhow::Result<()>;
     fn save_decision(&self, decision: &RandDecision<P>) -> anyhow::Result<()>;
 
     fn get_all_shares(&self) -> anyhow::Result<Vec<(ShareId, RandShare<S>)>>;
-    fn get_all_decision(&self) -> anyhow::Result<Vec<(RandMetadata, RandDecision<P>)>>;
+    fn get_all_decisions(&self) -> anyhow::Result<Vec<(RandMetadata, RandDecision<P>)>>;
 
     fn remove_shares(&self, shares: impl Iterator<Item = RandShare<S>>) -> anyhow::Result<()>;
     fn remove_decisions(
@@ -20,7 +20,7 @@ pub trait RandStorage<S, P> {
     ) -> anyhow::Result<()>;
 }
 
-pub trait AugDataStorage<D> {
+pub trait AugDataStorage<D>: 'static {
     fn save_aug_data(&self, aug_data: &AugData<D>) -> anyhow::Result<()>;
     fn save_certified_aug_data(
         &self,

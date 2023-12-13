@@ -32,7 +32,7 @@ use aptos_vm::{
     data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
-use aptos_vm_types::storage::ChangeSetConfigs;
+use aptos_vm_types::storage::change_set_configs::ChangeSetConfigs;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -440,6 +440,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
         FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
         FeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
+        FeatureFlag::BN254_STRUCTURES,
     ]
 }
 

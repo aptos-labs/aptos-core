@@ -27,6 +27,7 @@ This module provides utils to add and emit new token events that are not in toke
 -  [Function `emit_token_royalty_mutate_event`](#0x3_token_event_store_emit_token_royalty_mutate_event)
 -  [Function `emit_token_maximum_mutate_event`](#0x3_token_event_store_emit_token_maximum_mutate_event)
 -  [Specification](#@Specification_0)
+    -  [Module-level Specification](#@Module-level_Specification_1)
     -  [Function `initialize_token_event_store`](#@Specification_0_initialize_token_event_store)
     -  [Function `emit_collection_uri_mutate_event`](#@Specification_0_emit_collection_uri_mutate_event)
     -  [Function `emit_collection_description_mutate_event`](#@Specification_0_emit_collection_description_mutate_event)
@@ -1007,6 +1008,11 @@ Emit maximum mutation event
 <a id="@Specification_0"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_1"></a>
+
+### Module-level Specification
 
 
 

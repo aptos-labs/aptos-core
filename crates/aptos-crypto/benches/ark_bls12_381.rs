@@ -6,18 +6,27 @@
 #[macro_use]
 extern crate criterion;
 
+use crate::bench_utils::{
+    bench_function_add, bench_function_clone, bench_function_deser_comp,
+    bench_function_deser_uncomp, bench_function_div, bench_function_double, bench_function_eq,
+    bench_function_from_u64, bench_function_inv, bench_function_mul, bench_function_neg,
+    bench_function_pow_u256, bench_function_serialize_uncomp, bench_function_square,
+    bench_function_sub,
+};
 use aptos_crypto::test_utils::random_bytes;
 use ark_bls12_381::{Fq12, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_ec::{
     hashing::HashToCurve, pairing::Pairing, short_weierstrass::Projective, AffineRepr, CurveGroup,
     Group,
 };
-use ark_ff::{BigInteger256, Field, One, UniformRand, Zero};
+use ark_ff::{One, UniformRand, Zero};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::test_rng;
 use criterion::{BenchmarkId, Criterion};
 use rand::thread_rng;
-use std::ops::{Add, Div, Mul, Neg};
+use std::ops::{Add, Mul, Neg};
+
+mod bench_utils;
 
 fn msm_all_bench_cases() -> Vec<usize> {
     let series_until_65 = (1..65).step_by(2);
@@ -46,26 +55,9 @@ macro_rules! serialize {
 fn bench_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("ark_bls12_381");
 
-    group.bench_function("fr_add", move |b| {
-        b.iter_with_setup(
-            || (rand!(Fr), rand!(Fr)),
-            |(k_1, k_2)| {
-                let _k_3 = k_1 + k_2;
-            },
-        )
-    });
+    group.bench_function("fr_add", bench_function_add::<Fr>);
 
-    group.bench_function("fr_deser", move |b| {
-        b.iter_with_setup(
-            || {
-                let k = rand!(Fr);
-                serialize!(k, serialize_uncompressed)
-            },
-            |buf| {
-                let _k = Fr::deserialize_uncompressed(buf.as_slice()).unwrap();
-            },
-        )
-    });
+    group.bench_function("fr_deser", bench_function_deser_uncomp::<Fr>);
 
     group.bench_function("fr_deser_invalid_4_bytes", move |b| {
         b.iter_with_setup(
@@ -94,69 +86,23 @@ fn bench_group(c: &mut Criterion) {
         )
     });
 
-    group.bench_function("fr_div", move |b| {
-        b.iter_with_setup(
-            || (rand!(Fr), rand!(Fr)),
-            |(k_1, k_2)| {
-                let _k_3 = k_1 / k_2;
-            },
-        )
-    });
-
-    group.bench_function("fr_eq", move |b| {
-        b.iter_with_setup(
-            || {
-                let k_1 = rand!(Fr);
-                let k_2 = k_1;
-                (k_1, k_2)
-            },
-            |(k_1, k_2)| {
-                let _res = k_1 == k_2;
-            },
-        )
-    });
-
-    group.bench_function("fr_from_u64", move |b| {
-        b.iter_with_setup(
-            || rand!(u64),
-            |v| {
-                let _res: Fr = BigInteger256::from(v).into();
-            },
-        )
-    });
-
-    group.bench_function("fr_inv", move |b| {
-        b.iter_with_setup(
-            || rand!(Fr),
-            |k| {
-                let _k_inv = k.inverse();
-            },
-        )
-    });
-
-    group.bench_function("fr_mul", move |b| {
-        b.iter_with_setup(
-            || (rand!(Fr), rand!(Fr)),
-            |(k_1, k_2)| {
-                let _k_3 = k_1 * k_2;
-            },
-        )
-    });
+    group.bench_function("fr_div", bench_function_div::<Fr>);
+    group.bench_function("fr_double", bench_function_double::<Fr>);
+    group.bench_function("fr_eq", bench_function_eq::<Fr>);
+    group.bench_function("fr_from_u64", bench_function_from_u64::<Fr>);
+    group.bench_function("fr_inv", bench_function_inv::<Fr>);
+    group.bench_function("fr_mul", bench_function_mul::<Fr>);
+    group.bench_function("fr_neg", bench_function_neg::<Fr>);
+    group.bench_function("fr_pow_u256", bench_function_pow_u256::<Fr>);
+    group.bench_function("fr_serialize", bench_function_serialize_uncomp::<Fr>);
+    group.bench_function("fr_square", bench_function_square::<Fr>);
+    group.bench_function("fr_sub", bench_function_sub::<Fr>);
 
     group.bench_function("fr_mul_self", move |b| {
         b.iter_with_setup(
             || rand!(Fr),
             |k| {
                 let _k2 = k.mul(&k);
-            },
-        )
-    });
-
-    group.bench_function("fr_neg", move |b| {
-        b.iter_with_setup(
-            || rand!(Fr),
-            |k| {
-                let _k_inv = k.neg();
             },
         )
     });
@@ -170,33 +116,6 @@ fn bench_group(c: &mut Criterion) {
         )
     });
 
-    group.bench_function("fr_serialize", move |b| {
-        b.iter_with_setup(
-            || rand!(Fr),
-            |k| {
-                let _buf = serialize!(k, serialize_uncompressed);
-            },
-        )
-    });
-
-    group.bench_function("fr_square", move |b| {
-        b.iter_with_setup(
-            || rand!(Fr),
-            |k| {
-                let _k2 = k.square();
-            },
-        )
-    });
-
-    group.bench_function("fr_sub", move |b| {
-        b.iter_with_setup(
-            || (rand!(Fr), rand!(Fr)),
-            |(k_1, k_2)| {
-                let _k_3 = k_1 - k_2;
-            },
-        )
-    });
-
     group.bench_function("fr_zero", move |b| {
         b.iter_with_setup(
             || {},
@@ -205,104 +124,26 @@ fn bench_group(c: &mut Criterion) {
             },
         )
     });
-
-    group.bench_function("fq12_add", move |b| {
-        b.iter_with_setup(
-            || (rand!(Fq12), rand!(Fq12)),
-            |(e_1, e_2)| {
-                let _e_3 = e_1 + e_2;
-            },
-        )
-    });
+    group.bench_function("fq12_add", bench_function_add::<Fq12>);
+    group.bench_function("fq12_clone", bench_function_clone::<Fq12>);
+    group.bench_function("fq12_deser", bench_function_deser_uncomp::<Fq12>);
+    group.bench_function("fq12_div", bench_function_div::<Fq12>);
+    group.bench_function("fq12_double", bench_function_double::<Fq12>);
+    group.bench_function("fq12_eq", bench_function_eq::<Fq12>);
+    group.bench_function("fq12_from_u64", bench_function_from_u64::<Fq12>);
+    group.bench_function("fq12_inv", bench_function_inv::<Fq12>);
+    group.bench_function("fq12_mul", bench_function_mul::<Fq12>);
+    group.bench_function("fq12_neg", bench_function_neg::<Fq12>);
+    group.bench_function("fq12_pow_u256", bench_function_pow_u256::<Fq12>);
+    group.bench_function("fq12_serialize", bench_function_serialize_uncomp::<Fq12>);
+    group.bench_function("fq12_square", bench_function_square::<Fq12>);
+    group.bench_function("fq12_sub", bench_function_sub::<Fq12>);
 
     group.bench_function("fq12_add_self", move |b| {
         b.iter_with_setup(
             || rand!(Fq12),
             |e| {
                 let _e_2 = e.add(&e);
-            },
-        )
-    });
-
-    group.bench_function("fq12_clone", move |b| {
-        b.iter_with_setup(
-            || rand!(Fq12),
-            |e| {
-                let _e_2 = e;
-            },
-        )
-    });
-
-    group.bench_function("fq12_deser", move |b| {
-        b.iter_with_setup(
-            || {
-                let e = rand!(Fq12);
-                serialize!(e, serialize_uncompressed)
-            },
-            |buf| {
-                let _e = Fq12::deserialize_uncompressed(buf.as_slice()).unwrap();
-            },
-        )
-    });
-
-    group.bench_function("fq12_div", move |b| {
-        b.iter_with_setup(
-            || {
-                let e = rand!(Fq12);
-                let f = rand!(Fq12);
-                (e, f)
-            },
-            |(e, f)| {
-                let _g = e.div(f);
-            },
-        )
-    });
-
-    group.bench_function("fq12_double", move |b| {
-        b.iter_with_setup(
-            || rand!(Fq12),
-            |e| {
-                let _e_2 = e.double();
-            },
-        )
-    });
-
-    group.bench_function("fq12_eq", move |b| {
-        b.iter_with_setup(
-            || {
-                let e_1 = rand!(Fq12);
-                let e_2 = e_1;
-                (e_1, e_2)
-            },
-            |(e_1, e_2)| {
-                let _res = e_1 == e_2;
-            },
-        )
-    });
-
-    group.bench_function("fq12_from_u64", move |b| {
-        b.iter_with_setup(
-            || rand!(u64),
-            |i| {
-                let _res = Fq12::from(i);
-            },
-        )
-    });
-
-    group.bench_function("fq12_inv", move |b| {
-        b.iter_with_setup(
-            || rand!(Fq12),
-            |e| {
-                let _e_inv = e.inverse();
-            },
-        )
-    });
-
-    group.bench_function("fq12_mul", move |b| {
-        b.iter_with_setup(
-            || (rand!(Fq12), rand!(Fq12)),
-            |(e_1, e_2)| {
-                let _e_3 = e_1 * e_2;
             },
         )
     });
@@ -316,61 +157,10 @@ fn bench_group(c: &mut Criterion) {
         )
     });
 
-    group.bench_function("fq12_neg", move |b| {
-        b.iter_with_setup(
-            || rand!(Fq12),
-            |e| {
-                let _e_2 = e.neg();
-            },
-        )
-    });
-
     group.bench_function("fq12_one", move |b| {
         b.iter(|| {
             let _e = Fq12::one();
         })
-    });
-
-    group.bench_function("fq12_pow_u256", move |b| {
-        b.iter_with_setup(
-            || {
-                let base = rand!(Fq12);
-                let exp = rand!(Fr);
-                let exp = BigInteger256::from(exp);
-                (base, exp)
-            },
-            |(base, exp)| {
-                let _res = base.pow(exp);
-            },
-        )
-    });
-
-    group.bench_function("fq12_serialize", move |b| {
-        b.iter_with_setup(
-            || rand!(Fq12),
-            |e| {
-                let mut buf = vec![];
-                e.serialize_uncompressed(&mut buf).unwrap();
-            },
-        )
-    });
-
-    group.bench_function("fq12_square", move |b| {
-        b.iter_with_setup(
-            || rand!(Fq12),
-            |e| {
-                let _res = e.square();
-            },
-        )
-    });
-
-    group.bench_function("fq12_sub", move |b| {
-        b.iter_with_setup(
-            || (rand!(Fq12), rand!(Fq12)),
-            |(e, f)| {
-                let _res = e - f;
-            },
-        )
     });
 
     group.bench_function("fq12_zero", move |b| {
@@ -382,51 +172,16 @@ fn bench_group(c: &mut Criterion) {
         )
     });
 
-    group.bench_function("g1_affine_add", move |b| {
-        b.iter_with_setup(
-            || (rand!(G1Affine), rand!(G1Affine)),
-            |(p1, p2)| {
-                let _p3 = p1 + p2;
-            },
-        )
-    });
-
-    group.bench_function("g1_affine_deser_comp", move |b| {
-        b.iter_with_setup(
-            || {
-                let p = rand!(G1Affine);
-                serialize!(p, serialize_compressed)
-            },
-            |buf| {
-                let _p = G1Affine::deserialize_compressed(buf.as_slice());
-            },
-        )
-    });
-
-    group.bench_function("g1_affine_deser_uncomp", move |b| {
-        b.iter_with_setup(
-            || {
-                let p = rand!(G1Affine);
-                serialize!(p, serialize_uncompressed)
-            },
-            |buf| {
-                let _p = G1Affine::deserialize_uncompressed(buf.as_slice());
-            },
-        )
-    });
-
-    group.bench_function("g1_affine_eq", move |b| {
-        b.iter_with_setup(
-            || {
-                let p1 = rand!(G1Affine);
-                let p2 = p1;
-                (p1, p2)
-            },
-            |(p1, p2)| {
-                let _res = p1 == Projective::from(p2);
-            },
-        )
-    });
+    group.bench_function("g1_affine_add", bench_function_add::<G1Affine>);
+    group.bench_function(
+        "g1_affine_deser_comp",
+        bench_function_deser_comp::<G1Affine>,
+    );
+    group.bench_function(
+        "g1_affine_deser_uncomp",
+        bench_function_deser_uncomp::<G1Affine>,
+    );
+    group.bench_function("g1_affine_eq", bench_function_eq::<G1Affine>);
 
     group.bench_function("g1_affine_generator", move |b| {
         b.iter(|| {

@@ -19,6 +19,7 @@
 -  [Function `set_allow_direct_coin_transfers`](#0x1_aptos_account_set_allow_direct_coin_transfers)
 -  [Function `can_receive_direct_coin_transfers`](#0x1_aptos_account_can_receive_direct_coin_transfers)
 -  [Specification](#@Specification_1)
+    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `create_account`](#@Specification_1_create_account)
     -  [Function `batch_transfer`](#@Specification_1_batch_transfer)
     -  [Function `transfer`](#@Specification_1_transfer)
@@ -485,6 +486,11 @@ By default, this returns true if an account has not explicitly set whether the c
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Module-level_Specification_2"></a>
+
+### Module-level Specification
 
 
 

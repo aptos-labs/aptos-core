@@ -10,6 +10,7 @@ use crate::{
     },
 };
 use anyhow::bail;
+use aptos_consensus_types::common::Author;
 use aptos_enum_conversion_derive::EnumConversion;
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::RBMessage;
@@ -32,10 +33,18 @@ pub enum RandMessage<S, P, D> {
 impl<S: Share, P: Proof<Share = S>, D: AugmentedData> RandMessage<S, P, D> {
     pub fn verify(
         &self,
-        _epoch_state: &EpochState,
-        _rand_config: &RandConfig,
+        epoch_state: &EpochState,
+        rand_config: &RandConfig,
+        sender: Author,
     ) -> anyhow::Result<()> {
-        Ok(())
+        match self {
+            RandMessage::Share(share) => share.verify(rand_config),
+            RandMessage::AugData(aug_data) => aug_data.verify(sender),
+            RandMessage::CertifiedAugData(certified_aug_data) => {
+                certified_aug_data.verify(&epoch_state.verifier)
+            },
+            _ => bail!("[RandMessage] unexpected message type"),
+        }
     }
 }
 
@@ -76,6 +85,10 @@ pub struct RandGenMessage {
 }
 
 impl RandGenMessage {
+    pub fn new(epoch: u64, data: Vec<u8>) -> Self {
+        Self { epoch, data }
+    }
+
     pub fn data(&self) -> &[u8] {
         &self.data
     }

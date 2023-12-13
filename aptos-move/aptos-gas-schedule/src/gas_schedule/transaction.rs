@@ -9,9 +9,6 @@ use aptos_gas_algebra::{
     AbstractValueSize, Fee, FeePerByte, FeePerGasUnit, FeePerSlot, Gas, GasExpression,
     GasScalingFactor, GasUnit, NumSlots,
 };
-use aptos_types::{
-    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
-};
 use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumBytes, ToUnitWithParams,
 };
@@ -79,38 +76,50 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             storage_io_per_state_slot_read: InternalGasPerArg,
             { 0..=9 => "load_data.base", 10.. => "storage_io_per_state_slot_read"},
-            300_000,
+            // At the current mainnet scale, we should assume most levels of the (hexary) JMT nodes
+            // in cache, hence target charging 1-2 4k-sized pages for each read. Notice the cost
+            // of seeking for the leaf node is covered by the first page of the "value size fee"
+            // (storage_io_per_state_byte_read) defined below.
+            800_000,
         ],
         [
             storage_io_per_state_byte_read: InternalGasPerByte,
             { 0..=9 => "load_data.per_byte", 10.. => "storage_io_per_state_byte_read"},
-            300,
+            // Notice in the latest IoPricing, bytes are charged at 4k intervals (even the smallest
+            // read will be charged for 4KB) to reflect the assumption that every roughly 4k bytes
+            // might require a separate random IO upon the FS.
+            100,
         ],
         [load_data_failure: InternalGas, "load_data.failure", 0],
         // Gas parameters for writing data to storage.
         [
             storage_io_per_state_slot_write: InternalGasPerArg,
             { 0..=9 => "write_data.per_op", 10.. => "storage_io_per_state_slot_write"},
-            300_000,
+            // The cost of writing down the upper level new JMT nodes are shared between transactions
+            // because we write down the JMT in batches, however the bottom levels will be specific
+            // to each transactions assuming they don't touch exactly the same leaves. It's fair to
+            // target roughly 1-2 full internal JMT nodes (about 0.5-1KB in total) worth of writes
+            // for each write op.
+            100_000,
         ],
         [
-            write_data_per_new_item: InternalGasPerArg,
-            "write_data.new_item",
-            1_280_000
+            legacy_write_data_per_new_item: InternalGasPerArg,
+            {0..=9 => "write_data.new_item"},
+            1_280_000,
         ],
         [
             storage_io_per_state_byte_write: InternalGasPerByte,
             { 0..=9 => "write_data.per_byte_in_key", 10.. => "storage_io_per_state_byte_write"},
-            5_000
+            100,
         ],
         [
-            write_data_per_byte_in_val: InternalGasPerByte,
-            "write_data.per_byte_in_val",
+            legacy_write_data_per_byte_in_val: InternalGasPerByte,
+            { 0..=9 => "write_data.per_byte_in_val" },
             10_000
         ],
         [memory_quota: AbstractValueSize, { 1.. => "memory_quota" }, 10_000_000],
         [
-            free_write_bytes_quota: NumBytes,
+            legacy_free_write_bytes_quota: NumBytes,
             { 5.. => "free_write_bytes_quota" },
             1024, // 1KB free per state write
         ],
@@ -192,51 +201,6 @@ impl TransactionGasParameters {
             0 => 1.into(),
             x => x.into(),
         }
-    }
-
-    pub fn storage_fee_for_slot(&self, op_size: &WriteOpSize) -> Fee {
-        use WriteOpSize::*;
-
-        match op_size {
-            Creation { .. } => self.storage_fee_per_state_slot_create * NumSlots::new(1),
-            Modification { .. } | Deletion | DeletionWithDeposit { .. } => 0.into(),
-        }
-    }
-
-    pub fn storage_fee_refund_for_slot(&self, op_size: &WriteOpSize) -> Fee {
-        op_size.deletion_deposit().map_or(0.into(), Fee::new)
-    }
-
-    /// Maybe value size is None for deletion Ops.
-    pub fn storage_fee_for_bytes(&self, key: &StateKey, op_size: &WriteOpSize) -> Fee {
-        if let Some(value_size) = op_size.write_len() {
-            let size = NumBytes::new(key.size() as u64) + NumBytes::new(value_size);
-            if let Some(excess) = size.checked_sub(self.free_write_bytes_quota) {
-                return excess * self.storage_fee_per_excess_state_byte;
-            }
-        }
-
-        0.into()
-    }
-
-    /// New formula to charge storage fee for an event, measured in APT.
-    pub fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee {
-        NumBytes::new(event.size() as u64) * self.storage_fee_per_event_byte
-    }
-
-    pub fn storage_discount_for_events(&self, total_cost: Fee) -> Fee {
-        std::cmp::min(
-            total_cost,
-            self.free_event_bytes_quota * self.storage_fee_per_event_byte,
-        )
-    }
-
-    /// New formula to charge storage fee for transaction, measured in APT.
-    pub fn storage_fee_for_transaction_storage(&self, txn_size: NumBytes) -> Fee {
-        txn_size
-            .checked_sub(self.large_transaction_cutoff)
-            .unwrap_or(NumBytes::zero())
-            * self.storage_fee_per_transaction_byte
     }
 
     /// Calculate the intrinsic gas for the transaction based upon its size in bytes.
