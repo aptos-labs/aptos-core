@@ -4,6 +4,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 - Fix nested type tag parsing in `Object` types
+- Update all dependencies including `@aptos-labs/aptos-client`
 
 ## 1.20.0 (2023-09-22)
 
