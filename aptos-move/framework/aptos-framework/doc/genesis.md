@@ -1051,16 +1051,6 @@ The last step of genesis.
 
 
 
-<a id="@Specification_1_set_genesis_end"></a>
-
-### Function `set_genesis_end`
-
-
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_set_genesis_end">set_genesis_end</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
-
-
-
 
 <pre><code><b>requires</b> len(<b>global</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>&gt;(@aptos_framework).active_validators) &gt;= 1;
 <b>let</b> addr = std::signer::address_of(aptos_framework);
