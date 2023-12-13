@@ -2170,7 +2170,7 @@ where
                 infer_abilities_opt_check(ty_arg, ty_param_abilities, get_abilities, on_err);
             if let Some((loc, on_err)) = on_err {
                 if !constraints.is_subset(ty_arg_abilities) {
-                    on_err(loc, &format!("Invalid instantiation"))
+                    on_err(loc, "Invalid instantiation")
                 }
             }
             ty_arg_abilities

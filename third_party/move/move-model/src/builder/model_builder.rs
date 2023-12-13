@@ -402,9 +402,9 @@ impl<'env> ModelBuilder<'env> {
         (params_ability_constraints, struct_abilities)
     }
 
-    fn gen_get_abilities<'a>(
-        &'a self,
-    ) -> impl Fn(ModuleId, StructId) -> (Vec<AbilitySet>, AbilitySet) + Copy + 'a {
+    fn gen_get_abilities(
+        &self,
+    ) -> impl Fn(ModuleId, StructId) -> (Vec<AbilitySet>, AbilitySet) + Copy + '_ {
         |mid, sid| self.get_abilities(mid, sid)
     }
 
