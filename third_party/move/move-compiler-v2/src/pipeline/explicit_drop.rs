@@ -1,4 +1,4 @@
-//! Adds implicit destroy instructions for non-primitive types.
+//! Adds explicit destroy instructions for non-primitive types.
 
 use super::{
     livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
