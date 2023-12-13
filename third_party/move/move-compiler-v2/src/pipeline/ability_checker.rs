@@ -47,6 +47,7 @@ fn check_copy_for_temp_with_msg(
     check_copy(func_target, ty, loc, err_msg)
 }
 
+/// `t` is the local containing the reference read
 fn check_read_ref(target: &FunctionTarget, t: TempIndex, loc: &Loc) {
     if let Type::Reference(_, ty) = target.get_local_type(t) {
         check_copy(target, ty, loc, "cannot copy")
