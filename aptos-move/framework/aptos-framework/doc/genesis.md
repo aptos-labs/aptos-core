@@ -897,7 +897,6 @@ The last step of genesis.
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
-<b>invariant</b> <a href="chain_status.md#0x1_chain_status_is_genesis">chain_status::is_genesis</a>() ==&gt; len(<b>global</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>&gt;(@aptos_framework).active_validators) &gt;= 1;
 </code></pre>
 
 
@@ -1041,7 +1040,8 @@ The last step of genesis.
 
 
 
-<pre><code><b>let</b> addr = std::signer::address_of(aptos_framework);
+<pre><code><b>requires</b> len(<b>global</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>&gt;(@aptos_framework).active_validators) &gt;= 1;
+<b>let</b> addr = std::signer::address_of(aptos_framework);
 <b>aborts_if</b> addr != @aptos_framework;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">chain_status::GenesisEndMarker</a>&gt;(@aptos_framework);
 <b>ensures</b> <b>global</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">chain_status::GenesisEndMarker</a>&gt;(@aptos_framework) == <a href="chain_status.md#0x1_chain_status_GenesisEndMarker">chain_status::GenesisEndMarker</a> {};
