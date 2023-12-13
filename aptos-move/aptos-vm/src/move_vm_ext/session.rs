@@ -74,6 +74,11 @@ pub enum SessionId {
     },
     // For those runs that are not a transaction and the output of which won't be committed.
     Void,
+    RunOnAbort {
+        sender: AccountAddress,
+        sequence_number: u64,
+        script_hash: Vec<u8>,
+    },
 }
 
 impl SessionId {
@@ -97,6 +102,14 @@ impl SessionId {
 
     pub fn prologue_meta(txn_metadata: &TransactionMetadata) -> Self {
         Self::Prologue {
+            sender: txn_metadata.sender,
+            sequence_number: txn_metadata.sequence_number,
+            script_hash: txn_metadata.script_hash.clone(),
+        }
+    }
+
+    pub fn run_on_abort(txn_metadata: &TransactionMetadata) -> Self {
+        Self::RunOnAbort {
             sender: txn_metadata.sender,
             sequence_number: txn_metadata.sequence_number,
             script_hash: txn_metadata.script_hash.clone(),

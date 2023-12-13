@@ -328,13 +328,16 @@ impl Mempool {
                 .transactions
                 .get_with_ranking_score(&txn_pointer.sender, txn_pointer.sequence_number)
             {
-                let txn_size = txn.raw_txn_bytes_len();
-                if total_bytes + txn_size > max_bytes as usize {
+                let txn_size = txn.txn_bytes_len() as u64;
+                if total_bytes + txn_size > max_bytes {
                     full_bytes = true;
                     break;
                 }
                 total_bytes += txn_size;
                 block.push(txn);
+                if total_bytes == max_bytes {
+                    full_bytes = true;
+                }
                 counters::core_mempool_txn_ranking_score(
                     counters::CONSENSUS_PULLED_LABEL,
                     counters::CONSENSUS_PULLED_LABEL,
