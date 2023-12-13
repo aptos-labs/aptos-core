@@ -5,8 +5,8 @@ use crate::log::{
     CallFrame, EventStorage, ExecutionAndIOCosts, ExecutionGasEvent, FrameName, StorageFees,
     TransactionGasLog, WriteOpType, WriteStorage, WriteTransient,
 };
-use aptos_gas_algebra::{Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes};
-use aptos_gas_meter::AptosGasMeter;
+use aptos_gas_algebra::{Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes, NumTypeNodes};
+use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
 use aptos_types::{state_store::state_key::StateKey, write_set::WriteOpSize};
 use aptos_vm_types::{
     change_set::VMChangeSet, resolver::ExecutorView, storage::space_pricing::ChargeAndRefund,
@@ -32,7 +32,6 @@ pub struct GasProfiler<G> {
     base: G,
 
     intrinsic_cost: Option<InternalGas>,
-    total_exec_io: InternalGas,
     frames: Vec<CallFrame>,
     write_set_transient: Vec<WriteTransient>,
     storage_fees: Option<StorageFees>,
@@ -86,7 +85,6 @@ impl<G> GasProfiler<G> {
             base,
 
             intrinsic_cost: None,
-            total_exec_io: 0.into(),
             frames: vec![CallFrame::new_script()],
             write_set_transient: vec![],
             storage_fees: None,
@@ -103,7 +101,6 @@ impl<G> GasProfiler<G> {
             base,
 
             intrinsic_cost: None,
-            total_exec_io: 0.into(),
             frames: vec![CallFrame::new_function(module_id, func_name, ty_args)],
             write_set_transient: vec![],
             storage_fees: None,
@@ -120,16 +117,6 @@ where
     }
 
     fn record_gas_event(&mut self, event: ExecutionGasEvent) {
-        use ExecutionGasEvent::*;
-
-        match &event {
-            Loc(..) => (),
-            Call(..) => unreachable!("call frames are handled separately"),
-            Bytecode { cost, .. } | CallNative { cost, .. } | LoadResource { cost, .. } => {
-                self.total_exec_io += *cost;
-            },
-        }
-
         self.active_event_stream().push(event);
     }
 
@@ -321,6 +308,14 @@ where
         let (cost, res) =
             self.delegate_charge(|base| base.charge_native_function(amount, ret_vals));
 
+        // Whenever a function gets called, the VM will notify the gas profiler
+        // via `charge_call/charge_call_generic`.
+        //
+        // At this point of time, the gas profiler does not yet have an efficient way to determine
+        // whether the function is a native or not, so it will blindly create a new frame.
+        //
+        // Later when it realizes the function is native, it will transform the original frame
+        // into a native-specific event that does not contain recursive structures.
         let cur = self.frames.pop().expect("frame must exist");
         let (module_id, name, ty_args) = match cur.name {
             FrameName::Function {
@@ -330,6 +325,11 @@ where
             } => (module_id, name, ty_args),
             FrameName::Script => unreachable!(),
         };
+        // The following line of code is needed for correctness.
+        //
+        // This is because additional gas events may be produced after the frame has been
+        // created and these events need to be preserved.
+        self.active_event_stream().extend(cur.events);
 
         self.record_gas_event(ExecutionGasEvent::CallNative {
             module_id,
@@ -458,6 +458,14 @@ where
 
         res
     }
+
+    fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()> {
+        let (cost, res) = self.delegate_charge(|base| base.charge_create_ty(num_nodes));
+
+        self.record_gas_event(ExecutionGasEvent::CreateTy { cost });
+
+        res
+    }
 }
 
 fn write_op_type(op: &WriteOpSize) -> WriteOpType {
@@ -494,7 +502,6 @@ where
     fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOpSize) -> VMResult<()> {
         let (cost, res) = self.delegate_charge(|base| base.charge_io_gas_for_write(key, op));
 
-        self.total_exec_io += cost;
         self.write_set_transient.push(WriteTransient {
             key: key.clone(),
             cost,
@@ -588,7 +595,6 @@ where
             self.delegate_charge(|base| base.charge_intrinsic_gas_for_transaction(txn_size));
 
         self.intrinsic_cost = Some(cost);
-        self.total_exec_io += cost;
 
         res
     }
@@ -607,7 +613,7 @@ where
 
         let exec_io = ExecutionAndIOCosts {
             gas_scaling_factor: self.base.gas_unit_scaling_factor(),
-            total: self.total_exec_io,
+            total: self.algebra().execution_gas_used() + self.algebra().io_gas_used(),
             intrinsic_cost: self.intrinsic_cost.unwrap_or_else(|| 0.into()),
             call_graph: self.frames.pop().expect("frame must exist"),
             write_set_transient: self.write_set_transient,
