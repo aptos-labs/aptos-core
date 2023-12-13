@@ -17,7 +17,7 @@ use aptos_moving_average::MovingAverage;
 use aptos_protos::transaction::v1::Transaction;
 use prost::Message;
 use std::time::Duration;
-use tracing::{debug, info};
+use tracing::debug;
 
 // If the version is ahead of the cache head, retry after a short sleep.
 const AHEAD_OF_CACHE_SLEEP_DURATION_IN_MILLIS: u64 = 100;
