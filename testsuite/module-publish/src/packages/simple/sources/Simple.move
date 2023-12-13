@@ -9,6 +9,7 @@
 // multiple, publishable module.
 module 0xABCD::simple {
     use std::error;
+    use std::bcs;
     use std::signer;
     use std::string::{Self, String, utf8};
     use std::vector;
@@ -57,8 +58,51 @@ module 0xABCD::simple {
     // Test simple CPU usage. Loop as defined by the input `count`.
     // Not a true test of CPU usage given the number of instructions
     // used, but a simple reference to computation with no data access.
-    public entry fun loopy(_s: &signer, count: u64) {
+    public entry fun loop_nop(_s: &signer, count: u64) {
         while (count > 0) {
+            count = count - 1;
+        }
+    }
+
+    public entry fun loop_arithmetic(_s: &signer, count: u64) {
+        let a;
+        let b = 0;
+        let c;
+        let d = 0;
+        while (count > 0) {
+            count = count - 1;
+
+            a = b + 1;
+            c = d + 1;
+            b = a + 1;
+            d = b - a;
+            b = c + 1;
+            a = b - c;
+            b = a + 1;
+
+            // can never be true
+            if (a > b && b > c && c > d && d > a) {
+                count = count + 1;
+            }
+        }
+    }
+
+    // Test simple CPU usage. Loop as defined by the input `count`.
+    // Not a true test of CPU usage given the number of instructions
+    // used, but a simple reference to computation with no data access.
+    public entry fun loop_bcs(_s: &signer, count: u64, len: u64) {
+        let vec = vector::empty<u64>();
+        let i = 0;
+        while (i < len) {
+            vector::push_back(&mut vec, i);
+            i = i + 1;
+        };
+
+        let sum: u64 = 0;
+
+        while (count > 0) {
+            let val = bcs::to_bytes(&vec);
+            sum = sum + ((*vector::borrow(&val, 0)) as u64);
             count = count - 1;
         }
     }
