@@ -51,11 +51,20 @@ const TABLE_INFO_RETRY_TIME_MILLIS: u64 = 10;
 #[derive(Debug)]
 pub struct IndexerAsyncV2 {
     db: DB,
+    // Next version to be processed
     next_version: AtomicU64,
+    // It is used in the context of processing write ops and extracting table information.
+    // As the code iterates through the write ops, it checks if the state key corresponds to a table item.
+    // If it does, the associated bytes are added to the pending_on map under the corresponding table handle.
+    // Later, when the table information becomes available, the pending items can be retrieved and processed accordingly.
+    // One example could be a nested table item, parent table contains child table, so when parent table is first met and parsed,
+    // is obscure and will be stored as bytes with parent table's handle, once parent table's parsed with instructions,
+    // child table handle will be parsed accordingly.
     pending_on: DashMap<TableHandle, DashSet<Bytes>>,
 }
 
 impl IndexerAsyncV2 {
+    /// Opens up this rocksdb to get ready for read and write when bootstraping the aptosdb
     pub fn open(
         db_root_path: impl AsRef<std::path::Path>,
         rocksdb_config: RocksdbConfig,
@@ -81,11 +90,12 @@ impl IndexerAsyncV2 {
         })
     }
 
-    pub fn index(
+    pub fn index_table_info(
         &self,
         db_reader: Arc<dyn DbReader>,
         first_version: Version,
         write_sets: &[&WriteSet],
+        end_early_if_pending_on_empty: bool,
     ) -> Result<()> {
         let last_version = first_version + write_sets.len() as Version;
         let state_view = DbStateView {
@@ -94,48 +104,44 @@ impl IndexerAsyncV2 {
         };
         let resolver = state_view.as_move_resolver();
         let annotator = MoveValueAnnotator::new(&resolver);
-        self.index_with_annotator(&annotator, first_version, write_sets)
+        self.index_with_annotator(
+            &annotator,
+            first_version,
+            write_sets,
+            end_early_if_pending_on_empty,
+        )
     }
 
-    pub fn handle_pending_on_items(
-        &self,
-        db_reader: Arc<dyn DbReader>,
-        last_version: Version,
-    ) -> Result<()> {
-        let state_view = DbStateView {
-            db: db_reader,
-            version: Some(last_version),
-        };
-        let resolver = state_view.as_move_resolver();
-        let annotator = MoveValueAnnotator::new(&resolver);
-        let mut table_info_parser = TableInfoParser::new(self, &annotator, &self.pending_on);
-        table_info_parser.parse_pending_on()
-    }
-
+    /// Index write sets with the move annotator to parse obscure table handle and key value types
+    /// After the current batch's parsed, write the mapping to the rocksdb, also update the next version to be processed
     pub fn index_with_annotator<R: MoveResolver>(
         &self,
         annotator: &MoveValueAnnotator<R>,
         first_version: Version,
         write_sets: &[&WriteSet],
+        end_early_if_pending_on_empty: bool,
     ) -> Result<()> {
         let end_version = first_version + write_sets.len() as Version;
         let mut table_info_parser = TableInfoParser::new(self, annotator, &self.pending_on);
-        for write_set in write_sets {
+        'outer_loop: for write_set in write_sets {
             for (state_key, write_op) in write_set.iter() {
                 table_info_parser.parse_write_op(state_key, write_op)?;
+                // In the second sequential retry to parse write sets, we will end early if all pending on items are parsed
+                if end_early_if_pending_on_empty && self.is_indexer_async_v2_pending_on_empty() {
+                    break 'outer_loop; // This breaks out of both loops
+                }
             }
         }
         let mut batch = SchemaBatch::new();
         match table_info_parser.finish(&mut batch) {
             Ok(_) => {},
             Err(err) => {
-                aptos_logger::error!(first_version = first_version, end_version = end_version, error = ?&err);
-                write_sets
-                    .iter()
-                    .enumerate()
-                    .for_each(|(i, write_set)| {
-                        aptos_logger::error!(version = first_version as usize + i, write_set = ?write_set);
-                    });
+                aptos_logger::error!(
+                    first_version = first_version,
+                    end_version = end_version,
+                    error = ?&err,
+                    "[DB] Failed to parse table info"
+                );
                 bail!(err);
             },
         };
@@ -164,8 +170,9 @@ impl IndexerAsyncV2 {
             }
             retried += 1;
             info!(
-                "Retried {} times when getting table info with the handle: {:?}, and the next version: {:?}",
-                retried, handle, self.next_version
+                retry_count = retried,
+                table_handle = handle.0.to_canonical_string(),
+                "[DB] Failed to get table info",
             );
             std::thread::sleep(Duration::from_millis(TABLE_INFO_RETRY_TIME_MILLIS));
         }
@@ -173,6 +180,29 @@ impl IndexerAsyncV2 {
 
     pub fn is_indexer_async_v2_pending_on_empty(&self) -> bool {
         self.pending_on.is_empty()
+    }
+
+    /// After multiple threads have processed batches of write sets, clean up the pending on items to
+    /// remove any handles that have already been successfully parsed
+    /// ideally pending on items should be empty after threads join, meaning that all batches have done the work
+    pub fn cleanup_pending_on_items(&self) -> Result<()> {
+        let pending_keys: Vec<TableHandle> =
+            self.pending_on.iter().map(|entry| *entry.key()).collect();
+
+        for handle in pending_keys.iter() {
+            if self.get_table_info(*handle)?.is_some() {
+                self.pending_on.remove(handle);
+            }
+        }
+
+        if !self.pending_on.is_empty() {
+            aptos_logger::warn!(
+                "There are still pending table items to parse due to unknown table info for table handles: {:?}",
+                pending_keys
+            );
+        }
+
+        Ok(())
     }
 }
 
@@ -197,28 +227,7 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
         }
     }
 
-    pub fn parse_pending_on(&mut self) -> Result<()> {
-        let handles: Vec<TableHandle> = self.pending_on.iter().map(|entry| *entry.key()).collect();
-        for handle in handles {
-            if let Some(pending_items) = self.pending_on.remove(&handle) {
-                for bytes in pending_items.1 {
-                    self.parse_table_item(handle, &bytes)?;
-                }
-            }
-        }
-        Ok(())
-    }
-
     /// Parses a write operation and extracts table information from it.
-    ///
-    /// # Arguments
-    ///
-    /// * `state_key` - The state key associated with the write operation.
-    /// * `write_op` - The write operation to parse.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` if the parsing is successful, or an error if an error occurs during parsing.
     pub fn parse_write_op(&mut self, state_key: &'a StateKey, write_op: &'a WriteOp) -> Result<()> {
         if let Some(bytes) = write_op.bytes() {
             match state_key.inner() {
@@ -277,12 +286,6 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
     /// performs different parsing actions. For Vector and Struct, it recursively
     /// calls itself to parse each element or field. This recursive approach allows
     /// the function to handle nested data structures in Move values.
-    ///
-    /// # Arguments
-    /// * `move_value` - A reference to an `AnnotatedMoveValue` that needs to be parsed.
-    ///
-    /// # Returns
-    /// Returns `Result<()>` indicating the success or failure of the operation.
     fn parse_move_value(&mut self, move_value: &AnnotatedMoveValue) -> Result<()> {
         match move_value {
             AnnotatedMoveValue::Vector(_type_tag, items) => {
@@ -352,12 +355,6 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
     /// there. If not, it fetches the table information from the database using the `IndexerAsyncV2`
     /// instance. This approach of checking in-memory cache first improves performance by avoiding
     /// unnecessary database reads.
-    ///
-    /// # Arguments
-    /// * `handle` - The table handle for which information is needed.
-    ///
-    /// # Returns
-    /// Returns `Result<Option<TableInfo>>`, which is the table information if available, or `None` if not.
     fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
         match self.result.get(&handle) {
             Some(table_info) => Ok(Some(table_info.clone())),
@@ -366,42 +363,16 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
     }
 
     /// Finishes the parsing process and writes the parsed table information to a SchemaBatch.
-    ///
-    /// # Arguments
-    ///
-    /// * `batch` - A mutable reference to the SchemaBatch.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(true)` if the parsed table information is written to the SchemaBatch,
-    /// `Ok(false)` if there is no table information to write,
-    /// or an error if an error occurs during the writing process.
-    fn finish(self, batch: &mut SchemaBatch) -> Result<bool> {
-        let pending_keys: Vec<TableHandle> =
-            self.pending_on.iter().map(|entry| *entry.key()).collect();
-
-        for handle in pending_keys.iter() {
-            if self.get_table_info(*handle)?.is_some() {
-                self.pending_on.remove(handle);
-            }
-        }
-        if !self.pending_on.is_empty() {
-            aptos_logger::warn!(
-                "There are still pending table items to parse due to unknown table info for table handles: {:?}",
-                pending_keys
-            );
-        }
-
-        if self.result.is_empty() {
-            Ok(false)
-        } else {
-            self.result
-                .into_iter()
-                .try_for_each(|(table_handle, table_info)| {
-                    info!("Written to rocksdb handle: {:?}", table_handle);
-                    batch.put::<TableInfoSchema>(&table_handle, &table_info)
-                })?;
-            Ok(true)
-        }
+    fn finish(self, batch: &mut SchemaBatch) -> Result<()> {
+        self.result
+            .into_iter()
+            .try_for_each(|(table_handle, table_info)| {
+                info!(
+                    table_handle = table_handle.0.to_canonical_string(),
+                    "[DB] Table handle written to the rocksdb successfully",
+                );
+                batch.put::<TableInfoSchema>(&table_handle, &table_info)
+            })?;
+        Ok(())
     }
 }

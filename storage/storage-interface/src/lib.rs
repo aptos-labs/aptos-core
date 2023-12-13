@@ -500,9 +500,10 @@ impl MoveStorage for &dyn DbReader {
 
     fn fetch_config_by_version(&self, config_id: ConfigID, version: Version) -> Result<Vec<u8>> {
         let config_value_option = self.get_state_value_by_version(
-            &StateKey::access_path(
-                AccessPath::new(CORE_CODE_ADDRESS, access_path_for_config(config_id)?.path)
-            ),
+            &StateKey::access_path(AccessPath::new(
+                CORE_CODE_ADDRESS,
+                access_path_for_config(config_id)?.path,
+            )),
             version,
         )?;
         config_value_option
@@ -569,20 +570,21 @@ pub trait DbWriter: Send + Sync {
         unimplemented!()
     }
 
+    /// Index table info mapping for the indexer async v2 rocksdb.
+    /// Called by the table info service when its constantly parsing the table info.
     fn index_table_info(
         &self,
         db_reader: Arc<dyn DbReader>,
         first_version: Version,
         write_sets: &[&WriteSet],
+        end_early_if_pending_on_empty: bool,
     ) -> Result<()> {
         unimplemented!()
     }
 
-    fn handle_pending_on_items(
-        &self,
-        db_reader: Arc<dyn DbReader>,
-        last_version: Version,
-    ) -> Result<()> {
+    /// Clean up pending on items in the indexer async v2 rocksdb.
+    /// Called by the table info service when all threads finish processing.
+    fn cleanup_pending_on_items(&self) -> Result<()> {
         unimplemented!()
     }
 }

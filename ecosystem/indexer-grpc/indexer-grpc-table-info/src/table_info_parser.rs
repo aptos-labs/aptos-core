@@ -13,14 +13,13 @@ use std::{sync::Arc, time::Duration};
 use tonic::Status;
 
 type EndVersion = u64;
-pub const LEDGER_VERSION_RETRY_TIME_MILLIS: u64 = 10;
+const LEDGER_VERSION_RETRY_TIME_MILLIS: u64 = 10;
 const DEFAULT_NUM_RETRIES: usize = 3;
 
 pub struct TableInfoParser {
     pub current_version: u64,
     pub parser_task_count: u16,
     pub parser_batch_size: u16,
-    pub highest_known_version: u64,
     pub context: Arc<Context>,
 }
 
@@ -40,7 +39,6 @@ impl TableInfoParser {
             current_version: request_start_version,
             parser_task_count,
             parser_batch_size,
-            highest_known_version: 0,
             context,
         }
     }
@@ -56,19 +54,18 @@ impl TableInfoParser {
         db: DbReaderWriter,
     ) -> Vec<Result<EndVersion, Status>> {
         let mut tasks = vec![];
-        let batches = self.get_batches().await;
+        let (batches, total_txns_to_process, ledger_version) = self.get_batches().await;
         let db_writer = db.writer.clone();
 
         for batch in batches {
             let start_time = std::time::Instant::now();
             let db_writer = db_writer.clone();
             let context = self.context.clone();
-            let ledger_version = self.highest_known_version;
             let task = tokio::spawn(async move {
                 let raw_txns =
                     Self::fetch_raw_txns_with_retries(context.clone(), ledger_version, batch).await;
-                Self::parse_table_info(context.clone(), raw_txns.clone(), db_writer.clone())
-                    .expect("Failed to parse table info");
+                Self::parse_table_info(context.clone(), raw_txns.clone(), db_writer.clone(), false)
+                    .expect("[Table Info] Failed to parse table info");
 
                 DURATION_IN_SECS
                     .with_label_values(&[
@@ -91,38 +88,64 @@ impl TableInfoParser {
         }
         match futures::future::try_join_all(tasks).await {
             Ok(res) => {
+                // After all threads finish processing, clean up pending on items across threads
+                db_writer
+                    .clone()
+                    .cleanup_pending_on_items()
+                    .expect("[Table Info] Failed to clean up the pending on items");
                 let db_reader = db.reader.clone();
-                let mut retried: u64 = 0;
-                while !db_reader
+
+                // If pending on items are not empty, meaning the current loop hasn't fully parsed all table infos
+                // due to the nature of multithreading where instructions used to parse table info might come later,
+                // retry sequentially to ensure parsing is complete
+                //
+                // Risk of this sequential approach is that it could be slow when the txns to process contain extremely
+                // nested table items, but the risk is bounded by the the configuration of the number of txns to process and number of threads
+                if !db_reader
                     .clone()
                     .is_indexer_async_v2_pending_on_empty()
                     .unwrap()
                 {
-                    retried += 1;
                     let retry_batch = TransactionBatchInfo {
                         start_version: self.current_version,
-                        num_transactions_to_fetch: self.parser_batch_size * self.parser_task_count,
+                        num_transactions_to_fetch: total_txns_to_process,
                     };
+
                     let context = self.context.clone();
-                    let ledger_version = self.highest_known_version;
                     let raw_txns = Self::fetch_raw_txns_with_retries(
                         context.clone(),
                         ledger_version,
                         retry_batch,
                     )
                     .await;
-                    Self::parse_table_info(context.clone(), raw_txns.clone(), db_writer.clone())
-                        .expect("Failed to parse table info");
+                    Self::parse_table_info(
+                        context.clone(),
+                        raw_txns.clone(),
+                        db_writer.clone(),
+                        true,
+                    )
+                    .expect("[Table Info] Failed to parse table info");
                     info!(
                         start_version = self.current_version,
-                        retry_count = retried,
-                        "Missing data in table info parsing",
+                        total_txns_to_process = total_txns_to_process,
+                        ledger_version = ledger_version,
+                        "[Table Info] Missing data in table info parsing",
                     );
-                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+
+                if !db_reader
+                    .clone()
+                    .is_indexer_async_v2_pending_on_empty()
+                    .unwrap()
+                {
+                    panic!("[Table Info] Missing data in table info parsing after sequential retry, start_version: {:?}, total_txns_to_process: {:?}", self.current_version, total_txns_to_process)
                 }
                 res
             },
-            Err(err) => panic!("Error processing table info batches: {:?}", err),
+            Err(err) => panic!(
+                "[Table Info] Error processing table info batches: {:?}",
+                err
+            ),
         }
     }
 
@@ -143,36 +166,43 @@ impl TableInfoParser {
         Ok(max_version)
     }
 
-    async fn get_batches(&mut self) -> Vec<TransactionBatchInfo> {
-        self.ensure_highest_known_version().await;
+    async fn get_batches(&mut self) -> (Vec<TransactionBatchInfo>, u16, u64) {
+        let ledger_version = self
+            .get_highest_known_version()
+            .await
+            .expect("[Table Info] Failed to get latest ledger version.");
 
         info!(
             current_version = self.current_version,
-            highest_known_version = self.highest_known_version,
+            highest_known_version = ledger_version,
             parser_batch_size = self.parser_batch_size,
             parser_task_count = self.parser_task_count,
-            "Preparing to fetch transactions"
+            "[Table Info] Preparing to fetch transactions"
         );
 
         let mut starting_version = self.current_version;
         let mut num_fetches = 0;
+        let mut total_txns_to_process = 0;
         let mut batches = vec![];
 
-        while num_fetches < self.parser_task_count && starting_version <= self.highest_known_version
-        {
+        while num_fetches < self.parser_task_count && starting_version <= ledger_version {
             let num_transactions_to_fetch = std::cmp::min(
                 self.parser_batch_size as u64,
-                self.highest_known_version - starting_version + 1,
+                ledger_version - starting_version + 1,
             ) as u16;
 
             batches.push(TransactionBatchInfo {
                 start_version: starting_version,
                 num_transactions_to_fetch,
             });
+
+            total_txns_to_process += num_transactions_to_fetch;
+
             starting_version += num_transactions_to_fetch as u64;
             num_fetches += 1;
         }
-        batches
+
+        (batches, total_txns_to_process, ledger_version)
     }
 
     async fn fetch_raw_txns_with_retries(
@@ -196,10 +226,10 @@ impl TableInfoParser {
                             starting_version = batch.start_version,
                             num_transactions = batch.num_transactions_to_fetch,
                             error = format!("{:?}", err),
-                            "Could not fetch transactions: retries exhausted",
+                            "[Table Info] Could not fetch transactions: retries exhausted",
                         );
                         panic!(
-                            "Could not fetch {} transactions after {} retries, starting at {}: {:?}",
+                            "[Table Info] Could not fetch {} transactions after {} retries, starting at {}: {:?}",
                             batch.num_transactions_to_fetch, retries, batch.start_version, err
                         );
                     } else {
@@ -207,7 +237,7 @@ impl TableInfoParser {
                             starting_version = batch.start_version,
                             num_transactions = batch.num_transactions_to_fetch,
                             error = format!("{:?}", err),
-                            "Could not fetch transactions: will retry",
+                            "[Table Info] Could not fetch transactions: will retry",
                         );
                     }
                     tokio::time::sleep(Duration::from_millis(300)).await;
@@ -220,6 +250,7 @@ impl TableInfoParser {
         context: Arc<Context>,
         raw_txns: Vec<TransactionOnChainData>,
         db_writer: Arc<dyn DbWriter>,
+        end_early_if_pending_on_empty: bool,
     ) -> Result<(), Error> {
         if raw_txns.is_empty() {
             return Ok(());
@@ -227,58 +258,66 @@ impl TableInfoParser {
 
         let start_millis = chrono::Utc::now().naive_utc();
         let first_version = raw_txns.first().map(|txn| txn.version).unwrap();
-        let ledger_chain_id = context.chain_id().id();
 
         let write_sets: Vec<WriteSet> = raw_txns.iter().map(|txn| txn.changes.clone()).collect();
         let write_sets_slice: Vec<&WriteSet> = write_sets.iter().collect();
         db_writer
             .clone()
-            .index_table_info(context.db.clone(), first_version, &write_sets_slice)
-            .expect("Failed to process write sets and index to the table info rocksdb");
+            .index_table_info(
+                context.db.clone(),
+                first_version,
+                &write_sets_slice,
+                end_early_if_pending_on_empty,
+            )
+            .expect(
+                "[Table Info] Failed to process write sets and index to the table info rocksdb",
+            );
         let fetch_millis = (chrono::Utc::now().naive_utc() - start_millis).num_milliseconds();
 
         info!(
             table_info_first_version = first_version,
-            ledger_chain_id = ledger_chain_id,
             write_sets_bcs_size = bcs::serialized_size(&write_sets).unwrap(),
             table_info_parsing_millis_per_batch = fetch_millis,
             num_transactions = raw_txns.len(),
-            "Table info parsed successfully"
+            "[Table Info] Table info parsed successfully"
         );
 
         Ok(())
     }
 
-    pub fn set_highest_known_version(&mut self) -> anyhow::Result<()> {
-        let info = self.context.get_latest_ledger_info_wrapped()?;
-        self.highest_known_version = info.ledger_version.0;
-        Ok(())
-    }
-
     /// Will keep looping and checking the latest ledger info to see if there are new transactions
-    /// If there are, it will set the highest known version
-    async fn ensure_highest_known_version(&mut self) {
+    /// If there are, it will update the ledger version version
+    async fn get_highest_known_version(&mut self) -> Result<u64, Error> {
+        let mut info = self.context.get_latest_ledger_info_wrapped();
+        let mut ledger_version = info.unwrap().ledger_version.0;
         let mut empty_loops = 0;
-        while self.highest_known_version == 0 || self.current_version > self.highest_known_version {
+        while ledger_version == 0 || self.current_version > ledger_version {
             if empty_loops > 0 {
                 tokio::time::sleep(Duration::from_millis(LEDGER_VERSION_RETRY_TIME_MILLIS)).await;
             }
             empty_loops += 1;
-            if let Err(err) = self.set_highest_known_version() {
+            if let Err(err) =
+                {
+                    info = self.context.get_latest_ledger_info_wrapped();
+                    ledger_version = info.unwrap().ledger_version.0;
+                    Ok::<(), Error>(())
+                }
+            {
                 error!(
                     error = format!("{:?}", err),
-                    "Failed to set highest known version"
+                    "[Table Info] Failed to set highest known version"
                 );
                 continue;
             } else {
                 sample!(
                     SampleRate::Frequency(100),
                     debug!(
-                        highest_known_version = self.highest_known_version,
-                        "Found new highest known version",
+                        ledger_version = ledger_version,
+                        "[Table Info] Found new highest known ledger version",
                     )
                 );
             }
         }
+        Ok(ledger_version)
     }
 }

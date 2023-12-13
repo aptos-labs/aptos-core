@@ -124,7 +124,7 @@ pub fn new_test_context(
         DbReaderWriter::wrap(
             AptosDB::open(
                 StorageDirPaths::from_path(&tmp_dir),
-                false, /* readonly */
+                false,                       /* readonly */
                 NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
                 RocksdbConfigs::default(),
                 false, /* indexer */
@@ -924,10 +924,8 @@ impl TestContext {
         &self,
         poem_address: SocketAddr,
     ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
-        warp::path!("v1" / ..).and(reverse_proxy_filter(
-            "v1".to_string(),
-            format!("http://{}/v1", poem_address),
-        ))
+        warp::path!("v1" / ..)
+            .and(reverse_proxy_filter("v1".to_string(), format!("http://{}/v1", poem_address)))
     }
 
     pub async fn execute(&self, req: warp::test::RequestBuilder) -> Value {

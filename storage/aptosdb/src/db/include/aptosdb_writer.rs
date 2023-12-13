@@ -208,24 +208,23 @@ impl DbWriter for AptosDB {
         db_reader: Arc<dyn DbReader>,
         first_version: Version,
         write_sets: &[&WriteSet],
+        end_early_if_pending_on_empty: bool,
     ) -> Result<()> {
         gauged_api("index_table_info", || {
             self.indexer_async_v2
                 .as_ref()
-                .map(|indexer| indexer.index(db_reader, first_version, write_sets))
+                .map(|indexer| indexer.index_table_info(db_reader, first_version, write_sets, end_early_if_pending_on_empty))
                 .unwrap_or(Ok(()))
         })
     }
 
-    fn handle_pending_on_items(
+    fn cleanup_pending_on_items(
         &self,
-        db_reader: Arc<dyn DbReader>,
-        last_version: Version,
     ) -> Result<()> {
-        gauged_api("handle_pending_on_items", || {
+        gauged_api("cleanup_pending_on_items", || {
             self.indexer_async_v2
                 .as_ref()
-                .map(|indexer| indexer.handle_pending_on_items(db_reader, last_version))
+                .map(|indexer| indexer.cleanup_pending_on_items())
                 .unwrap_or(Ok(()))
         })
     }

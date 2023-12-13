@@ -628,8 +628,13 @@ pub fn setup_environment_and_start_node(
     );
 
     // Bootstrap the API and indexer
-    let (mempool_client_receiver, api_runtime, indexer_table_info_runtime, indexer_runtime, indexer_grpc_runtime) =
-        services::bootstrap_api_and_indexer(&node_config, db_rw.clone(), chain_id)?;
+    let (
+        mempool_client_receiver,
+        api_runtime,
+        indexer_table_info_runtime,
+        indexer_runtime,
+        indexer_grpc_runtime,
+    ) = services::bootstrap_api_and_indexer(&node_config, db_rw.clone(), chain_id)?;
 
     // Create mempool and get the consensus to mempool sender
     let (mempool_runtime, consensus_to_mempool_sender) =

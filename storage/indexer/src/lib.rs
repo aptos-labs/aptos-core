@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+/// TODO(jill): deprecate Indexer once Indexer Async V2 is ready
 mod db;
 pub mod db_v2;
 mod metadata;

@@ -963,6 +963,7 @@ impl AptosDB {
         }
     }
 
+    /// TODO(jill): deprecate Indexer once Indexer Async V2 is ready
     fn get_table_info_from_indexer(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
         match &self.indexer {
             Some(indexer) => indexer.get_table_info(handle),

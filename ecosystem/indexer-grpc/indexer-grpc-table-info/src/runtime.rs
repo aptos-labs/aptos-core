@@ -68,7 +68,7 @@ pub fn bootstrap(
                     Ok(max_version) => max_version,
                     Err(e) => {
                         error!(
-                            "[table-info] Error getting the max batch version processed: {}",
+                            "[Table Info] Error getting the max batch version processed: {}",
                             e
                         );
                         break;
@@ -112,7 +112,7 @@ pub fn bootstrap(
                     batch_end_version = max_version,
                     versions_processed = ma.sum(),
                     tps = (ma.avg() * 1000.0) as u64,
-                    "[table-info] Table info processed successfully"
+                    "[Table Info] Table info processed successfully"
                 );
             }
             parser.current_version = max_version + 1;
