@@ -1278,9 +1278,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     let field_sym = et.symbol_pool().make(field_name_);
                     let field_ty = et.translate_type(ty);
                     let field_ty_loc = et.to_loc(&ty.loc);
+                    // store the `field_ty` and f`ield_ty_loc `to process with `ability_check_field` outside of this loop, to avoid borrow issues
                     field_ty_and_locs.push((field_ty.clone(), field_ty_loc));
-                    // borrow checker complains
-                    // self.ability_check_field(struct_abilities, &qsym, &field_ty, &field_ty_loc);
                     field_map.insert(field_sym, (field_loc, *idx, field_ty));
                 }
                 if field_map.is_empty() {
