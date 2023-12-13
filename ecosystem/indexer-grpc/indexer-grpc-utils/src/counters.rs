@@ -45,8 +45,8 @@ impl IndexerGrpcStep {
             // Fullnode steps
             IndexerGrpcStep::FullnodeFetchedBatch => "1",
             IndexerGrpcStep::FullnodeDecodedBatch => "2",
-            IndexerGrpcStep::FullnodeProcessedBatch => "3",
-            IndexerGrpcStep::FullnodeSentBatch => "4",
+            IndexerGrpcStep::FullnodeSentBatch => "3",
+            IndexerGrpcStep::FullnodeProcessedBatch => "4",
         }
     }
 
