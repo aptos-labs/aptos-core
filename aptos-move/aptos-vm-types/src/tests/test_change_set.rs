@@ -830,7 +830,7 @@ mod tests {
         );
         additional_update.insert(
             key.clone(),
-            group_write(write_op_with_metadata(additional_type_idx, 200), vec![], 0),
+            group_write(write_op_with_metadata(additional_type_idx, 100), vec![], 0),
         );
 
         assert_ok!(VMChangeSet::squash_additional_resource_writes(
@@ -889,7 +889,7 @@ mod tests {
         additional_update.insert(
             key.clone(),
             group_write(
-                write_op_with_metadata(DELETION, 200), // delete
+                write_op_with_metadata(DELETION, 100), // delete
                 vec![],
                 0,
             ),
@@ -930,7 +930,7 @@ mod tests {
         additional_update.insert(
             key_1.clone(),
             group_write(
-                write_op_with_metadata(MODIFICATION, 200),
+                write_op_with_metadata(MODIFICATION, 100),
                 vec![
                     (
                         mock_tag_0(),
@@ -966,7 +966,7 @@ mod tests {
         additional_update.insert(
             key_2.clone(),
             group_write(
-                write_op_with_metadata(MODIFICATION, 200),
+                write_op_with_metadata(MODIFICATION, 100),
                 vec![
                     (
                         mock_tag_0(),
@@ -1012,7 +1012,7 @@ mod tests {
         let additional_update = BTreeMap::from([(
             key_2.clone(),
             group_write(
-                write_op_with_metadata(MODIFICATION, 200),
+                write_op_with_metadata(MODIFICATION, 100),
                 vec![(mock_tag_1(), (WriteOp::legacy_deletion(), None))],
                 0,
             ),

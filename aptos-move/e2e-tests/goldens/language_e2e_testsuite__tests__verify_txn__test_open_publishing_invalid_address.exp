@@ -8,11 +8,7 @@ Ok(
                             StateKey {
                                 inner: AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>)" },
                                 hash: OnceCell(Uninit),
-<<<<<<< HEAD
-                            }: Modification(3c420f00000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1),
-=======
-                            }: Modification(3e420f00000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, metadata:StateValueMetadata { inner: None }),
->>>>>>> c99c84082a (Make state value metadata upgradable at runtime)
+                            }: Modification(3c420f00000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, metadata:StateValueMetadata { inner: None }),
                             StateKey {
                                 inner: AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" },
                                 hash: OnceCell(Uninit),
@@ -20,11 +16,7 @@ Ok(
                             StateKey {
                                 inner: TableItem { handle: 1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca, key: 0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935 },
                                 hash: OnceCell(Uninit),
-<<<<<<< HEAD
-                            }: Modification(fbe0f505000000000100000000000000),
-=======
-                            }: Modification(fde0f505000000000100000000000000, metadata:StateValueMetadata { inner: None }),
->>>>>>> c99c84082a (Make state value metadata upgradable at runtime)
+                            }: Modification(fbe0f505000000000100000000000000, metadata:StateValueMetadata { inner: None }),
                         },
                     },
                 ),
