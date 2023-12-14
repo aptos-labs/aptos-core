@@ -1,0 +1,129 @@
+processed 2 tasks
+
+task 0 'publish'. lines 1-14:
+
+
+
+==> Compiler v2 delivered same results!
+
+>>> V1 Compiler {
+== BEGIN Bytecode ==
+// Move bytecode v6
+module 42.Test {
+
+
+public test() {
+L0:	loc0: u64
+L1:	loc1: u64
+L2:	loc2: u64
+L3:	loc3: u64
+L4:	loc4: u64
+L5:	loc5: u64
+B0:
+	0: LdU64(10)
+	1: LdU64(100)
+	2: StLoc[4](loc4: u64)
+	3: StLoc[2](loc2: u64)
+	4: CopyLoc[2](loc2: u64)
+	5: CopyLoc[4](loc4: u64)
+	6: Pop
+	7: StLoc[3](loc3: u64)
+	8: CopyLoc[2](loc2: u64)
+	9: CopyLoc[4](loc4: u64)
+	10: StLoc[5](loc5: u64)
+	11: Pop
+	12: CopyLoc[2](loc2: u64)
+	13: CopyLoc[4](loc4: u64)
+	14: Pop
+	15: StLoc[0](loc0: u64)
+	16: MoveLoc[2](loc2: u64)
+	17: MoveLoc[4](loc4: u64)
+	18: StLoc[1](loc1: u64)
+	19: Pop
+	20: MoveLoc[3](loc3: u64)
+	21: MoveLoc[5](loc5: u64)
+	22: Add
+	23: MoveLoc[0](loc0: u64)
+	24: Add
+	25: MoveLoc[1](loc1: u64)
+	26: Add
+	27: LdU64(220)
+	28: Eq
+	29: BrFalse(31)
+B1:
+	30: Branch(33)
+B2:
+	31: LdU64(0)
+	32: Abort
+B3:
+	33: Ret
+}
+}
+== END Bytecode ==
+}
+
+>>> V2 Compiler {
+== BEGIN Bytecode ==
+// Move bytecode v7
+module 42.Test {
+
+
+public test() {
+L0:	loc0: u64
+L1:	loc1: u64
+L2:	loc2: u64
+L3:	loc3: u64
+L4:	loc4: u64
+L5:	loc5: u64
+L6:	loc6: u64
+L7:	loc7: u64
+L8:	loc8: u64
+L9:	loc9: u64
+L10:	loc10: u64
+L11:	loc11: u64
+B0:
+	0: LdU64(10)
+	1: StLoc[0](loc0: u64)
+	2: LdU64(100)
+	3: StLoc[1](loc1: u64)
+	4: CopyLoc[0](loc0: u64)
+	5: StLoc[2](loc2: u64)
+	6: CopyLoc[2](loc2: u64)
+	7: StLoc[3](loc3: u64)
+	8: CopyLoc[1](loc1: u64)
+	9: StLoc[4](loc4: u64)
+	10: CopyLoc[4](loc4: u64)
+	11: StLoc[5](loc5: u64)
+	12: MoveLoc[3](loc3: u64)
+	13: MoveLoc[5](loc5: u64)
+	14: Add
+	15: CopyLoc[0](loc0: u64)
+	16: StLoc[6](loc6: u64)
+	17: CopyLoc[1](loc1: u64)
+	18: StLoc[7](loc7: u64)
+	19: CopyLoc[6](loc6: u64)
+	20: StLoc[8](loc8: u64)
+	21: MoveLoc[8](loc8: u64)
+	22: Add
+	23: CopyLoc[0](loc0: u64)
+	24: StLoc[9](loc9: u64)
+	25: CopyLoc[1](loc1: u64)
+	26: StLoc[10](loc10: u64)
+	27: CopyLoc[10](loc10: u64)
+	28: StLoc[11](loc11: u64)
+	29: MoveLoc[11](loc11: u64)
+	30: Add
+	31: LdU64(220)
+	32: Eq
+	33: BrFalse(35)
+B1:
+	34: Branch(37)
+B2:
+	35: LdU64(0)
+	36: Abort
+B3:
+	37: Ret
+}
+}
+== END Bytecode ==
+}
