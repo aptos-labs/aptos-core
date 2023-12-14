@@ -70,9 +70,10 @@ impl Default for IndexerGrpcConfig {
         Self {
             enabled: false,
             use_data_service_interface: false,
-            address: SocketAddr::V4(
-                SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), DEFAULT_GRPC_STREAM_PORT)
-            ),
+            address: SocketAddr::V4(SocketAddrV4::new(
+                Ipv4Addr::new(0, 0, 0, 0),
+                DEFAULT_GRPC_STREAM_PORT,
+            )),
             processor_task_count: DEFAULT_PROCESSOR_TASK_COUNT,
             processor_batch_size: DEFAULT_PROCESSOR_BATCH_SIZE,
             output_batch_size: DEFAULT_OUTPUT_BATCH_SIZE,

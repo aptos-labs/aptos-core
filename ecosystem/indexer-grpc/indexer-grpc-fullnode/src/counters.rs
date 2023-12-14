@@ -33,22 +33,20 @@ pub static FETCHED_TRANSACTION: Lazy<IntCounter> = Lazy::new(|| {
 });
 
 /// Data latency for fullnode fetched the data from storage.
-pub static FETCHED_LATENCY_IN_SECS: Lazy<Gauge> =
-    Lazy::new(|| {
-        register_gauge!(
-            "indexer_grpc_fullnode_fetched_data_latency_in_secs",
-            "Latency of fullnode fetched the data from storage",
-        )
-        .unwrap()
-    });
+pub static FETCHED_LATENCY_IN_SECS: Lazy<Gauge> = Lazy::new(|| {
+    register_gauge!(
+        "indexer_grpc_fullnode_fetched_data_latency_in_secs",
+        "Latency of fullnode fetched the data from storage",
+    )
+    .unwrap()
+});
 
 /// Channel size
-pub static CHANNEL_SIZE: Lazy<IntGaugeVec> =
-    Lazy::new(|| {
-        register_int_gauge_vec!(
-            "indexer_grpc_fullnode_channel_size",
-            "Channel size for full node",
-            &["step"],
-        )
-        .unwrap()
-    });
+pub static CHANNEL_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "indexer_grpc_fullnode_channel_size",
+        "Channel size for full node",
+        &["step"],
+    )
+    .unwrap()
+});

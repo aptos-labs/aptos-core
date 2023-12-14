@@ -133,7 +133,7 @@ impl IndexerAsyncV2 {
             }
         }
         let mut batch = SchemaBatch::new();
-        match table_info_parser.finish(&mut batch) {
+        match self.finish_table_info_parsing(&mut batch, &table_info_parser.result) {
             Ok(_) => {},
             Err(err) => {
                 aptos_logger::error!(
@@ -145,12 +145,57 @@ impl IndexerAsyncV2 {
                 bail!(err);
             },
         };
+        self.db.write_schemas(batch)?;
+        Ok(())
+    }
+
+    pub fn update_next_version(&self, end_version: u64) -> Result<()> {
+        let batch = SchemaBatch::new();
         batch.put::<IndexerMetadataSchema>(
             &MetadataKey::LatestVersion,
             &MetadataValue::Version(end_version - 1),
         )?;
         self.db.write_schemas(batch)?;
         self.next_version.store(end_version, Ordering::Relaxed);
+        Ok(())
+    }
+
+    /// Finishes the parsing process and writes the parsed table information to a SchemaBatch.
+    pub fn finish_table_info_parsing(
+        &self,
+        batch: &mut SchemaBatch,
+        result: &HashMap<TableHandle, TableInfo>,
+    ) -> Result<()> {
+        result.iter().try_for_each(|(table_handle, table_info)| {
+            info!(
+                table_handle = table_handle.0.to_canonical_string(),
+                "[DB] Table handle written to the rocksdb successfully",
+            );
+            batch.put::<TableInfoSchema>(table_handle, table_info)
+        })?;
+        Ok(())
+    }
+
+    /// After multiple threads have processed batches of write sets, clean up the pending on items to
+    /// remove any handles that have already been successfully parsed
+    /// ideally pending on items should be empty after threads join, meaning that all batches have done the work
+    pub fn cleanup_pending_on_items(&self) -> Result<()> {
+        let pending_keys: Vec<TableHandle> =
+            self.pending_on.iter().map(|entry| *entry.key()).collect();
+
+        for handle in pending_keys.iter() {
+            if self.get_table_info(*handle)?.is_some() {
+                self.pending_on.remove(handle);
+            }
+        }
+
+        if !self.pending_on.is_empty() {
+            aptos_logger::warn!(
+                "There are still pending table items to parse due to unknown table info for table handles: {:?}",
+                pending_keys
+            );
+        }
+
         Ok(())
     }
 
@@ -180,29 +225,6 @@ impl IndexerAsyncV2 {
 
     pub fn is_indexer_async_v2_pending_on_empty(&self) -> bool {
         self.pending_on.is_empty()
-    }
-
-    /// After multiple threads have processed batches of write sets, clean up the pending on items to
-    /// remove any handles that have already been successfully parsed
-    /// ideally pending on items should be empty after threads join, meaning that all batches have done the work
-    pub fn cleanup_pending_on_items(&self) -> Result<()> {
-        let pending_keys: Vec<TableHandle> =
-            self.pending_on.iter().map(|entry| *entry.key()).collect();
-
-        for handle in pending_keys.iter() {
-            if self.get_table_info(*handle)?.is_some() {
-                self.pending_on.remove(handle);
-            }
-        }
-
-        if !self.pending_on.is_empty() {
-            aptos_logger::warn!(
-                "There are still pending table items to parse due to unknown table info for table handles: {:?}",
-                pending_keys
-            );
-        }
-
-        Ok(())
     }
 }
 
@@ -360,19 +382,5 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
             Some(table_info) => Ok(Some(table_info.clone())),
             None => self.indexer_async_v2.get_table_info(handle),
         }
-    }
-
-    /// Finishes the parsing process and writes the parsed table information to a SchemaBatch.
-    fn finish(self, batch: &mut SchemaBatch) -> Result<()> {
-        self.result
-            .into_iter()
-            .try_for_each(|(table_handle, table_info)| {
-                info!(
-                    table_handle = table_handle.0.to_canonical_string(),
-                    "[DB] Table handle written to the rocksdb successfully",
-                );
-                batch.put::<TableInfoSchema>(&table_handle, &table_info)
-            })?;
-        Ok(())
     }
 }

@@ -587,6 +587,10 @@ pub trait DbWriter: Send + Sync {
     fn cleanup_pending_on_items(&self) -> Result<()> {
         unimplemented!()
     }
+
+    fn update_next_version(&self, end_version: u64) -> Result<()> {
+        unimplemented!()
+    }
 }
 
 #[derive(Clone)]

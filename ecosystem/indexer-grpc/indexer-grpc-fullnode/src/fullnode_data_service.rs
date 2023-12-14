@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::{stream_coordinator::IndexerStreamCoordinator, ServiceContext, counters::CHANNEL_SIZE};
+use crate::{counters::CHANNEL_SIZE, stream_coordinator::IndexerStreamCoordinator, ServiceContext};
 use aptos_indexer_grpc_utils::counters::{log_grpc_step_fullnode, IndexerGrpcStep};
 use aptos_logger::{error, info};
 use aptos_moving_average::MovingAverage;
@@ -65,15 +65,14 @@ impl FullnodeData for FullnodeDataService {
         // This is the main thread handling pushing to the stream
         tokio::spawn(async move {
             // Initialize the coordinator that tracks starting version and processes transactions
-            let mut coordinator =
-                IndexerStreamCoordinator::new(
-                    context,
-                    starting_version,
-                    processor_task_count,
-                    processor_batch_size,
-                    output_batch_size,
-                    tx.clone(),
-                );
+            let mut coordinator = IndexerStreamCoordinator::new(
+                context,
+                starting_version,
+                processor_task_count,
+                processor_batch_size,
+                output_batch_size,
+                tx.clone(),
+            );
             // Sends init message (one time per request) to the client in the with chain id and starting version. Basically a handshake
             let init_status = get_status(StatusType::Init, starting_version, None, ledger_chain_id);
             match tx.send(Result::<_, Status>::Ok(init_status)).await {
@@ -148,8 +147,9 @@ impl FullnodeData for FullnodeDataService {
             }
         });
         let output_stream = ReceiverStream::new(rx);
-        Ok(Response::new(Box::pin(output_stream)
-            as Self::GetTransactionsFromNodeStream))
+        Ok(Response::new(
+            Box::pin(output_stream) as Self::GetTransactionsFromNodeStream
+        ))
     }
 }
 

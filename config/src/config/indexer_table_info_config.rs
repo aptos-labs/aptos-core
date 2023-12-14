@@ -18,6 +18,8 @@ pub struct IndexerTableInfoConfig {
 
     /// Number of transactions each parser will process
     pub parser_batch_size: u16,
+
+    pub enable_verbose_logging: bool,
 }
 
 // Reminder, #[serde(default)] on IndexerTableInfoConfig means that the default values for
@@ -29,6 +31,7 @@ impl Default for IndexerTableInfoConfig {
             enabled: false,
             parser_task_count: DEFAULT_PARSER_TASK_COUNT,
             parser_batch_size: DEFAULT_PARSER_BATCH_SIZE,
+            enable_verbose_logging: false,
         }
     }
 }

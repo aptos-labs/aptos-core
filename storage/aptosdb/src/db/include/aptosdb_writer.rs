@@ -228,6 +228,18 @@ impl DbWriter for AptosDB {
                 .unwrap_or(Ok(()))
         })
     }
+
+    fn update_next_version(
+        &self,
+        end_version: u64
+    ) -> Result<()> {
+        gauged_api("update_next_version", || {
+            self.indexer_async_v2
+                .as_ref()
+                .map(|indexer| indexer.update_next_version(end_version))
+                .unwrap_or(Ok(()))
+        })
+    }
 }
 
 impl AptosDB {
