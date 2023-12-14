@@ -107,7 +107,10 @@ jobs:
 
       - name: Run replay-verify in parallel
         shell: bash
-        run: testsuite/replay_verify.py ${{ matrix.number }} 17 # first argument is the runner number, second argument is the total number of runners
+        run:
+          export PUSH_METRICS_ENDPOINT=http://vmagent-victoria-metrics-agent.victoria-metrics.svc:8429/api/v1/import/prometheus?extra_lable=replay-verify&extra_label=${{ inputs.BUCKET }}-${{ matrix.number }}
+          echo "PUSH_METRICS_ENDPOINT is $PUSH_METRICS_ENDPOINT"
+          testsuite/replay_verify.py ${{ matrix.number }} 17 # first argument is the runner number, second argument is the total number of runners
         env:
           BUCKET: ${{ inputs.BUCKET }}
           SUB_DIR: ${{ inputs.SUB_DIR }}
