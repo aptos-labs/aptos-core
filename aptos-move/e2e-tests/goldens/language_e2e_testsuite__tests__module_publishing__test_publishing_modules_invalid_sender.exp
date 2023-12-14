@@ -14,9 +14,9 @@ Ok(
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "02000000000000000200000000000000000000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "04000000000000000400000000000000000000000000000000000000000000000000000000000000" },
             ],
-            gas_used: 2,
+            gas_used: 4,
             status: Keep(
                 MiscellaneousError(
                     Some(
