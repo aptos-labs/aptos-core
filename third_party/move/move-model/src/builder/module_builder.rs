@@ -1239,10 +1239,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 ),
                 Ability::Store => {
                     let mut abilities = Vec::new();
-                    if field_abilities.has_store() {
+                    if struct_abilities.has_store() {
                         abilities.push("store");
                     }
-                    if field_abilities.has_key() {
+                    if struct_abilities.has_key() {
                         abilities.push("key");
                     }
                     self.parent.error(
