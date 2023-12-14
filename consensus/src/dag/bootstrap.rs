@@ -34,6 +34,7 @@ use crate::{
     pipeline::buffer_manager::OrderedBlocks,
     state_replication::StateComputer,
 };
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{
     aptos_channel::{self, Receiver},
     message_queues::QueueStyle,
@@ -119,7 +120,7 @@ impl ActiveMode {
     async fn run_internal(
         self,
         dag_rpc_rx: &mut Receiver<Author, IncomingDAGRequest>,
-        _bootstrapper: &DagBootstrapper,
+        bootstrapper: &DagBootstrapper,
     ) -> Option<Mode> {
         info!(
             LogSchema::new(LogEvent::ActiveMode)
@@ -148,7 +149,10 @@ impl ActiveMode {
         });
 
         // Run the network handler until it returns with state sync status.
-        let sync_outcome = self.handler.run(dag_rpc_rx, self.buffer).await;
+        let sync_outcome = self
+            .handler
+            .run(dag_rpc_rx, bootstrapper.executor.clone(), self.buffer)
+            .await;
 
         info!(
             LogSchema::new(LogEvent::SyncOutcome),
@@ -324,6 +328,7 @@ pub struct DagBootstrapper {
     ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
     quorum_store_enabled: bool,
     validator_txn_enabled: bool,
+    executor: BoundedExecutor,
 }
 
 impl DagBootstrapper {
@@ -345,6 +350,7 @@ impl DagBootstrapper {
         ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
         quorum_store_enabled: bool,
         validator_txn_enabled: bool,
+        executor: BoundedExecutor,
     ) -> Self {
         Self {
             self_peer,
@@ -363,6 +369,7 @@ impl DagBootstrapper {
             ordered_nodes_tx,
             quorum_store_enabled,
             validator_txn_enabled,
+            executor,
         }
     }
 
@@ -485,6 +492,7 @@ impl DagBootstrapper {
             rb_backoff_policy,
             self.time_service.clone(),
             Duration::from_millis(rb_config.rpc_timeout_ms),
+            self.executor.clone(),
         ));
 
         let BootstrapBaseState {
@@ -655,6 +663,7 @@ pub(super) fn bootstrap_dag_for_test(
         ordered_nodes_tx,
         false,
         true,
+        BoundedExecutor::new(2, Handle::current()),
     );
 
     let (_base_state, handler, fetch_service) = bootstraper.full_bootstrap();
@@ -663,7 +672,9 @@ pub(super) fn bootstrap_dag_for_test(
 
     let dh_handle = tokio::spawn(async move {
         let mut dag_rpc_rx = dag_rpc_rx;
-        handler.run(&mut dag_rpc_rx, Vec::new()).await
+        handler
+            .run(&mut dag_rpc_rx, bootstraper.executor.clone(), Vec::new())
+            .await
     });
     let df_handle = tokio::spawn(fetch_service.start());
 

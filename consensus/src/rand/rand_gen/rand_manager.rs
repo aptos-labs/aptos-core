@@ -64,6 +64,7 @@ impl<
         outgoing_blocks: Sender<OrderedBlocks>,
         network_sender: Arc<NetworkSender>,
         db: Arc<Storage>,
+        bounded_executor: BoundedExecutor,
     ) -> Self {
         let (rand_decision_tx, rand_decision_rx) = tokio::sync::mpsc::unbounded_channel();
         let rb_backoff_policy = ExponentialBackoff::from_millis(2)
@@ -75,6 +76,7 @@ impl<
             rb_backoff_policy,
             TimeService::real(),
             Duration::from_secs(10),
+            bounded_executor,
         ));
         let rand_store = RandStore::new(epoch_state.epoch, author, config.clone(), db.clone());
         let aug_data_store = AugDataStore::new(epoch_state.epoch, signer, config.clone(), db);
@@ -168,12 +170,12 @@ impl<
         let share = S::generate(&self.config, metadata);
         let rb = self.reliable_broadcast.clone();
         let validators = self.epoch_state.verifier.get_ordered_account_addresses();
-        let share_ack_state = ShareAckState::new(
+        let share_ack_state = Arc::new(ShareAckState::new(
             validators.into_iter(),
             share.metadata().clone(),
             self.config.clone(),
             self.rand_decision_tx.clone(),
-        );
+        ));
         let task = async move {
             let round = share.round();
             info!("[RandManager] Start broadcasting share for {}", round);
@@ -200,7 +202,7 @@ impl<
         let validators = self.epoch_state.verifier.get_ordered_account_addresses();
         let task = async move {
             let cert = first_phase.await;
-            let ack_state = CertifiedAugDataAckState::new(validators.into_iter());
+            let ack_state = Arc::new(CertifiedAugDataAckState::new(validators.into_iter()));
             info!("[RandManager] Start broadcasting certified aug data");
             rb2.broadcast(cert, ack_state).await;
             info!("[RandManager] Finish broadcasting certified aug data");

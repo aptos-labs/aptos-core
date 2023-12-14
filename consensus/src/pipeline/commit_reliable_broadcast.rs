@@ -7,11 +7,12 @@ use aptos_consensus_types::{
     common::Author,
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
 };
+use aptos_infallible::Mutex;
 use aptos_reliable_broadcast::{BroadcastStatus, RBMessage, RBNetworkSender};
 use aptos_types::validator_verifier::ValidatorVerifier;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 /// Network message for the pipeline phase
@@ -38,25 +39,26 @@ impl CommitMessage {
 impl RBMessage for CommitMessage {}
 
 pub struct AckState {
-    validators: HashSet<Author>,
+    validators: Mutex<HashSet<Author>>,
 }
 
 impl AckState {
-    pub fn new(validators: impl Iterator<Item = Author>) -> Self {
-        Self {
-            validators: validators.collect(),
-        }
+    pub fn new(validators: impl Iterator<Item = Author>) -> Arc<Self> {
+        Arc::new(Self {
+            validators: Mutex::new(validators.collect()),
+        })
     }
 }
 
-impl BroadcastStatus<CommitMessage> for AckState {
+impl BroadcastStatus<CommitMessage> for Arc<AckState> {
     type Ack = CommitMessage;
     type Aggregated = ();
     type Message = CommitMessage;
 
-    fn add(&mut self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
-        if self.validators.remove(&peer) {
-            if self.validators.is_empty() {
+    fn add(&self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
+        let mut validators = self.validators.lock();
+        if validators.remove(&peer) {
+            if validators.is_empty() {
                 Ok(Some(()))
             } else {
                 Ok(None)
