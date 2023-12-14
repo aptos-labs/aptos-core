@@ -67,7 +67,6 @@ pub struct RawDataServerWrapper {
     pub redis_client: Arc<redis::Client>,
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub data_service_response_channel_size: usize,
-    pub enable_verbose_logging: bool,
 }
 
 impl RawDataServerWrapper {
@@ -75,7 +74,6 @@ impl RawDataServerWrapper {
         redis_address: RedisUrl,
         file_store_config: IndexerGrpcFileStoreConfig,
         data_service_response_channel_size: usize,
-        enable_verbose_logging: bool,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             redis_client: Arc::new(
@@ -85,7 +83,6 @@ impl RawDataServerWrapper {
             ),
             file_store_config,
             data_service_response_channel_size,
-            enable_verbose_logging,
         })
     }
 }
@@ -165,7 +162,6 @@ impl RawData for RawDataServerWrapper {
         );
 
         let redis_client = self.redis_client.clone();
-        let enable_verbose_logging = self.enable_verbose_logging;
         tokio::spawn({
             let request_metadata = request_metadata.clone();
             async move {
@@ -247,7 +243,6 @@ impl RawData for RawDataServerWrapper {
                         file_store_operator.as_ref(),
                         current_batch_start_time,
                         request_metadata.clone(),
-                        enable_verbose_logging,
                     )
                     .await
                     {
@@ -321,7 +316,6 @@ impl RawData for RawDataServerWrapper {
                         chain_id as u32,
                         current_batch_start_time,
                         request_metadata.clone(),
-                        enable_verbose_logging,
                     );
                     let data_latency_in_secs = resp_items
                         .last()
@@ -338,7 +332,6 @@ impl RawData for RawDataServerWrapper {
                         tx.clone(),
                         current_batch_start_time,
                         request_metadata.clone(),
-                        enable_verbose_logging,
                     )
                     .await
                     {
@@ -440,7 +433,6 @@ fn get_transactions_responses_builder(
     chain_id: u32,
     current_batch_start_time: Instant,
     request_metadata: IndexerGrpcRequestMetadata,
-    _enable_logging: bool,
 ) -> Vec<TransactionsResponse> {
     let transactions: Vec<Transaction> = data
         .into_iter()
@@ -492,7 +484,6 @@ async fn data_fetch(
     file_store_operator: &dyn FileStoreOperator,
     current_batch_start_time: Instant,
     request_metadata: IndexerGrpcRequestMetadata,
-    _enable_logging: bool,
 ) -> anyhow::Result<TransactionsDataStatus> {
     let batch_get_result = cache_operator
         .batch_get_encoded_proto_data(starting_version)
@@ -671,7 +662,6 @@ async fn channel_send_multiple_with_timeout(
     tx: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
     current_batch_start_time: Instant,
     request_metadata: IndexerGrpcRequestMetadata,
-    _enable_logging: bool,
 ) -> Result<(), SendTimeoutError<Result<TransactionsResponse, Status>>> {
     let overall_size_in_bytes = resp_items
         .iter()

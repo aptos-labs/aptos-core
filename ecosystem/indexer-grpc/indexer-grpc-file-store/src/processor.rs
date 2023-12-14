@@ -28,14 +28,14 @@ pub struct Processor {
     cache_operator: CacheOperator<redis::aio::ConnectionManager>,
     file_store_operator: Box<dyn FileStoreOperator>,
     cache_chain_id: u64,
-    enable_verbose_logging: bool,
+    enable_expensive_logging: bool,
 }
 
 impl Processor {
     pub async fn new(
         redis_main_instance_address: RedisUrl,
         file_store_config: IndexerGrpcFileStoreConfig,
-        enable_verbose_logging: bool,
+        enable_expensive_logging: bool,
     ) -> Result<Self> {
         // Connection to redis is a hard dependency for file store processor.
         let conn = redis::Client::open(redis_main_instance_address.0.clone())
@@ -79,7 +79,7 @@ impl Processor {
             cache_operator,
             file_store_operator,
             cache_chain_id,
-            enable_verbose_logging,
+            enable_expensive_logging,
         })
     }
 
@@ -231,7 +231,7 @@ impl Processor {
             );
 
             let (mut start_version_timestamp, mut end_version_timestamp) = (None, None);
-            if self.enable_verbose_logging {
+            if self.enable_expensive_logging {
                 // This decoding may be inefficient, but this is the file store so we don't have to be overly
                 // concerned with efficiency.
                 start_version_timestamp = {
