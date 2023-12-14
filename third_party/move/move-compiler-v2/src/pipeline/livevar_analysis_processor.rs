@@ -8,6 +8,7 @@
 //! After transformation, this also runs copy inference transformation, which inserts
 //! copies as needed, and reports errors for invalid copies.
 
+use super::ability_checker::check_copy;
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_binary_format::file_format::CodeOffset;
@@ -326,14 +327,23 @@ impl<'a> CopyTransformation<'a> {
     fn check_implicit_copy(
         &self,
         alive: &LiveVarInfoAtCodeOffset,
-        _id: AttrId,
+        id: AttrId,
         _is_updated: bool,
         temp: TempIndex,
     ) -> bool {
-        // TODO(#10723): insert ability check here
         // Notice we do allow copy of &mut. Those copies are checked for validity in
         // reference safety.
-        alive.after.contains_key(&temp)
+        let needed = alive.after.contains_key(&temp);
+        if needed {
+            let target = self.target();
+            check_copy(
+                &target,
+                target.get_local_type(temp),
+                &target.get_bytecode_loc(id),
+                &format!("cannot copy {} implicitly", target.get_local_name_for_error_message(temp))
+            );
+        }
+        needed
     }
 
     fn make_hints_from_usage(
@@ -370,7 +380,12 @@ impl<'a> CopyTransformation<'a> {
                 );
                 false
             } else {
-                // TODO(#10723): insert ability check here
+                check_copy(
+                    &target,
+                    target.get_local_type(temp),
+                    &target.get_bytecode_loc(id),
+                    &format!("cannot copy {} implicitly", target.get_local_name_for_error_message(temp))
+                );
                 true
             }
         } else {
@@ -391,8 +406,14 @@ impl<'a> CopyTransformation<'a> {
                 "copied here",
                 empty(),
             );
+        } else {
+            check_copy(
+                &target,
+                target.get_local_type(temp),
+                &target.get_bytecode_loc(id),
+                &format!("cannot copy {} implicitly", target.get_local_name_for_error_message(temp))
+            );
         }
-        // TODO(#10723): insert ability check here
     }
 
     /// Checks whether an explicit move is allowed.
