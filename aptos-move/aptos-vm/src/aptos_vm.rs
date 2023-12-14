@@ -418,25 +418,6 @@ impl AptosVM {
                 .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
         ) {
             TransactionStatus::Keep(status) => {
-                // Inject abort info if available.
-                let status = match status {
-                    ExecutionStatus::MoveAbort {
-                        location: AbortLocation::Module(module),
-                        code,
-                        ..
-                    } => {
-                        let info = self
-                            .extract_module_metadata(&module)
-                            .and_then(|m| m.extract_abort_info(code));
-                        ExecutionStatus::MoveAbort {
-                            location: AbortLocation::Module(module),
-                            code,
-                            info,
-                        }
-                    },
-                    _ => status,
-                };
-
                 // The transaction should be kept. Run the appropriate post transaction workflows
                 // including epilogue. This runs a new session that ignores any side effects that
                 // might abort the execution (e.g., spending additional funds needed to pay for
@@ -447,10 +428,11 @@ impl AptosVM {
                     gas_meter,
                     txn_data,
                     resolver,
+                    status,
                     log_context,
                     change_set_configs,
                 ) {
-                    Ok((change_set, fee_statement)) => {
+                    Ok((change_set, fee_statement, status)) => {
                         VMOutput::new(change_set, fee_statement, TransactionStatus::Keep(status))
                     },
                     Err(err) => discarded_output(err.status_code()),
@@ -465,19 +447,41 @@ impl AptosVM {
         }
     }
 
+    fn inject_abort_info_if_available(&self, status: ExecutionStatus) -> ExecutionStatus {
+        match status {
+            ExecutionStatus::MoveAbort {
+                location: AbortLocation::Module(module),
+                code,
+                ..
+            } => {
+                let info = self
+                    .extract_module_metadata(&module)
+                    .and_then(|m| m.extract_abort_info(code));
+                ExecutionStatus::MoveAbort {
+                    location: AbortLocation::Module(module),
+                    code,
+                    info,
+                }
+            },
+            _ => status,
+        }
+    }
+
     fn finish_aborted_transaction(
         &self,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         resolver: &impl AptosMoveResolver,
+        status: ExecutionStatus,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
-    ) -> Result<(VMChangeSet, FeeStatement), VMStatus> {
+    ) -> Result<(VMChangeSet, FeeStatement, ExecutionStatus), VMStatus> {
         // Storage refund is zero since no slots are deleted in aborted transactions.
         const ZERO_STORAGE_REFUND: u64 = 0;
 
         if is_account_init_for_sponsored_transaction(txn_data, &self.features) {
             let mut session = self.new_session(resolver, SessionId::run_on_abort(txn_data));
+            let status = self.inject_abort_info_if_available(status);
 
             create_account_if_does_not_exist(&mut session, gas_meter, txn_data.sender())
                 // if this fails, it is likely due to out of gas, so we try again without metering
@@ -553,9 +557,10 @@ impl AptosVM {
             })?;
             respawned_session
                 .finish(change_set_configs)
-                .map(|set| (set, fee_statement))
+                .map(|set| (set, fee_statement, status))
         } else {
             let mut session = self.new_session(resolver, SessionId::epilogue_meta(txn_data));
+            let status = self.inject_abort_info_if_available(status);
 
             let fee_statement =
                 AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
@@ -569,7 +574,7 @@ impl AptosVM {
             )?;
             session
                 .finish(change_set_configs)
-                .map(|set| (set, fee_statement))
+                .map(|set| (set, fee_statement, status))
                 .map_err(|e| e.into())
         }
     }
