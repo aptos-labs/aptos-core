@@ -24,7 +24,7 @@ use aptos_logger::{debug, error, warn};
 use aptos_types::epoch_state::EpochState;
 use futures::StreamExt;
 use std::sync::Arc;
-use tokio::{runtime::Handle, select};
+use tokio::select;
 
 pub(crate) struct NetworkHandler {
     epoch_state: Arc<EpochState>,
@@ -63,12 +63,10 @@ impl NetworkHandler {
     pub async fn run(
         mut self,
         dag_rpc_rx: &mut aptos_channel::Receiver<Author, IncomingDAGRequest>,
+        executor: BoundedExecutor,
         _buffer: Vec<DAGMessage>,
     ) -> SyncOutcome {
         // TODO: process buffer
-
-        // TODO: Pass bounded executor from EpochManager.
-        let executor = BoundedExecutor::new(2, Handle::current());
         let epoch_state = self.epoch_state.clone();
 
         let mut verified_msg_stream = concurrent_map(
@@ -77,7 +75,6 @@ impl NetworkHandler {
             move |rpc_request: IncomingDAGRequest| {
                 let epoch_state = epoch_state.clone();
                 async move {
-                    debug!("deserializing and verifying message");
                     let result = rpc_request
                         .req
                         .try_into()
@@ -88,7 +85,6 @@ impl NetworkHandler {
                             )?;
                             Ok(dag_message)
                         });
-                    debug!("message verified");
                     (result, rpc_request.sender, rpc_request.responder)
                 }
             },

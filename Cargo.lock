@@ -3328,6 +3328,7 @@ name = "aptos-reliable-broadcast"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-bounded-executor",
  "aptos-consensus-types",
  "aptos-enum-conversion-derive",
  "aptos-infallible",
