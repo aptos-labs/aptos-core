@@ -75,11 +75,12 @@ impl OnChainExecutionConfig {
                 effective_block_gas_limit: 40000,
                 execution_gas_effective_multiplier: 1,
                 io_gas_effective_multiplier: 1,
-                block_output_limit: Some(5 * 1024 * 1024),
                 conflict_penalty_window: 6,
+                use_granular_resource_group_conflicts: false,
+                use_module_publishing_block_conflict: false,
+                block_output_limit: Some(5 * 1024 * 1024),
                 include_user_txn_size_in_block_output: true,
                 add_block_limit_outcome_onchain: false,
-                use_granular_resource_group_conflicts: false,
             },
             transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
         })
@@ -168,6 +169,17 @@ pub enum BlockGasLimitType {
         io_gas_effective_multiplier: u64,
         conflict_penalty_window: u32,
 
+        /// If true we look at granular resource group conflicts (i.e. if same Tag
+        /// within a resource group has a conflict)
+        /// If false, we treat any conclicts inside of resource groups (even across
+        /// non-overlapping tags) as conflicts).
+        use_granular_resource_group_conflicts: bool,
+        /// Module publishing today fallbacks to sequential execution,
+        /// even though there is no read-write conflict.
+        /// When enabled, this flag allows us to account for that conflict.
+        /// NOTE: Currently not supported.
+        use_module_publishing_block_conflict: bool,
+
         /// Block limit on the total (approximate) txn output size in bytes.
         block_output_limit: Option<u64>,
         /// When set, we include the user txn size in the approximate computation
@@ -176,13 +188,8 @@ pub enum BlockGasLimitType {
 
         /// When set, we create BlockEpilogue (instead of StateCheckpint) transaction,
         /// which contains BlockEndInfo
+        /// NOTE: Currently not supported.
         add_block_limit_outcome_onchain: bool,
-
-        // If true we look at granular resource group conflicts (i.e. if same Tag
-        // within a resource group has a conflict)
-        // If false, we treat any conclicts inside of resource groups (even across
-        // non-overlapping tags) as conflicts).
-        use_granular_resource_group_conflicts: bool,
     },
 }
 
