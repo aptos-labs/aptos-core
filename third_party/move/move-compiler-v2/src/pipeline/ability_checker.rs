@@ -94,7 +94,7 @@ fn check_key_for_struct(
     loc: &Loc,
     err_msg: &str,
 ) {
-    if !check_struct_inst(target, mod_id, struct_id, insts, &loc).has_ability(Ability::Key) {
+    if !check_struct_inst(target, mod_id, struct_id, insts, loc).has_ability(Ability::Key) {
         target.global_env().error(loc, err_msg)
     }
 }

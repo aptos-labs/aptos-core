@@ -79,14 +79,17 @@ impl<'a> ExplicitDropTransformer<'a> {
     /// Add explicit drops at the given code offset.
     fn explicit_drops_at(&mut self, code_offset: CodeOffset, bytecode: &Bytecode) {
         match bytecode {
-            Bytecode::Ret(..) | Bytecode::Jump(..) | Bytecode::Abort(..) | Bytecode::Branch(..) => {
-                ()
-            },
+            Bytecode::Ret(..) | Bytecode::Jump(..) | Bytecode::Abort(..) | Bytecode::Branch(..) => (),
             _ => {
                 let released_temps = self.released_temps_at(code_offset);
                 self.drop_temps(&released_temps, bytecode.get_attr_id())
             },
         }
+    }
+
+    /// Checks if the given local is of primitive type
+    fn is_primitive(&self, t: TempIndex) -> bool {
+        matches!(self.target.get_local_type(t), Type::Primitive(_))
     }
 
     /// Drops unused function arguments
@@ -95,12 +98,10 @@ impl<'a> ExplicitDropTransformer<'a> {
         let live_var_info = self.get_live_var_info(start_code_offset);
         let lifetime_info = self.get_lifetime_info(start_code_offset);
         for arg in self.target.get_parameters() {
-            if !matches!(self.target.get_local_type(arg), Type::Primitive(_)) {
-                if !live_var_info.before.contains_key(&arg) && !lifetime_info.before.is_borrowed(arg) {
-                    // a non-native function has at least one instruction; a single return or abort at minimum
-                    let attr_id = self.target.get_bytecode()[start_code_offset as usize].get_attr_id();
-                    self.drop_temp(arg, attr_id)
-                }
+            if !self.is_primitive(arg) && !live_var_info.before.contains_key(&arg) && !lifetime_info.before.is_borrowed(arg) {
+                // a non-native function has at least one instruction; a single return or abort at minimum
+                let attr_id = self.target.get_bytecode()[start_code_offset as usize].get_attr_id();
+                self.drop_temp(arg, attr_id)
             }
         }
     }
@@ -113,7 +114,7 @@ impl<'a> ExplicitDropTransformer<'a> {
         let bytecode = &self.target.get_bytecode()[code_offset as usize];
         released_temps(live_var_info, lifetime_info, bytecode)
             .into_iter()
-            .filter(|t| !matches!(self.target.get_local_type(*t), Type::Primitive(_)))
+            .filter(|t| !self.is_primitive(*t))
             .collect()
     }
 
