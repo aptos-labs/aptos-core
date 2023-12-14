@@ -2,14 +2,14 @@
 
 //! This submodule implements the *public parameters* for this PVSS scheme.
 
+use crate::{
+    constants::{DST_PVSS_PUBLIC_PARAMS, G2_PROJ_NUM_BYTES, SEED_PVSS_PUBLIC_PARAMS},
+    pvss::{encryption_elgamal, traits},
+};
 use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_crypto_derive::{DeserializeKey, SerializeKey};
 use blstrs::{G1Projective, G2Projective};
 use pairing::group::Group;
-
-use crate::constants::{DST_PVSS_PUBLIC_PARAMS, G2_PROJ_NUM_BYTES, SEED_PVSS_PUBLIC_PARAMS};
-use crate::pvss::encryption_elgamal;
-use crate::pvss::traits;
 
 /// The size, in number of bytes, of a serialized `PublicParameters` struct.
 const NUM_BYTES: usize = encryption_elgamal::g1::PUBLIC_PARAMS_NUM_BYTES + G2_PROJ_NUM_BYTES;
@@ -34,6 +34,7 @@ impl PublicParameters {
             g_2: G2Projective::hash_to_curve(seed, DST_PVSS_PUBLIC_PARAMS.as_slice(), b"g2"),
         }
     }
+
     /// Verifiably creates public parameters from a public sequence of bytes `seed` but sets
     /// the encryption pubkey (and randomness) base $g$ to be `ek_base`.
     pub fn new_from_seed_with_bls_base(seed: &[u8]) -> Self {

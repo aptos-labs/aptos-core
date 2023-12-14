@@ -4,16 +4,24 @@
 use anyhow::{bail, ensure};
 pub use aptos_consensus_types::common::Author;
 use aptos_consensus_types::common::Round;
-use aptos_crypto::{HashValue, bls12381::Signature, CryptoMaterialError, hash::{CryptoHash, CryptoHasher}};
+use aptos_crypto::{
+    bls12381::Signature,
+    hash::{CryptoHash, CryptoHasher},
+    CryptoMaterialError, HashValue,
+};
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_dkg::weighted_vuf::traits::WeightedVUF;
 use aptos_enum_conversion_derive::EnumConversion;
 use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
-use aptos_types::{randomness::{RandConfig, RandDecision, ProofShare, Delta, RandMetadata, WVUF}, validator_verifier::ValidatorVerifier, validator_signer::ValidatorSigner, aggregate_signature::{PartialSignatures, AggregateSignature}};
+use aptos_types::{
+    aggregate_signature::{AggregateSignature, PartialSignatures},
+    randomness::{Delta, ProofShare, RandConfig, RandDecision, RandMetadata, WVUF},
+    validator_signer::ValidatorSigner,
+    validator_verifier::ValidatorVerifier,
+};
 use futures_channel::mpsc::UnboundedSender;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, sync::Arc};
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct RandShare {
@@ -24,7 +32,11 @@ pub struct RandShare {
 
 impl RandShare {
     pub fn new(author: Author, metadata: RandMetadata, share: ProofShare) -> Self {
-        Self { author, metadata, share }
+        Self {
+            author,
+            metadata,
+            share,
+        }
     }
 
     pub fn author(&self) -> &Author {
@@ -58,12 +70,25 @@ impl RandShare {
 
 impl RandShare {
     pub fn verify(&self, rand_config: &RandConfig) -> anyhow::Result<()> {
-        let index = *rand_config.validator.address_to_validator_index().get(&self.author).unwrap();
+        let index = *rand_config
+            .validator
+            .address_to_validator_index()
+            .get(&self.author)
+            .unwrap();
         let maybe_apk = &rand_config.keys.certified_apks[index];
         if let Some(apk) = maybe_apk {
-            <WVUF as WeightedVUF>::verify_share(&rand_config.vuf_pp, apk, self.metadata.to_bytes().as_slice(), &self.share)?;
+            <WVUF as WeightedVUF>::verify_share(
+                &rand_config.vuf_pp,
+                apk,
+                self.metadata.to_bytes().as_slice(),
+                &self.share,
+            )?;
         } else {
-            bail!("[RandShare] No augmented public key for validator id {}, {}", index, self.author);
+            bail!(
+                "[RandShare] No augmented public key for validator id {}, {}",
+                index,
+                self.author
+            );
         }
         Ok(())
     }
@@ -71,12 +96,16 @@ impl RandShare {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ShareAck {
+    pub epoch: u64,
     pub maybe_decision: Option<RandDecision>,
 }
 
 impl ShareAck {
-    pub fn new(maybe_decision: Option<RandDecision>) -> Self {
-        Self { maybe_decision }
+    pub fn new(epoch: u64, maybe_decision: Option<RandDecision>) -> Self {
+        Self {
+            epoch,
+            maybe_decision,
+        }
     }
 }
 
@@ -114,7 +143,11 @@ pub struct DeltaMsg {
 impl DeltaMsg {
     pub fn new(epoch: u64, author: Author, delta: Delta) -> Self {
         let digest = Self::calculate_digest_internal(epoch, author, &delta);
-        let metadata = DeltaMetadata { epoch, author, digest };
+        let metadata = DeltaMetadata {
+            epoch,
+            author,
+            digest,
+        };
         Self { metadata, delta }
     }
 
@@ -122,11 +155,7 @@ impl DeltaMsg {
         Self::calculate_digest_internal(self.metadata.epoch, self.metadata.author, &self.delta)
     }
 
-    fn calculate_digest_internal(
-        epoch: u64,
-        author: Author,
-        delta: &Delta,
-    ) -> HashValue {
+    fn calculate_digest_internal(epoch: u64, author: Author, delta: &Delta) -> HashValue {
         let delta_msg_without_digest = DeltaMsgWithoutDigest {
             epoch,
             author,
@@ -140,7 +169,7 @@ impl DeltaMsg {
     }
 
     pub fn author(&self) -> &Author {
-       & self.metadata.author
+        &self.metadata.author
     }
 
     pub fn digest(&self) -> HashValue {
@@ -156,7 +185,10 @@ impl DeltaMsg {
     }
 
     pub fn verify(&self) -> anyhow::Result<()> {
-        ensure!(self.digest() == self.calculate_digest(), "DeltaMsg: invalid digest");
+        ensure!(
+            self.digest() == self.calculate_digest(),
+            "DeltaMsg: invalid digest"
+        );
         Ok(())
     }
 }
@@ -169,7 +201,10 @@ pub struct DeltaAck {
 
 impl DeltaAck {
     pub fn new(metadata: DeltaMetadata, signature: Signature) -> Self {
-        Self { metadata, signature }
+        Self {
+            metadata,
+            signature,
+        }
     }
 
     pub fn metadata(&self) -> &DeltaMetadata {
@@ -189,13 +224,16 @@ pub struct DeltaCertificate {
 
 impl DeltaCertificate {
     pub fn new(metadata: DeltaMetadata, signatures: AggregateSignature) -> Self {
-        Self { metadata, signatures }
+        Self {
+            metadata,
+            signatures,
+        }
     }
 
     pub fn signatures(&self) -> &AggregateSignature {
         &self.signatures
     }
-    
+
     // pub fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
     //     Ok(verifier.verify_multi_signatures(self.metadata(), &self.signatures)?)
     // }
@@ -209,7 +247,10 @@ pub struct CertifiedDelta {
 
 impl CertifiedDelta {
     pub fn new(delta_msg: DeltaMsg, signatures: AggregateSignature) -> Self {
-        Self { delta_msg, signatures }
+        Self {
+            delta_msg,
+            signatures,
+        }
     }
 
     pub fn metadata(&self) -> &DeltaMetadata {
@@ -231,6 +272,11 @@ impl CertifiedDelta {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct CertifiedDeltaAck {
+    pub epoch: u64,
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug, EnumConversion)]
 pub enum RandMessage {
     Share(RandShare),
@@ -238,7 +284,7 @@ pub enum RandMessage {
     Delta(DeltaMsg),
     DeltaAck(DeltaAck),
     CertifiedDelta(CertifiedDelta),
-    CertifiedDeltaAck(()),
+    CertifiedDeltaAck(CertifiedDeltaAck),
 }
 
 impl RandMessage {
@@ -252,6 +298,17 @@ impl RandMessage {
             RandMessage::CertifiedDeltaAck(_) => "RandMessage::CertifiedDeltaAck",
         }
     }
+
+    pub fn epoch(&self) -> u64 {
+        match self {
+            RandMessage::Share(msg) => msg.epoch(),
+            RandMessage::ShareAck(msg) => msg.epoch,
+            RandMessage::Delta(msg) => msg.metadata.epoch,
+            RandMessage::DeltaAck(msg) => msg.metadata.epoch,
+            RandMessage::CertifiedDelta(msg) => msg.delta_msg.metadata.epoch,
+            RandMessage::CertifiedDeltaAck(msg) => msg.epoch,
+        }
+    }
 }
 
 impl RBMessage for RandMessage {}
@@ -263,7 +320,11 @@ pub struct ShareAckState {
 }
 
 impl ShareAckState {
-    pub fn new(validators: impl Iterator<Item = Author>, rand_config: RandConfig, rand_decision_tx: UnboundedSender<RandDecision>) -> Self {
+    pub fn new(
+        validators: impl Iterator<Item = Author>,
+        rand_config: RandConfig,
+        rand_decision_tx: UnboundedSender<RandDecision>,
+    ) -> Self {
         Self {
             validators: validators.collect(),
             rand_config,
@@ -283,7 +344,7 @@ impl BroadcastStatus<RandMessage> for ShareAckState {
             if let Some(decision) = ack.maybe_decision {
                 if decision.verify(&self.rand_config).is_ok() {
                     let _ = self.rand_decision_tx.unbounded_send(decision);
-                        return Ok(Some(()));
+                    return Ok(Some(()));
                 }
             }
             // If receive from all validators, stop the reliable broadcast
@@ -338,7 +399,6 @@ impl BroadcastStatus<RandMessage> for SignatureBuilder {
     }
 }
 
-
 pub struct CertifiedDeltaAckState {
     validators: HashSet<Author>,
 }
@@ -346,13 +406,13 @@ pub struct CertifiedDeltaAckState {
 impl CertifiedDeltaAckState {
     pub fn new(validators: impl Iterator<Item = Author>) -> Self {
         Self {
-            validators: validators.collect()
+            validators: validators.collect(),
         }
     }
 }
 
 impl BroadcastStatus<RandMessage> for CertifiedDeltaAckState {
-    type Ack = ();
+    type Ack = CertifiedDeltaAck;
     type Aggregated = ();
     type Message = CertifiedDelta;
 

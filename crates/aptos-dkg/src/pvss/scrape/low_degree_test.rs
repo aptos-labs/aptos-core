@@ -1,10 +1,12 @@
 // Copyright © Aptos Foundation
 
-use crate::algebra::evaluation_domain::BatchEvaluationDomain;
-use crate::algebra::fft::fft_assign;
-use crate::algebra::lagrange::all_lagrange_denominators;
-use crate::utils::random::random_scalars;
-use crate::utils::{g1_multi_exp, g2_multi_exp};
+use crate::{
+    algebra::{
+        evaluation_domain::BatchEvaluationDomain, fft::fft_assign,
+        lagrange::all_lagrange_denominators,
+    },
+    utils::{g1_multi_exp, g2_multi_exp, random::random_scalars},
+};
 use anyhow::{anyhow, bail};
 use blstrs::{G1Projective, G2Projective, Scalar};
 use ff::Field;
@@ -240,11 +242,11 @@ impl<'a> LowDegreeTest<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::algebra::evaluation_domain::BatchEvaluationDomain;
-    use crate::algebra::fft::fft_assign;
-    use crate::pvss::scrape::low_degree_test::LowDegreeTest;
-    use crate::pvss::test_utils;
-    use crate::utils::random::random_scalars;
+    use crate::{
+        algebra::{evaluation_domain::BatchEvaluationDomain, fft::fft_assign},
+        pvss::{scrape::low_degree_test::LowDegreeTest, test_utils},
+        utils::random::random_scalars,
+    };
     use rand::thread_rng;
 
     #[test]

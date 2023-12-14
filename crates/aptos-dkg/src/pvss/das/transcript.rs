@@ -1,13 +1,22 @@
 // Copyright © Aptos Foundation
 
-use crate::algebra::polynomials::{get_nonzero_powers_of_tau, shamir_secret_share};
-use crate::pvss;
-use crate::pvss::das::DAS_SK_IN_G1;
-use crate::pvss::scrape::LowDegreeTest;
-use crate::pvss::traits::{HasEncryptionPublicParams, SecretSharingConfig};
-use crate::pvss::{das, encryption_dlog, fiat_shamir, schnorr, traits, Player, ThresholdConfig};
-use crate::utils::random::{random_g1_point, random_g2_point, random_scalar};
-use crate::utils::{g1_multi_exp, g2_multi_exp, multi_pairing};
+use crate::{
+    algebra::polynomials::{get_nonzero_powers_of_tau, shamir_secret_share},
+    pvss,
+    pvss::{
+        das,
+        das::DAS_SK_IN_G1,
+        encryption_dlog, fiat_shamir, schnorr,
+        scrape::LowDegreeTest,
+        traits,
+        traits::{HasEncryptionPublicParams, SecretSharingConfig},
+        Player, ThresholdConfig,
+    },
+    utils::{
+        g1_multi_exp, g2_multi_exp, multi_pairing,
+        random::{random_g1_point, random_g2_point, random_scalar},
+    },
+};
 use anyhow::bail;
 use aptos_crypto::{bls12381, CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -77,17 +86,17 @@ impl TryFrom<&[u8]> for Transcript {
 }
 
 impl traits::Transcript for Transcript {
-    type SecretSharingConfig = ThresholdConfig;
-    type PublicParameters = das::PublicParameters;
-    type SigningSecretKey = bls12381::PrivateKey;
-    type SigningPubKey = bls12381::PublicKey;
-    type DealtSecretKeyShare = pvss::dealt_secret_key_share::g1::DealtSecretKeyShare;
+    type DealtPubKey = pvss::dealt_pub_key::g2::DealtPubKey;
     type DealtPubKeyShare = pvss::dealt_pub_key_share::g2::DealtPubKeyShare;
     type DealtSecretKey = pvss::dealt_secret_key::g1::DealtSecretKey;
-    type DealtPubKey = pvss::dealt_pub_key::g2::DealtPubKey;
-    type InputSecret = pvss::input_secret::InputSecret;
-    type EncryptPubKey = encryption_dlog::g1::EncryptPubKey;
+    type DealtSecretKeyShare = pvss::dealt_secret_key_share::g1::DealtSecretKeyShare;
     type DecryptPrivKey = encryption_dlog::g1::DecryptPrivKey;
+    type EncryptPubKey = encryption_dlog::g1::EncryptPubKey;
+    type InputSecret = pvss::input_secret::InputSecret;
+    type PublicParameters = das::PublicParameters;
+    type SecretSharingConfig = ThresholdConfig;
+    type SigningPubKey = bls12381::PublicKey;
+    type SigningSecretKey = bls12381::PrivateKey;
 
     fn scheme_name() -> String {
         DAS_SK_IN_G1.to_string()

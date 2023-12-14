@@ -34,7 +34,8 @@
 
 
 
-<pre><code><b>struct</b> <a href="dkg.md#0x1_dkg_StartDKGEvent">StartDKGEvent</a> <b>has</b> drop, store
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="dkg.md#0x1_dkg_StartDKGEvent">StartDKGEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -149,12 +150,6 @@ The complete and ongoing DKG sessions.
 <dd>
 
 </dd>
-<dt>
-<code>events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="dkg.md#0x1_dkg_StartDKGEvent">dkg::StartDKGEvent</a>&gt;</code>
-</dt>
-<dd>
-
-</dd>
 </dl>
 
 
@@ -215,7 +210,6 @@ The complete and ongoing DKG sessions.
         <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
             last_complete: std::option::none(),
             in_progress: std::option::none(),
-            events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="dkg.md#0x1_dkg_StartDKGEvent">StartDKGEvent</a>&gt;(aptos_framework),
         }
     );
 }
@@ -256,13 +250,12 @@ The complete and ongoing DKG sessions.
         deadline_microseconds: <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() + 60000000,
         result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
     });
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="dkg.md#0x1_dkg_StartDKGEvent">StartDKGEvent</a>&gt;(
-        &<b>mut</b> dkg_state.events,
-        <a href="dkg.md#0x1_dkg_StartDKGEvent">StartDKGEvent</a> {
-            target_epoch,
-            target_validator_set,
-        },
-    );
+
+    <b>let</b> <a href="event.md#0x1_event">event</a> = <a href="dkg.md#0x1_dkg_StartDKGEvent">StartDKGEvent</a> {
+        target_epoch,
+        target_validator_set,
+    };
+    emit(<a href="event.md#0x1_event">event</a>);
 }
 </code></pre>
 

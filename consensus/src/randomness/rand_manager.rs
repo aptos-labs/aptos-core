@@ -1,16 +1,29 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::BTreeMap;
-use std::sync::Arc;
-
+use super::{
+    block_queue::{OrderedBlocks, RandReadyBlocks},
+    rand_store::{AddDecisionResult, RandStore},
+    types::{
+        CertifiedDelta, CertifiedDeltaAckState, DeltaAck, RandMessage, RandShare, ShareAckState,
+        SignatureBuilder,
+    },
+};
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters,
+    logging::{LogEvent, LogSchema},
     monitor,
-    network::{NetworkSender, IncomingRandRequest},
+    network::{IncomingRandRequest, NetworkSender},
     network_interface::ConsensusMsg,
-    randomness::{block_queue::BlockQueueItem, types::DeltaMsg}, logging::{LogEvent, LogSchema},
+    pipeline::{
+        buffer_manager::{create_channel, ResetAck, ResetRequest},
+        commit_reliable_broadcast::DropGuard,
+    },
+    randomness::{
+        block_queue::BlockQueueItem,
+        types::{CertifiedDeltaAck, DeltaMsg},
+    },
 };
 use anyhow::bail;
 use aptos_consensus_types::common::{Author, Round};
@@ -21,19 +34,19 @@ use aptos_network::protocols::network::RpcError;
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_address::AccountAddress, validator_verifier::ValidatorVerifier, randomness::{RandDecision, RandConfig, RandMetadata, Delta, WVUF}, validator_signer::ValidatorSigner,
+    account_address::AccountAddress,
+    randomness::{Delta, RandConfig, RandDecision, RandMetadata, WVUF},
+    validator_signer::ValidatorSigner,
+    validator_verifier::ValidatorVerifier,
 };
 use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
     future::{AbortHandle, Abortable},
     FutureExt, SinkExt, StreamExt,
 };
+use std::{collections::BTreeMap, sync::Arc};
 use tokio::time::{Duration, Instant};
 use tokio_retry::strategy::ExponentialBackoff;
-use crate::pipeline::buffer_manager::{create_channel, ResetAck, ResetRequest};
-use crate::pipeline::commit_reliable_broadcast::DropGuard;
-
-use super::{block_queue::{OrderedBlocks, RandReadyBlocks}, types::{RandMessage, RandShare, ShareAckState, CertifiedDelta, DeltaAck, SignatureBuilder, CertifiedDeltaAckState}, rand_store::{RandStore, AddDecisionResult}};
 
 // rand todo: parameters. These parameters can sometimes pass smoke test.
 pub const RAND_SHARE_BROADCAST_INTERVAL_MS: u64 = 1_000;
@@ -48,7 +61,13 @@ pub enum BufferManagerEvent {
     Commit(Round),
 }
 
-pub fn log_rand_event(event: LogEvent, author: Author, remote_peer: Option<Author>, id: HashValue, round: Round) {
+pub fn log_rand_event(
+    event: LogEvent,
+    author: Author,
+    remote_peer: Option<Author>,
+    id: HashValue,
+    round: Round,
+) {
     let mut log = LogSchema::new(event).author(author).id(id).round(round);
     if let Some(peer) = remote_peer {
         log = log.remote_peer(peer);
@@ -104,7 +123,9 @@ impl RandManager {
         rand_msg_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, IncomingRandRequest>,
     ) -> Self {
         // rand todo: parameters
-        let rb_backoff_policy = ExponentialBackoff::from_millis(2).factor(50).max_delay(Duration::from_secs(5));
+        let rb_backoff_policy = ExponentialBackoff::from_millis(2)
+            .factor(50)
+            .max_delay(Duration::from_secs(5));
         let reliable_broadcast = Arc::new(ReliableBroadcast::new(
             verifier.get_ordered_account_addresses(),
             network_sender.clone(),
@@ -113,20 +134,30 @@ impl RandManager {
             Duration::from_millis(RAND_SHARE_BROADCAST_INTERVAL_MS),
         ));
 
-        let (acked_rand_decision_tx, acked_rand_decision_rx) =
-            create_channel::<RandDecision>();
+        let (acked_rand_decision_tx, acked_rand_decision_rx) = create_channel::<RandDecision>();
 
         // reliable broadcast my delta
         let delta_rb_drop_guard = match &rand_config {
             Some(rand_config) => {
                 let apk_delta: Delta = rand_config.get_my_delta().clone();
                 let delta_msg = DeltaMsg::new(epoch, author, apk_delta);
-                Some(Self::reliable_broadcast_delta(delta_msg, reliable_broadcast.clone(), verifier.clone()))
+                Some(Self::reliable_broadcast_delta(
+                    delta_msg,
+                    reliable_broadcast.clone(),
+                    verifier.clone(),
+                ))
             },
             None => None,
         };
 
-        let rand_store = RandStore::new(author, rand_config, delta_rb_drop_guard, gc_gap_below, gc_gap_above);
+        let rand_store = RandStore::new(
+            epoch,
+            author,
+            rand_config,
+            delta_rb_drop_guard,
+            gc_gap_below,
+            gc_gap_above,
+        );
 
         Self {
             author,
@@ -147,28 +178,37 @@ impl RandManager {
         }
     }
 
-    fn reliable_broadcast_delta(delta_msg: DeltaMsg, reliable_broadcast: Arc<ReliableBroadcast<RandMessage, ExponentialBackoff>>, verifier: Arc<ValidatorVerifier>) -> DropGuard {
+    fn reliable_broadcast_delta(
+        delta_msg: DeltaMsg,
+        reliable_broadcast: Arc<ReliableBroadcast<RandMessage, ExponentialBackoff>>,
+        verifier: Arc<ValidatorVerifier>,
+    ) -> DropGuard {
         let rb = reliable_broadcast.clone();
         let rb2 = reliable_broadcast.clone();
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let signature_builder =
             SignatureBuilder::new(delta_msg.metadata().clone(), verifier.clone());
-        let cert_ack_set = CertifiedDeltaAckState::new(verifier.get_ordered_account_addresses_iter());
+        let cert_ack_set =
+            CertifiedDeltaAckState::new(verifier.get_ordered_account_addresses_iter());
 
         let delta_msg_clone = delta_msg.clone();
         let metadata = delta_msg.metadata().clone();
-        let delta_broadcast = async move {
-            rb.broadcast(delta_msg_clone, signature_builder).await
-        };
+        let delta_broadcast = async move { rb.broadcast(delta_msg_clone, signature_builder).await };
         let core_task = delta_broadcast.then(move |certificate| {
             let certified_delta =
                 CertifiedDelta::new(delta_msg.clone(), certificate.signatures().to_owned());
             rb2.broadcast(certified_delta, cert_ack_set)
         });
         let task = async move {
-            debug!("[RandManager] Start reliable broadcast delta {:?}", metadata);
+            debug!(
+                "[RandManager] Start reliable broadcast delta {:?}",
+                metadata
+            );
             core_task.await;
-            debug!("[RandManager] Finish reliable broadcast delta {:?}", metadata);
+            debug!(
+                "[RandManager] Finish reliable broadcast delta {:?}",
+                metadata
+            );
         };
         tokio::spawn(Abortable::new(task, abort_registration));
         DropGuard::new(abort_handle)
@@ -178,7 +218,11 @@ impl RandManager {
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let task = self.reliable_broadcast.broadcast(
             shares,
-            ShareAckState::new(self.verifier.get_ordered_account_addresses_iter(), self.rand_store.rand_config().unwrap().clone(), self.acked_rand_decision_tx.clone()),
+            ShareAckState::new(
+                self.verifier.get_ordered_account_addresses_iter(),
+                self.rand_store.rand_config().unwrap().clone(),
+                self.acked_rand_decision_tx.clone(),
+            ),
         );
         tokio::spawn(Abortable::new(task, abort_registration));
         DropGuard::new(abort_handle)
@@ -195,7 +239,13 @@ impl RandManager {
     }
 
     async fn process_acked_decision(&mut self, decision: RandDecision) {
-        log_rand_event(LogEvent::ReceiveAckedRandDecision, self.author, None, decision.block_id(), decision.round());
+        log_rand_event(
+            LogEvent::ReceiveAckedRandDecision,
+            self.author,
+            None,
+            decision.block_id(),
+            decision.round(),
+        );
 
         observe_block(decision.timestamp(), BlockStage::RAND_RCV_ACK_DECISION);
 
@@ -221,21 +271,37 @@ impl RandManager {
         }
     }
 
-    fn process_certified_delta(&mut self, certified_delta: CertifiedDelta) -> anyhow::Result<RandMessage> {
+    fn process_certified_delta(
+        &mut self,
+        certified_delta: CertifiedDelta,
+    ) -> anyhow::Result<RandMessage> {
         if let Some(rand_config) = self.rand_store.rand_config.as_mut() {
-            if rand_config.get_certified_apk(certified_delta.author()).is_none() {
+            if rand_config
+                .get_certified_apk(certified_delta.author())
+                .is_none()
+            {
                 certified_delta.verify(&self.verifier)?;
-                rand_config.add_certified_delta(certified_delta.author(), certified_delta.delta().clone())?;
+                rand_config.add_certified_delta(
+                    certified_delta.author(),
+                    certified_delta.delta().clone(),
+                )?;
             }
-            Ok(RandMessage::CertifiedDeltaAck(()))
+            Ok(RandMessage::CertifiedDeltaAck(CertifiedDeltaAck {
+                epoch: self.epoch,
+            }))
         } else {
             bail!("[RandManager] No rand_config!");
         }
     }
 
-
     async fn process_share(&mut self, share: RandShare) -> anyhow::Result<RandMessage> {
-        log_rand_event(LogEvent::ReceiveRandShare, self.author, Some(*share.author()), share.id(), share.round());
+        log_rand_event(
+            LogEvent::ReceiveRandShare,
+            self.author,
+            Some(*share.author()),
+            share.id(),
+            share.round(),
+        );
 
         match self.rand_store.add_share(share.clone()) {
             Ok((maybe_decision, result)) => {
@@ -264,7 +330,9 @@ impl RandManager {
         let rand_msg = match req {
             RandMessage::Share(share) => self.process_share(share).await?,
             RandMessage::Delta(delta_msg) => self.process_delta(delta_msg)?,
-            RandMessage::CertifiedDelta(certified_delta) => self.process_certified_delta(certified_delta)?,
+            RandMessage::CertifiedDelta(certified_delta) => {
+                self.process_certified_delta(certified_delta)?
+            },
             _ => {
                 bail!("[RandManager] error unknown rpc message {:?}", req)
             },
@@ -273,12 +341,12 @@ impl RandManager {
         let response = ConsensusMsg::RandMessage(Box::new(rand_msg));
 
         match protocol.to_bytes(&response) {
-            Ok(bytes) => {
-                response_sender.send(Ok(bytes.into())).map_err(|_| anyhow::anyhow!("[RandManager] error unable to respond to rpc"))
-            },
-            Err(e) => {
-                response_sender.send(Err(RpcError::ApplicationError(e))).map_err(|_| anyhow::anyhow!("[RandManager] error unable to respond to rpc"))
-            },
+            Ok(bytes) => response_sender
+                .send(Ok(bytes.into()))
+                .map_err(|_| anyhow::anyhow!("[RandManager] error unable to respond to rpc")),
+            Err(e) => response_sender
+                .send(Err(RpcError::ApplicationError(e)))
+                .map_err(|_| anyhow::anyhow!("[RandManager] error unable to respond to rpc")),
         }
     }
 
@@ -307,8 +375,11 @@ impl RandManager {
             maybe_randomness,
         } = blocks;
 
-        let rounds: Vec<Round> = ordered_blocks.iter().map(|b|b.round()).collect();
-        debug!("[RandManager] process_ordered_blocks, epoch={}, rounds={:?}", self.epoch, rounds);
+        let rounds: Vec<Round> = ordered_blocks.iter().map(|b| b.round()).collect();
+        debug!(
+            "[RandManager] process_ordered_blocks, epoch={}, rounds={:?}",
+            self.epoch, rounds
+        );
 
         let num_blocks = ordered_blocks.len();
 
@@ -321,24 +392,41 @@ impl RandManager {
         };
 
         let mut num_undecided_blocks = num_blocks;
-        let mut timed_drop_guards: Vec<Option<(Instant, DropGuard)>> = (0..num_blocks).map(|_|None).collect();
+        let mut timed_drop_guards: Vec<Option<(Instant, DropGuard)>> =
+            (0..num_blocks).map(|_| None).collect();
 
-        for (idx, (block, optimistic_rand)) in ordered_blocks.iter_mut().zip(optimistic_rands.into_iter()).enumerate() {
+        for (idx, (block, optimistic_rand)) in ordered_blocks
+            .iter_mut()
+            .zip(optimistic_rands.into_iter())
+            .enumerate()
+        {
             observe_block(block.timestamp_usecs(), BlockStage::RAND_ENTER);
             let round = block.round();
-            let fallback_rand = self.rand_store.get_randomness(&round).map(|r|r.clone());
+            let fallback_rand = self.rand_store.get_randomness(&round).cloned();
             assert!(!block.has_randomness());
             if let Some(r) = optimistic_rand.or(fallback_rand) {
                 num_undecided_blocks -= 1;
                 block.set_randomness(r);
             } else if let Some(rand_config) = self.rand_store.rand_config.as_ref() {
                 let ask = &rand_config.keys.ask;
-                let metadata = RandMetadata::new(block.epoch(), block.round(), block.id(), block.timestamp_usecs());
-                let proof = <WVUF as WeightedVUF>::create_share(&ask, metadata.to_bytes().as_slice());
+                let metadata = RandMetadata::new(
+                    block.epoch(),
+                    block.round(),
+                    block.id(),
+                    block.timestamp_usecs(),
+                );
+                let proof =
+                    <WVUF as WeightedVUF>::create_share(ask, metadata.to_bytes().as_slice());
                 let share = RandShare::new(self.author, metadata, proof);
 
                 observe_block(share.timestamp(), BlockStage::RAND_BC_SHARE);
-                log_rand_event(LogEvent::BroadcastRandShare, self.author, None, share.id(), share.round());
+                log_rand_event(
+                    LogEvent::BroadcastRandShare,
+                    self.author,
+                    None,
+                    share.id(),
+                    share.round(),
+                );
 
                 let drop_guard = self.do_reliable_broadcast(share);
                 timed_drop_guards[idx] = Some((Instant::now(), drop_guard));
@@ -351,7 +439,11 @@ impl RandManager {
             }
         }
 
-        let offsets_by_round: BTreeMap<Round, usize> = rounds.iter().enumerate().map(|(idx, round)| (*round, idx)).collect();
+        let offsets_by_round: BTreeMap<Round, usize> = rounds
+            .iter()
+            .enumerate()
+            .map(|(idx, round)| (*round, idx))
+            .collect();
         let item = BlockQueueItem {
             ordered_blocks,
             offsets_by_round,
@@ -363,7 +455,11 @@ impl RandManager {
 
         let mut try_dequeue = item.num_undecided_blocks == 0;
         match self.rand_store.add_item(item) {
-            Ok(results) if results.iter().any(|result| matches!(result, &AddDecisionResult::NewRandReadyBlock)) => {
+            Ok(results)
+                if results
+                    .iter()
+                    .any(|result| matches!(result, &AddDecisionResult::NewRandReadyBlock)) =>
+            {
                 try_dequeue = true;
             },
             Ok(_) => (),
@@ -383,12 +479,14 @@ impl RandManager {
         }
         self.previous_dequeue_time = Instant::now();
         for block in rand_ready_blocks {
-            let rounds: Vec<Round> = block.ordered_blocks.iter().map(|b|b.round()).collect();
-            debug!("[RandManager] Dequeuing, epoch={}, rounds={:?}", self.epoch, rounds);
-            self.rand_ready_block_tx
-                .send(block)
-                .await
-                .expect("[RandManager] error failed to send execution ready blocks to buffer manager");
+            let rounds: Vec<Round> = block.ordered_blocks.iter().map(|b| b.round()).collect();
+            debug!(
+                "[RandManager] Dequeuing, epoch={}, rounds={:?}",
+                self.epoch, rounds
+            );
+            self.rand_ready_block_tx.send(block).await.expect(
+                "[RandManager] error failed to send execution ready blocks to buffer manager",
+            );
         }
     }
 
@@ -418,19 +516,28 @@ impl RandManager {
         {
             return;
         }
-        let rebroadcast_rounds = self.rand_store.rebroadcast_rounds(Duration::from_millis(RAND_SHARE_REBROADCAST_INTERVAL_MS));
+        let rebroadcast_rounds = self
+            .rand_store
+            .rebroadcast_rounds(Duration::from_millis(RAND_SHARE_REBROADCAST_INTERVAL_MS));
 
         if !rebroadcast_rounds.is_empty() {
             // rand todo: add counters
-            info!("[RandManager] Re-broadcast randomness shares of epoch {} rounds {:?}", self.epoch, rebroadcast_rounds);
+            info!(
+                "[RandManager] Re-broadcast randomness shares of epoch {} rounds {:?}",
+                self.epoch, rebroadcast_rounds
+            );
         }
 
         for round in rebroadcast_rounds {
             if let Some(share) = self.rand_store.get_my_share(&round) {
                 observe_block(share.timestamp(), BlockStage::RAND_RE_BC_SHARE);
-                self.rand_store.update_guard(round, self.do_reliable_broadcast(share.clone()));
+                self.rand_store
+                    .update_guard(round, self.do_reliable_broadcast(share.clone()));
             } else {
-                debug!("[RandManager] No local share for epoch {} round {} to re-broadcast", self.epoch, round);
+                debug!(
+                    "[RandManager] No local share for epoch {} round {} to re-broadcast",
+                    self.epoch, round
+                );
             }
         }
     }
@@ -439,7 +546,7 @@ impl RandManager {
         let mut pending_ordered = 0;
         let mut pending_rand_ready = 0;
 
-        for (_, item) in self.rand_store.block_queue() {
+        for item in self.rand_store.block_queue().values() {
             pending_ordered += item.num_undecided_blocks;
             pending_rand_ready += item.num_blocks() - item.num_undecided_blocks;
         }
@@ -454,14 +561,20 @@ impl RandManager {
 
     fn print_rand_store(&self) {
         if !self.rand_store.block_queue().is_empty() || !self.rand_store.rand_map().is_empty() {
-            debug!("[RandManager] printing rand_store of epoch {}: block queue: {:?}", self.epoch, self.rand_store.block_queue());
+            debug!(
+                "[RandManager] printing rand_store of epoch {}: block queue: {:?}",
+                self.epoch,
+                self.rand_store.block_queue()
+            );
         }
     }
 
     pub async fn start(mut self) {
         info!("Randomness manager starts.");
-        let mut rebroadcast_interval = tokio::time::interval(Duration::from_millis(REBROADCAST_LOOP_INTERVAL_MS));
-        let mut garbage_collect_interval = tokio::time::interval(Duration::from_millis(GARBAGE_COLLECT_LOOP_INTERVAL_MS));
+        let mut rebroadcast_interval =
+            tokio::time::interval(Duration::from_millis(REBROADCAST_LOOP_INTERVAL_MS));
+        let mut garbage_collect_interval =
+            tokio::time::interval(Duration::from_millis(GARBAGE_COLLECT_LOOP_INTERVAL_MS));
 
         while !self.stop {
             // If no rand_config, only process ordered_block_rx

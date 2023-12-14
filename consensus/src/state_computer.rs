@@ -6,7 +6,6 @@ use crate::{
     block_preparer::BlockPreparer,
     block_storage::tracing::{observe_block, BlockStage},
     counters,
-    dkg::dkg_manager::DKGManagerWrapper,
     error::StateSyncError,
     execution_pipeline::ExecutionPipeline,
     monitor,
@@ -27,6 +26,7 @@ use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress,
     block_executor::config::BlockExecutorConfigFromOnchain,
+    block_metadata_ext::BlockMetadataWrapper,
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
@@ -36,11 +36,14 @@ use aptos_types::{
 };
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
-use std::{boxed::Box, sync::Arc};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::{
+    boxed::Box,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 use tokio::sync::Mutex as AsyncMutex;
-use aptos_consensus_types::block::RandomnessData;
-use aptos_types::block_metadata_ext::BlockMetadataWrapper;
 
 pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<PipelineExecutionResult>>;
 
@@ -67,6 +70,7 @@ type NotificationType = (
     Box<dyn FnOnce() + Send + Sync>,
     Vec<Transaction>,
     Vec<ContractEvent>,
+    Vec<ContractEvent>,
 );
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Hash)]
@@ -91,7 +95,6 @@ pub struct ExecutionProxy {
     validators: Mutex<Vec<AccountAddress>>,
     write_mutex: AsyncMutex<LogicalTime>,
     payload_manager: Mutex<Option<Arc<PayloadManager>>>,
-    dkg_manager_wrapper: Mutex<Option<Arc<DKGManagerWrapper>>>,
     transaction_shuffler: Mutex<Option<Arc<dyn TransactionShuffler>>>,
     block_executor_onchain_config: Mutex<BlockExecutorConfigFromOnchain>,
     transaction_deduper: Mutex<Option<Arc<dyn TransactionDeduper>>>,
@@ -112,10 +115,12 @@ impl ExecutionProxy {
             aptos_channels::new::<NotificationType>(10, &counters::PENDING_STATE_SYNC_NOTIFICATION);
         let notifier = state_sync_notifier.clone();
         handle.spawn(async move {
-            while let Some((callback, txns, reconfig_events)) = rx.next().await {
+            while let Some((callback, txns, reconfig_events, start_dkg_events)) = rx.next().await {
                 if let Err(e) = monitor!(
                     "notify_state_sync",
-                    notifier.notify_new_commit(txns, reconfig_events).await
+                    notifier
+                        .notify_new_commit(txns, reconfig_events, start_dkg_events)
+                        .await
                 ) {
                     error!(error = ?e, "Failed to notify state synchronizer");
                 }
@@ -132,7 +137,6 @@ impl ExecutionProxy {
             validators: Mutex::new(vec![]),
             write_mutex: AsyncMutex::new(LogicalTime::new(0, 0)),
             payload_manager: Mutex::new(None),
-            dkg_manager_wrapper: Mutex::new(None),
             transaction_shuffler: Mutex::new(None),
             block_executor_onchain_config: Mutex::new(
                 OnChainExecutionConfig::default_if_missing().block_executor_onchain_config(),
@@ -177,7 +181,9 @@ impl StateComputer for ExecutionProxy {
 
         let metadata = if self.randomness_enabled.load(Ordering::SeqCst) {
             debug!("randomness_enabled=1");
-            BlockMetadataWrapper::Ext(block.new_block_metadata_ext(&self.validators.lock(), randomness))
+            BlockMetadataWrapper::Ext(
+                block.new_block_metadata_ext(&self.validators.lock(), randomness),
+            )
         } else {
             debug!("randomness_enabled=0");
             BlockMetadataWrapper::Default(block.new_block_metadata(&self.validators.lock()))
@@ -230,8 +236,7 @@ impl StateComputer for ExecutionProxy {
         let mut block_ids = Vec::new();
         let mut txns = Vec::new();
         let mut reconfig_events = Vec::new();
-        let mut dkg_events = Vec::new();
-        let mut has_dkg_payloads = false;
+        let mut start_dkg_events = Vec::new();
         let mut payloads = Vec::new();
         let logical_time = LogicalTime::new(
             finality_proof.ledger_info().epoch(),
@@ -259,7 +264,7 @@ impl StateComputer for ExecutionProxy {
                 block.randomness().cloned(),
             ));
             reconfig_events.extend(block.reconfig_event());
-            dkg_events.extend(block.dkg_event());
+            start_dkg_events.extend(block.start_dkg_events());
         }
 
         let executor = self.executor.clone();
@@ -281,21 +286,14 @@ impl StateComputer for ExecutionProxy {
         };
         self.async_state_sync_notifier
             .clone()
-            .send((Box::new(wrapped_callback), txns, reconfig_events))
+            .send((
+                Box::new(wrapped_callback),
+                txns,
+                reconfig_events,
+                start_dkg_events,
+            ))
             .await
             .expect("Failed to send async state sync notification");
-
-        // trigger the start of dkg
-        if !dkg_events.is_empty() {
-            let dkg_manager_wrapper = self.dkg_manager_wrapper.lock().as_ref().unwrap().clone();
-            dkg_manager_wrapper.start_dkg(dkg_events).await;
-        }
-
-        // finish dkg when the aggregated transcript is committed
-        if has_dkg_payloads {
-            let dkg_manager_wrapper = self.dkg_manager_wrapper.lock().as_ref().unwrap().clone();
-            dkg_manager_wrapper.finish_dkg();
-        }
 
         *latest_logical_time = logical_time;
         payload_manager.notify_commit(block_timestamp, payloads);
@@ -358,7 +356,6 @@ impl StateComputer for ExecutionProxy {
         &self,
         epoch_state: &EpochState,
         payload_manager: Arc<PayloadManager>,
-        dkg_manager_wrapper: Arc<DKGManagerWrapper>,
         transaction_shuffler: Arc<dyn TransactionShuffler>,
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
@@ -369,14 +366,14 @@ impl StateComputer for ExecutionProxy {
             .get_ordered_account_addresses_iter()
             .collect();
         self.payload_manager.lock().replace(payload_manager);
-        self.dkg_manager_wrapper.lock().replace(dkg_manager_wrapper);
 
         self.transaction_shuffler
             .lock()
             .replace(transaction_shuffler);
         *self.block_executor_onchain_config.lock() = block_executor_onchain_config;
         self.transaction_deduper.lock().replace(transaction_deduper);
-        self.randomness_enabled.store(randomness_enabled, Ordering::SeqCst);
+        self.randomness_enabled
+            .store(randomness_enabled, Ordering::SeqCst);
     }
 
     // Clears the epoch-specific state. Only a sync_to call is expected before calling new_epoch
@@ -384,7 +381,6 @@ impl StateComputer for ExecutionProxy {
     fn end_epoch(&self) {
         *self.validators.lock() = vec![];
         self.payload_manager.lock().take();
-        self.dkg_manager_wrapper.lock().take();
     }
 }
 
@@ -480,6 +476,7 @@ async fn test_commit_sync_race() {
             &self,
             _transactions: Vec<Transaction>,
             _reconfiguration_events: Vec<ContractEvent>,
+            _start_dkg_events: Vec<ContractEvent>,
         ) -> std::result::Result<(), Error> {
             Ok(())
         }
@@ -523,10 +520,10 @@ async fn test_commit_sync_race() {
     executor.new_epoch(
         &EpochState::empty(),
         Arc::new(PayloadManager::DirectMempool),
-        Arc::new(DKGManagerWrapper::default()),
         create_transaction_shuffler(TransactionShufflerType::NoShuffling),
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         create_transaction_deduper(TransactionDeduperType::NoDedup),
+        false,
     );
     executor
         .commit(&[], generate_li(1, 1), callback.clone())

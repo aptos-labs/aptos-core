@@ -18,7 +18,6 @@ use crate::{
         signing_phase::{SigningRequest, SigningResponse},
     },
     randomness::{block_queue::RandReadyBlocks, rand_manager::BufferManagerEvent},
-    state_replication::StateComputerCommitCallBackType,
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_consensus_types::{
@@ -30,7 +29,6 @@ use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_time_service::TimeService;
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
 };
 use futures::{
     channel::{
@@ -105,7 +103,6 @@ pub struct BufferManager {
 
     epoch_state: Arc<EpochState>,
     rand_manager_tx: Sender<BufferManagerEvent>,
-
 
     ongoing_tasks: Arc<AtomicU64>,
     // Since proposal_generator is not aware of reconfiguration any more, the suffix blocks
@@ -375,9 +372,17 @@ impl BufferManager {
                     }))
                     .await
                     .expect("Failed to send persist request");
-                info!("Advance head to round {}, {:?}", committed_round, self.buffer.head_cursor());
+                info!(
+                    "Advance head to round {}, {:?}",
+                    committed_round,
+                    self.buffer.head_cursor()
+                );
                 self.previous_commit_time = Instant::now();
-                if let Err(e) = self.rand_manager_tx.send(BufferManagerEvent::Commit(committed_round)).await {
+                if let Err(e) = self
+                    .rand_manager_tx
+                    .send(BufferManagerEvent::Commit(committed_round))
+                    .await
+                {
                     warn!("Failed to send commit round to rand manager: {:?}", e);
                 }
                 return;

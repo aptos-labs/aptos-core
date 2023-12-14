@@ -15,6 +15,7 @@ use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
+    block_metadata_ext::{BlockMetadataExt, BlockMetadataWrapper},
     dkg::DKGTranscriptWrapper,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
@@ -29,9 +30,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::{
     convert::TryFrom,
     fmt::{self, Display, Formatter},
+    iter::once,
 };
-use std::iter::once;
-use aptos_types::block_metadata_ext::{BlockMetadataExt, BlockMetadataWrapper};
 
 #[path = "block_test_utils.rs"]
 #[cfg(any(test, feature = "fuzzing"))]
@@ -119,7 +119,6 @@ impl Block {
             Some(payload) => match payload {
                 Payload::InQuorumStore(pos) => pos.proofs.len(),
                 Payload::DirectMempool(txns) => txns.len(),
-                Payload::DKG(dkg_payload) => dkg_payload.len(),
             },
         }
     }
@@ -464,7 +463,6 @@ impl Block {
             BlockMetadataWrapper::Ext(self.new_block_metadata_ext(validators, randomness))
         } else {
             BlockMetadataWrapper::Default(self.new_block_metadata(validators))
-
         };
         Self::transactions_to_execute_for_metadata(
             self.id,

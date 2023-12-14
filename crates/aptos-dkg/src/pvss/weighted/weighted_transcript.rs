@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::pvss::traits::{Reconstructable, SecretSharingConfig, Transcript};
-use crate::pvss::{Player, ThresholdConfig, WeightedConfig};
+use crate::pvss::{
+    traits::{Reconstructable, SecretSharingConfig, Transcript},
+    Player, ThresholdConfig, WeightedConfig,
+};
 use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use rand_core::{CryptoRng, RngCore};
@@ -83,21 +85,19 @@ impl<T: Transcript> WeightedTranscript<T> {
 }
 
 impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for WeightedTranscript<T> {
-    type SecretSharingConfig = WeightedConfig;
-    type PublicParameters = T::PublicParameters;
-
-    type SigningSecretKey = T::SigningSecretKey;
-    type SigningPubKey = T::SigningPubKey;
-
+    type DealtPubKey = T::DealtPubKey;
+    type DealtPubKeyShare = Vec<T::DealtPubKeyShare>;
+    type DealtSecretKey = T::DealtSecretKey;
     /// In a weighted PVSS, an SK share is represented as a vector of SK shares in the unweighted
     /// PVSS, whose size is proportional to the weight of the owning player.
     type DealtSecretKeyShare = Vec<T::DealtSecretKeyShare>;
-    type DealtPubKeyShare = Vec<T::DealtPubKeyShare>;
-    type DealtSecretKey = T::DealtSecretKey;
-    type DealtPubKey = T::DealtPubKey;
-    type InputSecret = T::InputSecret;
-    type EncryptPubKey = T::EncryptPubKey;
     type DecryptPrivKey = T::DecryptPrivKey;
+    type EncryptPubKey = T::EncryptPubKey;
+    type InputSecret = T::InputSecret;
+    type PublicParameters = T::PublicParameters;
+    type SecretSharingConfig = WeightedConfig;
+    type SigningPubKey = T::SigningPubKey;
+    type SigningSecretKey = T::SigningSecretKey;
 
     fn scheme_name() -> String {
         format!("weighted_{}", T::scheme_name())

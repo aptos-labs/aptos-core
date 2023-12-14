@@ -2,18 +2,13 @@
 
 // TODO: Do we even need this Dealt[Secret/Pub][Key/KeyShare] anymore?
 macro_rules! dealt_pub_key_share_impl {
-    (
-        $GTProjective:ident,
-        $gt:ident
-    ) => {
-        use crate::pvss::dealt_pub_key::$gt::DealtPubKey;
-        use crate::pvss::dealt_pub_key::$gt::DEALT_PK_NUM_BYTES;
-        use blstrs::$GTProjective;
-
+    ($GTProjective:ident, $gt:ident) => {
+        use crate::pvss::dealt_pub_key::$gt::{DealtPubKey, DEALT_PK_NUM_BYTES};
         use aptos_crypto::{
             CryptoMaterialError, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
         };
         use aptos_crypto_derive::{DeserializeKey, SerializeKey};
+        use blstrs::$GTProjective;
 
         /// The size of a serialized *dealt public key share*.
         pub(crate) const DEALT_PK_SHARE_NUM_BYTES: usize = DEALT_PK_NUM_BYTES;

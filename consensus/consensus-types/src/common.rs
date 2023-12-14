@@ -2,21 +2,18 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    proof_of_store::{BatchInfo, ProofOfStore},
-};
+use crate::proof_of_store::{BatchInfo, ProofOfStore};
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
 use aptos_types::{
-    account_address::AccountAddress, dkg::DKGPvssConfig,
-    transaction::SignedTransaction, validator_verifier::ValidatorVerifier, vm_status::DiscardedVMStatus,
+    account_address::AccountAddress, transaction::SignedTransaction,
+    validator_verifier::ValidatorVerifier, vm_status::DiscardedVMStatus,
 };
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fmt, fmt::Write, sync::Arc};
 use tokio::sync::oneshot;
-use aptos_types::dkg::DKGAggNode;
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases
 /// monotonically. It is used for the protocol safety and liveness (please see the detailed
@@ -142,48 +139,11 @@ impl ProofWithData {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
-pub struct DKGPayload {
-    pub dkg_agg_node: DKGAggNode,
-    pub pvss_config: DKGPvssConfig,
-}
-
-impl DKGPayload {
-    pub fn new(dkg_agg_node: DKGAggNode, pvss_config: DKGPvssConfig) -> Self {
-        DKGPayload { dkg_agg_node, pvss_config }
-    }
-
-    pub fn dkg_agg_node(&self) -> &DKGAggNode {
-        &self.dkg_agg_node
-    }
-
-    pub fn pvss_config(&self) -> &DKGPvssConfig {
-        &self.pvss_config
-    }
-
-    pub fn num_bytes(&self) -> usize {
-        self.dkg_agg_node.num_bytes() + self.pvss_config.num_bytes()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        false
-    }
-
-    pub fn len(&self) -> usize {
-        1
-    }
-
-    pub fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
-        self.dkg_agg_node.verify(&self.pvss_config, verifier)
-    }
-}
-
 /// The payload in block.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum Payload {
     DirectMempool(Vec<SignedTransaction>),
     InQuorumStore(ProofWithData),
-    DKG(DKGPayload),
 }
 
 impl Payload {
@@ -203,7 +163,6 @@ impl Payload {
                 .iter()
                 .map(|proof| proof.num_txns() as usize)
                 .sum(),
-            Payload::DKG(_) => 1,
         }
     }
 
@@ -211,7 +170,6 @@ impl Payload {
         match self {
             Payload::DirectMempool(txns) => txns.is_empty(),
             Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs.is_empty(),
-            Payload::DKG(_) => false,
         }
     }
 
@@ -240,7 +198,6 @@ impl Payload {
                 .iter()
                 .map(|proof| proof.num_bytes() as usize)
                 .sum(),
-            Payload::DKG(dkg_payload) => dkg_payload.num_bytes(),
         }
     }
 
@@ -257,11 +214,6 @@ impl Payload {
                 }
                 Ok(())
             },
-            (_, Payload::DKG(dkg_payload)) => {
-                // We will verify the pvss config in process_proposal.
-                dkg_payload.verify(validator)?;
-                Ok(())
-            }
             (_, _) => Err(anyhow::anyhow!(
                 "Wrong payload type. Expected Payload::InQuorumStore {} got {} ",
                 quorum_store_enabled,
@@ -279,9 +231,6 @@ impl fmt::Display for Payload {
             },
             Payload::InQuorumStore(proof_with_status) => {
                 write!(f, "InMemory proofs: {}", proof_with_status.proofs.len())
-            },
-            Payload::DKG(_) => {
-                write!(f, "DKG Aggregated Node")
             },
         }
     }

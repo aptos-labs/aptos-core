@@ -604,16 +604,6 @@ pub static BLOCK_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Traces latency throughout the DKG process
-pub static DKG_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        "aptos_consensus_dkg_tracing",
-        "Histogram for different stages of the DKG process",
-        &["stage"]
-    )
-    .unwrap()
-});
-
 const CONSENSUS_WAIT_DURATION_BUCKETS: [f64; 19] = [
     0.005, 0.01, 0.015, 0.02, 0.04, 0.06, 0.08, 0.10, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25, 0.3,
     0.4, 0.6, 0.8, 2.0,

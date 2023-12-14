@@ -8,6 +8,7 @@ use aptos_config::{
     network_id::NetworkId,
 };
 use aptos_consensus::network_interface::{ConsensusMsg, DIRECT_SEND, RPC};
+use aptos_dkg_runtime::network_interface::{DKGMsg, DIRECT_SEND_DKG, RPC_DKG};
 use aptos_event_notifications::EventSubscriptionService;
 use aptos_logger::debug;
 use aptos_mempool::network::MempoolSyncMsg;
@@ -78,6 +79,21 @@ pub fn mempool_network_configuration(node_config: &NodeConfig) -> NetworkApplica
         aptos_channel::Config::new(node_config.mempool.max_network_channel_size)
             .queue_style(QueueStyle::KLAST) // TODO: why is this not FIFO?
             .counters(&aptos_mempool::counters::PENDING_MEMPOOL_NETWORK_EVENTS),
+    );
+    NetworkApplicationConfig::new(network_client_config, network_service_config)
+}
+
+pub fn dkg_network_configuration(node_config: &NodeConfig) -> NetworkApplicationConfig {
+    let direct_send_protocols: Vec<ProtocolId> = DIRECT_SEND_DKG.into();
+    let rpc_protocols: Vec<ProtocolId> = RPC_DKG.into();
+
+    let network_client_config =
+        NetworkClientConfig::new(direct_send_protocols.clone(), rpc_protocols.clone());
+    let network_service_config = NetworkServiceConfig::new(
+        direct_send_protocols,
+        rpc_protocols,
+        aptos_channel::Config::new(node_config.consensus.max_network_channel_size)
+            .queue_style(QueueStyle::FIFO),
     );
     NetworkApplicationConfig::new(network_client_config, network_service_config)
 }
@@ -190,6 +206,7 @@ pub fn setup_networks_and_get_interfaces(
 ) -> (
     Vec<Runtime>,
     Option<ApplicationNetworkInterfaces<ConsensusMsg>>,
+    Option<ApplicationNetworkInterfaces<DKGMsg>>,
     ApplicationNetworkInterfaces<MempoolSyncMsg>,
     ApplicationNetworkInterfaces<PeerMonitoringServiceMessage>,
     ApplicationNetworkInterfaces<StorageServiceMessage>,
@@ -200,6 +217,7 @@ pub fn setup_networks_and_get_interfaces(
     // Create each network and register the application handles
     let mut network_runtimes = vec![];
     let mut consensus_network_handle = None;
+    let mut dkg_network_handle = None;
     let mut mempool_network_handles = vec![];
     let mut peer_monitoring_service_network_handles = vec![];
     let mut storage_service_network_handles = vec![];
@@ -233,6 +251,17 @@ pub fn setup_networks_and_get_interfaces(
                     network_id,
                     &network_config,
                     consensus_network_configuration(node_config),
+                ));
+            }
+
+            if dkg_network_handle.is_some() {
+                panic!("There can be at most one validator network!");
+            } else {
+                dkg_network_handle = Some(register_client_and_service_with_network(
+                    &mut network_builder,
+                    network_id,
+                    &network_config,
+                    dkg_network_configuration(node_config),
                 ));
             }
         }
@@ -288,12 +317,14 @@ pub fn setup_networks_and_get_interfaces(
     // Transform all network handles into application interfaces
     let (
         consensus_interfaces,
+        dkg_interfaces,
         mempool_interfaces,
         peer_monitoring_service_interfaces,
         storage_service_interfaces,
     ) = transform_network_handles_into_interfaces(
         node_config,
         consensus_network_handle,
+        dkg_network_handle,
         mempool_network_handles,
         peer_monitoring_service_network_handles,
         storage_service_network_handles,
@@ -316,6 +347,7 @@ pub fn setup_networks_and_get_interfaces(
     (
         network_runtimes,
         consensus_interfaces,
+        dkg_interfaces,
         mempool_interfaces,
         peer_monitoring_service_interfaces,
         storage_service_interfaces,
@@ -360,6 +392,7 @@ fn register_client_and_service_with_network<
 fn transform_network_handles_into_interfaces(
     node_config: &NodeConfig,
     consensus_network_handle: Option<ApplicationNetworkHandle<ConsensusMsg>>,
+    dkg_network_handle: Option<ApplicationNetworkHandle<DKGMsg>>,
     mempool_network_handles: Vec<ApplicationNetworkHandle<MempoolSyncMsg>>,
     peer_monitoring_service_network_handles: Vec<
         ApplicationNetworkHandle<PeerMonitoringServiceMessage>,
@@ -368,6 +401,7 @@ fn transform_network_handles_into_interfaces(
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> (
     Option<ApplicationNetworkInterfaces<ConsensusMsg>>,
+    Option<ApplicationNetworkInterfaces<DKGMsg>>,
     ApplicationNetworkInterfaces<MempoolSyncMsg>,
     ApplicationNetworkInterfaces<PeerMonitoringServiceMessage>,
     ApplicationNetworkInterfaces<StorageServiceMessage>,
@@ -384,6 +418,13 @@ fn transform_network_handles_into_interfaces(
         mempool_network_configuration(node_config),
         peers_and_metadata.clone(),
     );
+    let dkg_interfaces = dkg_network_handle.map(|dkg_network_handle| {
+        create_network_interfaces(
+            vec![dkg_network_handle],
+            dkg_network_configuration(node_config),
+            peers_and_metadata.clone(),
+        )
+    });
     let peer_monitoring_service_interfaces = create_network_interfaces(
         peer_monitoring_service_network_handles,
         peer_monitoring_network_configuration(node_config),
@@ -397,6 +438,7 @@ fn transform_network_handles_into_interfaces(
 
     (
         consensus_interfaces,
+        dkg_interfaces,
         mempool_interfaces,
         peer_monitoring_service_interfaces,
         storage_service_interfaces,

@@ -1,9 +1,15 @@
 // Copyright © Aptos Foundation
 
-use aptos_dkg::algebra::evaluation_domain::{BatchEvaluationDomain, EvaluationDomain};
-use aptos_dkg::algebra::fft::{fft_assign, ifft_assign};
-use aptos_dkg::algebra::polynomials::poly_eval;
-use aptos_dkg::utils::random::random_scalars;
+#![allow(clippy::needless_range_loop)]
+
+use aptos_dkg::{
+    algebra::{
+        evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
+        fft::{fft_assign, ifft_assign},
+        polynomials::poly_eval,
+    },
+    utils::random::random_scalars,
+};
 use blstrs::Scalar;
 use ff::Field;
 use rand::thread_rng;

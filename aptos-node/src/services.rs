@@ -11,7 +11,7 @@ use aptos_consensus::{
 };
 use aptos_consensus_notifications::ConsensusNotifier;
 use aptos_data_client::client::AptosDataClient;
-use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener, EventNotificationListener};
+use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_indexer_grpc_fullnode::runtime::bootstrap as bootstrap_indexer_grpc;
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
 use aptos_mempool::{network::MempoolSyncMsg, MempoolClientRequest, QuorumStoreRequest};
@@ -23,13 +23,14 @@ use aptos_peer_monitoring_service_server::{
     PeerMonitoringServiceServer,
 };
 use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
+use aptos_safety_rules::SafetyRulesManager;
 use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_time_service::TimeService;
-use aptos_types::{chain_id::ChainId, validator_txn::pool::ValidatorTransactionPoolClient};
+use aptos_types::chain_id::ChainId;
+use aptos_validator_transaction_pool as vtxn_pool;
 use futures::channel::{mpsc, mpsc::Sender};
 use std::{sync::Arc, time::Instant};
 use tokio::runtime::{Handle, Runtime};
-use aptos_types::validator_txn::pool::ValidatorTransactionPoolWriter;
 
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
@@ -85,18 +86,18 @@ pub fn bootstrap_api_and_indexer(
 /// Starts consensus and returns the runtime
 pub fn start_consensus_runtime(
     node_config: &mut NodeConfig,
+    safety_rules_manager: Arc<SafetyRulesManager>,
     db_rw: DbReaderWriter,
     consensus_reconfig_subscription: Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
-    consensus_dkg_subscription: Option<EventNotificationListener>,
     consensus_network_interfaces: ApplicationNetworkInterfaces<ConsensusMsg>,
     consensus_notifier: ConsensusNotifier,
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
-    validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
-    validator_txn_pool_writer_for_dkg: Arc<dyn ValidatorTransactionPoolWriter>,
+    validator_txn_pool_client: Arc<dyn vtxn_pool::PullClient>,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let instant = Instant::now();
     let consensus = aptos_consensus::consensus_provider::start_consensus(
         node_config,
+        safety_rules_manager,
         consensus_network_interfaces.network_client,
         consensus_network_interfaces.network_service_events,
         Arc::new(consensus_notifier),
@@ -105,10 +106,6 @@ pub fn start_consensus_runtime(
         consensus_reconfig_subscription
             .expect("Consensus requires a reconfiguration subscription!"),
         validator_txn_pool_client,
-        validator_txn_pool_writer_for_dkg,
-        consensus_dkg_subscription
-            .expect("Consensus requires a DKG subscription!"),
-
     );
     debug!("Consensus started in {} ms", instant.elapsed().as_millis());
     consensus

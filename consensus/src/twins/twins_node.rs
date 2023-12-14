@@ -8,9 +8,10 @@ use crate::{
     network::NetworkTask,
     network_interface::{ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
+    payload_client::validator::DummyValidatorTxnClient,
     payload_manager::PayloadManager,
-    pipeline::buffer_manager::OrderedBlocks,
     quorum_store::quorum_store_db::MockQuorumStoreDB,
+    randomness::block_queue::OrderedBlocks,
     test_utils::{MockStateComputer, MockStorage},
     util::time_service::ClockTimeService,
 };
@@ -35,6 +36,7 @@ use aptos_network::{
     transport::ConnectionMetadata,
     ProtocolId,
 };
+use aptos_safety_rules::SafetyRulesManager;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{
@@ -45,9 +47,9 @@ use aptos_types::{
     },
     transaction::SignedTransaction,
     validator_info::ValidatorInfo,
-    validator_txn::pool::{ValidatorTransactionPool, ValidatorTransactionPoolClient},
     waypoint::Waypoint,
 };
+use aptos_validator_transaction_pool as vtxn_pool;
 use futures::{channel::mpsc, StreamExt};
 use maplit::hashmap;
 use std::{collections::HashMap, iter::FromIterator, sync::Arc};
@@ -74,7 +76,7 @@ impl SMRNode {
         consensus_config: OnChainConsensusConfig,
         storage: Arc<MockStorage>,
         twin_id: TwinId,
-        validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
+        vtxn_pool_pull_cli: Arc<dyn vtxn_pool::PullClient>,
     ) -> Self {
         // Create a runtime for the twin
         let thread_name = format!("twin-{}", twin_id.id);
@@ -146,9 +148,11 @@ impl SMRNode {
 
         let quorum_store_storage = Arc::new(MockQuorumStoreDB::new());
         let bounded_executor = BoundedExecutor::new(2, playground.handle());
-
+        let safety_rules_manager =
+            Arc::new(SafetyRulesManager::new(&config.consensus.safety_rules));
         let epoch_mgr = EpochManager::new(
             &config,
+            safety_rules_manager,
             time_service,
             self_sender,
             consensus_network_client,
@@ -160,7 +164,7 @@ impl SMRNode {
             reconfig_listener,
             bounded_executor,
             aptos_time_service::TimeService::real(),
-            validator_txn_pool_client,
+            vtxn_pool_pull_cli,
         );
         let (network_task, network_receiver) =
             NetworkTask::new(network_service_events, self_receiver);
@@ -286,14 +290,14 @@ impl SMRNode {
                 ..ConsensusConfigV1::default()
             });
 
-            let validator_txn_pool = Arc::new(ValidatorTransactionPool::new());
+            let vtxn_pool_pull_cli = Arc::new(DummyValidatorTxnClient::new(vec![]));
             smr_nodes.push(Self::start(
                 playground,
                 config,
                 consensus_config,
                 storage,
                 twin_id,
-                validator_txn_pool,
+                vtxn_pool_pull_cli,
             ));
         }
         smr_nodes

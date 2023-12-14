@@ -7,7 +7,7 @@ use crate::{
 };
 use aptos_consensus_types::{
     block::Block,
-    common::{DataStatus, Payload, DKGPayload},
+    common::{DataStatus, Payload},
     proof_of_store::ProofOfStore,
 };
 use aptos_crypto::HashValue;
@@ -70,18 +70,11 @@ impl PayloadManager {
 
                 let batches: Vec<_> = payloads
                     .into_iter()
-                    .filter(|payload| match payload {
-                        Payload::DKG(_) => false, // Skip DKG payloads
-                        _ => true,                // Include other payloads
-                    })
                     .flat_map(|payload| match payload {
                         Payload::DirectMempool(_) => {
                             unreachable!("InQuorumStore should be used");
                         },
                         Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs,
-                        Payload::DKG(_dkg_payload) => {
-                            unreachable!("DKG payload should be filtered out");
-                        },
                     })
                     .map(|proof| proof.info().clone())
                     .collect();
@@ -122,13 +115,11 @@ impl PayloadManager {
                 Payload::DirectMempool(_) => {
                     unreachable!()
                 },
-                // DKG payload contains DKG aggregated node
-                Payload::DKG(_) => {},
             },
         }
     }
 
-    /// Extract transaction and DKG Aggregated Node from a given block
+    /// Extract transactions from a given block
     /// Assumes it is never called for the same block concurrently. Otherwise status can be None.
     pub async fn get_transactions(&self, block: &Block) -> ExecutorResult<Vec<SignedTransaction>> {
         let payload = match block.payload() {
@@ -137,9 +128,7 @@ impl PayloadManager {
         };
 
         match (self, payload) {
-            (PayloadManager::DirectMempool, Payload::DirectMempool(txns)) => {
-                Ok(txns.clone())
-            },
+            (PayloadManager::DirectMempool, Payload::DirectMempool(txns)) => Ok(txns.clone()),
             (
                 PayloadManager::InQuorumStore(batch_reader, _),
                 Payload::InQuorumStore(proof_with_data),

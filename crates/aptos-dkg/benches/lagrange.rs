@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
 
-use aptos_dkg::algebra::evaluation_domain::BatchEvaluationDomain;
-use aptos_dkg::algebra::lagrange::lagrange_coefficients;
-use aptos_dkg::constants::{OUR_N, OUR_THRESHOLD};
+use aptos_dkg::{
+    algebra::{evaluation_domain::BatchEvaluationDomain, lagrange::lagrange_coefficients},
+    constants::{OUR_N, OUR_THRESHOLD},
+};
 use blstrs::Scalar;
 use criterion::{
     criterion_group, criterion_main, measurement::Measurement, BenchmarkGroup, BenchmarkId,
@@ -10,8 +11,7 @@ use criterion::{
 };
 use ff::Field;
 use more_asserts::{assert_ge, assert_le};
-use rand::seq::IteratorRandom;
-use rand::thread_rng;
+use rand::{seq::IteratorRandom, thread_rng};
 
 pub fn lagrange_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("lagrange");

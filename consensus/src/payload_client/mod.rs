@@ -3,7 +3,8 @@
 
 use crate::error::QuorumStoreError;
 use aptos_consensus_types::common::{Payload, PayloadFilter};
-use aptos_types::validator_txn::{pool::ValidatorTransactionFilter, ValidatorTransaction};
+use aptos_types::validator_txn::ValidatorTransaction;
+use aptos_validator_transaction_pool::ValidatorTransactionFilter;
 use futures::future::BoxFuture;
 use std::time::Duration;
 

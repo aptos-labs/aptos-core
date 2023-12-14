@@ -32,9 +32,8 @@ use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_time_service::{TimeService, TimeServiceTrait};
-use aptos_types::{
-    block_info::Round, epoch_state::EpochState, validator_txn::pool::ValidatorTransactionFilter,
-};
+use aptos_types::{block_info::Round, epoch_state::EpochState};
+use aptos_validator_transaction_pool::ValidatorTransactionFilter;
 use async_trait::async_trait;
 use futures::{
     executor::block_on,

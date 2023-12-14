@@ -5,7 +5,6 @@ pub mod transcript;
 use crate::pvss::player::Player;
 use more_asserts::assert_lt;
 use std::fmt::Display;
-
 pub use transcript::Transcript;
 
 /// Converts a type `Self` to `ToType` using auxiliary data from type `AuxType`.

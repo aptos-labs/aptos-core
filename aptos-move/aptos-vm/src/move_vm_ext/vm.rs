@@ -7,6 +7,7 @@ use aptos_framework::natives::{
     code::NativeCodeContext,
     cryptography::{algebra::AlgebraContext, ristretto255_point::NativeRistrettoPointContext},
     event::NativeEventContext,
+    randomness::RandomnessContext,
     state_storage::NativeStateStorageContext,
     transaction_context::NativeTransactionContext,
 };
@@ -26,7 +27,6 @@ use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
 use std::{ops::Deref, sync::Arc};
-use aptos_framework::natives::randomness::RandomnessContext;
 
 pub struct MoveVmExt {
     inner: MoveVM,

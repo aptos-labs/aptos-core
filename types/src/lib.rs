@@ -27,7 +27,6 @@ pub mod move_utils;
 pub mod network_address;
 pub mod nibble;
 pub mod on_chain_config;
-pub mod oracle;
 pub mod proof;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod proptest_types;

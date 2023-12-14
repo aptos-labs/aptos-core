@@ -1,15 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeMap, fmt};
-
+use crate::{
+    pipeline::commit_reliable_broadcast::DropGuard,
+    state_replication::StateComputerCommitCallBackType,
+};
 use anyhow::bail;
-use aptos_consensus_types::{executed_block::ExecutedBlock, common::Round};
-use aptos_types::{ledger_info::LedgerInfoWithSignatures, randomness::{Randomness, RandMetadata}};
+use aptos_consensus_types::{common::Round, executed_block::ExecutedBlock};
+use aptos_types::{
+    ledger_info::LedgerInfoWithSignatures,
+    randomness::{RandMetadata, Randomness},
+};
+use std::{collections::BTreeMap, fmt};
 use tokio::time::Instant;
-
-use crate::{state_replication::StateComputerCommitCallBackType};
-use crate::pipeline::commit_reliable_broadcast::DropGuard;
 
 /// Sent from consensus to RandManager.
 /// May contains a randomness if sent from DAG consensus.
@@ -54,6 +57,7 @@ impl BlockQueueItem {
     pub fn offset(&self, round: Round) -> usize {
         *self.offsets_by_round.get(&round).unwrap()
     }
+
     pub fn update_drop_guard(&mut self, round: Round, drop_guard: DropGuard) {
         let offset = self.offset(round);
         self.timed_drop_guards[offset] = Some((Instant::now(), drop_guard));
@@ -61,7 +65,12 @@ impl BlockQueueItem {
 
     pub fn rand_metadata(&self, round: Round) -> RandMetadata {
         let block = self.ordered_blocks[self.offset(round)].block();
-        RandMetadata::new(block.epoch(), block.round(), block.id(), block.timestamp_usecs())
+        RandMetadata::new(
+            block.epoch(),
+            block.round(),
+            block.id(),
+            block.timestamp_usecs(),
+        )
     }
 }
 
@@ -116,7 +125,9 @@ impl BlockQueue {
 
     /// Return the `BlockQueueItem` that contains the given round, if exists.
     pub fn item_mut(&mut self, round: Round) -> Option<&mut BlockQueueItem> {
-        self.queue.range_mut(0..=round).last()
+        self.queue
+            .range_mut(0..=round)
+            .last()
             .map(|(_, item)| item)
             .filter(|item| item.offsets_by_round.contains_key(&round))
     }
@@ -127,7 +138,11 @@ impl BlockQueue {
         }
     }
 
-    pub fn update_randomness(&mut self, round: Round, randomness: Randomness) -> anyhow::Result<()> {
+    pub fn update_randomness(
+        &mut self,
+        round: Round,
+        randomness: Randomness,
+    ) -> anyhow::Result<()> {
         if let Some(item) = self.item_mut(round) {
             let offset = item.offset(round);
             assert!(item.ordered_blocks[offset].randomness().is_none());
@@ -135,7 +150,11 @@ impl BlockQueue {
             item.num_undecided_blocks -= 1;
             Ok(())
         } else {
-            bail!("[BlockQueue] update_decision failed: epoch {} round {} item not found", randomness.epoch(), round);
+            bail!(
+                "[BlockQueue] update_decision failed: epoch {} round {} item not found",
+                randomness.epoch(),
+                round
+            );
         }
     }
 }

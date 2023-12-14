@@ -9,8 +9,6 @@ use crate::{
 use aptos_api::context::Context;
 use aptos_api_types::{AsConverter, Transaction as APITransaction, TransactionOnChainData};
 use aptos_indexer_grpc_utils::{
-    chunk_transactions,
-    constants::MESSAGE_SIZE_LIMIT,
     counters::{IndexerGrpcStep, TRANSACTION_UNIX_TIMESTAMP},
     timestamp_to_unixtime,
 };

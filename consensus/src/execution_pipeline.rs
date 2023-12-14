@@ -18,7 +18,7 @@ use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::{debug, error};
 use aptos_types::{
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
-    block_metadata::BlockMetadata,
+    block_metadata_ext::BlockMetadataWrapper,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
     },
@@ -28,7 +28,6 @@ use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
-use aptos_types::block_metadata_ext::BlockMetadataWrapper;
 
 pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(

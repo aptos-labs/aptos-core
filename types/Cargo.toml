@@ -22,8 +22,8 @@ aptos-enum-conversion-derive = { workspace = true }
 aptos-experimental-runtimes = { workspace = true }
 arr_macro = { workspace = true }
 bcs = { workspace = true }
-bytes = { workspace = true }
 byteorder = { workspace = true }
+bytes = { workspace = true }
 chrono = { workspace = true }
 derivative = { workspace = true }
 hex = { workspace = true }

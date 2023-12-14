@@ -83,7 +83,6 @@ pub fn extract_txns_from_block<'a>(
                         }
                     }
                 },
-                Payload::DKG(_) => {},
             }
             Ok(block_txns)
         },

@@ -9,10 +9,9 @@ use crate::{
     payload_client::{user::UserPayloadClient, PayloadClient},
 };
 use aptos_consensus_types::common::{Payload, PayloadFilter};
-use aptos_types::validator_txn::{
-    pool::{ValidatorTransactionFilter, ValidatorTransactionPoolClient},
-    ValidatorTransaction,
-};
+use aptos_logger::debug;
+use aptos_types::validator_txn::ValidatorTransaction;
+use aptos_validator_transaction_pool as vtxn_pool;
 use futures::future::BoxFuture;
 #[cfg(test)]
 use std::collections::HashSet;
@@ -20,18 +19,17 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use aptos_logger::debug;
 
 pub struct MixedPayloadClient {
     validator_txn_enabled: bool,
-    validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
+    validator_txn_pool_client: Arc<dyn vtxn_pool::PullClient>,
     user_payload_client: Arc<dyn UserPayloadClient>,
 }
 
 impl MixedPayloadClient {
     pub fn new(
         validator_txn_enabled: bool,
-        validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
+        validator_txn_pool_client: Arc<dyn vtxn_pool::PullClient>,
         user_payload_client: Arc<dyn UserPayloadClient>,
     ) -> Self {
         Self {
@@ -49,7 +47,7 @@ impl PayloadClient for MixedPayloadClient {
         mut max_poll_time: Duration,
         mut max_items: u64,
         mut max_bytes: u64,
-        validator_txn_filter: ValidatorTransactionFilter,
+        validator_txn_filter: vtxn_pool::ValidatorTransactionFilter,
         user_txn_filter: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,
@@ -120,7 +118,7 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
             Duration::from_millis(50), // max_poll_time
             99,                        // max_items
             1048576,                   // size limit: 1MB
-            ValidatorTransactionFilter::PendingTxnHashSet(HashSet::new()),
+            vtxn_pool::ValidatorTransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),
             false,
@@ -141,7 +139,7 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
             Duration::from_micros(500), // max_poll_time
             99,                         // max_items
             1048576,                    // size limit: 1MB
-            ValidatorTransactionFilter::PendingTxnHashSet(HashSet::new()),
+            vtxn_pool::ValidatorTransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),
             false,
@@ -162,7 +160,7 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
             Duration::from_millis(50), // max_poll_time
             1,                         // max_items
             1048576,                   // size limit: 1MB
-            ValidatorTransactionFilter::PendingTxnHashSet(HashSet::new()),
+            vtxn_pool::ValidatorTransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),
             false,
@@ -183,7 +181,7 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
             Duration::from_millis(50), // max_poll_time
             99,                        // max_items
             1,                         // size limit: 1 byte
-            ValidatorTransactionFilter::PendingTxnHashSet(HashSet::new()),
+            vtxn_pool::ValidatorTransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),
             false,
@@ -222,7 +220,7 @@ async fn mixed_payload_client_should_respect_validator_txn_feature_flag() {
             Duration::from_millis(50), // max_poll_time
             99,                        // max_items
             1048576,                   // size limit: 1MB
-            ValidatorTransactionFilter::PendingTxnHashSet(HashSet::new()),
+            vtxn_pool::ValidatorTransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),
             false,

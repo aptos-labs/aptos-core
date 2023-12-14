@@ -7,13 +7,14 @@ use std::time::Duration;
 
 pub struct DKGStage;
 
+#[allow(dead_code)]
 impl DKGStage {
-    pub const DKG_NODE_READY: &'static str = "dkg_node_ready";
+    pub const DKG_AGG_NODE_PROPOSED: &'static str = "dkg_agg_node_proposed";
+    pub const DKG_AGG_NODE_READY: &'static str = "dkg_agg_node_ready";
+    pub const DKG_FINISH: &'static str = "dkg_finish";
     pub const DKG_NODES_RECEIVED: &'static str = "dkg_nodes_received";
     pub const DKG_NODES_VERIFIED_AND_AGGREGATED: &'static str = "dkg_nodes_verified_and_aggregated";
-    pub const DKG_AGG_NODE_READY: &'static str = "dkg_agg_node_ready";
-    pub const DKG_AGG_NODE_PROPOSED: &'static str = "dkg_agg_node_proposed";
-    pub const DKG_FINISH: &'static str = "dkg_finish";
+    pub const DKG_NODE_READY: &'static str = "dkg_node_ready";
 }
 
 /// Record the time during each stage of the DKG process.

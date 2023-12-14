@@ -17,13 +17,14 @@ use crate::{
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::NodeConfig;
 use aptos_consensus_notifications::ConsensusNotificationSender;
-use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener, EventNotificationListener};
+use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_executor::block_executor::BlockExecutor;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
+use aptos_safety_rules::SafetyRulesManager;
 use aptos_storage_interface::DbReaderWriter;
-use aptos_types::validator_txn::pool::{ValidatorTransactionPoolClient, ValidatorTransactionPoolWriter};
+use aptos_validator_transaction_pool as vtxn_pool;
 use aptos_vm::AptosVM;
 use futures::channel::mpsc;
 use std::sync::Arc;
@@ -32,15 +33,14 @@ use tokio::runtime::Runtime;
 /// Helper function to start consensus based on configuration and return the runtime
 pub fn start_consensus(
     node_config: &NodeConfig,
+    safety_rules_manager: Arc<SafetyRulesManager>,
     network_client: NetworkClient<ConsensusMsg>,
     network_service_events: NetworkServiceEvents<ConsensusMsg>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     consensus_to_mempool_sender: mpsc::Sender<QuorumStoreRequest>,
     aptos_db: DbReaderWriter,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
-    validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
-    validator_txn_poll_writer_for_dkg: Arc<dyn ValidatorTransactionPoolWriter>,
-    dkg_events: EventNotificationListener,
+    validator_txn_pool_client: Arc<dyn vtxn_pool::PullClient>,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let runtime = aptos_runtimes::spawn_named_runtime("consensus".into(), None);
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
@@ -69,6 +69,7 @@ pub fn start_consensus(
     let bounded_executor = BoundedExecutor::new(8, runtime.handle().clone());
     let epoch_mgr = EpochManager::new(
         node_config,
+        safety_rules_manager,
         time_service,
         self_sender,
         consensus_network_client,
@@ -78,11 +79,9 @@ pub fn start_consensus(
         storage.clone(),
         quorum_store_db.clone(),
         reconfig_events,
-        dkg_events,
         bounded_executor,
         aptos_time_service::TimeService::real(),
         validator_txn_pool_client,
-        validator_txn_poll_writer_for_dkg,
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);

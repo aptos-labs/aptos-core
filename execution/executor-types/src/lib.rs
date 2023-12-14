@@ -323,7 +323,7 @@ pub struct StateComputeResult {
 
     reconfig_events: Vec<ContractEvent>,
 
-    dkg_events: Vec<ContractEvent>,
+    start_dkg_events: Vec<ContractEvent>,
 }
 
 impl StateComputeResult {
@@ -337,7 +337,7 @@ impl StateComputeResult {
         compute_status: Vec<TransactionStatus>,
         transaction_info_hashes: Vec<HashValue>,
         reconfig_events: Vec<ContractEvent>,
-        dkg_events: Vec<ContractEvent>,
+        start_dkg_events: Vec<ContractEvent>,
     ) -> Self {
         Self {
             root_hash,
@@ -349,7 +349,7 @@ impl StateComputeResult {
             compute_status,
             transaction_info_hashes,
             reconfig_events,
-            dkg_events,
+            start_dkg_events,
         }
     }
 
@@ -367,7 +367,7 @@ impl StateComputeResult {
             compute_status: vec![],
             transaction_info_hashes: vec![],
             reconfig_events: vec![],
-            dkg_events: vec![],
+            start_dkg_events: vec![],
         }
     }
 
@@ -382,7 +382,7 @@ impl StateComputeResult {
             compute_status: vec![TransactionStatus::Keep(ExecutionStatus::Success); num_txns],
             transaction_info_hashes: vec![],
             reconfig_events: vec![],
-            dkg_events: vec![],
+            start_dkg_events: vec![],
         }
     }
 
@@ -458,11 +458,11 @@ impl StateComputeResult {
     }
 
     pub fn has_dkg_event(&self) -> bool {
-        !self.dkg_events.is_empty()
+        !self.start_dkg_events.is_empty()
     }
 
-    pub fn dkg_events(&self) -> &[ContractEvent] {
-        &self.dkg_events
+    pub fn start_dkg_events(&self) -> &[ContractEvent] {
+        &self.start_dkg_events
     }
 }
 

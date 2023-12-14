@@ -15,15 +15,18 @@ pub mod utils;
 #[cfg(test)]
 mod tests;
 
+use crate::network::ApplicationNetworkInterfaces;
 use anyhow::anyhow;
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
+use aptos_channels::message_queues::QueueStyle;
 use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
+use aptos_safety_rules::SafetyRulesManager;
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
-use aptos_types::{chain_id::ChainId, validator_txn::pool::ValidatorTransactionPool};
+use aptos_types::{chain_id::ChainId, validator_txn::Topic};
 use clap::Parser;
 use futures::channel::mpsc;
 use hex::{FromHex, FromHexError};
@@ -39,11 +42,9 @@ use std::{
     thread,
 };
 use tokio::runtime::Runtime;
-use aptos_types::oracle::OracleTopic;
-use aptos_types::validator_txn::pool::ValidatorTransactionPoolTopicWriter;
 
 // dkg todo: change it back
-const EPOCH_LENGTH_SECS: u64 = 5;
+const EPOCH_LENGTH_SECS: u64 = 30;
 
 /// Runs an Aptos validator or fullnode
 #[derive(Clone, Debug, Parser)]
@@ -188,6 +189,7 @@ pub struct AptosHandle {
     _api_runtime: Option<Runtime>,
     _backup_runtime: Option<Runtime>,
     _consensus_runtime: Option<Runtime>,
+    _dkg_runtime: Option<Runtime>,
     _indexer_grpc_runtime: Option<Runtime>,
     _indexer_runtime: Option<Runtime>,
     _mempool_runtime: Runtime,
@@ -588,7 +590,8 @@ pub fn setup_environment_and_start_node(
         mut event_subscription_service,
         mempool_reconfig_subscription,
         consensus_reconfig_subscription,
-        consensus_dkg_subscription,
+        dkg_reconfig_subscription,
+        dkg_start_subscription,
     ) = state_sync::create_event_subscription_service(&node_config, &db_rw);
 
     // Set up the networks and gather the application network handles
@@ -596,6 +599,7 @@ pub fn setup_environment_and_start_node(
     let (
         network_runtimes,
         consensus_network_interfaces,
+        dkg_network_interfaces,
         mempool_network_interfaces,
         peer_monitoring_service_network_interfaces,
         storage_service_network_interfaces,
@@ -646,11 +650,38 @@ pub fn setup_environment_and_start_node(
             peers_and_metadata,
         );
 
-    let validator_txn_pool = Arc::new(ValidatorTransactionPool::new(vec![OracleTopic::RANDOMNESS_DKG]));
-    let dkg_txn_writer = ValidatorTransactionPoolTopicWriter {
-        pool: validator_txn_pool.clone(),
-        topic: OracleTopic::RANDOMNESS_DKG,
+    let safety_rules_manager = if node_config.base.role.is_validator() {
+        let sr_config = &node_config.consensus.safety_rules;
+        let safety_rules_manager = Arc::new(SafetyRulesManager::new(sr_config));
+        Some(safety_rules_manager)
+    } else {
+        None
     };
+
+    let (dkg_pulled_tx, dkg_pulled_rx) =
+        aptos_channels::aptos_channel::new(QueueStyle::KLAST, 1, None);
+    let (vtxn_pull_client, mut vtxn_writers) =
+        aptos_validator_transaction_pool::new(vec![(Topic::RANDOMNESS_DKG, Some(dkg_pulled_tx))]);
+    let dkg_txn_writer = vtxn_writers.pop().unwrap();
+    let dkg_runtime = if let Some(app_network_interfaces) = dkg_network_interfaces {
+        let ApplicationNetworkInterfaces {
+            network_client,
+            network_service_events,
+        } = app_network_interfaces;
+        let dkg_runtime = aptos_dkg_runtime::start_dkg_runtime(
+            &node_config,
+            network_client,
+            network_service_events,
+            dkg_reconfig_subscription.unwrap(),
+            dkg_start_subscription.unwrap(),
+            dkg_txn_writer,
+            dkg_pulled_rx,
+        );
+        Some(dkg_runtime)
+    } else {
+        None
+    };
+
     // Create the consensus runtime (this blocks on state sync first)
     let consensus_runtime = consensus_network_interfaces.map(|consensus_network_interfaces| {
         // Wait until state sync has been initialized
@@ -661,14 +692,15 @@ pub fn setup_environment_and_start_node(
         // Initialize and start consensus
         let (runtime, consensus_db, quorum_store_db) = services::start_consensus_runtime(
             &mut node_config,
+            safety_rules_manager
+                .clone()
+                .expect("safety_rules_manager is required for consensus"),
             db_rw,
             consensus_reconfig_subscription,
-            consensus_dkg_subscription,
             consensus_network_interfaces,
             consensus_notifier,
             consensus_to_mempool_sender,
-            validator_txn_pool,
-            Arc::new(dkg_txn_writer),
+            Arc::new(vtxn_pull_client),
         );
         admin_service.set_consensus_dbs(consensus_db, quorum_store_db);
         runtime
@@ -679,6 +711,7 @@ pub fn setup_environment_and_start_node(
         _api_runtime: api_runtime,
         _backup_runtime: backup_service,
         _consensus_runtime: consensus_runtime,
+        _dkg_runtime: dkg_runtime,
         _indexer_grpc_runtime: indexer_grpc_runtime,
         _indexer_runtime: indexer_runtime,
         _mempool_runtime: mempool_runtime,

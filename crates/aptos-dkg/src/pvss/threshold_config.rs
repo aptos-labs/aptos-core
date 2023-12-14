@@ -1,10 +1,11 @@
 // Copyright © Aptos Foundation
 
-use crate::algebra::evaluation_domain::{BatchEvaluationDomain, EvaluationDomain};
-use crate::pvss::{traits, Player};
+use crate::{
+    algebra::evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
+    pvss::{traits, Player},
+};
 use anyhow::anyhow;
-use rand::seq::IteratorRandom;
-use rand::Rng;
+use rand::{seq::IteratorRandom, Rng};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};

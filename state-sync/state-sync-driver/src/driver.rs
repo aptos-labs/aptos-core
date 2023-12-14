@@ -307,8 +307,11 @@ impl<
         // TODO(joshlind): can we get consensus to forward the events?
 
         // Handle the commit notification
+        let mut events = vec![];
+        events.extend(consensus_commit_notification.reconfiguration_events.clone());
+        events.extend(consensus_commit_notification.start_dkg_events.clone());
         let committed_transactions = CommittedTransactions {
-            events: consensus_commit_notification.reconfiguration_events.clone(),
+            events,
             transactions: consensus_commit_notification.transactions.clone(),
         };
         utils::handle_committed_transactions(

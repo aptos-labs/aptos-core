@@ -1,16 +1,22 @@
 // Copyright © Aptos Foundation
 
-use crate::algebra::polynomials::shamir_secret_share;
-use crate::pvss;
-use crate::pvss::player::Player;
-use crate::pvss::scrape;
-use crate::pvss::scrape::{LowDegreeTest, SCRAPE_SK_IN_G2};
-use crate::pvss::threshold_config::ThresholdConfig;
-use crate::pvss::traits;
-use crate::pvss::traits::SecretSharingConfig;
-use crate::pvss::{encryption_dlog, fiat_shamir};
-use crate::utils::random::{random_g1_point, random_g2_point};
-use crate::utils::{g2_multi_exp, multi_pairing};
+use crate::{
+    algebra::polynomials::shamir_secret_share,
+    pvss,
+    pvss::{
+        encryption_dlog, fiat_shamir,
+        player::Player,
+        scrape,
+        scrape::{LowDegreeTest, SCRAPE_SK_IN_G2},
+        threshold_config::ThresholdConfig,
+        traits,
+        traits::SecretSharingConfig,
+    },
+    utils::{
+        g2_multi_exp, multi_pairing,
+        random::{random_g1_point, random_g2_point},
+    },
+};
 use anyhow::bail;
 use aptos_crypto::{bls12381, CryptoMaterialError, ValidCryptoMaterial};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -60,18 +66,18 @@ impl TryFrom<&[u8]> for Transcript {
 }
 
 impl traits::Transcript for Transcript {
-    // TODO: remove scrape typedefs, so as to be able to macro things later
-    type SecretSharingConfig = ThresholdConfig;
-    type PublicParameters = scrape::PublicParameters;
-    type SigningPubKey = bls12381::PublicKey;
-    type SigningSecretKey = bls12381::PrivateKey;
-    type DealtSecretKeyShare = pvss::dealt_secret_key_share::g2::DealtSecretKeyShare;
+    type DealtPubKey = pvss::dealt_pub_key::g1::DealtPubKey;
     type DealtPubKeyShare = pvss::dealt_pub_key_share::g1::DealtPubKeyShare;
     type DealtSecretKey = pvss::dealt_secret_key::g2::DealtSecretKey;
-    type DealtPubKey = pvss::dealt_pub_key::g1::DealtPubKey;
-    type InputSecret = pvss::input_secret::InputSecret;
-    type EncryptPubKey = encryption_dlog::g2::EncryptPubKey;
+    type DealtSecretKeyShare = pvss::dealt_secret_key_share::g2::DealtSecretKeyShare;
     type DecryptPrivKey = encryption_dlog::g2::DecryptPrivKey;
+    type EncryptPubKey = encryption_dlog::g2::EncryptPubKey;
+    type InputSecret = pvss::input_secret::InputSecret;
+    type PublicParameters = scrape::PublicParameters;
+    // TODO: remove scrape typedefs, so as to be able to macro things later
+    type SecretSharingConfig = ThresholdConfig;
+    type SigningPubKey = bls12381::PublicKey;
+    type SigningSecretKey = bls12381::PrivateKey;
 
     fn scheme_name() -> String {
         SCRAPE_SK_IN_G2.to_string()

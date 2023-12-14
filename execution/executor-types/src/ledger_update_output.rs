@@ -23,7 +23,7 @@ pub struct LedgerUpdateOutput {
     pub status: Vec<TransactionStatus>,
     pub to_commit: Vec<TransactionToCommit>,
     pub reconfig_events: Vec<ContractEvent>,
-    pub dkg_events: Vec<ContractEvent>,
+    pub start_dkg_events: Vec<ContractEvent>,
     pub transaction_info_hashes: Vec<HashValue>,
     pub state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
     pub sharded_state_cache: ShardedStateCache,
@@ -174,7 +174,7 @@ impl LedgerUpdateOutput {
             self.status.clone(),
             self.transaction_info_hashes.clone(),
             self.reconfig_events.clone(),
-            self.dkg_events.clone(),
+            self.start_dkg_events.clone(),
         )
     }
 
@@ -187,7 +187,7 @@ impl LedgerUpdateOutput {
             state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
             sharded_state_cache,
             transaction_accumulator,
-            dkg_events,
+            start_dkg_events: dkg_events,
         } = rhs;
 
         if let Some(updates) = state_updates_before_last_checkpoint {
@@ -200,7 +200,7 @@ impl LedgerUpdateOutput {
         self.status.extend(status);
         self.to_commit.extend(to_commit);
         self.reconfig_events.extend(reconfig_events);
-        self.dkg_events.extend(dkg_events);
+        self.start_dkg_events.extend(dkg_events);
         self.transaction_info_hashes.extend(transaction_info_hashes);
         self.sharded_state_cache.combine(sharded_state_cache);
         self.transaction_accumulator = transaction_accumulator;

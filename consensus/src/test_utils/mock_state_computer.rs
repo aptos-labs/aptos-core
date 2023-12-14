@@ -3,14 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    dkg::dkg_manager::DKGManagerWrapper,
     error::StateSyncError,
     payload_manager::PayloadManager,
+    randomness::block_queue::OrderedBlocks,
     state_computer::{PipelineExecutionResult, StateComputeResultFut},
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     test_utils::mock_storage::MockStorage,
     transaction_deduper::TransactionDeduper,
-    transaction_shuffler::TransactionShuffler, randomness::block_queue::OrderedBlocks,
+    transaction_shuffler::TransactionShuffler,
 };
 use anyhow::{format_err, Result};
 use aptos_consensus_types::{block::Block, common::Payload, executed_block::ExecutedBlock};
@@ -55,7 +55,6 @@ impl MockStateComputer {
             ordered_proof,
             callback,
             maybe_randomness: _,
-            timed_drop_guard: _,
         } = blocks;
 
         self.consensus_db
@@ -67,8 +66,7 @@ impl MockStateComputer {
                 .lock()
                 .remove(&block.id())
                 .ok_or_else(|| format_err!("Cannot find block"))?;
-            let (mut payload_txns, _) =
-                self.payload_manager.get_transactions(block.block()).await?;
+            let mut payload_txns = self.payload_manager.get_transactions(block.block()).await?;
             txns.append(&mut payload_txns);
         }
         // they may fail during shutdown
@@ -89,7 +87,7 @@ impl StateComputer for MockStateComputer {
         &self,
         block: &Block,
         _parent_block_id: HashValue,
-        _randomness: Randomness,
+        _randomness: Option<Randomness>,
     ) -> ExecutorResult<PipelineExecutionResult> {
         self.block_cache.lock().insert(
             block.id(),
@@ -121,7 +119,6 @@ impl StateComputer for MockStateComputer {
                 ordered_proof: finality_proof,
                 callback,
                 maybe_randomness: None,
-                timed_drop_guard: None,
             })
             .await
             .is_err()
@@ -146,10 +143,10 @@ impl StateComputer for MockStateComputer {
         &self,
         _: &EpochState,
         _: Arc<PayloadManager>,
-        _: Arc<DKGManagerWrapper>,
         _: Arc<dyn TransactionShuffler>,
         _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
+        _: bool,
     ) {
     }
 
@@ -164,7 +161,7 @@ impl StateComputer for EmptyStateComputer {
         &self,
         _block: &Block,
         _parent_block_id: HashValue,
-        _randomness: Randomness,
+        _randomness: Option<Randomness>,
     ) -> ExecutorResult<PipelineExecutionResult> {
         Ok(PipelineExecutionResult::new_dummy())
     }
@@ -186,10 +183,10 @@ impl StateComputer for EmptyStateComputer {
         &self,
         _: &EpochState,
         _: Arc<PayloadManager>,
-        _: Arc<DKGManagerWrapper>,
         _: Arc<dyn TransactionShuffler>,
         _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
+        _: bool,
     ) {
     }
 
@@ -221,7 +218,7 @@ impl StateComputer for RandomComputeResultStateComputer {
         &self,
         _block: &Block,
         parent_block_id: HashValue,
-        _randomness: Randomness,
+        _randomness: Option<Randomness>,
     ) -> StateComputeResultFut {
         // trapdoor for Execution Error
         let res = if parent_block_id == self.random_compute_result_root_hash {
@@ -252,10 +249,10 @@ impl StateComputer for RandomComputeResultStateComputer {
         &self,
         _: &EpochState,
         _: Arc<PayloadManager>,
-        _: Arc<DKGManagerWrapper>,
         _: Arc<dyn TransactionShuffler>,
         _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
+        _: bool,
     ) {
     }
 

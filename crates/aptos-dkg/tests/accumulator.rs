@@ -1,11 +1,14 @@
 // Copyright © Aptos Foundation
 
-use aptos_dkg::algebra::evaluation_domain::BatchEvaluationDomain;
-use aptos_dkg::algebra::polynomials::{
-    accumulator_poly, accumulator_poly_scheduled, accumulator_poly_slow, poly_eval,
+use aptos_dkg::{
+    algebra::{
+        evaluation_domain::BatchEvaluationDomain,
+        polynomials::{
+            accumulator_poly, accumulator_poly_scheduled, accumulator_poly_slow, poly_eval,
+        },
+    },
+    utils::random::{random_scalar, random_scalars},
 };
-use aptos_dkg::utils::random::random_scalar;
-use aptos_dkg::utils::random::random_scalars;
 use blstrs::Scalar;
 use ff::Field;
 use rand::thread_rng;

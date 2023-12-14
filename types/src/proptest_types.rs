@@ -12,6 +12,7 @@ use crate::{
     aggregate_signature::PartialSignatures,
     block_info::{BlockInfo, Round},
     block_metadata::BlockMetadata,
+    block_metadata_ext::BlockMetadataExt,
     chain_id::ChainId,
     contract_event::ContractEvent,
     epoch_state::EpochState,
@@ -56,7 +57,6 @@ use std::{
     convert::TryFrom,
     iter::Iterator,
 };
-use crate::block_metadata_ext::BlockMetadataExt;
 
 impl WriteOp {
     pub fn value_strategy() -> impl Strategy<Value = Self> {
@@ -991,14 +991,14 @@ impl Arbitrary for BlockMetadataExt {
         )
             .prop_map(
                 |(
-                     id,
-                     epoch,
-                     round,
-                     proposer,
-                     previous_block_votes,
-                     failed_proposer_indices,
-                     timestamp,
-                 )| {
+                    id,
+                    epoch,
+                    round,
+                    proposer,
+                    previous_block_votes,
+                    failed_proposer_indices,
+                    timestamp,
+                )| {
                     BlockMetadataExt::new_v2(
                         id,
                         epoch,

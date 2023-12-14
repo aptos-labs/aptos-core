@@ -59,6 +59,12 @@ pub enum ProtocolId {
     ConsensusDirectSendCompressed = 12,
     NetbenchDirectSend = 13,
     NetbenchRpc = 14,
+    DKGDirectSendCompressed = 15,
+    DKGDirectSendBcs = 16,
+    DKGDirectSendJson = 17,
+    DKGRpcCompressed = 18,
+    DKGRpcBcs = 19,
+    DKGRpcJson = 20,
 }
 
 /// The encoding types for Protocols
@@ -87,6 +93,12 @@ impl ProtocolId {
             ConsensusDirectSendCompressed => "ConsensusDirectSendCompressed",
             NetbenchDirectSend => "NetbenchDirectSend",
             NetbenchRpc => "NetbenchRpc",
+            DKGDirectSendCompressed => "DKGDirectSendCompressed",
+            DKGDirectSendBcs => "DKGDirectSendBcs",
+            DKGDirectSendJson => "DKGDirectSendJson",
+            DKGRpcCompressed => "DKGRpcCompressed",
+            DKGRpcBcs => "DKGRpcBcs",
+            DKGRpcJson => "DKGRpcJson",
         }
     }
 
@@ -108,6 +120,12 @@ impl ProtocolId {
             ProtocolId::ConsensusDirectSendCompressed,
             ProtocolId::NetbenchDirectSend,
             ProtocolId::NetbenchRpc,
+            ProtocolId::DKGDirectSendCompressed,
+            ProtocolId::DKGDirectSendBcs,
+            ProtocolId::DKGDirectSendJson,
+            ProtocolId::DKGRpcCompressed,
+            ProtocolId::DKGRpcBcs,
+            ProtocolId::DKGRpcJson,
         ]
     }
 

@@ -1,20 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::dkg::DKGAggNode;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use crate::dkg::{DKGAggNode, DKGPvssConfig};
-use crate::validator_verifier::ValidatorVerifier;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub enum ValidatorTransaction {
+    DKGTranscriptForNextEpoch(DKGAggNode),
     DummyTopic(DummyValidatorTransaction),
-    DKGAggregatedTranscript{
-        agg_node: DKGAggNode,
-        pvss_config: DKGPvssConfig,
-        validator_verifier: ValidatorVerifier,
-    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
@@ -29,11 +24,12 @@ impl ValidatorTransaction {
     }
 
     pub fn size_in_bytes(&self) -> usize {
-        match self {
-            ValidatorTransaction::DummyTopic(txn) => txn.payload.len(),
-            ValidatorTransaction::DKGAggregatedTranscript{..} => 1, // DKG todo: real
-        }
+        bcs::to_bytes(self).unwrap().len()
     }
 }
 
-pub mod pool;
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[allow(non_camel_case_types)]
+pub enum Topic {
+    RANDOMNESS_DKG = 0,
+}

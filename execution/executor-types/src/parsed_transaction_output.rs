@@ -31,7 +31,7 @@ impl ParsedTransactionOutput {
     pub fn parse_dkg_events(events: &[ContractEvent]) -> impl Iterator<Item = &ContractEvent> {
         events
             .iter()
-            .filter(|e| e.event_key().cloned() == Some(*START_DKG_EVENT_KEY))
+            .filter(|e| e.type_tag().to_string().as_str() == "0x1::dkg::StartDKGEvent")
     }
 }
 
@@ -86,7 +86,14 @@ impl ParsedTransactionOutput {
         } = self;
         let (write_set, events, gas_used, status) = output.unpack();
 
-        (write_set, events, reconfig_events, dkg_events, gas_used, status)
+        (
+            write_set,
+            events,
+            reconfig_events,
+            dkg_events,
+            gas_used,
+            status,
+        )
     }
 }
 

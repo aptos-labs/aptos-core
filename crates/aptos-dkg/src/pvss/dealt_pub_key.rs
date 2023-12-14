@@ -1,14 +1,8 @@
 // Copyright © Aptos Foundation
 
 macro_rules! dealt_pub_key_impl {
-    (
-        $GT_PROJ_NUM_BYTES:ident,
-        $gt_proj_from_bytes:ident,
-        $GTProjective:ident
-    ) => {
-        use crate::constants::$GT_PROJ_NUM_BYTES;
-        use crate::utils::serialization::$gt_proj_from_bytes;
-
+    ($GT_PROJ_NUM_BYTES:ident, $gt_proj_from_bytes:ident, $GTProjective:ident) => {
+        use crate::{constants::$GT_PROJ_NUM_BYTES, utils::serialization::$gt_proj_from_bytes};
         use aptos_crypto::{
             CryptoMaterialError, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
         };

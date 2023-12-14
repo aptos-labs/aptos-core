@@ -84,11 +84,13 @@ fn serial_fft_assign(a: &mut [Scalar], omega: &Scalar, log_n: u32) {
 
 #[cfg(test)]
 mod test {
-    use crate::algebra::evaluation_domain::{
-        smallest_power_of_2_greater_than_or_eq, EvaluationDomain,
+    use crate::{
+        algebra::{
+            evaluation_domain::{smallest_power_of_2_greater_than_or_eq, EvaluationDomain},
+            fft::fft_assign,
+        },
+        utils::random::random_scalars,
     };
-    use crate::algebra::fft::fft_assign;
-    use crate::utils::random::random_scalars;
     use rand::thread_rng;
 
     #[test]

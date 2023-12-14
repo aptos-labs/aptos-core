@@ -1,13 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{bls12381, bls12381::{PrivateKey, ProofOfPossession, PublicKey}, test_utils::{random_subset, KeyPair, TestAptosCrypto}, validatable::{Validatable, Validate}, Signature, SigningKey, Uniform};
-use rand::{distributions::Alphanumeric, Rng, thread_rng};
-use rand_core::OsRng;
-use std::{convert::TryFrom, iter::zip};
+use crate::{
+    bls12381,
+    bls12381::{PrivateKey, ProofOfPossession, PublicKey},
+    test_utils::{random_subset, KeyPair, TestAptosCrypto},
+    validatable::{Validatable, Validate},
+    Signature, SigningKey, Uniform,
+};
 use blstrs::{G1Projective, Scalar};
 use group::Group;
-use std::ops::Mul;
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use rand_core::OsRng;
+use std::{convert::TryFrom, iter::zip, ops::Mul};
 
 /// Test that `blstrs` returns the same G1 generator as used in `blst`.
 #[test]
@@ -25,7 +30,6 @@ fn bls12381_g1_generator() {
 
     assert_eq!(serialized_pk, pk_same.to_compressed())
 }
-
 
 /// Tests that an individual signature share computed correctly on a message m passes verification on m.
 /// Tests that a signature share computed on a different message m' fails verification on m.

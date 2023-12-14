@@ -131,8 +131,6 @@ fn test_reconfiguration() {
         vec![0],
         vec![],
         300000001,
-        vec![],
-        None,
     ));
 
     // txn3 = set the aptos version

@@ -500,7 +500,6 @@ The runtime always runs this before executing the transactions in a block.
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_reconfigure_with_dkg_enabled">features::reconfigure_with_dkg_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="block.md#0x1_block_EAPI_DISABLED">EAPI_DISABLED</a>));
 
     <b>let</b> epoch_interval = <a href="block.md#0x1_block_block_prologue_common">block_prologue_common</a>(&vm, <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>, epoch, round, proposer, failed_proposer_indices, previous_block_votes_bitvec, <a href="timestamp.md#0x1_timestamp">timestamp</a>);
-
     <a href="randomness.md#0x1_randomness_on_new_block">randomness::on_new_block</a>(&vm, randomness_available, <a href="randomness.md#0x1_randomness">randomness</a>);
 
     <b>if</b> (!<a href="dkg.md#0x1_dkg_in_progress">dkg::in_progress</a>() && <a href="timestamp.md#0x1_timestamp">timestamp</a> - <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>() &gt;= epoch_interval) {

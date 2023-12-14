@@ -2,9 +2,19 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use super::buffer_manager::Sender;
 use crate::{
     network::{IncomingCommitRequest, NetworkSender},
-    state_replication::StateComputer, randomness::{block_queue::RandReadyBlocks, rand_manager::BufferManagerEvent},
+    pipeline::{
+        buffer_manager::{create_channel, BufferManager, ResetRequest},
+        execution_schedule_phase::{ExecutionRequest, ExecutionSchedulePhase},
+        execution_wait_phase::{ExecutionResponse, ExecutionWaitPhase, ExecutionWaitRequest},
+        persisting_phase::{PersistingPhase, PersistingRequest},
+        pipeline_phase::{CountedRequest, PipelinePhase},
+        signing_phase::{CommitSignerProvider, SigningPhase, SigningRequest, SigningResponse},
+    },
+    randomness::{block_queue::RandReadyBlocks, rand_manager::BufferManagerEvent},
+    state_replication::StateComputer,
 };
 use aptos_channels::aptos_channel::Receiver;
 use aptos_consensus_types::common::Author;
@@ -14,14 +24,6 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU64},
     Arc,
 };
-use crate::pipeline::buffer_manager::{BufferManager, create_channel, ResetRequest};
-use crate::pipeline::execution_schedule_phase::{ExecutionRequest, ExecutionSchedulePhase};
-use crate::pipeline::execution_wait_phase::{ExecutionResponse, ExecutionWaitPhase, ExecutionWaitRequest};
-use crate::pipeline::persisting_phase::{PersistingPhase, PersistingRequest};
-use crate::pipeline::pipeline_phase::{CountedRequest, PipelinePhase};
-use crate::pipeline::signing_phase::{CommitSignerProvider, SigningPhase, SigningRequest, SigningResponse};
-
-use super::buffer_manager::Sender;
 
 /// build channels and return phases and buffer manager
 pub fn prepare_phases_and_buffer_manager(

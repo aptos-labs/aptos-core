@@ -191,7 +191,6 @@ module aptos_framework::block {
         assert!(features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
 
         let epoch_interval = block_prologue_common(&vm, hash, epoch, round, proposer, failed_proposer_indices, previous_block_votes_bitvec, timestamp);
-
         randomness::on_new_block(&vm, randomness_available, randomness);
 
         if (!dkg::in_progress() && timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {

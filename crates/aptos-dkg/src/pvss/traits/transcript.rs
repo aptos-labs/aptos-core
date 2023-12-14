@@ -46,17 +46,15 @@
 //! that one can always derive a public key from a secret key, which in our PVSS construction's case
 //! does not hold.
 
-use crate::pvss::traits::{
-    Convert, HasEncryptionPublicParams, Reconstructable, SecretSharingConfig,
+use crate::pvss::{
+    traits::{Convert, HasEncryptionPublicParams, Reconstructable, SecretSharingConfig},
+    Player,
 };
-use crate::pvss::Player;
 use anyhow::bail;
 use aptos_crypto::{SigningKey, Uniform, ValidCryptoMaterial, VerifyingKey};
 use num_traits::Zero;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-use std::fmt::Debug;
-use std::ops::AddAssign;
+use serde::{de::DeserializeOwned, Serialize};
+use std::{fmt::Debug, ops::AddAssign};
 
 /// A trait for a PVSS protocol. This trait allows both for:
 ///

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::field_reassign_with_default)]
+#![allow(clippy::if_same_then_else)]
 
 use anyhow::{format_err, Context, Result};
 use aptos_config::config::{
@@ -598,7 +599,11 @@ fn get_land_blocking_test(
     let test = match test_name {
         "land_blocking" => land_blocking_test_suite(duration), // TODO: remove land_blocking, superseded by below
         "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
-        "realistic_env_max_load_randomness" => realistic_env_max_load_test_for_randomness_mainnet_simulation(duration, test_cmd, 112, 10),
+        "realistic_env_max_load_randomness" => {
+            realistic_env_max_load_test_for_randomness_mainnet_simulation(
+                duration, test_cmd, 112, 10,
+            )
+        },
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         _ => return None, // The test name does not match a land-blocking test
@@ -1783,7 +1788,8 @@ fn realistic_env_max_load_test(
             helm_values["chain"]["epoch_duration_secs"] =
                 (if long_running { 120 } else { 120 }).into();
             helm_values["chain"]["on_chain_consensus_config"] =
-                serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis()).expect("must serialize");
+                serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
+                    .expect("must serialize");
             helm_values["chain"]["on_chain_execution_config"] =
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");

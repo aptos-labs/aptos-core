@@ -14,6 +14,7 @@ async fn dkg_basic() {
     let time_limit_secs = epoch_duration_secs + estimated_dkg_latency_secs;
 
     let swarm = SwarmBuilder::new_local(4)
+        .with_num_fullnodes(1)
         .with_aptos()
         .with_init_genesis_config(Arc::new(|conf| {
             conf.epoch_duration_secs = 10;

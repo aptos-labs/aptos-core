@@ -189,7 +189,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                     update_counters_for_committed_blocks(committed_blocks);
                 },
             ),
-            maybe_randomness: None,  // rand todo: optimistic commit add rand decision
+            maybe_randomness: None, // rand todo: optimistic commit add rand decision
         };
         if self
             .executor_channel

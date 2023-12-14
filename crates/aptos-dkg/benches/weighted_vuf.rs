@@ -1,19 +1,26 @@
 // Copyright © Aptos Foundation
 
-use criterion::measurement::WallTime;
-use criterion::{
-    criterion_group, criterion_main, measurement::Measurement, BenchmarkGroup, Criterion,
-};
-use rand::rngs::ThreadRng;
-use rand::thread_rng;
-use std::iter::zip;
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::ptr_arg)]
+#![allow(clippy::extra_unused_type_parameters)]
+#![allow(clippy::needless_borrow)]
 
-use aptos_dkg::pvss::test_utils::{get_weighted_configs_for_benchmarking, setup_dealing, NoAux};
-use aptos_dkg::pvss::traits::{SecretSharingConfig, Transcript};
-use aptos_dkg::pvss::{das, scrape, Player, ThresholdConfig, WeightedConfig, WeightedTranscript};
-use aptos_dkg::weighted_vuf::gjm21_insecure;
-use aptos_dkg::weighted_vuf::pinkas::PinkasWUF;
-use aptos_dkg::weighted_vuf::traits::WeightedVUF;
+use aptos_dkg::{
+    pvss::{
+        das, scrape,
+        test_utils::{get_weighted_configs_for_benchmarking, setup_dealing, NoAux},
+        traits::{SecretSharingConfig, Transcript},
+        Player, ThresholdConfig, WeightedConfig, WeightedTranscript,
+    },
+    weighted_vuf::{gjm21_insecure, pinkas::PinkasWUF, traits::WeightedVUF},
+};
+use criterion::{
+    criterion_group, criterion_main,
+    measurement::{Measurement, WallTime},
+    BenchmarkGroup, Criterion,
+};
+use rand::{rngs::ThreadRng, thread_rng};
+use std::iter::zip;
 
 const BENCH_MSG: &[u8; 36] = b"some dummy message for the benchmark";
 

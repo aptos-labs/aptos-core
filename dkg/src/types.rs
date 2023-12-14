@@ -1,29 +1,44 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{network::TConsensusMsg, network_interface::ConsensusMsg};
+use crate::network_interface::DKGMsg;
 use anyhow::bail;
 pub use aptos_consensus_types::common::Author;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_enum_conversion_derive::EnumConversion;
 use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
-use aptos_types::{dkg::{DKGPvssConfig, DKGTranscriptWrapper}, validator_verifier::ValidatorVerifier};
+pub use aptos_types::dkg::DKGAggNode;
+use aptos_types::{
+    dkg::{DKGPvssConfig, DKGTranscriptWrapper},
+    validator_verifier::ValidatorVerifier,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-pub use aptos_types::dkg::DKGAggNode;
 
 pub trait TDKGMessage: Into<DKGMessage> + TryFrom<DKGMessage> {
-    fn verify(&self, dkg_pvss_config: &DKGPvssConfig, verifier: &ValidatorVerifier) -> anyhow::Result<()>;
+    fn verify(
+        &self,
+        dkg_pvss_config: &DKGPvssConfig,
+        verifier: &ValidatorVerifier,
+    ) -> anyhow::Result<()>;
 }
 
 impl TDKGMessage for DKGNodeAck {
-    fn verify(&self, _dkg_pvss_config: &DKGPvssConfig, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+    fn verify(
+        &self,
+        _dkg_pvss_config: &DKGPvssConfig,
+        _verifier: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
         Ok(())
     }
 }
 
 impl TDKGMessage for DKGAggNodeAck {
-    fn verify(&self, _dkg_pvss_config: &DKGPvssConfig, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+    fn verify(
+        &self,
+        _dkg_pvss_config: &DKGPvssConfig,
+        _verifier: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
         Ok(())
     }
 }
@@ -82,7 +97,11 @@ impl DKGNode {
 }
 
 impl TDKGMessage for DKGNode {
-    fn verify(&self, dkg_pvss_config: &DKGPvssConfig, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+    fn verify(
+        &self,
+        dkg_pvss_config: &DKGPvssConfig,
+        verifier: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
         self.trx.verify(dkg_pvss_config, verifier)?;
         Ok(())
     }
@@ -134,10 +153,18 @@ where
 }
 
 impl TDKGMessage for DKGAggNode {
-    fn verify(&self, dkg_pvss_config: &DKGPvssConfig, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+    fn verify(
+        &self,
+        dkg_pvss_config: &DKGPvssConfig,
+        verifier: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
         let dealers = self.agg_trx.verify_dealers(verifier.len())?;
         let addresses = verifier.get_ordered_account_addresses();
-        let dealers_addresses = dealers.iter().filter_map(|&pos| addresses.get(pos)).cloned().collect::<Vec<_>>();
+        let dealers_addresses = dealers
+            .iter()
+            .filter_map(|&pos| addresses.get(pos))
+            .cloned()
+            .collect::<Vec<_>>();
         // Ensure aggregated transcript has enough stakes
         verifier.check_voting_power(dealers_addresses.iter(), false)?;
 
@@ -228,21 +255,14 @@ impl DKGMessage {
 
 impl RBMessage for DKGMessage {}
 
-impl TConsensusMsg for DKGMessage {
-    fn epoch(&self) -> u64 {
+impl DKGMessage {
+    pub fn epoch(&self) -> u64 {
         match self {
             DKGMessage::DKGNodeMsg(node) => node.metadata.epoch,
             DKGMessage::DKGNodeAckMsg(ack) => ack.epoch,
             DKGMessage::DKGAggNodeMsg(node) => node.metadata.epoch,
             DKGMessage::DKGAggNodeAckMsg(ack) => ack.epoch,
         }
-    }
-
-    fn into_network_message(self) -> ConsensusMsg {
-        ConsensusMsg::DKGMessage(Box::new(DKGNetworkMessage {
-            epoch: self.epoch(),
-            data: bcs::to_bytes(&self).unwrap(),
-        }))
     }
 }
 
@@ -254,10 +274,21 @@ impl TryFrom<DKGNetworkMessage> for DKGMessage {
     }
 }
 
-impl TryFrom<ConsensusMsg> for DKGMessage {
+impl From<DKGMessage> for DKGMsg {
+    fn from(value: DKGMessage) -> Self {
+        Self::DKGMessage(Box::new(DKGNetworkMessage {
+            epoch: value.epoch(),
+            data: bcs::to_bytes(&value).unwrap(),
+        }))
+    }
+}
+
+impl TryFrom<DKGMsg> for DKGMessage {
     type Error = anyhow::Error;
 
-    fn try_from(msg: ConsensusMsg) -> Result<Self, Self::Error> {
-        TConsensusMsg::from_network_message(msg)
+    fn try_from(value: DKGMsg) -> Result<Self, Self::Error> {
+        match value {
+            DKGMsg::DKGMessage(obj) => Ok(bcs::from_bytes(&obj.data)?),
+        }
     }
 }

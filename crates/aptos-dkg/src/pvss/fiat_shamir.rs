@@ -6,10 +6,11 @@
 //! I suspect the reason they want the developer to do things these ways is to force them to cleanly
 //! define all the things that are appended to the transcript.
 
-use crate::pvss::threshold_config::ThresholdConfig;
-use crate::pvss::traits::Transcript;
-use crate::utils::random::random_scalar_from_uniform_bytes;
-use crate::SCALAR_NUM_BYTES;
+use crate::{
+    pvss::{threshold_config::ThresholdConfig, traits::Transcript},
+    utils::random::random_scalar_from_uniform_bytes,
+    SCALAR_NUM_BYTES,
+};
 use aptos_crypto::ValidCryptoMaterial;
 use blstrs::Scalar;
 use ff::PrimeField;

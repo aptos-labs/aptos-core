@@ -22,7 +22,7 @@ use crate::{
     network_interface::ConsensusMsg,
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::PersistentLivenessStorage,
-    quorum_store::types::BatchMsg, dkg::dkg_manager::DKGManagerWrapper,
+    quorum_store::types::BatchMsg,
 };
 use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
@@ -30,7 +30,7 @@ use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
     block::Block,
     block_data::BlockType,
-    common::{Author, Round, Payload},
+    common::{Author, Round},
     delayed_qc_msg::DelayedQcMsg,
     proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
@@ -184,8 +184,6 @@ pub struct RoundManager {
     onchain_config: OnChainConsensusConfig,
     buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
     local_config: ConsensusConfig,
-    // Round manager will fetch the DKG PVSS config from the DKG manager
-    dkg_manager_wrapper: Arc<DKGManagerWrapper>,
 }
 
 impl RoundManager {
@@ -201,7 +199,6 @@ impl RoundManager {
         onchain_config: OnChainConsensusConfig,
         buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
         local_config: ConsensusConfig,
-        dkg_manager_wrapper: Arc<DKGManagerWrapper>,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -223,7 +220,6 @@ impl RoundManager {
             onchain_config,
             buffered_proposal_tx,
             local_config,
-            dkg_manager_wrapper,
         }
     }
 
@@ -712,17 +708,6 @@ impl RoundManager {
             block_time_since_epoch,
             self.round_state.current_round_deadline(),
         );
-
-        // If the proposal contains DKG payload, should verify its validity
-        match proposal.payload() {
-            Some(Payload::DKG(dkg_payload)) => {
-                // Already verified in UnverifiedEvent, now checking if pvss config matches
-                ensure!(self.dkg_manager_wrapper.get_pvss_config().is_some(), "[DKG] DKG payload received but no PVSS config is set!");
-                ensure!(*dkg_payload.pvss_config() == self.dkg_manager_wrapper.get_pvss_config().unwrap(), "[DKG] Mismatch PVSS config in DKG payload: {:?}!", dkg_payload.dkg_agg_node().metadata());
-            }
-            _ => {}
-        }
-
 
         observe_block(proposal.timestamp_usecs(), BlockStage::SYNCED);
         if self.decoupled_execution() && self.block_store.vote_back_pressure() {

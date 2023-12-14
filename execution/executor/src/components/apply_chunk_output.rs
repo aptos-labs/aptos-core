@@ -140,7 +140,7 @@ impl ApplyChunkOutput {
             .with_label_values(&["assemble_ledger_diff_for_block"])
             .start_timer();
 
-        let (to_commit, transaction_info_hashes, reconfig_events, dkg_events) =
+        let (to_commit, transaction_info_hashes, reconfig_events, start_dkg_events) =
             Self::assemble_ledger_diff(to_keep, state_updates_vec, state_checkpoint_hashes);
         let transaction_accumulator =
             Arc::new(base_txn_accumulator.append(&transaction_info_hashes));
@@ -149,7 +149,7 @@ impl ApplyChunkOutput {
                 status,
                 to_commit,
                 reconfig_events,
-                dkg_events,
+                start_dkg_events,
                 transaction_info_hashes,
                 state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
                 sharded_state_cache,
@@ -367,6 +367,7 @@ impl ApplyChunkOutput {
             all_dkg_events.extend(per_txn_dkg_events);
             to_commit.push(txn_to_commit);
         }
+
         (
             to_commit,
             txn_info_hashes,

@@ -41,6 +41,7 @@ pub trait ConsensusNotificationSender: Send + Sync {
         &self,
         transactions: Vec<Transaction>,
         reconfiguration_events: Vec<ContractEvent>,
+        start_dkg_events: Vec<ContractEvent>,
     ) -> Result<(), Error>;
 
     /// Notify state sync to synchronize storage to the specified target.
@@ -94,6 +95,7 @@ impl ConsensusNotificationSender for ConsensusNotifier {
         &self,
         transactions: Vec<Transaction>,
         reconfiguration_events: Vec<ContractEvent>,
+        start_dkg_events: Vec<ContractEvent>,
     ) -> Result<(), Error> {
         // Only send a notification if transactions have been committed
         if transactions.is_empty() {
@@ -106,6 +108,7 @@ impl ConsensusNotificationSender for ConsensusNotifier {
             ConsensusNotification::NotifyCommit(ConsensusCommitNotification {
                 transactions,
                 reconfiguration_events,
+                start_dkg_events,
                 callback,
             });
 
@@ -226,6 +229,7 @@ pub enum ConsensusNotification {
 pub struct ConsensusCommitNotification {
     pub transactions: Vec<Transaction>,
     pub reconfiguration_events: Vec<ContractEvent>,
+    pub start_dkg_events: Vec<ContractEvent>,
     pub(crate) callback: oneshot::Sender<ConsensusNotificationResponse>,
 }
 
@@ -233,11 +237,13 @@ impl ConsensusCommitNotification {
     pub fn new(
         transactions: Vec<Transaction>,
         reconfiguration_events: Vec<ContractEvent>,
+        start_dkg_events: Vec<ContractEvent>,
     ) -> (Self, oneshot::Receiver<ConsensusNotificationResponse>) {
         let (callback, callback_receiver) = oneshot::channel();
         let commit_notification = ConsensusCommitNotification {
             transactions,
             reconfiguration_events,
+            start_dkg_events,
             callback,
         };
 
@@ -300,14 +306,20 @@ mod tests {
             crate::new_consensus_notifier_listener_pair(CONSENSUS_NOTIFICATION_TIMEOUT);
 
         // Send a notification and expect a timeout (no listener)
-        let notify_result =
-            block_on(consensus_notifier.notify_new_commit(vec![create_user_transaction()], vec![]));
+        let notify_result = block_on(consensus_notifier.notify_new_commit(
+            vec![create_user_transaction()],
+            vec![],
+            vec![],
+        ));
         assert_matches!(notify_result, Err(Error::TimeoutWaitingForStateSync));
 
         // Drop the receiver and try again
         consensus_listener.notification_receiver.close();
-        let notify_result =
-            block_on(consensus_notifier.notify_new_commit(vec![create_user_transaction()], vec![]));
+        let notify_result = block_on(consensus_notifier.notify_new_commit(
+            vec![create_user_transaction()],
+            vec![],
+            vec![],
+        ));
         assert_matches!(notify_result, Err(Error::NotificationError(_)));
     }
 
@@ -320,7 +332,7 @@ mod tests {
             crate::new_consensus_notifier_listener_pair(CONSENSUS_NOTIFICATION_TIMEOUT);
 
         // Send a notification
-        let notify_result = block_on(consensus_notifier.notify_new_commit(vec![], vec![]));
+        let notify_result = block_on(consensus_notifier.notify_new_commit(vec![], vec![], vec![]));
         assert_ok!(notify_result);
     }
 
@@ -335,10 +347,12 @@ mod tests {
         // Send a commit notification
         let transactions = vec![create_user_transaction()];
         let reconfiguration_events = vec![create_contract_event()];
-        let _ = block_on(
-            consensus_notifier
-                .notify_new_commit(transactions.clone(), reconfiguration_events.clone()),
-        );
+        let dkg_events = vec![create_contract_event()];
+        let _ = block_on(consensus_notifier.notify_new_commit(
+            transactions.clone(),
+            reconfiguration_events.clone(),
+            dkg_events.clone(),
+        ));
 
         // Verify the notification arrives at the receiver
         match consensus_listener.select_next_some().now_or_never() {
@@ -349,6 +363,7 @@ mod tests {
                         reconfiguration_events,
                         commit_notification.reconfiguration_events
                     );
+                    assert_eq!(dkg_events, commit_notification.start_dkg_events,);
                 },
                 result => panic!(
                     "Expected consensus commit notification but got: {:?}",
@@ -406,8 +421,11 @@ mod tests {
         });
 
         // Send a commit notification and verify a successful response
-        let notify_result =
-            block_on(consensus_notifier.notify_new_commit(vec![create_user_transaction()], vec![]));
+        let notify_result = block_on(consensus_notifier.notify_new_commit(
+            vec![create_user_transaction()],
+            vec![],
+            vec![],
+        ));
         assert_ok!(notify_result);
 
         // Send a sync notification and very an error response

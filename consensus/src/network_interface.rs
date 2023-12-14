@@ -4,10 +4,11 @@
 
 //! Interface between Consensus and Network layers.
 
+pub use crate::pipeline::commit_reliable_broadcast::CommitMessage;
 use crate::{
     dag::DAGNetworkMessage,
-    dkg::DKGNetworkMessage,
-    quorum_store::types::{Batch, BatchMsg, BatchRequest}, randomness::types::RandMessage,
+    quorum_store::types::{Batch, BatchMsg, BatchRequest},
+    randomness::types::RandMessage,
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
@@ -26,7 +27,6 @@ use aptos_network::{
 use aptos_types::{epoch_change::EpochChangeProof, PeerId};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use crate::pipeline::commit_reliable_broadcast::CommitMessage;
 
 /// Network type for consensus
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -70,8 +70,6 @@ pub enum ConsensusMsg {
     DAGMessage(DAGNetworkMessage),
     /// Commit message
     CommitMessage(Box<CommitMessage>),
-    /// DKG protocol message
-    DKGMessage(Box<DKGNetworkMessage>),
     /// Randomness message
     RandMessage(Box<RandMessage>),
 }
@@ -98,7 +96,6 @@ impl ConsensusMsg {
             ConsensusMsg::ProofOfStoreMsg(_) => "ProofOfStoreMsg",
             ConsensusMsg::DAGMessage(_) => "DAGMessage",
             ConsensusMsg::CommitMessage(_) => "CommitMessage",
-            ConsensusMsg::DKGMessage(_) => "DKGMessage",
             ConsensusMsg::RandMessage(_) => "RandMessage",
         }
     }

@@ -1,19 +1,26 @@
 // Copyright © Aptos Foundation
 
+#![allow(clippy::ptr_arg)]
+#![allow(clippy::needless_borrow)]
+
 use aptos_crypto::Uniform;
-use aptos_dkg::pvss;
-use aptos_dkg::pvss::test_utils;
-use aptos_dkg::pvss::test_utils::{get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking, NoAux};
-use aptos_dkg::pvss::traits::transcript::Transcript;
-use aptos_dkg::pvss::traits::SecretSharingConfig;
-use criterion::measurement::WallTime;
+use aptos_dkg::{
+    pvss,
+    pvss::{
+        test_utils,
+        test_utils::{
+            get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking, NoAux,
+        },
+        traits::{transcript::Transcript, SecretSharingConfig},
+    },
+};
 use criterion::{
-    criterion_group, criterion_main, measurement::Measurement, BenchmarkGroup, Criterion,
-    Throughput,
+    criterion_group, criterion_main,
+    measurement::{Measurement, WallTime},
+    BenchmarkGroup, Criterion, Throughput,
 };
 use more_asserts::assert_le;
-use rand::rngs::ThreadRng;
-use rand::{thread_rng, Rng};
+use rand::{rngs::ThreadRng, thread_rng, Rng};
 
 pub fn all_groups(c: &mut Criterion) {
     for tc in get_threshold_configs_for_benchmarking() {
@@ -219,6 +226,7 @@ fn pvss_decrypt_own_share<T: Transcript, M: Measurement>(
     });
 }
 
+#[allow(dead_code)]
 fn pvss_transcript_random<T: Transcript, M: Measurement>(
     sc: &T::SecretSharingConfig,
     g: &mut BenchmarkGroup<M>,

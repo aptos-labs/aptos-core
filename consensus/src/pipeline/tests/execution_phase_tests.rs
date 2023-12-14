@@ -127,7 +127,6 @@ fn add_execution_phase_test_cases(
                 bad_block,
                 vec![],
                 StateComputeResult::new_dummy(),
-                None,
             )],
             lifetime_guard: dummy_guard(),
         },

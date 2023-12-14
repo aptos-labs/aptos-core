@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 //! An insecure variant of [GJM+21e] that reuses the ElGamal randomness.
 //!
 //! # References

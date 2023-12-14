@@ -1,11 +1,13 @@
 // Copyright © Aptos Foundation
 
-use crate::algebra::evaluation_domain::{BatchEvaluationDomain, EvaluationDomain};
-use crate::algebra::fft;
-use crate::pvss::input_secret::InputSecret;
-use crate::pvss::ThresholdConfig;
-use crate::utils::is_power_of_two;
-use crate::utils::random::random_scalars;
+use crate::{
+    algebra::{
+        evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
+        fft,
+    },
+    pvss::{input_secret::InputSecret, ThresholdConfig},
+    utils::{is_power_of_two, random::random_scalars},
+};
 use blstrs::Scalar;
 use ff::Field;
 use more_asserts::debug_assert_le;

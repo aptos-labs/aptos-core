@@ -20,12 +20,13 @@ use aptos_config::config::{ChainHealthBackoffValues, PipelineBackpressureValues}
 use aptos_consensus_types::{
     block::Block,
     block_data::BlockData,
-    common::{Author, DKGPayload, Payload, PayloadFilter, Round},
+    common::{Author, Payload, PayloadFilter, Round},
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::{debug, error, sample, sample::SampleRate, warn};
-use aptos_types::validator_txn::{pool::ValidatorTransactionFilter, ValidatorTransaction};
+use aptos_types::validator_txn::ValidatorTransaction;
+use aptos_validator_transaction_pool::ValidatorTransactionFilter;
 use futures::future::BoxFuture;
 use std::{
     collections::{BTreeMap, HashSet},
@@ -262,16 +263,6 @@ impl ProposalGenerator {
                 Payload::empty(self.quorum_store_enabled),
                 hqc.certified_block().timestamp_usecs(),
             )
-        // } else if self.dkg_manager_wrapper.ready() {
-        //     // generate DKG payload
-        //     // the block contains just one DKG aggregate node
-        //     // dkg todo: handle the bad path where the submitted dkg payload does not get committed, i.e., when the validator sees its dkg payload is discarded, it needs to re-propose
-        //     let pvss_config = self.dkg_manager_wrapper.get_pvss_config().unwrap();
-        //     let dkg_agg_node = self.dkg_manager_wrapper.take_agg_node().unwrap();
-        //     debug!("[DKG]: epoch {} node {} generates DKG payload", dkg_agg_node.epoch(), self.author);
-        //     let payload = Payload::DKG(DKGPayload::new(dkg_agg_node, pvss_config.clone()));
-        //     let timestamp = self.time_service.get_current_timestamp();
-        //     (vec![], payload, timestamp.as_micros() as u64) //dkg todo: dkg result should be a system txn
         } else {
             // One needs to hold the blocks with the references to the payloads while get_block is
             // being executed: pending blocks vector keeps all the pending ancestors of the extended branch.
@@ -353,7 +344,6 @@ impl ProposalGenerator {
                 )
                 .await
                 .context("Fail to retrieve payload")?;
-            println!("DKG debug: node {} generates QS payload {}", self.author, payload.len());
 
             (validator_txns, payload, timestamp.as_micros() as u64)
         };

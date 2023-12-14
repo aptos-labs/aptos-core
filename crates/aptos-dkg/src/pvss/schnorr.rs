@@ -1,5 +1,6 @@
-use crate::utils::random::random_scalar;
-use crate::utils::{hash_to_scalar, HasMultiExp};
+// Copyright © Aptos Foundation
+
+use crate::utils::{hash_to_scalar, random::random_scalar, HasMultiExp};
 use anyhow::bail;
 use aptos_crypto::signing_message;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};

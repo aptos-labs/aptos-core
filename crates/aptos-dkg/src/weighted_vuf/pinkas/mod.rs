@@ -1,11 +1,12 @@
-use crate::algebra::lagrange::lagrange_coefficients;
-use crate::algebra::polynomials::get_powers_of_tau;
-use crate::pvss;
-use crate::pvss::traits::HasEncryptionPublicParams;
-use crate::pvss::{Player, WeightedConfig};
-use crate::utils::random::random_scalar;
-use crate::utils::{g1_multi_exp, g2_multi_exp, multi_pairing};
-use crate::weighted_vuf::traits::WeightedVUF;
+// Copyright © Aptos Foundation
+
+use crate::{
+    algebra::{lagrange::lagrange_coefficients, polynomials::get_powers_of_tau},
+    pvss,
+    pvss::{traits::HasEncryptionPublicParams, Player, WeightedConfig},
+    utils::{g1_multi_exp, g2_multi_exp, multi_pairing, random::random_scalar},
+    weighted_vuf::traits::WeightedVUF,
+};
 use anyhow::{anyhow, bail};
 use blstrs::{pairing, G1Projective, G2Projective, Gt, Scalar};
 use ff::Field;
@@ -40,27 +41,22 @@ impl From<&pvss::das::PublicParameters> for PublicParameters {
 /// Implements the Pinkas weighted VUF scheme, compatible with *any* PVSS scheme with the right kind
 /// of secret key and public key.
 impl WeightedVUF for PinkasWUF {
-    type PublicParameters = PublicParameters;
-    type PubKey = pvss::dealt_pub_key::g2::DealtPubKey;
-    type SecretKey = pvss::dealt_secret_key::g1::DealtSecretKey;
-    type PubKeyShare = Vec<pvss::dealt_pub_key_share::g2::DealtPubKeyShare>;
-    type SecretKeyShare = Vec<pvss::dealt_secret_key_share::g1::DealtSecretKeyShare>;
-
+    type AugmentedPubKeyShare = (RandomizedPKs, Self::PubKeyShare);
+    type AugmentedSecretKeyShare = (Scalar, Self::SecretKeyShare);
     // /// Note: Our BLS PKs are currently in G_1.
     // type BlsPubKey = bls12381::PublicKey;
     // type BlsSecretKey = bls12381::PrivateKey;
 
     type Delta = RandomizedPKs;
-
-    type AugmentedPubKeyShare = (RandomizedPKs, Self::PubKeyShare);
-    type AugmentedSecretKeyShare = (Scalar, Self::SecretKeyShare);
-
-    type ProofShare = G2Projective;
-
+    type Evaluation = Gt;
     /// Naive aggregation by concatenation. It is an open problem to get constant-sized aggregation.
     type Proof = Vec<(Player, Self::ProofShare)>;
-
-    type Evaluation = Gt;
+    type ProofShare = G2Projective;
+    type PubKey = pvss::dealt_pub_key::g2::DealtPubKey;
+    type PubKeyShare = Vec<pvss::dealt_pub_key_share::g2::DealtPubKeyShare>;
+    type PublicParameters = PublicParameters;
+    type SecretKey = pvss::dealt_secret_key::g1::DealtSecretKey;
+    type SecretKeyShare = Vec<pvss::dealt_secret_key_share::g1::DealtSecretKeyShare>;
 
     fn augment_key_pair<R: rand_core::RngCore + rand_core::CryptoRng>(
         pp: &Self::PublicParameters,

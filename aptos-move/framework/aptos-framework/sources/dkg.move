@@ -4,7 +4,7 @@ module aptos_framework::dkg {
     use std::option::Option;
     use std::signer;
     use aptos_framework::account;
-    use aptos_framework::event;
+    use aptos_framework::event::emit;
     use aptos_framework::stake::ValidatorSet;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
@@ -16,6 +16,7 @@ module aptos_framework::dkg {
     const EDKG_NOT_IN_PROGRESS: u64 = 2;
     const EINVALID_GUID_FOR_EVENT: u64 = 3;
 
+    #[event]
     struct StartDKGEvent has drop, store {
         target_epoch: u64,
         target_validator_set: ValidatorSet,
@@ -36,7 +37,6 @@ module aptos_framework::dkg {
     struct DKGState has key {
         last_complete: Option<DKGSessionState>,
         in_progress: Option<DKGSessionState>,
-        events: event::EventHandle<StartDKGEvent>,
     }
 
     public(friend) fun initialize(aptos_framework: &signer) {
@@ -47,7 +47,6 @@ module aptos_framework::dkg {
             DKGState {
                 last_complete: std::option::none(),
                 in_progress: std::option::none(),
-                events: account::new_event_handle<StartDKGEvent>(aptos_framework),
             }
         );
     }
@@ -68,13 +67,12 @@ module aptos_framework::dkg {
             deadline_microseconds: timestamp::now_microseconds() + 60000000,
             result: vector[],
         });
-        event::emit_event<StartDKGEvent>(
-            &mut dkg_state.events,
-            StartDKGEvent {
-                target_epoch,
-                target_validator_set,
-            },
-        );
+
+        let event = StartDKGEvent {
+            target_epoch,
+            target_validator_set,
+        };
+        emit(event);
     }
 
     /// Update the current DKG state with a potential transcript.

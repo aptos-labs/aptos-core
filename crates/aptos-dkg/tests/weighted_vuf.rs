@@ -1,13 +1,20 @@
-use aptos_dkg::pvss;
-use aptos_dkg::pvss::test_utils::NoAux;
-use aptos_dkg::pvss::traits::{Convert, SecretSharingConfig, Transcript};
-use aptos_dkg::pvss::{test_utils, Player, WeightedConfig, WeightedTranscript};
-use aptos_dkg::utils::random::random_scalar;
-use aptos_dkg::weighted_vuf::gjm21_insecure;
-use aptos_dkg::weighted_vuf::pinkas::PinkasWUF;
-use aptos_dkg::weighted_vuf::traits::WeightedVUF;
-use rand::rngs::StdRng;
-use rand::thread_rng;
+#![allow(clippy::ptr_arg)]
+#![allow(clippy::needless_borrow)]
+
+// Copyright © Aptos Foundation
+
+use aptos_dkg::{
+    pvss,
+    pvss::{
+        test_utils,
+        test_utils::NoAux,
+        traits::{Convert, SecretSharingConfig, Transcript},
+        Player, WeightedConfig, WeightedTranscript,
+    },
+    utils::random::random_scalar,
+    weighted_vuf::{gjm21_insecure, pinkas::PinkasWUF, traits::WeightedVUF},
+};
+use rand::{rngs::StdRng, thread_rng};
 use rand_core::SeedableRng;
 use sha3::{Digest, Sha3_256};
 
@@ -16,8 +23,14 @@ fn all_wvuf_bvt() {
     weighted_wvuf_bvt::<WeightedTranscript<pvss::das::Transcript>, PinkasWUF>();
     weighted_wvuf_bvt::<pvss::das::WeightedTranscript, PinkasWUF>();
 
-    weighted_wvuf_bvt::<WeightedTranscript<pvss::scrape::Transcript>, gjm21_insecure::g2::GjmInsecureWVUF>();
-    weighted_wvuf_bvt::<WeightedTranscript<pvss::das::Transcript>, gjm21_insecure::g1::GjmInsecureWVUF>();
+    weighted_wvuf_bvt::<
+        WeightedTranscript<pvss::scrape::Transcript>,
+        gjm21_insecure::g2::GjmInsecureWVUF,
+    >();
+    weighted_wvuf_bvt::<
+        WeightedTranscript<pvss::das::Transcript>,
+        gjm21_insecure::g1::GjmInsecureWVUF,
+    >();
 }
 
 fn weighted_wvuf_bvt<
@@ -62,7 +75,7 @@ fn weighted_pvss<T: Transcript<SecretSharingConfig = WeightedConfig>>(
     let wc = WeightedConfig::new(10, vec![3, 5, 3, 4, 2, 1, 1, 7]).unwrap();
 
     let (pvss_pp, ssks, spks, dks, eks, _, s, sk) =
-        test_utils::setup_dealing::<T, StdRng>(&wc, &mut rng);
+        test_utils::setup_dealing::<T, StdRng>(&wc, rng);
 
     let trx = T::deal(
         &wc,

@@ -13,9 +13,10 @@ use aptos_consensus_types::{
 };
 use aptos_types::{
     transaction::{ExecutionStatus, TransactionStatus},
-    validator_txn::{pool::ValidatorTransactionFilter, ValidatorTransaction},
+    validator_txn::ValidatorTransaction,
     vm_status::StatusCode,
 };
+use aptos_validator_transaction_pool::ValidatorTransactionFilter;
 use futures::{channel::mpsc, future::BoxFuture};
 use rand::Rng;
 use std::time::Duration;

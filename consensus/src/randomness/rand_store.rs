@@ -1,20 +1,28 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::{HashMap, BTreeMap}, time::Duration, fmt};
-
+use super::{
+    block_queue::{BlockQueue, BlockQueueItem, RandReadyBlocks},
+    types::RandShare,
+};
+use crate::{
+    block_storage::tracing::{observe_block, BlockStage},
+    logging::LogEvent,
+    pipeline::commit_reliable_broadcast::DropGuard,
+    randomness::{rand_manager::log_rand_event, types::ShareAck},
+};
 use anyhow::bail;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_dkg::{pvss::Player, weighted_vuf::traits::WeightedVUF};
 use aptos_logger::debug;
-use aptos_types::randomness::{Randomness, RandConfig, RandDecision, RandMetadata, WVUF};
-use serde::{Serialize, Deserialize};
+use aptos_types::randomness::{RandConfig, RandDecision, RandMetadata, Randomness, WVUF};
+use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
-
-use crate::{logging::LogEvent, block_storage::tracing::{BlockStage, observe_block}, randomness::{rand_manager::log_rand_event, types::ShareAck}};
-use crate::pipeline::commit_reliable_broadcast::DropGuard;
-
-use super::{block_queue::{BlockQueue, BlockQueueItem, RandReadyBlocks}, types::RandShare};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt,
+    time::Duration,
+};
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RandItem {
@@ -27,7 +35,12 @@ pub struct RandItem {
 
 impl fmt::Debug for RandItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "(weight: {}, decision: {:?})", self.weight, self.decision.is_some())
+        write!(
+            f,
+            "(weight: {}, decision: {:?})",
+            self.weight,
+            self.decision.is_some()
+        )
     }
 }
 
@@ -56,7 +69,10 @@ impl RandItem {
     pub fn add_share(&mut self, share: RandShare, rand_config: &RandConfig) -> anyhow::Result<()> {
         if let Some(metadata) = self.metadata.as_ref() {
             if metadata != share.metadata() {
-                bail!("[RandStore] RandMetadata mismatch in share {:?}!", share.metadata());
+                bail!(
+                    "[RandStore] RandMetadata mismatch in share {:?}!",
+                    share.metadata()
+                );
             }
         }
 
@@ -68,7 +84,10 @@ impl RandItem {
     pub fn add_decision(&mut self, decision: RandDecision) -> anyhow::Result<()> {
         if let Some(metadata) = self.metadata.as_ref() {
             if metadata != decision.metadata() {
-                bail!("[RandStore] RandMetadata mismatch in decision {:?}!", decision.metadata());
+                bail!(
+                    "[RandStore] RandMetadata mismatch in decision {:?}!",
+                    decision.metadata()
+                );
             }
         }
         self.decision = Some(decision);
@@ -99,17 +118,32 @@ impl RandItem {
         if let Some(metadata) = &self.metadata {
             let mut apks_and_proofs = vec![];
             for share in self.shares.values() {
-                let id = *rand_config.validator.address_to_validator_index().get(share.author()).unwrap();
+                let id = *rand_config
+                    .validator
+                    .address_to_validator_index()
+                    .get(share.author())
+                    .unwrap();
                 let maybe_apk = rand_config.get_certified_apk(share.author());
                 if let Some(apk) = maybe_apk {
-                    apks_and_proofs.push((Player{ id }, apk.clone(), share.share().clone()));
+                    apks_and_proofs.push((Player { id }, apk.clone(), *share.share()));
                 } else {
-                    bail!("[RandStore] No augmented public key for validator id {}, {}", id, share.author());
+                    bail!(
+                        "[RandStore] No augmented public key for validator id {}, {}",
+                        id,
+                        share.author()
+                    );
                 }
             }
 
-            let proof = <WVUF as WeightedVUF>::aggregate_shares(&rand_config.wconfig, &apks_and_proofs);
-            let eval = <WVUF as WeightedVUF>::derive_eval(&rand_config.wconfig, &rand_config.vuf_pp, metadata.to_bytes().as_slice(), &rand_config.get_all_certified_apk(), &proof)?;
+            let proof =
+                <WVUF as WeightedVUF>::aggregate_shares(&rand_config.wconfig, &apks_and_proofs);
+            let eval = <WVUF as WeightedVUF>::derive_eval(
+                &rand_config.wconfig,
+                &rand_config.vuf_pp,
+                metadata.to_bytes().as_slice(),
+                rand_config.get_all_certified_apk(),
+                &proof,
+            )?;
             let eval_bytes = bcs::to_bytes(&eval).unwrap();
             let rand_bytes = Sha3_256::digest(eval_bytes.as_slice()).to_vec();
             let randomness = Randomness::new(metadata.clone(), rand_bytes);
@@ -129,6 +163,7 @@ pub enum AddDecisionResult {
 
 // RandStore is not required to be persisted
 pub struct RandStore {
+    pub epoch: u64,
     pub author: Author,
     pub rand_config: Option<RandConfig>,
     pub delta_rb_drop_guard: Option<DropGuard>,
@@ -147,8 +182,16 @@ pub struct RandStore {
 }
 
 impl RandStore {
-    pub fn new(author: Author, rand_config: Option<RandConfig>, delta_rb_drop_guard: Option<DropGuard>, gc_gap_below: Round, gc_gap_above: Round) -> Self {
+    pub fn new(
+        epoch: u64,
+        author: Author,
+        rand_config: Option<RandConfig>,
+        delta_rb_drop_guard: Option<DropGuard>,
+        gc_gap_below: Round,
+        gc_gap_above: Round,
+    ) -> Self {
         Self {
+            epoch,
             author,
             rand_config,
             delta_rb_drop_guard,
@@ -173,7 +216,7 @@ impl RandStore {
     }
 
     pub fn block_queue(&self) -> &BTreeMap<Round, BlockQueueItem> {
-        &self.block_queue.queue()
+        self.block_queue.queue()
     }
 
     pub fn rand_map(&self) -> &HashMap<Round, RandItem> {
@@ -181,9 +224,12 @@ impl RandStore {
     }
 
     pub fn rebroadcast_rounds(&self, duration: Duration) -> Vec<Round> {
-        self.block_queue().iter()
+        self.block_queue()
+            .iter()
             .flat_map(|(_, item)| {
-                item.ordered_blocks.iter().zip(item.timed_drop_guards.iter())
+                item.ordered_blocks
+                    .iter()
+                    .zip(item.timed_drop_guards.iter())
                     .filter_map(|(block, timed_drop_guard)| {
                         if !block.has_randomness() {
                             if let Some((a, _)) = timed_drop_guard {
@@ -212,7 +258,12 @@ impl RandStore {
 
     pub fn check_rounds(&self, round: Round) -> anyhow::Result<()> {
         if round < self.rand_round_min || round > self.rand_round_max {
-            bail!("[RandStore] round {} is not in range [{}, {}]", round, self.rand_round_min, self.rand_round_max);
+            bail!(
+                "[RandStore] round {} is not in range [{}, {}]",
+                round,
+                self.rand_round_min,
+                self.rand_round_max
+            );
         }
         Ok(())
     }
@@ -230,15 +281,20 @@ impl RandStore {
     }
 
     pub fn get_my_share(&self, round: &Round) -> Option<&RandShare> {
-        self.rand_map.get(round).and_then(|rand_item| rand_item.shares().get(&self.author))
+        self.rand_map
+            .get(round)
+            .and_then(|rand_item| rand_item.shares().get(&self.author))
     }
 
     pub fn get_decision(&self, round: &Round) -> Option<&RandDecision> {
-        self.rand_map.get(round).and_then(|rand_item| rand_item.decision())
+        self.rand_map
+            .get(round)
+            .and_then(|rand_item| rand_item.decision())
     }
 
     pub fn get_randomness(&self, round: &Round) -> Option<&Randomness> {
-        self.get_decision(round).map(|decision| decision.randomness())
+        self.get_decision(round)
+            .map(|decision| decision.randomness())
     }
 
     pub fn dequeue_rand_ready_prefix(&mut self) -> Vec<RandReadyBlocks> {
@@ -246,17 +302,26 @@ impl RandStore {
     }
 
     pub fn add_item(&mut self, item: BlockQueueItem) -> anyhow::Result<Vec<AddDecisionResult>> {
-        let metadata_objs: Vec<RandMetadata> = item.ordered_blocks.iter()
+        let metadata_objs: Vec<RandMetadata> = item
+            .ordered_blocks
+            .iter()
             .map(|b| item.rand_metadata(b.round()))
             .collect();
         self.block_queue.push_back(item);
 
-        let add_decision_results: Vec<AddDecisionResult> = metadata_objs.into_iter().map(|metadata| {
-            let maybe_decision = self.try_aggregate_shares(metadata.round(), Some(metadata)).unwrap();
-            if maybe_decision.is_none() { return AddDecisionResult::None; }
-            let decision = maybe_decision.unwrap();
-            self.add_decision(decision, true).unwrap()
-        }).collect();
+        let add_decision_results: Vec<AddDecisionResult> = metadata_objs
+            .into_iter()
+            .map(|metadata| {
+                let maybe_decision = self
+                    .try_aggregate_shares(metadata.round(), Some(metadata))
+                    .unwrap();
+                if maybe_decision.is_none() {
+                    return AddDecisionResult::None;
+                }
+                let decision = maybe_decision.unwrap();
+                self.add_decision(decision, true).unwrap()
+            })
+            .collect();
 
         Ok(add_decision_results)
     }
@@ -265,7 +330,11 @@ impl RandStore {
         self.block_queue.update_guard(round, drop_guard);
     }
 
-    pub fn try_aggregate_shares(&mut self, round: Round, metadata: Option<RandMetadata>) -> anyhow::Result<Option<RandDecision>> {
+    pub fn try_aggregate_shares(
+        &mut self,
+        round: Round,
+        metadata: Option<RandMetadata>,
+    ) -> anyhow::Result<Option<RandDecision>> {
         if self.rand_config.is_none() {
             return Ok(None);
         }
@@ -280,11 +349,17 @@ impl RandStore {
         if rand_item.ready_to_aggregate(rand_config) {
             match rand_item.aggregate_shares(rand_config) {
                 Ok(decision) => {
-                    log_rand_event(LogEvent::AggregateRandDecision, self.author, None, decision.block_id(), decision.round());
+                    log_rand_event(
+                        LogEvent::AggregateRandDecision,
+                        self.author,
+                        None,
+                        decision.block_id(),
+                        decision.round(),
+                    );
                     observe_block(decision.timestamp(), BlockStage::RAND_AGG_DECISION);
 
                     return Ok(Some(decision));
-                }
+                },
                 Err(e) => bail!("{:?}", e),
             }
         }
@@ -301,17 +376,26 @@ impl RandStore {
 
         self.check_rounds(share.round())?;
 
-        let rand_item = self.rand_map.entry(share.round()).or_insert_with(RandItem::new);
+        let rand_item = self
+            .rand_map
+            .entry(share.round())
+            .or_insert_with(RandItem::new);
 
         if let Some(decision) = rand_item.decision() {
-            return Ok((ShareAck::new(Some(decision.clone())), AddDecisionResult::None));
+            return Ok((
+                ShareAck::new(self.epoch, Some(decision.clone())),
+                AddDecisionResult::None,
+            ));
         }
 
         if rand_item.contain_author(share.author()) {
             if *share.author() == self.author {
-                return Ok((ShareAck::new(None), AddDecisionResult::None));
+                return Ok((ShareAck::new(self.epoch, None), AddDecisionResult::None));
             }
-            bail!("[RandStore] duplicate share from the same author {:?}", share.author());
+            bail!(
+                "[RandStore] duplicate share from the same author {:?}",
+                share.author()
+            );
         }
 
         share.verify(rand_config)?;
@@ -322,21 +406,26 @@ impl RandStore {
 
         match self.try_aggregate_shares(share.round(), None)? {
             Some(decision) => {
-                let ack = ShareAck::new(Some(decision.clone()));
+                let ack = ShareAck::new(self.epoch, Some(decision.clone()));
                 let add_decision_result = self.add_decision(decision, true)?;
                 Ok((ack, add_decision_result))
             },
-            None => {
-                Ok((ShareAck::new(None), AddDecisionResult::None))
-            },
+            None => Ok((ShareAck::new(self.epoch, None), AddDecisionResult::None)),
         }
     }
 
-    pub fn add_decision(&mut self, decision: RandDecision, local: bool) -> anyhow::Result<AddDecisionResult> {
+    pub fn add_decision(
+        &mut self,
+        decision: RandDecision,
+        local: bool,
+    ) -> anyhow::Result<AddDecisionResult> {
         let rand_config = self.rand_config.as_ref().unwrap();
         self.check_rounds(decision.round())?;
 
-        let rand_item = self.rand_map.entry(decision.round()).or_insert_with(RandItem::new);
+        let rand_item = self
+            .rand_map
+            .entry(decision.round())
+            .or_insert_with(RandItem::new);
 
         if rand_item.decision().is_some() {
             return Ok(AddDecisionResult::None);
@@ -348,17 +437,22 @@ impl RandStore {
 
         rand_item.add_decision(decision.clone())?;
 
-        log_rand_event(LogEvent::AddFirstRandDecision, self.author, None, decision.block_id(), decision.round());
+        log_rand_event(
+            LogEvent::AddFirstRandDecision,
+            self.author,
+            None,
+            decision.block_id(),
+            decision.round(),
+        );
 
         observe_block(decision.timestamp(), BlockStage::RAND_ADD_FIRST_DECISION);
 
-        match self.block_queue.update_randomness(decision.round(), decision.randomness().clone()) {
-            Err(_e) => {
-                Ok(AddDecisionResult::None)
-            }
-            Ok(()) => {
-                Ok(AddDecisionResult::NewRandReadyBlock)
-            }
+        match self
+            .block_queue
+            .update_randomness(decision.round(), decision.randomness().clone())
+        {
+            Err(_e) => Ok(AddDecisionResult::None),
+            Ok(()) => Ok(AddDecisionResult::NewRandReadyBlock),
         }
     }
 }

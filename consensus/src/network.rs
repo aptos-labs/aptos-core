@@ -9,11 +9,12 @@ use crate::{
         DAGMessage, DAGNetworkMessage, DAGRpcResult, ProofNotifier, RpcWithFallback,
         TDAGNetworkSender,
     },
-    dkg::DKGNetworkMessage,
     logging::{LogEvent, LogSchema},
     monitor,
     network_interface::{ConsensusMsg, ConsensusNetworkClient, RPC},
-    quorum_store::types::{Batch, BatchMsg, BatchRequest}, randomness::types::RandMessage,
+    pipeline::commit_reliable_broadcast::CommitMessage,
+    quorum_store::types::{Batch, BatchMsg, BatchRequest},
+    randomness::types::RandMessage,
 };
 use anyhow::{anyhow, bail, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
@@ -53,8 +54,6 @@ use std::{
     time::Duration,
 };
 use tokio::time::timeout;
-use crate::dkg::DKGMessage;
-use crate::pipeline::commit_reliable_broadcast::CommitMessage;
 
 pub trait TConsensusMsg: Sized + Serialize + DeserializeOwned {
     fn epoch(&self) -> u64;
@@ -62,7 +61,6 @@ pub trait TConsensusMsg: Sized + Serialize + DeserializeOwned {
     fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self> {
         match msg {
             ConsensusMsg::DAGMessage(msg) => Ok(bcs::from_bytes(&msg.data)?),
-            ConsensusMsg::DKGMessage(msg) => Ok(bcs::from_bytes(&msg.data)?),
             _ => bail!("unexpected consensus message type {:?}", msg),
         }
     }
@@ -102,14 +100,6 @@ pub struct IncomingCommitRequest {
 }
 
 #[derive(Debug)]
-pub struct IncomingDKGRequest {
-    pub req: DKGNetworkMessage,
-    pub sender: Author,
-    pub protocol: ProtocolId,
-    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
-}
-
-#[derive(Debug)]
 pub struct IncomingRandRequest {
     pub req: RandMessage,
     pub protocol: ProtocolId,
@@ -122,7 +112,6 @@ pub enum IncomingRpcRequest {
     BatchRetrieval(IncomingBatchRetrievalRequest),
     DAGRequest(IncomingDAGRequest),
     CommitRequest(IncomingCommitRequest),
-    DKGRequest(IncomingDKGRequest),
     RandRequest(IncomingRandRequest),
 }
 
@@ -528,21 +517,6 @@ impl RBNetworkSender<DAGMessage, DAGRpcResult> for NetworkSender {
 }
 
 #[async_trait]
-impl RBNetworkSender<DKGMessage, DKGMessage> for NetworkSender {
-    async fn send_rb_rpc(
-        &self,
-        receiver: Author,
-        message: DKGMessage,
-        timeout: Duration,
-    ) -> anyhow::Result<DKGMessage> {
-        self.send_rpc(receiver, message.into_network_message(), timeout)
-            .await
-            .map_err(|e| anyhow!("invalid rpc response: {}", e))
-            .and_then(TConsensusMsg::from_network_message)
-    }
-}
-
-#[async_trait]
 impl RBNetworkSender<RandMessage, RandMessage> for NetworkSender {
     async fn send_rb_rpc(
         &self,
@@ -552,7 +526,16 @@ impl RBNetworkSender<RandMessage, RandMessage> for NetworkSender {
     ) -> anyhow::Result<RandMessage> {
         let msg = ConsensusMsg::RandMessage(message.into());
         let response = match self.send_rpc(receiver, msg, timeout_duration).await? {
-            ConsensusMsg::RandMessage(resp) if matches!(*resp, RandMessage::ShareAck(_) | RandMessage::DeltaAck(_) | RandMessage::CertifiedDeltaAck(_)) => *resp,
+            ConsensusMsg::RandMessage(resp)
+                if matches!(
+                    *resp,
+                    RandMessage::ShareAck(_)
+                        | RandMessage::DeltaAck(_)
+                        | RandMessage::CertifiedDeltaAck(_)
+                ) =>
+            {
+                *resp
+            },
             _ => bail!("[RandMessage] Invalid response to request"),
         };
 
@@ -766,14 +749,6 @@ impl NetworkTask {
                         ConsensusMsg::CommitMessage(req) => {
                             IncomingRpcRequest::CommitRequest(IncomingCommitRequest {
                                 req: *req,
-                                protocol,
-                                response_sender: callback,
-                            })
-                        },
-                        ConsensusMsg::DKGMessage(request) => {
-                            IncomingRpcRequest::DKGRequest(IncomingDKGRequest {
-                                req: *request,
-                                sender: peer_id,
                                 protocol,
                                 response_sender: callback,
                             })

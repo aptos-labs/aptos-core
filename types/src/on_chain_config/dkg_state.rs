@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
-
-use crate::event::EventHandle;
-use crate::on_chain_config::{OnChainConfig, ValidatorSet};
-use serde::{Serialize, Deserialize};
+use crate::{
+    dkg::{build_dkg_pvss_config, DKGPvssConfig},
+    on_chain_config::{OnChainConfig, ValidatorSet},
+};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DKGSessionState {
@@ -14,11 +15,16 @@ pub struct DKGSessionState {
     pub deadline_microseconds: u64,
 }
 
+impl DKGSessionState {
+    pub fn pvss_config(&self) -> DKGPvssConfig {
+        build_dkg_pvss_config(self.dealer_epoch, &self.target_validator_set)
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DKGState {
     pub last_complete: Option<DKGSessionState>,
     pub in_progress: Option<DKGSessionState>,
-    pub events: EventHandle,
 }
 
 impl DKGState {

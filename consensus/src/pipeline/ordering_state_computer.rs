@@ -3,13 +3,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    dkg::dkg_manager::DKGManagerWrapper,
     error::StateSyncError,
     payload_manager::PayloadManager,
+    pipeline::{
+        buffer_manager::{ResetAck, ResetRequest},
+        errors::Error,
+    },
+    randomness::block_queue::OrderedBlocks,
     state_computer::PipelineExecutionResult,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
-    transaction_shuffler::TransactionShuffler, randomness::block_queue::OrderedBlocks,
+    transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
 use aptos_consensus_types::{block::Block, executed_block::ExecutedBlock};
@@ -28,8 +32,6 @@ use futures::{
 };
 use futures_channel::mpsc::unbounded;
 use std::sync::Arc;
-use crate::pipeline::buffer_manager::{ResetAck, ResetRequest};
-use crate::pipeline::errors::Error;
 
 /// Ordering-only execution proxy
 /// implements StateComputer traits.
@@ -151,7 +153,6 @@ impl StateComputer for OrderingStateComputer {
         &self,
         _: &EpochState,
         _payload_manager: Arc<PayloadManager>,
-        _dkg_manager_wrapper: Arc<DKGManagerWrapper>,
         _: Arc<dyn TransactionShuffler>,
         _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
@@ -223,7 +224,6 @@ impl StateComputer for DagStateSyncComputer {
         &self,
         _epoch_state: &EpochState,
         _payload_manager: Arc<PayloadManager>,
-        _dkg_manager: Arc<DKGManagerWrapper>,
         _transaction_shuffler: Arc<dyn TransactionShuffler>,
         _block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_deduper: Arc<dyn TransactionDeduper>,

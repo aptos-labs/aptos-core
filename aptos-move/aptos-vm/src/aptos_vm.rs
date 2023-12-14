@@ -34,20 +34,26 @@ use aptos_types::{
         partitioner::PartitionedTransactions,
     },
     block_metadata::BlockMetadata,
+    block_metadata_ext::BlockMetadataExt,
+    dkg::DKGAggNode,
     fee_statement::FeeStatement,
-    on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
+    on_chain_config::{
+        new_epoch_event_key, DKGState, FeatureFlag, OnChainConfig, TimedFeatureOverride,
+    },
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction,
         EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
         MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
         Transaction::{
-            GenesisTransaction, StateCheckpoint,
+            BlockMetadata as BlockMetadataTransaction,
+            BlockMetadataExt as BlockMetadataExtTransaction, GenesisTransaction, StateCheckpoint,
             UserTransaction,
         },
         TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
         WriteSetPayload,
     },
     validator_txn::ValidatorTransaction,
+    validator_verifier::ValidatorVerifier,
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use aptos_utils::{aptos_try, return_on_failure};
@@ -91,12 +97,6 @@ use std::{
         Arc,
     },
 };
-use aptos_types::block_metadata_ext::BlockMetadataExt;
-use aptos_types::dkg::{DKGAggNode, DKGPvssConfig};
-use aptos_types::transaction::Transaction::BlockMetadataExt as BlockMetadataExtTransaction;
-use aptos_types::transaction::Transaction::BlockMetadata as BlockMetadataTransaction;
-use aptos_types::validator_verifier::ValidatorVerifier;
-use move_core_types::vm_status::DiscardedVMStatus;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -1255,38 +1255,82 @@ impl AptosVM {
         resolver: &impl AptosMoveResolver,
         txn: ValidatorTransaction,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        debug!("[DKG] process_validator_transaction: validator transaction executed!");
+    ) -> (VMStatus, VMOutput) {
+        debug!("[DKG] process_validator_transaction: BEGIN");
         let session_id = SessionId::validator_txn(&txn);
-        match txn {
-            ValidatorTransaction::DummyTopic(_) => {
-                Ok((
-                    VMStatus::Executed,
-                    VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)),
-                ))
-            }
-            ValidatorTransaction::DKGAggregatedTranscript{ agg_node, pvss_config, validator_verifier } => {
-                // DKG todo: pvss_config and validator_verifier should be from the chain!
-                self.process_dkg_transcript(resolver, log_context, session_id, agg_node, pvss_config, validator_verifier)
-            }
-        }
+        let result = match txn {
+            ValidatorTransaction::DummyTopic(_) => Ok((
+                VMStatus::Executed,
+                VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)),
+            )),
+            ValidatorTransaction::DKGTranscriptForNextEpoch(agg_node) => {
+                self.process_dkg_transcript(resolver, log_context, session_id, agg_node)
+            },
+        };
+        debug!("[DKG] process_validator_transaction: END");
+        result.unwrap_or_else(discard_error_vm_status)
     }
 
-    fn process_dkg_transcript(&self, resolver: &impl AptosMoveResolver, log_context: &AdapterLogSchema, session_id: SessionId, agg_node: DKGAggNode, pvss_config: DKGPvssConfig, validator_verifier: ValidatorVerifier) -> Result<(VMStatus, VMOutput), VMStatus> {
-        // DKG todo: pvss_config and validator_verifier should be from the chain!
-        agg_node.verify(&pvss_config, &validator_verifier).map_err(|_| VMStatus::error(StatusCode::ABORTED, Some("DKG transcript verification failure".to_string())))?;
+    fn process_dkg_transcript(
+        &self,
+        resolver: &impl AptosMoveResolver,
+        log_context: &AdapterLogSchema,
+        session_id: SessionId,
+        agg_node: DKGAggNode,
+    ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        debug!("[DKG] process_dkg_transcript: BEGIN");
+        let dkg_state_bytes = resolver
+            .get_resource(&AccountAddress::ONE, &DKGState::struct_tag())
+            .map_err(|e| {
+                VMStatus::error(
+                    StatusCode::INVALID_SIGNATURE,
+                    Some(format!("could not fetch on-chain DKG state, caused by {e}")),
+                )
+            })?
+            .ok_or_else(|| {
+                VMStatus::error(
+                    StatusCode::INVALID_SIGNATURE,
+                    Some("no DKG state on chain".to_string()),
+                )
+            })?;
+        let dkg_state = bcs::from_bytes::<DKGState>(dkg_state_bytes.as_ref()).map_err(|_| {
+            VMStatus::error(
+                StatusCode::INVALID_SIGNATURE,
+                Some("Could not parse fetched bytes into ValidatorSet".to_string()),
+            )
+        })?;
+        let current_dkg_session = dkg_state.in_progress.as_ref().ok_or_else(|| {
+            VMStatus::error(
+                StatusCode::INVALID_SIGNATURE,
+                Some("no dkg in progress".to_string()),
+            )
+        })?;
+        if agg_node.metadata.epoch != current_dkg_session.dealer_epoch {
+            return Err(VMStatus::error(
+                StatusCode::INVALID_SIGNATURE,
+                Some("unexpected epoch".to_string()),
+            ));
+        }
+        let pvss_config = current_dkg_session.pvss_config();
+        let verifier = ValidatorVerifier::from(&current_dkg_session.dealer_validator_set);
+        agg_node.verify(&pvss_config, &verifier).map_err(|_| {
+            VMStatus::error(
+                StatusCode::INVALID_SIGNATURE,
+                Some("DKG transcript verification failure".to_string()),
+            )
+        })?;
 
-        debug!("[DKG] process_validator_transaction: agg_node verified. TODO: update on chain.");
+        debug!("[DKG] process_dkg_transcript: check passed, updating on-chain state.");
         let mut gas_meter = UnmeteredGasMeter;
-        let mut session = self
-            .vm_impl
-            .new_session(resolver, session_id);
+        let mut session = self.vm_impl.new_session(resolver, session_id);
         let args = vec![
             MoveValue::Signer(AccountAddress::ZERO),
-            MoveValue::Vector(bcs::to_bytes(agg_node.agg_trx()).unwrap()
-                .into_iter()
-                .map(MoveValue::U8)
-                .collect()
+            MoveValue::Vector(
+                bcs::to_bytes(agg_node.agg_trx())
+                    .unwrap()
+                    .into_iter()
+                    .map(MoveValue::U8)
+                    .collect(),
             ),
         ];
         session
@@ -1299,7 +1343,11 @@ impl AptosVM {
             )
             .map(|_return_vals| ())
             .or_else(|e| {
-                expect_only_successful_execution(e, FINISH_WITH_DKG_TRANSCRIPT.as_str(), log_context)
+                expect_only_successful_execution(
+                    e,
+                    FINISH_WITH_DKG_TRANSCRIPT.as_str(),
+                    log_context,
+                )
             })?;
 
         let output = get_transaction_output(
@@ -1312,10 +1360,7 @@ impl AptosVM {
                 .change_set_configs,
         )?;
 
-        Ok((
-            VMStatus::Executed,
-            output,
-        ))
+        Ok((VMStatus::Executed, output))
     }
 
     fn execute_user_transaction_impl(
@@ -1641,13 +1686,6 @@ impl AptosVM {
             .vm_impl
             .new_session(resolver, SessionId::block_meta(&block_metadata));
 
-        let reconfigure_with_dkg_enabled = self
-            .vm_impl
-            .get_features()
-            .is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG);
-
-        assert!(!reconfigure_with_dkg_enabled);
-
         let args = serialize_values(
             &block_metadata.get_prologue_move_args(account_config::reserved_vm_address()),
         );
@@ -1677,7 +1715,6 @@ impl AptosVM {
         Ok((VMStatus::Executed, output))
     }
 
-
     pub(crate) fn process_block_prologue_ext(
         &self,
         resolver: &impl AptosMoveResolver,
@@ -1701,14 +1738,8 @@ impl AptosVM {
             .vm_impl
             .new_session(resolver, SessionId::block_meta_ext(&block_metadata_ext));
 
-        let reconfigure_with_dkg_enabled = self
-            .vm_impl
-            .get_features()
-            .is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG);
-
-        assert!(reconfigure_with_dkg_enabled);
-
-        let args = serialize_values(&block_metadata_ext.get_prologue_ext_move_args(txn_data.sender));
+        let args =
+            serialize_values(&block_metadata_ext.get_prologue_ext_move_args(txn_data.sender));
         session
             .execute_function_bypass_visibility(
                 &BLOCK_MODULE,
@@ -1873,8 +1904,11 @@ impl AptosVM {
             },
             BlockMetadataExtTransaction(block_metadata_ext) => {
                 fail_point!("aptos_vm::execution::block_metadata_ext");
-                let (vm_status, output) =
-                    self.process_block_prologue_ext(resolver, block_metadata_ext.clone(), log_context)?;
+                let (vm_status, output) = self.process_block_prologue_ext(
+                    resolver,
+                    block_metadata_ext.clone(),
+                    log_context,
+                )?;
                 (vm_status, output, Some("block_prologue_ext".to_string()))
             },
             GenesisTransaction(write_set_payload) => {
@@ -1971,7 +2005,7 @@ impl AptosVM {
             Transaction::ValidatorTransaction(txn) => {
                 fail_point!("aptos_vm::execution::validator_transaction");
                 let (vm_status, output) =
-                    self.process_validator_transaction(resolver, txn.clone(), log_context)?;
+                    self.process_validator_transaction(resolver, txn.clone(), log_context);
                 (vm_status, output, Some("validator_transaction".to_string()))
             },
         })

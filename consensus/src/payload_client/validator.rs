@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
-use aptos_types::validator_txn::{
-    pool::{ValidatorTransactionFilter, ValidatorTransactionPoolClient},
-    ValidatorTransaction,
-};
+use aptos_types::validator_txn::ValidatorTransaction;
+use aptos_validator_transaction_pool as vtxn_pool;
 use std::{
     thread::sleep,
     time::{Duration, Instant},
@@ -18,13 +16,13 @@ impl DummyValidatorTxnClient {
     }
 }
 
-impl ValidatorTransactionPoolClient for DummyValidatorTxnClient {
+impl vtxn_pool::PullClient for DummyValidatorTxnClient {
     fn pull(
         &self,
         max_time: Duration,
         mut max_items: u64,
         mut max_bytes: u64,
-        _exclude: ValidatorTransactionFilter,
+        _exclude: vtxn_pool::ValidatorTransactionFilter,
     ) -> Vec<ValidatorTransaction> {
         let timer = Instant::now();
         let mut nxt_txn_idx = 0;

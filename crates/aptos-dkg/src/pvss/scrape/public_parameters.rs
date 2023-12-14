@@ -2,13 +2,13 @@
 
 //! This submodule implements the *public parameters* for the SCRAPE PVSS scheme.
 
+use crate::{
+    constants::{DST_PVSS_PUBLIC_PARAMS, G2_PROJ_NUM_BYTES, SEED_PVSS_PUBLIC_PARAMS},
+    pvss::{encryption_dlog, traits},
+};
 use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_crypto_derive::{DeserializeKey, SerializeKey};
 use blstrs::{G1Projective, G2Projective};
-
-use crate::constants::{DST_PVSS_PUBLIC_PARAMS, G2_PROJ_NUM_BYTES, SEED_PVSS_PUBLIC_PARAMS};
-use crate::pvss::encryption_dlog;
-use crate::pvss::traits;
 
 /// The size, in number of bytes, of a serialized `PublicParameters` struct.
 const NUM_BYTES: usize = encryption_dlog::g2::PUBLIC_PARAMS_NUM_BYTES + 2 * G2_PROJ_NUM_BYTES;

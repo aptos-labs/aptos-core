@@ -1,8 +1,10 @@
 // Copyright © Aptos Foundation
 
-use crate::algebra::evaluation_domain::BatchEvaluationDomain;
-use crate::algebra::fft::{fft, fft_assign};
-use crate::algebra::polynomials::{accumulator_poly, poly_differentiate, poly_eval, poly_mul_slow};
+use crate::algebra::{
+    evaluation_domain::BatchEvaluationDomain,
+    fft::{fft, fft_assign},
+    polynomials::{accumulator_poly, poly_differentiate, poly_eval, poly_mul_slow},
+};
 use blstrs::Scalar;
 use ff::{BatchInvert, Field};
 use more_asserts::{assert_gt, debug_assert_le};
@@ -307,18 +309,18 @@ fn compute_numerators(
 
 #[cfg(test)]
 mod test {
-    use crate::algebra::evaluation_domain::BatchEvaluationDomain;
-    use crate::algebra::fft::fft_assign;
-    use crate::algebra::lagrange::{
-        all_n_lagrange_coefficients, lagrange_coefficients, FFT_THRESH,
+    use crate::{
+        algebra::{
+            evaluation_domain::BatchEvaluationDomain,
+            fft::fft_assign,
+            lagrange::{all_n_lagrange_coefficients, lagrange_coefficients, FFT_THRESH},
+            polynomials::poly_eval,
+        },
+        utils::random::{random_scalar, random_scalars},
     };
-    use crate::algebra::polynomials::poly_eval;
-    use crate::utils::random::random_scalar;
-    use crate::utils::random::random_scalars;
     use blstrs::Scalar;
     use ff::Field;
-    use rand::seq::IteratorRandom;
-    use rand::thread_rng;
+    use rand::{seq::IteratorRandom, thread_rng};
     use std::ops::Mul;
 
     #[test]

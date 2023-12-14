@@ -1,10 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::pvss::dealt_pub_key::g1::DealtPubKey;
-use crate::pvss::dealt_secret_key::g2::DealtSecretKey;
-use crate::pvss::input_secret::InputSecret;
-use crate::pvss::scrape::public_parameters::PublicParameters;
-use crate::pvss::traits;
+use crate::pvss::{
+    dealt_pub_key::g1::DealtPubKey, dealt_secret_key::g2::DealtSecretKey,
+    input_secret::InputSecret, scrape::public_parameters::PublicParameters, traits,
+};
 use std::ops::Mul;
 
 //

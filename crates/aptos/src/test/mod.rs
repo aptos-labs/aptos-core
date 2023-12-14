@@ -463,7 +463,8 @@ impl CliTestFramework {
         operator_index: usize,
         pool_index: Option<usize>,
     ) -> CliTypedResult<TransactionSummary> {
-        self.leave_validator_set_with_gas_options(operator_index, pool_index, None).await
+        self.leave_validator_set_with_gas_options(operator_index, pool_index, None)
+            .await
     }
 
     pub async fn leave_validator_set_with_gas_options(
@@ -476,8 +477,8 @@ impl CliTestFramework {
             txn_options: self.transaction_options(operator_index, gas_options),
             operator_args: self.operator_args(pool_index),
         }
-            .execute()
-            .await
+        .execute()
+        .await
     }
 
     pub async fn update_validator_network_addresses(
@@ -791,7 +792,7 @@ impl CliTestFramework {
             &source_path.display().to_string(),
             hello_blockchain_contents.as_bytes(),
         )
-            .unwrap();
+        .unwrap();
 
         let hello_blockchain_test_contents = include_str!("../../../../aptos-move/move-examples/hello_blockchain/sources/hello_blockchain_test.move");
         let test_path = sources_dir.join("hello_blockchain_test.move");
@@ -800,7 +801,7 @@ impl CliTestFramework {
             &test_path.display().to_string(),
             hello_blockchain_test_contents.as_bytes(),
         )
-            .unwrap();
+        .unwrap();
     }
 
     pub fn add_file_in_package(&self, rel_path: &str, content: String) {
@@ -809,7 +810,8 @@ impl CliTestFramework {
             source_path.as_path(),
             &source_path.as_display().to_string(),
             content.as_bytes(),
-        ).unwrap();
+        )
+        .unwrap();
     }
 
     pub fn move_dir(&self) -> PathBuf {

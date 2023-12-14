@@ -4,7 +4,6 @@
 
 use crate::{
     block_storage::{BlockReader, BlockStore},
-    dkg::dkg_manager::DKGManagerWrapper,
     liveness::{
         proposal_generator::{
             ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
@@ -19,13 +18,13 @@ use crate::{
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::PayloadManager,
     persistent_liveness_storage::RecoveryData,
-    pipeline::buffer_manager::OrderedBlocks,
+    randomness::block_queue::OrderedBlocks,
     round_manager::RoundManager,
     test_utils::{
         consensus_runtime, timed_block_on, MockPayloadManager, MockStateComputer, MockStorage,
         TreeInserter,
     },
-    util::time_service::{ClockTimeService, TimeService}, randomness::block_queue::OrderedBlocks,
+    util::time_service::{ClockTimeService, TimeService},
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
@@ -295,7 +294,6 @@ impl NodeSetup {
             onchain_consensus_config.clone(),
             round_manager_tx,
             local_consensus_config.clone(),
-            Arc::new(DKGManagerWrapper::default()),
         );
         block_on(round_manager.init(last_vote_sent));
         Self {

@@ -1,12 +1,11 @@
 // Copyright © Aptos Foundation
 
-use std::collections::VecDeque;
-use better_any::{Tid, TidAble};
-use smallvec::{SmallVec, smallvec};
 use aptos_native_interface::{SafeNativeBuilder, SafeNativeContext, SafeNativeResult};
+use better_any::{Tid, TidAble};
 use move_vm_runtime::native_functions::NativeFunction;
-use move_vm_types::loaded_data::runtime_types::Type;
-use move_vm_types::values::Value;
+use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use smallvec::{smallvec, SmallVec};
+use std::collections::VecDeque;
 
 /// A txn-local counter that increments each time a random 32-byte blob is requested.
 #[derive(Tid, Default)]
@@ -49,9 +48,7 @@ pub fn make_all(
 ) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let mut natives = vec![];
 
-    natives.extend([
-        ("get_and_add_txn_local_state", get_and_add_txn_local_state),
-    ]);
+    natives.extend([("get_and_add_txn_local_state", get_and_add_txn_local_state)]);
 
     builder.make_named_natives(natives)
 }

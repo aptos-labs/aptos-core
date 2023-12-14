@@ -152,7 +152,13 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     timestamp: timestamp.into(),
                 })
             },
-            ValidatorTransaction(_txn) => todo!(),
+            ValidatorTransaction(_txn) => {
+                //dkg todo: this is a temp fix to pass realistic_env_max_load
+                Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
+                    info,
+                    timestamp: timestamp.into(),
+                })
+            },
         })
     }
 

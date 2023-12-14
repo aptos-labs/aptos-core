@@ -16,6 +16,7 @@ use aptos_crypto::{
 use aptos_types::{
     account_address::AccountAddress,
     block_metadata::BlockMetadata,
+    block_metadata_ext::BlockMetadataExt,
     contract_event::{ContractEvent, EventWithVersion},
     transaction::{
         authenticator::{
@@ -35,7 +36,6 @@ use std::{
     str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
 };
-use aptos_types::block_metadata_ext::BlockMetadataExt;
 
 static DUMMY_GUID: Lazy<EventGuid> = Lazy::new(|| EventGuid {
     creation_number: U64::from(0u64),

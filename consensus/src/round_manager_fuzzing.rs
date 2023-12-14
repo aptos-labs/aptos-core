@@ -4,7 +4,6 @@
 
 use crate::{
     block_storage::BlockStore,
-    dkg::dkg_manager::DKGManagerWrapper,
     liveness::{
         proposal_generator::{
             ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
@@ -184,7 +183,6 @@ fn create_node_for_fuzzing() -> RoundManager {
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
         false,
-        Arc::new(DKGManagerWrapper::default()),
     );
 
     //
@@ -211,7 +209,6 @@ fn create_node_for_fuzzing() -> RoundManager {
         OnChainConsensusConfig::default(),
         round_manager_tx,
         ConsensusConfig::default(),
-        Arc::new(DKGManagerWrapper::default()),
     )
 }
 

@@ -1,17 +1,19 @@
 // Copyright © Aptos Foundation
 
-use aptos_consensus::dkg::build_dkg_pvss_config;
 use aptos_crypto::Uniform;
 use aptos_dkg::pvss::{
+    self,
     das::PublicParameters,
+    dealt_secret_key::g1::DealtSecretKey,
     encryption_dlog::g1::DecryptPrivKey,
+    input_secret::InputSecret,
     traits::{Convert, Reconstructable, Transcript},
-    Player, WeightedConfig, self,
+    Player, WeightedConfig,
 };
 use aptos_forge::LocalSwarm;
 use aptos_rest_client::Client;
 use aptos_types::{
-    dkg::{DKGTranscriptWrapper, WTrx},
+    dkg::{build_dkg_pvss_config, DKGTranscriptWrapper, WTrx},
     on_chain_config::{DKGSessionState, DKGState, ValidatorSet},
     validator_verifier::ValidatorVerifier,
 };
@@ -20,8 +22,6 @@ use num_traits::Zero;
 use rand::{prelude::StdRng, SeedableRng};
 use std::{collections::HashMap, time::Duration};
 use tokio::time::Instant;
-use aptos_dkg::pvss::dealt_secret_key::g1::DealtSecretKey;
-use aptos_dkg::pvss::input_secret::InputSecret;
 
 type WT = pvss::das::WeightedTranscript;
 
@@ -81,9 +81,8 @@ fn verify_dkg_transcript(
     let verifier = ValidatorVerifier::from(&dkg_session.dealer_validator_set);
     let pvss_config =
         build_dkg_pvss_config(dkg_session.dealer_epoch, &dkg_session.target_validator_set);
-    let trxs: DKGTranscriptWrapper =
-        bcs::from_bytes(dkg_session.result.as_slice()).unwrap();
-    if !trxs.verify(&pvss_config, &verifier).is_ok() {
+    let trxs: DKGTranscriptWrapper = bcs::from_bytes(dkg_session.result.as_slice()).unwrap();
+    if trxs.verify(&pvss_config, &verifier).is_err() {
         return false;
     }
 
@@ -175,6 +174,6 @@ fn decrypt_key_map(swarm: &LocalSwarm) -> HashMap<AccountAddress, DecryptPrivKey
 }
 
 mod dkg_basic;
+mod dkg_feature_flag_flips;
 mod dkg_with_validator_down;
 mod dkg_with_validator_join_leave;
-mod dkg_feature_flag_flips;

@@ -2,11 +2,7 @@
 
 /// Implements public parameters $h \in G$ for a simple DLOG-based encryption scheme.
 macro_rules! encryption_dlog_pp_impl {
-    (
-        $GT_PROJ_NUM_BYTES:ident,
-        $gt_proj_from_bytes:ident,
-        $GTProjective:ident
-    ) => {
+    ($GT_PROJ_NUM_BYTES:ident, $gt_proj_from_bytes:ident, $GTProjective:ident) => {
         pub const PUBLIC_PARAMS_NUM_BYTES: usize = $GT_PROJ_NUM_BYTES;
 
         /// The public parameters used in the encryption scheme.

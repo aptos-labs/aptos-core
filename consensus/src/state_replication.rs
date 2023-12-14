@@ -3,8 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    dkg::dkg_manager::DKGManagerWrapper,
-    error::{QuorumStoreError, StateSyncError},
+    error::StateSyncError,
     payload_manager::PayloadManager,
     state_computer::{PipelineExecutionResult, StateComputeResultFut},
     transaction_deduper::TransactionDeduper,
@@ -16,7 +15,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures, randomness::Randomness
+    ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
 };
 use std::sync::Arc;
 
@@ -39,7 +38,9 @@ pub trait StateComputer: Send + Sync {
         parent_block_id: HashValue,
         randomness: Option<Randomness>,
     ) -> ExecutorResult<PipelineExecutionResult> {
-        self.schedule_compute(block, parent_block_id, randomness).await.await
+        self.schedule_compute(block, parent_block_id, randomness)
+            .await
+            .await
     }
 
     async fn schedule_compute(
@@ -72,7 +73,6 @@ pub trait StateComputer: Send + Sync {
         &self,
         epoch_state: &EpochState,
         payload_manager: Arc<PayloadManager>,
-        dkg_manager: Arc<DKGManagerWrapper>,
         transaction_shuffler: Arc<dyn TransactionShuffler>,
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,

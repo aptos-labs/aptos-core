@@ -1,12 +1,12 @@
 // Copyright © Aptos Foundation
 
-use crate::pvss::traits::transcript::Transcript;
-use crate::pvss::traits::{Convert, HasEncryptionPublicParams, SecretSharingConfig};
-use crate::pvss::{ThresholdConfig, WeightedConfig};
+use crate::pvss::{
+    traits::{transcript::Transcript, Convert, HasEncryptionPublicParams, SecretSharingConfig},
+    ThresholdConfig, WeightedConfig,
+};
 use aptos_crypto::{SigningKey, Uniform};
 use num_traits::Zero;
-use rand::prelude::ThreadRng;
-use rand::thread_rng;
+use rand::{prelude::ThreadRng, thread_rng};
 use serde::Serialize;
 use std::ops::AddAssign;
 

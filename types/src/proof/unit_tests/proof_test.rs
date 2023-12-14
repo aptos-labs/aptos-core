@@ -403,8 +403,6 @@ fn test_transaction_list_with_proof() {
         vec![0],
         vec![],
         0,
-        vec![],
-        None,
     ))];
 
     // Create transaction list with proof
@@ -480,8 +478,6 @@ fn test_transaction_and_output_list_with_proof() {
         vec![0],
         vec![],
         0,
-        vec![],
-        None,
     ));
     let txn_hash = transaction.hash();
     let event = create_event();

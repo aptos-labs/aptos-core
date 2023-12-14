@@ -289,13 +289,15 @@ impl TryFrom<&ContractEvent> for StartDKGEvent {
 
     fn try_from(event: &ContractEvent) -> Result<Self> {
         match event {
-            ContractEvent::V1(event) => {
+            ContractEvent::V1(_) => {
+                bail!("should be StartDKGEvent");
+            },
+            ContractEvent::V2(event) => {
                 if event.type_tag != TypeTag::Struct(Box::new(Self::struct_tag())) {
                     bail!("Expected StartDKGEvent")
                 }
                 Self::try_from_bytes(&event.event_data)
             },
-            ContractEvent::V2(_) => bail!("This is a module event"),
         }
     }
 }

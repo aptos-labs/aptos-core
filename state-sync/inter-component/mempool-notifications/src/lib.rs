@@ -378,8 +378,6 @@ mod tests {
             vec![0],
             vec![],
             1,
-            vec![],
-            None,
         ))
     }
 

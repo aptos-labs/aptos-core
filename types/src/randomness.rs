@@ -2,11 +2,14 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{block_info::Round, validator_verifier::ValidatorVerifier};
 use aptos_crypto::HashValue;
-use aptos_dkg::{weighted_vuf::{self, traits::WeightedVUF}, pvss::{WeightedConfig, Player}};
+use aptos_dkg::{
+    pvss::{Player, WeightedConfig},
+    weighted_vuf::{self, traits::WeightedVUF},
+};
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
-use crate::{block_info::Round, validator_verifier::ValidatorVerifier};
 
 pub type WVUF = weighted_vuf::pinkas::PinkasWUF;
 // pub type WVUF = weighted_vuf::gjm21_insecure::g1::GjmInsecureWVUF;
@@ -36,12 +39,17 @@ pub struct RandMetadata {
 
 impl RandMetadata {
     pub fn new(epoch: u64, round: Round, block_id: HashValue, timestamp: u64) -> Self {
-        Self { metadata_to_sign: RandMetadataToSign { epoch, round}, block_id, timestamp }
+        Self {
+            metadata_to_sign: RandMetadataToSign { epoch, round },
+            block_id,
+            timestamp,
+        }
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
         // only sign (epoch, round) to produce randomness
-        bcs::to_bytes(&self.metadata_to_sign).expect("[RandMessage] RandMetadata serialization failed!")
+        bcs::to_bytes(&self.metadata_to_sign)
+            .expect("[RandMessage] RandMetadata serialization failed!")
     }
 
     pub fn round(&self) -> Round {
@@ -61,14 +69,10 @@ pub struct Randomness {
 
 impl Randomness {
     pub fn new(metadata: RandMetadata, randomness: Vec<u8>) -> Self {
-        Self { metadata, randomness }
-    }
-
-    // Only used for the execution interface of ordering_state_computer which does not actually execute
-    pub fn default() -> Self {
-        let metadata = RandMetadata::new(0, 0, HashValue::zero(), 0);
-        let randomness = vec![];
-        Self { metadata, randomness }
+        Self {
+            metadata,
+            randomness,
+        }
     }
 
     pub fn metadata(&self) -> &RandMetadata {
@@ -97,7 +101,11 @@ pub struct RandDecision {
 
 impl RandDecision {
     pub fn new(randomness: Randomness, eval: Evaluation, proof: Proof) -> Self {
-        Self { randomness, eval, proof }
+        Self {
+            randomness,
+            eval,
+            proof,
+        }
     }
 
     pub fn randomness(&self) -> &Randomness {
@@ -136,7 +144,13 @@ impl RandDecision {
         // If the caller locally does not have all the certified apks corresponding to self.proof, the verification should fail.
         // Then RandShare multicast may be retried periodically and the caller will receive RandDecision.
         // Eventually the caller will receive certified apks to verify the proof in RandDecision.
-        <WVUF as WeightedVUF>::verify_proof(&rand_config.vuf_pp, &rand_config.pk, rand_config.get_all_certified_apk(), self.randomness.metadata.to_bytes().as_slice(), &self.proof)
+        <WVUF as WeightedVUF>::verify_proof(
+            &rand_config.vuf_pp,
+            &rand_config.pk,
+            rand_config.get_all_certified_apk(),
+            self.randomness.metadata.to_bytes().as_slice(),
+            &self.proof,
+        )
     }
 }
 
@@ -161,7 +175,13 @@ impl RandKeys {
         let signed_deltas = vec![None; num_validators];
         let certified_apks = vec![None; num_validators];
 
-        Self { ask, apk, signed_deltas, certified_apks, pk_shares }
+        Self {
+            ask,
+            apk,
+            signed_deltas,
+            certified_apks,
+            pk_shares,
+        }
     }
 
     pub fn add_signed_delta(&mut self, index: usize, delta: Delta) -> anyhow::Result<()> {
@@ -199,12 +219,30 @@ pub struct RandConfig {
 }
 
 impl RandConfig {
-    pub fn new(author: AccountAddress, validator: ValidatorVerifier, vuf_pp: WvufPP, pk: PK, keys: RandKeys, wconfig: WeightedConfig) -> Self {
-        Self { author, validator, vuf_pp, pk, keys, wconfig}
+    pub fn new(
+        author: AccountAddress,
+        validator: ValidatorVerifier,
+        vuf_pp: WvufPP,
+        pk: PK,
+        keys: RandKeys,
+        wconfig: WeightedConfig,
+    ) -> Self {
+        Self {
+            author,
+            validator,
+            vuf_pp,
+            pk,
+            keys,
+            wconfig,
+        }
     }
 
     pub fn get_id(&self, peer: &AccountAddress) -> usize {
-        self.validator.address_to_validator_index().get(peer).unwrap().clone()
+        *self
+            .validator
+            .address_to_validator_index()
+            .get(peer)
+            .unwrap()
     }
 
     pub fn get_signed_delta(&self, peer: &AccountAddress) -> Option<&Delta> {
@@ -231,8 +269,16 @@ impl RandConfig {
         self.keys.add_certified_apk(index, apk)
     }
 
-    pub fn add_certified_delta(&mut self, peer: &AccountAddress, delta: Delta) -> anyhow::Result<()> {
-        let apk = <WVUF as WeightedVUF>::augment_pubkey(&self.vuf_pp, self.get_pk_share(peer).clone(), delta)?;
+    pub fn add_certified_delta(
+        &mut self,
+        peer: &AccountAddress,
+        delta: Delta,
+    ) -> anyhow::Result<()> {
+        let apk = <WVUF as WeightedVUF>::augment_pubkey(
+            &self.vuf_pp,
+            self.get_pk_share(peer).clone(),
+            delta,
+        )?;
         self.add_certified_apk(peer, apk)?;
         Ok(())
     }
@@ -247,7 +293,9 @@ impl RandConfig {
     }
 
     pub fn get_peer_weight(&self, peer: &AccountAddress) -> usize {
-        let player = Player{ id: self.get_id(peer) };
+        let player = Player {
+            id: self.get_id(peer),
+        };
         self.wconfig.get_player_weight(&player)
     }
 

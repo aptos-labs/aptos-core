@@ -10,7 +10,8 @@ use aptos_data_streaming_service::{
     streaming_service::DataStreamingService,
 };
 use aptos_event_notifications::{
-    DbBackedOnChainConfig, EventSubscriptionService, ReconfigNotificationListener, EventNotificationListener,
+    DbBackedOnChainConfig, EventNotificationListener, EventSubscriptionService,
+    ReconfigNotificationListener,
 };
 use aptos_executor::chunk_executor::ChunkExecutor;
 use aptos_infallible::RwLock;
@@ -31,7 +32,7 @@ use aptos_storage_service_server::{
 };
 use aptos_storage_service_types::StorageServiceMessage;
 use aptos_time_service::TimeService;
-use aptos_types::{waypoint::Waypoint, on_chain_config};
+use aptos_types::waypoint::Waypoint;
 use aptos_vm::AptosVM;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
@@ -44,6 +45,7 @@ pub fn create_event_subscription_service(
 ) -> (
     EventSubscriptionService,
     ReconfigNotificationListener<DbBackedOnChainConfig>,
+    Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
     Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
     Option<EventNotificationListener>,
 ) {
@@ -67,12 +69,21 @@ pub fn create_event_subscription_service(
         None
     };
 
-    let consensus_dkg_subscription =
-    if node_config.base.role.is_validator() {
+    let dkg_reconfig_subscription = if node_config.base.role.is_validator() {
         Some(
             event_subscription_service
-                .subscribe_to_events(vec![on_chain_config::start_dkg_event_key()], vec![])
-                .expect("Consensus must subscribe to DKG events")
+                .subscribe_to_reconfigurations()
+                .expect("DKG must subscribe to reconfigurations"),
+        )
+    } else {
+        None
+    };
+
+    let dkg_start_subscription = if node_config.base.role.is_validator() {
+        Some(
+            event_subscription_service
+                .subscribe_to_events(vec![], vec!["0x1::dkg::StartDKGEvent".to_string()])
+                .expect("Consensus must subscribe to DKG events"),
         )
     } else {
         None
@@ -82,7 +93,8 @@ pub fn create_event_subscription_service(
         event_subscription_service,
         mempool_reconfig_subscription,
         consensus_reconfig_subscription,
-        consensus_dkg_subscription,
+        dkg_reconfig_subscription,
+        dkg_start_subscription,
     )
 }
 

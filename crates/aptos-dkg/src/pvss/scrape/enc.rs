@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::pvss::encryption_dlog::g2::{DecryptPrivKey, EncryptPubKey, PublicParameters};
-use crate::pvss::traits;
+use crate::pvss::{
+    encryption_dlog::g2::{DecryptPrivKey, EncryptPubKey, PublicParameters},
+    traits,
+};
 use ff::Field;
 use std::ops::Mul;
 

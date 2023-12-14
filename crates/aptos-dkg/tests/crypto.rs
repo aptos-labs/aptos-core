@@ -1,10 +1,11 @@
 // Copyright © Aptos Foundation
 
-use aptos_dkg::algebra::polynomials::{
-    poly_eval, poly_mul_fft, poly_mul_less_slow, poly_mul_slow, poly_xnmul,
+use aptos_dkg::{
+    algebra::polynomials::{
+        poly_eval, poly_mul_fft, poly_mul_less_slow, poly_mul_slow, poly_xnmul,
+    },
+    utils::random::{random_g2_point, random_scalar, random_scalars},
 };
-use aptos_dkg::utils::random::random_scalars;
-use aptos_dkg::utils::random::{random_g2_point, random_scalar};
 use blstrs::{G1Projective, G2Projective, Scalar};
 use ff::Field;
 use group::Group;

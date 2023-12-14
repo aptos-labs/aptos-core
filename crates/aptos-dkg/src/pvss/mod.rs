@@ -19,5 +19,4 @@ pub mod weighted;
 
 pub use player::Player;
 pub use threshold_config::ThresholdConfig;
-pub use weighted::WeightedConfig;
-pub use weighted::WeightedTranscript;
+pub use weighted::{WeightedConfig, WeightedTranscript};

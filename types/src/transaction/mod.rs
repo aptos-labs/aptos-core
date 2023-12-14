@@ -50,9 +50,9 @@ mod script;
 pub mod signature_verified_transaction;
 
 use crate::{
-    contract_event::TransactionEvent, executable::ModulePath, fee_statement::FeeStatement,
-    proof::accumulator::InMemoryEventAccumulator, validator_txn::ValidatorTransaction,
-    write_set::TransactionWrite,
+    block_metadata_ext::BlockMetadataExt, contract_event::TransactionEvent, executable::ModulePath,
+    fee_statement::FeeStatement, proof::accumulator::InMemoryEventAccumulator,
+    validator_txn::ValidatorTransaction, write_set::TransactionWrite,
 };
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
@@ -66,7 +66,6 @@ pub use script::{
 };
 use serde::de::DeserializeOwned;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
-use crate::block_metadata_ext::BlockMetadataExt;
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
@@ -1834,7 +1833,9 @@ impl Transaction {
             // TODO: display proper information for client
             Transaction::BlockMetadata(_block_metadata) => String::from("block_metadata"),
             // TODO: display proper information for client
-            Transaction::BlockMetadataExt(_block_metadata_ext) => String::from("block_metadata_ext"),
+            Transaction::BlockMetadataExt(_block_metadata_ext) => {
+                String::from("block_metadata_ext")
+            },
             // TODO: display proper information for client
             Transaction::StateCheckpoint(_) => String::from("state_checkpoint"),
             // TODO: display proper information for client

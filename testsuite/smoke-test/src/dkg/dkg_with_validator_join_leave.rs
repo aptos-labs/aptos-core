@@ -1,10 +1,9 @@
 // Copyright © Aptos Foundation
 
 use crate::{dkg, dkg::decrypt_key_map, smoke_test_environment::SwarmBuilder};
-use aptos::test::CliTestFramework;
+use aptos::{common::types::GasOptions, test::CliTestFramework};
 use aptos_forge::{Node, Swarm};
 use std::sync::Arc;
-use aptos::common::types::GasOptions;
 
 #[tokio::test]
 async fn dkg_with_validator_join_leave() {
@@ -13,6 +12,7 @@ async fn dkg_with_validator_join_leave() {
     let time_limit_secs = epoch_duration_secs + estimated_dkg_latency_secs;
 
     let mut swarm = SwarmBuilder::new_local(7)
+        .with_num_fullnodes(1)
         .with_aptos()
         .with_init_genesis_config(Arc::new(move |conf| {
             conf.epoch_duration_secs = epoch_duration_secs;
@@ -24,12 +24,7 @@ async fn dkg_with_validator_join_leave() {
     let decrypt_key_map = decrypt_key_map(&swarm);
 
     println!("Wait for a moment when DKG is not running.");
-    let client_endpoint = swarm
-        .validators()
-        .skip(1)
-        .next()
-        .unwrap()
-        .rest_api_endpoint();
+    let client_endpoint = swarm.validators().nth(1).unwrap().rest_api_endpoint();
     let client = aptos_rest_client::Client::new(client_endpoint.clone());
     let dkg_session_1 = dkg::wait_for_dkg_finish(&client, None, time_limit_secs).await;
     println!(
@@ -84,7 +79,10 @@ async fn dkg_with_validator_join_leave() {
     .await;
     let idx = cli.add_account_to_cli(victim_validator_sk);
     let gas_options = Some(GasOptions::default().with_gas_unit_price(Some(1)));
-    let txn_result = cli.leave_validator_set_with_gas_options(idx, None, gas_options).await.unwrap();
+    let txn_result = cli
+        .leave_validator_set_with_gas_options(idx, None, gas_options)
+        .await
+        .unwrap();
     println!("Txn result: {:?}", txn_result);
 
     println!(

@@ -19,9 +19,8 @@ use aptos_types::{
     validator_txn::ValidatorTransaction,
 };
 use once_cell::sync::OnceCell;
-use std::fmt::{Debug, Display, Formatter};
-use crate::block::RandomnessData;
 use std::{
+    fmt::{Debug, Display, Formatter},
     time::{Duration, Instant},
 };
 
@@ -202,11 +201,11 @@ impl ExecutedBlock {
             txns_with_state_checkpoint,
             self.state_compute_result.compute_status(),
         )
-            .filter_map(|(txn, status)| match status {
-                TransactionStatus::Keep(_) => Some(txn),
-                _ => None,
-            })
-            .collect()
+        .filter_map(|(txn, status)| match status {
+            TransactionStatus::Keep(_) => Some(txn),
+            _ => None,
+        })
+        .collect()
     }
 
     pub fn reconfig_event(&self) -> Vec<ContractEvent> {
@@ -217,8 +216,8 @@ impl ExecutedBlock {
         self.state_compute_result.reconfig_events().to_vec()
     }
 
-    pub fn dkg_event(&self) -> Vec<ContractEvent> {
-        self.state_compute_result.dkg_events().to_vec()
+    pub fn start_dkg_events(&self) -> Vec<ContractEvent> {
+        self.state_compute_result.start_dkg_events().to_vec()
     }
 
     /// The block is suffix of a reconfiguration block if the state result carries over the epoch state

@@ -1,12 +1,9 @@
 // Copyright © Aptos Foundation
 
-use serde::{Deserialize, Serialize};
+use crate::{block_metadata::BlockMetadata, randomness::Randomness};
 use aptos_crypto::HashValue;
-use move_core_types::account_address::AccountAddress;
-use move_core_types::value::MoveValue;
-use crate::block_metadata::BlockMetadata;
-use crate::dkg::DKGTranscriptWrapper;
-use crate::randomness::Randomness;
+use move_core_types::{account_address::AccountAddress, value::MoveValue};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BlockMetadataExt {
@@ -51,7 +48,7 @@ impl BlockMetadataExt {
 
     pub fn id(&self) -> HashValue {
         match self {
-            BlockMetadataExt::V2(obj) => obj.id
+            BlockMetadataExt::V2(obj) => obj.id,
         }
     }
 
@@ -71,7 +68,7 @@ impl BlockMetadataExt {
             MoveValue::Vector(
                 self.previous_block_votes_bitvec()
                     .iter()
-                    .map(|x|MoveValue::U8(*x))
+                    .map(|x| MoveValue::U8(*x))
                     .collect(),
             ),
             MoveValue::U64(self.timestamp_usecs()),
@@ -81,55 +78,60 @@ impl BlockMetadataExt {
             None => {
                 ret.push(MoveValue::Bool(false));
                 ret.push(MoveValue::Vector(vec![]));
-            }
+            },
             Some(randomness) => {
-                let move_bytes = randomness.randomness().to_vec().into_iter().map(MoveValue::U8).collect();
+                let move_bytes = randomness
+                    .randomness()
+                    .iter()
+                    .copied()
+                    .map(MoveValue::U8)
+                    .collect();
                 ret.push(MoveValue::Bool(true));
                 ret.push(MoveValue::Vector(move_bytes));
-            }
+            },
         }
         ret
     }
 
     pub fn timestamp_usecs(&self) -> u64 {
         match self {
-            BlockMetadataExt::V2(obj) => obj.timestamp_usecs
+            BlockMetadataExt::V2(obj) => obj.timestamp_usecs,
         }
     }
 
     pub fn proposer(&self) -> AccountAddress {
         match self {
-            BlockMetadataExt::V2(obj) => obj.proposer
+            BlockMetadataExt::V2(obj) => obj.proposer,
         }
     }
 
     pub fn previous_block_votes_bitvec(&self) -> &Vec<u8> {
         match self {
-            BlockMetadataExt::V2(obj) => &obj.previous_block_votes_bitvec
+            BlockMetadataExt::V2(obj) => &obj.previous_block_votes_bitvec,
         }
     }
 
     pub fn failed_proposer_indices(&self) -> &Vec<u32> {
         match self {
-            BlockMetadataExt::V2(obj) => &obj.failed_proposer_indices
+            BlockMetadataExt::V2(obj) => &obj.failed_proposer_indices,
         }
     }
 
     pub fn epoch(&self) -> u64 {
         match self {
-            BlockMetadataExt::V2(obj) => obj.epoch
+            BlockMetadataExt::V2(obj) => obj.epoch,
         }
     }
 
     pub fn round(&self) -> u64 {
         match self {
-            BlockMetadataExt::V2(obj) => obj.round
+            BlockMetadataExt::V2(obj) => obj.round,
         }
     }
 
     pub fn randomness(&self) -> &Option<Randomness> {
         match self {
-            BlockMetadataExt::V2(obj) => &obj.randomness
+            BlockMetadataExt::V2(obj) => &obj.randomness,
         }
     }
 }

@@ -1,19 +1,25 @@
 // Copyright © Aptos Foundation
 
+#![allow(clippy::needless_borrow)]
+#![allow(clippy::ptr_arg)]
+#![allow(clippy::let_and_return)]
+
 //! PVSS scheme-independent testing
 use aptos_crypto::hash::CryptoHash;
-use aptos_dkg::constants::{
-    BEST_CASE_N, BEST_CASE_THRESHOLD, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, WORST_CASE_N,
-    WORST_CASE_THRESHOLD,
+use aptos_dkg::{
+    constants::{
+        BEST_CASE_N, BEST_CASE_THRESHOLD, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, WORST_CASE_N,
+        WORST_CASE_THRESHOLD,
+    },
+    pvss::{
+        das, scrape, test_utils,
+        test_utils::NoAux,
+        traits::{transcript::Transcript, Reconstructable, SecretSharingConfig},
+        Player, ThresholdConfig, WeightedConfig, WeightedTranscript,
+    },
+    utils::random::random_scalar,
 };
-use aptos_dkg::pvss::test_utils::NoAux;
-use aptos_dkg::pvss::traits::transcript::Transcript;
-use aptos_dkg::pvss::traits::{Reconstructable, SecretSharingConfig};
-use aptos_dkg::pvss::{das, scrape, test_utils, WeightedConfig, WeightedTranscript};
-use aptos_dkg::pvss::{Player, ThresholdConfig};
-use aptos_dkg::utils::random::random_scalar;
-use rand::rngs::StdRng;
-use rand::thread_rng;
+use rand::{rngs::StdRng, thread_rng};
 use rand_core::SeedableRng;
 
 #[test]
