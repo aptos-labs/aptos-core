@@ -1099,11 +1099,19 @@ fn get_params_from_decls(decls: &LValueList) -> Vec<Symbol> {
         .value
         .iter()
         .flat_map(|lv| match &lv.value {
-            LValue_::Var(v, _) => vec![v.0.value],
-            LValue_::Ignore => vec![],
+            LValue_::Var(v, _) => vec![Some(v.0.value)],
+            LValue_::Ignore => vec![None], // placeholderfor "_"
             LValue_::Unpack(_, _, _, fields) | LValue_::BorrowUnpack(_, _, _, _, fields) => {
-                fields.iter().map(|(_, x, _)| *x).collect()
+                fields.iter().map(|(_, x, _)| Some(*x)).collect()
             },
+        })
+        .enumerate()
+        .map(|(idx, opt_sym)| {
+            if let Some(sym) = opt_sym {
+                sym
+            } else {
+                Symbol::from(format!("_${}", idx))
+            }
         })
         .collect()
 }
