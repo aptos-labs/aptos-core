@@ -47,7 +47,6 @@ pub struct Worker {
     fullnode_grpc_address: Url,
     /// File store config
     file_store: IndexerGrpcFileStoreConfig,
-    enable_verbose_logging: bool,
 }
 
 /// GRPC data status enum is to identify the data frame.
@@ -76,7 +75,6 @@ impl Worker {
         fullnode_grpc_address: Url,
         redis_main_instance_address: RedisUrl,
         file_store: IndexerGrpcFileStoreConfig,
-        enable_verbose_logging: bool,
     ) -> Result<Self> {
         let redis_client = redis::Client::open(redis_main_instance_address.0.clone())
             .with_context(|| {
@@ -89,7 +87,6 @@ impl Worker {
             redis_client,
             file_store,
             fullnode_grpc_address,
-            enable_verbose_logging,
         })
     }
 
@@ -166,13 +163,7 @@ impl Worker {
                 })?;
 
             // 3&4. Infinite streaming until error happens. Either stream ends or worker crashes.
-            process_streaming_response(
-                conn,
-                file_store_metadata,
-                response.into_inner(),
-                self.enable_verbose_logging,
-            )
-            .await?;
+            process_streaming_response(conn, file_store_metadata, response.into_inner()).await?;
         }
     }
 }
@@ -180,7 +171,6 @@ impl Worker {
 async fn process_transactions_from_node_response(
     response: TransactionsFromNodeResponse,
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
-    _enable_verbose_logging: bool,
 ) -> Result<GrpcDataStatus> {
     let size_in_bytes = response.encoded_len();
     match response.response.unwrap() {
@@ -309,7 +299,6 @@ async fn process_streaming_response(
     file_store_metadata: Option<FileStoreMetadata>,
     mut resp_stream: impl futures_core::Stream<Item = Result<TransactionsFromNodeResponse, tonic::Status>>
         + std::marker::Unpin,
-    enable_verbose_logging: bool,
 ) -> Result<()> {
     let mut tps_calculator = MovingAverage::new(10_000);
     let mut transaction_count = 0;
@@ -356,13 +345,7 @@ async fn process_streaming_response(
 
         let size_in_bytes = received.encoded_len();
 
-        match process_transactions_from_node_response(
-            received,
-            &mut cache_operator,
-            enable_verbose_logging,
-        )
-        .await
-        {
+        match process_transactions_from_node_response(received, &mut cache_operator).await {
             Ok(status) => match status {
                 GrpcDataStatus::ChunkDataOk {
                     start_version,
