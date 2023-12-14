@@ -71,7 +71,7 @@ impl InMemoryStateCalculatorV2 {
     pub fn calculate_for_transactions(
         base: &StateDelta,
         state_cache: StateCache,
-        to_keep: &TransactionsWithParsedOutput,
+        to_commit: &TransactionsWithParsedOutput,
         new_epoch: bool,
         is_block: bool,
     ) -> Result<(
@@ -83,17 +83,17 @@ impl InMemoryStateCalculatorV2 {
         ShardedStateCache,
     )> {
         if is_block {
-            Self::validate_input_for_block(base, to_keep)?;
+            Self::validate_input_for_block(base, to_commit)?;
         }
 
         let state_updates_vec =
-            Self::get_sharded_state_updates(to_keep.parsed_outputs(), |txn_output| {
+            Self::get_sharded_state_updates(to_commit.parsed_outputs(), |txn_output| {
                 txn_output.write_set()
             });
 
         // If there are multiple checkpoints in the chunk, we only calculate the SMT (and its root
         // hash) for the last one.
-        let last_checkpoint_index = to_keep.get_last_checkpoint_index();
+        let last_checkpoint_index = to_commit.get_last_checkpoint_index();
 
         Self::calculate_impl(
             base,
@@ -436,9 +436,9 @@ impl InMemoryStateCalculatorV2 {
 
     fn validate_input_for_block(
         base: &StateDelta,
-        to_keep: &TransactionsWithParsedOutput,
+        to_commit: &TransactionsWithParsedOutput,
     ) -> Result<()> {
-        let num_txns = to_keep.len();
+        let num_txns = to_commit.len();
         ensure!(num_txns != 0, "Empty block is not allowed.");
         ensure!(
             base.base_version == base.current_version,
@@ -451,7 +451,7 @@ impl InMemoryStateCalculatorV2 {
             "Base state is corrupted, updates_since_base is not empty at a checkpoint."
         );
 
-        for (i, (txn, txn_output)) in to_keep.iter().enumerate() {
+        for (i, (txn, txn_output)) in to_commit.iter().enumerate() {
             ensure!(
                 TransactionsWithParsedOutput::need_checkpoint(txn, txn_output) ^ (i != num_txns - 1),
                 "Checkpoint is allowed iff it's the last txn in the block. index: {i}, num_txns: {num_txns}, is_last: {}, txn: {txn:?}, is_reconfig: {}",

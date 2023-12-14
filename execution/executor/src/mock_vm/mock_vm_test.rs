@@ -7,7 +7,6 @@ use anyhow::Result;
 use aptos_state_view::TStateView;
 use aptos_types::{
     account_address::AccountAddress,
-    block_executor::config::BlockExecutorConfigFromOnchain,
     bytes::NumToBytes,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
@@ -44,10 +43,9 @@ fn test_mock_vm_different_senders() {
         txns.push(encode_mint_transaction(gen_address(i), amount));
     }
 
-    let outputs = MockVM::execute_block(
+    let outputs = MockVM::execute_block_no_limit(
         &into_signature_verified_block(txns.clone()),
         &MockStateView,
-        BlockExecutorConfigFromOnchain::new_no_block_limit(),
     )
     .expect("MockVM should not fail to start");
 
@@ -84,12 +82,9 @@ fn test_mock_vm_same_sender() {
         txns.push(encode_mint_transaction(sender, amount));
     }
 
-    let outputs = MockVM::execute_block(
-        &into_signature_verified_block(txns),
-        &MockStateView,
-        BlockExecutorConfigFromOnchain::new_no_block_limit(),
-    )
-    .expect("MockVM should not fail to start");
+    let outputs =
+        MockVM::execute_block_no_limit(&into_signature_verified_block(txns), &MockStateView)
+            .expect("MockVM should not fail to start");
 
     for (i, output) in outputs.iter().enumerate() {
         assert_eq!(
@@ -122,12 +117,9 @@ fn test_mock_vm_payment() {
         encode_transfer_transaction(gen_address(0), gen_address(1), 50),
     ];
 
-    let output = MockVM::execute_block(
-        &into_signature_verified_block(txns),
-        &MockStateView,
-        BlockExecutorConfigFromOnchain::new_no_block_limit(),
-    )
-    .expect("MockVM should not fail to start");
+    let output =
+        MockVM::execute_block_no_limit(&into_signature_verified_block(txns), &MockStateView)
+            .expect("MockVM should not fail to start");
 
     let mut output_iter = output.iter();
     output_iter.next();

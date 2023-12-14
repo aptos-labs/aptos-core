@@ -28,9 +28,10 @@ use aptos_types::{
     },
     state_store::state_key::StateKey,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, ChangeSet, ExecutionStatus,
-        RawTransaction, Script, SignedTransaction, Transaction, TransactionArgument,
-        TransactionOutput, TransactionPayload, TransactionStatus, WriteSetPayload,
+        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, ChangeSet,
+        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
+        TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
+        WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -80,7 +81,7 @@ impl VMExecutor for MockVM {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         // output_cache is used to store the output of transactions so they are visible to later
         // transactions.
         let mut output_cache = HashMap::new();
@@ -187,7 +188,7 @@ impl VMExecutor for MockVM {
             }
         }
 
-        Ok(outputs)
+        Ok(BlockOutput::new(outputs))
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(
