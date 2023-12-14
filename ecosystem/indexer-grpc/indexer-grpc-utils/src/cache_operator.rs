@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{constants::BLOB_STORAGE_SIZE, EncodedTransactionWithVersion};
-use anyhow::Context;
+use anyhow::{bail, Context, Ok};
 use redis::{AsyncCommands, RedisError, RedisResult};
 
 // Configurations for cache.
@@ -137,45 +137,49 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
 
     // Update the chain id in cache if missing; otherwise, verify the chain id.
     // It's a fatal error if the chain id is not correct.
-    pub async fn update_or_verify_chain_id(&mut self, chain_id: u64) -> anyhow::Result<()> {
-        let script = redis::Script::new(CACHE_SCRIPT_UPDATE_OR_VERIFY_CHAIN_ID);
-        let result: u8 = script
-            .key(CACHE_KEY_CHAIN_ID)
-            .arg(chain_id)
-            .invoke_async(&mut self.conn)
-            .await
-            .context("Redis chain id update/verification failed.")?;
-        if result != 1 {
-            anyhow::bail!("Chain id is not correct.");
+    // TODO: remove and use getter and setters
+    // pub async fn update_or_verify_chain_id(&mut self, chain_id: u64) -> anyhow::Result<()> {
+    //     let script = redis::Script::new(CACHE_SCRIPT_UPDATE_OR_VERIFY_CHAIN_ID);
+    //     let result: u8 = script
+    //         .key(CACHE_KEY_CHAIN_ID)
+    //         .arg(chain_id)
+    //         .invoke_async(&mut self.conn)
+    //         .await
+    //         .context("Redis chain id update/verification failed.")?;
+    //     if result != 1 {
+    //         anyhow::bail!("Chain id is not correct.");
+    //     }
+    //     Ok(())
+    // }
+
+    pub async fn set_chain_id(&mut self) -> anyhow::Result<Option<u64>> {
+        // TODO
+        self.get_config_by_key(CACHE_KEY_CHAIN_ID).await
+    }
+
+    pub async fn get_chain_id(&mut self) -> anyhow::Result<Option<u64>> {
+        self.get_config_by_key(CACHE_KEY_CHAIN_ID).await
+    }
+
+    pub async fn get_latest_version(&mut self) -> anyhow::Result<Option<u64>> {
+        self.get_config_by_key(CACHE_KEY_LATEST_VERSION).await
+    }
+
+    pub async fn get_file_store_latest_version(&mut self) -> anyhow::Result<Option<u64>> {
+        self.get_config_by_key(FILE_STORE_LATEST_VERSION).await
+    }
+
+    /// This gets latest version, chain id, and file store latest version
+    async fn get_config_by_key(&mut self, key: &str) -> anyhow::Result<Option<u64>> {
+        let result = self.conn.get::<&str, Vec<u8>>(key).await?;
+        if result.is_empty() {
+            Ok(None)
+        } else {
+            let result_string = String::from_utf8(result).unwrap();
+            Ok(Some(result_string.parse::<u64>().with_context(|| {
+                format!("Redis key {} is not a number.", key)
+            })?))
         }
-        Ok(())
-    }
-
-    // Downstream system can infer the chain id from cache.
-    pub async fn get_chain_id(&mut self) -> anyhow::Result<u64> {
-        let chain_id: u64 = match self.conn.get::<&str, String>(CACHE_KEY_CHAIN_ID).await {
-            Ok(v) => v
-                .parse::<u64>()
-                .with_context(|| format!("Redis key {} is not a number.", CACHE_KEY_CHAIN_ID))?,
-            Err(err) => return Err(err.into()),
-        };
-        Ok(chain_id)
-    }
-
-    pub async fn get_latest_version(&mut self) -> anyhow::Result<u64> {
-        self.conn
-            .get::<&str, String>(CACHE_KEY_LATEST_VERSION)
-            .await?
-            .parse::<u64>()
-            .context("Redis latest_version is not a number.")
-    }
-
-    pub async fn get_file_store_latest_version(&mut self) -> anyhow::Result<u64> {
-        self.conn
-            .get::<&str, String>(FILE_STORE_LATEST_VERSION)
-            .await?
-            .parse::<u64>()
-            .context("Redis file_store_latest_version is not a number.")
     }
 
     pub async fn update_file_store_latest_version(
@@ -248,6 +252,16 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
             Ok(_) => Ok(()),
             Err(err) => Err(err.into()),
         }
+    }
+
+    // Overwrite the latest version in cache.
+    // Only call this function during cache worker startup.
+    pub async fn overwrite_cache_latest_version(&mut self, version: u64) -> anyhow::Result<()> {
+        self.conn
+            .set(CACHE_KEY_LATEST_VERSION, version)
+            .await
+            .context("Redis latest version overwrite failed.")?;
+        Ok(())
     }
 
     // Update the latest version in cache.

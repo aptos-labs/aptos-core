@@ -24,6 +24,26 @@ pub enum IndexerGrpcFileStoreConfig {
     LocalFileStore(LocalFileStore),
 }
 
+impl IndexerGrpcFileStoreConfig {
+    pub fn create(&self) -> Box<dyn crate::file_store_operator::FileStoreOperator> {
+        match self {
+            IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => {
+                Box::new(crate::file_store_operator::gcs::GcsFileStoreOperator::new(
+                    gcs_file_store.gcs_file_store_bucket_name.clone(),
+                    gcs_file_store
+                        .gcs_file_store_service_account_key_path
+                        .clone(),
+                ))
+            },
+            IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => Box::new(
+                crate::file_store_operator::local::LocalFileStoreOperator::new(
+                    local_file_store.local_file_store_path.clone(),
+                ),
+            ),
+        }
+    }
+}
+
 impl Default for IndexerGrpcFileStoreConfig {
     fn default() -> Self {
         IndexerGrpcFileStoreConfig::LocalFileStore(LocalFileStore {
