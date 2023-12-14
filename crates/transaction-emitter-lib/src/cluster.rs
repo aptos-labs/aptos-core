@@ -152,6 +152,21 @@ impl Cluster {
             urls.push(url);
         }
 
+        // some sanity check around the URL and whether we expect an API key or not
+        // just print it out for now rather than enforcing, since this is subject to change
+        for url in &urls {
+            if url.host_str().unwrap().starts_with("api.") {
+                if args.node_api_key.is_none() {
+                    println!("URL {} starts with api.* but no API key was provided. Hint: generate one at https://developers.aptoslabs.com", url);
+                }
+            } else if args.node_api_key.is_some() {
+                println!(
+                    "URL {} does not start with api.* but an API key was provided. You may not need it.",
+                    url
+                );
+            }
+        }
+
         let (coin_source_key, is_root) = args.coin_source_args.get_private_key()?;
 
         let cluster = Cluster::from_host_port(
