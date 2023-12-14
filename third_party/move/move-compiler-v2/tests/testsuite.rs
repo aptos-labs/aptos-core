@@ -82,18 +82,7 @@ impl TestConfig {
         let path = path.to_string_lossy();
         let verbose = cfg!(feature = "verbose-debug-print");
         let mut pipeline = FunctionTargetPipeline::default();
-        if path.contains("/inlining/bug_") {
-            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
-            pipeline.add_processor(Box::new(VisibilityChecker {}));
-            pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
-            Self {
-                type_check_only: false,
-                dump_ast: true,
-                pipeline,
-                generate_file_format: false,
-                dump_annotated_targets: true,
-            }
-        } else if path.contains("/inlining/") || path.contains("/folding/") {
+        if path.contains("/inlining/") || path.contains("/folding/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
             pipeline.add_processor(Box::new(VisibilityChecker {}));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
