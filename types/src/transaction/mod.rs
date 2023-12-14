@@ -43,6 +43,7 @@ use std::{
 
 pub mod analyzed_transaction;
 pub mod authenticator;
+mod block_output;
 mod change_set;
 mod module;
 mod multisig;
@@ -54,6 +55,7 @@ use crate::{
     proof::accumulator::InMemoryEventAccumulator, validator_txn::ValidatorTransaction,
     write_set::TransactionWrite,
 };
+pub use block_output::BlockOutput;
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 pub use move_core_types::transaction_argument::TransactionArgument;
@@ -1853,6 +1855,16 @@ impl Transaction {
             Transaction::StateCheckpoint(_) => String::from("state_checkpoint"),
             // TODO: display proper information for client
             Transaction::ValidatorTransaction(_) => String::from("validator_transaction"),
+        }
+    }
+
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            Transaction::UserTransaction(_) => "user_transaction",
+            Transaction::GenesisTransaction(_) => "genesis_transaction",
+            Transaction::BlockMetadata(_) => "block_metadata",
+            Transaction::StateCheckpoint(_) => "state_checkpoint",
+            Transaction::ValidatorTransaction(_) => "validator_transaction",
         }
     }
 }

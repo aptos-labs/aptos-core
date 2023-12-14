@@ -16,6 +16,7 @@ pub struct BlockGasLimitProcessor<T: Transaction> {
     accumulated_fee_statement: FeeStatement,
     txn_fee_statements: Vec<FeeStatement>,
     txn_read_write_summaries: Vec<ReadWriteSummary<T>>,
+    block_limit_reached: bool,
 }
 
 impl<T: Transaction> BlockGasLimitProcessor<T> {
@@ -27,6 +28,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
             accumulated_fee_statement: FeeStatement::zero(),
             txn_fee_statements: Vec::with_capacity(init_size),
             txn_read_write_summaries: Vec::with_capacity(init_size),
+            block_limit_reached: false,
         }
     }
 
@@ -81,7 +83,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         }
     }
 
-    fn should_end_block(&self, mode: &str) -> bool {
+    fn should_end_block(&mut self, mode: &str) -> bool {
         if let Some(per_block_gas_limit) = self.block_gas_limit_type.block_gas_limit() {
             // When the accumulated block gas of the committed txns exceeds
             // PER_BLOCK_GAS_LIMIT, early halt BlockSTM.
@@ -95,6 +97,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                     accumulated_block_gas {} >= PER_BLOCK_GAS_LIMIT {}",
                     mode, accumulated_block_gas, per_block_gas_limit,
                 );
+                self.block_limit_reached = true;
 
                 return true;
             }
@@ -111,6 +114,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                     accumulated_output {} >= PER_BLOCK_OUTPUT_LIMIT {}",
                     mode, accumulated_output, per_block_output_limit,
                 );
+                self.block_limit_reached = true;
 
                 return true;
             }
@@ -119,11 +123,11 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         false
     }
 
-    pub(crate) fn should_end_block_parallel(&self) -> bool {
+    pub(crate) fn should_end_block_parallel(&mut self) -> bool {
         self.should_end_block(counters::Mode::PARALLEL)
     }
 
-    pub(crate) fn should_end_block_sequential(&self) -> bool {
+    pub(crate) fn should_end_block_sequential(&mut self) -> bool {
         self.should_end_block(counters::Mode::SEQUENTIAL)
     }
 
@@ -209,6 +213,11 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         num_total: u32,
     ) {
         self.finish_update_counters_and_log_info(false, num_committed, num_total)
+    }
+
+    #[allow(unused)]
+    pub(crate) fn is_block_limit_reached(&self) -> bool {
+        self.block_limit_reached
     }
 }
 

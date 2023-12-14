@@ -10,7 +10,6 @@ use aptos_framework::natives::code::PackageMetadata;
 use aptos_rest_client::Client;
 use aptos_state_view::TStateView;
 use aptos_types::{
-    block_executor::config::BlockExecutorConfigFromOnchain,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
@@ -92,12 +91,8 @@ impl DataCollection {
         // FIXME(#10412): remove the assert
         let val = debugger_stateview.get_state_value(TOTAL_SUPPLY_STATE_KEY.deref());
         assert!(val.is_ok() && val.unwrap().is_some());
-        AptosVM::execute_block(
-            &sig_verified_txns,
-            debugger_stateview,
-            BlockExecutorConfigFromOnchain::new_no_block_limit(),
-        )
-        .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
+        AptosVM::execute_block_no_limit(&sig_verified_txns, debugger_stateview)
+            .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
     }
 
     fn dump_and_check_src(

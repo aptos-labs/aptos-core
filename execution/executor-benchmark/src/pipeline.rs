@@ -218,13 +218,11 @@ where
             .name("ledger_update".to_string())
             .spawn(move || {
                 while let Ok(ledger_update_msg) = ledger_update_receiver.recv() {
-                    let block_size = ledger_update_msg
-                        .state_checkpoint_output
-                        .txn_statuses()
-                        .len();
+                    let input_block_size =
+                        ledger_update_msg.state_checkpoint_output.input_txns_len();
                     NUM_TXNS
                         .with_label_values(&["ledger_update"])
-                        .inc_by(block_size as u64);
+                        .inc_by(input_block_size as u64);
                     ledger_update_stage.ledger_update(ledger_update_msg);
                 }
             })
