@@ -77,6 +77,7 @@ impl OnChainExecutionConfig {
                 io_gas_effective_multiplier: 1,
                 block_output_limit: None,
                 conflict_penalty_window: 1,
+                include_user_txn_size_in_block_output: true,
                 add_block_limit_outcome_onchain: false,
                 use_granular_resource_group_conflicts: false,
             },
@@ -166,9 +167,15 @@ pub enum BlockGasLimitType {
         execution_gas_effective_multiplier: u64,
         io_gas_effective_multiplier: u64,
         conflict_penalty_window: u32,
+
         /// Block limit on the total (approximate) txn output size in bytes.
         block_output_limit: Option<u64>,
+        /// When set, we include the user txn size in the approximate computation
+        /// of block output size, which is compared against the block_output_limit above.
+        include_user_txn_size_in_block_output: bool,
 
+        /// When set, we create BlockEpilogue (instead of StateCheckpint) transaction,
+        /// which contains BlockEndInfo
         add_block_limit_outcome_onchain: bool,
 
         // If true we look at granular resource group conflicts (i.e. if same Tag
@@ -237,6 +244,17 @@ impl BlockGasLimitType {
                     None
                 }
             },
+        }
+    }
+
+    pub fn include_user_txn_size_in_block_output(&self) -> bool {
+        match self {
+            BlockGasLimitType::NoLimit => false,
+            BlockGasLimitType::Limit(_) => false,
+            BlockGasLimitType::ComplexLimitV1 {
+                include_user_txn_size_in_block_output,
+                ..
+            } => *include_user_txn_size_in_block_output,
         }
     }
 

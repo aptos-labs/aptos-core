@@ -455,6 +455,10 @@ impl<
     type Key = K;
     type Tag = u32;
     type Value = ValueType;
+
+    fn user_txn_bytes_len(&self) -> usize {
+        0
+    }
 }
 
 // TODO: try and test different strategies.
