@@ -18,7 +18,7 @@ use aptos_indexer_grpc_utils::{
         MESSAGE_SIZE_LIMIT,
     },
     counters::{log_grpc_step, IndexerGrpcStep},
-    file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
+    file_store_operator::FileStoreOperator,
     time_diff_since_pb_timestamp_in_secs,
     types::RedisUrl,
     EncodedTransactionWithVersion,
@@ -133,19 +133,7 @@ impl RawData for RawDataServerWrapper {
             },
         };
 
-        let file_store_operator: Box<dyn FileStoreOperator> = match &self.file_store_config {
-            IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => {
-                Box::new(GcsFileStoreOperator::new(
-                    gcs_file_store.gcs_file_store_bucket_name.clone(),
-                    gcs_file_store
-                        .gcs_file_store_service_account_key_path
-                        .clone(),
-                ))
-            },
-            IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => Box::new(
-                LocalFileStoreOperator::new(local_file_store.local_file_store_path.clone()),
-            ),
-        };
+        let file_store_operator: Box<dyn FileStoreOperator> = self.file_store_config.create();
 
         // Adds tracing context for the request.
         log_grpc_step(

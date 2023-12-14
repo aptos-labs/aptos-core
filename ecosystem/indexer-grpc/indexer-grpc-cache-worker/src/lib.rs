@@ -6,7 +6,10 @@ pub mod worker;
 
 use anyhow::{Context, Result};
 use aptos_indexer_grpc_server_framework::RunnableConfig;
-use aptos_indexer_grpc_utils::{config::IndexerGrpcFileStoreConfig, types::RedisUrl};
+use aptos_indexer_grpc_utils::{
+    cache_operator::CacheOperator, config::IndexerGrpcFileStoreConfig,
+    create_grpc_client_with_retry, types::RedisUrl,
+};
 use serde::{Deserialize, Serialize};
 use url::Url;
 use worker::Worker;

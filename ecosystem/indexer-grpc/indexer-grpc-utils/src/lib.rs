@@ -21,8 +21,8 @@ use url::Url;
 pub type GrpcClientType = FullnodeDataClient<tonic::transport::Channel>;
 
 /// Create a gRPC client with exponential backoff.
-pub async fn create_grpc_client(address: Url) -> GrpcClientType {
-    backoff::future::retry(backoff::ExponentialBackoff::default(), || async {
+pub async fn create_grpc_client_with_retry(address: Url) -> Result<GrpcClientType> {
+    let res = backoff::future::retry(backoff::ExponentialBackoff::default(), || async {
         match FullnodeDataClient::connect(address.to_string()).await {
             Ok(client) => {
                 tracing::info!(
@@ -43,8 +43,8 @@ pub async fn create_grpc_client(address: Url) -> GrpcClientType {
             },
         }
     })
-    .await
-    .unwrap()
+    .await;
+    res.context("Failed to create gRPC client")
 }
 
 pub type GrpcDataServiceClientType = RawDataClient<tonic::transport::Channel>;
