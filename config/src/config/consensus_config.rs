@@ -188,33 +188,46 @@ impl Default for ConsensusConfig {
                     backpressure_proposal_delay_ms: 100,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1500,
+                    back_pressure_pipeline_latency_limit_ms: 1400,
                     max_sending_block_txns_override: 10000,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 200,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 2000,
-                    max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 300,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 2500,
+                    back_pressure_pipeline_latency_limit_ms: 1800,
                     max_sending_block_txns_override: 2000,
                     max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
                     backpressure_proposal_delay_ms: 300,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 4000,
+                    back_pressure_pipeline_latency_limit_ms: 2200,
+                    max_sending_block_txns_override: 1000,
+                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
+                    backpressure_proposal_delay_ms: 400,
+                },
+                PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 2600,
+                    max_sending_block_txns_override: 600,
+                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
+                    backpressure_proposal_delay_ms: 500,
+                },
+                PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 3000,
+                    max_sending_block_txns_override: 400,
+                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
+                    backpressure_proposal_delay_ms: 500,
+                },
+                PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 3500,
                     // in practice, latencies and delay make it such that ~2 blocks/s is max,
-                    // meaning that most aggressively we limit to ~1000 TPS
+                    // meaning that most aggressively we limit to ~500 TPS
                     // For transactions that are more expensive than that, we should
-                    // instead rely on max gas per block to limit latency
-                    max_sending_block_txns_override: 500,
+                    // instead rely on max gas per block to limit latency.
+                    // We cannot reduce this further currently, as it needs to be larger than batch size.
+                    max_sending_block_txns_override: 250,
                     // stop reducing size, so 1MB transactions can still go through
                     max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
-                    backpressure_proposal_delay_ms: 300,
+                    backpressure_proposal_delay_ms: 500,
                 },
             ],
             window_for_chain_health: 100,
