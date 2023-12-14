@@ -2933,9 +2933,11 @@ dependencies = [
  "anyhow",
  "aptos-indexer-grpc-server-framework",
  "aptos-metrics-core",
+ "aptos-runtimes",
  "async-trait",
  "backoff",
  "base64 0.13.0",
+ "bytes",
  "chrono",
  "clap 4.3.21",
  "csv",
@@ -2943,7 +2945,6 @@ dependencies = [
  "diesel_migrations",
  "field_count",
  "futures",
- "google-cloud-pubsub",
  "google-cloud-storage",
  "image",
  "once_cell",
@@ -2954,6 +2955,7 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+ "warp",
 ]
 
 [[package]]
