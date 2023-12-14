@@ -9,6 +9,7 @@ use crate::{
 use aptos_protos::indexer::v1::TransactionsInStorage;
 use cloud_storage::{Bucket, Object};
 use itertools::{any, Itertools};
+use prost::Message;
 use std::env;
 
 const JSON_FILE_TYPE: &str = "application/json";
@@ -242,7 +243,8 @@ impl FileStoreOperator for GcsFileStoreOperator {
             batch_size % BLOB_STORAGE_SIZE == 0,
             "The number of transactions to upload has to be multiplier of BLOB_STORAGE_SIZE."
         );
-
+        let start_time = std::time::Instant::now();
+        let protobuf_serialized_size = transactions.iter().map(|t| t.encoded_len()).sum::<usize>();
         let files_to_upload = transactions
             .into_iter()
             .chunks(BLOB_STORAGE_SIZE)
@@ -260,6 +262,11 @@ impl FileStoreOperator for GcsFileStoreOperator {
                 (file_key_string, file_entry.into_inner())
             })
             .collect_vec();
+        let serialization_start_time = std::time::Instant::now();
+        let uploaded_size = files_to_upload
+            .iter()
+            .map(|(_, file_entry)| file_entry.len())
+            .sum::<usize>();
 
         let tasks = files_to_upload
             .into_iter()
@@ -291,6 +298,16 @@ impl FileStoreOperator for GcsFileStoreOperator {
             anyhow::bail!("Uploading transactions failed.");
         }
 
+        tracing::info!(
+            start_version = start_version,
+            duration_in_secs = start_time.elapsed().as_secs_f64(),
+            service_type = SERVICE_TYPE,
+            protobuf_serialized_size = protobuf_serialized_size,
+            uploaded_size = uploaded_size,
+            batch_size = batch_size,
+            serialization_duration_in_secs = serialization_start_time.elapsed().as_secs_f64(),
+            "Uploaded data to GCS.",
+        );
         if let Some(ts) = self.latest_metadata_update_timestamp {
             // a periodic metadata update
             if ts.elapsed().as_secs() > FILE_STORE_UPDATE_FREQUENCY_SECS {
