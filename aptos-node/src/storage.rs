@@ -11,7 +11,7 @@ use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, waypoint::Waypoint};
 use aptos_vm::AptosVM;
 use either::Either;
-use std::{fs, path::Path, time::Instant};
+use std::{fs, path::Path, sync::Arc, time::Instant};
 use tokio::runtime::Runtime;
 
 pub(crate) fn maybe_apply_genesis(
@@ -30,44 +30,49 @@ pub(crate) fn maybe_apply_genesis(
 }
 
 #[cfg(not(feature = "consensus-only-perf-test"))]
-pub(crate) fn bootstrap_db(node_config: &NodeConfig) -> Result<(DbReaderWriter, Option<Runtime>)> {
-    let (db_rw, backup_service) = match FastSyncStorageWrapper::initialize_dbs(node_config)? {
-        Either::Left(db) => {
-            let (db_arc, db_rw) = DbReaderWriter::wrap(db);
-            let db_backup_service =
-                start_backup_service(node_config.storage.backup_service_address, db_arc.clone());
-            maybe_apply_genesis(&db_rw, node_config)?;
-            (db_rw, Some(db_backup_service))
-        },
-        Either::Right(fast_sync_db_wrapper) => {
-            let temp_db = fast_sync_db_wrapper.get_temporary_db_with_genesis();
-            maybe_apply_genesis(&DbReaderWriter::from_arc(temp_db), node_config)?;
-            let (db_arc, db_rw) = DbReaderWriter::wrap(fast_sync_db_wrapper);
-            let fast_sync_db = db_arc.get_fast_sync_db();
-            // FastSyncDB requires ledger info at epoch 0 to establish provenance to genesis
-            let ledger_info = db_arc
-                .get_temporary_db_with_genesis()
-                .get_epoch_ending_ledger_info(0)
-                .expect("Genesis ledger info must exist");
+pub(crate) fn bootstrap_db(
+    node_config: &NodeConfig,
+) -> Result<(Arc<dyn DbReader>, DbReaderWriter, Option<Runtime>)> {
+    let (aptos_db_reader, db_rw, backup_service) =
+        match FastSyncStorageWrapper::initialize_dbs(node_config)? {
+            Either::Left(db) => {
+                let (db_arc, db_rw) = DbReaderWriter::wrap(db);
+                let db_backup_service = start_backup_service(
+                    node_config.storage.backup_service_address,
+                    db_arc.clone(),
+                );
+                maybe_apply_genesis(&db_rw, node_config)?;
+                (db_arc as Arc<dyn DbReader>, db_rw, Some(db_backup_service))
+            },
+            Either::Right(fast_sync_db_wrapper) => {
+                let temp_db = fast_sync_db_wrapper.get_temporary_db_with_genesis();
+                maybe_apply_genesis(&DbReaderWriter::from_arc(temp_db), node_config)?;
+                let (db_arc, db_rw) = DbReaderWriter::wrap(fast_sync_db_wrapper);
+                let fast_sync_db = db_arc.get_fast_sync_db();
+                // FastSyncDB requires ledger info at epoch 0 to establish provenance to genesis
+                let ledger_info = db_arc
+                    .get_temporary_db_with_genesis()
+                    .get_epoch_ending_ledger_info(0)
+                    .expect("Genesis ledger info must exist");
 
-            if fast_sync_db
-                .get_latest_ledger_info_option()
-                .expect("should returns Ok results")
-                .is_none()
-            {
-                // it means the DB is empty and we need to
-                // commit the genesis ledger info to the DB.
-                fast_sync_db.commit_genesis_ledger_info(&ledger_info)?;
-            }
+                if fast_sync_db
+                    .get_latest_ledger_info_option()
+                    .expect("should returns Ok results")
+                    .is_none()
+                {
+                    // it means the DB is empty and we need to
+                    // commit the genesis ledger info to the DB.
+                    fast_sync_db.commit_genesis_ledger_info(&ledger_info)?;
+                }
 
-            let db_backup_service =
-                start_backup_service(node_config.storage.backup_service_address, fast_sync_db);
+                let db_backup_service =
+                    start_backup_service(node_config.storage.backup_service_address, fast_sync_db);
 
-            (db_rw, Some(db_backup_service))
-        },
-    };
+                (db_arc as Arc<dyn DbReader>, db_rw, Some(db_backup_service))
+            },
+        };
 
-    Ok((db_rw, backup_service))
+    Ok((aptos_db_reader, db_rw, backup_service))
 }
 
 /// In consensus-only mode, return a in-memory based [FakeAptosDB] and
@@ -144,7 +149,7 @@ pub fn initialize_database_and_checkpoints(
 
     // Open the database
     let instant = Instant::now();
-    let (db_rw, backup_service) = bootstrap_db(node_config)?;
+    let (_aptos_db, db_rw, backup_service) = bootstrap_db(node_config)?;
 
     // Log the duration to open storage
     debug!(

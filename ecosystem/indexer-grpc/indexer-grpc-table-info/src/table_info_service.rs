@@ -18,28 +18,28 @@ type EndVersion = u64;
 const LEDGER_VERSION_RETRY_TIME_MILLIS: u64 = 10;
 const SERVICE_TYPE: &str = "table_info_service";
 
-pub struct TableInfoParser {
+pub struct TableInfoService {
     pub current_version: u64,
     pub parser_task_count: u16,
     pub parser_batch_size: u16,
     pub context: Arc<Context>,
-    pub enable_verbose_logging: bool,
+    pub enable_expensive_logging: bool,
 }
 
-impl TableInfoParser {
+impl TableInfoService {
     pub fn new(
         context: Arc<Context>,
         request_start_version: u64,
         parser_task_count: u16,
         parser_batch_size: u16,
-        enable_verbose_logging: bool,
+        enable_expensive_logging: bool,
     ) -> Self {
         Self {
             current_version: request_start_version,
             parser_task_count,
             parser_batch_size,
             context,
-            enable_verbose_logging,
+            enable_expensive_logging,
         }
     }
 
@@ -63,7 +63,7 @@ impl TableInfoParser {
             log_grpc_step(
                 SERVICE_TYPE,
                 IndexerGrpcStep::TableInfoProcessed,
-                self.enable_verbose_logging,
+                self.enable_expensive_logging,
                 Some(self.current_version as i64),
                 Some(max_version as i64),
                 None,
@@ -101,7 +101,7 @@ impl TableInfoParser {
                 ledger_version,
                 batch,
                 false, /* end_early_if_pending_on_empty */
-                self.enable_verbose_logging,
+                self.enable_expensive_logging,
             ));
             tasks.push(task);
         }
@@ -114,12 +114,6 @@ impl TableInfoParser {
                     - self.current_version;
                 let end_version =
                     last_batch.start_version + last_batch.num_transactions_to_fetch as u64;
-
-                // Update rocksdb next version after threads join
-                db.writer
-                    .clone()
-                    .update_next_version(end_version + 1)
-                    .unwrap();
 
                 // Clean up pending on items across threads
                 db.writer
@@ -151,7 +145,7 @@ impl TableInfoParser {
                         ledger_version,
                         retry_batch,
                         true, /* end_early_if_pending_on_empty */
-                        self.enable_verbose_logging,
+                        self.enable_expensive_logging,
                     )
                     .await
                     .expect("[Table Info] Failed to parse table info");
@@ -165,6 +159,12 @@ impl TableInfoParser {
                     "Missing data in table info parsing after sequential retry"
                 );
 
+                // Update rocksdb's to be processed next version after verifying all txns are successfully parsed
+                db.writer
+                    .clone()
+                    .update_next_version(end_version + 1)
+                    .unwrap();
+
                 res
             },
             Err(err) => panic!(
@@ -174,6 +174,10 @@ impl TableInfoParser {
         }
     }
 
+    /// Process a single batch of transactions for table info parsing.
+    /// It's used in the first loop to process batches in parallel,
+    /// and it's used in the second loop to process transactions sequentially
+    /// if pending on items are not empty
     async fn process_single_batch(
         context: Arc<Context>,
         db_writer: Arc<dyn DbWriter>,
@@ -216,6 +220,9 @@ impl TableInfoParser {
         Ok(raw_txns.last().unwrap().version)
     }
 
+    /// Retrieves transaction batches based on the provided ledger version.
+    /// The function prepares to fetch transactions by determining the start version,
+    /// the number of fetches, and the size of each batch.
     async fn get_batches(&mut self, ledger_version: u64) -> Vec<TransactionBatchInfo> {
         info!(
             current_version = self.current_version,
@@ -259,6 +266,9 @@ impl TableInfoParser {
             .unwrap_or_default()
     }
 
+    /// Parse table info from write sets,
+    /// end_early_if_pending_on_empty flag will be true if we couldn't parse all table infos in the first try with multithread,
+    /// in the second try with sequential looping, to make parsing efficient, we end early if all table infos are parsed
     fn parse_table_info(
         context: Arc<Context>,
         raw_txns: Vec<TransactionOnChainData>,

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::table_info_parser::TableInfoParser;
+use crate::table_info_service::TableInfoService;
 use aptos_api::context::Context;
 use aptos_config::config::NodeConfig;
 use aptos_mempool::MempoolClientSender;
@@ -27,7 +27,7 @@ pub fn bootstrap(
     let node_config = config.clone();
     let parser_task_count = node_config.indexer_table_info.parser_task_count;
     let parser_batch_size = node_config.indexer_table_info.parser_batch_size;
-    let enable_verbose_logging = node_config.indexer_table_info.enable_verbose_logging;
+    let enable_expensive_logging = node_config.indexer_table_info.enable_expensive_logging;
     let next_version = db.reader.get_indexer_async_v2_next_version().unwrap();
 
     // Spawn the runtime for table info parsing
@@ -38,12 +38,12 @@ pub fn bootstrap(
             mp_sender,
             node_config,
         ));
-        let mut parser = TableInfoParser::new(
+        let mut parser = TableInfoService::new(
             context,
             next_version,
             parser_task_count,
             parser_batch_size,
-            enable_verbose_logging,
+            enable_expensive_logging,
         );
         parser.run(db.clone()).await
     });

@@ -2,4 +2,4 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod runtime;
-pub mod table_info_parser;
+pub mod table_info_service;
