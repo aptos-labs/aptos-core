@@ -1043,10 +1043,10 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         ]),
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
-            (3700, 0.35, 0.5, 0.8, 0.65),
-            (2800, 0.35, 0.5, 1.2, 1.3),
-            (1800, 0.35, 2.0, 1.5, 3.0),
-            (950, 0.35, 0.65, 1.5, 2.9),
+            (5500, 0.35, 0.3, 0.8, 0.65),
+            (4500, 0.35, 0.3, 1.0, 1.0),
+            (2000, 0.35, 0.3, 1.0, 1.0),
+            (600, 0.35, 0.3, 1.0, 1.0),
             // (150, 0.5, 1.0, 1.5, 0.65),
         ]
         .into_iter()
