@@ -37,7 +37,7 @@ fn check_ability(target: &FunctionTarget, ty: &Type, ability: Ability, loc: &Loc
 }
 
 /// Checks if the given type has constraint copy, and add diagnostics if not.
-fn check_copy(func_target: &FunctionTarget, ty: &Type, loc: &Loc, err_msg: &str) {
+pub fn check_copy(func_target: &FunctionTarget, ty: &Type, loc: &Loc, err_msg: &str) {
     check_ability(func_target, ty, Ability::Copy, loc, err_msg)
 }
 
