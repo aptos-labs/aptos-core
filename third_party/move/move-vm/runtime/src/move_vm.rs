@@ -124,8 +124,12 @@ impl MoveVM {
     /// If the loader cache has been invalidated (either by the above call or by internal logic)
     /// flush it so it is valid again. Notice that should only be called if there are no
     /// outstanding sessions created from this VM.
-    /// TODO: new loader architecture
     pub fn flush_loader_cache_if_invalidated(&self) {
+        // Flush the module cache inside the VMRuntime. This code is there for a legacy reason:
+        // - In the old session api that we provide, MoveVM will hold a cache for loaded module and the session will be created against that cache.
+        //   Thus if an module invalidation event happens (e.g, by upgrade request), we will need to flush this internal cache as well.
+        // - If we can deprecate this session api, we will be able to get rid of this internal loaded cache and make the MoveVM "stateless" and
+        //   invulnerable to module invalidation.
         if self.runtime.loader().is_invalidated() {
             self.runtime.module_cache.flush();
         };

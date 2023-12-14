@@ -1,4 +1,3 @@
-// Copyright (c) The Diem Core Contributors
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
@@ -18,10 +17,9 @@ use std::{collections::BTreeMap, sync::Arc};
 
 // A Script is very similar to a `CompiledScript` but data is "transformed" to a representation
 // more appropriate to execution.
-// When code executes, indexes in instructions are resolved against runtime structures
+// When code executes, indices in instructions are resolved against runtime structures
 // (rather then "compiled") to make available data needed for execution
-// #[derive(Debug)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct Script {
     // primitive pools
     pub(crate) script: CompiledScript,
