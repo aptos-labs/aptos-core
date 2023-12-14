@@ -44,6 +44,7 @@ pub struct IndexerStreamCoordinator {
 }
 
 // Single batch of transactions to fetch, convert, and stream
+#[derive(Clone, Copy)]
 pub struct TransactionBatchInfo {
     pub start_version: u64,
     pub head_version: u64,
@@ -229,7 +230,7 @@ impl IndexerStreamCoordinator {
         batches
     }
 
-    async fn fetch_raw_txns_with_retries(
+    pub async fn fetch_raw_txns_with_retries(
         context: Arc<Context>,
         ledger_version: u64,
         batch: TransactionBatchInfo,

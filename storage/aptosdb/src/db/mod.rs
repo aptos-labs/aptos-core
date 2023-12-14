@@ -30,7 +30,7 @@ use aptos_config::config::{
     PrunerConfig, RocksdbConfig, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::HashValue;
-use aptos_db_indexer::Indexer;
+use aptos_db_indexer::{db_v2::IndexerAsyncV2, Indexer};
 use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
@@ -74,6 +74,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::data_cache::AsMoveResolver;
+use dashmap::DashMap;
 use move_resource_viewer::MoveValueAnnotator;
 use rayon::prelude::*;
 use std::{
@@ -103,6 +104,7 @@ pub struct AptosDB {
     ledger_commit_lock: std::sync::Mutex<()>,
     indexer: Option<Indexer>,
     skip_index_and_usage: bool,
+    indexer_async_v2: Option<IndexerAsyncV2>,
 }
 
 // DbReader implementations and private functions used by them.
@@ -124,6 +126,7 @@ impl AptosDB {
         enable_indexer: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
+        enable_indexer_async_v2: bool,
     ) -> Result<Self> {
         Self::open_internal(
             &db_paths,
@@ -134,6 +137,7 @@ impl AptosDB {
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
             false,
+            enable_indexer_async_v2,
         )
     }
 
@@ -145,6 +149,7 @@ impl AptosDB {
         enable_indexer: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
+        enable_indexer_async_v2: bool,
     ) -> Result<Self> {
         Self::open_internal(
             &db_paths,
@@ -155,6 +160,7 @@ impl AptosDB {
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
             true,
+            enable_indexer_async_v2,
         )
     }
 
