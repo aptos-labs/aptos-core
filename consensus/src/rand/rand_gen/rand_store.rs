@@ -15,7 +15,12 @@ use aptos_consensus_types::{
     randomness::RandMetadata,
 };
 use aptos_logger::error;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
+
+const FUTURE_ROUNDS_TO_ACCEPT: u64 = 200;
 
 struct ShareAggregator<S> {
     shares: HashMap<Author, RandShare<S>>,
@@ -164,14 +169,15 @@ pub struct RandStore<S, P, Storage> {
     epoch: u64,
     author: Author,
     rand_config: RandConfig,
-    rand_map: HashMap<Round, RandItem<S, P>>,
+    rand_map: BTreeMap<Round, RandItem<S, P>>,
     block_queue: BlockQueue,
     db: Arc<Storage>,
+    highest_known_round: u64,
 }
 
 impl<S: Share, P: Proof<Share = S>, Storage: RandStorage<S, P>> RandStore<S, P, Storage> {
     pub fn new(epoch: u64, author: Author, rand_config: RandConfig, db: Arc<Storage>) -> Self {
-        let mut rand_map: HashMap<Round, RandItem<S, P>> = HashMap::new();
+        let mut rand_map: BTreeMap<Round, RandItem<S, P>> = BTreeMap::new();
         let all_shares = db.get_all_shares().unwrap_or_default();
         let mut shares_to_delete = vec![];
         for (_, share) in all_shares {
@@ -201,6 +207,7 @@ impl<S: Share, P: Proof<Share = S>, Storage: RandStorage<S, P>> RandStore<S, P, 
         if let Err(e) = db.remove_decisions(decisions_to_delete.into_iter()) {
             error!("[RandStore] Failed to remove decisions: {:?}", e);
         }
+        let max_round = rand_map.last_key_value().map_or(0, |(k, _)| *k);
         Self {
             epoch,
             author,
@@ -208,11 +215,13 @@ impl<S: Share, P: Proof<Share = S>, Storage: RandStorage<S, P>> RandStore<S, P, 
             rand_map,
             block_queue: BlockQueue::new(),
             db,
+            highest_known_round: max_round,
         }
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self, target_round: u64) {
         self.block_queue = BlockQueue::new();
+        self.highest_known_round = std::cmp::max(self.highest_known_round, target_round);
     }
 
     pub fn try_dequeue_rand_ready_prefix(&mut self) -> Option<Vec<OrderedBlocks>> {
@@ -242,6 +251,8 @@ impl<S: Share, P: Proof<Share = S>, Storage: RandStorage<S, P>> RandStore<S, P, 
         let all_rand_metadata = block.all_rand_metadata();
         self.block_queue.push_back(block);
         for rand_metadata in all_rand_metadata {
+            self.highest_known_round =
+                std::cmp::max(self.highest_known_round, rand_metadata.round());
             let rand_item = self
                 .rand_map
                 .entry(rand_metadata.round())
@@ -252,6 +263,14 @@ impl<S: Share, P: Proof<Share = S>, Storage: RandStorage<S, P>> RandStore<S, P, 
     }
 
     pub fn add_share(&mut self, share: RandShare<S>) -> anyhow::Result<ShareAck<P>> {
+        ensure!(
+            share.metadata().epoch() == self.epoch,
+            "Share from different epoch"
+        );
+        ensure!(
+            share.metadata().round() <= self.highest_known_round + FUTURE_ROUNDS_TO_ACCEPT,
+            "Share from future round"
+        );
         self.db.save_share(&share)?;
         let rand_metadata = share.metadata().clone();
         let rand_item = self
