@@ -103,7 +103,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         if let Some(per_block_output_limit) = self.block_gas_limit_type.block_output_limit() {
             let accumulated_output = self.get_accumulated_approx_output_size();
             if accumulated_output >= per_block_output_limit {
-                counters::EXCEED_PER_BLOCK_GAS_LIMIT_COUNT
+                counters::EXCEED_PER_BLOCK_OUTPUT_LIMIT_COUNT
                     .with_label_values(&[mode])
                     .inc();
                 info!(
