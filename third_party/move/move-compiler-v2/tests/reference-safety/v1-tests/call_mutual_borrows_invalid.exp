@@ -1,12 +1,12 @@
 
 Diagnostics:
 error: cannot copy mutable reference in local `s1` which is still borrowed
-   ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:15:17
+   ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:15:9
    │
 14 │         let f = freeze(s1);
    │                 ---------- previous call result
 15 │         mut_imm(s1, f);
-   │                 ^^ copied here
+   │         ^^^^^^^^^^^^^^ copied here
 
 error: cannot pass mutable reference in local, which is still borrowed, as function argument
    ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:15:9
@@ -17,12 +17,12 @@ error: cannot pass mutable reference in local, which is still borrowed, as funct
    │         ^^^^^^^^^^^^^^ passed here
 
 error: cannot copy mutable reference in local `s1` which is still borrowed
-   ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:17:17
+   ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:17:9
    │
 16 │         let f = &s1.f;
    │                 ----- previous field borrow
 17 │         mut_imm(s1, f);
-   │                 ^^ copied here
+   │         ^^^^^^^^^^^^^^ copied here
 
 error: cannot pass mutable reference in local, which is still borrowed, as function argument
    ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:17:9
@@ -68,12 +68,12 @@ error: cannot mutable borrow local since other references exists
    │                ^^^^^^^^^ mutable borrow attempted here
 
 error: cannot copy mutable reference in local `s1` which is still borrowed
-   ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:25:17
+   ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:25:9
    │
 24 │         let f = &mut s1.f;
    │                 --------- previous mutable field borrow
 25 │         mut_mut(s1, f);
-   │                 ^^ copied here
+   │         ^^^^^^^^^^^^^^ copied here
 
 error: cannot pass mutable reference in local, which is still borrowed, as function argument
    ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:25:9
@@ -118,7 +118,7 @@ error: cannot pass mutable reference in local, which is still borrowed, as funct
    │         ^^^^^^^^^^ passed here
 
 error: cannot copy mutable reference in local `s1` which is still borrowed
-   ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:31:17
+   ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:31:9
    │
 30 │         let f = id_mut(&mut s1.f);
    │                 -----------------
@@ -126,7 +126,7 @@ error: cannot copy mutable reference in local `s1` which is still borrowed
    │                 │      previous mutable field borrow
    │                 used by mutable call result
 31 │         mut_mut(s1, f);
-   │                 ^^ copied here
+   │         ^^^^^^^^^^^^^^ copied here
 
 error: cannot pass mutable reference in local, which is still borrowed, as function argument
    ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:31:9
