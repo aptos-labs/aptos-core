@@ -172,8 +172,13 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         counters::update_txn_gas_counters(&self.txn_fee_statements, is_parallel);
 
         info!(
-            "[BlockSTM]: {} execution completed. {} out of {} txns committed. \
-            accumulated_effective_block_gas = {}, limit = {:?}",
+            effective_block_gas = accumulated_effective_block_gas,
+            block_gas_limit = self.block_gas_limit_type.block_gas_limit().unwrap_or(0),
+            block_gas_limit_exceeded = self.block_gas_limit_type.block_gas_limit().map_or(false, |limit| accumulated_effective_block_gas >= limit),
+            approx_output_size = accumulated_approx_output_size,
+            block_output_limit = self.block_gas_limit_type.block_output_limit().unwrap_or(0),
+            block_output_limit_exceeded = self.block_gas_limit_type.block_output_limit().map_or(false, |limit| accumulated_approx_output_size >= limit),
+            "[BlockSTM]: {} execution completed. {} out of {} txns committed",
             if is_parallel {
                 "Parallel"
             } else {
@@ -181,8 +186,6 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
             },
             num_committed,
             num_total,
-            accumulated_effective_block_gas,
-            self.block_gas_limit_type,
         );
     }
 
