@@ -103,7 +103,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         if let Some(per_block_output_limit) = self.block_gas_limit_type.block_output_limit() {
             let accumulated_output = self.get_accumulated_approx_output_size();
             if accumulated_output >= per_block_output_limit {
-                counters::EXCEED_PER_BLOCK_GAS_LIMIT_COUNT
+                counters::EXCEED_PER_BLOCK_OUTPUT_LIMIT_COUNT
                     .with_label_values(&[mode])
                     .inc();
                 info!(
@@ -221,6 +221,7 @@ mod test {
         io_gas_effective_multiplier: 1,
         conflict_penalty_window: 1,
         block_output_limit: None,
+        include_user_txn_size_in_block_output: true,
         add_block_limit_outcome_onchain: false,
         use_granular_resource_group_conflicts: false,
     };
@@ -247,6 +248,7 @@ mod test {
             io_gas_effective_multiplier: 1,
             conflict_penalty_window: 1,
             block_output_limit: None,
+            include_user_txn_size_in_block_output: true,
             add_block_limit_outcome_onchain: false,
             use_granular_resource_group_conflicts: false,
         };
@@ -269,6 +271,7 @@ mod test {
             io_gas_effective_multiplier: 1,
             conflict_penalty_window: 1,
             block_output_limit: Some(100),
+            include_user_txn_size_in_block_output: true,
             add_block_limit_outcome_onchain: false,
             use_granular_resource_group_conflicts: false,
         };
@@ -276,10 +279,13 @@ mod test {
         let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, 10);
 
         processor.accumulate_fee_statement(FeeStatement::zero(), None, Some(10));
+        assert_eq!(processor.accumulated_approx_output_size, 10);
         assert!(!processor.should_end_block_parallel());
         processor.accumulate_fee_statement(FeeStatement::zero(), None, Some(50));
+        assert_eq!(processor.accumulated_approx_output_size, 60);
         assert!(!processor.should_end_block_parallel());
         processor.accumulate_fee_statement(FeeStatement::zero(), None, Some(40));
+        assert_eq!(processor.accumulated_approx_output_size, 100);
         assert!(processor.should_end_block_parallel());
     }
 
@@ -306,6 +312,7 @@ mod test {
             io_gas_effective_multiplier: 1,
             conflict_penalty_window: 8,
             block_output_limit: None,
+            include_user_txn_size_in_block_output: true,
             add_block_limit_outcome_onchain: false,
             use_granular_resource_group_conflicts: false,
         };
@@ -366,6 +373,7 @@ mod test {
             io_gas_effective_multiplier: 1,
             conflict_penalty_window: 8,
             block_output_limit: None,
+            include_user_txn_size_in_block_output: true,
             add_block_limit_outcome_onchain: false,
             use_granular_resource_group_conflicts: true,
         };

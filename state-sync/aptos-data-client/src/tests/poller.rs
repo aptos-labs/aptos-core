@@ -5,7 +5,8 @@ use crate::{
     error::Error,
     poller,
     poller::DataSummaryPoller,
-    tests::{mock::MockNetwork, utils},
+    priority::PeerPriority,
+    tests::{mock::MockNetwork, utils, utils::NUM_SELECTION_ITERATIONS},
 };
 use aptos_config::{
     config::{AptosDataClientConfig, AptosDataPollerConfig},
@@ -26,18 +27,12 @@ async fn identify_peers_to_poll_rounds() {
     let (mut mock_network, _, _, poller) = MockNetwork::new(None, None, None);
 
     // Add several priority peers
-    let num_priority_peers = 10;
-    let mut priority_peers = hashset![];
-    for _ in 0..num_priority_peers {
-        priority_peers.insert(mock_network.add_peer(true));
-    }
+    let priority_peers =
+        utils::add_several_peers(&mut mock_network, 10, PeerPriority::HighPriority);
 
     // Add several regular peers
-    let num_regular_peers = 20;
-    let mut regular_peers = hashset![];
-    for _ in 0..num_regular_peers {
-        regular_peers.insert(mock_network.add_peer(false));
-    }
+    let regular_peers =
+        utils::add_several_peers(&mut mock_network, 20, PeerPriority::MediumPriority);
 
     // Fetch the priority peers to poll multiple times and verify no regular peers are returned
     let num_polling_rounds = 100;
@@ -203,11 +198,11 @@ async fn identify_peers_to_poll_latency_weights() {
             let (mut mock_network, _, _, poller) =
                 MockNetwork::new(None, Some(data_client_config), None);
 
+            // Determine the peer priority
+            let peer_priority = utils::get_peer_priority_for_polling(poll_priority_peers);
+
             // Add the expected number of peers
-            let mut peers = vec![];
-            for _ in 0..*peer_count {
-                peers.push(mock_network.add_peer(poll_priority_peers));
-            }
+            let _ = utils::add_several_peers(&mut mock_network, *peer_count, peer_priority);
 
             // Gather the peers to poll over many rounds
             let mut peers_and_poll_counts = HashMap::new();
@@ -247,12 +242,11 @@ async fn identify_peers_to_poll_missing_latencies() {
 
     // Ensure the properties hold for both priority and non-priority peers
     for poll_priority_peers in [true, false] {
+        // Determine the peer priority
+        let peer_priority = utils::get_peer_priority_for_polling(poll_priority_peers);
+
         // Add several peers
-        let num_peers = 100;
-        let mut peers = vec![];
-        for _ in 0..num_peers {
-            peers.push(mock_network.add_peer(poll_priority_peers));
-        }
+        let peers = utils::add_several_peers(&mut mock_network, 100, peer_priority);
 
         // Set some peers to have missing latencies in the peer metadata
         let num_peers_with_missing_latencies = 10;
@@ -267,7 +261,7 @@ async fn identify_peers_to_poll_missing_latencies() {
 
         // Gather the peers to poll over many rounds
         let mut peers_and_poll_counts = HashMap::new();
-        for _ in 0..10_000 {
+        for _ in 0..NUM_SELECTION_ITERATIONS {
             // Identify the peers to poll this round
             let peers_to_poll = poller.identify_peers_to_poll(poll_priority_peers).unwrap();
 
@@ -304,18 +298,21 @@ async fn identify_peers_to_poll_disconnected() {
         // Request the next set of peers to poll and verify we have no peers
         assert_matches!(
             poller.identify_peers_to_poll(poll_priority_peers),
-            Err(Error::DataIsUnavailable(_))
+            Err(Error::NoConnectedPeers(_))
         );
 
+        // Determine the peer priority
+        let peer_priority = utils::get_peer_priority_for_polling(poll_priority_peers);
+
         // Add peer 1
-        let peer_1 = mock_network.add_peer(poll_priority_peers);
+        let peer_1 = mock_network.add_peer(peer_priority);
 
         // Request the next set of peers to poll and verify it's peer 1
         let peers_to_poll = poller.identify_peers_to_poll(poll_priority_peers).unwrap();
         assert_eq!(peers_to_poll, hashset![peer_1]);
 
         // Add peer 2 and disconnect peer 1
-        let peer_2 = mock_network.add_peer(poll_priority_peers);
+        let peer_2 = mock_network.add_peer(peer_priority);
         mock_network.disconnect_peer(peer_1);
 
         // Request the next set of peers to poll and verify it's peer 2
@@ -328,11 +325,11 @@ async fn identify_peers_to_poll_disconnected() {
         // Request the next set of peers to poll and verify we have no peers
         assert_matches!(
             poller.identify_peers_to_poll(poll_priority_peers),
-            Err(Error::DataIsUnavailable(_))
+            Err(Error::NoConnectedPeers(_))
         );
 
         // Add peer 3
-        let peer_3 = mock_network.add_peer(poll_priority_peers);
+        let peer_3 = mock_network.add_peer(peer_priority);
 
         // Request the next set of peers to poll and verify it's peer 3
         let peers_to_poll = poller.identify_peers_to_poll(poll_priority_peers).unwrap();
@@ -344,7 +341,7 @@ async fn identify_peers_to_poll_disconnected() {
         // Request the next set of peers to poll and verify we have no peers
         assert_matches!(
             poller.identify_peers_to_poll(poll_priority_peers),
-            Err(Error::DataIsUnavailable(_))
+            Err(Error::NoConnectedPeers(_))
         );
     }
 }
@@ -356,8 +353,11 @@ async fn identify_peers_to_poll_ordering() {
 
     // Ensure the properties hold for both priority and non-priority peers
     for poll_priority_peers in [true, false] {
+        // Determine the peer priority
+        let peer_priority = utils::get_peer_priority_for_polling(poll_priority_peers);
+
         // Add peer 1
-        let peer_1 = mock_network.add_peer(poll_priority_peers);
+        let peer_1 = mock_network.add_peer(peer_priority);
 
         // Request the next set of peers to poll and verify it's peer 1
         for _ in 0..3 {
@@ -368,7 +368,7 @@ async fn identify_peers_to_poll_ordering() {
         }
 
         // Add peer 2
-        let peer_2 = mock_network.add_peer(poll_priority_peers);
+        let peer_2 = mock_network.add_peer(peer_priority);
 
         // Request the next set of peers to poll and verify it's either peer
         let peers_to_poll = poller.identify_peers_to_poll(poll_priority_peers).unwrap();
@@ -402,7 +402,7 @@ async fn identify_peers_to_poll_ordering() {
             .is_empty());
 
         // Add peer 3
-        let peer_3 = mock_network.add_peer(poll_priority_peers);
+        let peer_3 = mock_network.add_peer(peer_priority);
 
         // Request another peer again and verify it's peer_3
         let peers_to_poll_3 = poller.identify_peers_to_poll(poll_priority_peers).unwrap();
@@ -454,18 +454,21 @@ async fn identify_peers_to_poll_reconnected() {
         // Request the next set of peers to poll and verify we have no peers
         assert_matches!(
             poller.identify_peers_to_poll(poll_priority_peers),
-            Err(Error::DataIsUnavailable(_))
+            Err(Error::NoConnectedPeers(_))
         );
 
+        // Determine the peer priority
+        let peer_priority = utils::get_peer_priority_for_polling(poll_priority_peers);
+
         // Add peer 1
-        let peer_1 = mock_network.add_peer(poll_priority_peers);
+        let peer_1 = mock_network.add_peer(peer_priority);
 
         // Request the next set of peers to poll and verify it's peer 1
         let peers_to_poll = poller.identify_peers_to_poll(poll_priority_peers).unwrap();
         assert_eq!(peers_to_poll, hashset![peer_1]);
 
         // Add peer 2 and disconnect peer 1
-        let peer_2 = mock_network.add_peer(poll_priority_peers);
+        let peer_2 = mock_network.add_peer(peer_priority);
         mock_network.disconnect_peer(peer_1);
 
         // Request the next set of peers to poll and verify it's peer 2
@@ -486,7 +489,7 @@ async fn identify_peers_to_poll_reconnected() {
         // Request the next set of peers to poll and verify we have no peers
         assert_matches!(
             poller.identify_peers_to_poll(poll_priority_peers),
-            Err(Error::DataIsUnavailable(_))
+            Err(Error::NoConnectedPeers(_))
         );
     }
 }
@@ -501,11 +504,14 @@ async fn identify_peers_to_poll_reconnected_in_flight() {
         // Request the next set of peers to poll and verify we have no peers
         assert_matches!(
             poller.identify_peers_to_poll(poll_priority_peers),
-            Err(Error::DataIsUnavailable(_))
+            Err(Error::NoConnectedPeers(_))
         );
 
+        // Determine the peer priority
+        let peer_priority = utils::get_peer_priority_for_polling(poll_priority_peers);
+
         // Add peer 1
-        let peer_1 = mock_network.add_peer(poll_priority_peers);
+        let peer_1 = mock_network.add_peer(peer_priority);
 
         // Request the next set of peers to poll and verify it's peer 1.
         // Mark the request as in-flight but not completed.
@@ -514,7 +520,7 @@ async fn identify_peers_to_poll_reconnected_in_flight() {
         poller.in_flight_request_started(poll_priority_peers, &peer_1);
 
         // Add peer 2 and disconnect peer 1
-        let peer_2 = mock_network.add_peer(poll_priority_peers);
+        let peer_2 = mock_network.add_peer(peer_priority);
         mock_network.disconnect_peer(peer_1);
 
         // Request the next set of peers to poll and verify it's peer 2.
@@ -578,7 +584,7 @@ async fn identify_peers_to_poll_reconnected_in_flight() {
         // Request the next set of peers to poll and verify we have no peers
         assert_matches!(
             poller.identify_peers_to_poll(poll_priority_peers),
-            Err(Error::DataIsUnavailable(_))
+            Err(Error::NoConnectedPeers(_))
         );
     }
 }
@@ -600,8 +606,11 @@ async fn identify_peers_to_poll_max_in_flight() {
 
     // Ensure the properties hold for both priority and non-priority peers
     for poll_priority_peers in [true, false] {
+        // Determine the peer priority
+        let peer_priority = utils::get_peer_priority_for_polling(poll_priority_peers);
+
         // Add peer 1
-        let peer_1 = mock_network.add_peer(poll_priority_peers);
+        let peer_1 = mock_network.add_peer(peer_priority);
 
         // Request the next set of peers to poll and verify it's peer 1.
         // Mark the request as in-flight but not completed.
@@ -610,7 +619,7 @@ async fn identify_peers_to_poll_max_in_flight() {
         poller.in_flight_request_started(poll_priority_peers, &peer_1);
 
         // Add peer 2
-        let peer_2 = mock_network.add_peer(poll_priority_peers);
+        let peer_2 = mock_network.add_peer(peer_priority);
 
         // Request the next set of peers to poll and verify it's peer 2
         // (peer 1's request has not yet completed). Mark the request as
@@ -620,7 +629,7 @@ async fn identify_peers_to_poll_max_in_flight() {
         poller.in_flight_request_started(poll_priority_peers, &peer_2);
 
         // Add peer 3
-        let peer_3 = mock_network.add_peer(poll_priority_peers);
+        let peer_3 = mock_network.add_peer(peer_priority);
 
         // Request the next set of peers to poll and verify none are returned
         // (we already have the maximum number of in-flight requests).
@@ -677,11 +686,11 @@ async fn identify_peers_to_poll_max_in_flight_disjoint() {
 
     // Ensure the properties hold for both priority and non-priority peers
     for poll_priority_peers in [true, false] {
+        // Determine the peer priority
+        let peer_priority = utils::get_peer_priority_for_polling(poll_priority_peers);
+
         // Add several peers
-        let num_peers = 100;
-        for _ in 0..num_peers {
-            mock_network.add_peer(poll_priority_peers);
-        }
+        let _ = utils::add_several_peers(&mut mock_network, 100, peer_priority);
 
         // Keep requesting peers to poll until we get the maximum number of in-flight requests
         let mut peers_with_polls = hashset![];
@@ -759,11 +768,11 @@ async fn peers_with_active_polls() {
 
     // Ensure the properties hold for both priority and non-priority peers
     for poll_priority_peers in [true, false] {
+        // Determine the peer priority
+        let peer_priority = utils::get_peer_priority_for_polling(poll_priority_peers);
+
         // Add several peers
-        let num_peers = 100;
-        for _ in 0..num_peers {
-            mock_network.add_peer(poll_priority_peers);
-        }
+        let _ = utils::add_several_peers(&mut mock_network, 100, peer_priority);
 
         // Keep requesting peers to poll until we get the maximum number of in-flight requests
         let mut peers_with_polls = hashset![];
@@ -855,9 +864,11 @@ async fn poll_peers_error_handling() {
             let num_in_flight_polls = get_num_in_flight_polls(poller.clone());
             assert_eq!(num_in_flight_polls, 0);
 
+            // Determine the peer priority
+            let peer_priority = utils::get_peer_priority_for_polling(poll_priority_peers);
+
             // Add a peer
-            let (peer, network_id) =
-                utils::add_peer_to_network(poll_priority_peers, &mut mock_network);
+            let (peer, network_id) = utils::add_peer_to_network(peer_priority, &mut mock_network);
 
             // Poll the peer
             let handle = poller::poll_peer(poller.clone(), poll_priority_peers, peer);
@@ -961,11 +972,11 @@ fn verify_peer_counts_and_polls(
         let (mut mock_network, _, _, poller) =
             MockNetwork::new(None, Some(data_client_config), None);
 
+        // Determine the peer priority
+        let peer_priority = utils::get_peer_priority_for_polling(poll_priority_peers);
+
         // Add the expected number of peers
-        let mut peers = vec![];
-        for _ in 0..peer_count {
-            peers.push(mock_network.add_peer(poll_priority_peers));
-        }
+        let _ = utils::add_several_peers(&mut mock_network, peer_count as u64, peer_priority);
 
         // Sum the peers to poll over many rounds
         let num_polling_rounds = 1000;

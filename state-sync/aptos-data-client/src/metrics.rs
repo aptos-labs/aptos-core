@@ -48,6 +48,22 @@ pub static ERROR_RESPONSES: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+// Buckets for tracking the number of multi-fetches sent per request
+const MULTI_FETCH_BUCKETS: &[f64] = &[
+    1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 15.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0,
+    80.0, 90.0, 100.0, 150.0, 200.0, 300.0, 400.0, 500.0,
+];
+
+/// Counter for tracking the number of multi-fetches sent per request
+pub static MULTI_FETCHES_PER_REQUEST: Lazy<HistogramVec> = Lazy::new(|| {
+    let histogram_opts = histogram_opts!(
+        "aptos_data_client_multi_fetches_per_request",
+        "Counters related to the number of multi-fetches sent per request",
+        MULTI_FETCH_BUCKETS.to_vec()
+    );
+    register_histogram_vec!(histogram_opts, &["label"]).unwrap()
+});
+
 // Latency buckets for network latencies (seconds)
 const REQUEST_LATENCY_BUCKETS_SECS: &[f64] = &[
     0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 5.0, 7.5, 10.0, 15.0, 20.0, 30.0, 40.0,
@@ -79,6 +95,16 @@ pub static CONNECTED_PEERS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "aptos_data_client_connected_peers",
         "Gauge related to the number of connected peers",
+        &["peer_type"]
+    )
+    .unwrap()
+});
+
+/// Gauge for tracking the number of connected peers by priority
+pub static CONNECTED_PEERS_AND_PRIORITIES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_data_client_connected_peers_and_priorities",
+        "Gauge related to the number of connected peers by priority",
         &["peer_type"]
     )
     .unwrap()

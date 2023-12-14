@@ -30,7 +30,7 @@ mod call_custom_modules;
 mod entry_points;
 mod p2p_transaction_generator;
 pub mod publish_modules;
-mod publishing;
+pub mod publishing;
 mod transaction_mix_generator;
 use self::{
     account_generator::AccountGeneratorCreator,

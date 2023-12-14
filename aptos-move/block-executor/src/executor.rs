@@ -479,9 +479,18 @@ where
             }
 
             if let Some(fee_statement) = last_input_output.fee_statement(txn_idx) {
-                let approx_output_size = block_gas_limit_type
-                    .block_output_limit()
-                    .and_then(|_| last_input_output.output_approx_size(txn_idx));
+                let approx_output_size = block_gas_limit_type.block_output_limit().and_then(|_| {
+                    last_input_output
+                        .output_approx_size(txn_idx)
+                        .map(|approx_output| {
+                            approx_output
+                                + if block_gas_limit_type.include_user_txn_size_in_block_output() {
+                                    block[txn_idx as usize].user_txn_bytes_len()
+                                } else {
+                                    0
+                                } as u64
+                        })
+                });
                 let txn_read_write_summary = block_gas_limit_type
                     .conflict_penalty_window()
                     .map(|_| last_input_output.get_txn_read_write_summary(txn_idx));
@@ -1236,7 +1245,19 @@ where
                         .onchain
                         .block_gas_limit_type
                         .block_output_limit()
-                        .map(|_| output.output_approx_size());
+                        .map(|_| {
+                            output.output_approx_size()
+                                + if self
+                                    .config
+                                    .onchain
+                                    .block_gas_limit_type
+                                    .include_user_txn_size_in_block_output()
+                                {
+                                    txn.user_txn_bytes_len()
+                                } else {
+                                    0
+                                } as u64
+                        });
 
                     let read_write_summary = self
                         .config

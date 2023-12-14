@@ -10,8 +10,11 @@ use aptos_network::application::storage::PeersAndMetadata;
 use itertools::Itertools;
 use std::sync::Arc;
 
-/// A simple enum containing the different categories for peer prioritization
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// A simple enum containing the different categories for peer prioritization.
+///
+/// Note: If another priority is added to this enum, it should also be added
+/// to `get_all_ordered_priorities`, below.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum PeerPriority {
     HighPriority,   // Peers to highly prioritize when requesting data
     MediumPriority, // Peers to prioritize iff high priority peers are unavailable
@@ -19,6 +22,16 @@ pub enum PeerPriority {
 }
 
 impl PeerPriority {
+    /// Returns a list of all peer priorities, ordered from
+    /// highest to lowest priority.
+    pub fn get_all_ordered_priorities() -> Vec<PeerPriority> {
+        vec![
+            PeerPriority::HighPriority,
+            PeerPriority::MediumPriority,
+            PeerPriority::LowPriority,
+        ]
+    }
+
     /// Returns the label for the peer priority
     pub fn get_label(&self) -> String {
         let label = match self {
@@ -136,11 +149,11 @@ mod tests {
     use aptos_network::{application::storage::PeersAndMetadata, transport::ConnectionMetadata};
     use aptos_types::PeerId;
     use maplit::hashmap;
-    use std::sync::Arc;
+    use std::{assert_eq, sync::Arc};
 
     #[test]
     fn test_is_high_priority_peer_validator() {
-        // Create a base config for a validator node
+        // Create a base config for a validator
         let base_config = Arc::new(BaseConfig {
             role: RoleType::Validator,
             ..Default::default()
@@ -177,7 +190,7 @@ mod tests {
 
     #[test]
     fn test_is_priority_peer_vfn() {
-        // Create a base config for a VFN node
+        // Create a base config for a VFN
         let base_config = Arc::new(BaseConfig {
             role: RoleType::FullNode,
             ..Default::default()
@@ -300,7 +313,7 @@ mod tests {
 
     #[test]
     fn test_validator_priorities() {
-        // Create a base config for a validator node
+        // Create a base config for a validator
         let base_config = Arc::new(BaseConfig {
             role: RoleType::Validator,
             ..Default::default()
@@ -338,7 +351,7 @@ mod tests {
 
     #[test]
     fn test_vfn_priorities() {
-        // Create a base config for a VFN node
+        // Create a base config for a VFN
         let base_config = Arc::new(BaseConfig {
             role: RoleType::FullNode,
             ..Default::default()
