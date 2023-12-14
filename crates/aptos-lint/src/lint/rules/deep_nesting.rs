@@ -1,6 +1,10 @@
-use move_model::{ model::{ FunctionEnv, GlobalEnv, NodeId }, ast::ExpData };
-
-use crate::lint::visitor::{ ExpDataVisitor, LintUtilities };
+use crate::lint::visitor::{ExpDataVisitor, LintUtilities};
+/// Detect if any code is too deeply nested (> 5 levels). This usually means the code can be buggy
+/// and hard to read.
+use move_model::{
+    ast::ExpData,
+    model::{FunctionEnv, GlobalEnv},
+};
 
 #[derive(Debug)]
 pub struct DeepNestingVisitor {
@@ -8,6 +12,11 @@ pub struct DeepNestingVisitor {
     max_nesting_allowed: usize,
 }
 
+impl Default for DeepNestingVisitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl DeepNestingVisitor {
     pub fn new() -> Self {
         Self {
@@ -15,15 +24,15 @@ impl DeepNestingVisitor {
             max_nesting_allowed: 5,
         }
     }
+
     pub fn visitor() -> Box<dyn ExpDataVisitor> {
         Box::new(Self::new())
     }
-
 }
 
 impl ExpDataVisitor for DeepNestingVisitor {
     fn visit(&mut self, func_env: &FunctionEnv, env: &GlobalEnv) {
-        func_env.get_def().map(|func| {
+        if let Some(func) = func_env.get_def().as_ref() {
             func.visit_pre_post(
                 &mut (|up: bool, exp: &ExpData| {
 
@@ -53,7 +62,7 @@ impl ExpDataVisitor for DeepNestingVisitor {
                     }
                 })
             );
-        });
+        };
     }
 }
 impl LintUtilities for DeepNestingVisitor {}

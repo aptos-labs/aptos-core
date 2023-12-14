@@ -11,6 +11,7 @@ module NamedAddr::Detector {
 
         let sum = 0;
         let i = 1;
+        let n = 10;
         while (i <= n) {
             sum = sum + i;
             i = i + 1

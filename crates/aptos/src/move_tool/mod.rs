@@ -37,6 +37,7 @@ use aptos_framework::{
     BuildOptions, BuiltPackage,
 };
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
+use aptos_lint::aptos_lint;
 use aptos_rest_client::aptos_api_types::{
     EntryFunctionId, HexEncodedBytes, IdentifierWrapper, MoveModuleId,
 };
@@ -76,6 +77,7 @@ pub enum MoveTool {
     BuildPublishPayload(BuildPublishPayload),
     Clean(CleanPackage),
     Compile(CompilePackage),
+    Lint(LintPackage),
     CompileScript(CompileScript),
     #[clap(subcommand)]
     Coverage(coverage::CoveragePackage),
@@ -111,6 +113,7 @@ impl MoveTool {
             MoveTool::Document(tool) => tool.execute_serialized().await,
             MoveTool::Download(tool) => tool.execute_serialized().await,
             MoveTool::Init(tool) => tool.execute_serialized_success().await,
+            MoveTool::Lint(tool) => tool.execute_serialized().await,
             MoveTool::List(tool) => tool.execute_serialized().await,
             MoveTool::Prove(tool) => tool.execute_serialized().await,
             MoveTool::Publish(tool) => tool.execute_serialized().await,
@@ -401,6 +404,30 @@ impl CompileScript {
 pub struct CompileScriptOutput {
     pub script_location: PathBuf,
     pub script_hash: HashValue,
+}
+
+#[derive(Parser)]
+pub struct LintPackage {
+    #[clap(long)]
+    pub(crate) save_metadata: bool,
+
+    #[clap(flatten)]
+    pub(crate) included_artifacts_args: IncludedArtifactsArgs,
+    #[clap(flatten)]
+    pub(crate) move_options: MovePackageDir,
+}
+
+#[async_trait]
+impl CliCommand<&'static str> for LintPackage {
+    fn command_name(&self) -> &'static str {
+        "LintPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<&'static str> {
+        let path: PathBuf = self.move_options.get_package_path()?;
+        aptos_lint(path);
+        Ok("")
+    }
 }
 
 /// Runs Move unit tests for a package

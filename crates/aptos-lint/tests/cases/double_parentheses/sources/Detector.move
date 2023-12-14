@@ -3,11 +3,6 @@ module NamedAddr::Detector {
         let a = 10;
         let b = 20;
 
-        // Simple expression with unnecessary double parentheses
-        let c = (a + b);
-        // Conditional expression with unnecessary double parentheses
-
-
         // While loop with unnecessary double parentheses
         while (((a < b))) {
             a = a + 1;

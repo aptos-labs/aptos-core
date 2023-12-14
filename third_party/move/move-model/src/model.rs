@@ -995,6 +995,10 @@ impl GlobalEnv {
             .ok()
     }
 
+    pub fn get_source_files(&self) -> Files<String> {
+        self.source_files.clone()
+    }
+
     /// Return the source text for the given location.
     pub fn get_source(&self, loc: &Loc) -> Result<&str, codespan_reporting::files::Error> {
         self.source_files.source_slice(loc.file_id, loc.span)

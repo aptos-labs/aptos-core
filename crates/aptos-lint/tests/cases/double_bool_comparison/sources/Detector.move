@@ -9,6 +9,7 @@ module NamedAddr::Detector {
         if (x < y || x != y) {}; // same as x < y
         if (x != y || x > y) {}; // same as x > y
         if (x > y || x != y) {}; // same as x > y
+        if (x > y || y != x) {}; // same as x > y
 
         if (x <= y) {};
         if (x >= y) {};

@@ -1,12 +1,16 @@
-// The visitor identifies functions that are declared but not used
-// (i.e., functions that are defined but not called anywhere within the module).
-
+use crate::lint::visitor::{ExpDataVisitor, LintUtilities};
+use move_model::model::{GlobalEnv, Loc, ModuleEnv, Visibility};
+/// Detect private functions that are declared but not used
 use std::collections::BTreeMap;
-use move_model::model::{ GlobalEnv, Visibility, ModuleEnv, Loc };
-use crate::lint::visitor::{ ExpDataVisitor, LintUtilities };
 
 pub struct UnusedFunctionVisitor {
     not_called_functions: BTreeMap<String, Loc>,
+}
+
+impl Default for UnusedFunctionVisitor {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl UnusedFunctionVisitor {
@@ -22,19 +26,19 @@ impl UnusedFunctionVisitor {
 
     fn detect_unused_functions(&mut self, module: &ModuleEnv, env: &GlobalEnv) {
         for func_env in module.get_functions() {
-            if func_env.visibility() == Visibility::Private {
-                if func_env.get_calling_functions().unwrap().len() == 0 {
-                    let message = format!(
-                        "Function '{}' is unused.",
-                        env.symbol_pool().string(func_env.get_name()).to_string()
-                    );
-                    self.add_diagnostic_and_emit(
-                        &func_env.get_loc(),
-                        &message,
-                        codespan_reporting::diagnostic::Severity::Warning,
-                        env
-                    );
-                }
+            if func_env.visibility() == Visibility::Private
+                && func_env.get_calling_functions().unwrap().is_empty()
+            {
+                let message = format!(
+                    "Function '{}' is unused.",
+                    env.symbol_pool().string(func_env.get_name())
+                );
+                self.add_diagnostic_and_emit(
+                    &func_env.get_loc(),
+                    &message,
+                    codespan_reporting::diagnostic::Severity::Warning,
+                    env,
+                );
             }
         }
     }
@@ -46,7 +50,12 @@ impl UnusedFunctionVisitor {
             warnings.push((loc.clone(), message));
         }
         for (loc, message) in warnings {
-            self.add_diagnostic_and_emit(&loc, &message, codespan_reporting::diagnostic::Severity::Warning, env);
+            self.add_diagnostic_and_emit(
+                &loc,
+                &message,
+                codespan_reporting::diagnostic::Severity::Warning,
+                env,
+            );
         }
     }
 }

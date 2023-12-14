@@ -1,6 +1,5 @@
-use std::path::PathBuf;
-
 use move_model::model::GlobalEnv;
+use std::path::PathBuf;
 
 mod resolved_graph;
 
