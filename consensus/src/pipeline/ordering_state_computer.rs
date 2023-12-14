@@ -6,7 +6,7 @@ use crate::{
     error::StateSyncError,
     payload_manager::PayloadManager,
     pipeline::{
-        buffer_manager::{OrderedBlocks, ResetAck, ResetRequest},
+        buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
         errors::Error,
     },
     state_computer::PipelineExecutionResult,
@@ -119,7 +119,7 @@ impl StateComputer for OrderingStateComputer {
             .clone()
             .send(ResetRequest {
                 tx,
-                stop: false, // epoch manager is responsible for sending stop request
+                signal: ResetSignal::TargetRound(target.commit_info().round()),
             })
             .await
             .map_err(|_| Error::ResetDropped)?;

@@ -8,7 +8,8 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     pipeline::{
         buffer_manager::{
-            create_channel, BufferManager, OrderedBlocks, Receiver, ResetAck, ResetRequest, Sender,
+            create_channel, BufferManager, OrderedBlocks, Receiver, ResetAck, ResetRequest,
+            ResetSignal, Sender,
         },
         decoupled_execution_utils::prepare_phases_and_buffer_manager,
         execution_schedule_phase::ExecutionSchedulePhase,
@@ -389,7 +390,13 @@ fn buffer_manager_sync_test() {
         // reset
         let (tx, rx) = oneshot::channel::<ResetAck>();
 
-        reset_tx.send(ResetRequest { tx, stop: false }).await.ok();
+        reset_tx
+            .send(ResetRequest {
+                tx,
+                signal: ResetSignal::Stop,
+            })
+            .await
+            .ok();
         rx.await.ok();
 
         // start sending back commit vote after reset, to avoid [0..dropped_batches] being sent to result_rx

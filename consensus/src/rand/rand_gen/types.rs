@@ -166,19 +166,12 @@ impl<P: Proof> RandDecision<P> {
 
     pub fn verify(&self, rand_config: &RandConfig, metadata: &RandMetadata) -> anyhow::Result<()> {
         ensure!(
-            metadata.round() == self.randomness.metadata().round(),
-            "Round does not match: local {}, received {}",
-            metadata.round(),
-            self.randomness.metadata().round()
-        );
-        self.proof.verify(rand_config, self.randomness.metadata())?;
-        // this is a sanity check in case we receive different ordered blocks from consensus
-        ensure!(
             metadata == self.randomness.metadata(),
             "Metadata does not match: local {:?}, received {:?}",
             metadata,
             self.randomness.metadata()
         );
+        self.proof.verify(rand_config, self.randomness.metadata())?;
         Ok(())
     }
 
