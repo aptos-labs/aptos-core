@@ -344,6 +344,8 @@ impl ProofQueue {
             counters::BLOCK_BYTES_WHEN_PULL.observe(cur_bytes as f64);
             counters::PROOF_SIZE_WHEN_PULL.observe(ret.len() as f64);
             counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);
+            // Stable sort, so the order of proofs within an author will not change.
+            ret.sort_by_key(|proof| u64::MAX - proof.gas_bucket_start());
             ret
         } else {
             Vec::new()
