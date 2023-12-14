@@ -296,7 +296,7 @@ Required if user wants to start accepting deposits of <code>CoinType</code> in h
 
 </table>
 
-</high-level-req>
+
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
@@ -320,7 +320,7 @@ Required if user wants to start accepting deposits of <code>CoinType</code> in h
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt;&gt;(account_addr);
 <b>let</b> coin_store = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
 <b>let</b> balance = coin_store.<a href="coin.md#0x1_coin">coin</a>.value;
-// This enforces <a id=high-level-spec-3.2 href="#high-level-req">high-level requirement 3</a>:
+// This enforces <a id="high-level-spec-3.2" href="#high-level-req">high level requirement 3</a>:
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
 <b>aborts_if</b> coin_store.frozen;
 <b>aborts_if</b> balance &lt; amount;
@@ -354,7 +354,7 @@ The Capabilities<CoinType> should be under the signer after creating;
 <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(name);
 <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(symbol);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt;&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
-// This enforces <a id=managed_coin::high-level-spec-3.1 href="managed_coin.md#high-level-req">high-level requirement 3</a> of the <a href=managed_coin.md>managed_coin</a> module:
+// This enforces <a id="high-level-spec-3.1" href="managed_coin.md#high-level-req">high level requirement 3</a> of the <a href=managed_coin.md>managed_coin</a> module:
 <b>ensures</b> <b>exists</b>&lt;<a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt;&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
 </code></pre>
 
@@ -374,7 +374,7 @@ The <code>dst_addr</code> should not be frozen.
 
 
 <pre><code><b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-// This enforces <a id=high-level-spec-3.3 href="#high-level-req">high-level requirement 3</a>:
+// This enforces <a id="high-level-spec-3.3" href="#high-level-req">high level requirement 3</a>:
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt;&gt;(account_addr);
 <b>let</b> addr = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
 <b>aborts_if</b> (amount != 0) && !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">coin::CoinInfo</a>&lt;CoinType&gt;&gt;(addr);

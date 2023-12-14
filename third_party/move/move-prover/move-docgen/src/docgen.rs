@@ -302,7 +302,7 @@ impl<'env> Docgen<'env> {
                 | (?P<index>move-index)
                 )\s*}}.*$",
             )
-                .unwrap()
+            .unwrap()
         });
         let mut content = String::new();
         let mut file = File::open(file_name)?;
@@ -845,7 +845,7 @@ impl<'env> Docgen<'env> {
 
             format!("<a href=\"{}#{}\">{}</a>", module_link, href, text)
         })
-            .to_string()
+        .to_string()
     }
 
     /// Generate a static call diagram (.svg) starting from the given function.
@@ -1444,13 +1444,13 @@ impl<'env> Docgen<'env> {
             let may_merge_with_current = match &block.target {
                 SpecBlockTarget::Schema(..) => true,
                 SpecBlockTarget::Module
-                if !block.member_locs.is_empty() || !self.is_single_liner(&block.loc) =>
-                    {
-                        // This is a bit of a hack: if spec module is on a single line,
-                        // we consider it as a marker to switch doc context back to module level,
-                        // otherwise (the case in this branch), we merge it with the predecessor.
-                        true
-                    },
+                    if !block.member_locs.is_empty() || !self.is_single_liner(&block.loc) =>
+                {
+                    // This is a bit of a hack: if spec module is on a single line,
+                    // we consider it as a marker to switch doc context back to module level,
+                    // otherwise (the case in this branch), we merge it with the predecessor.
+                    true
+                },
                 _ => false,
             };
             if !may_merge_with_current
@@ -1733,7 +1733,7 @@ impl<'env> Docgen<'env> {
                         "<code>{}</code>",
                         self.decorate_code(&code)
                     )
-                        .unwrap()
+                    .unwrap()
                 }
             } else {
                 decorated_text.push(chr);
@@ -1771,7 +1771,7 @@ impl<'env> Docgen<'env> {
             Regex::new(
                 r"(?P<ident>(\b\w+\b\s*::\s*)*\b\w+\b)(?P<call>\s*[(<])?|(?P<lt><)|(?P<gt>>)",
             )
-                .unwrap()
+            .unwrap()
         });
         let mut r = String::new();
         let mut at = 0;
@@ -1856,13 +1856,13 @@ impl<'env> Docgen<'env> {
                     || module.find_named_constant(name).is_some()
                     || module.find_spec_var(name).is_some()
                     || self
-                    .declared_schemas
-                    .get(&module.get_id())
-                    .map(|s| s.contains(&name))
-                    .unwrap_or(false)
+                        .declared_schemas
+                        .get(&module.get_id())
+                        .map(|s| s.contains(&name))
+                        .unwrap_or(false)
                     || ((is_qualified || is_followed_by_open)
-                    && (module.find_function(name).is_some()
-                    || module.get_spec_funs_of_name(name).next().is_some()))
+                        && (module.find_function(name).is_some()
+                            || module.get_spec_funs_of_name(name).next().is_some()))
                 {
                     Some(self.ref_for_module_item(module, name))
                 } else {
