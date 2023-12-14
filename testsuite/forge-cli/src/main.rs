@@ -1867,11 +1867,18 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             let mut on_chain_execution_config = OnChainExecutionConfig::default_for_genesis();
-            if let OnChainExecutionConfig::V4(config_v4) = &mut on_chain_execution_config {
-                config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
-                config_v4.transaction_shuffler_type = TransactionShufflerType::SenderAwareV2(256);
-            } else {
-                panic!("Unexpected on-chain execution config type, if OnChainExecutionConfig::default_for_genesis() has been updated, this test must be updated too.")
+            // Need to update if the default changes
+            match &mut on_chain_execution_config {
+                OnChainExecutionConfig::Missing
+                | OnChainExecutionConfig::V1(_)
+                | OnChainExecutionConfig::V2(_)
+                | OnChainExecutionConfig::V3(_) => {
+                    unreachable!("Unexpected on-chain execution config type, if OnChainExecutionConfig::default_for_genesis() has been updated, this test must be updated too.")
+                }
+                OnChainExecutionConfig::V4(config_v4) => {
+                    config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                    config_v4.transaction_shuffler_type = TransactionShufflerType::SenderAwareV2(256);
+                }
             }
             helm_values["chain"]["on_chain_execution_config"] =
                 serde_yaml::to_value(on_chain_execution_config).expect("must serialize");
