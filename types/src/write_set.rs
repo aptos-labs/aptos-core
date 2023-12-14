@@ -12,7 +12,7 @@ use crate::{
     },
     write_set::WriteOp::{Creation, Deletion, Modification},
 };
-use anyhow::{bail, Result};
+use anyhow::{bail, ensure, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use bytes::Bytes;
 use once_cell::sync::Lazy;
@@ -147,21 +147,27 @@ impl WriteOp {
             => {
                 bail!("The given change sets cannot be squashed")
             },
-            (Creation {metadata, .. } , Modification {data, ..}) => {
+            (Creation {metadata: old_meta, .. } , Modification {data, metadata}) => {
+                Self::ensure_metadata_compatible(old_meta, &metadata)?;
+
                 *op = Creation {
                     data,
-                    metadata: metadata.clone(),
+                    metadata,
                 };
             },
-            (Modification{metadata, .. } , Modification {data, ..}) => {
+            (Modification{metadata: old_meta, .. } , Modification {data, metadata}) => {
+                Self::ensure_metadata_compatible(old_meta, &metadata)?;
+
                 *op = Modification {
                     data,
-                    metadata: metadata.clone(),
+                    metadata,
                 };
             },
-            (Modification {metadata, ..}, Deletion {..}) => {
+            (Modification {metadata: old_meta, ..}, Deletion {metadata}) => {
+                Self::ensure_metadata_compatible(old_meta, &metadata)?;
+
                 *op = Deletion {
-                    metadata: metadata.clone(),
+                    metadata,
                 }
             },
             (Deletion {metadata}, Creation {data, ..}) => {
@@ -176,11 +182,26 @@ impl WriteOp {
                     metadata: metadata.clone(),
                 }
             },
-            (Creation { .. }, Deletion { .. }) => {
+            (Creation { metadata: old_meta, .. }, Deletion { metadata }) => {
+                Self::ensure_metadata_compatible(old_meta, &metadata)?;
+
                 return Ok(false)
             },
         }
         Ok(true)
+    }
+
+    fn ensure_metadata_compatible(
+        old: &StateValueMetadata,
+        new: &StateValueMetadata,
+    ) -> Result<()> {
+        // Write ops shouldn't be squashed after the second one is charged for fees, which might
+        // result in metadata change (bytes_deposit increase, for example).
+        ensure!(
+            old == new,
+            "Squashing incompatible metadata: old:{old:?}, new:{new:?}",
+        );
+        Ok(())
     }
 
     pub fn bytes(&self) -> Option<&Bytes> {
