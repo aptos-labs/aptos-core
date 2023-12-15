@@ -50,6 +50,7 @@ message Transaction {
     TRANSACTION_TYPE_BLOCK_METADATA = 2;
     TRANSACTION_TYPE_STATE_CHECKPOINT = 3;
     TRANSACTION_TYPE_USER = 4;
+    TRANSACTION_TYPE_VALIDATOR = 20;
   }
 
   TransactionType type = 6;
@@ -59,6 +60,7 @@ message Transaction {
     GenesisTransaction genesis = 8;
     StateCheckpointTransaction state_checkpoint = 9;
     UserTransaction user = 10;
+    ValidatorTransaction validator = 21;
   }
 }
 
@@ -77,6 +79,9 @@ message GenesisTransaction {
 }
 
 message StateCheckpointTransaction {
+}
+
+message ValidatorTransaction {
 }
 
 message UserTransaction {

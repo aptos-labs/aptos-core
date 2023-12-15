@@ -6073,6 +6073,9 @@ impl serde::Serialize for Transaction {
                 transaction::TxnData::User(v) => {
                     struct_ser.serialize_field("user", v)?;
                 }
+                transaction::TxnData::Validator(v) => {
+                    struct_ser.serialize_field("validator", v)?;
+                }
             }
         }
         struct_ser.end()
@@ -6098,6 +6101,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
             "state_checkpoint",
             "stateCheckpoint",
             "user",
+            "validator",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -6112,6 +6116,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
             Genesis,
             StateCheckpoint,
             User,
+            Validator,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -6143,6 +6148,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                             "genesis" => Ok(GeneratedField::Genesis),
                             "stateCheckpoint" | "state_checkpoint" => Ok(GeneratedField::StateCheckpoint),
                             "user" => Ok(GeneratedField::User),
+                            "validator" => Ok(GeneratedField::Validator),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -6241,6 +6247,13 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                             txn_data__ = map.next_value::<::std::option::Option<_>>()?.map(transaction::TxnData::User)
 ;
                         }
+                        GeneratedField::Validator => {
+                            if txn_data__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("validator"));
+                            }
+                            txn_data__ = map.next_value::<::std::option::Option<_>>()?.map(transaction::TxnData::Validator)
+;
+                        }
                     }
                 }
                 Ok(Transaction {
@@ -6269,6 +6282,7 @@ impl serde::Serialize for transaction::TransactionType {
             Self::BlockMetadata => "TRANSACTION_TYPE_BLOCK_METADATA",
             Self::StateCheckpoint => "TRANSACTION_TYPE_STATE_CHECKPOINT",
             Self::User => "TRANSACTION_TYPE_USER",
+            Self::Validator => "TRANSACTION_TYPE_VALIDATOR",
         };
         serializer.serialize_str(variant)
     }
@@ -6285,6 +6299,7 @@ impl<'de> serde::Deserialize<'de> for transaction::TransactionType {
             "TRANSACTION_TYPE_BLOCK_METADATA",
             "TRANSACTION_TYPE_STATE_CHECKPOINT",
             "TRANSACTION_TYPE_USER",
+            "TRANSACTION_TYPE_VALIDATOR",
         ];
 
         struct GeneratedVisitor;
@@ -6332,6 +6347,7 @@ impl<'de> serde::Deserialize<'de> for transaction::TransactionType {
                     "TRANSACTION_TYPE_BLOCK_METADATA" => Ok(transaction::TransactionType::BlockMetadata),
                     "TRANSACTION_TYPE_STATE_CHECKPOINT" => Ok(transaction::TransactionType::StateCheckpoint),
                     "TRANSACTION_TYPE_USER" => Ok(transaction::TransactionType::User),
+                    "TRANSACTION_TYPE_VALIDATOR" => Ok(transaction::TransactionType::Validator),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }
@@ -7150,6 +7166,77 @@ impl<'de> serde::Deserialize<'de> for UserTransactionRequest {
             }
         }
         deserializer.deserialize_struct("aptos.transaction.v1.UserTransactionRequest", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for ValidatorTransaction {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let len = 0;
+        let struct_ser = serializer.serialize_struct("aptos.transaction.v1.ValidatorTransaction", len)?;
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for ValidatorTransaction {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                            Err(serde::de::Error::unknown_field(value, FIELDS))
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = ValidatorTransaction;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct aptos.transaction.v1.ValidatorTransaction")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<ValidatorTransaction, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                while map.next_key::<GeneratedField>()?.is_some() {
+                    let _ = map.next_value::<serde::de::IgnoredAny>()?;
+                }
+                Ok(ValidatorTransaction {
+                })
+            }
+        }
+        deserializer.deserialize_struct("aptos.transaction.v1.ValidatorTransaction", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for WriteModule {

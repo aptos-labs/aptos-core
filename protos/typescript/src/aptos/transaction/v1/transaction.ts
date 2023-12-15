@@ -222,6 +222,7 @@ export interface Transaction {
   genesis?: GenesisTransaction | undefined;
   stateCheckpoint?: StateCheckpointTransaction | undefined;
   user?: UserTransaction | undefined;
+  validator?: ValidatorTransaction | undefined;
 }
 
 export enum Transaction_TransactionType {
@@ -230,6 +231,7 @@ export enum Transaction_TransactionType {
   TRANSACTION_TYPE_BLOCK_METADATA = 2,
   TRANSACTION_TYPE_STATE_CHECKPOINT = 3,
   TRANSACTION_TYPE_USER = 4,
+  TRANSACTION_TYPE_VALIDATOR = 20,
   UNRECOGNIZED = -1,
 }
 
@@ -250,6 +252,9 @@ export function transaction_TransactionTypeFromJSON(object: any): Transaction_Tr
     case 4:
     case "TRANSACTION_TYPE_USER":
       return Transaction_TransactionType.TRANSACTION_TYPE_USER;
+    case 20:
+    case "TRANSACTION_TYPE_VALIDATOR":
+      return Transaction_TransactionType.TRANSACTION_TYPE_VALIDATOR;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -269,6 +274,8 @@ export function transaction_TransactionTypeToJSON(object: Transaction_Transactio
       return "TRANSACTION_TYPE_STATE_CHECKPOINT";
     case Transaction_TransactionType.TRANSACTION_TYPE_USER:
       return "TRANSACTION_TYPE_USER";
+    case Transaction_TransactionType.TRANSACTION_TYPE_VALIDATOR:
+      return "TRANSACTION_TYPE_VALIDATOR";
     case Transaction_TransactionType.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -290,6 +297,9 @@ export interface GenesisTransaction {
 }
 
 export interface StateCheckpointTransaction {
+}
+
+export interface ValidatorTransaction {
 }
 
 export interface UserTransaction {
@@ -1190,6 +1200,7 @@ function createBaseTransaction(): Transaction {
     genesis: undefined,
     stateCheckpoint: undefined,
     user: undefined,
+    validator: undefined,
   };
 }
 
@@ -1233,6 +1244,9 @@ export const Transaction = {
     }
     if (message.user !== undefined) {
       UserTransaction.encode(message.user, writer.uint32(82).fork()).ldelim();
+    }
+    if (message.validator !== undefined) {
+      ValidatorTransaction.encode(message.validator, writer.uint32(170).fork()).ldelim();
     }
     return writer;
   },
@@ -1314,6 +1328,13 @@ export const Transaction = {
 
           message.user = UserTransaction.decode(reader, reader.uint32());
           continue;
+        case 21:
+          if (tag !== 170) {
+            break;
+          }
+
+          message.validator = ValidatorTransaction.decode(reader, reader.uint32());
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1369,6 +1390,7 @@ export const Transaction = {
         ? StateCheckpointTransaction.fromJSON(object.stateCheckpoint)
         : undefined,
       user: isSet(object.user) ? UserTransaction.fromJSON(object.user) : undefined,
+      validator: isSet(object.validator) ? ValidatorTransaction.fromJSON(object.validator) : undefined,
     };
   },
 
@@ -1404,6 +1426,9 @@ export const Transaction = {
     if (message.user !== undefined) {
       obj.user = UserTransaction.toJSON(message.user);
     }
+    if (message.validator !== undefined) {
+      obj.validator = ValidatorTransaction.toJSON(message.validator);
+    }
     return obj;
   },
 
@@ -1433,6 +1458,9 @@ export const Transaction = {
       : undefined;
     message.user = (object.user !== undefined && object.user !== null)
       ? UserTransaction.fromPartial(object.user)
+      : undefined;
+    message.validator = (object.validator !== undefined && object.validator !== null)
+      ? ValidatorTransaction.fromPartial(object.validator)
       : undefined;
     return message;
   },
@@ -1821,6 +1849,83 @@ export const StateCheckpointTransaction = {
   },
   fromPartial(_: DeepPartial<StateCheckpointTransaction>): StateCheckpointTransaction {
     const message = createBaseStateCheckpointTransaction();
+    return message;
+  },
+};
+
+function createBaseValidatorTransaction(): ValidatorTransaction {
+  return {};
+}
+
+export const ValidatorTransaction = {
+  encode(_: ValidatorTransaction, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ValidatorTransaction {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseValidatorTransaction();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<ValidatorTransaction, Uint8Array>
+  async *encodeTransform(
+    source:
+      | AsyncIterable<ValidatorTransaction | ValidatorTransaction[]>
+      | Iterable<ValidatorTransaction | ValidatorTransaction[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ValidatorTransaction.encode(p).finish()];
+        }
+      } else {
+        yield* [ValidatorTransaction.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, ValidatorTransaction>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<ValidatorTransaction> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ValidatorTransaction.decode(p)];
+        }
+      } else {
+        yield* [ValidatorTransaction.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(_: any): ValidatorTransaction {
+    return {};
+  },
+
+  toJSON(_: ValidatorTransaction): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create(base?: DeepPartial<ValidatorTransaction>): ValidatorTransaction {
+    return ValidatorTransaction.fromPartial(base ?? {});
+  },
+  fromPartial(_: DeepPartial<ValidatorTransaction>): ValidatorTransaction {
+    const message = createBaseValidatorTransaction();
     return message;
   },
 };
