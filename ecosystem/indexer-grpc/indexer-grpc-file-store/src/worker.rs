@@ -2,20 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{METADATA_UPLOAD_FAILURE_COUNT, PROCESSED_VERSIONS_COUNT};
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{ensure, Context, Result};
 use aptos_indexer_grpc_utils::{
-    build_protobuf_encoded_transaction_wrappers,
-    cache_operator::{CacheBatchGetStatus, CacheOperator},
+    cache_operator::CacheOperator,
     config::IndexerGrpcFileStoreConfig,
     constants::BLOB_STORAGE_SIZE,
     counters::{log_grpc_step, IndexerGrpcStep},
     file_store_operator::FileStoreOperator,
     types::RedisUrl,
-    EncodedTransactionWithVersion,
 };
 use aptos_moving_average::MovingAverage;
 use aptos_protos::transaction::v1::Transaction;
-use futures::channel::oneshot::channel;
 use prost::Message;
 use std::time::Duration;
 use tracing::debug;
@@ -27,19 +24,6 @@ const SERVICE_TYPE: &str = "file_worker";
 pub struct Worker {}
 
 impl Worker {
-    pub async fn setup_metadata(
-        chain_id: u64,
-        mut file_store_operator: Box<dyn FileStoreOperator>,
-    ) -> Result<()> {
-        let file_store_metadata = file_store_operator.get_file_store_metadata().await;
-        if file_store_metadata.is_none() {
-            file_store_operator
-                .update_file_store_metadata_with_timeout(chain_id, 0)
-                .await?;
-        }
-        Ok(())
-    }
-
     /// Starts the processing. The steps are
     /// 1. Check chain id at the beginning and every step after
     /// 2. Get the batch start version from file store metadata
@@ -74,23 +58,33 @@ impl Worker {
 
         let mut file_store_operator: Box<dyn FileStoreOperator> = file_store_config.create();
 
-        Self::setup_metadata(chain_id, file_store_operator).await?;
+        let file_store_metadata = file_store_operator.get_file_store_metadata().await;
+        if file_store_metadata.is_none() {
+            file_store_operator
+                .update_file_store_metadata_internal(chain_id, 0)
+                .await?;
+        }
         // Metadata is guaranteed to exist now
-        let metadata = file_store_operator
-            .get_file_store_metadata()
-            .await
-            .unwrap();
+        let metadata = file_store_operator.get_file_store_metadata().await.unwrap();
+
         ensure!(metadata.chain_id == chain_id, "Chain ID mismatch.");
         let mut batch_start_version = metadata.version;
         // Cache config in the cache
+        match cache_operator.get_chain_id().await? {
+            Some(id) => {
+                ensure!(id == chain_id, "Chain ID mismatch.");
+            },
+            None => {
+                cache_operator.set_chain_id(chain_id).await?;
+            },
+        }
         cache_operator
             .update_file_store_latest_version(batch_start_version)
             .await?;
-        cache_operator.update_or_verify_chain_id(chain_id).await?;
         let mut tps_calculator = MovingAverage::new(10_000);
         loop {
             let latest_loop_time = std::time::Instant::now();
-            let cache_worker_latest = cache_operator.get_latest_version().await?;
+            let cache_worker_latest = cache_operator.get_latest_version().await?.unwrap();
 
             // batches tracks the start version of the batches to fetch. 1000 at the time
             let mut batches = vec![];
