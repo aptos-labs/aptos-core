@@ -6,6 +6,7 @@ use itertools::{any, Itertools};
 use std::path::PathBuf;
 use tracing::info;
 
+#[derive(Clone)]
 pub struct LocalFileStoreOperator {
     path: PathBuf,
     /// The timestamp of the latest metadata update; this is to avoid too frequent metadata update.
@@ -82,26 +83,27 @@ impl FileStoreOperator for LocalFileStoreOperator {
         }
     }
 
-    async fn create_default_file_store_metadata_if_absent(
+    async fn update_file_store_metadata_with_timeout(
         &mut self,
         expected_chain_id: u64,
-    ) -> anyhow::Result<FileStoreMetadata> {
+        _version: u64,
+    ) -> anyhow::Result<()> {
         let metadata_path = self.path.join(METADATA_FILE_NAME);
         match tokio::fs::read(metadata_path).await {
             Ok(metadata) => {
                 let metadata: FileStoreMetadata =
                     serde_json::from_slice(&metadata).expect("Expected metadata to be valid JSON.");
                 anyhow::ensure!(metadata.chain_id == expected_chain_id, "Chain ID mismatch.");
-                Ok(metadata)
+                Ok(())
             },
             Err(err) => {
                 if err.kind() == std::io::ErrorKind::NotFound {
                     // If the metadata is not found, it means the file store is empty.
                     info!("File store is empty. Creating metadata file.");
-                    self.update_file_store_metadata(expected_chain_id, 0)
+                    self.update_file_store_metadata_internal(expected_chain_id, 0)
                         .await
                         .expect("[Indexer File] Update metadata failed.");
-                    Ok(FileStoreMetadata::new(expected_chain_id, 0))
+                    Ok(())
                 } else {
                     // If not in write mode, the metadata must exist.
                     Err(anyhow::Error::msg(format!(
@@ -113,7 +115,7 @@ impl FileStoreOperator for LocalFileStoreOperator {
         }
     }
 
-    async fn update_file_store_metadata(
+    async fn update_file_store_metadata_internal(
         &mut self,
         chain_id: u64,
         version: u64,
@@ -135,11 +137,12 @@ impl FileStoreOperator for LocalFileStoreOperator {
         }
     }
 
-    async fn upload_transactions(
+    /// TODO: rewrite this function to be similar to the general version
+    async fn upload_transaction_batch(
         &mut self,
         chain_id: u64,
         transactions: Vec<EncodedTransactionWithVersion>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<(u64, u64)> {
         let start_version = transactions.first().unwrap().1;
         let batch_size = transactions.len();
         anyhow::ensure!(
@@ -198,34 +201,26 @@ impl FileStoreOperator for LocalFileStoreOperator {
         if let Some(ts) = self.latest_metadata_update_timestamp {
             // a periodic metadata update
             if (std::time::Instant::now() - ts).as_secs() > FILE_STORE_UPDATE_FREQUENCY_SECS {
-                self.update_file_store_metadata(chain_id, start_version + batch_size as u64)
-                    .await?;
+                self.update_file_store_metadata_internal(
+                    chain_id,
+                    start_version + batch_size as u64,
+                )
+                .await?;
             }
         } else {
             // the first metadata update
-            self.update_file_store_metadata(chain_id, start_version + batch_size as u64)
+            self.update_file_store_metadata_internal(chain_id, start_version + batch_size as u64)
                 .await?;
         }
 
-        Ok(())
-    }
-
-    async fn get_or_create_verification_metadata(
-        &self,
-        _chain_id: u64,
-    ) -> Result<VerificationMetadata> {
-        anyhow::bail!("Verification is not impelemented for local file store.")
-    }
-
-    async fn update_verification_metadata(
-        &mut self,
-        _chain_id: u64,
-        _next_version_to_verify: u64,
-    ) -> Result<()> {
-        anyhow::bail!("Verification is not impelemented for local file store.")
+        Ok((start_version, start_version + batch_size as u64 - 1))
     }
 
     async fn get_raw_transactions(&self, _version: u64) -> anyhow::Result<TransactionsFile> {
         anyhow::bail!("Unimplemented");
+    }
+
+    fn clone_box(&self) -> Box<dyn FileStoreOperator> {
+        Box::new(self.clone())
     }
 }
