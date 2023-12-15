@@ -13,6 +13,7 @@ use aptos_sdk::{
 };
 use args::TransactionTypeArg;
 use async_trait::async_trait;
+use rand::rngs::StdRng;
 use std::{
     collections::HashMap,
     sync::{
@@ -45,6 +46,7 @@ use crate::{
     entry_points::EntryPointTransactionGenerator, p2p_transaction_generator::SamplingMode,
 };
 pub use publishing::module_simple::EntryPoints;
+use rand::Rng;
 
 pub const SEND_AMOUNT: u64 = 1;
 
@@ -309,6 +311,7 @@ pub async fn create_txn_generator_creator(
 fn get_account_to_burn_from_pool(
     accounts_pool: &Arc<RwLock<Vec<LocalAccount>>>,
     needed: usize,
+    rng: &mut StdRng,
 ) -> Vec<LocalAccount> {
     let mut accounts_pool = accounts_pool.write();
     let num_in_pool = accounts_pool.len();
@@ -319,9 +322,14 @@ fn get_account_to_burn_from_pool(
         );
         return Vec::new();
     }
-    accounts_pool
+    let mut result = accounts_pool
         .drain((num_in_pool - needed)..)
-        .collect::<Vec<_>>()
+        .collect::<Vec<_>>();
+    if accounts_pool.len() > needed {
+        let start = rng.gen_range(0, accounts_pool.len() - needed);
+        accounts_pool[start..start + needed].swap_with_slice(&mut result);
+    }
+    result
 }
 
 pub fn create_account_transaction(
