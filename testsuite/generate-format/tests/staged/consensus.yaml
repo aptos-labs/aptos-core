@@ -604,6 +604,12 @@ StateValueMetadata:
         STRUCT:
           - deposit: U64
           - creation_time_usecs: U64
+    1:
+      V1:
+        STRUCT:
+          - slot_deposit: U64
+          - bytes_deposit: U64
+          - creation_time_usecs: U64
 StructTag:
   STRUCT:
     - address:

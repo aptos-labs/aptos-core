@@ -154,6 +154,7 @@ impl VMChangeSet {
                                                     ),
                                                 )
                                             })?,
+                                        metadata: w.into_metadata(),
                                     },
                                 ),
                             ))
@@ -341,7 +342,7 @@ impl VMChangeSet {
     /// So this method is needed to be able to update metadata generically across different variants.
     pub fn write_set_iter_mut(
         &mut self,
-    ) -> impl Iterator<Item = (&StateKey, WriteOpSize, Option<&mut StateValueMetadata>)> {
+    ) -> impl Iterator<Item = (&StateKey, WriteOpSize, &mut StateValueMetadata)> {
         self.resource_write_set
             .iter_mut()
             .map(|(k, v)| (k, v.materialized_size(), v.get_metadata_mut()))
@@ -476,10 +477,7 @@ impl VMChangeSet {
             if let Some(write_op) = aggregator_v1_write_set.get_mut(&state_key) {
                 // In this case, delta follows a write op.
                 match write_op {
-                    Creation(data)
-                    | Modification(data)
-                    | CreationWithMetadata { data, .. }
-                    | ModificationWithMetadata { data, .. } => {
+                    Creation { data, .. } | Modification { data, .. } => {
                         // Apply delta on top of creation or modification.
                         // TODO[agg_v1](cleanup): This will not be needed anymore once aggregator
                         // change sets carry non-serialized information.
@@ -491,7 +489,7 @@ impl VMChangeSet {
                             .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
                         *data = serialize(&value).into();
                     },
-                    Deletion | DeletionWithMetadata { .. } => {
+                    Deletion { .. } => {
                         // This case (applying a delta to deleted item) should
                         // never happen. Let's still return an error instead of
                         // panicking.
