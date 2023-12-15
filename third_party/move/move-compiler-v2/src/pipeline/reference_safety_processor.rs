@@ -519,9 +519,7 @@ impl LifetimeState {
 impl LifetimeState {
     /// Returns the locals borrowed
     pub fn borrowed_locals(&self) -> impl Iterator<Item = TempIndex> + '_ {
-        self.local_to_label_map
-            .keys()
-            .cloned()
+        self.local_to_label_map.keys().cloned()
     }
 
     /// Checks if the given local is borrowed

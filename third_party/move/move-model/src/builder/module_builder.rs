@@ -1219,7 +1219,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     }
 
     // checks whether the field has the abilities required by the declared abilities of the struct
-    fn ability_check_field(&self, struct_abilities: AbilitySet, struct_name: &QualifiedSymbol, field_ty: &Type, field_ty_loc: &Loc) {
+    fn ability_check_field(
+        &self,
+        struct_abilities: AbilitySet,
+        struct_name: &QualifiedSymbol,
+        field_ty: &Type,
+        field_ty_loc: &Loc,
+    ) {
         let field_abilities = self.infer_abilities_may_have(field_ty);
         for ability in field_missing_abilities(struct_abilities, field_abilities) {
             match ability {
@@ -1228,14 +1234,14 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     &format!(
                         "field must have copy ability because {} is declared with copy ability",
                         struct_name.display_simple(self.parent.env)
-                    )
+                    ),
                 ),
                 Ability::Drop => self.parent.error(
                     field_ty_loc,
                     &format!(
                         "field must have drop ability because {} is declared with drop ability",
                         struct_name.display_simple(self.parent.env)
-                    )
+                    ),
                 ),
                 Ability::Store => {
                     let mut abilities = Vec::new();
@@ -1251,9 +1257,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             "field must have store ability because {} is declared with {}",
                             struct_name.display_simple(self.parent.env),
                             abilities.join(" + ")
-                        )
+                        ),
                     );
-                }
+                },
                 Ability::Key => panic!("ICE check_field: field missing key ability"),
             }
         }
@@ -1263,9 +1269,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let qsym = self.qualified_by_module_from_name(&name.0);
         let struct_entry = self.parent.struct_table.get(&qsym).expect("struct invalid");
         let struct_abilities = struct_entry.abilities;
-        let type_params = struct_entry
-            .type_params
-            .clone();
+        let type_params = struct_entry.type_params.clone();
         let mut et = ExpTranslator::new(self);
         let loc = et.to_loc(&name.0.loc);
         et.define_type_params(&loc, &type_params, false);
@@ -3816,7 +3820,10 @@ pub(crate) fn extract_schema_access<'a>(exp: &'a EA::Exp, res: &mut Vec<&'a EA::
 }
 
 // returns the abilities that a field should have but not
-fn field_missing_abilities(struct_abilities: AbilitySet, field_abilities: AbilitySet) -> AbilitySet {
+fn field_missing_abilities(
+    struct_abilities: AbilitySet,
+    field_abilities: AbilitySet,
+) -> AbilitySet {
     let mut missing_abilities = AbilitySet::EMPTY;
     if struct_abilities.has_copy() && !field_abilities.has_copy() {
         missing_abilities = missing_abilities.add(Ability::Copy);
@@ -3824,7 +3831,8 @@ fn field_missing_abilities(struct_abilities: AbilitySet, field_abilities: Abilit
     if struct_abilities.has_drop() && !field_abilities.has_drop() {
         missing_abilities = missing_abilities.add(Ability::Drop);
     }
-    if (struct_abilities.has_store() || struct_abilities.has_key()) && !field_abilities.has_store() {
+    if (struct_abilities.has_store() || struct_abilities.has_key()) && !field_abilities.has_store()
+    {
         missing_abilities = missing_abilities.add(Ability::Store)
     }
     missing_abilities

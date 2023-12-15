@@ -14,7 +14,8 @@ use move_binary_format::file_format::{CodeOffset, Visibility};
 use move_model::{
     ast::{Exp, ExpData, Spec, TempIndex},
     model::{
-        FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, QualifiedId, QualifiedInstId, StructId, TypeParameter,
+        FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, QualifiedId, QualifiedInstId, StructId,
+        TypeParameter,
     },
     symbol::{Symbol, SymbolPool},
     ty::{Type, TypeDisplayContext},

@@ -9,9 +9,10 @@ use move_compiler::compiled_unit::CompiledUnit;
 use move_compiler_v2::{
     inliner,
     pipeline::{
+        ability_checker::AbilityChecker, explicit_drop::ExplicitDrop,
         livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety_processor::ReferenceSafetyProcessor,
-        visibility_checker::VisibilityChecker, ability_checker::AbilityChecker, explicit_drop::ExplicitDrop,
+        visibility_checker::VisibilityChecker,
     },
     run_file_format_gen, Options,
 };

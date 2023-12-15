@@ -489,13 +489,11 @@ impl Bytecode {
         match self {
             Bytecode::Assign(_, dst, _, _) => {
                 vec![*dst]
-            }
+            },
             Bytecode::Load(_, dst, _) => {
                 vec![*dst]
-            }
-            Bytecode::Call(_, dsts, _, _, _) => {
-                dsts.clone()
-            }
+            },
+            Bytecode::Call(_, dsts, _, _, _) => dsts.clone(),
             _ => Vec::new(),
         }
     }
