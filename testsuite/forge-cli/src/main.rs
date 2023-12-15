@@ -1008,6 +1008,10 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
         })
         .collect(),
     })
+    .with_emit_job(
+        EmitJobRequest::default().latency_polling_interval(Duration::from_millis(100))
+        .max_transactions_per_account(1),
+    )
 }
 
 fn realistic_env_workload_sweep_test() -> ForgeConfig {
@@ -1036,7 +1040,7 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
                 transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
                 num_modules: 1,
                 unique_senders: true,
-                mempool_backlog: 30000,
+                mempool_backlog: 10000,
             },
             // transactions get rejected, to fix.
             // TransactionWorkload {
