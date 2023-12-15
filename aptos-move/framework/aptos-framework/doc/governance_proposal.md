@@ -13,6 +13,7 @@ This is separate from the AptosGovernance module to avoid circular dependency be
 -  [Function `create_empty_proposal`](#0x1_governance_proposal_create_empty_proposal)
 -  [Specification](#@Specification_0)
     -  [Function `create_proposal`](#@Specification_0_create_proposal)
+    -  [High-level Requirements](#high-level-req)
     -  [Function `create_empty_proposal`](#@Specification_0_create_empty_proposal)
 
 
@@ -113,7 +114,39 @@ Useful for AptosGovernance to create an empty proposal as proof.
 
 
 
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Property</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>Creating a proposal should never abort but should always return a governance proposal resource.</td>
+<td>Medium</td>
+<td>Both create_proposal and create_empty_proposal functions return a GovernanceProposal resource.</td>
+<td>Enforced via <a href="#high-level-spec-1.1">create_proposal</a> and <a href="#high-level-spec-1.2">create_empty_proposal</a>.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>The governance proposal module should only be accessible to the aptos governance.</td>
+<td>Medium</td>
+<td>Both create_proposal and create_empty_proposal functions are only available to the friend module</td>
+<td>Enforced via friend module relationship.</td>
+</tr>
+
+</table>
+
+
+
+
 <pre><code><b>aborts_if</b> <b>false</b>;
+// This enforces <a id="high-level-spec-1.1" href="#high-level-req">high level requirement 1</a>:
 <b>ensures</b> result == <a href="governance_proposal.md#0x1_governance_proposal_GovernanceProposal">GovernanceProposal</a> {};
 </code></pre>
 
@@ -131,6 +164,7 @@ Useful for AptosGovernance to create an empty proposal as proof.
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
+// This enforces <a id="high-level-spec-1.2" href="#high-level-req">high level requirement 1</a>:
 <b>ensures</b> result == <a href="governance_proposal.md#0x1_governance_proposal_GovernanceProposal">GovernanceProposal</a> {};
 </code></pre>
 

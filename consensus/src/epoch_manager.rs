@@ -601,14 +601,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             block_rx,
             reset_rx,
             epoch_state,
+            self.bounded_executor.clone(),
         );
-        let bounded_executor = self.bounded_executor.clone();
 
         tokio::spawn(execution_schedule_phase.start());
         tokio::spawn(execution_wait_phase.start());
         tokio::spawn(signing_phase.start());
         tokio::spawn(persisting_phase.start());
-        tokio::spawn(buffer_manager.start(bounded_executor));
+        tokio::spawn(buffer_manager.start());
 
         (block_tx, reset_tx)
     }
@@ -1130,6 +1130,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             block_tx,
             onchain_consensus_config.quorum_store_enabled(),
             onchain_consensus_config.validator_txn_enabled(),
+            self.bounded_executor.clone(),
         );
 
         let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);

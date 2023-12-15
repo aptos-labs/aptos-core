@@ -17,7 +17,6 @@ can be enabled for the public.
 -  [Function `create_aggregator`](#0x1_aggregator_factory_create_aggregator)
 -  [Function `new_aggregator`](#0x1_aggregator_factory_new_aggregator)
 -  [Specification](#@Specification_1)
-    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `initialize_aggregator_factory`](#@Specification_1_initialize_aggregator_factory)
     -  [Function `create_aggregator_internal`](#@Specification_1_create_aggregator_internal)
     -  [Function `create_aggregator`](#@Specification_1_create_aggregator)
@@ -191,11 +190,6 @@ Returns a new aggregator.
 <a id="@Specification_1"></a>
 
 ## Specification
-
-
-<a id="@Module-level_Specification_2"></a>
-
-### Module-level Specification
 
 
 

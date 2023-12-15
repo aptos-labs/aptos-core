@@ -772,29 +772,56 @@ impl<'env> Docgen<'env> {
         ));
     }
 
-    fn gen_req_tag(&self, tag: &str) {
-        let (req_tag, module_link, suffix) = if tag.contains("::") {
-            let parts = tag.split("::").collect::<Vec<_>>();
-            let module_name = *parts.first().unwrap_or(&"");
-            let req_tag = *parts.get(1).unwrap_or(&"");
-            let label_link = self
-                .resolve_to_label(module_name, false)
-                .unwrap_or(String::new());
-            let module_link = label_link.split('#').next().unwrap_or("").to_string();
-            let suffix = format!(" of the <a href={}>{}</a> module", module_link, module_name);
-            (req_tag, module_link, suffix)
-        } else {
-            (tag, String::new(), String::new())
-        };
+    fn gen_req_tags(&self, tags: Vec<&str>) {
+        let mut links = Vec::new();
 
-        let req_number = req_tag
-            .split('-')
-            .nth(3)
-            .unwrap_or_default()
-            .split('.')
-            .next()
-            .unwrap_or_default();
-        self.doc_text_general(false, &format!("// This enforces <a id={} href=\"{}#high-level-req\">high-level requirement {}</a>{}:", tag, module_link, req_number, suffix));
+        for &tag in tags.iter() {
+            let (req_tag, module_link, suffix) = if tag.contains("::") {
+                let parts = tag.split("::").collect::<Vec<_>>();
+                let module_name = *parts.first().unwrap_or(&"");
+                let req_tag = *parts.get(1).unwrap_or(&"");
+                let label_link = self
+                    .resolve_to_label(module_name, false)
+                    .unwrap_or(String::new());
+                let module_link = label_link.split('#').next().unwrap_or("").to_string();
+                let suffix = format!(" of the <a href={}>{}</a> module", module_link, module_name);
+                (req_tag, module_link, suffix)
+            } else {
+                (tag, String::new(), String::new())
+            };
+
+            let req_number = req_tag
+                .split('-')
+                .nth(3)
+                .unwrap_or_default()
+                .split('.')
+                .next()
+                .unwrap_or_default();
+
+            let href = format!("href=\"{}#high-level-req\"", module_link);
+            let link = format!(
+                "<a id=\"{}\" {}>high level requirement {}</a>{}",
+                req_tag, href, req_number, suffix
+            );
+            links.push(link);
+        }
+
+        match links.len() {
+            0 => {
+                self.doc_text_general(false, "");
+            },
+            1 => {
+                self.doc_text_general(false, &format!("// This enforces {}:", links[0]));
+            },
+            _ => {
+                let last_link = links.pop().unwrap();
+                let links_str = links.join(", ");
+                self.doc_text_general(
+                    false,
+                    &format!("// This enforces {} and {}:", links_str, last_link),
+                );
+            },
+        }
     }
 
     fn convert_to_anchor(&self, input: &str) -> String {
@@ -1316,7 +1343,7 @@ impl<'env> Docgen<'env> {
                         "Enforcement",
                     ];
                     self.gen_html_table(table_text, column_names);
-                    self.doc_text(&text[end..text.len()]);
+                    self.doc_text(&text[end + end_tag.len()..text.len()]);
                 } else {
                     self.doc_text("");
                 }
@@ -1364,12 +1391,21 @@ impl<'env> Docgen<'env> {
                 }
             };
             for loc in &block.member_locs {
-                let mut tag = None;
+                let mut tags = Vec::new();
                 let doc = self.env.get_doc(loc);
                 if !doc.is_empty() {
-                    if let (Some(start), Some(end)) = (doc.find('['), doc.find(']')) {
-                        tag = Some(&doc[start + 1..end])
-                    } else {
+                    let mut start = 0;
+
+                    while let (Some(open), Some(close)) =
+                        (doc[start..].find('['), doc[start..].find(']'))
+                    {
+                        if open < close {
+                            tags.push(&doc[start + open + 1..start + close]);
+                        }
+                        start += close + 1;
+                    }
+
+                    if tags.is_empty() {
                         end_code(&mut in_code);
                         self.doc_text(doc);
                     }
@@ -1388,9 +1424,7 @@ impl<'env> Docgen<'env> {
                     }
                 }
                 begin_code(&mut in_code);
-                if let Some(t) = tag {
-                    self.gen_req_tag(t);
-                };
+                self.gen_req_tags(tags);
                 self.code_text(&self.get_source_with_indent(loc));
             }
             end_code(&mut in_code);
@@ -1470,11 +1504,6 @@ impl<'env> Docgen<'env> {
         let section_label = self.label_for_section("Specification");
         self.section_header("Specification", &section_label);
         self.increment_section_nest();
-        // Add a header for module-level specification if there is one
-        if spec_block_map.contains_key(&SpecBlockTarget::Module) {
-            let section_label = self.label_for_section("Module-level Specification");
-            self.section_header("Module-level Specification", &section_label);
-        }
         self.gen_spec_blocks(module_env, "", &SpecBlockTarget::Module, spec_block_map);
         for struct_env in module_env
             .get_structs()

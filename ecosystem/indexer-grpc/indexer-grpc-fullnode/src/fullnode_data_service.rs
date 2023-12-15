@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::{stream_coordinator::IndexerStreamCoordinator, ServiceContext};
+use crate::{counters::CHANNEL_SIZE, stream_coordinator::IndexerStreamCoordinator, ServiceContext};
 use aptos_indexer_grpc_utils::counters::{log_grpc_step_fullnode, IndexerGrpcStep};
 use aptos_logger::{error, info};
 use aptos_moving_average::MovingAverage;
@@ -114,6 +114,10 @@ impl FullnodeData for FullnodeDataService {
                     Some(max_version),
                     ledger_chain_id,
                 );
+                let channel_size = TRANSACTION_CHANNEL_SIZE - tx.capacity();
+                CHANNEL_SIZE
+                    .with_label_values(&["2"])
+                    .set(channel_size as i64);
                 match tx.send(Result::<_, Status>::Ok(batch_end_status)).await {
                     Ok(_) => {
                         // tps logging

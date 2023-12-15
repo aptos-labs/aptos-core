@@ -1,14 +1,34 @@
 ---
 remote_endpoint: ~
-name: "v1.8"
+name: "v1.9"
 proposals:
-  - name: upgrade_framework
+  - name: step_1_upgrade_framework
     metadata:
-      title: "Multi-step proposal to upgrade mainnet framework to v1.8"
-      description: "This includes changes in https://github.com/aptos-labs/aptos-core/commits/aptos-release-v1.8"
+      title: "Multi-step proposal to upgrade mainnet framework to v1.9"
+      description: "This includes changes in https://github.com/aptos-labs/aptos-core/commits/aptos-release-v1.9"
     execution_mode: MultiStep
     update_sequence:
       - DefaultGas
       - Framework:
           bytecode_version: 6
           git_hash: ~
+  - name: step_2_commission_change_delegation_pool
+    metadata:
+      title: "AIP-50: Change commission rates in delegation pools"
+      description: "AIP-50: This allows delegation pool owners to change operator commission rates after delegation pool creation."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/249"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - commission_change_delegation_pool
+  - name: step_3_enable_automatic_sponsored_account_creation
+    metadata:
+      title: "AIP-52: Automated Account Creation for Sponsored Transactions"
+      description: "AIP-52: Automated Account Creation for Sponsored Transactions."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/258"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - sponsored_automatic_account_creation

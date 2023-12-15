@@ -121,6 +121,7 @@ pub struct BufferManager {
     end_epoch_timestamp: OnceCell<u64>,
     previous_commit_time: Instant,
     reset_flag: Arc<AtomicBool>,
+    bounded_executor: BoundedExecutor,
 }
 
 impl BufferManager {
@@ -144,6 +145,7 @@ impl BufferManager {
         epoch_state: Arc<EpochState>,
         ongoing_tasks: Arc<AtomicU64>,
         reset_flag: Arc<AtomicBool>,
+        executor: BoundedExecutor,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 
@@ -171,6 +173,7 @@ impl BufferManager {
                 rb_backoff_policy,
                 TimeService::real(),
                 Duration::from_millis(COMMIT_VOTE_BROADCAST_INTERVAL_MS),
+                executor.clone(),
             ),
             commit_proof_rb_handle: None,
             commit_msg_tx,
@@ -187,6 +190,7 @@ impl BufferManager {
             end_epoch_timestamp: OnceCell::new(),
             previous_commit_time: Instant::now(),
             reset_flag,
+            bounded_executor: executor,
         }
     }
 
@@ -694,12 +698,13 @@ impl BufferManager {
             .set(pending_aggregated as i64);
     }
 
-    pub async fn start(mut self, bounded_executor: BoundedExecutor) {
+    pub async fn start(mut self) {
         info!("Buffer manager starts.");
         let (verified_commit_msg_tx, mut verified_commit_msg_rx) = create_channel();
         let mut interval = tokio::time::interval(Duration::from_millis(LOOP_INTERVAL_MS));
         let mut commit_msg_rx = self.commit_msg_rx.take().expect("commit msg rx must exist");
         let epoch_state = self.epoch_state.clone();
+        let bounded_executor = self.bounded_executor.clone();
         spawn_named!("buffer manager verification", async move {
             while let Some(commit_msg) = commit_msg_rx.next().await {
                 let tx = verified_commit_msg_tx.clone();

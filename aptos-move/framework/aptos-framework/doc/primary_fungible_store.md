@@ -38,7 +38,6 @@ fungible asset to it. This emits an deposit event.
 -  [Function `transfer_with_ref`](#0x1_primary_fungible_store_transfer_with_ref)
 -  [Function `may_be_unburn`](#0x1_primary_fungible_store_may_be_unburn)
 -  [Specification](#@Specification_0)
-    -  [Module-level Specification](#@Module-level_Specification_1)
 
 
 <pre><code><b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
@@ -620,11 +619,6 @@ Transfer <code>amount</code> of FA from the primary store of <code>from</code> t
 <a id="@Specification_0"></a>
 
 ## Specification
-
-
-<a id="@Module-level_Specification_1"></a>
-
-### Module-level Specification
 
 
 

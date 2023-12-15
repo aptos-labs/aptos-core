@@ -30,7 +30,6 @@ a 64-bit fractional part.
 -  [Function `ceil`](#0x1_fixed_point64_ceil)
 -  [Function `round`](#0x1_fixed_point64_round)
 -  [Specification](#@Specification_1)
-    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `sub`](#@Specification_1_sub)
     -  [Function `add`](#@Specification_1_add)
     -  [Function `multiply_u128`](#@Specification_1_multiply_u128)
@@ -744,11 +743,6 @@ Returns the value of a FixedPoint64 to the nearest integer.
 <a id="@Specification_1"></a>
 
 ## Specification
-
-
-<a id="@Module-level_Specification_2"></a>
-
-### Module-level Specification
 
 
 

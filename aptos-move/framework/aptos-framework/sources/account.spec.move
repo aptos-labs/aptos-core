@@ -431,6 +431,7 @@ spec aptos_framework::account {
         let addr = signer::address_of(account);
         let account_resource = global<Account>(address);
         aborts_if !exists<Account>(address);
+        /// [create_signer::high-level-spec-3]
         aborts_if !option::spec_contains(account_resource.signer_capability_offer.for,addr);
     }
 
