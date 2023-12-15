@@ -63,9 +63,9 @@ impl TableInfoService {
             log_grpc_step(
                 SERVICE_TYPE,
                 IndexerGrpcStep::TableInfoProcessed,
-                self.enable_expensive_logging,
                 Some(self.current_version as i64),
                 Some(max_version as i64),
+                None,
                 None,
                 Some(start_time.elapsed().as_secs_f64()),
                 None,
@@ -205,9 +205,9 @@ impl TableInfoService {
         log_grpc_step(
             SERVICE_TYPE,
             IndexerGrpcStep::TableInfoProcessedBatch,
-            enable_verbose_logging,
             Some(batch.start_version as i64),
             Some((batch.start_version + batch.num_transactions_to_fetch as u64) as i64),
+            None,
             None,
             Some(start_time.elapsed().as_secs_f64()),
             None,
