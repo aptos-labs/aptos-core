@@ -25,7 +25,6 @@ This module provides an interface to burn or collect and redistribute transactio
 -  [Function `initialize_storage_refund`](#0x1_transaction_fee_initialize_storage_refund)
 -  [Function `emit_fee_statement`](#0x1_transaction_fee_emit_fee_statement)
 -  [Specification](#@Specification_1)
-    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Resource `CollectedFeesPerBlock`](#@Specification_1_CollectedFeesPerBlock)
     -  [Function `initialize_fee_collection_and_distribution`](#@Specification_1_initialize_fee_collection_and_distribution)
     -  [Function `upgrade_burn_percentage`](#@Specification_1_upgrade_burn_percentage)
@@ -689,11 +688,6 @@ Only called during genesis.
 <a id="@Specification_1"></a>
 
 ## Specification
-
-
-<a id="@Module-level_Specification_2"></a>
-
-### Module-level Specification
 
 
 

@@ -53,7 +53,6 @@
 -  [Function `get_signer_capability_address`](#0x1_account_get_signer_capability_address)
 -  [Function `verify_signed_message`](#0x1_account_verify_signed_message)
 -  [Specification](#@Specification_1)
-    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `create_account_if_does_not_exist`](#@Specification_1_create_account_if_does_not_exist)
     -  [Function `create_account`](#@Specification_1_create_account)
@@ -2090,11 +2089,6 @@ Capability based functions for efficient use.
 ## Specification
 
 
-<a id="@Module-level_Specification_2"></a>
-
-### Module-level Specification
-
-
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
@@ -2744,6 +2738,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>let</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(<b>address</b>);
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(<b>address</b>);
+    // This enforces <a id="high-level-spec-3" href="create_signer.md#high-level-req">high level requirement 3</a> of the <a href=create_signer.md>create_signer</a> module:
     <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_contains">option::spec_contains</a>(account_resource.signer_capability_offer.for,addr);
 }
 </code></pre>

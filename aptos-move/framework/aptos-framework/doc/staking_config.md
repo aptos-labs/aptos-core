@@ -27,7 +27,6 @@ Provides the configuration for staking and rewards
 -  [Function `validate_required_stake`](#0x1_staking_config_validate_required_stake)
 -  [Function `validate_rewards_config`](#0x1_staking_config_validate_rewards_config)
 -  [Specification](#@Specification_1)
-    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Resource `StakingConfig`](#@Specification_1_StakingConfig)
     -  [Resource `StakingRewardsConfig`](#@Specification_1_StakingRewardsConfig)
     -  [Function `initialize`](#@Specification_1_initialize)
@@ -963,11 +962,6 @@ Can only be called as part of the Aptos governance proposal process established 
 <a id="@Specification_1"></a>
 
 ## Specification
-
-
-<a id="@Module-level_Specification_2"></a>
-
-### Module-level Specification
 
 
 

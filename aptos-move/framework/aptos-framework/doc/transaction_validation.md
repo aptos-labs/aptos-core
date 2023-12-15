@@ -17,7 +17,6 @@
 -  [Function `epilogue`](#0x1_transaction_validation_epilogue)
 -  [Function `epilogue_gas_payer`](#0x1_transaction_validation_epilogue_gas_payer)
 -  [Specification](#@Specification_1)
-    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `prologue_common`](#@Specification_1_prologue_common)
     -  [Function `module_prologue`](#@Specification_1_module_prologue)
@@ -674,11 +673,6 @@ Called by the Adapter
 <a id="@Specification_1"></a>
 
 ## Specification
-
-
-<a id="@Module-level_Specification_2"></a>
-
-### Module-level Specification
 
 
 
