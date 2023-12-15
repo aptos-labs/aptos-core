@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    block_storage::tracing::{observe_block, BlockStage},
     pipeline::buffer_manager::OrderedBlocks,
     rand::rand_gen::{
         block_queue::{BlockQueue, QueueItem},
@@ -36,7 +37,9 @@ impl<S: Share> ShareAggregator<S> {
     }
 
     fn add_share(&mut self, weight: u64, share: RandShare<S>) {
+        let timestamp = share.metadata().timestamp();
         if self.shares.insert(*share.author(), share).is_none() {
+            observe_block(timestamp, BlockStage::RAND_ADD_SHARE);
             self.total_weight += weight;
         }
     }
@@ -136,6 +139,10 @@ impl<S: Share, P: Proof<Share = S>> RandItem<S, P> {
                 if let Some(decision) =
                     share_aggregator.try_aggregate(rand_config, metadata.clone())
                 {
+                    observe_block(
+                        decision.rand_metadata().timestamp(),
+                        BlockStage::RAND_AGG_DECISION,
+                    );
                     Self::Decided(decision)
                 } else {
                     Self::PendingDecision {

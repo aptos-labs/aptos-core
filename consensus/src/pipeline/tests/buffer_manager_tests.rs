@@ -393,7 +393,7 @@ fn buffer_manager_sync_test() {
         reset_tx
             .send(ResetRequest {
                 tx,
-                signal: ResetSignal::Stop,
+                signal: ResetSignal::TargetRound(1),
             })
             .await
             .ok();
