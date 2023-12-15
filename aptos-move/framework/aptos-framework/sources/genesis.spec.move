@@ -60,10 +60,6 @@ spec aptos_framework::genesis {
         ensures exists<transaction_fee::AptosCoinCapabilities>(@aptos_framework);
     }
 
-    spec set_genesis_end {
-        pragma delegate_invariants_to_caller;
-    }
-
     spec create_initialize_validators_with_commission {
         pragma verify_duration_estimate = 120;
 
@@ -91,6 +87,7 @@ spec aptos_framework::genesis {
     }
 
     spec set_genesis_end {
+        pragma delegate_invariants_to_caller;
         // property 4: An initial set of validators should exist before the end of genesis.
         requires len(global<stake::ValidatorSet>(@aptos_framework).active_validators) >= 1;
         // property 5: The end of genesis should be marked on chain.
