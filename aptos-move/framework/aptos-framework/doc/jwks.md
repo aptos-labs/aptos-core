@@ -612,15 +612,6 @@ Maintained by governance proposals.
 ## Constants
 
 
-<a id="0x1_jwks_EINVALID_SIG"></a>
-
-
-
-<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_EINVALID_SIG">EINVALID_SIG</a>: u64 = 3;
-</code></pre>
-
-
-
 <a id="0x1_jwks_EUNEXPECTED_EPOCH"></a>
 
 
@@ -643,7 +634,7 @@ Maintained by governance proposals.
 
 
 
-<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_EUNKNOWN_JWK_MAP_EDIT">EUNKNOWN_JWK_MAP_EDIT</a>: u64 = 4;
+<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_EUNKNOWN_JWK_MAP_EDIT">EUNKNOWN_JWK_MAP_EDIT</a>: u64 = 3;
 </code></pre>
 
 

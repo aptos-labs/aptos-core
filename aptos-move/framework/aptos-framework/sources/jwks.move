@@ -22,8 +22,7 @@ module aptos_framework::jwks {
 
     const EUNEXPECTED_EPOCH: u64 = 1;
     const EUNEXPECTED_VERSION: u64 = 2;
-    const EINVALID_SIG: u64 = 3;
-    const EUNKNOWN_JWK_MAP_EDIT: u64 = 4;
+    const EUNKNOWN_JWK_MAP_EDIT: u64 = 3;
 
     /// An OIDC provider.
     struct OIDCProvider has drop, store {
