@@ -341,7 +341,10 @@ impl IndexerStreamCoordinator {
                             sct.info.block_height = Some(block_height_bcs);
                             sct.info.epoch = Some(epoch_bcs);
                         },
-                        APITransaction::ValidatorTransaction(_) => todo!(),
+                        APITransaction::ValidatorTransaction(ref mut vt) => {
+                            vt.info.block_height = Some(block_height_bcs);
+                            vt.info.epoch = Some(epoch_bcs);
+                        },
                     };
                     txn
                 }) {
