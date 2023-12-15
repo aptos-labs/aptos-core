@@ -11,7 +11,6 @@ use aptos_storage_interface::{
     StateSnapshotReceiver,
 };
 use aptos_types::{
-    epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
     state_store::{state_key::StateKey, state_value::StateValue, ShardedStateUpdates},
     transaction::{TransactionOutputListWithProof, TransactionToCommit, Version},
@@ -50,6 +49,7 @@ impl FastSyncStorageWrapper {
             config.storage.enable_indexer,
             config.storage.buffered_state_target_items,
             config.storage.max_num_nodes_per_lru_cache_shard,
+            config.indexer_table_info.enabled,
         )
         .map_err(|err| anyhow!("fast sync DB failed to open {}", err))?;
 
@@ -71,6 +71,7 @@ impl FastSyncStorageWrapper {
                 config.storage.enable_indexer,
                 config.storage.buffered_state_target_items,
                 config.storage.max_num_nodes_per_lru_cache_shard,
+                config.indexer_table_info.enabled,
             )
             .map_err(|err| anyhow!("Secondary DB failed to open {}", err))?;
 
@@ -181,16 +182,5 @@ impl DbWriter for FastSyncStorageWrapper {
 impl DbReader for FastSyncStorageWrapper {
     fn get_read_delegatee(&self) -> &dyn DbReader {
         self.get_aptos_db_read_ref()
-    }
-
-    fn get_epoch_ending_ledger_infos(
-        &self,
-        start_epoch: u64,
-        end_epoch: u64,
-    ) -> Result<EpochChangeProof> {
-        let (ledger_info, flag) = self
-            .get_aptos_db_read_ref()
-            .get_epoch_ending_ledger_infos(start_epoch, end_epoch)?;
-        Ok(EpochChangeProof::new(ledger_info, flag))
     }
 }

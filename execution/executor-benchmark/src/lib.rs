@@ -66,6 +66,7 @@ where
             false,
             config.storage.buffered_state_target_items,
             config.storage.max_num_nodes_per_lru_cache_shard,
+            false,
         )
         .expect("DB should open."),
     );
@@ -123,7 +124,7 @@ pub fn run_benchmark<V>(
     config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
 
     let (db, executor) = init_db_and_executor::<V>(&config);
-    let transaction_generator_creator = transaction_mix.clone().map(|transaction_mix| {
+    let transaction_generators = transaction_mix.clone().map(|transaction_mix| {
         let num_existing_accounts = TransactionGenerator::read_meta(&source_dir);
         let num_accounts_to_be_loaded = std::cmp::min(
             num_existing_accounts,
@@ -148,7 +149,7 @@ pub fn run_benchmark<V>(
         let (main_signer_accounts, burner_accounts) =
             accounts_cache.split(num_main_signer_accounts);
 
-        init_workload::<V>(
+        let transaction_generator_creator = init_workload::<V>(
             transaction_mix,
             main_signer_accounts,
             burner_accounts,
@@ -156,7 +157,9 @@ pub fn run_benchmark<V>(
             // Initialization pipeline is temporary, so needs to be fully committed.
             // No discards/aborts allowed during initialization, even if they are allowed later.
             &PipelineConfig::default(),
-        )
+        );
+        // need to initialize all workers and finish with all transactions before we start the timer:
+        (0..pipeline_config.num_generator_workers).map(|_| transaction_generator_creator.create_transaction_generator()).collect::<Vec<_>>()
     });
 
     let version = db.reader.get_latest_version().unwrap();
@@ -222,11 +225,11 @@ pub fn run_benchmark<V>(
     let start_commit_total = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum();
 
     let start_vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
-    if let Some(transaction_generator_creator) = transaction_generator_creator {
+    if let Some(transaction_generators) = transaction_generators {
         generator.run_workload(
             block_size,
             num_blocks,
-            transaction_generator_creator,
+            transaction_generators,
             transactions_per_sender,
         );
     } else {
@@ -247,7 +250,7 @@ pub fn run_benchmark<V>(
     pipeline.join();
 
     let elapsed = start_time.elapsed().as_secs_f64();
-    let delta_v = (db.reader.get_latest_version().unwrap() - version) as f64;
+    let delta_v = (db.reader.get_latest_version().unwrap() - version - num_blocks as u64) as f64;
     let delta_gas = start_gas_measurement.end();
     let delta_output_size = APTOS_PROCESSED_TXNS_OUTPUT_SIZE.get_sample_sum() - start_output_size;
 
@@ -268,6 +271,10 @@ pub fn run_benchmark<V>(
     );
     info!("Overall TPS: {} txn/s", delta_v / elapsed);
     info!("Overall GPS: {} gas/s", delta_gas.gas / elapsed);
+    info!(
+        "Overall effectiveGPS: {} gas/s",
+        delta_gas.effective_block_gas / elapsed
+    );
     info!("Overall ioGPS: {} gas/s", delta_gas.io_gas / elapsed);
     info!(
         "Overall executionGPS: {} gas/s",
@@ -276,6 +283,10 @@ pub fn run_benchmark<V>(
     info!(
         "Overall GPT: {} gas/txn",
         delta_gas.gas / (delta_gas.gas_count as f64).max(1.0)
+    );
+    info!(
+        "Overall approx_output: {} bytes/s",
+        delta_gas.approx_block_output / elapsed
     );
     info!("Overall output: {} bytes/s", delta_output_size / elapsed);
 
@@ -503,9 +514,12 @@ fn add_accounts_impl<V>(
 
 struct GasMeasurement {
     pub gas: f64,
+    pub effective_block_gas: f64,
 
     pub io_gas: f64,
     pub execution_gas: f64,
+
+    pub approx_block_output: f64,
 
     pub gas_count: u64,
 }
@@ -532,10 +546,26 @@ impl GasMeasurement {
         let gas_count = Self::sequential_gas_counter(GasType::NON_STORAGE_GAS).get_sample_count()
             + Self::parallel_gas_counter(GasType::NON_STORAGE_GAS).get_sample_count();
 
+        let effective_block_gas = block_executor_counters::EFFECTIVE_BLOCK_GAS
+            .with_label_values(&[block_executor_counters::Mode::SEQUENTIAL])
+            .get_sample_sum()
+            + block_executor_counters::EFFECTIVE_BLOCK_GAS
+                .with_label_values(&[block_executor_counters::Mode::PARALLEL])
+                .get_sample_sum();
+
+        let approx_block_output = block_executor_counters::APPROX_BLOCK_OUTPUT_SIZE
+            .with_label_values(&[block_executor_counters::Mode::SEQUENTIAL])
+            .get_sample_sum()
+            + block_executor_counters::APPROX_BLOCK_OUTPUT_SIZE
+                .with_label_values(&[block_executor_counters::Mode::PARALLEL])
+                .get_sample_sum();
+
         Self {
             gas,
+            effective_block_gas,
             io_gas,
             execution_gas,
+            approx_block_output,
             gas_count,
         }
     }
@@ -557,8 +587,10 @@ impl GasMeasuring {
 
         GasMeasurement {
             gas: end.gas - self.start.gas,
+            effective_block_gas: end.effective_block_gas - self.start.effective_block_gas,
             io_gas: end.io_gas - self.start.io_gas,
             execution_gas: end.execution_gas - self.start.execution_gas,
+            approx_block_output: end.approx_block_output - self.start.approx_block_output,
             gas_count: end.gas_count - self.start.gas_count,
         }
     }
@@ -589,8 +621,8 @@ mod tests {
         crate::db_generator::create_db_with_accounts::<E>(
             100, /* num_accounts */
             // TODO(Gas): double check if this is correct
-            100_000_000, /* init_account_balance */
-            5,           /* block_size */
+            100_000_000_000, /* init_account_balance */
+            5,               /* block_size */
             storage_dir.as_ref(),
             NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
             verify_sequence_numbers,
@@ -627,6 +659,7 @@ mod tests {
     #[test]
     fn test_benchmark_transaction() {
         AptosVM::set_concurrency_level_once(4);
+        AptosVM::set_processed_transactions_detailed_counters();
         test_generic_benchmark::<AptosVM>(Some(TransactionTypeArg::TokenV2AmbassadorMint), true);
     }
 

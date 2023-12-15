@@ -2,9 +2,7 @@
 module aptos_std::fixed_point64_tests {
     use aptos_std::fixed_point64;
 
-    fun POW2_64(): u128 {
-        1 << 64 // TODO(#9330)
-    }
+    const POW2_64: u128 = 1 << 64;
     const MAX_U128: u128 = 340282366920938463463374607431768211455;
 
     #[test]
@@ -19,7 +17,7 @@ module aptos_std::fixed_point64_tests {
     fun create_overflow() {
         // The maximum value is 2^32 - 1. Check that anything larger aborts
         // with an overflow.
-        fixed_point64::create_from_rational(POW2_64(), 1); // 2^64
+        fixed_point64::create_from_rational(POW2_64, 1); // 2^64
     }
 
     #[test]
@@ -27,7 +25,7 @@ module aptos_std::fixed_point64_tests {
     fun create_underflow() {
         // The minimum non-zero value is 2^-32. Check that anything smaller
         // aborts.
-        fixed_point64::create_from_rational(1, 2 * POW2_64()); // 2^-65
+        fixed_point64::create_from_rational(1, 2 * POW2_64); // 2^-65
     }
 
     #[test]
@@ -49,7 +47,7 @@ module aptos_std::fixed_point64_tests {
     fun divide_overflow_small_divisore() {
         let f = fixed_point64::create_from_raw_value(1); // 2^-64
         // Divide 2^64 by the minimum fractional value. This should overflow.
-        fixed_point64::divide_u128(POW2_64(), f);
+        fixed_point64::divide_u128(POW2_64, f);
     }
 
     #[test]
@@ -73,7 +71,7 @@ module aptos_std::fixed_point64_tests {
     fun multiply_overflow_large_multiplier() {
         let f = fixed_point64::create_from_raw_value(MAX_U128);
         // Multiply 2^65 by the maximum fixed-point value. This should overflow.
-        fixed_point64::multiply_u128(2 * POW2_64(), f);
+        fixed_point64::multiply_u128(2 * POW2_64, f);
     }
 
     #[test]
@@ -109,7 +107,7 @@ module aptos_std::fixed_point64_tests {
         // Test creating a 1.0 fraction from the maximum u64 value.
         let f = fixed_point64::create_from_rational(MAX_U128, MAX_U128);
         let one = fixed_point64::get_raw_value(f);
-        assert!(one == POW2_64(), 0); // 0x1.00000000
+        assert!(one == POW2_64, 0); // 0x1.00000000
     }
 
     #[test]
@@ -118,10 +116,10 @@ module aptos_std::fixed_point64_tests {
         let two = fixed_point64::create_from_rational(2, 1);
         let smaller_number1 = fixed_point64::min(one, two);
         let val1 = fixed_point64::get_raw_value(smaller_number1);
-        assert!(val1 == POW2_64(), 0);  // 0x1.00000000
+        assert!(val1 == POW2_64, 0);  // 0x1.00000000
         let smaller_number2 = fixed_point64::min(two, one);
         let val2 = fixed_point64::get_raw_value(smaller_number2);
-        assert!(val2 == POW2_64(), 0);  // 0x1.00000000
+        assert!(val2 == POW2_64, 0);  // 0x1.00000000
     }
 
     #[test]
@@ -131,9 +129,9 @@ module aptos_std::fixed_point64_tests {
         let larger_number1 = fixed_point64::max(one, two);
         let larger_number2 = fixed_point64::max(two, one);
         let val1 = fixed_point64::get_raw_value(larger_number1);
-        assert!(val1 == 2 * POW2_64(), 0);  // 0x2.00000000
+        assert!(val1 == 2 * POW2_64, 0);  // 0x2.00000000
         let val2 = fixed_point64::get_raw_value(larger_number2);
-        assert!(val2 == 2 * POW2_64(), 0);  // 0x2.00000000
+        assert!(val2 == 2 * POW2_64, 0);  // 0x2.00000000
     }
 
     #[test]
@@ -147,13 +145,13 @@ module aptos_std::fixed_point64_tests {
     fun create_from_u128_create_correct_fixed_point_number() {
         let one = fixed_point64::create_from_u128(1);
         let val = fixed_point64::get_raw_value(one);
-        assert!(val == POW2_64(), 0);
+        assert!(val == POW2_64, 0);
     }
 
     #[test]
     #[expected_failure(abort_code = fixed_point64::ERATIO_OUT_OF_RANGE)]
     fun create_from_u128_throw_error_when_number_too_large() {
-        fixed_point64::create_from_u128(POW2_64());
+        fixed_point64::create_from_u128(POW2_64);
     }
 
     #[test]

@@ -140,7 +140,7 @@ fn create_rocksdb_checkpoint_and_change_working_dir(
 /// the various handles.
 pub fn initialize_database_and_checkpoints(
     node_config: &mut NodeConfig,
-) -> Result<(Arc<dyn DbReader>, DbReaderWriter, Option<Runtime>, Waypoint)> {
+) -> Result<(DbReaderWriter, Option<Runtime>, Waypoint)> {
     // If required, create RocksDB checkpoints and change the working directory.
     // This is test-only.
     if let Some(working_dir) = node_config.base.working_dir.clone() {
@@ -149,7 +149,7 @@ pub fn initialize_database_and_checkpoints(
 
     // Open the database
     let instant = Instant::now();
-    let (aptos_db, db_rw, backup_service) = bootstrap_db(node_config)?;
+    let (_aptos_db, db_rw, backup_service) = bootstrap_db(node_config)?;
 
     // Log the duration to open storage
     debug!(
@@ -158,7 +158,6 @@ pub fn initialize_database_and_checkpoints(
     );
 
     Ok((
-        aptos_db,
         db_rw,
         backup_service,
         node_config.base.waypoint.genesis_waypoint(),

@@ -41,7 +41,7 @@ pub enum FeatureFlag {
     SAFER_RESOURCE_GROUPS = 31,
     SAFER_METADATA = 32,
     SINGLE_SENDER_AUTHENTICATOR = 33,
-    SPONSORED_AUTOMATIC_ACCOUNT_CREATION = 34,
+    SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION = 34,
     FEE_PAYER_ACCOUNT_OPTIONAL = 35,
     AGGREGATOR_V2_DELAYED_FIELDS = 36,
     CONCURRENT_ASSETS = 37,
@@ -50,6 +50,7 @@ pub enum FeatureFlag {
     VM_BINARY_FORMAT_V7 = 40,
     RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM = 41,
     COMMISSION_CHANGE_DELEGATION_POOL = 42,
+    BN254_STRUCTURES = 43,
 }
 
 /// Representation of features on chain as a bitset.
@@ -73,7 +74,7 @@ impl Default for Features {
         features.enable(APTOS_UNIQUE_IDENTIFIERS);
         features.enable(SIGNATURE_CHECKER_V2_SCRIPT_FIX);
         features.enable(AGGREGATOR_V2_API);
-
+        features.enable(BN254_STRUCTURES);
         features
     }
 }

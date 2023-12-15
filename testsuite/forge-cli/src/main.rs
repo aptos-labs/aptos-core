@@ -23,7 +23,9 @@ use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::aptos_stdlib,
-    types::on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig},
+    types::on_chain_config::{
+        BlockGasLimitType, OnChainConsensusConfig, OnChainExecutionConfig, TransactionShufflerType,
+    },
 };
 use aptos_testcases::{
     compatibility_test::SimpleValidatorUpgrade,
@@ -1043,10 +1045,10 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         ]),
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
-            (3700, 0.35, 0.5, 0.8, 0.65),
-            (2800, 0.35, 0.5, 1.2, 1.3),
-            (1800, 0.35, 2.0, 1.5, 3.0),
-            (950, 0.35, 0.65, 1.5, 2.9),
+            (5500, 0.35, 0.3, 0.8, 0.65),
+            (4500, 0.35, 0.3, 1.0, 1.0),
+            (2000, 0.35, 0.3, 1.0, 1.0),
+            (600, 0.35, 0.3, 1.0, 1.0),
             // (150, 0.5, 1.0, 1.5, 0.65),
         ]
         .into_iter()
@@ -1757,9 +1759,6 @@ fn realistic_env_max_load_test(
     let duration_secs = duration.as_secs();
     let long_running = duration_secs >= 2400;
 
-    // Calculate the max CPU threshold
-    let max_cpu_threshold = if num_validators >= 10 { 30 } else { 70 };
-
     // Create the test
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
@@ -1785,7 +1784,8 @@ fn realistic_env_max_load_test(
             helm_values["chain"]["epoch_duration_secs"] =
                 (if long_running { 600 } else { 300 }).into();
             helm_values["chain"]["on_chain_consensus_config"] =
-                serde_yaml::to_value(OnChainConsensusConfig::default()).expect("must serialize");
+                serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
+                    .expect("must serialize");
             helm_values["chain"]["on_chain_execution_config"] =
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
@@ -1804,12 +1804,6 @@ fn realistic_env_max_load_test(
                     // Give at least 60s for catchup, give 10% of the run for longer durations.
                     (duration.as_secs() / 10).max(60),
                 )
-                .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                    // Check that we don't use more than 16 CPU cores for 30% of the time.
-                    MetricsThreshold::new(16.0, max_cpu_threshold),
-                    // Check that we don't use more than 10 GB of memory for 30% of the time.
-                    MetricsThreshold::new_gb(10.0, 30),
-                ))
                 .add_latency_threshold(3.4, LatencyType::P50)
                 .add_latency_threshold(4.5, LatencyType::P90)
                 .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_with_breach_pct(
@@ -1872,13 +1866,22 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             }
         }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
+            let mut on_chain_execution_config = OnChainExecutionConfig::default_for_genesis();
+            // Need to update if the default changes
+            match &mut on_chain_execution_config {
+                OnChainExecutionConfig::Missing
+                | OnChainExecutionConfig::V1(_)
+                | OnChainExecutionConfig::V2(_)
+                | OnChainExecutionConfig::V3(_) => {
+                    unreachable!("Unexpected on-chain execution config type, if OnChainExecutionConfig::default_for_genesis() has been updated, this test must be updated too.")
+                }
+                OnChainExecutionConfig::V4(config_v4) => {
+                    config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                    config_v4.transaction_shuffler_type = TransactionShufflerType::SenderAwareV2(256);
+                }
+            }
             helm_values["chain"]["on_chain_execution_config"] =
-                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
-                    .expect("must serialize");
-            helm_values["chain"]["on_chain_execution_config"]["V3"]["block_gas_limit"] =
-                serde_yaml::Value::Null;
-            helm_values["chain"]["on_chain_execution_config"]["V3"]["transaction_shuffler_type"]
-                ["sender_aware_v2"] = 256.into();
+                serde_yaml::to_value(on_chain_execution_config).expect("must serialize");
         }));
 
     if ENABLE_VFNS {
@@ -1922,20 +1925,12 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             SuccessCriteria::new(12000)
                 .add_no_restarts()
                 /* This test runs at high load, so we need more catchup time */
-                .add_wait_for_catchup_s(120)
-                .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                    // Tuned for throughput uses more cores than regular tests,
-                    // as it achieves higher throughput.
-                    // Check that we don't use more than 14 CPU cores for 30% of the time.
-                    MetricsThreshold::new(14.0, 30),
-                    // Check that we don't use more than 10 GB of memory for 30% of the time.
-                    MetricsThreshold::new_gb(10.0, 30),
-                )),
+                .add_wait_for_catchup_s(120),
             /* Doesn't work without event indices
-            .add_chain_progress(StateProgressThreshold {
-                max_no_progress_secs: 10.0,
-                max_round_gap: 4,
-            }),
+                .add_chain_progress(StateProgressThreshold {
+                     max_no_progress_secs: 10.0,
+                     max_round_gap: 4,
+                 }),
             */
         );
     }

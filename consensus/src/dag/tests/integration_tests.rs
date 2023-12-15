@@ -3,11 +3,11 @@
 use super::dag_test;
 use crate::{
     dag::{bootstrap::bootstrap_dag_for_test, dag_state_sync::SyncOutcome},
-    experimental::buffer_manager::OrderedBlocks,
-    network::{IncomingDAGRequest, NetworkSender},
+    network::{IncomingDAGRequest, NetworkSender, RpcResponder},
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::PayloadManager,
+    pipeline::buffer_manager::OrderedBlocks,
     test_utils::{consensus_runtime, EmptyStateComputer, MockPayloadManager, MockStorage},
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -111,8 +111,10 @@ impl DagBootstrapUnit {
                         self.dag_rpc_tx.push(sender, IncomingDAGRequest {
                             req: msg,
                             sender,
-                            protocol,
-                            response_sender,
+                            responder: RpcResponder {
+                                protocol,
+                                response_sender,
+                            },
                         })
                     },
                     _ => unreachable!("expected only DAG-related messages"),

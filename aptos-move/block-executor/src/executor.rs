@@ -10,10 +10,12 @@ use crate::{
     },
     errors::*,
     explicit_sync_wrapper::ExplicitSyncWrapper,
+    limit_processor::BlockGasLimitProcessor,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::{KeyKind, TxnLastInputOutput},
+    types::ReadWriteSummary,
     view::{LatestView, ParallelState, SequentialState, ViewState},
 };
 use aptos_aggregator::{
@@ -24,7 +26,7 @@ use aptos_aggregator::{
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_logger::{debug, error, info};
 use aptos_mvhashmap::{
-    types::{Incarnation, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
+    types::{Incarnation, MVDataOutput, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
     unsync_map::UnsyncMap,
     versioned_delayed_fields::CommitError,
     MVHashMap,
@@ -35,8 +37,8 @@ use aptos_types::{
     block_executor::config::BlockExecutorConfig,
     contract_event::TransactionEvent,
     executable::Executable,
-    fee_statement::FeeStatement,
-    transaction::BlockExecutableTransaction as Transaction,
+    on_chain_config::BlockGasLimitType,
+    transaction::{BlockExecutableTransaction as Transaction, BlockOutput},
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
@@ -57,9 +59,8 @@ use std::{
 pub struct BlockExecutor<T, E, S, L, X> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
-    concurrency_level: usize,
+    config: BlockExecutorConfig,
     executor_thread_pool: Arc<ThreadPool>,
-    maybe_block_gas_limit: Option<u64>,
     transaction_commit_hook: Option<L>,
     phantom: PhantomData<(T, E, S, L, X)>,
 }
@@ -85,9 +86,8 @@ where
             config.local.concurrency_level
         );
         Self {
-            concurrency_level: config.local.concurrency_level,
+            config,
             executor_thread_pool,
-            maybe_block_gas_limit: config.onchain.block_gas_limit_type.block_gas_limit(),
             transaction_commit_hook,
             phantom: PhantomData,
         }
@@ -108,7 +108,7 @@ where
 
         // VM execution.
         let sync_view = LatestView::new(base_view, ViewState::Sync(latest_view), idx_to_execute);
-        let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute, false);
+        let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
 
         let mut prev_modified_keys = last_input_output
             .modified_keys(idx_to_execute)
@@ -118,7 +118,7 @@ where
             .delayed_field_keys(idx_to_execute)
             .map_or(HashSet::new(), |keys| keys.collect());
 
-        let mut read_set = sync_view.take_reads();
+        let mut read_set = sync_view.take_parallel_reads();
 
         // For tracking whether the recent execution wrote outside of the previous write/delta set.
         let mut updates_outside = false;
@@ -414,14 +414,13 @@ where
     /// way, the materialization can be almost embarassingly parallelizable.
     fn prepare_and_queue_commit_ready_txns(
         &self,
-        maybe_block_gas_limit: Option<u64>,
+        block_gas_limit_type: &BlockGasLimitType,
         scheduler: &Scheduler,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         scheduler_task: &mut SchedulerTask,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         shared_commit_state: &ExplicitSyncWrapper<(
-            FeeStatement,
-            Vec<FeeStatement>,
+            BlockGasLimitProcessor<T>,
             Option<Error<E::Error>>,
         )>,
         base_view: &S,
@@ -431,30 +430,8 @@ where
         block: &[T],
     ) -> ::std::result::Result<(), PanicOr<IntentionalFallbackToSequential>> {
         let mut shared_commit_state_guard = shared_commit_state.acquire();
-        let (accumulated_fee_statement, txn_fee_statements, shared_maybe_error) =
+        let (block_limit_processor, shared_maybe_error) =
             shared_commit_state_guard.dereference_mut();
-
-        let update_counters_and_log_info =
-            |txn_idx: u32,
-             accumulated_fee_statement: &mut FeeStatement,
-             txn_fee_statements: &mut Vec<FeeStatement>| {
-                counters::update_parallel_block_gas_counters(
-                    accumulated_fee_statement,
-                    (txn_idx + 1) as usize,
-                );
-                counters::update_parallel_txn_gas_counters(txn_fee_statements);
-
-                let accumulated_non_storage_gas = accumulated_fee_statement.execution_gas_used()
-                    + accumulated_fee_statement.io_gas_used();
-                info!(
-                    "[BlockSTM]: Parallel execution completed. {} out of {} txns committed. \
-		         accumulated_non_storage_gas = {}, limit = {:?}",
-                    txn_idx + 1,
-                    scheduler.num_txns(),
-                    accumulated_non_storage_gas,
-                    maybe_block_gas_limit,
-                );
-            };
 
         while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
             if !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)? {
@@ -502,30 +479,34 @@ where
             }
 
             if let Some(fee_statement) = last_input_output.fee_statement(txn_idx) {
+                let approx_output_size = block_gas_limit_type.block_output_limit().and_then(|_| {
+                    last_input_output
+                        .output_approx_size(txn_idx)
+                        .map(|approx_output| {
+                            approx_output
+                                + if block_gas_limit_type.include_user_txn_size_in_block_output() {
+                                    block[txn_idx as usize].user_txn_bytes_len()
+                                } else {
+                                    0
+                                } as u64
+                        })
+                });
+                let txn_read_write_summary = block_gas_limit_type
+                    .conflict_penalty_window()
+                    .map(|_| last_input_output.get_txn_read_write_summary(txn_idx));
+
                 // For committed txns with Success status, calculate the accumulated gas costs.
-                accumulated_fee_statement.add_fee_statement(&fee_statement);
-                txn_fee_statements.push(fee_statement);
+                block_limit_processor.accumulate_fee_statement(
+                    fee_statement,
+                    txn_read_write_summary,
+                    approx_output_size,
+                );
 
-                if let Some(per_block_gas_limit) = maybe_block_gas_limit {
-                    // When the accumulated execution and io gas of the committed txns exceeds
-                    // PER_BLOCK_GAS_LIMIT, early halt BlockSTM. Storage gas does not count towards
-                    // the per block gas limit, as we measure execution related cost here.
-                    let accumulated_non_storage_gas = accumulated_fee_statement
-                        .execution_gas_used()
-                        + accumulated_fee_statement.io_gas_used();
-                    if accumulated_non_storage_gas >= per_block_gas_limit {
-                        counters::EXCEED_PER_BLOCK_GAS_LIMIT_COUNT
-                            .with_label_values(&[counters::Mode::PARALLEL])
-                            .inc();
-                        info!(
-                            "[BlockSTM]: Parallel execution early halted due to \
-                             accumulated_non_storage_gas {} >= PER_BLOCK_GAS_LIMIT {}",
-                            accumulated_non_storage_gas, per_block_gas_limit,
-                        );
-
-                        // Set the execution output status to be SkipRest, to skip the rest of the txns.
-                        last_input_output.update_to_skip_rest(txn_idx);
-                    }
+                if txn_idx < scheduler.num_txns() - 1
+                    && block_limit_processor.should_end_block_parallel()
+                {
+                    // Set the execution output status to be SkipRest, to skip the rest of the txns.
+                    last_input_output.update_to_skip_rest(txn_idx);
                 }
             }
 
@@ -620,10 +601,9 @@ where
                         "Block execution was aborted due to {:?}",
                         shared_maybe_error.as_ref().unwrap()
                     );
-                    update_counters_and_log_info(
-                        txn_idx,
-                        accumulated_fee_statement,
-                        txn_fee_statements,
+                    block_limit_processor.finish_parallel_update_counters_and_log_info(
+                        txn_idx + 1,
+                        scheduler.num_txns(),
                     );
                 } // else it's already halted
                 break;
@@ -642,10 +622,9 @@ where
                 }
 
                 if scheduler.halt() {
-                    update_counters_and_log_info(
-                        txn_idx,
-                        accumulated_fee_statement,
-                        txn_fee_statements,
+                    block_limit_processor.finish_parallel_update_counters_and_log_info(
+                        txn_idx + 1,
+                        scheduler.num_txns(),
                     );
                 }
                 break;
@@ -656,24 +635,32 @@ where
 
     // For each delayed field in resource write set, replace the identifiers with values.
     fn map_id_to_values_in_write_set(
-        resource_write_set: Option<BTreeMap<T::Key, (T::Value, Option<Arc<MoveTypeLayout>>)>>,
+        resource_write_set: Option<Vec<(T::Key, (T::Value, Option<Arc<MoveTypeLayout>>))>>,
         latest_view: &LatestView<T, S, X>,
     ) -> BTreeMap<T::Key, T::Value> {
         let mut patched_resource_write_set = BTreeMap::new();
         if let Some(resource_write_set) = resource_write_set {
-            for (key, (write_op, layout)) in resource_write_set.iter() {
+            for (key, (write_op, layout)) in resource_write_set.into_iter() {
                 // layout is Some(_) if it contains a delayed field
                 if let Some(layout) = layout {
                     if !write_op.is_deletion() {
-                        let patched_bytes = match latest_view
-                            .replace_identifiers_with_values(write_op.bytes().unwrap(), layout)
-                        {
-                            Ok((bytes, _)) => bytes,
-                            Err(_) => unreachable!("Failed to replace identifiers with values"),
-                        };
-                        let mut patched_write_op = write_op.clone();
-                        patched_write_op.set_bytes(patched_bytes);
-                        patched_resource_write_set.insert(key.clone(), patched_write_op);
+                        match write_op.bytes() {
+                            // TODO[agg_v2](fix): propagate error
+                            None => unreachable!(),
+                            Some(write_op_bytes) => {
+                                let patched_bytes = match latest_view
+                                    .replace_identifiers_with_values(write_op_bytes, &layout)
+                                {
+                                    Ok((bytes, _)) => bytes,
+                                    Err(_) => {
+                                        unreachable!("Failed to replace identifiers with values")
+                                    },
+                                };
+                                let mut patched_write_op = write_op;
+                                patched_write_op.set_bytes(patched_bytes);
+                                patched_resource_write_set.insert(key, patched_write_op);
+                            },
+                        }
                     }
                 }
             }
@@ -798,8 +785,10 @@ where
                 });
 
             // Must contain committed value as we set the base value above.
-            aggregator_v1_delta_writes
-                .push((k, WriteOp::Modification(serialize(&committed_delta).into())));
+            aggregator_v1_delta_writes.push((
+                k,
+                WriteOp::legacy_modification(serialize(&committed_delta).into()),
+            ));
         }
         aggregator_v1_delta_writes
     }
@@ -861,11 +850,18 @@ where
         if let Some(reads_needing_delayed_field_exchange) =
             last_input_output.reads_needing_delayed_field_exchange(txn_idx)
         {
-            for (key, (value, layout)) in reads_needing_delayed_field_exchange.into_iter() {
-                patched_resource_write_set.insert(
-                    key,
-                    Self::replace_ids_with_values(&value, layout.as_ref(), &latest_view),
-                );
+            for (key, layout) in reads_needing_delayed_field_exchange.into_iter() {
+                if let Ok(MVDataOutput::Versioned(
+                    _,
+                    ValueWithLayout::Exchanged(value, _existing_layout),
+                )) = versioned_cache.data().fetch_data(&key, txn_idx)
+                {
+                    // TODO[agg_v2](fix) add randomly_check_layout_matches(Some(_existing_layout), layout);
+                    patched_resource_write_set.insert(
+                        key,
+                        Self::replace_ids_with_values(&value, layout.as_ref(), &latest_view),
+                    );
+                }
             }
         }
 
@@ -886,9 +882,11 @@ where
         last_input_output.record_materialized_txn_output(
             txn_idx,
             aggregator_v1_delta_writes,
-            patched_resource_write_set,
+            patched_resource_write_set
+                .into_iter()
+                .chain(serialized_groups)
+                .collect(),
             patched_events,
-            serialized_groups,
         );
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
             let txn_output = last_input_output.txn_output(txn_idx).unwrap();
@@ -944,8 +942,7 @@ where
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
         shared_commit_state: &ExplicitSyncWrapper<(
-            FeeStatement,
-            Vec<FeeStatement>,
+            BlockGasLimitProcessor<T>,
             Option<Error<E::Error>>,
         )>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
@@ -979,7 +976,7 @@ where
             // Priorotize committing validated transactions
             while scheduler.should_coordinate_commits() {
                 self.prepare_and_queue_commit_ready_txns(
-                    self.maybe_block_gas_limit,
+                    &self.config.onchain.block_gas_limit_type,
                     scheduler,
                     versioned_cache,
                     &mut scheduler_task,
@@ -1055,27 +1052,29 @@ where
         executor_initial_arguments: E::Argument,
         signature_verified_block: &[T],
         base_view: &S,
-    ) -> Result<Vec<E::Output>, E::Error> {
+    ) -> Result<BlockOutput<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
         // will only have a coordinator role but no workers for rolling commit.
         // Need to special case no roles (commit hook by thread itself) to run
         // w. concurrency_level = 1 for some reason.
-        assert!(self.concurrency_level > 1, "Must use sequential execution");
+        assert!(
+            self.config.local.concurrency_level > 1,
+            "Must use sequential execution"
+        );
 
         let versioned_cache = MVHashMap::new();
         let start_shared_counter = gen_id_start_value(false);
         let shared_counter = AtomicU32::new(start_shared_counter);
 
         if signature_verified_block.is_empty() {
-            return Ok(vec![]);
+            return Ok(BlockOutput::new(vec![]));
         }
 
         let num_txns = signature_verified_block.len();
 
         let shared_commit_state = ExplicitSyncWrapper::new((
-            FeeStatement::zero(),
-            Vec::<FeeStatement>::with_capacity(num_txns),
+            BlockGasLimitProcessor::new(self.config.onchain.block_gas_limit_type.clone(), num_txns),
             None,
         ));
 
@@ -1094,7 +1093,7 @@ where
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
-            for _ in 0..self.concurrency_level {
+            for _ in 0..self.config.local.concurrency_level {
                 s.spawn(|_| {
                     if let Err(e) = self.worker_loop(
                         &executor_initial_arguments,
@@ -1110,7 +1109,7 @@ where
                     ) {
                         if scheduler.halt() {
                             let mut shared_commit_state_guard = shared_commit_state.acquire();
-                            let (_, _, maybe_error) = shared_commit_state_guard.dereference_mut();
+                            let (_, maybe_error) = shared_commit_state_guard.dereference_mut();
                             *maybe_error = Some(Error::FallbackToSequential(e));
                         }
                     }
@@ -1120,10 +1119,14 @@ where
         drop(timer);
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
-        let (_, _, maybe_error) = shared_commit_state.into_inner();
+        let (_block_limit_processor, maybe_error) = shared_commit_state.into_inner();
+
+        // TODO add block end info to output.
+        // block_limit_processor.is_block_limit_reached();
+
         match maybe_error {
             Some(err) => Err(err),
-            None => Ok(final_results.into_inner()),
+            None => Ok(BlockOutput::new(final_results.into_inner())),
         }
     }
 
@@ -1211,7 +1214,7 @@ where
         signature_verified_block: &[T],
         base_view: &S,
         dynamic_change_set_optimizations_enabled: bool,
-    ) -> Result<Vec<E::Output>, E::Error> {
+    ) -> Result<BlockOutput<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(executor_arguments);
@@ -1221,7 +1224,10 @@ where
         let counter = RefCell::new(start_counter);
         let unsync_map = UnsyncMap::new();
         let mut ret = Vec::with_capacity(num_txns);
-        let mut accumulated_fee_statement = FeeStatement::zero();
+        let mut block_limit_processor = BlockGasLimitProcessor::<T>::new(
+            self.config.onchain.block_gas_limit_type.clone(),
+            num_txns,
+        );
 
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let latest_view = LatestView::<T, S, X>::new(
@@ -1234,21 +1240,56 @@ where
                 )),
                 idx as TxnIndex,
             );
-            let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex, true);
+            let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex);
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
+                    // Calculating the accumulated gas costs of the committed txns.
+                    let fee_statement = output.fee_statement();
+
+                    let approx_output_size = self
+                        .config
+                        .onchain
+                        .block_gas_limit_type
+                        .block_output_limit()
+                        .map(|_| {
+                            output.output_approx_size()
+                                + if self
+                                    .config
+                                    .onchain
+                                    .block_gas_limit_type
+                                    .include_user_txn_size_in_block_output()
+                                {
+                                    txn.user_txn_bytes_len()
+                                } else {
+                                    0
+                                } as u64
+                        });
+
+                    let read_write_summary = self
+                        .config
+                        .onchain
+                        .block_gas_limit_type
+                        .conflict_penalty_window()
+                        .map(|_| {
+                            ReadWriteSummary::new(
+                                latest_view.take_sequential_reads().get_read_summary(),
+                                output.get_write_summary(),
+                            )
+                        });
+                    block_limit_processor.accumulate_fee_statement(
+                        fee_statement,
+                        read_write_summary,
+                        approx_output_size,
+                    );
+
+                    output.materialize_agg_v1(&latest_view);
                     assert_eq!(
                         output.aggregator_v1_delta_set().len(),
                         0,
                         "Sequential execution must materialize deltas"
                     );
-
-                    // Calculating the accumulated gas costs of the committed txns.
-                    let fee_statement = output.fee_statement();
-                    accumulated_fee_statement.add_fee_statement(&fee_statement);
-                    counters::update_sequential_txn_gas_counters(&fee_statement);
 
                     // Apply the writes.
                     // TODO[agg_v2](fix): return code invariant error if dynamic change set optimizations disabled.
@@ -1290,23 +1331,27 @@ where
                         let mut patched_resource_write_set =
                             Self::map_id_to_values_in_write_set(resource_change_set, &latest_view);
 
-                        for (key, (value, layout)) in
+                        for (key, layout) in
                             output.reads_needing_delayed_field_exchange().into_iter()
                         {
-                            if patched_resource_write_set
-                                .insert(
-                                    key,
-                                    Self::replace_ids_with_values(
-                                        &value,
-                                        layout.as_ref(),
-                                        &latest_view,
-                                    ),
-                                )
-                                .is_some()
+                            if let Some(ValueWithLayout::Exchanged(value, _)) =
+                                unsync_map.fetch_data(&key)
                             {
-                                return Err(Error::FallbackToSequential(code_invariant_error(
-                                    "reads_needing_delayed_field_exchange already in the write set for key",
-                                ).into()));
+                                if patched_resource_write_set
+                                    .insert(
+                                        key,
+                                        Self::replace_ids_with_values(
+                                            &value,
+                                            layout.as_ref(),
+                                            &latest_view,
+                                        ),
+                                    )
+                                    .is_some()
+                                {
+                                    return Err(Error::FallbackToSequential(code_invariant_error(
+                                        "reads_needing_delayed_field_exchange already in the write set for key",
+                                    ).into()));
+                                }
                             }
                         }
 
@@ -1328,9 +1373,11 @@ where
                             // They are already handled because we passed materialize_deltas=true
                             // to execute_transaction.
                             vec![],
-                            patched_resource_write_set,
+                            patched_resource_write_set
+                                .into_iter()
+                                .chain(serialized_groups.into_iter())
+                                .collect(),
                             patched_events,
-                            serialized_groups,
                         );
                     } else {
                         output.set_txn_output_for_non_dynamic_change_set();
@@ -1376,43 +1423,20 @@ where
                 break;
             }
 
-            if let Some(per_block_gas_limit) = self.maybe_block_gas_limit {
-                // When the accumulated gas of the committed txns
-                // exceeds per_block_gas_limit, halt sequential execution.
-                let accumulated_non_storage_gas = accumulated_fee_statement.execution_gas_used()
-                    + accumulated_fee_statement.io_gas_used();
-                if accumulated_non_storage_gas >= per_block_gas_limit {
-                    counters::EXCEED_PER_BLOCK_GAS_LIMIT_COUNT
-                        .with_label_values(&[counters::Mode::SEQUENTIAL])
-                        .inc();
-                    info!(
-                        "[Execution]: Sequential execution early halted due to \
-                        accumulated_non_storage_gas {} >= PER_BLOCK_GAS_LIMIT {}, {} txns committed.",
-                        accumulated_non_storage_gas,
-                        per_block_gas_limit,
-                        ret.len()
-                    );
-                    break;
-                }
+            if idx < num_txns - 1 && block_limit_processor.should_end_block_sequential() {
+                break;
             }
         }
 
-        if ret.len() == num_txns {
-            let accumulated_non_storage_gas = accumulated_fee_statement.execution_gas_used()
-                + accumulated_fee_statement.io_gas_used();
-            info!(
-                "[Execution]: Sequential execution completed. \
-		 {} out of {} txns committed. accumulated_non_storage_gas = {}, limit = {:?}",
-                ret.len(),
-                num_txns,
-                accumulated_non_storage_gas,
-                self.maybe_block_gas_limit,
-            );
-        }
+        block_limit_processor
+            .finish_sequential_update_counters_and_log_info(ret.len() as u32, num_txns as u32);
 
-        counters::update_sequential_block_gas_counters(&accumulated_fee_statement, ret.len());
         ret.resize_with(num_txns, E::Output::skip_output);
-        Ok(ret)
+
+        // TODO add block end info to output.
+        // block_limit_processor.is_block_limit_reached();
+
+        Ok(BlockOutput::new(ret))
     }
 
     pub fn execute_block(
@@ -1420,11 +1444,13 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: &[T],
         base_view: &S,
-    ) -> Result<Vec<E::Output>, E::Error> {
+    ) -> Result<BlockOutput<E::Output>, E::Error> {
         let dynamic_change_set_optimizations_enabled = signature_verified_block.len() != 1
             || E::is_transaction_dynamic_change_set_capable(&signature_verified_block[0]);
 
-        let mut ret = if self.concurrency_level > 1 && dynamic_change_set_optimizations_enabled {
+        let mut ret = if self.config.local.concurrency_level > 1
+            && dynamic_change_set_optimizations_enabled
+        {
             self.execute_transactions_parallel(
                 executor_arguments,
                 signature_verified_block,
@@ -1441,7 +1467,7 @@ where
 
         // Sequential execution fallback
         // Only worth doing if we did parallel before, i.e. if we did a different pass.
-        if self.concurrency_level > 1 {
+        if self.config.local.concurrency_level > 1 {
             if let Err(Error::FallbackToSequential(e)) = &ret {
                 match e {
                     PanicOr::Or(IntentionalFallbackToSequential::ModulePathReadWrite) => {

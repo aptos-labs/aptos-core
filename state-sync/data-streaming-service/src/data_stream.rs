@@ -263,14 +263,25 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         &mut self,
         global_data_summary: &GlobalDataSummary,
     ) -> Result<(), Error> {
-        // Determine how many requests (at most) can be sent to the network
-        let num_sent_requests = self.get_sent_data_requests()?.len() as u64;
-        let max_concurrent_requests = self.get_max_concurrent_requests();
-        let max_num_requests_to_send = max_concurrent_requests
-            .checked_sub(num_sent_requests)
-            .ok_or_else(|| {
-                Error::IntegerOverflow("Max number of requests to send has overflown!".into())
-            })?;
+        // Calculate the number of in-flight requests (i.e., requests that haven't completed)
+        let num_pending_requests = self.get_num_pending_data_requests()?;
+        let num_complete_pending_requests = self.get_num_complete_pending_requests()?;
+        let num_in_flight_requests =
+            num_pending_requests.saturating_sub(num_complete_pending_requests);
+
+        // Calculate the max number of requests that can be sent now
+        let max_pending_requests = self.streaming_service_config.max_pending_requests;
+        let max_num_requests_to_send = if num_pending_requests >= max_pending_requests {
+            0 // We're already at the max number of pending requests (don't do anything)
+        } else {
+            // Otherwise, calculate the max number of requests to send based on
+            // the max concurrent requests and the number of pending request slots.
+            let remaining_concurrent_requests = self
+                .get_max_concurrent_requests()
+                .saturating_sub(num_in_flight_requests);
+            let remaining_request_slots = max_pending_requests.saturating_sub(num_pending_requests);
+            min(remaining_concurrent_requests, remaining_request_slots)
+        };
 
         // Send the client requests
         if max_num_requests_to_send > 0 {
@@ -303,8 +314,9 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
             );
         }
 
-        // Update the counters for the pending response queue
-        metrics::set_pending_data_responses(self.get_sent_data_requests()?.len());
+        // Update the counters for the complete and pending responses
+        metrics::set_complete_pending_data_responses(num_complete_pending_requests);
+        metrics::set_pending_data_responses(self.get_num_pending_data_requests()?);
 
         Ok(())
     }
@@ -435,7 +447,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         }
 
         // Process any ready data responses
-        for _ in 0..self.get_max_concurrent_requests() {
+        for _ in 0..self.get_num_pending_data_requests()? {
             if let Some(pending_response) = self.pop_pending_response_queue()? {
                 // Get the client request and response information
                 let maybe_client_response = pending_response.lock().client_response.take();
@@ -849,6 +861,28 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
             )));
         }
         Ok(())
+    }
+
+    /// Returns the number of pending requests in the sent data requests queue
+    /// that have already completed (i.e., are no longer in-flight).
+    fn get_num_complete_pending_requests(&mut self) -> Result<u64, Error> {
+        let mut num_complete_pending_requests = 0;
+        for sent_data_request in self.get_sent_data_requests()? {
+            if let Some(client_response) = sent_data_request.lock().client_response.as_ref() {
+                if client_response.is_ok() {
+                    // Only count successful responses as complete. Failures will be retried
+                    num_complete_pending_requests += 1;
+                }
+            }
+        }
+        Ok(num_complete_pending_requests)
+    }
+
+    /// Returns the number of pending requests in the sent data requests queue
+    fn get_num_pending_data_requests(&mut self) -> Result<u64, Error> {
+        let pending_data_requests = self.get_sent_data_requests()?;
+        let num_pending_data_requests = pending_data_requests.len() as u64;
+        Ok(num_pending_data_requests)
     }
 
     /// Assumes the caller has already verified that `sent_data_requests` has

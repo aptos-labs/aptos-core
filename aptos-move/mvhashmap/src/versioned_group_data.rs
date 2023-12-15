@@ -6,6 +6,7 @@ use crate::types::{
 };
 use anyhow::bail;
 use aptos_types::write_set::{TransactionWrite, WriteOpKind};
+use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
 use claims::{assert_matches, assert_none, assert_some};
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
@@ -326,7 +327,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
             })
     }
 
-    fn get_latest_group_size(&self, txn_idx: TxnIndex) -> Result<u64, MVGroupError> {
+    fn get_latest_group_size(&self, txn_idx: TxnIndex) -> Result<ResourceGroupSize, MVGroupError> {
         if !self
             .idx_to_update
             .contains_key(&ShiftedTxnIndex::zero_idx())
@@ -334,34 +335,27 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
             return Err(MVGroupError::Uninitialized);
         }
 
-        self.versioned_map
+        let sizes = self
+            .versioned_map
             .iter()
-            .try_fold(0_u64, |len, (tag, tree)| {
-                match tree
-                    .range(ShiftedTxnIndex::zero_idx()..ShiftedTxnIndex::new(txn_idx))
+            .flat_map(|(tag, tree)| {
+                tree.range(ShiftedTxnIndex::zero_idx()..ShiftedTxnIndex::new(txn_idx))
                     .next_back()
-                {
-                    Some((idx, entry)) => {
+                    .and_then(|(idx, entry)| {
                         if entry.flag == Flag::Estimate {
-                            Err(MVGroupError::Dependency(
+                            Some(Err(MVGroupError::Dependency(
                                 idx.idx().expect("May not depend on storage version"),
-                            ))
+                            )))
                         } else {
-                            match entry.value.bytes_len() {
-                                Some(bytes_len) => {
-                                    let delta = bytes_len as u64
-                                        + bcs::serialized_size(tag)
-                                            .map_err(|_| MVGroupError::TagSerializationError)?
-                                            as u64;
-                                    Ok(len + delta)
-                                },
-                                None => Ok(len),
-                            }
+                            entry
+                                .value
+                                .bytes_len()
+                                .map(|bytes_len| Ok((tag, bytes_len)))
                         }
-                    },
-                    None => Ok(len),
-                }
+                    })
             })
+            .collect::<Result<Vec<_>, MVGroupError>>()?;
+        group_size_as_sum(sizes.into_iter()).map_err(|_| MVGroupError::TagSerializationError)
     }
 }
 
@@ -454,7 +448,11 @@ impl<
     /// marked as an estimate, a dependency is returned. Note: it would be possible to
     /// process estimated entry sizes, but would have to mark that if after the re-execution
     /// the entry size changes, then re-execution must reduce validation idx.
-    pub fn get_group_size(&self, key: &K, txn_idx: TxnIndex) -> Result<u64, MVGroupError> {
+    pub fn get_group_size(
+        &self,
+        key: &K,
+        txn_idx: TxnIndex,
+    ) -> Result<ResourceGroupSize, MVGroupError> {
         match self.group_values.get(key) {
             Some(g) => g.get_latest_group_size(txn_idx),
             None => Err(MVGroupError::Uninitialized),
@@ -705,13 +703,19 @@ mod test {
         );
 
         let tag: usize = 5;
-        let tag_len = bcs::serialized_size(&tag).unwrap();
         let one_entry_len = TestValue::creation_with_len(1).bytes().unwrap().len();
         let two_entry_len = TestValue::creation_with_len(2).bytes().unwrap().len();
         let three_entry_len = TestValue::creation_with_len(3).bytes().unwrap().len();
         let four_entry_len = TestValue::creation_with_len(4).bytes().unwrap().len();
-        let exp_size = 2 * two_entry_len + 3 * one_entry_len + 5 * tag_len;
-        assert_ok_eq!(map.get_group_size(&ap, 12), exp_size as u64);
+        let exp_size = group_size_as_sum(vec![(&tag, two_entry_len); 2].into_iter().chain(vec![
+            (
+                &tag,
+                one_entry_len
+            );
+            3
+        ]))
+        .unwrap();
+        assert_ok_eq!(map.get_group_size(&ap, 12), exp_size);
 
         map.write(
             ap.clone(),
@@ -720,14 +724,21 @@ mod test {
             // tags 4, 5
             (4..6).map(|i| (i, (TestValue::creation_with_len(3), None))),
         );
-        let exp_size_12 = exp_size + 2 * three_entry_len + tag_len - one_entry_len;
-        assert_ok_eq!(map.get_group_size(&ap, 12), exp_size_12 as u64);
-        assert_ok_eq!(map.get_group_size(&ap, 10), exp_size as u64);
+        let exp_size_12 = group_size_as_sum(
+            vec![(&tag, one_entry_len); 2]
+                .into_iter()
+                .chain(vec![(&tag, two_entry_len); 2])
+                .chain(vec![(&tag, three_entry_len); 2]),
+        )
+        .unwrap();
+        assert_ok_eq!(map.get_group_size(&ap, 12), exp_size_12);
+        assert_ok_eq!(map.get_group_size(&ap, 10), exp_size);
 
         map.mark_estimate(&ap, 5);
         assert_matches!(map.get_group_size(&ap, 12), Err(Dependency(5)));
-        let exp_size_4 = 4 * (tag_len + one_entry_len);
-        assert_ok_eq!(map.get_group_size(&ap, 4), exp_size_4 as u64);
+        let exp_size_4 = group_size_as_sum(vec![(&tag, one_entry_len); 4].into_iter()).unwrap();
+
+        assert_ok_eq!(map.get_group_size(&ap, 4), exp_size_4);
 
         map.write(
             ap.clone(),
@@ -735,12 +746,20 @@ mod test {
             1,
             (0..2).map(|i| (i, (TestValue::creation_with_len(4), None))),
         );
-        let exp_size_7 = 2 * four_entry_len + 3 * one_entry_len + 5 * tag_len;
-        assert_ok_eq!(map.get_group_size(&ap, 7), exp_size_7 as u64);
+        let exp_size_7 = group_size_as_sum(vec![(&tag, one_entry_len); 3].into_iter().chain(vec![
+            (
+                &tag,
+                four_entry_len
+            );
+            2
+        ]))
+        .unwrap();
+
+        assert_ok_eq!(map.get_group_size(&ap, 7), exp_size_7);
         assert_matches!(map.get_group_size(&ap, 6), Err(Dependency(5)));
 
         map.remove(&ap, 5);
-        assert_ok_eq!(map.get_group_size(&ap, 6), exp_size_4 as u64);
+        assert_ok_eq!(map.get_group_size(&ap, 6), exp_size_4);
     }
 
     fn finalize_group_as_hashmap(

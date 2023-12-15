@@ -113,6 +113,7 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-integration-tests",
     "ecosystem/indexer-grpc/indexer-grpc-post-processor",
     "ecosystem/indexer-grpc/indexer-grpc-server-framework",
+    "ecosystem/indexer-grpc/indexer-grpc-table-info",
     "ecosystem/indexer-grpc/indexer-grpc-utils",
     "ecosystem/nft-metadata-crawler-parser",
     "ecosystem/node-checker",
@@ -339,6 +340,7 @@ aptos-indexer-grpc-data-access = { path = "ecosystem/indexer-grpc/indexer-grpc-d
 aptos-indexer-grpc-file-store = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store" }
 aptos-indexer-grpc-post-processor = { path = "ecosystem/indexer-grpc/indexer-grpc-post-processor" }
 aptos-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-fullnode" }
+aptos-indexer-grpc-table-info = { path = "ecosystem/indexer-grpc/indexer-grpc-table-info" }
 aptos-indexer-grpc-utils = { path = "ecosystem/indexer-grpc/indexer-grpc-utils" }
 aptos-indexer-grpc-server-framework = { path = "ecosystem/indexer-grpc/indexer-grpc-server-framework" }
 aptos-infallible = { path = "crates/aptos-infallible" }
@@ -437,6 +439,7 @@ anstyle = "1.0.1"
 arc-swap = "1.6.0"
 arr_macro = "0.2.1"
 ark-bls12-381 = "0.4.0"
+ark-bn254 = "0.4.0"
 ark-ec = "0.4.0"
 ark-ff = "0.4.0"
 ark-serialize = "0.4.0"
@@ -504,16 +507,15 @@ event-listener = "2.5.3"
 fail = "0.5.0"
 field_count = "0.1.1"
 flate2 = "1.0.24"
-futures = "0.3.24"
-futures-channel = "0.3.24"
-futures-core = "0.3.25"
-futures-util = "0.3.21"
+futures = "0.3.29"
+futures-channel = "0.3.29"
+futures-core = "0.3.29"
+futures-util = "0.3.29"
 gcp-bigquery-client = "0.13.0"
 get_if_addrs = "0.5.3"
 git2 = "0.16.1"
 glob = "0.3.0"
 goldenfile = "1.5.2"
-google-cloud-pubsub = "0.18.0"
 google-cloud-storage = "0.13.0"
 handlebars = "4.2.2"
 heck = "0.3.2"
@@ -610,6 +612,7 @@ rocksdb = { version = "0.21.0", features = ["lz4"] }
 rstack-self =  { version = "0.3.0", features = ["dw"], default_features = false }
 rstest = "0.15.0"
 rusty-fork = "0.3.0"
+rustversion = "1.0.14"
 scopeguard = "1.2.0"
 sha-1 = "0.10.0"
 sha2 = "0.9.3"

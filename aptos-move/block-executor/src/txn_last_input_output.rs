@@ -6,6 +6,7 @@ use crate::{
     errors::{Error, IntentionalFallbackToSequential},
     explicit_sync_wrapper::ExplicitSyncWrapper,
     task::{ExecutionStatus, TransactionOutput},
+    types::{InputOutputKey, ReadWriteSummary},
 };
 use aptos_aggregator::types::PanicOr;
 use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
@@ -18,7 +19,7 @@ use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
 use move_core_types::value::MoveTypeLayout;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     fmt::Debug,
     iter::{empty, Iterator},
     sync::{
@@ -178,6 +179,19 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         }
     }
 
+    pub(crate) fn output_approx_size(&self, txn_idx: TxnIndex) -> Option<u64> {
+        match &self.outputs[txn_idx as usize]
+            .load_full()
+            .expect("[BlockSTM]: Execution output must be recorded after execution")
+            .output_status
+        {
+            ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
+                Some(output.output_approx_size())
+            },
+            _ => None,
+        }
+    }
+
     /// Does a transaction at txn_idx have SkipRest or Abort status.
     pub(crate) fn block_skips_rest_at_idx(&self, txn_idx: TxnIndex) -> bool {
         matches!(
@@ -231,7 +245,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             .and_then(|txn_output| match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => Some(
                     t.resource_write_set()
-                        .into_keys()
+                        .into_iter()
+                        .map(|(k, _)| k)
                         .chain(t.aggregator_v1_write_set().into_keys())
                         .chain(t.aggregator_v1_delta_set().into_keys())
                         .map(|k| (k, KeyKind::Resource))
@@ -256,7 +271,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn resource_write_set(
         &self,
         txn_idx: TxnIndex,
-    ) -> Option<BTreeMap<T::Key, (T::Value, Option<Arc<MoveTypeLayout>>)>> {
+    ) -> Option<Vec<(T::Key, (T::Value, Option<Arc<MoveTypeLayout>>))>> {
         self.outputs[txn_idx as usize]
             .load_full()
             .and_then(|txn_output| match &txn_output.output_status {
@@ -291,7 +306,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn reads_needing_delayed_field_exchange(
         &self,
         txn_idx: TxnIndex,
-    ) -> Option<BTreeMap<T::Key, (T::Value, Arc<MoveTypeLayout>)>> {
+    ) -> Option<Vec<(T::Key, Arc<MoveTypeLayout>)>> {
         self.outputs[txn_idx as usize]
             .load()
             .as_ref()
@@ -309,7 +324,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn group_reads_needing_delayed_field_exchange(
         &self,
         txn_idx: TxnIndex,
-    ) -> Option<BTreeMap<T::Key, T::Value>> {
+    ) -> Option<Vec<(T::Key, T::Value)>> {
         self.outputs[txn_idx as usize]
             .load()
             .as_ref()
@@ -397,9 +412,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         &self,
         txn_idx: TxnIndex,
         delta_writes: Vec<(T::Key, WriteOp)>,
-        patched_resource_write_set: BTreeMap<T::Key, T::Value>,
+        patched_resource_write_set: Vec<(T::Key, T::Value)>,
         patched_events: Vec<T::Event>,
-        combined_groups: Vec<(T::Key, T::Value)>,
     ) {
         match &self.outputs[txn_idx as usize]
             .load_full()
@@ -411,7 +425,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     delta_writes,
                     patched_resource_write_set,
                     patched_events,
-                    combined_groups,
                 );
             },
             ExecutionStatus::Abort(_)
@@ -419,6 +432,31 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             | ExecutionStatus::SpeculativeExecutionAbortError(_)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {},
         };
+    }
+
+    pub(crate) fn get_txn_read_write_summary(&self, txn_idx: TxnIndex) -> ReadWriteSummary<T> {
+        let read_set = self.read_set(txn_idx).expect("Read set must be recorded");
+
+        let reads = read_set.get_read_summary();
+        let writes = self.get_write_summary(txn_idx);
+        ReadWriteSummary::new(reads, writes)
+    }
+
+    pub(crate) fn get_write_summary(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>> {
+        match &self.outputs[txn_idx as usize]
+            .load_full()
+            .expect("Output must exist")
+            .output_status
+        {
+            ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t.get_write_summary(),
+            ExecutionStatus::Abort(_)
+            | ExecutionStatus::DirectWriteSetTransactionNotCapableError
+            | ExecutionStatus::SpeculativeExecutionAbortError(_)
+            | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => HashSet::new(),
+        }
     }
 
     // Must be executed after parallel execution is done, grabs outputs. Will panic if

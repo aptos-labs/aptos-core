@@ -243,16 +243,9 @@ spec aptos_framework::transaction_fee {
         ensures exists<AptosCoinMintCapability>(addr);
     }
 
-    /// Ensure caller is admin.
-    /// Aborts if `AptosCoinCapabilities` under the stake module does not exist.
-    /// Aborts if `AptosCoinMintCapability` already exists.
-    spec initialize_storage_refund(aptos_framework: &signer) {
-        use std::signer;
-        let addr = signer::address_of(aptos_framework);
-        aborts_if !system_addresses::is_aptos_framework_address(addr);
-        aborts_if !exists<stake::AptosCoinCapabilities>(addr);
-        aborts_if exists<AptosCoinMintCapability>(addr);
-        ensures exists<AptosCoinMintCapability>(addr);
+    /// Historical. Aborts.
+    spec initialize_storage_refund(_: &signer) {
+        aborts_if true;
     }
 
     /// Aborts if module event feature is not enabled.

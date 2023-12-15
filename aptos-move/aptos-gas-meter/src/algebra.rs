@@ -5,7 +5,9 @@ use crate::traits::GasAlgebra;
 use aptos_gas_algebra::{Fee, FeePerGasUnit, Gas, GasExpression, Octa};
 use aptos_gas_schedule::VMGasParameters;
 use aptos_logger::error;
-use aptos_vm_types::storage::StorageGasParameters;
+use aptos_vm_types::storage::{
+    io_pricing::IoPricing, space_pricing::DiskSpacePricing, StorageGasParameters,
+};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     gas_algebra::{InternalGas, InternalGasUnit},
@@ -83,8 +85,12 @@ impl GasAlgebra for StandardGasAlgebra {
         &self.vm_gas_params
     }
 
-    fn storage_gas_params(&self) -> &StorageGasParameters {
-        &self.storage_gas_params
+    fn io_pricing(&self) -> &IoPricing {
+        &self.storage_gas_params.io_pricing
+    }
+
+    fn disk_space_pricing(&self) -> &DiskSpacePricing {
+        &self.storage_gas_params.space_pricing
     }
 
     fn balance_internal(&self) -> InternalGas {

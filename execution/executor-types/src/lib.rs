@@ -316,7 +316,10 @@ pub struct StateComputeResult {
     /// The compute status (success/failure) of the given payload. The specific details are opaque
     /// for StateMachineReplication, which is merely passing it between StateComputer and
     /// PayloadClient.
-    compute_status: Vec<TransactionStatus>,
+    ///
+    /// Here, only input transactions statuses are kept, and in their order.
+    /// Input includes BlockMetadata, but doesn't include StateCheckpoint/BlockEpilogue
+    compute_status_for_input_txns: Vec<TransactionStatus>,
 
     /// The transaction info hashes of all success txns.
     transaction_info_hashes: Vec<HashValue>,
@@ -332,7 +335,7 @@ impl StateComputeResult {
         parent_frozen_subtree_roots: Vec<HashValue>,
         parent_num_leaves: u64,
         epoch_state: Option<EpochState>,
-        compute_status: Vec<TransactionStatus>,
+        compute_status_for_input_txns: Vec<TransactionStatus>,
         transaction_info_hashes: Vec<HashValue>,
         reconfig_events: Vec<ContractEvent>,
     ) -> Self {
@@ -343,7 +346,7 @@ impl StateComputeResult {
             parent_frozen_subtree_roots,
             parent_num_leaves,
             epoch_state,
-            compute_status,
+            compute_status_for_input_txns,
             transaction_info_hashes,
             reconfig_events,
         }
@@ -360,7 +363,7 @@ impl StateComputeResult {
             parent_frozen_subtree_roots: vec![],
             parent_num_leaves: 0,
             epoch_state: None,
-            compute_status: vec![],
+            compute_status_for_input_txns: vec![],
             transaction_info_hashes: vec![],
             reconfig_events: vec![],
         }
@@ -374,7 +377,10 @@ impl StateComputeResult {
             parent_frozen_subtree_roots: vec![],
             parent_num_leaves: 0,
             epoch_state: None,
-            compute_status: vec![TransactionStatus::Keep(ExecutionStatus::Success); num_txns],
+            compute_status_for_input_txns: vec![
+                TransactionStatus::Keep(ExecutionStatus::Success);
+                num_txns
+            ],
             transaction_info_hashes: vec![],
             reconfig_events: vec![],
         }
@@ -391,7 +397,7 @@ impl StateComputeResult {
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_dummy_with_compute_status(compute_status: Vec<TransactionStatus>) -> Self {
         let mut ret = Self::new_dummy();
-        ret.compute_status = compute_status;
+        ret.compute_status_for_input_txns = compute_status;
         ret
     }
 }
@@ -407,8 +413,54 @@ impl StateComputeResult {
         self.root_hash
     }
 
-    pub fn compute_status(&self) -> &Vec<TransactionStatus> {
-        &self.compute_status
+    pub fn compute_status_for_input_txns(&self) -> &Vec<TransactionStatus> {
+        &self.compute_status_for_input_txns
+    }
+
+    pub fn transactions_to_commit_len(&self) -> usize {
+        // StateCheckpoint/BlockEpilogue is added if there is no reconfiguration
+        self.compute_status_for_input_txns().len()
+            + (if self.has_reconfiguration() { 0 } else { 1 })
+    }
+
+    /// On top of input transactions (which contain BlockMetadata and Validator txns),
+    /// filter out those that should be committed, and add StateCheckpoint/BlockEpilogue if needed.
+    pub fn transactions_to_commit(
+        &self,
+        input_txns: Vec<Transaction>,
+        block_id: HashValue,
+    ) -> Vec<Transaction> {
+        assert_eq!(
+            input_txns.len(),
+            self.compute_status_for_input_txns().len(),
+            "{:?} != {:?}",
+            input_txns.iter().map(|t| t.type_name()).collect::<Vec<_>>(),
+            self.compute_status_for_input_txns()
+        );
+        let output = itertools::zip_eq(input_txns, self.compute_status_for_input_txns())
+            .filter_map(|(txn, status)| {
+                assert!(
+                    !matches!(txn, Transaction::StateCheckpoint(_)),
+                    "{:?}: {:?}",
+                    txn,
+                    status
+                );
+                match status {
+                    TransactionStatus::Keep(_) => Some(txn),
+                    _ => None,
+                }
+            })
+            .chain((!self.has_reconfiguration()).then_some(Transaction::StateCheckpoint(block_id)))
+            .collect::<Vec<_>>();
+
+        assert!(
+            self.has_reconfiguration()
+                || matches!(output.last(), Some(Transaction::StateCheckpoint(_))),
+            "{:?}",
+            output.last()
+        );
+
+        output
     }
 
     pub fn epoch_state(&self) -> &Option<EpochState> {

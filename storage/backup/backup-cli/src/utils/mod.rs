@@ -19,11 +19,12 @@ use aptos_config::config::{
 use aptos_crypto::HashValue;
 use aptos_db::{
     backup::restore_handler::RestoreHandler,
+    db::AptosDB,
+    get_restore_handler::GetRestoreHandler,
     state_restore::{
         StateSnapshotProgress, StateSnapshotRestore, StateSnapshotRestoreMode, StateValueBatch,
         StateValueWriter,
     },
-    AptosDB, GetRestoreHandler,
 };
 use aptos_infallible::duration_since_epoch;
 use aptos_jellyfish_merkle::{NodeBatch, TreeWriter};
@@ -287,9 +288,10 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
                 false,                       /* read_only */
                 NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
                 opt.rocksdb_opt.clone().into(),
-                false,
+                false, /* indexer */
                 BUFFERED_STATE_TARGET_ITEMS,
                 DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+                false, /* indexer async v2 */
             )?)
             .get_restore_handler();
 

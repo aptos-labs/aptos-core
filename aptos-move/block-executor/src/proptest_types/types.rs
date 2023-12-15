@@ -9,6 +9,7 @@ use crate::{
 use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
+    resolver::TAggregatorV1View,
     types::DelayedFieldID,
 };
 use aptos_mvhashmap::types::TxnIndex;
@@ -22,7 +23,7 @@ use aptos_types::{
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{
         state_storage_usage::StateStorageUsage,
-        state_value::{StateValue, StateValueMetadata, StateValueMetadataKind},
+        state_value::{StateValue, StateValueMetadata},
     },
     transaction::BlockExecutableTransaction as Transaction,
     write_set::{TransactionWrite, WriteOp, WriteOpKind},
@@ -173,7 +174,7 @@ impl<K: Hash + Clone + Debug + Eq + PartialOrd + Ord> ModulePath for KeyType<K> 
 pub(crate) struct ValueType {
     /// Wrapping the types used for testing to add TransactionWrite trait implementation (below).
     bytes: Option<Bytes>,
-    metadata: StateValueMetadataKind,
+    metadata: StateValueMetadata,
     write_op_kind: ExplicitSyncWrapper<WriteOpKind>,
 }
 
@@ -205,7 +206,7 @@ impl Arbitrary for ValueType {
 impl ValueType {
     pub(crate) fn new(
         bytes: Option<Bytes>,
-        metadata: StateValueMetadataKind,
+        metadata: StateValueMetadata,
         kind: WriteOpKind,
     ) -> Self {
         Self {
@@ -228,7 +229,7 @@ impl ValueType {
                 v.resize(16, 1);
                 v.into()
             }),
-            metadata: None,
+            metadata: StateValueMetadata::none(),
             write_op_kind: ExplicitSyncWrapper::new(
                 if !use_value {
                     WriteOpKind::Deletion
@@ -240,7 +241,7 @@ impl ValueType {
     }
 
     /// If len = 0, treated as Deletion for testing.
-    pub(crate) fn with_len_and_metadata(len: usize, metadata: StateValueMetadataKind) -> Self {
+    pub(crate) fn with_len_and_metadata(len: usize, metadata: StateValueMetadata) -> Self {
         Self {
             bytes: (len > 0).then_some(vec![100_u8; len].into()),
             metadata,
@@ -262,9 +263,9 @@ impl TransactionWrite for ValueType {
 
     fn from_state_value(maybe_state_value: Option<StateValue>) -> Self {
         let (maybe_metadata, maybe_bytes) =
-            match maybe_state_value.map(|state_value| state_value.into()) {
+            match maybe_state_value.map(|state_value| state_value.unpack()) {
                 Some((maybe_metadata, bytes)) => (maybe_metadata, Some(bytes)),
-                None => (None, None),
+                None => (StateValueMetadata::none(), None),
             };
 
         let empty = maybe_bytes.is_none();
@@ -287,10 +288,8 @@ impl TransactionWrite for ValueType {
     }
 
     fn as_state_value(&self) -> Option<StateValue> {
-        self.extract_raw_bytes().map(|bytes| match &self.metadata {
-            Some(metadata) => StateValue::new_with_metadata(bytes, metadata.clone()),
-            None => StateValue::new_legacy(bytes),
-        })
+        self.extract_raw_bytes()
+            .map(|bytes| StateValue::new_with_metadata(bytes, self.metadata.clone()))
     }
 
     fn set_bytes(&mut self, bytes: Bytes) {
@@ -454,6 +453,10 @@ impl<
     type Key = K;
     type Tag = u32;
     type Value = ValueType;
+
+    fn user_txn_bytes_len(&self) -> usize {
+        0
+    }
 }
 
 // TODO: try and test different strategies.
@@ -840,7 +843,6 @@ where
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
-        _materialize_deltas: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
         match txn {
             MockTransaction::Write {
@@ -886,9 +888,9 @@ where
                     .map(|group_key| {
                         (
                             group_key.clone(),
-                            view.resource_group_size(group_key).expect(
-                                "Group must exist and size computation should must succeed",
-                            ),
+                            view.resource_group_size(group_key)
+                                .expect("Group must exist and size computation must succeed")
+                                .get(),
                         )
                     })
                     .collect();
@@ -928,7 +930,11 @@ where
                             } else {
                                 new_inner_ops.insert(
                                     *tag,
-                                    ValueType::new(None, None, WriteOpKind::Deletion),
+                                    ValueType::new(
+                                        None,
+                                        StateValueMetadata::none(),
+                                        WriteOpKind::Deletion,
+                                    ),
                                 );
                             }
                         }
@@ -970,10 +976,8 @@ where
     }
 }
 
-pub(crate) fn raw_metadata(v: u64) -> StateValueMetadataKind {
-    Some(StateValueMetadata::new(v, &CurrentTimeMicroseconds {
-        microseconds: v,
-    }))
+pub(crate) fn raw_metadata(v: u64) -> StateValueMetadata {
+    StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })
 }
 
 #[derive(Debug)]
@@ -999,7 +1003,7 @@ where
     // TODO[agg_v2](tests): Assigning MoveTypeLayout as None for all the writes for now.
     // That means, the resources do not have any DelayedFields embededded in them.
     // Change it to test resources with DelayedFields as well.
-    fn resource_write_set(&self) -> BTreeMap<K, (ValueType, Option<Arc<MoveTypeLayout>>)> {
+    fn resource_write_set(&self) -> Vec<(K, (ValueType, Option<Arc<MoveTypeLayout>>))> {
         self.writes
             .iter()
             .filter(|(k, _)| k.module_path().is_none())
@@ -1038,19 +1042,19 @@ where
 
     fn reads_needing_delayed_field_exchange(
         &self,
-    ) -> BTreeMap<
-        <Self::Txn as Transaction>::Key,
-        (<Self::Txn as Transaction>::Value, Arc<MoveTypeLayout>),
-    > {
+    ) -> Vec<(<Self::Txn as Transaction>::Key, Arc<MoveTypeLayout>)> {
         // TODO[agg_v2](tests): add aggregators V2 to the proptest?
-        BTreeMap::new()
+        Vec::new()
     }
 
     fn group_reads_needing_delayed_field_exchange(
         &self,
-    ) -> BTreeMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value> {
+    ) -> Vec<(
+        <Self::Txn as Transaction>::Key,
+        <Self::Txn as Transaction>::Value,
+    )> {
         // TODO[agg_v2](tests): add aggregators V2 to the proptest?
-        BTreeMap::new()
+        Vec::new()
     }
 
     // TODO[agg_v2](tests): Currently, appending None to all events, which means none of the
@@ -1093,18 +1097,22 @@ where
         }
     }
 
+    fn materialize_agg_v1(
+        &self,
+        _view: &impl TAggregatorV1View<Identifier = <Self::Txn as Transaction>::Key>,
+    ) {
+        // TODO[agg_v2](tests): implement this method and compare
+        // against sequential execution results v. aggregator v1.
+    }
+
     fn incorporate_materialized_txn_output(
         &self,
         aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
-        _patched_resource_write_set: BTreeMap<
-            <Self::Txn as Transaction>::Key,
-            <Self::Txn as Transaction>::Value,
-        >,
-        _patched_events: Vec<<Self::Txn as Transaction>::Event>,
-        _combined_groups: Vec<(
+        _patched_resource_write_set: Vec<(
             <Self::Txn as Transaction>::Key,
             <Self::Txn as Transaction>::Value,
         )>,
+        _patched_events: Vec<<Self::Txn as Transaction>::Event>,
     ) {
         assert_ok!(self.materialized_delta_writes.set(aggregator_v1_writes));
         // TODO[agg_v2](tests): Set the patched resource write set and events. But that requires the function
@@ -1127,6 +1135,23 @@ where
             0,
             0,
         )
+    }
+
+    fn output_approx_size(&self) -> u64 {
+        // TODO add block output limit testing
+        0
+    }
+
+    fn get_write_summary(
+        &self,
+    ) -> HashSet<
+        crate::types::InputOutputKey<
+            <Self::Txn as Transaction>::Key,
+            <Self::Txn as Transaction>::Tag,
+            <Self::Txn as Transaction>::Identifier,
+        >,
+    > {
+        HashSet::new()
     }
 }
 

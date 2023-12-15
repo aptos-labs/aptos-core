@@ -75,6 +75,11 @@ pub struct ClusterArgs {
 
     #[clap(flatten)]
     pub coin_source_args: CoinSourceArgs,
+
+    /// Key to use for ratelimiting purposes with the node API. This value will be used
+    /// as `Authorization: Bearer <key>`.
+    #[clap(long, env)]
+    pub node_api_key: Option<String>,
 }
 
 impl ClusterArgs {

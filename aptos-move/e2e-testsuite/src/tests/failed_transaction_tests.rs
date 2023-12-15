@@ -16,6 +16,7 @@ use aptos_types::{
 use aptos_vm::{data_cache::AsMoveResolver, transaction_metadata::TransactionMetadata, AptosVM};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::storage::StorageGasParameters;
+use claims::assert_some;
 use move_core_types::vm_status::StatusCode::TYPE_MISMATCH;
 
 #[test]
@@ -39,11 +40,11 @@ fn failed_transaction_cleanup_test() {
 
     let gas_params = AptosGasParameters::zeros();
     let storage_gas_params =
-        StorageGasParameters::unlimited(gas_params.vm.txn.free_write_bytes_quota);
+        StorageGasParameters::unlimited(gas_params.vm.txn.legacy_free_write_bytes_quota);
 
     let change_set_configs = storage_gas_params.change_set_configs.clone();
 
-    let gas_meter = MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
+    let mut gas_meter = MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
         LATEST_GAS_FEATURE_VERSION,
         gas_params.vm,
         storage_gas_params,
@@ -53,14 +54,18 @@ fn failed_transaction_cleanup_test() {
     // TYPE_MISMATCH should be kept and charged.
     let out1 = aptos_vm.failed_transaction_cleanup(
         VMStatus::error(StatusCode::TYPE_MISMATCH, None),
-        &gas_meter,
+        &mut gas_meter,
         &txn_data,
         &data_cache,
         &log_context,
         &change_set_configs,
     );
 
-    let write_set: Vec<(&StateKey, &WriteOp)> = out1.change_set().write_set_iter().collect();
+    let write_set: Vec<(&StateKey, &WriteOp)> = out1
+        .change_set()
+        .concrete_write_set_iter()
+        .map(|(k, v)| (k, assert_some!(v)))
+        .collect();
     assert!(!write_set.is_empty());
     assert_eq!(out1.gas_used(), 90_000);
     assert!(!out1.status().is_discarded());
@@ -73,7 +78,7 @@ fn failed_transaction_cleanup_test() {
     // Invariant violations should be charged.
     let out2 = aptos_vm.failed_transaction_cleanup(
         VMStatus::error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None),
-        &gas_meter,
+        &mut gas_meter,
         &txn_data,
         &data_cache,
         &log_context,

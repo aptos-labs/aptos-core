@@ -18,7 +18,7 @@ use aptos_types::{
     access_path::AccessPath, block_metadata::BlockMetadata, contract_event::ContractEvent,
     on_chain_config::Features, state_store::state_key::StateKey,
 };
-use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
+use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
 use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
@@ -74,6 +74,11 @@ pub enum SessionId {
     },
     // For those runs that are not a transaction and the output of which won't be committed.
     Void,
+    RunOnAbort {
+        sender: AccountAddress,
+        sequence_number: u64,
+        script_hash: Vec<u8>,
+    },
 }
 
 impl SessionId {
@@ -97,6 +102,14 @@ impl SessionId {
 
     pub fn prologue_meta(txn_metadata: &TransactionMetadata) -> Self {
         Self::Prologue {
+            sender: txn_metadata.sender,
+            sequence_number: txn_metadata.sequence_number,
+            script_hash: txn_metadata.script_hash.clone(),
+        }
+    }
+
+    pub fn run_on_abort(txn_metadata: &TransactionMetadata) -> Self {
+        Self::RunOnAbort {
             sender: txn_metadata.sender,
             sequence_number: txn_metadata.sequence_number,
             script_hash: txn_metadata.script_hash.clone(),
@@ -465,7 +478,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             .filter(|(state_key, _)| !resource_group_write_set.contains_key(state_key))
             .collect();
 
-        VMChangeSet::new(
+        VMChangeSet::new_expanded(
             resource_write_set,
             resource_group_write_set,
             module_write_set,

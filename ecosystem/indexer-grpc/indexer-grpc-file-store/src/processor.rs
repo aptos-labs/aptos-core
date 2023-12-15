@@ -10,12 +10,8 @@ use aptos_indexer_grpc_utils::{
     cache_operator::{CacheBatchGetStatus, CacheOperator},
     config::IndexerGrpcFileStoreConfig,
     constants::BLOB_STORAGE_SIZE,
-    counters::{
-        IndexerGrpcStep, DURATION_IN_SECS, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_COUNT,
-        TRANSACTION_UNIX_TIMESTAMP,
-    },
+    counters::{log_grpc_step, IndexerGrpcStep},
     file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
-    timestamp_to_unixtime,
     types::RedisUrl,
     EncodedTransactionWithVersion,
 };
@@ -23,10 +19,10 @@ use aptos_moving_average::MovingAverage;
 use aptos_protos::transaction::v1::Transaction;
 use prost::Message;
 use std::time::Duration;
-use tracing::info;
 
 // If the version is ahead of the cache head, retry after a short sleep.
 const AHEAD_OF_CACHE_SLEEP_DURATION_IN_MILLIS: u64 = 100;
+const LARGE_FILE_BYTES_COUNT: usize = 100_000_000;
 const SERVICE_TYPE: &str = "file_worker";
 
 /// Processor tails the data in cache and stores the data in file store.
@@ -34,12 +30,14 @@ pub struct Processor {
     cache_operator: CacheOperator<redis::aio::ConnectionManager>,
     file_store_operator: Box<dyn FileStoreOperator>,
     cache_chain_id: u64,
+    enable_verbose_logging: bool,
 }
 
 impl Processor {
     pub async fn new(
         redis_main_instance_address: RedisUrl,
         file_store_config: IndexerGrpcFileStoreConfig,
+        enable_verbose_logging: bool,
     ) -> Result<Self> {
         // Connection to redis is a hard dependency for file store processor.
         let conn = redis::Client::open(redis_main_instance_address.0.clone())
@@ -83,6 +81,7 @@ impl Processor {
             cache_operator,
             file_store_operator,
             cache_chain_id,
+            enable_verbose_logging,
         })
     }
 
@@ -143,18 +142,30 @@ impl Processor {
 
             // If not hit the head, we want to collect more transactions.
             if !hit_head && transactions_buffer.len() < 10 * BLOB_STORAGE_SIZE {
-                // If we haven't hit the head, we want to collect more transactions.
-                continue;
+                let total_size = transactions_buffer.iter().map(|t| t.0.len()).sum::<usize>();
+                // If we haven't hit the head and transactions are small,
+                // we want to collect more transactions.
+                if total_size < LARGE_FILE_BYTES_COUNT {
+                    // Skip only when current transactions are small.
+                    continue;
+                }
             }
             // If hit the head, we want to collect at least one batch of transactions.
             if hit_head && transactions_buffer.len() < BLOB_STORAGE_SIZE {
                 continue;
             }
+
+            // Final check to make sure the transactions buffer contains enough transactions.
+            if transactions_buffer.len() < BLOB_STORAGE_SIZE {
+                continue;
+            }
+
             // Drain the transactions buffer and upload to file store in size of multiple of BLOB_STORAGE_SIZE.
             let process_size = transactions_buffer.len() / BLOB_STORAGE_SIZE * BLOB_STORAGE_SIZE;
             let current_batch: Vec<EncodedTransactionWithVersion> =
                 transactions_buffer.drain(..process_size).collect();
             let last_transaction = current_batch.as_slice().last().unwrap().clone();
+            let first_transaction = current_batch.as_slice().first().unwrap().clone();
             self.file_store_operator
                 .upload_transactions(cache_chain_id, current_batch)
                 .await
@@ -163,55 +174,44 @@ impl Processor {
             tps_calculator.tick_now(process_size as u64);
             let end_version = current_file_store_version + process_size as u64 - 1_u64;
             let num_transactions = end_version - current_file_store_version + 1;
-            // This decoding may be inefficient, but this is the file store so we don't have to be overly
-            // concerned with efficiency.
-            let end_version_timestamp = {
-                let encoded_transaction = last_transaction.0;
-                let decoded_transaction =
-                    base64::decode(encoded_transaction).expect("Failed to decode base64.");
-                let transaction =
-                    Transaction::decode(&*decoded_transaction).expect("Failed to decode protobuf.");
-                transaction.timestamp
-            };
 
-            info!(
-                tps = (tps_calculator.avg() * 1000.0) as u64,
-                current_file_store_version = current_file_store_version,
-                "Upload transactions to file store."
+            let mut start_version_timestamp = None;
+            let mut end_version_timestamp = None;
+            if self.enable_verbose_logging {
+                // This decoding may be inefficient, but this is the file store so we don't have to be overly
+                // concerned with efficiency.
+                start_version_timestamp = {
+                    let encoded_transaction = first_transaction.0;
+                    let decoded_transaction =
+                        base64::decode(encoded_transaction).expect("Failed to decode base64.");
+                    let transaction = Transaction::decode(&*decoded_transaction)
+                        .expect("Failed to decode protobuf.");
+                    transaction.timestamp
+                };
+                end_version_timestamp = {
+                    let encoded_transaction = last_transaction.0;
+                    let decoded_transaction =
+                        base64::decode(encoded_transaction).expect("Failed to decode base64.");
+                    let transaction = Transaction::decode(&*decoded_transaction)
+                        .expect("Failed to decode protobuf.");
+                    transaction.timestamp
+                };
+            }
+
+            // TODO: Split file store worker into more steps
+            log_grpc_step(
+                SERVICE_TYPE,
+                IndexerGrpcStep::FilestoreUploadTxns,
+                self.enable_verbose_logging,
+                Some(current_file_store_version as i64),
+                Some(end_version as i64),
+                start_version_timestamp.as_ref(),
+                end_version_timestamp.as_ref(),
+                Some(file_store_upload_batch_start.elapsed().as_secs_f64()),
+                None,
+                Some(num_transactions as i64),
+                None,
             );
-
-            LATEST_PROCESSED_VERSION
-                .with_label_values(&[
-                    SERVICE_TYPE,
-                    IndexerGrpcStep::FilestoreUploadTxns.get_step(),
-                    IndexerGrpcStep::FilestoreUploadTxns.get_label(),
-                ])
-                .set(end_version as i64);
-            TRANSACTION_UNIX_TIMESTAMP
-                .with_label_values(&[
-                    SERVICE_TYPE,
-                    IndexerGrpcStep::FilestoreUploadTxns.get_step(),
-                    IndexerGrpcStep::FilestoreUploadTxns.get_label(),
-                ])
-                .set(
-                    end_version_timestamp
-                        .map(|t| timestamp_to_unixtime(&t))
-                        .unwrap_or_default(),
-                );
-            NUM_TRANSACTIONS_COUNT
-                .with_label_values(&[
-                    SERVICE_TYPE,
-                    IndexerGrpcStep::FilestoreUploadTxns.get_step(),
-                    IndexerGrpcStep::FilestoreUploadTxns.get_label(),
-                ])
-                .set(num_transactions as i64);
-            DURATION_IN_SECS
-                .with_label_values(&[
-                    SERVICE_TYPE,
-                    IndexerGrpcStep::FilestoreUploadTxns.get_step(),
-                    IndexerGrpcStep::FilestoreUploadTxns.get_label(),
-                ])
-                .set(file_store_upload_batch_start.elapsed().as_secs_f64());
 
             current_file_store_version += process_size as u64;
             LATEST_PROCESSED_VERSION_OLD.set(current_file_store_version as i64);

@@ -4,8 +4,8 @@
 
 use crate::{
     error::StateSyncError,
-    experimental::buffer_manager::OrderedBlocks,
     payload_manager::PayloadManager,
+    pipeline::buffer_manager::OrderedBlocks,
     state_computer::{PipelineExecutionResult, StateComputeResultFut},
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     test_utils::mock_storage::MockStorage,

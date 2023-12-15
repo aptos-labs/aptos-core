@@ -1,4 +1,63 @@
 spec aptos_framework::aptos_account {
+    /// <high-level-req>
+    /// No.: 1
+    /// Property: During the creation of an Aptos account the following rules should hold: (1) the authentication key
+    /// should be 32 bytes in length, (2) an Aptos account should not already exist for that authentication key, and (3)
+    /// the address of the authentication key should not be equal to a reserved address (0x0, 0x1, or 0x3).
+    /// Criticality: Critical
+    /// Implementation: The authentication key which is passed in as an argument to create_account should satisfy all
+    /// necessary conditions.
+    /// Enforcement: Formally verified via [high-level-spec-1](CreateAccountAbortsIf).
+    ///
+    /// No.: 2
+    /// Property: After creating an Aptos account, the account should become registered to receive AptosCoin.
+    /// Criticality: Critical
+    /// Implementation: The create_account function creates a new account for the particular address and registers
+    /// AptosCoin.
+    /// Enforcement: Formally verified via [high-level-spec-2](create_account).
+    ///
+    /// No.: 3
+    /// Property: An account may receive a direct transfer of coins they have not registered for if and only if the
+    /// transfer of arbitrary coins is enabled. By default the option should always set to be enabled for an account.
+    /// Criticality: Low
+    /// Implementation: Transfers of a coin to an account that has not yet registered for that coin should abort
+    /// if and only if the allow_arbitrary_coin_transfers flag is explicitly set to false.
+    /// Enforcement: Formally verified via [high-level-spec-3](can_receive_direct_coin_transfers).
+    ///
+    /// No.: 4
+    /// Property: Setting direct coin transfers may only occur if and only if a direct transfer config is associated
+    /// with the provided account address.
+    /// Criticality: Low
+    /// Implementation: The set_allow_direct_coin_transfers function ensures the DirectTransferConfig structure exists
+    /// for the signer.
+    /// Enforcement: Formally verified via [high-level-spec-4](set_allow_direct_coin_transfers).
+    ///
+    /// No.: 5
+    /// Property: The transfer function should ensure an account is created for the provided destination if one does not
+    /// exist; then, register AptosCoin for that account if a particular is unregistered before transferring the amount.
+    /// Criticality: Critical
+    /// Implementation: The transfer function checks if the recipient account exists. If the account does not exist,
+    /// the function creates one and registers the account to AptosCoin if not registered.
+    /// Enforcement: Formally verified via [high-level-spec-5](transfer).
+    ///
+    /// No.: 6
+    /// Property: Creating an account for the provided destination and registering it for that particular CoinType
+    /// should be the only way to enable depositing coins, provided the account does not already exist.
+    /// Criticality: Critical
+    /// Implementation: The deposit_coins function verifies if the recipient account exists. If the account does not
+    /// exist, the function creates one and ensures that the account becomes registered for the specified CointType.
+    /// Enforcement: Formally verified via [high-level-spec-6](deposit_coins).
+    ///
+    /// No.: 7
+    /// Property: When performing a batch transfer of Aptos Coin and/or a batch transfer of a custom coin type, it
+    /// should ensure that the vector containing destination addresses and the vector containing the corresponding
+    /// amounts are equal in length.
+    /// Criticality: Low
+    /// Implementation: The batch_transfer and batch_transfer_coins functions verify that the length of the recipient
+    /// addresses vector matches the length of the amount vector through an assertion.
+    /// Enforcement: Formally verified via [high-level-spec-7](batch_transfer_coins).
+    /// </high-level-req>
+    ///
     spec module {
         pragma aborts_if_is_strict;
     }
@@ -7,8 +66,10 @@ spec aptos_framework::aptos_account {
     /// The Account does not exist under the auth_key before creating the account.
     /// Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_toke.
     spec create_account(auth_key: address) {
+        /// [high-level-spec-1]
         include CreateAccountAbortsIf;
         ensures exists<account::Account>(auth_key);
+        /// [high-level-spec-2]
         ensures exists<coin::CoinStore<AptosCoin>>(auth_key);
     }
     spec schema CreateAccountAbortsIf {
@@ -37,6 +98,7 @@ spec aptos_framework::aptos_account {
         include TransferEnsures<AptosCoin>;
 
         aborts_if exists<coin::CoinStore<AptosCoin>>(to) && global<coin::CoinStore<AptosCoin>>(to).frozen;
+        /// [high-level-spec-5]
         ensures exists<aptos_framework::account::Account>(to);
         ensures exists<coin::CoinStore<AptosCoin>>(to);
     }
@@ -55,6 +117,7 @@ spec aptos_framework::aptos_account {
     spec set_allow_direct_coin_transfers(account: &signer, allow: bool) {
         let addr = signer::address_of(account);
         include !exists<DirectTransferConfig>(addr) ==> account::NewEventHandleAbortsIf;
+        /// [high-level-spec-4]
         ensures global<DirectTransferConfig>(addr).allow_arbitrary_coin_transfers == allow;
     }
 
@@ -101,6 +164,7 @@ spec aptos_framework::aptos_account {
 
     spec can_receive_direct_coin_transfers(account: address): bool {
         aborts_if false;
+        /// [high-level-spec-3]
         ensures result == (
             !exists<DirectTransferConfig>(account) ||
                 global<DirectTransferConfig>(account).allow_arbitrary_coin_transfers
@@ -121,6 +185,7 @@ spec aptos_framework::aptos_account {
         requires exists i in 0..len(recipients):
             amounts[i] > 0;
 
+        /// [high-level-spec-7]
         aborts_if len(recipients) != len(amounts);
 
         //create account properties
@@ -170,6 +235,7 @@ spec aptos_framework::aptos_account {
 
         let coin_store_to = global<coin::CoinStore<CoinType>>(to).coin.value;
         let post post_coin_store_to = global<coin::CoinStore<CoinType>>(to).coin.value;
+        /// [high-level-spec-6]
         ensures if_exist_coin ==> post_coin_store_to == coin_store_to + coins.value;
     }
 

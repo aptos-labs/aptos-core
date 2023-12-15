@@ -249,7 +249,7 @@ async fn get_transactions_with_proof_network_limit(network_limit_bytes: u64) {
             // Verify the response is correct
             match response.get_data_response().unwrap() {
                 DataResponse::TransactionsWithProof(transactions_with_proof) => {
-                    let num_response_bytes = bcs::to_bytes(&response).unwrap().len() as u64;
+                    let num_response_bytes = bcs::serialized_size(&response).unwrap() as u64;
                     let num_transactions = transactions_with_proof.transactions.len() as u64;
                     if num_response_bytes > network_limit_bytes {
                         assert_eq!(num_transactions, 1); // Data cannot be reduced more than a single item

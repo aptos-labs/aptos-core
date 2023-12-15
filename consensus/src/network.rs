@@ -9,11 +9,12 @@ use crate::{
         DAGMessage, DAGNetworkMessage, DAGRpcResult, ProofNotifier, RpcWithFallback,
         TDAGNetworkSender,
     },
-    experimental::commit_reliable_broadcast::CommitMessage,
     logging::{LogEvent, LogSchema},
     monitor,
     network_interface::{ConsensusMsg, ConsensusNetworkClient, RPC},
-    quorum_store::types::{Batch, BatchMsg, BatchRequest},
+    pipeline::commit_reliable_broadcast::CommitMessage,
+    quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
+    rand::rand_gen::RandGenMessage,
 };
 use anyhow::{anyhow, bail, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
@@ -21,7 +22,7 @@ use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     common::Author,
-    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
@@ -33,7 +34,7 @@ use aptos_network::{
     protocols::{network::Event, rpc::error::RpcError},
     ProtocolId,
 };
-use aptos_reliable_broadcast::RBNetworkSender;
+use aptos_reliable_broadcast::{RBMessage, RBNetworkSender};
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
@@ -57,14 +58,32 @@ use tokio::time::timeout;
 pub trait TConsensusMsg: Sized + Serialize + DeserializeOwned {
     fn epoch(&self) -> u64;
 
-    fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self> {
-        match msg {
-            ConsensusMsg::DAGMessage(msg) => Ok(bcs::from_bytes(&msg.data)?),
-            _ => bail!("unexpected consensus message type {:?}", msg),
-        }
-    }
+    fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self>;
 
     fn into_network_message(self) -> ConsensusMsg;
+}
+
+#[derive(Debug)]
+pub struct RpcResponder {
+    pub protocol: ProtocolId,
+    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
+
+impl RpcResponder {
+    pub fn respond<R>(self, response: R) -> anyhow::Result<()>
+    where
+        R: TConsensusMsg,
+    {
+        let rpc_response = self
+            .protocol
+            .to_bytes(&response.into_network_message())
+            .map(Bytes::from)
+            .map_err(RpcError::Error);
+
+        self.response_sender
+            .send(rpc_response)
+            .map_err(|_| anyhow::anyhow!("unable to respond to rpc"))
+    }
 }
 
 /// The block retrieval request is used internally for implementing RPC: the callback is executed
@@ -87,8 +106,7 @@ pub struct IncomingBatchRetrievalRequest {
 pub struct IncomingDAGRequest {
     pub req: DAGNetworkMessage,
     pub sender: Author,
-    pub protocol: ProtocolId,
-    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+    pub responder: RpcResponder,
 }
 
 #[derive(Debug)]
@@ -99,11 +117,20 @@ pub struct IncomingCommitRequest {
 }
 
 #[derive(Debug)]
+pub struct IncomingRandGenRequest {
+    pub req: RandGenMessage,
+    pub sender: Author,
+    pub protocol: ProtocolId,
+    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
+
+#[derive(Debug)]
 pub enum IncomingRpcRequest {
     BlockRetrieval(IncomingBlockRetrievalRequest),
     BatchRetrieval(IncomingBatchRetrievalRequest),
     DAGRequest(IncomingDAGRequest),
     CommitRequest(IncomingCommitRequest),
+    RandGenRequest(IncomingRandGenRequest),
 }
 
 /// Just a convenience struct to keep all the network proxy receiving queues in one place.
@@ -133,7 +160,7 @@ pub trait QuorumStoreSender: Send + Clone {
         request: BatchRequest,
         recipient: Author,
         timeout: Duration,
-    ) -> anyhow::Result<Batch>;
+    ) -> anyhow::Result<BatchResponse>;
 
     async fn send_batch(&self, batch: Batch, recipients: Vec<Author>);
 
@@ -402,7 +429,7 @@ impl QuorumStoreSender for NetworkSender {
         request: BatchRequest,
         recipient: Author,
         timeout: Duration,
-    ) -> anyhow::Result<Batch> {
+    ) -> anyhow::Result<BatchResponse> {
         let request_digest = request.digest();
         let msg = ConsensusMsg::BatchRequestMsg(Box::new(request));
         let response = self
@@ -410,9 +437,17 @@ impl QuorumStoreSender for NetworkSender {
             .send_rpc(recipient, msg, timeout)
             .await?;
         match response {
+            // TODO: deprecated, remove after two releases
             ConsensusMsg::BatchResponse(batch) => {
                 batch.verify_with_digest(request_digest)?;
-                Ok(*batch)
+                Ok(BatchResponse::Batch(*batch))
+            },
+            ConsensusMsg::BatchResponseV2(maybe_batch) => {
+                if let BatchResponse::Batch(batch) = maybe_batch.as_ref() {
+                    batch.verify_with_digest(request_digest)?;
+                }
+                // Note BatchResponse::NotFound(ledger_info) is verified later with a ValidatorVerifier
+                Ok(*maybe_batch)
             },
             _ => Err(anyhow!("Invalid batch response")),
         }
@@ -493,13 +528,15 @@ impl TDAGNetworkSender for NetworkSender {
 }
 
 #[async_trait]
-impl RBNetworkSender<DAGMessage, DAGRpcResult> for NetworkSender {
+impl<Req: TConsensusMsg + RBMessage + 'static, Res: TConsensusMsg + RBMessage + 'static>
+    RBNetworkSender<Req, Res> for NetworkSender
+{
     async fn send_rb_rpc(
         &self,
         receiver: Author,
-        message: DAGMessage,
+        message: Req,
         timeout: Duration,
-    ) -> anyhow::Result<DAGRpcResult> {
+    ) -> anyhow::Result<Res> {
         self.send_rpc(receiver, message.into_network_message(), timeout)
             .await
             .map_err(|e| anyhow!("invalid rpc response: {}", e))
@@ -706,13 +743,23 @@ impl NetworkTask {
                             IncomingRpcRequest::DAGRequest(IncomingDAGRequest {
                                 req,
                                 sender: peer_id,
-                                protocol,
-                                response_sender: callback,
+                                responder: RpcResponder {
+                                    protocol,
+                                    response_sender: callback,
+                                },
                             })
                         },
                         ConsensusMsg::CommitMessage(req) => {
                             IncomingRpcRequest::CommitRequest(IncomingCommitRequest {
                                 req: *req,
+                                protocol,
+                                response_sender: callback,
+                            })
+                        },
+                        ConsensusMsg::RandGenMessage(req) => {
+                            IncomingRpcRequest::RandGenRequest(IncomingRandGenRequest {
+                                req,
+                                sender: peer_id,
                                 protocol,
                                 response_sender: callback,
                             })

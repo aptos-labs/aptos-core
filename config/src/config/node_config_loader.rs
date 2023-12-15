@@ -13,7 +13,6 @@ use aptos_types::{
     on_chain_config::OnChainConfig,
     state_store::state_key::{StateKey, StateKeyInner},
     transaction::{Transaction, WriteSetPayload},
-    write_set::WriteOp,
 };
 use serde_yaml::Value;
 use std::path::Path;
@@ -184,17 +183,9 @@ fn get_chain_id(node_config: &NodeConfig) -> Result<ChainId, Error> {
             })?;
 
             // Extract the chain ID from the write op
-            let write_op_bytes = match write_op {
-                WriteOp::Creation(bytes) => bytes,
-                WriteOp::Modification(bytes) => bytes,
-                WriteOp::CreationWithMetadata { data, metadata: _ } => data,
-                WriteOp::ModificationWithMetadata { data, metadata: _ } => data,
-                _ => {
-                    return Err(Error::InvariantViolation(
-                        "The genesis transaction does not contain the correct write op for the chain ID!".into(),
-                    ));
-                },
-            };
+            let write_op_bytes = write_op.bytes().ok_or_else(|| Error::InvariantViolation(
+                "The genesis transaction does not contain the correct write op for the chain ID!".into(),
+            ))?;
             let chain_id = ChainId::deserialize_into_config(write_op_bytes).map_err(|error| {
                 Error::InvariantViolation(format!(
                     "Failed to deserialize the chain ID: {:?}",

@@ -19,6 +19,7 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_enum_conversion_derive::EnumConversion;
+use aptos_infallible::Mutex;
 use aptos_logger::debug;
 use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
 use aptos_types::{
@@ -533,42 +534,43 @@ impl TryFrom<DAGRpcResult> for Vote {
 
 pub struct SignatureBuilder {
     metadata: NodeMetadata,
-    partial_signatures: PartialSignatures,
+    partial_signatures: Mutex<PartialSignatures>,
     epoch_state: Arc<EpochState>,
 }
 
 impl SignatureBuilder {
-    pub fn new(metadata: NodeMetadata, epoch_state: Arc<EpochState>) -> Self {
-        Self {
+    pub fn new(metadata: NodeMetadata, epoch_state: Arc<EpochState>) -> Arc<Self> {
+        Arc::new(Self {
             metadata,
-            partial_signatures: PartialSignatures::empty(),
+            partial_signatures: Mutex::new(PartialSignatures::empty()),
             epoch_state,
-        }
+        })
     }
 }
 
-impl BroadcastStatus<DAGMessage, DAGRpcResult> for SignatureBuilder {
+impl BroadcastStatus<DAGMessage, DAGRpcResult> for Arc<SignatureBuilder> {
     type Ack = Vote;
     type Aggregated = NodeCertificate;
     type Message = Node;
 
-    fn add(&mut self, peer: Author, ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
+    fn add(&self, peer: Author, ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
         ensure!(self.metadata == ack.metadata, "Digest mismatch");
         ack.verify(peer, &self.epoch_state.verifier)?;
         debug!(LogSchema::new(LogEvent::ReceiveVote)
             .remote_peer(peer)
             .round(self.metadata.round()));
-        self.partial_signatures.add_signature(peer, ack.signature);
+        let mut signatures_lock = self.partial_signatures.lock();
+        signatures_lock.add_signature(peer, ack.signature);
         Ok(self
             .epoch_state
             .verifier
-            .check_voting_power(self.partial_signatures.signatures().keys(), true)
+            .check_voting_power(signatures_lock.signatures().keys(), true)
             .ok()
             .map(|_| {
                 let aggregated_signature = self
                     .epoch_state
                     .verifier
-                    .aggregate_signatures(&self.partial_signatures)
+                    .aggregate_signatures(&signatures_lock)
                     .expect("Signature aggregation should succeed");
                 observe_node(self.metadata.timestamp(), NodeStage::CertAggregated);
                 NodeCertificate::new(self.metadata.clone(), aggregated_signature)
@@ -578,15 +580,15 @@ impl BroadcastStatus<DAGMessage, DAGRpcResult> for SignatureBuilder {
 
 pub struct CertificateAckState {
     num_validators: usize,
-    received: HashSet<Author>,
+    received: Mutex<HashSet<Author>>,
 }
 
 impl CertificateAckState {
-    pub fn new(num_validators: usize) -> Self {
-        Self {
+    pub fn new(num_validators: usize) -> Arc<Self> {
+        Arc::new(Self {
             num_validators,
-            received: HashSet::new(),
-        }
+            received: Mutex::new(HashSet::new()),
+        })
     }
 }
 
@@ -615,15 +617,16 @@ impl TryFrom<DAGRpcResult> for CertifiedAck {
     }
 }
 
-impl BroadcastStatus<DAGMessage, DAGRpcResult> for CertificateAckState {
+impl BroadcastStatus<DAGMessage, DAGRpcResult> for Arc<CertificateAckState> {
     type Ack = CertifiedAck;
     type Aggregated = ();
     type Message = CertifiedNodeMessage;
 
-    fn add(&mut self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
+    fn add(&self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
         debug!(LogSchema::new(LogEvent::ReceiveAck).remote_peer(peer));
-        self.received.insert(peer);
-        if self.received.len() == self.num_validators {
+        let mut received = self.received.lock();
+        received.insert(peer);
+        if received.len() == self.num_validators {
             Ok(Some(()))
         } else {
             Ok(None)
@@ -838,6 +841,13 @@ impl TConsensusMsg for DAGMessage {
         }
     }
 
+    fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self> {
+        match msg {
+            ConsensusMsg::DAGMessage(msg) => Ok(bcs::from_bytes(&msg.data)?),
+            _ => bail!("unexpected consensus message type {:?}", msg),
+        }
+    }
+
     fn into_network_message(self) -> ConsensusMsg {
         ConsensusMsg::DAGMessage(DAGNetworkMessage {
             epoch: self.epoch(),
@@ -870,6 +880,13 @@ impl TConsensusMsg for DAGRpcResult {
         match &self.0 {
             Ok(dag_message) => dag_message.epoch(),
             Err(error) => error.epoch(),
+        }
+    }
+
+    fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self> {
+        match msg {
+            ConsensusMsg::DAGMessage(msg) => Ok(bcs::from_bytes(&msg.data)?),
+            _ => bail!("unexpected consensus message type {:?}", msg),
         }
     }
 

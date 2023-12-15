@@ -63,7 +63,7 @@ pub struct Context {
     chain_id: ChainId,
     pub db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
-    pub node_config: NodeConfig,
+    pub node_config: Arc<NodeConfig>,
     gas_schedule_cache: Arc<RwLock<GasScheduleCache>>,
     gas_estimation_cache: Arc<RwLock<GasEstimationCache>>,
     gas_limit_cache: Arc<RwLock<GasLimitCache>>,
@@ -86,7 +86,7 @@ impl Context {
             chain_id,
             db,
             mp_sender,
-            node_config,
+            node_config: Arc::new(node_config),
             gas_schedule_cache: Arc::new(RwLock::new(GasScheduleCache {
                 last_updated_epoch: None,
                 gas_schedule_params: None,
@@ -1029,8 +1029,14 @@ impl Context {
                     } else if let Some(full_block_gas_used) =
                         block_config.block_gas_limit_type.block_gas_limit()
                     {
-                        prices_and_used.iter().map(|(_, used)| *used).sum::<u64>()
-                            >= full_block_gas_used
+                        // be pessimistic for conflicts, as such information is not onchain
+                        let gas_used = prices_and_used.iter().map(|(_, used)| *used).sum::<u64>();
+                        let max_conflict_multiplier = block_config
+                            .block_gas_limit_type
+                            .conflict_penalty_window()
+                            .unwrap_or(1)
+                            as u64;
+                        gas_used * max_conflict_multiplier >= full_block_gas_used
                     } else {
                         false
                     };

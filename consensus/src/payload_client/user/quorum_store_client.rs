@@ -125,15 +125,15 @@ impl UserPayloadClient for QuorumStoreClient {
             break payload;
         };
         info!(
-            elapsed_time = start_time.elapsed(),
-            max_poll_time = max_poll_time,
+            elapsed_time_ms = start_time.elapsed().as_millis() as u64,
+            max_poll_time_ms = max_poll_time.as_millis() as u64,
             payload_len = payload.len(),
             max_items = max_items,
             max_bytes = max_bytes,
             pending_ordering = pending_ordering,
             return_empty = return_empty,
             return_non_full = return_non_full,
-            duration = start_time.elapsed().as_secs_f32(),
+            duration_ms = start_time.elapsed().as_millis() as u64,
             "Pull payloads from QuorumStore: proposal"
         );
 

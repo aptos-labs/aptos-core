@@ -16,6 +16,7 @@ use crate::{
             SpecOrBuiltinFunEntry,
         },
     },
+    constant_folder::ConstantFolder,
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     intrinsics::process_intrinsic_declaration,
     model::{
@@ -458,7 +459,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let type_params = et.analyze_and_add_type_params(
             def.type_parameters
                 .iter()
-                .map(|s| (&s.name, &s.constraints)),
+                .map(|s| (&s.name, &s.constraints, s.is_phantom)),
         );
         et.parent.parent.define_struct(
             et.to_loc(&def.loc),
@@ -484,8 +485,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let attributes = self.translate_attributes(&def.attributes);
         let mut et = ExpTranslator::new(self);
         et.enter_scope();
-        let type_params = et
-            .analyze_and_add_type_params(def.signature.type_parameters.iter().map(|(n, a)| (n, a)));
+        let type_params = et.analyze_and_add_type_params(
+            def.signature
+                .type_parameters
+                .iter()
+                .map(|(n, a)| (n, a, false)),
+        );
         et.enter_scope();
         let params = et.analyze_and_add_params(&def.signature.parameters, true);
         let result_type = et.translate_type(&def.signature.return_type);
@@ -742,8 +747,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         for_move_fun: bool,
     ) -> (Vec<TypeParameter>, Vec<Parameter>, Type) {
         let et = &mut ExpTranslator::new(self);
-        let type_params =
-            et.analyze_and_add_type_params(signature.type_parameters.iter().map(|(n, a)| (n, a)));
+        let type_params = et.analyze_and_add_type_params(
+            signature.type_parameters.iter().map(|(n, a)| (n, a, false)),
+        );
         et.enter_scope();
         let params = et.analyze_and_add_params(&signature.parameters, for_move_fun);
         let result_type = et.translate_type(&signature.return_type);
@@ -763,7 +769,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let name = self.symbol_pool().make(name.value.as_str());
         let (type_params, type_) = {
             let et = &mut ExpTranslator::new(self);
-            let type_params = et.analyze_and_add_type_params(type_params);
+            let type_params =
+                et.analyze_and_add_type_params(type_params.into_iter().map(|(n, a)| (n, a, false)));
             let type_ = et.translate_type(type_);
             (type_params, type_)
         };
@@ -804,7 +811,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let qsym = self.qualified_by_module_from_name(name);
         let mut et = ExpTranslator::new(self);
         et.enter_scope();
-        let type_params = et.analyze_and_add_type_params(type_params);
+        let type_params =
+            et.analyze_and_add_type_params(type_params.into_iter().map(|(n, a)| (n, a, false)));
         // Extract local variables.
         let mut vars = vec![];
         for member in &block.value.members {
@@ -1136,8 +1144,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         };
         let name = qsym.symbol;
         let const_name = ConstantName(self.symbol_pool().string(name).to_string().into());
-        let mut et = ExpTranslator::new(self);
-        et.set_translate_move_fun();
         let value = if let Some(BytecodeModule {
             compiled_module,
             source_map,
@@ -1153,23 +1159,47 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 &compiled_module.constant_pool()[*const_idx as usize],
             )
             .unwrap();
+            let mut et = ExpTranslator::new(self);
+            et.set_translate_move_fun();
             et.translate_from_move_value(&loc, &ty, &move_value)
         } else {
             // Type check the constant.
-            let exp = et.translate_exp(&def.value, &ty);
-            if !exp.is_valid_for_constant() {
-                et.error(
-                    &et.get_node_loc(exp.node_id()),
-                    "not a valid constant expression",
+            let mut et = ExpTranslator::new(self);
+            et.set_translate_move_fun();
+            let exp = et.translate_exp(&def.value, &ty).into_exp();
+            et.finalize_types();
+            let mut reasons: Vec<(Loc, String)> = Vec::new();
+            let mut ok = true;
+            if !exp.is_valid_for_constant(self.parent.env, &mut reasons) {
+                self.parent.env.diag_with_labels(
+                    Severity::Error,
+                    &self.parent.env.get_node_loc(exp.node_id()),
+                    "Not a valid constant expression.",
+                    reasons,
                 );
-                Value::Bool(false)
-            } else if let ExpData::Value(_, value) = exp {
-                value
+                ok = false;
+            }
+            if !ty.is_valid_for_constant() {
+                let reasons = vec![(loc, Type::describe_valid_for_constant().to_owned())];
+                self.parent.env.diag_with_labels(
+                    Severity::Error,
+                    &self.parent.env.get_node_loc(exp.node_id()),
+                    "Invalid type for constant",
+                    reasons,
+                );
+                ok = false;
+            }
+            if ok {
+                let mut folder = ConstantFolder::new(self.parent.env);
+                let rewritten = folder.rewrite_exp(exp);
+                if let ExpData::Value(_, value) = rewritten.as_ref() {
+                    value.clone()
+                } else {
+                    // The constant folder failed, but it already
+                    // generated error diagnostics as needed.
+                    Value::Bool(false)
+                }
             } else {
-                et.error(
-                    &et.get_node_loc(exp.node_id()),
-                    "constant expression must be a literal",
-                );
                 Value::Bool(false)
             }
         };
@@ -3213,7 +3243,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             .value
                             .type_parameters
                             .iter()
-                            .map(|(n, _)| (n, &ability_set)),
+                            .map(|(n, _)| (n, &ability_set, false)),
                     );
                     et.get_type_params()
                 };

@@ -41,8 +41,6 @@ mod block_store_test;
 #[path = "sync_manager.rs"]
 pub mod sync_manager;
 
-const MAX_ORDERING_PIPELINE_LATENCY_REDUCTION: Duration = Duration::from_secs(1);
-
 fn update_counters_for_ordered_blocks(ordered_blocks: &[Arc<ExecutedBlock>]) {
     for block in ordered_blocks {
         observe_block(block.block().timestamp_usecs(), BlockStage::ORDERED);
@@ -482,11 +480,28 @@ impl BlockStore {
     }
 
     pub fn pipeline_pending_latency(&self, proposal_timestamp: Duration) -> Duration {
-        let ordered_round = self.ordered_root().round();
-        let commit_round = self.commit_root().round();
-        let pending_rounds = ordered_round.checked_sub(commit_round).unwrap();
-        let ordered_timestamp = Duration::from_micros(self.ordered_root().timestamp_usecs());
-        let committed_timestamp = Duration::from_micros(self.commit_root().timestamp_usecs());
+        let ordered_root = self.ordered_root();
+        let commit_root = self.commit_root();
+        let pending_path = self
+            .path_from_commit_root(self.ordered_root().id())
+            .unwrap_or_default();
+        let pending_rounds = pending_path.len();
+        let oldest_not_committed = pending_path.into_iter().min_by_key(|b| b.round());
+
+        let oldest_not_committed_spent_in_pipeline = oldest_not_committed
+            .as_ref()
+            .and_then(|b| b.elapsed_in_pipeline())
+            .unwrap_or(Duration::ZERO);
+
+        let ordered_round = ordered_root.round();
+        let oldest_not_committed_round = oldest_not_committed.as_ref().map_or(0, |b| b.round());
+        let commit_round = commit_root.round();
+        let ordered_timestamp = Duration::from_micros(ordered_root.timestamp_usecs());
+        let oldest_not_committed_timestamp = oldest_not_committed
+            .as_ref()
+            .map(|b| Duration::from_micros(b.timestamp_usecs()))
+            .unwrap_or(Duration::ZERO);
+        let committed_timestamp = Duration::from_micros(commit_root.timestamp_usecs());
         let commit_cert_timestamp =
             Duration::from_micros(self.highest_commit_cert().commit_info().timestamp_usecs());
 
@@ -500,13 +515,19 @@ impl BlockStore {
         }
 
         let latency_to_committed = latency_from_proposal(proposal_timestamp, committed_timestamp);
+        let latency_to_oldest_not_committed =
+            latency_from_proposal(proposal_timestamp, oldest_not_committed_timestamp);
         let latency_to_ordered = latency_from_proposal(proposal_timestamp, ordered_timestamp);
 
         info!(
             pending_rounds = pending_rounds,
             ordered_round = ordered_round,
+            oldest_not_committed_round = oldest_not_committed_round,
             commit_round = commit_round,
+            oldest_not_committed_spent_in_pipeline =
+                oldest_not_committed_spent_in_pipeline.as_millis() as u64,
             latency_to_ordered_ms = latency_to_ordered.as_millis() as u64,
+            latency_to_oldest_not_committed = latency_to_oldest_not_committed.as_millis() as u64,
             latency_to_committed_ms = latency_to_committed.as_millis() as u64,
             latency_to_commit_cert_ms =
                 latency_from_proposal(proposal_timestamp, commit_cert_timestamp).as_millis() as u64,
@@ -514,10 +535,20 @@ impl BlockStore {
         );
 
         counters::CONSENSUS_PROPOSAL_PENDING_ROUNDS.observe(pending_rounds as f64);
-        counters::CONSENSUS_PROPOSAL_PENDING_DURATION.observe(latency_to_committed.as_secs_f64());
+        counters::CONSENSUS_PROPOSAL_PENDING_DURATION
+            .observe(oldest_not_committed_spent_in_pipeline.as_secs_f64());
 
-        latency_to_committed
-            .saturating_sub(latency_to_ordered.min(MAX_ORDERING_PIPELINE_LATENCY_REDUCTION))
+        if pending_rounds > 1 {
+            // TODO cleanup
+            // previous logic was using difference between committed and ordered.
+            // keeping it until we test out the new logic.
+            // latency_to_oldest_not_committed
+            //     .saturating_sub(latency_to_ordered.min(MAX_ORDERING_PIPELINE_LATENCY_REDUCTION))
+
+            oldest_not_committed_spent_in_pipeline
+        } else {
+            Duration::ZERO
+        }
     }
 }
 

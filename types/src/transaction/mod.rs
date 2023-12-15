@@ -43,6 +43,7 @@ use std::{
 
 pub mod analyzed_transaction;
 pub mod authenticator;
+mod block_output;
 mod change_set;
 mod module;
 mod multisig;
@@ -54,6 +55,7 @@ use crate::{
     proof::accumulator::InMemoryEventAccumulator, validator_txn::ValidatorTransaction,
     write_set::TransactionWrite,
 };
+pub use block_output::BlockOutput;
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 pub use move_core_types::transaction_argument::TransactionArgument;
@@ -546,7 +548,12 @@ pub struct SignedTransaction {
     /// A cached size of the raw transaction bytes.
     /// Prevents serializing the same transaction multiple times to determine size.
     #[serde(skip)]
-    size: OnceCell<usize>,
+    raw_txn_size: OnceCell<usize>,
+
+    /// A cached size of the authenticator.
+    /// Prevents serializing the same authenticator multiple times to determine size.
+    #[serde(skip)]
+    authenticator_size: OnceCell<usize>,
 }
 
 /// PartialEq ignores the "bytes" field as this is a OnceCell that may or
@@ -604,7 +611,8 @@ impl SignedTransaction {
         SignedTransaction {
             raw_txn,
             authenticator,
-            size: OnceCell::new(),
+            raw_txn_size: OnceCell::new(),
+            authenticator_size: OnceCell::new(),
         }
     }
 
@@ -617,7 +625,8 @@ impl SignedTransaction {
         SignedTransaction {
             raw_txn,
             authenticator,
-            size: OnceCell::new(),
+            raw_txn_size: OnceCell::new(),
+            authenticator_size: OnceCell::new(),
         }
     }
 
@@ -638,7 +647,8 @@ impl SignedTransaction {
                 fee_payer_address,
                 fee_payer_signer,
             ),
-            size: OnceCell::new(),
+            raw_txn_size: OnceCell::new(),
+            authenticator_size: OnceCell::new(),
         }
     }
 
@@ -651,7 +661,8 @@ impl SignedTransaction {
         SignedTransaction {
             raw_txn,
             authenticator,
-            size: OnceCell::new(),
+            raw_txn_size: OnceCell::new(),
+            authenticator_size: OnceCell::new(),
         }
     }
 
@@ -668,7 +679,8 @@ impl SignedTransaction {
                 secondary_signer_addresses,
                 secondary_signers,
             ),
-            size: OnceCell::new(),
+            raw_txn_size: OnceCell::new(),
+            authenticator_size: OnceCell::new(),
         }
     }
 
@@ -686,7 +698,8 @@ impl SignedTransaction {
         SignedTransaction {
             raw_txn,
             authenticator,
-            size: OnceCell::new(),
+            raw_txn_size: OnceCell::new(),
+            authenticator_size: OnceCell::new(),
         }
     }
 
@@ -697,7 +710,8 @@ impl SignedTransaction {
         SignedTransaction {
             raw_txn,
             authenticator: TransactionAuthenticator::single_sender(authenticator),
-            size: OnceCell::new(),
+            raw_txn_size: OnceCell::new(),
+            authenticator_size: OnceCell::new(),
         }
     }
 
@@ -708,7 +722,8 @@ impl SignedTransaction {
         Self {
             raw_txn,
             authenticator,
-            size: OnceCell::new(),
+            raw_txn_size: OnceCell::new(),
+            authenticator_size: OnceCell::new(),
         }
     }
 
@@ -757,11 +772,17 @@ impl SignedTransaction {
     }
 
     pub fn raw_txn_bytes_len(&self) -> usize {
-        *self.size.get_or_init(|| {
-            bcs::to_bytes(&self.raw_txn)
-                .expect("Unable to serialize RawTransaction")
-                .len()
+        *self.raw_txn_size.get_or_init(|| {
+            bcs::serialized_size(&self.raw_txn).expect("Unable to serialize RawTransaction")
         })
+    }
+
+    pub fn txn_bytes_len(&self) -> usize {
+        let authenticator_size = *self.authenticator_size.get_or_init(|| {
+            bcs::serialized_size(&self.authenticator)
+                .expect("Unable to serialize TransactionAuthenticator")
+        });
+        self.raw_txn_bytes_len() + authenticator_size
     }
 
     /// Checks that the signature of given transaction. Returns `Ok(SignatureCheckedTransaction)` if
@@ -1836,6 +1857,16 @@ impl Transaction {
             Transaction::ValidatorTransaction(_) => String::from("validator_transaction"),
         }
     }
+
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            Transaction::UserTransaction(_) => "user_transaction",
+            Transaction::GenesisTransaction(_) => "genesis_transaction",
+            Transaction::BlockMetadata(_) => "block_metadata",
+            Transaction::StateCheckpoint(_) => "state_checkpoint",
+            Transaction::ValidatorTransaction(_) => "validator_transaction",
+        }
+    }
 }
 
 impl TryFrom<Transaction> for SignedTransaction {
@@ -1882,4 +1913,7 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         + TryFromMoveValue<Hint = ()>;
     type Value: Send + Sync + Debug + Clone + TransactionWrite;
     type Event: Send + Sync + Debug + Clone + TransactionEvent;
+
+    /// Size of the user transaction in bytes, 0 otherwise
+    fn user_txn_bytes_len(&self) -> usize;
 }

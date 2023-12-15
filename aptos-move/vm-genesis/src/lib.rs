@@ -32,7 +32,7 @@ use aptos_vm::{
     data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
-use aptos_vm_types::storage::ChangeSetConfigs;
+use aptos_vm_types::storage::change_set_configs::ChangeSetConfigs;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -165,7 +165,9 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         change_set.aggregator_v1_delta_set().is_empty(),
         "non-empty delta change set in genesis"
     );
-    assert!(!change_set.write_set_iter().any(|(_, op)| op.is_deletion()));
+    assert!(!change_set
+        .concrete_write_set_iter()
+        .any(|(_, op)| op.expect("expect only concrete write ops").is_deletion()));
     verify_genesis_write_set(change_set.events());
 
     let change_set = change_set
@@ -277,7 +279,9 @@ pub fn encode_genesis_change_set(
         "non-empty delta change set in genesis"
     );
 
-    assert!(!change_set.write_set_iter().any(|(_, op)| op.is_deletion()));
+    assert!(!change_set
+        .concrete_write_set_iter()
+        .any(|(_, op)| op.expect("expect only concrete write ops").is_deletion()));
     verify_genesis_write_set(change_set.events());
     change_set
         .try_into_storage_change_set()
@@ -432,10 +436,12 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::SAFER_RESOURCE_GROUPS,
         FeatureFlag::SAFER_METADATA,
         FeatureFlag::SINGLE_SENDER_AUTHENTICATOR,
-        FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION,
+        FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
         FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
         FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
         FeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
+        FeatureFlag::BN254_STRUCTURES,
+        FeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL,
     ]
 }
 

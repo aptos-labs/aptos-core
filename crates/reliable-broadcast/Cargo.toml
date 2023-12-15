@@ -14,6 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-bounded-executor = { workspace = true }
 aptos-consensus-types = { workspace = true }
 aptos-enum-conversion-derive = { workspace = true }
 aptos-infallible = { workspace = true }

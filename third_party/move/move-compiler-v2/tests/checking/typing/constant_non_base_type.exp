@@ -1,10 +1,20 @@
 
 Diagnostics:
-error: not a valid constant expression
+error: Not a valid constant expression.
   ┌─ tests/checking/typing/constant_non_base_type.move:3:22
   │
 3 │     const C1: &u64 = &0;
   │                      ^^
+  │                      │
+  │                      Invalid call or operation in constant
+
+error: Invalid type for constant
+  ┌─ tests/checking/typing/constant_non_base_type.move:3:22
+  │
+3 │     const C1: &u64 = &0;
+  │     -----------------^^-
+  │     │
+  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
 
 error: mutability mismatch (&mut != &)
   ┌─ tests/checking/typing/constant_non_base_type.move:4:26
@@ -12,20 +22,34 @@ error: mutability mismatch (&mut != &)
 4 │     const C2: &mut u64 = &0;
   │                          ^^
 
-error: not a valid constant expression
+error: Not a valid constant expression.
   ┌─ tests/checking/typing/constant_non_base_type.move:4:26
   │
 4 │     const C2: &mut u64 = &0;
   │                          ^^
+  │                          │
+  │                          Invalid call or operation in constant
 
-error: constant expression must be a literal
+error: Invalid type for constant
+  ┌─ tests/checking/typing/constant_non_base_type.move:4:26
+  │
+4 │     const C2: &mut u64 = &0;
+  │     ---------------------^^-
+  │     │
+  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
+
+error: Invalid type for constant
   ┌─ tests/checking/typing/constant_non_base_type.move:5:20
   │
 5 │     const C3: () = ();
-  │                    ^^
+  │     ---------------^^-
+  │     │
+  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
 
-error: constant expression must be a literal
+error: Invalid type for constant
   ┌─ tests/checking/typing/constant_non_base_type.move:6:33
   │
 6 │     const C4: (address, bool) = (@0x0, false);
-  │                                 ^^^^^^^^^^^^^
+  │     ----------------------------^^^^^^^^^^^^^-
+  │     │
+  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.

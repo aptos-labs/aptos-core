@@ -12,7 +12,7 @@ use aptos_config::config::{
     StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     NO_OP_STORAGE_PRUNER_CONFIG,
 };
-use aptos_db::{AptosDB, GetRestoreHandler};
+use aptos_db::{get_restore_handler::GetRestoreHandler, AptosDB};
 use aptos_executor_types::VerifyExecutionMode;
 use aptos_logger::info;
 use aptos_types::transaction::Version;
@@ -66,9 +66,10 @@ impl Opt {
             false,                       /* read_only */
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
             self.rocksdb_opt.into(),
-            false,
+            false, /* indexer */
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            false, /* indexer async v2 */
         )?)
         .get_restore_handler();
         let ret = ReplayVerifyCoordinator::new(
@@ -92,6 +93,7 @@ impl Opt {
                     process::exit(2);
                 },
                 _ => {
+                    info!("ReplayVerify coordinator exiting with error: {:?}", e);
                     process::exit(1);
                 },
             },
