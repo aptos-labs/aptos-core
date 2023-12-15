@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::constants::BLOB_STORAGE_SIZE;
+use crate::{constants::BLOB_STORAGE_SIZE, EncodedTransactionWithVersion};
 use anyhow::Context;
 use redis::{AsyncCommands, RedisError, RedisResult};
 
@@ -24,6 +24,7 @@ const BASE_EXPIRATION_EPOCH_TIME_IN_SECONDS: u64 = 253_402_300_799;
 
 // Default values for cache.
 const CACHE_DEFAULT_LATEST_VERSION_NUMBER: &str = "0";
+const FILE_STORE_LATEST_VERSION: &str = "file_store_latest_version";
 
 // Returns 1 if the chain id is updated or verified. Otherwise(chain id not match), returns 0.
 // TODO(larry): add a test for this script.
@@ -106,11 +107,12 @@ pub fn get_ttl_in_seconds(timestamp_in_seconds: u64) -> u64 {
 }
 
 // Cache operator directly interacts with redis conn.
+#[derive(Clone)]
 pub struct CacheOperator<T: redis::aio::ConnectionLike + Send> {
     conn: T,
 }
 
-impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
+impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
     pub fn new(conn: T) -> Self {
         Self { conn }
     }
@@ -161,17 +163,29 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
     }
 
     pub async fn get_latest_version(&mut self) -> anyhow::Result<u64> {
-        let chain_id: u64 = match self
-            .conn
+        self.conn
             .get::<&str, String>(CACHE_KEY_LATEST_VERSION)
-            .await
-        {
-            Ok(v) => v.parse::<u64>().with_context(|| {
-                format!("Redis key {} is not a number.", CACHE_KEY_LATEST_VERSION)
-            })?,
-            Err(err) => return Err(err.into()),
-        };
-        Ok(chain_id)
+            .await?
+            .parse::<u64>()
+            .context("Redis latest_version is not a number.")
+    }
+
+    pub async fn get_file_store_latest_version(&mut self) -> anyhow::Result<u64> {
+        self.conn
+            .get::<&str, String>(FILE_STORE_LATEST_VERSION)
+            .await?
+            .parse::<u64>()
+            .context("Redis file_store_latest_version is not a number.")
+    }
+
+    pub async fn update_file_store_latest_version(
+        &mut self,
+        latest_version: u64,
+    ) -> anyhow::Result<()> {
+        self.conn
+            .set(FILE_STORE_LATEST_VERSION, latest_version)
+            .await?;
+        Ok(())
     }
 
     // Internal function to get the latest version from cache.
@@ -195,6 +209,7 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
         } else if requested_version + CACHE_SIZE_ESTIMATION < latest_version {
             Ok(CacheCoverageStatus::CacheEvicted)
         } else {
+            // TODO: rewrite this logic to surface this max fetch size better
             Ok(CacheCoverageStatus::CacheHit(std::cmp::min(
                 latest_version - requested_version,
                 BLOB_STORAGE_SIZE as u64,
@@ -263,6 +278,7 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
         }
     }
 
+    // TODO: Remove this
     pub async fn batch_get_encoded_proto_data(
         &mut self,
         start_version: u64,
@@ -283,6 +299,26 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
             Ok(CacheCoverageStatus::CacheEvicted) => Ok(CacheBatchGetStatus::EvictedFromCache),
             Ok(CacheCoverageStatus::DataNotReady) => Ok(CacheBatchGetStatus::NotReady),
             Err(err) => Err(err),
+        }
+    }
+
+    /// Fail if not all transactions requested are returned
+    pub async fn batch_get_encoded_proto_data_x(
+        &mut self,
+        start_version: u64,
+        transaction_count: u64,
+    ) -> anyhow::Result<Vec<EncodedTransactionWithVersion>> {
+        let versions = (start_version..start_version + transaction_count)
+            .map(|e| e.to_string())
+            .collect::<Vec<String>>();
+        let encoded_transactions: Result<Vec<String>, RedisError> = self.conn.mget(versions).await;
+        match encoded_transactions {
+            Ok(txns) => Ok(txns
+                .into_iter()
+                .enumerate()
+                .map(|(i, txn)| (txn, start_version + i as u64))
+                .collect()),
+            Err(err) => Err(err.into()),
         }
     }
 }

@@ -52,3 +52,12 @@ pub static PROCESSED_BATCH_SIZE: Lazy<IntGauge> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Number of waits that cache worker has encountered for file store.
+pub static WAIT_FOR_FILE_STORE_COUNTER: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "indexer_grpc_cache_worker_wait_for_file_store_counter",
+        "Number of waits that cache worker has encountered for file store",
+    )
+    .unwrap()
+});

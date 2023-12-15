@@ -152,6 +152,7 @@ pub enum TransactionDeduperType {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")] // cannot use tag = "type" as nested enums cannot work, and bcs doesn't support it
 pub enum BlockGasLimitType {
     NoLimit,
     Limit(u64),
