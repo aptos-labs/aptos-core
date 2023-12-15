@@ -483,7 +483,8 @@ impl<'a> AptosTestAdapter<'a> {
             block_gas_limit_type: BlockGasLimitType::Limit(30000),
         };
         let mut outputs =
-            AptosVM::execute_block(&sig_verified_block, &self.storage.clone(), onchain_config)?;
+            AptosVM::execute_block(&sig_verified_block, &self.storage.clone(), onchain_config)?
+                .into_inner();
 
         assert_eq!(outputs.len(), 1);
 
