@@ -1036,7 +1036,7 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
                 transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
                 num_modules: 1,
                 unique_senders: true,
-                mempool_backlog: 10000,
+                mempool_backlog: 30000,
             },
             // transactions get rejected, to fix.
             // TransactionWorkload {
