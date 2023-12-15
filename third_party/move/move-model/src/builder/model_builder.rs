@@ -16,7 +16,7 @@ use crate::{
         SpecFunId, SpecVarId, StructId, TypeParameter, TypeParameterKind,
     },
     symbol::Symbol,
-    ty::{infer_abilities, infer_and_check_abilities, is_phantom_type_arg, Constraint, Type},
+    ty::{infer_abilities, infer_and_check_abilities, is_phantom_type_arg, Constraint, Type, gen_get_ty_param_kinds},
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -413,13 +413,7 @@ impl<'env> ModelBuilder<'env> {
     pub fn check_instantiation(&self, ty: &Type, ty_params: &[TypeParameter], loc: &Loc) {
         infer_and_check_abilities(
             ty,
-            |i| {
-                if let Some(tp) = ty_params.get(i as usize) {
-                    tp.1.clone()
-                } else {
-                    panic!("ICE unbound type parameter")
-                }
-            },
+            gen_get_ty_param_kinds(ty_params),
             self.gen_get_struct_sig(),
             loc,
             |loc, err| self.error(loc, err),
@@ -448,13 +442,7 @@ impl<'env> ModelBuilder<'env> {
                 // check fields are properly instantiated
                 self.check_instantiation(field_ty, ty_params, loc);
                 if is_phantom_type_arg(
-                    |i| {
-                        if let Some(tp) = ty_params.get(i as usize) {
-                            tp.1.clone()
-                        } else {
-                            panic!("ICE unbound type parameter")
-                        }
-                    },
+                    gen_get_ty_param_kinds(ty_params),
                     field_ty,
                 ) {
                     self.error(loc, "phantom type arguments cannot be used")

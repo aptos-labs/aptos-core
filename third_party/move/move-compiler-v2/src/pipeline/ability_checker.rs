@@ -10,7 +10,7 @@ use move_model::{
     model::{
         FunId, FunctionEnv, Loc, ModuleId, QualifiedId, StructId, TypeParameter, TypeParameterKind,
     },
-    ty,
+    ty::{self, gen_get_ty_param_kinds},
     ty::Type,
 };
 use move_stackless_bytecode::{
@@ -101,16 +101,6 @@ fn check_key_for_struct(
     }
 }
 
-fn ty_param_kinds(ty_params: &[TypeParameter]) -> impl Fn(u16) -> TypeParameterKind + Copy + '_ {
-    |i| {
-        if let Some(tp) = ty_params.get(i as usize) {
-            tp.1.clone()
-        } else {
-            panic!("ICE ability checker: unbound type parameter")
-        }
-    }
-}
-
 fn get_struct_sig<'a>(
     target: &'a FunctionTarget,
 ) -> impl Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy + 'a {
@@ -144,7 +134,7 @@ fn check_struct_inst(
         mid,
         sid,
         ty_args,
-        ty_param_kinds(&ty_params),
+    gen_get_ty_param_kinds(&ty_params),
         get_struct_sig(target),
         Some((loc, |loc: &Loc, msg: &str| {
             target.global_env().error(loc, msg)
@@ -174,7 +164,7 @@ pub fn check_instantiation(target: &FunctionTarget, ty: &Type, loc: &Loc) -> Abi
     let ty_params = target.get_type_parameters();
     ty::infer_and_check_abilities(
         ty,
-        ty_param_kinds(&ty_params),
+        gen_get_ty_param_kinds(&ty_params),
         get_struct_sig(target),
         loc,
         |loc, msg| target.global_env().error(loc, msg),
