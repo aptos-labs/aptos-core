@@ -989,10 +989,11 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
 
     /// Convert a single-variable pattern into a `Pattern::Tuple` if needed.
     fn make_lambda_pattern_a_tuple(&mut self, pat: &Pattern) -> Pattern {
-        if let Pattern::Var(id, _) = pat {
+        if !matches!(pat, Pattern::Tuple(..)) {
+            let id = pat.node_id();
             let new_id = self.env.new_node(
-                self.env.get_node_loc(*id),
-                Type::Tuple(vec![self.env.get_node_type(*id)]),
+                self.env.get_node_loc(id),
+                Type::Tuple(vec![self.env.get_node_type(id)]),
             );
             Pattern::Tuple(new_id, vec![pat.clone()])
         } else {

@@ -1,4 +1,4 @@
-//#publish --print-bytecode
+//# publish
 module 0xcafe::vectors {
     use std::vector;
 
@@ -9,3 +9,5 @@ module 0xcafe::vectors {
 	assert!(v == vector[2, 3, 4], 0);
     }
 }
+
+//# run 0xcafe::vectors::test_for_each_mut

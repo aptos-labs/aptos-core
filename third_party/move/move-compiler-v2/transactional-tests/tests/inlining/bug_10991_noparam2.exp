@@ -1,0 +1,62 @@
+processed 2 tasks
+
+task 0 'publish'. lines 1-10:
+
+
+
+==> Compiler v2 delivered same results!
+
+>>> V1 Compiler {
+== BEGIN Bytecode ==
+// Move bytecode v6
+module 42.Test {
+
+
+public test() {
+L0:	loc0: u64
+B0:
+	0: LdU64(10)
+	1: LdU64(100)
+	2: Pop
+	3: StLoc[0](loc0: u64)
+	4: CopyLoc[0](loc0: u64)
+	5: Pop
+	6: MoveLoc[0](loc0: u64)
+	7: Pop
+	8: Ret
+}
+}
+== END Bytecode ==
+}
+
+>>> V2 Compiler {
+== BEGIN Bytecode ==
+// Move bytecode v7
+module 42.Test {
+
+
+public test() {
+L0:	loc0: u64
+L1:	loc1: u64
+B0:
+	0: LdU64(10)
+	1: StLoc[0](loc0: u64)
+	2: LdU64(100)
+	3: StLoc[1](loc1: u64)
+	4: LdU64(3)
+	5: LdU64(10)
+	6: Add
+	7: LdU64(13)
+	8: Eq
+	9: BrFalse(11)
+B1:
+	10: Branch(13)
+B2:
+	11: LdU64(0)
+	12: Abort
+B3:
+	13: Ret
+}
+}
+== END Bytecode ==
+}
