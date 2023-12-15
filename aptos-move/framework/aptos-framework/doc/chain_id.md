@@ -12,7 +12,6 @@ This code provides a container for storing a chain id and functions to initializ
 -  [Function `initialize`](#0x1_chain_id_initialize)
 -  [Function `get`](#0x1_chain_id_get)
 -  [Specification](#@Specification_0)
-    -  [Module-level Specification](#@Module-level_Specification_1)
     -  [Function `initialize`](#@Specification_0_initialize)
     -  [Function `get`](#@Specification_0_get)
 
@@ -105,11 +104,6 @@ Return the chain ID of this instance.
 <a id="@Specification_0"></a>
 
 ## Specification
-
-
-<a id="@Module-level_Specification_1"></a>
-
-### Module-level Specification
 
 
 

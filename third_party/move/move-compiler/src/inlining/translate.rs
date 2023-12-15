@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    command_line::compiler::FullyCompiledProgram,
     diag,
     expansion::ast::{AbilitySet, ModuleIdent, ModuleIdent_, SpecId, Visibility},
     inlining::visitor::{Dispatcher, Visitor, VisitorContinuation},
@@ -24,13 +25,15 @@ use crate::{
 };
 use move_ir_types::location::{sp, Loc};
 use move_symbol_pool::Symbol;
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::{
+    collections::{BTreeMap, BTreeSet, VecDeque},
+    fmt,
+};
 
 /// A globally unique function name
 type GlobalFunctionName = (ModuleIdent_, Symbol);
 type GlobalStructName = (ModuleIdent_, Symbol);
 
-#[derive(Debug)]
 struct Inliner<'l> {
     env: &'l mut CompilationEnv,
     current_module: Option<ModuleIdent_>,
@@ -42,12 +45,39 @@ struct Inliner<'l> {
     visibilities: BTreeMap<GlobalFunctionName, Visibility>,
     inline_stack: VecDeque<GlobalFunctionName>,
     rename_counter: usize,
+    pre_compiled_lib: Option<&'l FullyCompiledProgram>,
+}
+
+// Manually implement Debug so we don't have to include field pre_compiled_lib,
+// which may be huge.
+impl<'l> fmt::Debug for Inliner<'l> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Inliner")
+            .field("env", &self.env)
+            .field("current_module", &self.current_module)
+            .field("current_function", &self.current_function)
+            .field("current_function_loc", &self.current_function_loc)
+            .field(
+                "current_spec_block_counter",
+                &self.current_spec_block_counter,
+            )
+            .field("struct_defs", &self.struct_defs)
+            .field("inline_defs", &self.inline_defs)
+            .field("visibilities", &self.visibilities)
+            .field("inline_stack", &self.inline_stack)
+            .field("rename_counter", &self.rename_counter)
+            .finish()
+    }
 }
 
 // ============================================================================================
 // Entry point
 
-pub fn run_inlining(env: &mut CompilationEnv, prog: &mut Program) {
+pub fn run_inlining(
+    env: &mut CompilationEnv,
+    pre_compiled_lib: Option<&FullyCompiledProgram>,
+    prog: &mut Program,
+) {
     Inliner {
         env,
         current_module: None,
@@ -59,6 +89,7 @@ pub fn run_inlining(env: &mut CompilationEnv, prog: &mut Program) {
         visibilities: BTreeMap::new(),
         inline_stack: Default::default(),
         rename_counter: 0,
+        pre_compiled_lib,
     }
     .run(prog)
 }
@@ -66,6 +97,7 @@ pub fn run_inlining(env: &mut CompilationEnv, prog: &mut Program) {
 impl<'l> Inliner<'l> {
     fn run(&mut self, prog: &mut Program) {
         // First collect all definitions of inlined functions so we can expand them later in the AST.
+        // Also check that all local inline functions are not native.
         self.visit_functions(prog, VisitingMode::All, &mut |ctx, fname, fdef| {
             if let Some(mid) = ctx.current_module {
                 let global_name = (mid, ctx.current_function);
@@ -86,7 +118,7 @@ impl<'l> Inliner<'l> {
                 }
             }
         });
-        // Also collect all structs, we need them for ability computation
+        // Also collect all structs; we need them for ability computation.
         for (_, mid, mdef) in prog.modules.iter() {
             for (_, name, sdef) in mdef.structs.iter() {
                 let global_name = (*mid, *name);
@@ -122,6 +154,44 @@ impl<'l> Inliner<'l> {
         // Finally do acquires checking as we have inlined everything
         self.visit_functions(prog, VisitingMode::SourceOnly, &mut |inliner, name, def| {
             post_inlining_check(inliner, name, def)
+        })
+    }
+
+    /// Get a copy of the function body if `global_name` refers to an inline function.
+    fn copy_def_if_inline_function(
+        &mut self,
+        global_name: &(ModuleIdent_, Symbol),
+    ) -> Option<Function> {
+        // We need a copy of the function body to inline into the program if it's an inline function.
+        // But since we're mutating the program in complicated ways, any inline functions from the
+        // current program are stored in advance in the `inline_defs` table to avoid mutable reference.
+        self.inline_defs
+            .get(global_name)
+            .or_else(|| {
+                let mid = global_name.0;
+                let fsym = &global_name.1;
+                // Function defs from pre-compiled libs (if present) can be copied at the time of use,
+                // since we don't have a mutable ref to it.
+                self.pre_compiled_lib
+                    .and_then(|libs| libs.typing.modules.get_(&mid))
+                    .filter(|mod_def| mod_def.is_source_module)
+                    .and_then(|mod_def| mod_def.functions.get_(fsym))
+                    .filter(|fdef| fdef.inline)
+            })
+            .cloned()
+    }
+
+    /// Get a ref to the struct definition identified by `m::n` if it can be found.
+    fn get_struct_def(&self, m: &ModuleIdent, n: &StructName) -> Option<&StructDefinition> {
+        // To avoid mutable ref issues, this may be a ref to a copy stored in advance
+        // in the `struct_defs` table.
+        self.struct_defs.get(&(m.value, n.0.value)).or_else(|| {
+            // Struct defs from pre-compiled libs (if present) can be referenced at point
+            // of use, since there are no conflicting mutable refs to them.
+            self.pre_compiled_lib
+                .and_then(|libs| libs.typing.modules.get_(&m.value))
+                .filter(|mod_def| mod_def.is_source_module)
+                .and_then(|mod_def| mod_def.structs.get_(&n.value()))
         })
     }
 
@@ -608,7 +678,7 @@ impl<'l> Inliner<'l> {
     /// a `SubstitutionVisitor` for inlined functions.
     fn module_call(&mut self, call_loc: Loc, mcall: &mut ModuleCall) -> Option<UnannotatedExp_> {
         let global_name = (mcall.module.value, mcall.name.0.value);
-        if let Some(mut fdef) = self.inline_defs.get(&global_name).cloned() {
+        if let Some(mut fdef) = self.copy_def_if_inline_function(&global_name) {
             // Function to inline: check for cycles
             if let Some(pos) = self.inline_stack.iter().position(|f| f == &global_name) {
                 let cycle = self
@@ -913,16 +983,14 @@ impl<'l, 'r> Visitor for CheckerVisitor<'l, 'r> {
 impl<'l> InferAbilityContext for Inliner<'l> {
     fn struct_declared_abilities(&self, m: &ModuleIdent, n: &StructName) -> AbilitySet {
         let res = self
-            .struct_defs
-            .get(&(m.value, n.0.value))
+            .get_struct_def(m, n)
             .map(|s| s.abilities.clone())
             .unwrap_or_else(|| AbilitySet::all(self.current_function_loc.expect("loc")));
         res
     }
 
     fn struct_tparams(&self, m: &ModuleIdent, n: &StructName) -> Vec<StructTypeParameter> {
-        self.struct_defs
-            .get(&(m.value, n.0.value))
+        self.get_struct_def(m, n)
             .map(|s| s.type_parameters.clone())
             .unwrap_or_default()
     }

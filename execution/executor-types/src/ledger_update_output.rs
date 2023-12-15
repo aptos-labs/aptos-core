@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 #[derive(Default, Debug)]
 pub struct LedgerUpdateOutput {
-    pub status: Vec<TransactionStatus>,
+    pub statuses_for_input_txns: Vec<TransactionStatus>,
     pub to_commit: Vec<TransactionToCommit>,
     pub reconfig_events: Vec<ContractEvent>,
     pub transaction_info_hashes: Vec<HashValue>,
@@ -170,7 +170,7 @@ impl LedgerUpdateOutput {
             parent_accumulator.frozen_subtree_roots().clone(),
             parent_accumulator.num_leaves(),
             next_epoch_state,
-            self.status.clone(),
+            self.statuses_for_input_txns.clone(),
             self.transaction_info_hashes.clone(),
             self.reconfig_events.clone(),
         )
@@ -178,7 +178,7 @@ impl LedgerUpdateOutput {
 
     pub fn combine(&mut self, rhs: Self) {
         let Self {
-            status,
+            statuses_for_input_txns,
             to_commit,
             reconfig_events,
             transaction_info_hashes,
@@ -194,7 +194,7 @@ impl LedgerUpdateOutput {
             );
         }
 
-        self.status.extend(status);
+        self.statuses_for_input_txns.extend(statuses_for_input_txns);
         self.to_commit.extend(to_commit);
         self.reconfig_events.extend(reconfig_events);
         self.transaction_info_hashes.extend(transaction_info_hashes);

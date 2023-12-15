@@ -161,6 +161,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     dag_rpc_tx: Option<aptos_channel::Sender<AccountAddress, IncomingDAGRequest>>,
     dag_shutdown_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     dag_config: DagConsensusConfig,
+    payload_manager: Arc<PayloadManager>,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -218,6 +219,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             dag_shutdown_tx: None,
             aptos_time_service,
             dag_config,
+            payload_manager: Arc::new(PayloadManager::DirectMempool),
         }
     }
 
@@ -599,14 +601,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             block_rx,
             reset_rx,
             epoch_state,
+            self.bounded_executor.clone(),
         );
-        let bounded_executor = self.bounded_executor.clone();
 
         tokio::spawn(execution_schedule_phase.start());
         tokio::spawn(execution_wait_phase.start());
         tokio::spawn(signing_phase.start());
         tokio::spawn(persisting_phase.start());
-        tokio::spawn(buffer_manager.start(bounded_executor));
+        tokio::spawn(buffer_manager.start());
 
         (block_tx, reset_tx)
     }
@@ -690,6 +692,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             ledger_data.committed_round(),
             self.config
                 .max_blocks_per_sending_request(onchain_consensus_config.quorum_store_enabled()),
+            self.payload_manager.clone(),
         );
         tokio::spawn(recovery_manager.start(recovery_manager_rx, close_rx));
     }
@@ -738,6 +741,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let (payload_manager, quorum_store_msg_tx) = quorum_store_builder.init_payload_manager();
         self.quorum_store_msg_tx = quorum_store_msg_tx;
+        self.payload_manager = payload_manager.clone();
 
         let payload_client = QuorumStoreClient::new(
             consensus_to_quorum_store_tx,
@@ -1126,6 +1130,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             block_tx,
             onchain_consensus_config.quorum_store_enabled(),
             onchain_consensus_config.validator_txn_enabled(),
+            self.bounded_executor.clone(),
         );
 
         let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);
@@ -1174,6 +1179,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let round_manager_tx = self.round_manager_tx.clone();
             let my_peer_id = self.author;
             let max_num_batches = self.config.quorum_store.receiver_max_num_batches;
+            let payload_manager = self.payload_manager.clone();
             self.bounded_executor
                 .spawn(async move {
                     match monitor!(
@@ -1193,6 +1199,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                                 buffered_proposal_tx,
                                 peer_id,
                                 verified_event,
+                                payload_manager,
                             );
                         },
                         Err(e) => {
@@ -1314,6 +1321,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         buffered_proposal_tx: Option<aptos_channel::Sender<Author, VerifiedEvent>>,
         peer_id: AccountAddress,
         event: VerifiedEvent,
+        payload_manager: Arc<PayloadManager>,
     ) {
         if let VerifiedEvent::ProposalMsg(proposal) = &event {
             observe_block(
@@ -1329,6 +1337,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     .context("quorum store sender")
             },
             proposal_event @ VerifiedEvent::ProposalMsg(_) => {
+                if let VerifiedEvent::ProposalMsg(p) = &proposal_event {
+                    if let Some(payload) = p.proposal().payload() {
+                        payload_manager
+                            .prefetch_payload_data(payload, p.proposal().timestamp_usecs());
+                    }
+                }
                 Self::forward_event_to(buffered_proposal_tx, peer_id, proposal_event)
                     .context("proposal precheck sender")
             },

@@ -23,7 +23,6 @@
 -  [Function `set_genesis_end`](#0x1_genesis_set_genesis_end)
 -  [Function `initialize_for_verification`](#0x1_genesis_initialize_for_verification)
 -  [Specification](#@Specification_1)
-    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `initialize_aptos_coin`](#@Specification_1_initialize_aptos_coin)
     -  [Function `create_initialize_validators_with_commission`](#@Specification_1_create_initialize_validators_with_commission)
@@ -894,11 +893,6 @@ The last step of genesis.
 <a id="@Specification_1"></a>
 
 ## Specification
-
-
-<a id="@Module-level_Specification_2"></a>
-
-### Module-level Specification
 
 
 

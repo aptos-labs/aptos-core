@@ -23,7 +23,9 @@ use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::aptos_stdlib,
-    types::on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig},
+    types::on_chain_config::{
+        BlockGasLimitType, OnChainConsensusConfig, OnChainExecutionConfig, TransactionShufflerType,
+    },
 };
 use aptos_testcases::{
     compatibility_test::SimpleValidatorUpgrade,
@@ -1043,10 +1045,10 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         ]),
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
-            (3700, 0.35, 0.5, 0.8, 0.65),
-            (2800, 0.35, 0.5, 1.2, 1.3),
-            (1800, 0.35, 2.0, 1.5, 3.0),
-            (950, 0.35, 0.65, 1.5, 2.9),
+            (5500, 0.35, 0.3, 0.8, 0.65),
+            (4500, 0.35, 0.3, 1.0, 1.0),
+            (2000, 0.35, 0.3, 1.0, 1.0),
+            (600, 0.35, 0.3, 1.0, 1.0),
             // (150, 0.5, 1.0, 1.5, 0.65),
         ]
         .into_iter()
@@ -1864,13 +1866,22 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             }
         }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
+            let mut on_chain_execution_config = OnChainExecutionConfig::default_for_genesis();
+            // Need to update if the default changes
+            match &mut on_chain_execution_config {
+                OnChainExecutionConfig::Missing
+                | OnChainExecutionConfig::V1(_)
+                | OnChainExecutionConfig::V2(_)
+                | OnChainExecutionConfig::V3(_) => {
+                    unreachable!("Unexpected on-chain execution config type, if OnChainExecutionConfig::default_for_genesis() has been updated, this test must be updated too.")
+                }
+                OnChainExecutionConfig::V4(config_v4) => {
+                    config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                    config_v4.transaction_shuffler_type = TransactionShufflerType::SenderAwareV2(256);
+                }
+            }
             helm_values["chain"]["on_chain_execution_config"] =
-                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
-                    .expect("must serialize");
-            helm_values["chain"]["on_chain_execution_config"]["V3"]["block_gas_limit"] =
-                serde_yaml::Value::Null;
-            helm_values["chain"]["on_chain_execution_config"]["V3"]["transaction_shuffler_type"]
-                ["sender_aware_v2"] = 256.into();
+                serde_yaml::to_value(on_chain_execution_config).expect("must serialize");
         }));
 
     if ENABLE_VFNS {

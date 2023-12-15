@@ -192,7 +192,7 @@ impl ContractEventV1 {
     }
 
     pub fn size(&self) -> usize {
-        self.key.size() + 8 /* u64 */ + bcs::to_bytes(&self.type_tag).unwrap().len() + self.event_data.len()
+        self.key.size() + 8 /* u64 */ + bcs::serialized_size(&self.type_tag).unwrap() + self.event_data.len()
     }
 }
 
@@ -228,7 +228,7 @@ impl ContractEventV2 {
     }
 
     pub fn size(&self) -> usize {
-        bcs::to_bytes(&self.type_tag).unwrap().len() + self.event_data.len()
+        bcs::serialized_size(&self.type_tag).unwrap() + self.event_data.len()
     }
 
     pub fn type_tag(&self) -> &TypeTag {

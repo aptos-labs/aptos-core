@@ -8,7 +8,7 @@ use aptos_gas_schedule::{
 };
 use aptos_logger::{enabled, Level};
 use aptos_types::on_chain_config::{
-    ApprovedExecutionHashes, ConfigStorage, GasSchedule, GasScheduleV2, OnChainConfig,
+    ApprovedExecutionHashes, ConfigStorage, Features, GasSchedule, GasScheduleV2, OnChainConfig,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_log, speculative_warn};
 use aptos_vm_types::storage::{io_pricing::IoPricing, StorageGasParameters};
@@ -114,6 +114,7 @@ pub(crate) fn check_gas(
     gas_feature_version: u64,
     resolver: &impl AptosMoveResolver,
     txn_metadata: &TransactionMetadata,
+    features: &Features,
     log_context: &AdapterLogSchema,
 ) -> Result<(), VMStatus> {
     let txn_gas_params = &gas_params.vm.txn;
@@ -237,5 +238,34 @@ pub(crate) fn check_gas(
             None,
         ));
     }
+
+    // If this is a sponsored transaction for a potentially new account, ensure there's enough
+    // gas to cover storage, execution, and IO costs.
+    // TODO: This isn't the cleaning code, thus we localize it just here and will remove it
+    // once accountv2 is available and we no longer need to create accounts.
+    if crate::aptos_vm::is_account_init_for_sponsored_transaction(txn_metadata, features) {
+        let gas_unit_price: u64 = txn_metadata.gas_unit_price().into();
+        let max_gas_amount: u64 = txn_metadata.max_gas_amount().into();
+        let storage_fee_per_state_slot_create: u64 =
+            txn_gas_params.storage_fee_per_state_slot_create.into();
+
+        let expected = gas_unit_price * 10 + 2 * storage_fee_per_state_slot_create;
+        let actual = gas_unit_price * max_gas_amount;
+
+        if actual < expected {
+            speculative_warn!(
+                log_context,
+                format!(
+                    "[VM] Insufficient gas for sponsored transaction; min {}, submitted {}",
+                    expected, actual,
+                ),
+            );
+            return Err(VMStatus::error(
+                StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS,
+                None,
+            ));
+        }
+    }
+
     Ok(())
 }

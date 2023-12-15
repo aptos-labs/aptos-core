@@ -19,7 +19,7 @@
 -  [Function `set_allow_direct_coin_transfers`](#0x1_aptos_account_set_allow_direct_coin_transfers)
 -  [Function `can_receive_direct_coin_transfers`](#0x1_aptos_account_can_receive_direct_coin_transfers)
 -  [Specification](#@Specification_1)
-    -  [Module-level Specification](#@Module-level_Specification_2)
+    -  [High-level Requirements](#high-level-req)
     -  [Function `create_account`](#@Specification_1_create_account)
     -  [Function `batch_transfer`](#@Specification_1_batch_transfer)
     -  [Function `transfer`](#@Specification_1_transfer)
@@ -488,9 +488,75 @@ By default, this returns true if an account has not explicitly set whether the c
 ## Specification
 
 
-<a id="@Module-level_Specification_2"></a>
 
-### Module-level Specification
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Property</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>During the creation of an Aptos account the following rules should hold: (1) the authentication key should be 32 bytes in length, (2) an Aptos account should not already exist for that authentication key, and (3) the address of the authentication key should not be equal to a reserved address (0x0, 0x1, or 0x3).</td>
+<td>Critical</td>
+<td>The authentication key which is passed in as an argument to create_account should satisfy all necessary conditions.</td>
+<td>Formally verified via <a href="#high-level-spec-1">CreateAccountAbortsIf</a>.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>After creating an Aptos account, the account should become registered to receive AptosCoin.</td>
+<td>Critical</td>
+<td>The create_account function creates a new account for the particular address and registers AptosCoin.</td>
+<td>Formally verified via <a href="#high-level-spec-2">create_account</a>.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>An account may receive a direct transfer of coins they have not registered for if and only if the transfer of arbitrary coins is enabled. By default the option should always set to be enabled for an account.</td>
+<td>Low</td>
+<td>Transfers of a coin to an account that has not yet registered for that coin should abort if and only if the allow_arbitrary_coin_transfers flag is explicitly set to false.</td>
+<td>Formally verified via <a href="#high-level-spec-3">can_receive_direct_coin_transfers</a>.</td>
+</tr>
+
+<tr>
+<td>4</td>
+<td>Setting direct coin transfers may only occur if and only if a direct transfer config is associated with the provided account address.</td>
+<td>Low</td>
+<td>The set_allow_direct_coin_transfers function ensures the DirectTransferConfig structure exists for the signer.</td>
+<td>Formally verified via <a href="#high-level-spec-4">set_allow_direct_coin_transfers</a>.</td>
+</tr>
+
+<tr>
+<td>5</td>
+<td>The transfer function should ensure an account is created for the provided destination if one does not exist; then, register AptosCoin for that account if a particular is unregistered before transferring the amount.</td>
+<td>Critical</td>
+<td>The transfer function checks if the recipient account exists. If the account does not exist, the function creates one and registers the account to AptosCoin if not registered.</td>
+<td>Formally verified via <a href="#high-level-spec-5">transfer</a>.</td>
+</tr>
+
+<tr>
+<td>6</td>
+<td>Creating an account for the provided destination and registering it for that particular CoinType should be the only way to enable depositing coins, provided the account does not already exist.</td>
+<td>Critical</td>
+<td>The deposit_coins function verifies if the recipient account exists. If the account does not exist, the function creates one and ensures that the account becomes registered for the specified CointType.</td>
+<td>Formally verified via <a href="#high-level-spec-6">deposit_coins</a>.</td>
+</tr>
+
+<tr>
+<td>7</td>
+<td>When performing a batch transfer of Aptos Coin and/or a batch transfer of a custom coin type, it should ensure that the vector containing destination addresses and the vector containing the corresponding amounts are equal in length.</td>
+<td>Low</td>
+<td>The batch_transfer and batch_transfer_coins functions verify that the length of the recipient addresses vector matches the length of the amount vector through an assertion.</td>
+<td>Formally verified via <a href="#high-level-spec-7">batch_transfer_coins</a>.</td>
+</tr>
+
+</table>
+
 
 
 
@@ -513,8 +579,10 @@ The Account does not exist under the auth_key before creating the account.
 Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_toke.
 
 
-<pre><code><b>include</b> <a href="aptos_account.md#0x1_aptos_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a>;
+<pre><code>// This enforces <a id="high-level-spec-1" href="#high-level-req">high level requirement 1</a>:
+<b>include</b> <a href="aptos_account.md#0x1_aptos_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a>;
 <b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(auth_key);
+// This enforces <a id="high-level-spec-2" href="#high-level-req">high level requirement 2</a>:
 <b>ensures</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(auth_key);
 </code></pre>
 
@@ -609,6 +677,7 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 <b>include</b> <a href="aptos_account.md#0x1_aptos_account_WithdrawAbortsIf">WithdrawAbortsIf</a>&lt;AptosCoin&gt;{from: source};
 <b>include</b> <a href="aptos_account.md#0x1_aptos_account_TransferEnsures">TransferEnsures</a>&lt;AptosCoin&gt;;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(<b>to</b>) && <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(<b>to</b>).frozen;
+// This enforces <a id="high-level-spec-5" href="#high-level-req">high level requirement 5</a>:
 <b>ensures</b> <b>exists</b>&lt;aptos_framework::account::Account&gt;(<b>to</b>);
 <b>ensures</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(<b>to</b>);
 </code></pre>
@@ -634,6 +703,7 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
     recipients[i] != account_addr_source;
 <b>requires</b> <b>exists</b> i in 0..len(recipients):
     amounts[i] &gt; 0;
+// This enforces <a id="high-level-spec-7" href="#high-level-req">high level requirement 7</a>:
 <b>aborts_if</b> len(recipients) != len(amounts);
 <b>aborts_if</b> <b>exists</b> i in 0..len(recipients):
         !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[i]) && <a href="aptos_account.md#0x1_aptos_account_length_judgment">length_judgment</a>(recipients[i]);
@@ -789,6 +859,7 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 <b>ensures</b> <b>exists</b>&lt;aptos_framework::coin::CoinStore&lt;CoinType&gt;&gt;(<b>to</b>);
 <b>let</b> coin_store_to = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>).<a href="coin.md#0x1_coin">coin</a>.value;
 <b>let</b> <b>post</b> post_coin_store_to = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>).<a href="coin.md#0x1_coin">coin</a>.value;
+// This enforces <a id="high-level-spec-6" href="#high-level-req">high level requirement 6</a>:
 <b>ensures</b> if_exist_coin ==&gt; post_coin_store_to == coin_store_to + coins.value;
 </code></pre>
 
@@ -842,6 +913,7 @@ Check if the AptosCoin under the address existed.
 
 <pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
 <b>include</b> !<b>exists</b>&lt;<a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(addr) ==&gt; <a href="account.md#0x1_account_NewEventHandleAbortsIf">account::NewEventHandleAbortsIf</a>;
+// This enforces <a id="high-level-spec-4" href="#high-level-req">high level requirement 4</a>:
 <b>ensures</b> <b>global</b>&lt;<a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(addr).allow_arbitrary_coin_transfers == allow;
 </code></pre>
 
@@ -860,6 +932,7 @@ Check if the AptosCoin under the address existed.
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
+// This enforces <a id="high-level-spec-3" href="#high-level-req">high level requirement 3</a>:
 <b>ensures</b> result == (
     !<b>exists</b>&lt;<a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(<a href="account.md#0x1_account">account</a>) ||
         <b>global</b>&lt;<a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(<a href="account.md#0x1_account">account</a>).allow_arbitrary_coin_transfers

@@ -4,7 +4,6 @@
 use anyhow::Result;
 use aptos_language_e2e_tests::{account::AccountData, data_store::FakeDataStore};
 use aptos_types::{
-    block_executor::config::BlockExecutorConfigFromOnchain,
     transaction::{signature_verified_transaction::SignatureVerifiedTransaction, Transaction},
     write_set::WriteSet,
 };
@@ -49,11 +48,7 @@ fn main() -> Result<()> {
         })
         .collect();
 
-    let res = AptosVM::execute_block(
-        &txns,
-        &state_store,
-        BlockExecutorConfigFromOnchain::new_no_block_limit(),
-    )?;
+    let res = AptosVM::execute_block_no_limit(&txns, &state_store)?;
     for i in 0..NUM_TXNS {
         assert!(res[i as usize].status().status().unwrap().is_success());
     }

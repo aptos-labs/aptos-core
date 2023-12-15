@@ -101,7 +101,6 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 -  [Function `withdraw_stake`](#0x1_vesting_withdraw_stake)
 -  [Function `get_beneficiary`](#0x1_vesting_get_beneficiary)
 -  [Specification](#@Specification_1)
-    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `stake_pool_address`](#@Specification_1_stake_pool_address)
     -  [Function `vesting_start_secs`](#@Specification_1_vesting_start_secs)
     -  [Function `period_duration_secs`](#@Specification_1_period_duration_secs)
@@ -2776,11 +2775,6 @@ This address should be deterministic for the same admin and vesting contract cre
 <a id="@Specification_1"></a>
 
 ## Specification
-
-
-<a id="@Module-level_Specification_2"></a>
-
-### Module-level Specification
 
 
 

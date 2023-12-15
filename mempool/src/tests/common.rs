@@ -129,6 +129,11 @@ pub(crate) fn add_txns_to_mempool(
     transactions
 }
 
+pub(crate) fn txn_bytes_len(transaction: TestTransaction) -> u64 {
+    let txn = transaction.make_signed_transaction();
+    txn.txn_bytes_len() as u64
+}
+
 pub(crate) fn add_txn(pool: &mut CoreMempool, transaction: TestTransaction) -> Result<()> {
     add_signed_txn(pool, transaction.make_signed_transaction())
 }

@@ -72,11 +72,11 @@ impl<I: Ord + Hash> TimeExpirations<I> {
         self.expiries.push((Reverse(expiry_time), item));
     }
 
-    /// Expire and return items corresponding to round <= given (expired) round.
-    pub(crate) fn expire(&mut self, expiry_time: u64) -> HashSet<I> {
+    /// Expire and return items corresponding to expiration <= given certified time.
+    pub(crate) fn expire(&mut self, certified_time: u64) -> HashSet<I> {
         let mut ret = HashSet::new();
         while let Some((Reverse(t), _)) = self.expiries.peek() {
-            if *t <= expiry_time {
+            if *t <= certified_time {
                 let (_, item) = self.expiries.pop().unwrap();
                 ret.insert(item);
             } else {
@@ -344,6 +344,8 @@ impl ProofQueue {
             counters::BLOCK_BYTES_WHEN_PULL.observe(cur_bytes as f64);
             counters::PROOF_SIZE_WHEN_PULL.observe(ret.len() as f64);
             counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);
+            // Stable sort, so the order of proofs within an author will not change.
+            ret.sort_by_key(|proof| Reverse(proof.gas_bucket_start()));
             ret
         } else {
             Vec::new()

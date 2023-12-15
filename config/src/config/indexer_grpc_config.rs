@@ -42,7 +42,7 @@ pub struct IndexerGrpcConfig {
     /// Number of transactions returned in a single stream response
     pub output_batch_size: u16,
 
-    pub enable_verbose_logging: bool,
+    pub enable_expensive_logging: bool,
 }
 
 impl Debug for IndexerGrpcConfig {
@@ -57,7 +57,7 @@ impl Debug for IndexerGrpcConfig {
             .field("processor_task_count", &self.processor_task_count)
             .field("processor_batch_size", &self.processor_batch_size)
             .field("output_batch_size", &self.output_batch_size)
-            .field("enable_verbose_logging", &self.enable_verbose_logging)
+            .field("enable_expensive_logging", &self.enable_expensive_logging)
             .finish()
     }
 }
@@ -77,7 +77,7 @@ impl Default for IndexerGrpcConfig {
             processor_task_count: DEFAULT_PROCESSOR_TASK_COUNT,
             processor_batch_size: DEFAULT_PROCESSOR_BATCH_SIZE,
             output_batch_size: DEFAULT_OUTPUT_BATCH_SIZE,
-            enable_verbose_logging: false,
+            enable_expensive_logging: false,
         }
     }
 }
@@ -94,10 +94,10 @@ impl ConfigSanitizer for IndexerGrpcConfig {
             return Ok(());
         }
 
-        if !node_config.storage.enable_indexer {
+        if !node_config.storage.enable_indexer && !node_config.indexer_table_info.enabled {
             return Err(Error::ConfigSanitizerFailed(
                 sanitizer_name,
-                "storage.enable_indexer must be true if indexer_grpc.enabled is true".to_string(),
+                "storage.enable_indexer or indexer_table_info.enabled must be true if indexer_grpc.enabled is true".to_string(),
             ));
         }
         Ok(())
@@ -123,9 +123,9 @@ impl ConfigOptimizer for IndexerGrpcConfig {
         // just keep the legacy behaviour to avoid breaking anything.
 
         // Override with environment variables if they are set
-        indexer_config.enable_verbose_logging = env_var_or_default(
-            "INDEXER_GRPC_ENABLE_VERBOSE_LOGGING",
-            Some(indexer_config.enable_verbose_logging),
+        indexer_config.enable_expensive_logging = env_var_or_default(
+            "INDEXER_GRPC_ENABLE_EXPENSIVE_LOGGING",
+            Some(indexer_config.enable_expensive_logging),
             None,
         )
         .unwrap_or(false);
@@ -137,17 +137,20 @@ impl ConfigOptimizer for IndexerGrpcConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::StorageConfig;
+    use crate::config::{IndexerTableInfoConfig, StorageConfig};
 
     #[test]
     fn test_sanitize_enable_indexer() {
         // Create a storage config and disable the storage indexer
         let mut storage_config = StorageConfig::default();
+        let mut table_info_config = IndexerTableInfoConfig::default();
         storage_config.enable_indexer = false;
+        table_info_config.enabled = false;
 
         // Create a node config with the indexer enabled, but the storage indexer disabled
         let mut node_config = NodeConfig {
             storage: storage_config,
+            indexer_table_info: table_info_config,
             indexer_grpc: IndexerGrpcConfig {
                 enabled: true,
                 ..Default::default()
@@ -166,6 +169,25 @@ mod tests {
 
         // Enable the storage indexer
         node_config.storage.enable_indexer = true;
+
+        // Sanitize the config and verify that it now succeeds
+        IndexerGrpcConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
+            .unwrap();
+
+        // Disable the storage indexer and enable the table info service
+        node_config.storage.enable_indexer = false;
+
+        // Sanitize the config and verify that it fails
+        let error = IndexerGrpcConfig::sanitize(
+            &node_config,
+            NodeType::Validator,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+
+        // Enable the table info service
+        node_config.indexer_table_info.enabled = true;
 
         // Sanitize the config and verify that it now succeeds
         IndexerGrpcConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
