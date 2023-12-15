@@ -229,14 +229,16 @@ fn test_new_genesis() {
                 StateKey::access_path(
                     access_path_for_config(ValidatorSet::CONFIG_ID).expect("access path in test"),
                 ),
-                WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap().into()),
+                WriteOp::legacy_modification(
+                    bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap().into(),
+                ),
             ),
             (
                 StateKey::access_path(AccessPath::new(
                     CORE_CODE_ADDRESS,
                     ConfigurationResource::resource_path(),
                 )),
-                WriteOp::Modification(
+                WriteOp::legacy_modification(
                     bcs::to_bytes(&configuration.bump_epoch_for_test())
                         .unwrap()
                         .into(),
@@ -247,7 +249,7 @@ fn test_new_genesis() {
                     account1,
                     CoinStoreResource::resource_path(),
                 )),
-                WriteOp::Modification(
+                WriteOp::legacy_modification(
                     bcs::to_bytes(&CoinStoreResource::new(
                         100_000_000,
                         false,
