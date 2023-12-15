@@ -5,6 +5,7 @@ use crate::{constants::IndexerGrpcRequestMetadata, timestamp_to_iso, timestamp_t
 use aptos_metrics_core::{register_gauge_vec, register_int_gauge_vec, GaugeVec, IntGaugeVec};
 use aptos_protos::util::timestamp::Timestamp;
 use once_cell::sync::Lazy;
+use prometheus::{IntCounterVec, register_int_counter_vec};
 
 pub enum IndexerGrpcStep {
     DataServiceNewRequestReceived,   // [Data Service] New request received.
@@ -123,9 +124,9 @@ pub static TOTAL_SIZE_IN_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 /// Number of transactions at each step
-pub static NUM_TRANSACTIONS_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!(
-        "indexer_grpc_num_transactions_count",
+pub static NUM_TRANSACTIONS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_grpc_num_transactions_count_v2",
         "Total count of transactions at this step",
         &["service_type", "step", "message"],
     )
@@ -174,7 +175,7 @@ pub fn log_grpc_step(
     if let Some(num_transactions) = num_transactions {
         NUM_TRANSACTIONS_COUNT
             .with_label_values(&[service_type, step.get_step(), step.get_label()])
-            .set(num_transactions);
+            .inc_by(num_transactions);
     }
     if let Some(end_version) = end_version {
         LATEST_PROCESSED_VERSION
