@@ -175,7 +175,7 @@ pub fn log_grpc_step(
     if let Some(num_transactions) = num_transactions {
         NUM_TRANSACTIONS_COUNT
             .with_label_values(&[service_type, step.get_step(), step.get_label()])
-            .inc_by(num_transactions);
+            .inc_by(num_transactions as u64);
     }
     if let Some(end_version) = end_version {
         LATEST_PROCESSED_VERSION
@@ -265,7 +265,7 @@ pub fn log_grpc_step_fullnode(
     if let Some(num_transactions) = num_transactions {
         NUM_TRANSACTIONS_COUNT
             .with_label_values(&[service_type, step.get_step(), step.get_label()])
-            .set(num_transactions);
+            .inc_by(num_transactions as u64);
     }
     if let Some(end_version) = end_version {
         LATEST_PROCESSED_VERSION
