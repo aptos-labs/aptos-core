@@ -54,9 +54,8 @@ impl FileStoreOperator for GcsFileStoreOperator {
 
     /// Gets the transactions files from the file store. version has to be a multiple of BLOB_STORAGE_SIZE.
     async fn get_transactions(&self, version: u64) -> anyhow::Result<Vec<Transaction>> {
-        let batch_start_version = version / BLOB_STORAGE_SIZE as u64 * BLOB_STORAGE_SIZE as u64;
-        let current_file_name = generate_blob_name(batch_start_version);
-        match Object::download(&self.bucket_name, current_file_name.as_str()).await {
+        let file_entry_key = FileEntryKey::new(version, self.storage_format).to_string();
+        match Object::download(&self.bucket_name, file_entry_key.as_str()).await {
             Ok(file) => {
                 let file_entry = FileEntry::from_bytes(file, self.storage_format);
                 let transactions_in_storage: TransactionsInStorage = file_entry.try_into()?;

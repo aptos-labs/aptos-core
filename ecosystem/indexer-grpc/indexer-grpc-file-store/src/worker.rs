@@ -76,7 +76,6 @@ impl Worker {
             },
             None => {
                 cache_operator.set_chain_id(chain_id).await?;
-                
             },
         }
         cache_operator

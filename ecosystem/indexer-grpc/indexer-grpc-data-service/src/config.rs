@@ -71,7 +71,7 @@ pub struct IndexerGrpcDataServiceConfig {
 
     /// Cacahe storage format.
     #[serde(default = "default_cacche_storage_format")]
-    pub cacche_storage_format: StorageFormat,
+    pub cache_storage_format: StorageFormat,
 }
 
 fn default_cacche_storage_format() -> StorageFormat {
@@ -87,7 +87,7 @@ impl IndexerGrpcDataServiceConfig {
         disable_auth_check: bool,
         file_store_config: IndexerGrpcFileStoreConfig,
         redis_read_replica_address: RedisUrl,
-        cacche_storage_format: StorageFormat,
+        cache_storage_format: StorageFormat,
     ) -> Self {
         Self {
             data_service_grpc_tls_config,
@@ -98,7 +98,7 @@ impl IndexerGrpcDataServiceConfig {
             disable_auth_check,
             file_store_config,
             redis_read_replica_address,
-            cacche_storage_format,
+            cache_storage_format,
         }
     }
 
@@ -162,7 +162,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             self.redis_read_replica_address.clone(),
             self.file_store_config.clone(),
             self.data_service_response_channel_size,
-            self.cacche_storage_format,
+            self.cache_storage_format,
         )?;
         let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::new(server)
             .send_compressed(CompressionEncoding::Gzip)

@@ -9,7 +9,7 @@ use crate::metrics::{
 };
 use anyhow::Context;
 use aptos_indexer_grpc_utils::{
-    cache_operator::{CacheBatchGetStatus, CacheOperator},
+    cache_operator::CacheOperator,
     chunk_transactions,
     config::IndexerGrpcFileStoreConfig,
     constants::{
@@ -54,7 +54,7 @@ const TRANSIENT_DATA_ERROR_RETRY_SLEEP_DURATION_MS: u64 = 1000;
 const RESPONSE_CHANNEL_SEND_TIMEOUT: Duration = Duration::from_secs(120);
 
 const SHORT_CONNECTION_DURATION_IN_SECS: u64 = 10;
-
+const FILE_STORE_VERSIONS_RESERVED: u64 = 150_000;
 const REQUEST_HEADER_APTOS_EMAIL_HEADER: &str = "x-aptos-email";
 const REQUEST_HEADER_APTOS_USER_CLASSIFICATION_HEADER: &str = "x-aptos-user-classification";
 const REQUEST_HEADER_APTOS_API_KEY_NAME: &str = "x-aptos-api-key-name";
@@ -86,16 +86,6 @@ impl RawDataServerWrapper {
             cache_storage_format,
         })
     }
-}
-
-/// Enum to represent the status of the data fetching overall.
-enum TransactionsDataStatus {
-    // Data fetching is successful.
-    Success(Vec<Transaction>),
-    // Ahead of current head of cache.
-    AheadOfCache,
-    // Fatal error when gap detected between cache and file store.
-    DataGap,
 }
 
 /// RawDataServerWrapper handles the get transactions requests from cache and file store.
@@ -230,33 +220,11 @@ impl RawData for RawDataServerWrapper {
                     )
                     .await
                     {
-                        Ok(TransactionsDataStatus::Success(transactions)) => transactions,
-                        Ok(TransactionsDataStatus::AheadOfCache) => {
-                            info!(
-                                start_version = current_version,
-                                request_name = request_metadata.processor_name.as_str(),
-                                request_email = request_metadata.request_email.as_str(),
-                                request_api_key_name = request_metadata.request_api_key_name.as_str(),
-                                processor_name = request_metadata.processor_name.as_str(),
-                                connection_id = request_metadata.request_connection_id.as_str(),
-                    request_user_classification =
-                        request_metadata.request_user_classification.as_str(),
-                                duration_in_secs = current_batch_start_time.elapsed().as_secs_f64(),
-                                service_type = SERVICE_TYPE,
-                                "[Data Service] Requested data is ahead of cache. Sleeping for {} ms.",
-                                AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS,
-                            );
-                            ahead_of_cache_data_handling().await;
-                            // Retry after a short sleep.
-                            continue;
-                        },
-                        Ok(TransactionsDataStatus::DataGap) => {
-                            data_gap_handling(current_version);
-                            // End the data stream.
-                            break;
-                        },
+                        Ok(transactions) => transactions,
+
                         Err(e) => {
                             ERROR_COUNT.with_label_values(&["data_fetch_failed"]).inc();
+                            info!("Data fetch failed: {:?}", e);
                             data_fetch_error_handling(e, current_version, chain_id).await;
                             // Retry after a short sleep.
                             continue;
@@ -461,99 +429,64 @@ async fn data_fetch(
     file_store_operator: &dyn FileStoreOperator,
     current_batch_start_time: Instant,
     request_metadata: IndexerGrpcRequestMetadata,
-) -> anyhow::Result<TransactionsDataStatus> {
-    let batch_get_result = cache_operator
-        .batch_get_encoded_proto_data(starting_version)
-        .await;
-
-    match batch_get_result {
-        // Data is not ready yet in the cache.
-        Ok(CacheBatchGetStatus::NotReady) => Ok(TransactionsDataStatus::AheadOfCache),
-        Ok(CacheBatchGetStatus::Ok(transactions)) => {
-            let size_in_bytes = transactions
-                .iter()
-                .map(|transaction| transaction.encoded_len())
-                .sum::<usize>();
-            let num_of_transactions = transactions.len();
-            let duration_in_secs = current_batch_start_time.elapsed().as_secs_f64();
-            let start_version_timestamp = transactions.first().unwrap().timestamp.clone();
-            let end_version_timestamp = transactions.last().unwrap().timestamp.clone();
-
-            log_grpc_step(
-                SERVICE_TYPE,
-                IndexerGrpcStep::DataServiceDataFetchedCache,
-                Some(starting_version as i64),
-                Some(starting_version as i64 + num_of_transactions as i64 - 1),
-                start_version_timestamp.as_ref(),
-                end_version_timestamp.as_ref(),
-                Some(duration_in_secs),
-                Some(size_in_bytes),
-                Some(num_of_transactions as i64),
-                Some(request_metadata.clone()),
+) -> anyhow::Result<Vec<Transaction>> {
+    let latest_version = cache_operator.get_latest_version().await?.unwrap();
+    if starting_version >= latest_version.saturating_sub(FILE_STORE_VERSIONS_RESERVED) {
+        let fetch_size = loop {
+            let latest_version = cache_operator
+                .get_latest_version()
+                .await?
+                .context("latest version not found")?;
+            let fetch_size = std::cmp::min(
+                (latest_version + 1).saturating_sub(starting_version),
+                500_u64,
             );
-
-            Ok(TransactionsDataStatus::Success(transactions))
-        },
-        Ok(CacheBatchGetStatus::EvictedFromCache) => {
-            // Data is evicted from the cache. Fetch from file store.
-            let file_store_batch_get_result =
-                file_store_operator.get_transactions(starting_version).await;
-            match file_store_batch_get_result {
-                Ok(transactions) => {
-                    let size_in_bytes = transactions
-                        .iter()
-                        .map(|transaction| transaction.encoded_len())
-                        .sum::<usize>();
-                    let num_of_transactions = transactions.len();
-                    let duration_in_secs = current_batch_start_time.elapsed().as_secs_f64();
-                    let start_version_timestamp = transactions.first().unwrap().timestamp.clone();
-                    let end_version_timestamp = transactions.last().unwrap().timestamp.clone();
-
-                    log_grpc_step(
-                        SERVICE_TYPE,
-                        IndexerGrpcStep::DataServiceDataFetchedFilestore,
-                        Some(starting_version as i64),
-                        Some(starting_version as i64 + num_of_transactions as i64 - 1),
-                        start_version_timestamp.as_ref(),
-                        end_version_timestamp.as_ref(),
-                        Some(duration_in_secs),
-                        Some(size_in_bytes),
-                        Some(num_of_transactions as i64),
-                        Some(request_metadata.clone()),
-                    );
-
-                    Ok(TransactionsDataStatus::Success(transactions))
-                },
-                Err(e) => {
-                    if e.to_string().contains("Transactions file not found") {
-                        Ok(TransactionsDataStatus::DataGap)
-                    } else {
-                        Err(e)
-                    }
-                },
+            if fetch_size > 0 {
+                break fetch_size;
             }
-        },
-        Err(e) => Err(e),
+            tokio::time::sleep(std::time::Duration::from_millis(
+                AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS,
+            ))
+            .await;
+        };
+        info!(
+            start_version = starting_version,
+            fetch_size = fetch_size,
+            "[Data Service] Fetching {} transactions from cache.",
+            fetch_size
+        );
+        let transactions = cache_operator
+            .batch_get_transactions(starting_version, fetch_size)
+            .await?;
+        Ok(transactions)
+    } else {
+        // Data is evicted from the cache. Fetch from file store.
+        let transactions = file_store_operator
+            .get_transactions(starting_version)
+            .await?;
+        let size_in_bytes = transactions
+            .iter()
+            .map(|transaction| transaction.encoded_len())
+            .sum::<usize>();
+        let num_of_transactions = transactions.len();
+        let duration_in_secs = current_batch_start_time.elapsed().as_secs_f64();
+        let start_version_timestamp = transactions.first().unwrap().timestamp.clone();
+        let end_version_timestamp = transactions.last().unwrap().timestamp.clone();
+
+        log_grpc_step(
+            SERVICE_TYPE,
+            IndexerGrpcStep::DataServiceDataFetchedFilestore,
+            Some(starting_version as i64),
+            Some(starting_version as i64 + num_of_transactions as i64 - 1),
+            start_version_timestamp.as_ref(),
+            end_version_timestamp.as_ref(),
+            Some(duration_in_secs),
+            Some(size_in_bytes),
+            Some(num_of_transactions as i64),
+            Some(request_metadata.clone()),
+        );
+        Ok(transactions)
     }
-}
-
-/// Handles the case when the data is not ready in the cache, i.e., beyond the current head.
-async fn ahead_of_cache_data_handling() {
-    // TODO: add exponential backoff.
-    tokio::time::sleep(Duration::from_millis(
-        AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS,
-    ))
-    .await;
-}
-
-/// Handles data gap errors, i.e., the data is not present in the cache or file store.
-fn data_gap_handling(version: u64) {
-    // TODO(larry): add metrics/alerts to track the gap.
-    // Do not crash the server when gap detected since other clients may still be able to get data.
-    error!(
-        current_version = version,
-        "[Data Service] Data gap detected. Please check the logs for more details."
-    );
 }
 
 /// Handles data fetch errors, including cache and file store related errors.
