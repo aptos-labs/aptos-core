@@ -120,6 +120,24 @@ impl Processor {
                 anyhow::ensure!(metadata.chain_id == cache_chain_id, "Chain ID mismatch.");
                 metadata.version
             } else {
+                // If metadata doesn't exist, create and upload it and init file store latest version in cache.
+                while self
+                    .file_store_operator
+                    .update_file_store_metadata_with_timeout(cache_chain_id, 0)
+                    .await
+                    .is_err()
+                {
+                    tracing::error!(
+                        batch_start_version = 0,
+                        service_type = SERVICE_TYPE,
+                        "[File worker] Failed to update file store metadata. Retrying."
+                    );
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                    METADATA_UPLOAD_FAILURE_COUNT.inc();
+                }
+                self.cache_operator
+                    .update_file_store_latest_version(0)
+                    .await?;
                 0
             };
 

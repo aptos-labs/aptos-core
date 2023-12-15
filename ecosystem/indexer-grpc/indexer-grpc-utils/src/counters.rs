@@ -15,6 +15,8 @@ pub enum IndexerGrpcStep {
     DataServiceChunkSent, // [Data Service] One chunk of transactions sent to GRPC response channel.
     DataServiceAllChunksSent, // [Data Service] All chunks of transactions sent to GRPC response channel. Current batch finished.
 
+    CacheWorkerReceivedTxns, // [Indexer Cache] Received transactions from fullnode.
+    CacheWorkerTxnDecoded,   // [Indexer Cache] Decoded transactions.
     CacheWorkerTxnsProcessed, // [Indexer Cache] Processed transactions in a batch.
     CacheWorkerBatchProcessed, // [Indexer Cache] Successfully process current batch.
 
@@ -42,8 +44,10 @@ impl IndexerGrpcStep {
             IndexerGrpcStep::DataServiceChunkSent => "3.2",
             IndexerGrpcStep::DataServiceAllChunksSent => "4",
             // Cache worker steps
-            IndexerGrpcStep::CacheWorkerTxnsProcessed => "1",
-            IndexerGrpcStep::CacheWorkerBatchProcessed => "2",
+            IndexerGrpcStep::CacheWorkerReceivedTxns => "1",
+            IndexerGrpcStep::CacheWorkerTxnDecoded => "2",
+            IndexerGrpcStep::CacheWorkerTxnsProcessed => "3",
+            IndexerGrpcStep::CacheWorkerBatchProcessed => "4",
             // Filestore worker steps
             IndexerGrpcStep::FilestoreUploadTxns => "1",
             IndexerGrpcStep::FilestoreUpdateMetadata => "1.1",
@@ -75,6 +79,8 @@ impl IndexerGrpcStep {
             IndexerGrpcStep::DataServiceChunkSent => "[Data Service] One chunk of transactions sent to GRPC response channel.",
             IndexerGrpcStep::DataServiceAllChunksSent => "[Data Service] All chunks of transactions sent to GRPC response channel. Current batch finished.",
             // Cache worker steps
+            IndexerGrpcStep::CacheWorkerReceivedTxns => "[Indexer Cache] Received transactions from fullnode.",
+            IndexerGrpcStep::CacheWorkerTxnDecoded => "[Indexer Cache] Decoded transactions.",
             IndexerGrpcStep::CacheWorkerTxnsProcessed => "[Indexer Cache] Processed transactions in a batch.",
             IndexerGrpcStep::CacheWorkerBatchProcessed => "[Indexer Cache] Successfully process current batch.",
             // Filestore worker steps

@@ -55,10 +55,7 @@ pub(crate) enum GrpcDataStatus {
     /// Ok status with processed count.
     /// Each batch may contain multiple data chunks(like 1000 transactions).
     /// These data chunks may be out of order.
-    ChunkDataOk {
-        start_version: u64,
-        num_of_transactions: u64,
-    },
+    ChunkDataOk { num_of_transactions: u64 },
     /// Init signal received with start version of current stream.
     /// No two `Init` signals will be sent in the same stream.
     StreamInit(u64),
@@ -169,6 +166,7 @@ impl Worker {
 async fn process_transactions_from_node_response(
     response: TransactionsFromNodeResponse,
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
+    batch_start_time: std::time::Instant,
 ) -> Result<GrpcDataStatus> {
     let size_in_bytes = response.encoded_len();
     match response.response.unwrap() {
@@ -192,7 +190,6 @@ async fn process_transactions_from_node_response(
             }
         },
         Response::Data(data) => {
-            let starting_time = std::time::Instant::now();
             let transaction_len = data.transactions.len();
             let first_transaction = data
                 .transactions
@@ -205,6 +202,20 @@ async fn process_transactions_from_node_response(
             let start_version = first_transaction.version;
             let first_transaction_pb_timestamp = first_transaction.timestamp.clone();
             let last_transaction_pb_timestamp = last_transaction.timestamp.clone();
+
+            log_grpc_step(
+                SERVICE_TYPE,
+                IndexerGrpcStep::CacheWorkerReceivedTxns,
+                Some(start_version as i64),
+                Some(last_transaction.version as i64),
+                first_transaction_pb_timestamp.as_ref(),
+                last_transaction_pb_timestamp.as_ref(),
+                Some(batch_start_time.elapsed().as_secs_f64()),
+                Some(size_in_bytes),
+                Some((last_transaction.version - first_transaction.version + 1) as i64),
+                None,
+            );
+
             let transactions = data
                 .transactions
                 .clone()
@@ -222,6 +233,19 @@ async fn process_transactions_from_node_response(
                 })
                 .collect::<Result<Vec<(u64, String, u64)>>>()?;
 
+            log_grpc_step(
+                SERVICE_TYPE,
+                IndexerGrpcStep::CacheWorkerTxnDecoded,
+                Some(start_version as i64),
+                Some(last_transaction.version as i64),
+                first_transaction_pb_timestamp.as_ref(),
+                last_transaction_pb_timestamp.as_ref(),
+                Some(batch_start_time.elapsed().as_secs_f64()),
+                Some(size_in_bytes),
+                Some((last_transaction.version - first_transaction.version + 1) as i64),
+                None,
+            );
+
             // Push to cache.
             match cache_operator.update_cache_transactions(transactions).await {
                 Ok(_) => {
@@ -232,7 +256,7 @@ async fn process_transactions_from_node_response(
                         Some(last_transaction.version as i64),
                         first_transaction_pb_timestamp.as_ref(),
                         last_transaction_pb_timestamp.as_ref(),
-                        Some(starting_time.elapsed().as_secs_f64()),
+                        Some(batch_start_time.elapsed().as_secs_f64()),
                         Some(size_in_bytes),
                         Some((last_transaction.version - first_transaction.version + 1) as i64),
                         None,
@@ -246,7 +270,6 @@ async fn process_transactions_from_node_response(
                 },
             }
             Ok(GrpcDataStatus::ChunkDataOk {
-                start_version,
                 num_of_transactions: transaction_len as u64,
             })
         },
@@ -320,7 +343,8 @@ async fn process_streaming_response(
         }
     }
     let mut current_version = starting_version;
-    let mut starting_time = std::time::Instant::now();
+    let mut batch_start_time = std::time::Instant::now();
+    let mut start_time = std::time::Instant::now();
 
     // 4. Process the streaming response.
     while let Some(received) = resp_stream.next().await {
@@ -342,10 +366,11 @@ async fn process_streaming_response(
 
         let size_in_bytes = received.encoded_len();
 
-        match process_transactions_from_node_response(received, &mut cache_operator).await {
+        match process_transactions_from_node_response(received, &mut cache_operator, start_time)
+            .await
+        {
             Ok(status) => match status {
                 GrpcDataStatus::ChunkDataOk {
-                    start_version,
                     num_of_transactions,
                 } => {
                     current_version += num_of_transactions;
@@ -356,11 +381,7 @@ async fn process_streaming_response(
                     // TODO: Reasses whether this metric useful
                     LATEST_PROCESSED_VERSION_OLD.set(current_version as i64);
                     PROCESSED_BATCH_SIZE.set(num_of_transactions as i64);
-                    info!(
-                        start_version = start_version,
-                        num_of_transactions = num_of_transactions,
-                        "[Indexer Cache] Data chunk received.",
-                    );
+                    start_time = std::time::Instant::now();
                 },
                 GrpcDataStatus::StreamInit(new_version) => {
                     error!(
@@ -403,12 +424,12 @@ async fn process_streaming_response(
                         Some((start_version + num_of_transactions - 1) as i64),
                         None,
                         None,
-                        Some(starting_time.elapsed().as_secs_f64()),
+                        Some(batch_start_time.elapsed().as_secs_f64()),
                         Some(size_in_bytes),
                         Some(num_of_transactions as i64),
                         None,
                     );
-                    starting_time = std::time::Instant::now();
+                    batch_start_time = std::time::Instant::now();
                 },
             },
             Err(e) => {
