@@ -56,11 +56,11 @@ fun ability::invalid_copy() {
      # live vars: $t2
   1: $t1 := pack ability::Impotent($t2)
      # live vars: $t1
-  2: $t0 := move($t1)
+  2: $t0 := copy($t1)
      # live vars: $t0
   3: $t3 := copy($t0)
      # live vars: $t0
-  4: $t4 := move($t0)
+  4: $t4 := copy($t0)
      # live vars:
   5: return ()
 }
@@ -128,7 +128,7 @@ fun ability::invalid_copy() {
      # local_to_label: {}
      # global_to_label: {}
      #
-  2: $t0 := move($t1)
+  2: $t0 := copy($t1)
      # live vars: $t0
      # graph: {}
      # local_to_label: {}
@@ -140,7 +140,7 @@ fun ability::invalid_copy() {
      # local_to_label: {}
      # global_to_label: {}
      #
-  4: $t4 := move($t0)
+  4: $t4 := copy($t0)
      # live vars:
      # graph: {}
      # local_to_label: {}
@@ -237,12 +237,14 @@ fun ability::invalid_copy() {
      var $t4: ability::Impotent
   0: $t2 := false
   1: $t1 := pack ability::Impotent($t2)
-  2: $t0 := move($t1)
-  3: $t3 := copy($t0)
-  4: destroy($t3)
-  5: $t4 := move($t0)
-  6: destroy($t4)
-  7: return ()
+  2: $t0 := copy($t1)
+  3: destroy($t1)
+  4: $t3 := copy($t0)
+  5: destroy($t3)
+  6: $t4 := copy($t0)
+  7: destroy($t0)
+  8: destroy($t4)
+  9: return ()
 }
 
 
@@ -327,6 +329,18 @@ error: no key ability
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: cannot copy
+   ┌─ tests/ability-checker/ability_violation.move:25:7
+   │
+25 │         let x = Impotent {};
+   │             ^
+
+error: cannot drop
+   ┌─ tests/ability-checker/ability_violation.move:25:7
+   │
+25 │         let x = Impotent {};
+   │             ^
+
+error: cannot copy
    ┌─ tests/ability-checker/ability_violation.move:26:4
    │
 26 │         (x, x);
@@ -337,6 +351,12 @@ error: cannot drop
    │
 26 │         (x, x);
    │          ^
+
+error: cannot copy
+   ┌─ tests/ability-checker/ability_violation.move:26:7
+   │
+26 │         (x, x);
+   │             ^
 
 error: cannot drop
    ┌─ tests/ability-checker/ability_violation.move:26:7
@@ -355,12 +375,14 @@ fun ability::invalid_copy() {
      var $t4: ability::Impotent
   0: $t2 := false
   1: $t1 := pack ability::Impotent($t2)
-  2: $t0 := move($t1)
-  3: $t3 := copy($t0)
-  4: destroy($t3)
-  5: $t4 := move($t0)
-  6: destroy($t4)
-  7: return ()
+  2: $t0 := copy($t1)
+  3: destroy($t1)
+  4: $t3 := copy($t0)
+  5: destroy($t3)
+  6: $t4 := copy($t0)
+  7: destroy($t0)
+  8: destroy($t4)
+  9: return ()
 }
 
 
