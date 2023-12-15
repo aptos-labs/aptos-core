@@ -426,6 +426,7 @@ impl TransactionWrite for WriteOp {
     }
 }
 
+#[allow(clippy::format_collect)]
 impl std::fmt::Debug for WriteOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

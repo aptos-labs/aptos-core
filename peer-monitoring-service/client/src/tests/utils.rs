@@ -1090,6 +1090,7 @@ pub async fn wait_for_node_info_request_failure(
     .await;
 }
 
+#[allow(clippy::await_holding_lock)] // This appears to be a false positive!
 /// Waits for the peer monitor state to be updated with
 /// the specified request failure.
 pub async fn wait_for_request_failure(
@@ -1126,6 +1127,7 @@ pub async fn wait_for_request_failure(
     .await;
 }
 
+#[allow(clippy::await_holding_lock)] // This appears to be a false positive!
 /// Waits for the peer monitor state to be updated with
 /// metadata after the given timestamp.
 pub async fn wait_for_peer_state_update(

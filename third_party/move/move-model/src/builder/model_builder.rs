@@ -236,10 +236,7 @@ impl<'env> ModelBuilder<'env> {
         entry: SpecOrBuiltinFunEntry,
     ) {
         // TODO: check whether overloads are distinguishable
-        self.spec_fun_table
-            .entry(name)
-            .or_insert_with(Vec::new)
-            .push(entry);
+        self.spec_fun_table.entry(name).or_default().push(entry);
     }
 
     /// Defines a spec variable.

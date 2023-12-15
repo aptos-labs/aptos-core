@@ -250,9 +250,7 @@ impl TransactionStore {
 
         self.clean_committed_transactions(&address, acc_seq_num);
 
-        self.transactions
-            .entry(address)
-            .or_insert_with(AccountTransactions::new);
+        self.transactions.entry(address).or_default();
 
         if let Some(txns) = self.transactions.get_mut(&address) {
             // capacity check
