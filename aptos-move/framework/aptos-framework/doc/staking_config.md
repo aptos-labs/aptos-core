@@ -27,6 +27,7 @@ Provides the configuration for staking and rewards
 -  [Function `validate_required_stake`](#0x1_staking_config_validate_required_stake)
 -  [Function `validate_rewards_config`](#0x1_staking_config_validate_rewards_config)
 -  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
     -  [Resource `StakingConfig`](#@Specification_1_StakingConfig)
     -  [Resource `StakingRewardsConfig`](#@Specification_1_StakingRewardsConfig)
     -  [Function `initialize`](#@Specification_1_initialize)
@@ -965,6 +966,77 @@ Can only be called as part of the Aptos governance proposal process established 
 
 
 
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Property</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>The ability to initialize the staking config and staking rewards resources, as well as the ability to update the staking config and staking rewards should only be available to the Aptos framework account.</td>
+<td>Medium</td>
+<td>The function initialize and initialize_rewards are used to initialize the StakingConfig and StakingRewardConfig resources. Updating the resources, can be done using the update_required_stake, update_recurring_lockup_duration_secs, update_rewards_rate, update_rewards_config, update_voting_power_increase_limit functions, which ensure that the signer is aptos_framework using the assert_aptos_framework function.</td>
+<td>Verified via <a href="#high-level-req-1.1">initialize</a>, <a href="#high-level-req-1.2">initialize_rewards</a>, <a href="#high-level-req-1.3">update_required_stake</a>, <a href="#high-level-req-1.4">update_recurring_lockup_duration_secs</a>, <a href="#high-level-req-1.5">update_rewards_rate</a>, <a href="#high-level-req-1.6">update_rewards_config</a>, and <a href="#high-level-req-1.7">update_voting_power_increase_limit</a>.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>The voting power increase, in a staking config resource, should always be greater than 0 and less or equal to 50.</td>
+<td>High</td>
+<td>During the initialization and update of the staking config, the value of voting_power_increase_limit is ensured to be in the range of (0 to 50].</td>
+<td>Verified via <a href="#high-level-req-2.1">initialize</a> and <a href="#high-level-req-2.2">update_voting_power_increase_limit</a>.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>The recurring lockup duration, in a staking config resource, should always be greater than 0.</td>
+<td>Medium</td>
+<td>During the initialization and update of the staking config, the value of recurring_lockup_duration_secs is ensured to be greater than 0.</td>
+<td>Verified via <a href="#high-level-req-3.1">initialize</a> and <a href="#high-level-req-3.2">update_recurring_lockup_duration_secs</a>.</td>
+</tr>
+
+<tr>
+<td>4</td>
+<td>The calculation of rewards should not be possible if the last reward rate period just started.</td>
+<td>High</td>
+<td>The function calculate_and_save_latest_rewards_config ensures that last_rewards_rate_period_start_in_secs is greater or equal to the current timestamp.</td>
+<td>Formally verified in <a href="#high-level-req-4">StakingRewardsConfigEnabledRequirement</a>.</td>
+</tr>
+
+<tr>
+<td>5</td>
+<td>The rewards rate should always be less than or equal to 100%.</td>
+<td>High</td>
+<td>When initializing and updating the rewards rate, it is ensured that the rewards_rate is less or equal to MAX_REWARDS_RATE, otherwise rewards rate will be negative.</td>
+<td>Verified via <a href="#high-level-req-5">StakingConfig</a>.</td>
+</tr>
+
+<tr>
+<td>6</td>
+<td>The reward rate's denominator should never be 0.</td>
+<td>High</td>
+<td>While initializing and updating the rewards rate, rewards_rate_denominator is ensured to be greater than 0.</td>
+<td>Verified via <a href="#high-level-req-6">StakingConfig</a>.</td>
+</tr>
+
+<tr>
+<td>7</td>
+<td>The reward rate's nominator and dominator ratio should always be less or equal to 1.</td>
+<td>High</td>
+<td>When initializing and updating the rewards rate, it is ensured that rewards_rate is less or equal to rewards_rate_denominator.</td>
+<td>Verified via <a href="#high-level-req-7">StakingConfig</a>.</td>
+</tr>
+
+</table>
+
+
+
+
 <pre><code><b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
 <b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
@@ -1029,8 +1101,11 @@ Can only be called as part of the Aptos governance proposal process established 
 
 
 
-<pre><code><b>invariant</b> rewards_rate &lt;= <a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">MAX_REWARDS_RATE</a>;
+<pre><code>// This enforces <a id="high-level-req-5" href="#high-level-req">high level requirement 5</a>:
+<b>invariant</b> rewards_rate &lt;= <a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">MAX_REWARDS_RATE</a>;
+// This enforces <a id="high-level-req-6" href="#high-level-req">high level requirement 6</a>:
 <b>invariant</b> rewards_rate_denominator &gt; 0;
+// This enforces <a id="high-level-req-7" href="#high-level-req">high level requirement 7</a>:
 <b>invariant</b> rewards_rate &lt;= rewards_rate_denominator;
 <b>invariant</b> recurring_lockup_duration_secs &gt; 0;
 <b>invariant</b> voting_power_increase_limit &gt; 0 && voting_power_increase_limit &lt;= 50;
@@ -1112,10 +1187,13 @@ StakingConfig does not exist under the aptos_framework before creating it.
 
 
 <pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+// This enforces <a id="high-level-req-1.1" href="#high-level-req">high level requirement 1</a>:
 <b>aborts_if</b> addr != @aptos_framework;
 <b>aborts_if</b> minimum_stake &gt; maximum_stake || maximum_stake &lt;= 0;
+// This enforces <a id="high-level-req-3.1" href="#high-level-req">high level requirement 3</a>:
 <b>aborts_if</b> recurring_lockup_duration_secs &lt;= 0;
 <b>aborts_if</b> rewards_rate_denominator &lt;= 0;
+// This enforces <a id="high-level-req-2.1" href="#high-level-req">high level requirement 2</a>:
 <b>aborts_if</b> voting_power_increase_limit &lt;= 0 || voting_power_increase_limit &gt; 50;
 <b>aborts_if</b> rewards_rate &gt; <a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">MAX_REWARDS_RATE</a>;
 <b>aborts_if</b> rewards_rate &gt; rewards_rate_denominator;
@@ -1142,6 +1220,7 @@ StakingRewardsConfig does not exist under the aptos_framework before creating it
 
 <pre><code><b>requires</b> <b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+// This enforces <a id="high-level-req-1.2" href="#high-level-req">high level requirement 1</a>:
 <b>aborts_if</b> addr != @aptos_framework;
 <b>aborts_if</b> last_rewards_rate_period_start_in_secs &gt; <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>();
 <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigValidationAbortsIf">StakingRewardsConfigValidationAbortsIf</a>;
@@ -1238,6 +1317,7 @@ The StakingConfig is under @aptos_framework.
 
 
 <pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+// This enforces <a id="high-level-req-1.3" href="#high-level-req">high level requirement 1</a>:
 <b>aborts_if</b> addr != @aptos_framework;
 <b>aborts_if</b> minimum_stake &gt; maximum_stake || maximum_stake &lt;= 0;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
@@ -1262,7 +1342,9 @@ The StakingConfig is under @aptos_framework.
 
 
 <pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+// This enforces <a id="high-level-req-1.4" href="#high-level-req">high level requirement 1</a>:
 <b>aborts_if</b> addr != @aptos_framework;
+// This enforces <a id="high-level-req-3.2" href="#high-level-req">high level requirement 3</a>:
 <b>aborts_if</b> new_recurring_lockup_duration_secs &lt;= 0;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
 <b>ensures</b> <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework).recurring_lockup_duration_secs == new_recurring_lockup_duration_secs;
@@ -1288,6 +1370,7 @@ rewards_rate/rewards_rate_denominator <= 1.
 
 <pre><code><b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>();
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+// This enforces <a id="high-level-req-1.5" href="#high-level-req">high level requirement 1</a>:
 <b>aborts_if</b> addr != @aptos_framework;
 <b>aborts_if</b> new_rewards_rate_denominator &lt;= 0;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
@@ -1315,6 +1398,7 @@ StakingRewardsConfig is under the @aptos_framework.
 
 <pre><code><b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">StakingRewardsConfigRequirement</a>;
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+// This enforces <a id="high-level-req-1.6" href="#high-level-req">high level requirement 1</a>:
 <b>aborts_if</b> addr != @aptos_framework;
 <b>aborts_if</b> <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework).rewards_rate_period_in_secs != rewards_rate_period_in_secs;
 <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigValidationAbortsIf">StakingRewardsConfigValidationAbortsIf</a>;
@@ -1343,7 +1427,9 @@ The StakingConfig is under @aptos_framework.
 
 
 <pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+// This enforces <a id="high-level-req-1.7" href="#high-level-req">high level requirement 1</a>:
 <b>aborts_if</b> addr != @aptos_framework;
+// This enforces <a id="high-level-req-2.2" href="#high-level-req">high level requirement 2</a>:
 <b>aborts_if</b> new_voting_power_increase_limit &lt;= 0 || new_voting_power_increase_limit &gt; 50;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
 <b>ensures</b> <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework).voting_power_increase_limit == new_voting_power_increase_limit;
@@ -1381,6 +1467,67 @@ Abort at any condition in StakingRewardsConfigValidationAborts.
 
 
 <pre><code><b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigValidationAbortsIf">StakingRewardsConfigValidationAbortsIf</a>;
+</code></pre>
+
+
+rewards_rate must be within [0, 1].
+min_rewards_rate must be not greater than rewards_rate.
+rewards_rate_period_in_secs must be greater than 0.
+rewards_rate_decrease_rate must be within [0,1].
+
+
+<a id="0x1_staking_config_StakingRewardsConfigValidationAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigValidationAbortsIf">StakingRewardsConfigValidationAbortsIf</a> {
+    rewards_rate: FixedPoint64;
+    min_rewards_rate: FixedPoint64;
+    rewards_rate_period_in_secs: u64;
+    rewards_rate_decrease_rate: FixedPoint64;
+    <b>aborts_if</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_greater">fixed_point64::spec_greater</a>(
+        rewards_rate,
+        <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_create_from_u128">fixed_point64::spec_create_from_u128</a>((1u128)));
+    <b>aborts_if</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_greater">fixed_point64::spec_greater</a>(min_rewards_rate, rewards_rate);
+    <b>aborts_if</b> rewards_rate_period_in_secs &lt;= 0;
+    <b>aborts_if</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_ceil">fixed_point64::spec_ceil</a>(rewards_rate_decrease_rate) &gt; 1;
+}
+</code></pre>
+
+
+
+
+<a id="0x1_staking_config_StakingRewardsConfigRequirement"></a>
+
+
+<pre><code><b>schema</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">StakingRewardsConfigRequirement</a> {
+    <b>requires</b> <b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
+    <b>include</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>() ==&gt; <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigEnabledRequirement">StakingRewardsConfigEnabledRequirement</a>;
+}
+</code></pre>
+
+
+
+
+<a id="0x1_staking_config_StakingRewardsConfigEnabledRequirement"></a>
+
+
+<pre><code><b>schema</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigEnabledRequirement">StakingRewardsConfigEnabledRequirement</a> {
+    <b>requires</b> <b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework);
+    <b>let</b> staking_rewards_config = <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework);
+    <b>let</b> rewards_rate = staking_rewards_config.rewards_rate;
+    <b>let</b> min_rewards_rate = staking_rewards_config.min_rewards_rate;
+    <b>let</b> rewards_rate_period_in_secs = staking_rewards_config.rewards_rate_period_in_secs;
+    <b>let</b> last_rewards_rate_period_start_in_secs = staking_rewards_config.last_rewards_rate_period_start_in_secs;
+    <b>let</b> rewards_rate_decrease_rate = staking_rewards_config.rewards_rate_decrease_rate;
+    <b>requires</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_less_or_equal">fixed_point64::spec_less_or_equal</a>(
+        rewards_rate,
+        <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_create_from_u128">fixed_point64::spec_create_from_u128</a>((1u128)));
+    <b>requires</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_less_or_equal">fixed_point64::spec_less_or_equal</a>(min_rewards_rate, rewards_rate);
+    <b>requires</b> rewards_rate_period_in_secs &gt; 0;
+    // This enforces <a id="high-level-req-4" href="#high-level-req">high level requirement 4</a>:
+    <b>requires</b> last_rewards_rate_period_start_in_secs &lt;= <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>();
+    <b>requires</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_ceil">fixed_point64::spec_ceil</a>(rewards_rate_decrease_rate) &lt;= 1;
+}
 </code></pre>
 
 
