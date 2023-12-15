@@ -30,3 +30,12 @@ pub static ERROR_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Number of metadata upload failures that file store has encountered.
+pub static METADATA_UPLOAD_FAILURE_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "indexer_grpc_file_store_metadata_upload_failures",
+        "Number of metadata upload failures that file store has encountered"
+    )
+    .unwrap()
+});

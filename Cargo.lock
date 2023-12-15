@@ -2128,6 +2128,7 @@ dependencies = [
  "base64 0.13.0",
  "clap 4.3.21",
  "cloud-storage",
+ "futures",
  "futures-util",
  "once_cell",
  "prost 0.12.1",
@@ -2234,35 +2235,6 @@ dependencies = [
  "tracing",
  "url",
  "warp",
-]
-
-[[package]]
-name = "aptos-indexer-grpc-post-processor"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "aptos-indexer-grpc-server-framework",
- "aptos-indexer-grpc-utils",
- "aptos-metrics-core",
- "aptos-protos 1.1.2",
- "aptos-runtimes",
- "async-trait",
- "backtrace",
- "base64 0.13.0",
- "chrono",
- "clap 4.3.21",
- "futures",
- "hostname",
- "once_cell",
- "prost 0.12.1",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "toml 0.7.4",
- "tonic 0.10.2",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]

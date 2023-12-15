@@ -3,7 +3,7 @@
 
 use crate::metrics::{
     ERROR_COUNT, LATEST_PROCESSED_VERSION as LATEST_PROCESSED_VERSION_OLD, PROCESSED_BATCH_SIZE,
-    PROCESSED_VERSIONS_COUNT,
+    PROCESSED_VERSIONS_COUNT, WAIT_FOR_FILE_STORE_COUNTER,
 };
 use anyhow::{bail, Context, Result};
 use aptos_indexer_grpc_utils::{
@@ -29,11 +29,14 @@ use url::Url;
 type ChainID = u32;
 type StartingVersion = u64;
 
-const GCS_LOOKUP_FREQUENCY_IN_SECS: u64 = 60;
-const FILE_STORE_VERSIONS_RESERVED: u64 = 30_000;
+const FILE_STORE_VERSIONS_RESERVED: u64 = 150_000;
 // Cache worker will wait if filestore is behind by
 // `FILE_STORE_VERSIONS_RESERVED` versions
-const CACHE_WORKER_WAIT_FOR_FILE_STORE_IN_SECS: u64 = 1;
+// This is pinging the cache so it's OK to be more aggressive
+const CACHE_WORKER_WAIT_FOR_FILE_STORE_MS: u64 = 100;
+// This is the time we wait for the file store to be ready. It should only be
+// kicked off when there's no metadata in the file store.
+const FILE_STORE_METADATA_WAIT_MS: u64 = 2000;
 
 const SERVICE_TYPE: &str = "cache_worker";
 
@@ -44,7 +47,6 @@ pub struct Worker {
     fullnode_grpc_address: Url,
     /// File store config
     file_store: IndexerGrpcFileStoreConfig,
-    enable_verbose_logging: bool,
 }
 
 /// GRPC data status enum is to identify the data frame.
@@ -73,7 +75,6 @@ impl Worker {
         fullnode_grpc_address: Url,
         redis_main_instance_address: RedisUrl,
         file_store: IndexerGrpcFileStoreConfig,
-        enable_verbose_logging: bool,
     ) -> Result<Self> {
         let redis_client = redis::Client::open(redis_main_instance_address.0.clone())
             .with_context(|| {
@@ -86,7 +87,6 @@ impl Worker {
             redis_client,
             file_store,
             fullnode_grpc_address,
-            enable_verbose_logging,
         })
     }
 
@@ -98,7 +98,8 @@ impl Worker {
     ///    * If metadata is not present and cache is not empty, crash.
     ///    * If metadata is present, start from file store version.
     /// 4. Process the streaming response.
-    // TODO: Use the ! return type when it is stable.
+    /// TODO: Use the ! return type when it is stable.
+    /// TODO: Rewrite logic to actually conform to this description
     pub async fn run(&mut self) -> Result<()> {
         // Re-connect if lost.
         loop {
@@ -123,12 +124,25 @@ impl Worker {
                     LocalFileStoreOperator::new(local_file_store.local_file_store_path.clone()),
                 ),
             };
-
+            // TODO: this is unnecessary
+            // TODO: move chain id check somewhere around here
             file_store_operator.verify_storage_bucket_existence().await;
-            let starting_version = file_store_operator
-                .get_starting_version()
-                .await
-                .unwrap_or(0);
+            // This ensures that metadata is created before we start the cache worker
+            let mut starting_version = file_store_operator.get_latest_version().await;
+            while starting_version.is_none() {
+                starting_version = file_store_operator.get_latest_version().await;
+                tracing::warn!(
+                    "[Indexer Cache] File store metadata not found. Waiting for {} ms.",
+                    FILE_STORE_METADATA_WAIT_MS
+                );
+                tokio::time::sleep(std::time::Duration::from_millis(
+                    FILE_STORE_METADATA_WAIT_MS,
+                ))
+                .await;
+            }
+
+            // There's a guarantee at this point that starting_version is not null
+            let starting_version = starting_version.unwrap();
 
             let file_store_metadata = file_store_operator.get_file_store_metadata().await;
 
@@ -149,14 +163,7 @@ impl Worker {
                 })?;
 
             // 3&4. Infinite streaming until error happens. Either stream ends or worker crashes.
-            process_streaming_response(
-                conn,
-                file_store_metadata,
-                file_store_operator,
-                response.into_inner(),
-                self.enable_verbose_logging,
-            )
-            .await?;
+            process_streaming_response(conn, file_store_metadata, response.into_inner()).await?;
         }
     }
 }
@@ -164,7 +171,6 @@ impl Worker {
 async fn process_transactions_from_node_response(
     response: TransactionsFromNodeResponse,
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
-    enable_verbose_logging: bool,
 ) -> Result<GrpcDataStatus> {
     let size_in_bytes = response.encoded_len();
     match response.response.unwrap() {
@@ -224,7 +230,6 @@ async fn process_transactions_from_node_response(
                     log_grpc_step(
                         SERVICE_TYPE,
                         IndexerGrpcStep::CacheWorkerTxnsProcessed,
-                        enable_verbose_logging,
                         Some(first_transaction.version as i64),
                         Some(last_transaction.version as i64),
                         first_transaction_pb_timestamp.as_ref(),
@@ -250,7 +255,7 @@ async fn process_transactions_from_node_response(
     }
 }
 
-/// Setup the cache operator with init signal, includeing chain id and starting version from fullnode.
+//// Setup the cache operator with init signal, includeing chain id and starting version from fullnode.
 async fn setup_cache_with_init_signal(
     conn: redis::aio::ConnectionManager,
     init_signal: TransactionsFromNodeResponse,
@@ -288,14 +293,12 @@ async fn setup_cache_with_init_signal(
     Ok((cache_operator, fullnode_chain_id, starting_version))
 }
 
-// Infinite streaming processing. Retry if error happens; crash if fatal.
+/// Infinite streaming processing. Retry if error happens; crash if fatal.
 async fn process_streaming_response(
     conn: redis::aio::ConnectionManager,
     file_store_metadata: Option<FileStoreMetadata>,
-    file_store_operator: Box<dyn FileStoreOperator>,
     mut resp_stream: impl futures_core::Stream<Item = Result<TransactionsFromNodeResponse, tonic::Status>>
         + std::marker::Unpin,
-    enable_verbose_logging: bool,
 ) -> Result<()> {
     let mut tps_calculator = MovingAverage::new(10_000);
     let mut transaction_count = 0;
@@ -321,7 +324,6 @@ async fn process_streaming_response(
     }
     let mut current_version = starting_version;
     let mut starting_time = std::time::Instant::now();
-    let mut last_file_update_check_timestamp = std::time::Instant::now();
 
     // 4. Process the streaming response.
     while let Some(received) = resp_stream.next().await {
@@ -343,13 +345,7 @@ async fn process_streaming_response(
 
         let size_in_bytes = received.encoded_len();
 
-        match process_transactions_from_node_response(
-            received,
-            &mut cache_operator,
-            enable_verbose_logging,
-        )
-        .await
-        {
+        match process_transactions_from_node_response(received, &mut cache_operator).await {
             Ok(status) => match status {
                 GrpcDataStatus::ChunkDataOk {
                     start_version,
@@ -406,7 +402,6 @@ async fn process_streaming_response(
                     log_grpc_step(
                         SERVICE_TYPE,
                         IndexerGrpcStep::CacheWorkerBatchProcessed,
-                        enable_verbose_logging,
                         Some(start_version as i64),
                         Some((start_version + num_of_transactions - 1) as i64),
                         None,
@@ -432,23 +427,27 @@ async fn process_streaming_response(
             },
         }
 
-        // Check if the file store has been updated.
-        if last_file_update_check_timestamp.elapsed().as_secs() >= GCS_LOOKUP_FREQUENCY_IN_SECS {
-            let file_store_metadata = file_store_operator.get_file_store_metadata().await;
-            if let Some(file_store_metadata) = file_store_metadata {
-                if file_store_metadata.version + FILE_STORE_VERSIONS_RESERVED < current_version {
-                    tokio::time::sleep(std::time::Duration::from_secs(
-                        CACHE_WORKER_WAIT_FOR_FILE_STORE_IN_SECS,
-                    ))
-                    .await;
-                    tracing::warn!(
-                        current_version = current_version,
-                        file_store_version = file_store_metadata.version,
-                        "[Indexer Cache] File store version is behind current version too much."
-                    );
-                }
+        // Check if the file store isn't too far away
+        loop {
+            let file_store_version = cache_operator
+                .get_file_store_latest_version()
+                .await
+                .unwrap();
+            if file_store_version + FILE_STORE_VERSIONS_RESERVED < current_version {
+                tokio::time::sleep(std::time::Duration::from_millis(
+                    CACHE_WORKER_WAIT_FOR_FILE_STORE_MS,
+                ))
+                .await;
+                tracing::warn!(
+                    current_version = current_version,
+                    file_store_version = file_store_version,
+                    "[Indexer Cache] File store version is behind current version too much."
+                );
+                WAIT_FOR_FILE_STORE_COUNTER.inc();
+            } else {
+                // File store is up to date, continue cache update.
+                break;
             }
-            last_file_update_check_timestamp = std::time::Instant::now();
         }
     }
 
