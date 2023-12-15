@@ -107,6 +107,7 @@ or if their stake drops below the min required, they would get removed at the en
 -  [Function `is_allowed`](#0x1_stake_is_allowed)
 -  [Function `assert_owner_cap_exists`](#0x1_stake_assert_owner_cap_exists)
 -  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
     -  [Resource `ValidatorSet`](#@Specification_1_ValidatorSet)
     -  [Function `initialize_validator_fees`](#@Specification_1_initialize_validator_fees)
     -  [Function `add_transaction_fee`](#@Specification_1_add_transaction_fee)
@@ -3596,6 +3597,53 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Property</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>The validator set resource stores consensus information for each validator. The consensus scheme remains consistent across all validators within the set.</td>
+<td>Low</td>
+<td>The consensus_scheme attribute within ValidatorSet initializes with the value zero during the module's initialization and its value remains unchanged afterward.</td>
+<td>Formally verified by the data invariant of <a href="#high-level-req-1">ValidatorSet</a>.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>The owner of a validator is immutable.</td>
+<td>Low</td>
+<td>During the initialization of a validator, the owner attribute becomes the signer's address. This assignment establishes the signer as the owner and controller of the validator entity. Subsequently, the owner attribute remains unchanged throughout the validator's lifespan, maintaining its assigned value without any modifications.</td>
+<td>Formally verified in the schema <a href="#high-level-req-2">ValidatorOwnerNoChange</a>.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>The total staked value in the stake pool should remain constant, excluding operations related to adding and withdrawing.</td>
+<td>Low</td>
+<td>The total staked value (AptosCoin) of a stake pool is grouped by: active, inactive, pending_active, and pending_inactive. The stake value remains constant except during the execution of the add_stake_with_cap or withdraw_with_cap functions or on_new_epoch (which distributes the reward).</td>
+<td>Formally specified in the schema <a href="#high-level-req-3">StakedValueNoChange</a>.</td>
+</tr>
+
+<tr>
+<td>4</td>
+<td>During each epoch, the following operations should be consistently performed without aborting: rewards distribution, validator activation/deactivation, updates to validator sets and voting power, and renewal of lockups.</td>
+<td>Low</td>
+<td>The on_new_epoch function is triggered at each epoch boundary to perform distribution of the transaction fee, updates to active/inactive stakes, updates to pending active/inactive validators and adjusts voting power of the validators without aborting.</td>
+<td>Formally verified via <a href="#high-level-req-4">on_new_epoch</a>. This also requires a manual review to verify the state updates of the stake pool.</td>
+</tr>
+
+</table>
+
+
+
+
 <pre><code><b>invariant</b> [suspendable] <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework) ==&gt; <a href="stake.md#0x1_stake_validator_set_is_valid">validator_set_is_valid</a>();
 <b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="stake.md#0x1_stake_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework);
 <b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>&gt;(@aptos_framework);
@@ -3660,7 +3708,8 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<pre><code><b>invariant</b> consensus_scheme == 0;
+<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
+<b>invariant</b> consensus_scheme == 0;
 </code></pre>
 
 
@@ -3670,6 +3719,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 <pre><code><b>schema</b> <a href="stake.md#0x1_stake_ValidatorOwnerNoChange">ValidatorOwnerNoChange</a> {
+    // This enforces <a id="high-level-req-2" href="#high-level-req">high level requirement 2</a>:
     <b>ensures</b> <b>forall</b> addr: <b>address</b> <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">OwnerCapability</a>&gt;(addr)):
         <b>old</b>(<b>global</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">OwnerCapability</a>&gt;(addr)).pool_address == <b>global</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">OwnerCapability</a>&gt;(addr).pool_address;
 }
@@ -3685,6 +3735,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
     pool_address: <b>address</b>;
     <b>let</b> stake_pool = <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(pool_address);
     <b>let</b> <b>post</b> post_stake_pool = <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(pool_address);
+    // This enforces <a id="high-level-req-3" href="#high-level-req">high level requirement 3</a>:
     <b>ensures</b> stake_pool.active.value + stake_pool.inactive.value + stake_pool.pending_active.value + stake_pool.pending_inactive.value ==
         post_stake_pool.active.value + post_stake_pool.inactive.value + post_stake_pool.pending_active.value + post_stake_pool.pending_inactive.value;
 }
@@ -4316,6 +4367,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 <b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">ResourceRequirement</a>;
 <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;
 <b>include</b> aptos_framework::aptos_coin::ExistsAptosCoin;
+// This enforces <a id="high-level-req-4" href="#high-level-req">high level requirement 4</a>:
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 
