@@ -620,6 +620,7 @@ impl TxnEmitter {
         };
         let (txn_generator_creator, _, _) = create_txn_generator_creator(
             &req.transaction_mix_per_phase,
+            root_account,
             &mut all_accounts,
             vec![],
             &txn_executor,

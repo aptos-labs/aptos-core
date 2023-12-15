@@ -177,7 +177,7 @@ impl TransactionGenerator {
 
     pub fn new_with_existing_db<P: AsRef<Path>>(
         db: DbReaderWriter,
-        genesis_key: Ed25519PrivateKey,
+        root_account: LocalAccount,
         block_sender: mpsc::SyncSender<Vec<Transaction>>,
         db_dir: P,
         num_main_signer_accounts: Option<usize>,
@@ -187,11 +187,7 @@ impl TransactionGenerator {
 
         Self {
             seed_accounts_cache: None,
-            root_account: LocalAccount::new(
-                aptos_test_root_address(),
-                genesis_key,
-                get_sequence_number(aptos_test_root_address(), db.reader.clone()),
-            ),
+            root_account,
             main_signer_accounts: num_main_signer_accounts.map(|num_main_signer_accounts| {
                 let num_cached_accounts =
                     std::cmp::min(num_existing_accounts, num_main_signer_accounts);
@@ -236,6 +232,14 @@ impl TransactionGenerator {
             let TestCase::P2p(P2pTestCase { num_accounts }) = test_case;
             num_accounts
         })
+    }
+
+    pub fn read_root_account(genesis_key: Ed25519PrivateKey, db: &DbReaderWriter) -> LocalAccount {
+        LocalAccount::new(
+            aptos_test_root_address(),
+            genesis_key,
+            get_sequence_number(aptos_test_root_address(), db.reader.clone()),
+        )
     }
 
     pub fn num_existing_accounts(&self) -> usize {
@@ -319,12 +323,10 @@ impl TransactionGenerator {
                             RefCell::new(transaction_generators.lock().unwrap().pop().unwrap())
                         })
                         .borrow_mut();
-                    Transaction::UserTransaction(
-                        transaction_generator
-                            .generate_transactions(sender, 1)
-                            .pop()
-                            .unwrap(),
-                    )
+                    transaction_generator
+                        .generate_transactions(sender, 1)
+                        .pop()
+                        .map(Transaction::UserTransaction)
                 },
                 |sender_idx| *sender_idx,
             );
@@ -422,7 +424,7 @@ impl TransactionGenerator {
                                 init_account_balance,
                             ),
                     );
-                    Transaction::UserTransaction(txn)
+                    Some(Transaction::UserTransaction(txn))
                 },
                 |(sender_idx, _)| *sender_idx,
             );
@@ -617,7 +619,7 @@ impl TransactionGenerator {
                     self.transaction_factory
                         .transfer(account_cache.accounts[receiver_idx].address(), 1),
                 );
-                Transaction::UserTransaction(txn)
+                Some(Transaction::UserTransaction(txn))
             },
             |(sender_idx, _)| *sender_idx,
         );
@@ -631,7 +633,7 @@ impl TransactionGenerator {
         sender_func: S,
     ) where
         T: Send,
-        F: Fn(T, &AccountCache) -> Transaction + Send + Sync,
+        F: Fn(T, &AccountCache) -> Option<Transaction> + Send + Sync,
         S: Fn(&T) -> usize,
     {
         let _timer = TIMER.with_label_values(&["generate_block"]).start_timer();
@@ -648,7 +650,9 @@ impl TransactionGenerator {
                 let tx = tx.clone();
                 scope.spawn(move |_| {
                     for (index, job) in per_worker_jobs {
-                        tx.send((index, job())).unwrap();
+                        if let Some(txn) = job() {
+                            tx.send((index, txn)).unwrap();
+                        }
                     }
                 });
             }
@@ -661,7 +665,9 @@ impl TransactionGenerator {
 
         let mut transactions = Vec::new();
         for i in 0..block_size {
-            transactions.push(transactions_by_index.get(&i).unwrap().clone());
+            if let Some(txn) = transactions_by_index.get(&i) {
+                transactions.push(txn.clone());
+            }
         }
 
         NUM_TXNS
