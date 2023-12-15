@@ -114,9 +114,9 @@ pub static LATEST_PROCESSED_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 /// Transactions' total size in bytes at each step
-pub static TOTAL_SIZE_IN_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!(
-        "indexer_grpc_total_size_in_bytes",
+pub static TOTAL_SIZE_IN_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_grpc_total_size_in_bytes_v2",
         "Total size in bytes at this step",
         &["service_type", "step", "message"],
     )
@@ -191,7 +191,7 @@ pub fn log_grpc_step(
     if let Some(size_in_bytes) = size_in_bytes {
         TOTAL_SIZE_IN_BYTES
             .with_label_values(&[service_type, step.get_step(), step.get_label()])
-            .set(size_in_bytes as i64);
+            .inc_by(size_in_bytes as u64);
     }
 
     let start_txn_timestamp_iso = start_version_timestamp.map(timestamp_to_iso);
