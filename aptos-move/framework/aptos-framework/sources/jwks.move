@@ -137,7 +137,7 @@ module aptos_framework::jwks {
 
     //
     // Structs end.
-    // Public functions begin.
+    // Functions begin.
     //
 
     /// Initialize some JWK resources. Should only be invoked by genesis.
@@ -193,11 +193,6 @@ module aptos_framework::jwks {
         *borrow_global_mut<JWKConsensusConfig>(@aptos_framework) = config;
     }
 
-    //
-    // Public functions end.
-    // Private functions begin.
-    //
-
     /// Update the JWK set. Should only be invoked by validator transactions/governance proposals.
     public fun update_onchain_jwk_map(account: signer, epoch: u64, version: u64, jwk_map: JWKMap) acquires OnChainJWKMap {
         system_addresses::assert_aptos_framework(&account);
@@ -251,7 +246,7 @@ module aptos_framework::jwks {
     }
 
     //
-    // Private functions end.
+    // Functions end.
     // Tests begin.
     //
 
