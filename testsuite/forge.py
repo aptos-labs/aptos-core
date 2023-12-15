@@ -444,7 +444,7 @@ def get_humio_link_for_node_logs(
         f"$forgeLogs(validator_instance=*) |\n"
         f'    "k8s.namespace" = "{forge_namespace}" // filters on namespace which contains validator logs\n'
         f"   OR  // remove either side of the OR operator to only display validator or forge-runner logs\n"
-        f'    "k8s.labels.forge-namespace" = "{forge_namespace}" // filters on specific forge-runner pod in default namespace\n'
+        f'    "(k8s.namespace=default AND k8s.labels.forge-namespace" = "{forge_namespace}") // filters on specific forge-runner pod in default namespace\n'
     )
     columns = [
         {

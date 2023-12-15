@@ -91,5 +91,5 @@
     "typescript": "5.3.3",
     "webpack": "^5.89.0"
   },
-  "version": "1.20.0"
+  "version": "1.21.0"
 }

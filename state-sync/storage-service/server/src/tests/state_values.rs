@@ -295,7 +295,7 @@ async fn get_states_with_proof_network_limit(network_limit_bytes: u64) {
         // Verify the response adheres to the network limits
         match response.get_data_response().unwrap() {
             DataResponse::StateValueChunkWithProof(state_value_chunk_with_proof) => {
-                let num_response_bytes = bcs::to_bytes(&response).unwrap().len() as u64;
+                let num_response_bytes = bcs::serialized_size(&response).unwrap() as u64;
                 let num_state_values = state_value_chunk_with_proof.raw_values.len() as u64;
                 if num_response_bytes > network_limit_bytes {
                     assert_eq!(num_state_values, 1); // Data cannot be reduced more than a single item

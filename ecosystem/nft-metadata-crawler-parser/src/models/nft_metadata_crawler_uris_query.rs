@@ -10,6 +10,7 @@ use diesel::{
 };
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use tracing::error;
 
 #[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
 #[diesel(primary_key(asset_uri))]
@@ -45,7 +46,10 @@ impl NFTMetadataCrawlerURIsQuery {
             ..Default::default()
         };
 
-        retry(backoff, &mut op).expect("Querying asset_uri should not fail")
+        retry(backoff, &mut op).unwrap_or_else(|e| {
+            error!(asset_uri = asset_uri, error=?e, "Failed to get_by_asset_uri");
+            None
+        })
     }
 
     pub fn get_by_raw_image_uri(
@@ -67,7 +71,10 @@ impl NFTMetadataCrawlerURIsQuery {
             ..Default::default()
         };
 
-        retry(backoff, &mut op).expect("Querying raw_image_uri should not fail")
+        retry(backoff, &mut op).unwrap_or_else(|e| {
+            error!(asset_uri = asset_uri, error=?e, "Failed to get_by_raw_image_uri");
+            None
+        })
     }
 
     pub fn get_by_raw_animation_uri(
@@ -89,6 +96,9 @@ impl NFTMetadataCrawlerURIsQuery {
             ..Default::default()
         };
 
-        retry(backoff, &mut op).expect("Querying raw_animation_uri should not fail")
+        retry(backoff, &mut op).unwrap_or_else(|e| {
+            error!(asset_uri = asset_uri, error=?e, "Failed to get_by_raw_animation_uri");
+            None
+        })
     }
 }

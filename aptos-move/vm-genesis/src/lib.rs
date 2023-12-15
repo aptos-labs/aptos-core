@@ -436,11 +436,12 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::SAFER_RESOURCE_GROUPS,
         FeatureFlag::SAFER_METADATA,
         FeatureFlag::SINGLE_SENDER_AUTHENTICATOR,
-        FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION,
+        FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
         FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
         FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
         FeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
         FeatureFlag::BN254_STRUCTURES,
+        FeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL,
     ]
 }
 

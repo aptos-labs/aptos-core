@@ -469,7 +469,7 @@ fn test_transactions_with_byte_limit(
     // Continue to add transactions to the batch until we hit the byte limit
     loop {
         let transaction = test_transaction(sequence_number);
-        let transaction_bytes = bcs::to_bytes(&transaction).unwrap().len();
+        let transaction_bytes = bcs::serialized_size(&transaction).unwrap();
         if (byte_count + transaction_bytes) < byte_limit {
             transactions.push(transaction);
             byte_count += transaction_bytes;

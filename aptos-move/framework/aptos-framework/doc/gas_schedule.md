@@ -15,7 +15,6 @@ it costs to execute Move on the network.
 -  [Function `set_gas_schedule`](#0x1_gas_schedule_set_gas_schedule)
 -  [Function `set_storage_gas_config`](#0x1_gas_schedule_set_storage_gas_config)
 -  [Specification](#@Specification_1)
-    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `set_gas_schedule`](#@Specification_1_set_gas_schedule)
     -  [Function `set_storage_gas_config`](#@Specification_1_set_storage_gas_config)
@@ -255,11 +254,6 @@ This can be called by on-chain governance to update the gas schedule.
 <a id="@Specification_1"></a>
 
 ## Specification
-
-
-<a id="@Module-level_Specification_2"></a>
-
-### Module-level Specification
 
 
 

@@ -43,7 +43,7 @@ impl StorageGasParameters {
         Self {
             io_pricing: IoPricing::V3(IoPricingV3 {
                 feature_version: LATEST_GAS_FEATURE_VERSION,
-                free_write_bytes_quota,
+                legacy_free_write_bytes_quota: free_write_bytes_quota,
             }),
             space_pricing: DiskSpacePricing::v1(),
             change_set_configs: ChangeSetConfigs::unlimited_at_gas_feature_version(

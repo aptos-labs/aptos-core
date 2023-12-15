@@ -20,17 +20,14 @@ use std::{
 // Useful constants
 const ERROR_LOG_FREQ_SECS: u64 = 3;
 
-/// Chooses a peer with the lowest distance from the validator set weighted by
-/// latency (from the given set of peers). We prioritize distance over latency
-/// as we want to avoid close but not up-to-date peers.
-///
-/// Peer selection is done by: (i) identifying all peers with the same lowest
-/// distance; and (ii) selecting a single peer weighted by latencies (i.e.,
-/// the lower the latency, the higher the probability of selection).
-pub fn choose_random_peer_by_distance_and_latency(
+/// Chooses peers weighted by distance from the validator set
+/// and latency. We prioritize distance over latency as we want
+/// to avoid close but not up-to-date peers.
+pub fn choose_random_peers_by_distance_and_latency(
     peers: HashSet<PeerNetworkId>,
     peers_and_metadata: Arc<PeersAndMetadata>,
-) -> Option<PeerNetworkId> {
+    num_peers_to_choose: usize,
+) -> HashSet<PeerNetworkId> {
     // Group peers and latency weights by validator distance, i.e., distance -> [(peer, latency weight)]
     let mut peers_and_latencies_by_distance = BTreeMap::new();
     for peer in peers {
@@ -45,15 +42,25 @@ pub fn choose_random_peer_by_distance_and_latency(
         }
     }
 
-    // Find the peers with the lowest distance and select a single peer.
-    // Note: BTreeMaps are sorted by key, so the first entry will be for the lowest distance.
-    if let Some((_, peers_and_latencies)) = peers_and_latencies_by_distance.into_iter().next() {
-        let random_peer_by_latency = choose_random_peers_by_weight(1, peers_and_latencies);
-        return random_peer_by_latency.into_iter().next(); // Return the randomly selected peer
+    // Select the peers by distance and latency weights. Note: BTreeMaps are
+    // sorted by key, so the entries will be sorted by distance in ascending order.
+    let mut selected_peers = HashSet::new();
+    for (_, peers_and_latencies) in peers_and_latencies_by_distance {
+        // Select the peers by latency weights
+        let num_peers_remaining = num_peers_to_choose.saturating_sub(selected_peers.len()) as u64;
+        let peers = choose_random_peers_by_weight(num_peers_remaining, peers_and_latencies);
+
+        // Add the peers to the entire set
+        selected_peers.extend(peers);
+
+        // If we have selected enough peers, return early
+        if selected_peers.len() >= num_peers_to_choose {
+            return selected_peers;
+        }
     }
 
-    // Otherwise, no peer was selected
-    None
+    // Return the selected peers
+    selected_peers
 }
 
 /// Selects the specified number of peers from the list of potential
@@ -120,12 +127,12 @@ pub fn choose_random_peer(peers: HashSet<PeerNetworkId>) -> Option<PeerNetworkId
 
 /// Selects a set of peers randomly from the list of specified peers
 pub fn choose_random_peers(
-    num_peers_to_choose: u64,
+    num_peers_to_choose: usize,
     peers: HashSet<PeerNetworkId>,
 ) -> HashSet<PeerNetworkId> {
     let random_peers = peers
         .into_iter()
-        .choose_multiple(&mut rand::thread_rng(), num_peers_to_choose as usize);
+        .choose_multiple(&mut rand::thread_rng(), num_peers_to_choose);
     random_peers.into_iter().collect()
 }
 
@@ -173,6 +180,30 @@ fn convert_latency_to_weight(latency: f64) -> f64 {
 
     // Otherwise, invert the latency to get the weight
     1000.0 / latency
+}
+
+/// If the number of selected peers is less than the number of required peers,
+/// select remaining peers from the serviceable peers (at random).
+pub fn extend_with_random_peers(
+    mut selected_peers: HashSet<PeerNetworkId>,
+    serviceable_peers: HashSet<PeerNetworkId>,
+    num_required_peers: usize,
+) -> HashSet<PeerNetworkId> {
+    if selected_peers.len() < num_required_peers {
+        // Randomly select the remaining peers
+        let num_remaining_peers = num_required_peers.saturating_sub(selected_peers.len());
+        let remaining_serviceable_peers = serviceable_peers
+            .difference(&selected_peers)
+            .cloned()
+            .collect();
+        let remaining_peers = choose_random_peers(num_remaining_peers, remaining_serviceable_peers);
+
+        // Add the remaining peers to the selected peers
+        selected_peers.extend(remaining_peers);
+    }
+
+    // Return the selected peers
+    selected_peers
 }
 
 /// Gets the latency for the specified peer from the peer monitoring metadata
