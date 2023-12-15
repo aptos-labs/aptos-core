@@ -391,7 +391,7 @@ impl<'env> ModelBuilder<'env> {
     }
 
     /// returns the type parameter kinds and the abilities of the struct
-    fn get_abilities(&self, mid: ModuleId, sid: StructId) -> (Vec<TypeParameterKind>, AbilitySet) {
+    fn get_struct_sig(&self, mid: ModuleId, sid: StructId) -> (Vec<TypeParameterKind>, AbilitySet) {
         let struct_entry = self.lookup_struct_entry(mid.qualified(sid));
         let struct_abilities = struct_entry.abilities;
         let ty_param_kinds = struct_entry
@@ -402,10 +402,10 @@ impl<'env> ModelBuilder<'env> {
         (ty_param_kinds, struct_abilities)
     }
 
-    fn gen_get_abilities(
+    fn gen_get_struct_sig(
         &self,
     ) -> impl Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy + '_ {
-        |mid, sid| self.get_abilities(mid, sid)
+        |mid, sid| self.get_struct_sig(mid, sid)
     }
 
     /// Specialized `ty::infer_and_check_abilities`
@@ -420,7 +420,7 @@ impl<'env> ModelBuilder<'env> {
                     panic!("ICE unbound type parameter")
                 }
             },
-            self.gen_get_abilities(),
+            self.gen_get_struct_sig(),
             loc,
             |loc, err| self.error(loc, err),
         );
@@ -430,7 +430,7 @@ impl<'env> ModelBuilder<'env> {
     /// if all type params have all abilities.
     pub fn infer_abilities_may_have(&self, ty: &Type) -> AbilitySet {
         // since all type params have all abilities, it doesn't matter whether it's phantom or not
-        infer_abilities(ty, |_| TypeParameterKind { abilities: AbilitySet::ALL, is_phantom: false }, self.gen_get_abilities())
+        infer_abilities(ty, |_| TypeParameterKind { abilities: AbilitySet::ALL, is_phantom: false }, self.gen_get_struct_sig())
     }
 
     /// Checks whether a struct is well defined.

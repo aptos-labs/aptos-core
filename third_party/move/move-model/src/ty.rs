@@ -2127,18 +2127,18 @@ impl fmt::Display for PrimitiveType {
 
 /// Infers the abilities of a struct type given
 /// `struct_abilities`: the declared abilities of a struct
-/// `ty_args_abilities_meet`: the meet of the abilities of the type arguments
+/// `non_phantom_ty_args_abilities_meet`: the meet of the abilities of the non-phantom type arguments
 pub fn instantiate_abilities(
     struct_abilities: AbilitySet,
-    ty_args_abilities_meet: AbilitySet,
+    non_phantom_ty_args_abilities_meet: AbilitySet,
 ) -> AbilitySet {
-    let intersects = struct_abilities.intersect(ty_args_abilities_meet);
+    let intersects = struct_abilities.intersect(non_phantom_ty_args_abilities_meet);
     // a struct has copy/drop/store if it's declared with the ability
     // and all it's fields have the ability
     // a struct has key if it's declared with key
     // and all fields have store
     if struct_abilities.has_ability(Ability::Key)
-        && ty_args_abilities_meet.has_ability(Ability::Store)
+        && non_phantom_ty_args_abilities_meet.has_ability(Ability::Store)
     {
         intersects.add(Ability::Key)
     } else {
@@ -2147,13 +2147,13 @@ pub fn instantiate_abilities(
 }
 
 /// Checks whether the given type is a phantom type parameter
-/// `ty_param_abilities` specifies the abilities and phantomness of the type parameters
-pub fn is_phantom_type_arg<F>(ty_param_abilities: F, ty: &Type) -> bool
+/// `ty_param_kinds` specifies the abilities and phantomness of the type parameters
+pub fn is_phantom_type_arg<F>(ty_param_kinds: F, ty: &Type) -> bool
 where
     F: Fn(u16) -> TypeParameterKind
 {
     if let Type::TypeParameter(i) = ty {
-        ty_param_abilities(*i).is_phantom
+        ty_param_kinds(*i).is_phantom
     } else {
         false
     }
@@ -2165,8 +2165,8 @@ pub fn check_struct_inst<F, G, H>(
     mid: ModuleId,
     sid: StructId,
     ty_args: &[Type],
-    ty_param_abilities: F,
-    get_abilities: G,
+    get_ty_param_kinds: F,
+    get_struct_sig: G,
     on_err: Option<(&Loc, H)>,
 ) -> AbilitySet
 where
@@ -2174,20 +2174,20 @@ where
     G: Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy,
     H: Fn(&Loc, &str) + Copy,
 {
-    let (ty_params, struct_abilities) = get_abilities(mid, sid);
+    let (ty_params, struct_abilities) = get_struct_sig(mid, sid);
     let ty_args_abilities_meet = ty_args
         .iter()
         .zip(ty_params)
         .map(|(ty_arg, TypeParameterKind { abilities: constraints, is_phantom: is_phantom_position })| {
             let ty_arg_abilities =
-                infer_abilities_opt_check(ty_arg, ty_param_abilities, get_abilities, on_err);
+                infer_abilities_opt_check(ty_arg, get_ty_param_kinds, get_struct_sig, on_err);
             if let Some((loc, on_err)) = on_err {
                 // check ability constraints on the type param
                 if !constraints.is_subset(ty_arg_abilities) {
                     on_err(loc, "Invalid instantiation")
                 }
                 // check phantomness of the type param
-                if !is_phantom_position && is_phantom_type_arg(ty_param_abilities, ty_arg) {
+                if !is_phantom_position && is_phantom_type_arg(get_ty_param_kinds, ty_arg) {
                     on_err(loc, "Not a phantom position")
                 }
             }
@@ -2206,13 +2206,14 @@ where
 /// If `on_err` is not None, then checks for type
 /// - the type arguments given to the struct are instantiated properly
 /// - the type arguments satisfy the ability constraints defined on the struct generics
-/// `ty_param_abilities` specify the abilities and phantomness of type parameters
-/// `get_abilities` returns the type parameters and the abilities of the struct
+/// - phantom types arguments are fed into non-phantom positions
+/// `get_ty_param_kinds` specify the abilities and phantomness of type parameters
+/// `get_struct_sig` returns the type parameter kinds and the abilities of the struct
 /// `on_err` contains a location, and a function for err handling
 pub fn infer_abilities_opt_check<F, G, H>(
     ty: &Type,
-    ty_param_abilities: F,
-    get_abilities: G,
+    get_ty_param_kinds: F,
+    get_struct_sig: G,
     on_err: Option<(&Loc, H)>,
 ) -> AbilitySet
 where
@@ -2237,19 +2238,19 @@ where
         },
         Type::Vector(et) => AbilitySet::VECTOR.intersect(infer_abilities_opt_check(
             et,
-            ty_param_abilities,
-            get_abilities,
+            get_ty_param_kinds,
+            get_struct_sig,
             on_err,
         )),
         Type::Struct(mid, sid, ty_args) => check_struct_inst(
             *mid,
             *sid,
             ty_args,
-            ty_param_abilities,
-            get_abilities,
+            get_ty_param_kinds,
+            get_struct_sig,
             on_err,
         ),
-        Type::TypeParameter(i) => ty_param_abilities(*i).abilities,
+        Type::TypeParameter(i) => get_ty_param_kinds(*i).abilities,
         Type::Reference(_, _) => AbilitySet::REFERENCES,
         Type::Fun(_, _)
         | Type::Tuple(_)
@@ -2266,8 +2267,8 @@ where
 // type arguments themselves are instantiated properly
 pub fn infer_and_check_abilities<F, G, H>(
     ty: &Type,
-    ty_param_abilities: F,
-    get_abilities: G,
+    get_ty_param_kinds: F,
+    get_struct_sig: G,
     loc: &Loc,
     on_err: H,
 ) -> AbilitySet
@@ -2276,21 +2277,21 @@ where
     G: Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy,
     H: Fn(&Loc, &str) + Copy,
 {
-    infer_abilities_opt_check(ty, ty_param_abilities, get_abilities, Some((loc, on_err)))
+    infer_abilities_opt_check(ty, get_ty_param_kinds, get_struct_sig, Some((loc, on_err)))
 }
 
 /// Infers the abilities of the given type
-/// `ty_param_abilities` specify the abilities and phantomness of type parameters
-/// `get_abilities` returns the abilities for the generics and the abilities of the struct
-pub fn infer_abilities<F, G>(ty: &Type, ty_param_abilities: F, get_abilities: G) -> AbilitySet
+/// `get_ty_param_kinds` specify the abilities and phantomness of type parameters
+/// `get_struct_sig` returns the abilities for the generics and the abilities of the struct
+pub fn infer_abilities<F, G>(ty: &Type, get_ty_param_kinds: F, get_struct_sig: G) -> AbilitySet
 where
     F: Fn(u16) -> TypeParameterKind + Copy,
     G: Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy,
 {
     infer_abilities_opt_check(
         ty,
-        ty_param_abilities,
-        get_abilities,
+        get_ty_param_kinds,
+        get_struct_sig,
         None::<(&Loc, fn(&Loc, &str))>,
     )
 }

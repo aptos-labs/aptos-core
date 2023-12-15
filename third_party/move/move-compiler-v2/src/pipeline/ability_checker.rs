@@ -99,7 +99,7 @@ fn check_key_for_struct(
     }
 }
 
-fn ty_param_abilities(ty_params: &[TypeParameter]) -> impl Fn(u16) -> TypeParameterKind + Copy + '_ {
+fn ty_param_kinds(ty_params: &[TypeParameter]) -> impl Fn(u16) -> TypeParameterKind + Copy + '_ {
     |i| {
         if let Some(tp) = ty_params.get(i as usize) {
             tp.1.clone()
@@ -109,7 +109,7 @@ fn ty_param_abilities(ty_params: &[TypeParameter]) -> impl Fn(u16) -> TypeParame
     }
 }
 
-fn get_abilities<'a>(
+fn get_struct_sig<'a>(
     target: &'a FunctionTarget,
 ) -> impl Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy + 'a {
     |mid, sid| {
@@ -142,8 +142,8 @@ fn check_struct_inst(
         mid,
         sid,
         ty_args,
-        ty_param_abilities(&ty_params),
-        get_abilities(target),
+        ty_param_kinds(&ty_params),
+        get_struct_sig(target),
         Some((loc, |loc: &Loc, msg: &str| target.global_env().error(loc, msg))),
     )
 }
@@ -170,8 +170,8 @@ pub fn check_instantiation(target: &FunctionTarget, ty: &Type, loc: &Loc) -> Abi
     let ty_params = target.get_type_parameters();
     ty::infer_and_check_abilities(
         ty,
-        ty_param_abilities(&ty_params),
-        get_abilities(target),
+        ty_param_kinds(&ty_params),
+        get_struct_sig(target),
         loc,
         |loc, msg| target.global_env().error(loc, msg),
     )
