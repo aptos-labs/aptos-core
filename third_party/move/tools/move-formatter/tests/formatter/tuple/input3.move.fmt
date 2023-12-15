@@ -12,8 +12,10 @@ address 0x42 {
         
         fun returns_3_values(): (u64, bool, address) {
             // comment1
-            (  // comment2
-                0, /* comment3 */ false /* comment4 */ , @0x42)  // comment5
+            (
+                // comment2
+                0,
+                /* comment3 */ false /* comment4 */ , @0x42)  // comment5 
         }
     }
 }

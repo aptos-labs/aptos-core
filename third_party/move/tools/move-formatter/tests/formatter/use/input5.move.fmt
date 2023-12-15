@@ -2,7 +2,8 @@
 
 module BlockLine {
     // Multiple blank lines between statements
-    use aptos_std::type_info::{ /* use_item before */ Self, 
+    use aptos_std::type_info::{
+        /* use_item before */ Self, 
         TypeInfo};
     
     use aptos_framework::coin::{Self, 

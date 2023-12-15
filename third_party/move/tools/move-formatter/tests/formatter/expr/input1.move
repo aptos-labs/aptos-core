@@ -11,7 +11,7 @@ fun main() {
       x = x +   2;  // x increases by 2
     }    else {
       x = 10;   // Otherwise, set y to 10
-    }
+    };
     /*
     aa
     bb

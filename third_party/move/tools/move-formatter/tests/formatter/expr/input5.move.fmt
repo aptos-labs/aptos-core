@@ -5,7 +5,7 @@ script {
         let multiplication: u64 = a * b;  // Multiplication operation
         let division: u64 = a / b;  // Division operation
         let modulo: u64 = a % b;  // Modulo operation
-        let result: u64 = (addition*subtraction) / (multiplication + division) % modulo;  // Operator expression
+        let result: u64 = (addition * subtraction) / (multiplication + division) % modulo;  //  Operator expression
         // Operator expression
         let intermediate1: u64 = ((a + b) * (c - d)) / (e + 1);
         let intermediate2: u64 = (a * (c + d)) - (b / (e - 2));

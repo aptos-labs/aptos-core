@@ -28,7 +28,7 @@ address 0x42 {
         */ 
         fun examples(cond: bool) {
             // Assignment of tuple values to variables x and y  
-            let(x, y): /* (u8, u64) */ (u8, u64) = (0, /* comment */ 1);
+            let (x, y): /* (u8, u64) */ (u8, u64) = (0, /* comment */ 1);
         }
     }
 }

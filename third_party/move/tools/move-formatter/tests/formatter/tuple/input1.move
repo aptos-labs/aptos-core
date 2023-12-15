@@ -12,8 +12,8 @@ address 0x42 {
         fun returs_unit_3(): () { () }
 
         fun returns_3_values(): (u64, bool, address) {
-            // comment
-            (0, false, @0x42)// comment
+            // comment1
+            (0, false, @0x42)// comment2
         }
     }
 }

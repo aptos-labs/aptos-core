@@ -6,7 +6,7 @@ module econia::incentives {
       // Vectorize fee store tier parameters  
       let integrator_fee_store_tiers = vector[
           // Tier 0 parameters  
-          vector[//comment
+          vector[  //comment
               FEE_SHARE_DIVISOR_0,
               TIER_ACTIVATION_FEE_0,
               WITHDRAWAL_FEE_0
