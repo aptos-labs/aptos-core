@@ -96,7 +96,7 @@ impl CrossShardEdges {
     pub fn add_edge(&mut self, txn_idx: ShardedTxnIndex, storage_locations: Vec<StorageLocation>) {
         self.edges
             .entry(txn_idx)
-            .or_insert_with(Vec::new)
+            .or_default()
             .extend(storage_locations);
     }
 

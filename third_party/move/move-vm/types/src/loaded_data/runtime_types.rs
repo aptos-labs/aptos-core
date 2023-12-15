@@ -2,6 +2,8 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::non_canonical_partial_ord_impl)]
+
 use derivative::Derivative;
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},

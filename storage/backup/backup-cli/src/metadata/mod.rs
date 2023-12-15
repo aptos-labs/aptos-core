@@ -225,6 +225,7 @@ impl PartialEq<Self> for CompactionTimestampsMeta {
     }
 }
 
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd<Self> for CompactionTimestampsMeta {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.file_compacted_at.partial_cmp(&other.file_compacted_at)
