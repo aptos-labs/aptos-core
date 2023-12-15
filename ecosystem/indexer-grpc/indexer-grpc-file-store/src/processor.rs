@@ -1,9 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::{
-    LATEST_PROCESSED_VERSION as LATEST_PROCESSED_VERSION_OLD, PROCESSED_VERSIONS_COUNT,
-};
+use crate::metrics::{METADATA_UPLOAD_FAILURE_COUNT, PROCESSED_VERSIONS_COUNT};
 use anyhow::{bail, Context, Result};
 use aptos_indexer_grpc_utils::{
     build_protobuf_encoded_transaction_wrappers,
@@ -19,10 +17,10 @@ use aptos_moving_average::MovingAverage;
 use aptos_protos::transaction::v1::Transaction;
 use prost::Message;
 use std::time::Duration;
+use tracing::debug;
 
 // If the version is ahead of the cache head, retry after a short sleep.
 const AHEAD_OF_CACHE_SLEEP_DURATION_IN_MILLIS: u64 = 100;
-const LARGE_FILE_BYTES_COUNT: usize = 100_000_000;
 const SERVICE_TYPE: &str = "file_worker";
 
 /// Processor tails the data in cache and stores the data in file store.
@@ -30,14 +28,14 @@ pub struct Processor {
     cache_operator: CacheOperator<redis::aio::ConnectionManager>,
     file_store_operator: Box<dyn FileStoreOperator>,
     cache_chain_id: u64,
-    enable_verbose_logging: bool,
+    enable_expensive_logging: bool,
 }
 
 impl Processor {
     pub async fn new(
         redis_main_instance_address: RedisUrl,
         file_store_config: IndexerGrpcFileStoreConfig,
-        enable_verbose_logging: bool,
+        enable_expensive_logging: bool,
     ) -> Result<Self> {
         // Connection to redis is a hard dependency for file store processor.
         let conn = redis::Client::open(redis_main_instance_address.0.clone())
@@ -81,145 +79,194 @@ impl Processor {
             cache_operator,
             file_store_operator,
             cache_chain_id,
-            enable_verbose_logging,
+            enable_expensive_logging,
         })
     }
 
-    // Starts the processing.
+    /// Starts the processing. The steps are
+    /// 1. Check chain id at the beginning and every step after
+    /// 2. Get the batch start version from file store metadata
+    /// 3. Start loop
+    ///   3.1 Check head from cache, decide whether we need to parallel process or just wait
+    ///   3.2 If we're ready to process, create max of 10 threads and fetch / upload data
+    ///   3.3 Update file store metadata at the end of a batch
     pub async fn run(&mut self) -> Result<()> {
         let cache_chain_id = self.cache_chain_id;
 
-        // If file store and cache chain id don't match, return an error.
-        let metadata = self
-            .file_store_operator
-            .create_default_file_store_metadata_if_absent(cache_chain_id)
-            .await
-            .context("Metadata did not match.")?;
-
-        // This implements a two-cursor approach:
-        //   * One curosr is to track the current cache version.
-        //   * The other cursor is to track the current file store version.
-        //   * Constrains:
-        //     * The current cache version >= the current file store version.
-        //     * The current file store version is always a multiple of BLOB_STORAGE_SIZE.
-        let mut current_cache_version = metadata.version;
-        let mut current_file_store_version = current_cache_version;
-        // The transactions buffer to store the transactions fetched from cache.
-        let mut transactions_buffer: Vec<EncodedTransactionWithVersion> = vec![];
-        let mut tps_calculator = MovingAverage::new(10_000);
-        loop {
-            // 0. Data verfiication.
-            // File store version has to be a multiple of BLOB_STORAGE_SIZE.
-            if current_file_store_version % BLOB_STORAGE_SIZE as u64 != 0 {
-                bail!("File store version is not a multiple of BLOB_STORAGE_SIZE.");
-            }
-
-            let file_store_upload_batch_start = std::time::Instant::now();
-            let batch_get_result = self
-                .cache_operator
-                .batch_get_encoded_proto_data(current_cache_version)
-                .await;
-
-            let batch_get_result =
-                fullnode_grpc_status_handling(batch_get_result, current_cache_version)?;
-
-            let current_transactions = match batch_get_result {
-                Some(transactions) => transactions,
-                None => {
-                    // Cache is not ready yet, i.e., ahead of current head. Wait.
-                    tokio::time::sleep(Duration::from_millis(
-                        AHEAD_OF_CACHE_SLEEP_DURATION_IN_MILLIS,
-                    ))
-                    .await;
-                    continue;
-                },
+        let mut batch_start_version =
+            if let Some(metadata) = self.file_store_operator.get_file_store_metadata().await {
+                anyhow::ensure!(metadata.chain_id == cache_chain_id, "Chain ID mismatch.");
+                metadata.version
+            } else {
+                0
             };
 
-            let hit_head = current_transactions.len() != BLOB_STORAGE_SIZE;
-            // Update the current cache version.
-            current_cache_version += current_transactions.len() as u64;
-            transactions_buffer.extend(current_transactions);
+        let mut tps_calculator = MovingAverage::new(10_000);
+        loop {
+            let latest_loop_time = std::time::Instant::now();
+            let cache_worker_latest = self.cache_operator.get_latest_version().await?;
 
-            // If not hit the head, we want to collect more transactions.
-            if !hit_head && transactions_buffer.len() < 10 * BLOB_STORAGE_SIZE {
-                let total_size = transactions_buffer.iter().map(|t| t.0.len()).sum::<usize>();
-                // If we haven't hit the head and transactions are small,
-                // we want to collect more transactions.
-                if total_size < LARGE_FILE_BYTES_COUNT {
-                    // Skip only when current transactions are small.
-                    continue;
-                }
+            // batches tracks the start version of the batches to fetch. 1000 at the time
+            let mut batches = vec![];
+            let mut start_version = batch_start_version;
+            while start_version + (BLOB_STORAGE_SIZE as u64) < cache_worker_latest {
+                batches.push(start_version);
+                start_version += BLOB_STORAGE_SIZE as u64;
             }
-            // If hit the head, we want to collect at least one batch of transactions.
-            if hit_head && transactions_buffer.len() < BLOB_STORAGE_SIZE {
+
+            // we're too close to the head
+            if batches.is_empty() {
+                debug!(
+                    batch_start_version = batch_start_version,
+                    cache_worker_latest = cache_worker_latest,
+                    "[Filestore] No enough version yet, need 1000 versions at least"
+                );
+                tokio::time::sleep(Duration::from_millis(
+                    AHEAD_OF_CACHE_SLEEP_DURATION_IN_MILLIS,
+                ))
+                .await;
                 continue;
             }
 
-            // Final check to make sure the transactions buffer contains enough transactions.
-            if transactions_buffer.len() < BLOB_STORAGE_SIZE {
-                continue;
+            // Create thread and fetch transactions
+            let mut tasks = vec![];
+            for start_version in batches {
+                let mut cache_operator_clone = self.cache_operator.clone();
+                let mut file_store_operator_clone = self.file_store_operator.clone_box();
+                let task = tokio::spawn(async move {
+                    let transactions = cache_operator_clone
+                        .batch_get_encoded_proto_data_x(start_version, BLOB_STORAGE_SIZE as u64)
+                        .await
+                        .unwrap();
+                    let last_transaction = transactions.last().unwrap().0.clone();
+                    let (start, end) = file_store_operator_clone
+                        .upload_transaction_batch(cache_chain_id, transactions)
+                        .await
+                        .unwrap();
+                    (start, end, last_transaction)
+                });
+                tasks.push(task);
             }
+            let (first_version, last_version, first_version_encoded, last_version_encoded) =
+                match futures::future::try_join_all(tasks).await {
+                    Ok(mut res) => {
+                        // Check for gaps
+                        res.sort_by(|a, b| a.0.cmp(&b.0));
+                        let mut prev_start = None;
+                        let mut prev_end = None;
 
-            // Drain the transactions buffer and upload to file store in size of multiple of BLOB_STORAGE_SIZE.
-            let process_size = transactions_buffer.len() / BLOB_STORAGE_SIZE * BLOB_STORAGE_SIZE;
-            let current_batch: Vec<EncodedTransactionWithVersion> =
-                transactions_buffer.drain(..process_size).collect();
-            let last_transaction = current_batch.as_slice().last().unwrap().clone();
-            let first_transaction = current_batch.as_slice().first().unwrap().clone();
-            self.file_store_operator
-                .upload_transactions(cache_chain_id, current_batch)
+                        let first_version = res.first().unwrap().0;
+                        let last_version = res.last().unwrap().1;
+                        let first_version_encoded = res.first().unwrap().2.clone();
+                        let last_version_encoded = res.last().unwrap().2.clone();
+                        let versions: Vec<u64> = res.iter().map(|x| x.0).collect();
+                        for result in res {
+                            let start = result.0;
+                            let end = result.1;
+                            if prev_start.is_none() {
+                                prev_start = Some(start);
+                                prev_end = Some(end);
+                            } else {
+                                if prev_end.unwrap() + 1 != start {
+                                    tracing::error!(
+                                        processed_versions = ?versions,
+                                        "[Filestore] Gaps in processing data"
+                                    );
+                                    panic!("[Filestore] Gaps in processing data");
+                                }
+                                prev_start = Some(start);
+                                prev_end = Some(end);
+                            }
+                        }
+
+                        (
+                            first_version,
+                            last_version,
+                            first_version_encoded,
+                            last_version_encoded,
+                        )
+                    },
+                    Err(err) => panic!("Error processing transaction batches: {:?}", err),
+                };
+
+            // update next batch start version
+            batch_start_version = last_version + 1;
+            assert!(
+                batch_start_version % BLOB_STORAGE_SIZE as u64 == 0,
+                "[Filestore] Batch must be multiple of 1000"
+            );
+            let size = last_version - first_version + 1;
+            PROCESSED_VERSIONS_COUNT.inc_by(size);
+            tps_calculator.tick_now(size);
+
+            // Update filestore metadata. First do it in cache for performance then update metadata file
+            let start_metadata_upload_time = std::time::Instant::now();
+            self.cache_operator
+                .update_file_store_latest_version(batch_start_version)
+                .await?;
+            while self
+                .file_store_operator
+                .update_file_store_metadata_with_timeout(cache_chain_id, batch_start_version)
                 .await
-                .context("Uploading transactions to file store failed.")?;
-            PROCESSED_VERSIONS_COUNT.inc_by(process_size as u64);
-            tps_calculator.tick_now(process_size as u64);
-            let end_version = current_file_store_version + process_size as u64 - 1_u64;
-            let num_transactions = end_version - current_file_store_version + 1;
+                .is_err()
+            {
+                tracing::error!(
+                    batch_start_version = batch_start_version,
+                    "Failed to update file store metadata. Retrying."
+                );
+                std::thread::sleep(std::time::Duration::from_millis(500));
+                METADATA_UPLOAD_FAILURE_COUNT.inc();
+            }
+            log_grpc_step(
+                SERVICE_TYPE,
+                IndexerGrpcStep::FilestoreUpdateMetadata,
+                Some(first_version as i64),
+                Some(last_version as i64),
+                None,
+                None,
+                Some(start_metadata_upload_time.elapsed().as_secs_f64()),
+                None,
+                Some(size as i64),
+                None,
+            );
 
-            let mut start_version_timestamp = None;
-            let mut end_version_timestamp = None;
-            if self.enable_verbose_logging {
+            let (mut start_version_timestamp, mut end_version_timestamp) = (None, None);
+            if self.enable_expensive_logging {
                 // This decoding may be inefficient, but this is the file store so we don't have to be overly
                 // concerned with efficiency.
                 start_version_timestamp = {
-                    let encoded_transaction = first_transaction.0;
                     let decoded_transaction =
-                        base64::decode(encoded_transaction).expect("Failed to decode base64.");
+                        base64::decode(first_version_encoded).expect("Failed to decode base64.");
                     let transaction = Transaction::decode(&*decoded_transaction)
                         .expect("Failed to decode protobuf.");
                     transaction.timestamp
                 };
                 end_version_timestamp = {
-                    let encoded_transaction = last_transaction.0;
                     let decoded_transaction =
-                        base64::decode(encoded_transaction).expect("Failed to decode base64.");
+                        base64::decode(last_version_encoded).expect("Failed to decode base64.");
                     let transaction = Transaction::decode(&*decoded_transaction)
                         .expect("Failed to decode protobuf.");
                     transaction.timestamp
                 };
             }
-
-            // TODO: Split file store worker into more steps
+            let full_loop_duration = latest_loop_time.elapsed().as_secs_f64();
             log_grpc_step(
                 SERVICE_TYPE,
                 IndexerGrpcStep::FilestoreUploadTxns,
-                self.enable_verbose_logging,
-                Some(current_file_store_version as i64),
-                Some(end_version as i64),
+                Some(first_version as i64),
+                Some(last_version as i64),
                 start_version_timestamp.as_ref(),
                 end_version_timestamp.as_ref(),
-                Some(file_store_upload_batch_start.elapsed().as_secs_f64()),
+                Some(full_loop_duration),
                 None,
-                Some(num_transactions as i64),
+                Some(size as i64),
                 None,
             );
-
-            current_file_store_version += process_size as u64;
-            LATEST_PROCESSED_VERSION_OLD.set(current_file_store_version as i64);
         }
     }
 }
 
-fn fullnode_grpc_status_handling(
+fn _handle_batch_from_cache(
     fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus>,
     batch_start_version: u64,
 ) -> Result<Option<Vec<EncodedTransactionWithVersion>>> {
@@ -236,56 +283,5 @@ fn fullnode_grpc_status_handling(
         Err(err) => {
             bail!("Batch get encoded proto data failed: {}", err);
         },
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn verify_the_grpc_status_handling_ahead_of_cache() {
-        let fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus> =
-            Ok(CacheBatchGetStatus::NotReady);
-        let batch_start_version = 0;
-        assert!(
-            fullnode_grpc_status_handling(fullnode_rpc_status, batch_start_version)
-                .unwrap()
-                .is_none()
-        );
-    }
-
-    #[test]
-    fn verify_the_grpc_status_handling_evicted_from_cache() {
-        let fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus> =
-            Ok(CacheBatchGetStatus::EvictedFromCache);
-        let batch_start_version = 0;
-        assert!(fullnode_grpc_status_handling(fullnode_rpc_status, batch_start_version).is_err());
-    }
-
-    #[test]
-    fn verify_the_grpc_status_handling_error() {
-        let fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus> =
-            Err(anyhow::anyhow!("Error"));
-        let batch_start_version = 0;
-        assert!(fullnode_grpc_status_handling(fullnode_rpc_status, batch_start_version).is_err());
-    }
-
-    #[test]
-    fn verify_the_grpc_status_handling_ok() {
-        let batch_start_version = 2000;
-        let transactions: Vec<String> = std::iter::repeat("txn".to_string()).take(1000).collect();
-        let transactions_with_version: Vec<EncodedTransactionWithVersion> = transactions
-            .iter()
-            .enumerate()
-            .map(|(index, txn)| (txn.clone(), batch_start_version + index as u64))
-            .collect();
-        let fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus> =
-            Ok(CacheBatchGetStatus::Ok(transactions));
-        let actual_transactions =
-            fullnode_grpc_status_handling(fullnode_rpc_status, batch_start_version).unwrap();
-        assert!(actual_transactions.is_some());
-        let actual_transactions = actual_transactions.unwrap();
-        assert_eq!(actual_transactions, transactions_with_version);
     }
 }
