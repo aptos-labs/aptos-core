@@ -2599,8 +2599,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             }
             let mut success = true;
             for (i, arg_ty) in arg_types.iter().enumerate() {
-                let arg_ty = if cand.get_operation().allows_ref_param_for_value() {
-                    // Drop reference type if there is any.
+                let arg_ty = if cand.get_operation().allows_ref_param_for_value()
+                    && self.mode != ExpTranslationMode::Impl
+                {
+                    // Drop reference when translating specifications for eq/neq operation.
                     if let Type::Reference(_, target_ty) = arg_ty {
                         target_ty.as_ref().clone()
                     } else {
