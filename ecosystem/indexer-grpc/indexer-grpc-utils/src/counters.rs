@@ -46,7 +46,7 @@ impl IndexerGrpcStep {
             IndexerGrpcStep::CacheWorkerBatchProcessed => "2",
             // Filestore worker steps
             IndexerGrpcStep::FilestoreUploadTxns => "1",
-            IndexerGrpcStep::FilestoreUpdateMetadata => "2",
+            IndexerGrpcStep::FilestoreUpdateMetadata => "1.1",
             // Fullnode steps
             IndexerGrpcStep::FullnodeFetchedBatch => "1",
             IndexerGrpcStep::FullnodeDecodedBatch => "2",
@@ -78,7 +78,7 @@ impl IndexerGrpcStep {
             IndexerGrpcStep::CacheWorkerTxnsProcessed => "[Indexer Cache] Processed transactions in a batch.",
             IndexerGrpcStep::CacheWorkerBatchProcessed => "[Indexer Cache] Successfully process current batch.",
             // Filestore worker steps
-            IndexerGrpcStep::FilestoreUploadTxns => "[File worker] Upload transactions to filestore.",
+            IndexerGrpcStep::FilestoreUploadTxns => "[File worker] Finished uploading batch of transactions to filestore.",
             IndexerGrpcStep::FilestoreUpdateMetadata => "[File worker] Update filestore metadata.",
             // Fullnode steps
             IndexerGrpcStep::FullnodeFetchedBatch => "[Indexer Fullnode] Fetched batch of transactions from fullnode",
