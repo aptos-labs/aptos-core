@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{constants::BLOB_STORAGE_SIZE, EncodedTransactionWithVersion};
+use crate::constants::BLOB_STORAGE_SIZE;
 use anyhow::Result;
+use aptos_protos::transaction::v1::Transaction;
 use serde::{Deserialize, Serialize};
 
 pub mod gcs;
@@ -57,7 +58,7 @@ pub trait FileStoreOperator: Send + Sync {
     /// Bootstraps the file store operator. This is required before any other operations.
     async fn verify_storage_bucket_existence(&self);
     /// Gets the transactions files from the file store. version has to be a multiple of BLOB_STORAGE_SIZE.
-    async fn get_transactions(&self, version: u64) -> Result<Vec<String>>;
+    async fn get_transactions(&self, version: u64) -> Result<Vec<Transaction>>;
     /// Gets the metadata from the file store. Operator will panic if error happens when accessing the metadata file(except not found).
     async fn get_file_store_metadata(&self) -> Option<FileStoreMetadata>;
     /// If the file store is empty, the metadata will be created; otherwise, return the existing metadata.
@@ -77,7 +78,7 @@ pub trait FileStoreOperator: Send + Sync {
     async fn upload_transaction_batch(
         &mut self,
         chain_id: u64,
-        batch: Vec<EncodedTransactionWithVersion>,
+        batch: Vec<Transaction>,
     ) -> anyhow::Result<(u64, u64)>;
 
     /// This is updated by the filestore worker whenever it updates the filestore metadata
@@ -90,80 +91,4 @@ pub trait FileStoreOperator: Send + Sync {
 
     /// Get a clone for the file store operator.
     fn clone_box(&self) -> Box<dyn FileStoreOperator>;
-}
-
-pub(crate) fn build_transactions_file(
-    transactions: Vec<EncodedTransactionWithVersion>,
-) -> anyhow::Result<TransactionsFile> {
-    let starting_version = transactions.first().unwrap().1;
-    anyhow::ensure!(
-        starting_version % BLOB_STORAGE_SIZE as u64 == 0,
-        "Starting version has to be a multiple of BLOB_STORAGE_SIZE."
-    );
-    anyhow::ensure!(
-        transactions.len() == BLOB_STORAGE_SIZE,
-        "The number of transactions to upload has to be BLOB_STORAGE_SIZE."
-    );
-    anyhow::ensure!(
-        transactions
-            .iter()
-            .enumerate()
-            .any(|(ind, (_, version))| ind + starting_version as usize == *version as usize),
-        "Transactions are in order."
-    );
-
-    Ok(TransactionsFile {
-        starting_version,
-        transactions: transactions.into_iter().map(|(tx, _)| tx).collect(),
-    })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn verify_blob_naming() {
-        assert_eq!(super::generate_blob_name(0), "files/0.json");
-        assert_eq!(
-            super::generate_blob_name(100_000_000),
-            "files/100000000.json"
-        );
-        assert_eq!(
-            super::generate_blob_name(1_000_000_000),
-            "files/1000000000.json"
-        );
-        assert_eq!(
-            super::generate_blob_name(10_000_000_000),
-            "files/10000000000.json"
-        );
-        assert_eq!(
-            super::generate_blob_name(u64::MAX),
-            "files/18446744073709551615.json"
-        );
-    }
-
-    #[test]
-    fn verify_build_transactions_file() {
-        // 1000 txns with starting version 0 succeeds.
-        let mut transactions = vec![];
-        for i in 0..BLOB_STORAGE_SIZE {
-            transactions.push(("".to_string(), i as u64));
-        }
-        assert!(build_transactions_file(transactions).is_ok());
-
-        // 1001 txns fails.
-        let mut transactions = vec![];
-        for i in 0..BLOB_STORAGE_SIZE + 1 {
-            transactions.push(("".to_string(), i as u64));
-        }
-        assert!(build_transactions_file(transactions).is_err());
-        // 1000 txns with starting version 1 fails.
-        let mut transactions = vec![];
-        for i in 1..BLOB_STORAGE_SIZE + 1 {
-            transactions.push(("".to_string(), i as u64));
-        }
-
-        assert!(build_transactions_file(transactions).is_err());
-    }
 }

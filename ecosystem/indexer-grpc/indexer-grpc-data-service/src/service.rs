@@ -9,7 +9,6 @@ use crate::metrics::{
 };
 use anyhow::Context;
 use aptos_indexer_grpc_utils::{
-    build_protobuf_encoded_transaction_wrappers,
     cache_operator::{CacheBatchGetStatus, CacheOperator},
     chunk_transactions,
     config::IndexerGrpcFileStoreConfig,
@@ -19,9 +18,8 @@ use aptos_indexer_grpc_utils::{
     },
     counters::{log_grpc_step, IndexerGrpcStep},
     file_store_operator::FileStoreOperator,
-    time_diff_since_pb_timestamp_in_secs,
+    storage_format, time_diff_since_pb_timestamp_in_secs,
     types::RedisUrl,
-    EncodedTransactionWithVersion,
 };
 use aptos_moving_average::MovingAverage;
 use aptos_protos::{
@@ -90,7 +88,7 @@ impl RawDataServerWrapper {
 /// Enum to represent the status of the data fetching overall.
 enum TransactionsDataStatus {
     // Data fetching is successful.
-    Success(Vec<EncodedTransactionWithVersion>),
+    Success(Vec<Transaction>),
     // Ahead of current head of cache.
     AheadOfCache,
     // Fatal error when gap detected between cache and file store.
@@ -150,6 +148,7 @@ impl RawData for RawDataServerWrapper {
         );
 
         let redis_client = self.redis_client.clone();
+        let storage_format = storage_format::StorageFormat::GzipCompressionProto;
         tokio::spawn({
             let request_metadata = request_metadata.clone();
             async move {
@@ -186,7 +185,7 @@ impl RawData for RawDataServerWrapper {
                         return;
                     },
                 };
-                let mut cache_operator = CacheOperator::new(conn);
+                let mut cache_operator = CacheOperator::new(conn, storage_format);
                 file_store_operator.verify_storage_bucket_existence().await;
 
                 // Validate redis chain id
@@ -281,7 +280,7 @@ impl RawData for RawDataServerWrapper {
                     // and ready to be transferred to the client.
                     let bytes_ready_to_transfer = transaction_data
                         .iter()
-                        .map(|(encoded, _)| encoded.len())
+                        .map(|encoded| encoded.encoded_len())
                         .sum::<usize>();
                     BYTES_READY_TO_TRANSFER_FROM_SERVER
                         .with_label_values(&[
@@ -292,7 +291,7 @@ impl RawData for RawDataServerWrapper {
                         .inc_by(bytes_ready_to_transfer as u64);
                     // 2. Push the data to the response channel, i.e. stream the data to the client.
                     let current_batch_size = transaction_data.as_slice().len();
-                    let end_of_batch_version = transaction_data.as_slice().last().unwrap().1;
+                    let end_of_batch_version = transaction_data.as_slice().last().unwrap().version;
                     let resp_items = get_transactions_responses_builder(
                         transaction_data,
                         chain_id as u32,
@@ -411,19 +410,12 @@ impl RawData for RawDataServerWrapper {
 
 /// Builds the response for the get transactions request. Partial batch is ok, i.e., a batch with transactions < 1000.
 fn get_transactions_responses_builder(
-    data: Vec<EncodedTransactionWithVersion>,
+    data: Vec<Transaction>,
     chain_id: u32,
     current_batch_start_time: Instant,
     request_metadata: IndexerGrpcRequestMetadata,
 ) -> Vec<TransactionsResponse> {
-    let transactions: Vec<Transaction> = data
-        .into_iter()
-        .map(|(encoded, _)| {
-            let decoded_transaction = base64::decode(encoded).unwrap();
-            let transaction = Transaction::decode(&*decoded_transaction);
-            transaction.unwrap()
-        })
-        .collect();
+    let transactions = data;
     let chunks = chunk_transactions(transactions, MESSAGE_SIZE_LIMIT);
     let resp_items = chunks
         .into_iter()
@@ -477,24 +469,12 @@ async fn data_fetch(
         Ok(CacheBatchGetStatus::Ok(transactions)) => {
             let size_in_bytes = transactions
                 .iter()
-                .map(|transaction| transaction.len())
+                .map(|transaction| transaction.encoded_len())
                 .sum::<usize>();
             let num_of_transactions = transactions.len();
             let duration_in_secs = current_batch_start_time.elapsed().as_secs_f64();
-            let start_version_timestamp = {
-                let decoded_transaction = base64::decode(transactions.first().unwrap())
-                    .expect("Failed to decode base64.");
-                let transaction =
-                    Transaction::decode(&*decoded_transaction).expect("Failed to decode protobuf.");
-                transaction.timestamp
-            };
-            let end_version_timestamp = {
-                let decoded_transaction =
-                    base64::decode(transactions.last().unwrap()).expect("Failed to decode base64.");
-                let transaction =
-                    Transaction::decode(&*decoded_transaction).expect("Failed to decode protobuf.");
-                transaction.timestamp
-            };
+            let start_version_timestamp = transactions.first().unwrap().timestamp.clone();
+            let end_version_timestamp = transactions.last().unwrap().timestamp.clone();
 
             log_grpc_step(
                 SERVICE_TYPE,
@@ -509,9 +489,7 @@ async fn data_fetch(
                 Some(request_metadata.clone()),
             );
 
-            Ok(TransactionsDataStatus::Success(
-                build_protobuf_encoded_transaction_wrappers(transactions, starting_version),
-            ))
+            Ok(TransactionsDataStatus::Success(transactions))
         },
         Ok(CacheBatchGetStatus::EvictedFromCache) => {
             // Data is evicted from the cache. Fetch from file store.
@@ -521,24 +499,12 @@ async fn data_fetch(
                 Ok(transactions) => {
                     let size_in_bytes = transactions
                         .iter()
-                        .map(|transaction| transaction.len())
+                        .map(|transaction| transaction.encoded_len())
                         .sum::<usize>();
                     let num_of_transactions = transactions.len();
                     let duration_in_secs = current_batch_start_time.elapsed().as_secs_f64();
-                    let start_version_timestamp = {
-                        let decoded_transaction = base64::decode(transactions.first().unwrap())
-                            .expect("Failed to decode base64.");
-                        let transaction = Transaction::decode(&*decoded_transaction)
-                            .expect("Failed to decode protobuf.");
-                        transaction.timestamp
-                    };
-                    let end_version_timestamp = {
-                        let decoded_transaction = base64::decode(transactions.last().unwrap())
-                            .expect("Failed to decode base64.");
-                        let transaction = Transaction::decode(&*decoded_transaction)
-                            .expect("Failed to decode protobuf.");
-                        transaction.timestamp
-                    };
+                    let start_version_timestamp = transactions.first().unwrap().timestamp.clone();
+                    let end_version_timestamp = transactions.last().unwrap().timestamp.clone();
 
                     log_grpc_step(
                         SERVICE_TYPE,
@@ -553,9 +519,7 @@ async fn data_fetch(
                         Some(request_metadata.clone()),
                     );
 
-                    Ok(TransactionsDataStatus::Success(
-                        build_protobuf_encoded_transaction_wrappers(transactions, starting_version),
-                    ))
+                    Ok(TransactionsDataStatus::Success(transactions))
                 },
                 Err(e) => {
                     if e.to_string().contains("Transactions file not found") {

@@ -12,6 +12,7 @@ use aptos_indexer_grpc_utils::{
     counters::{log_grpc_step, IndexerGrpcStep},
     create_grpc_client_with_retry,
     file_store_operator::FileStoreOperator,
+    storage_format,
     types::RedisUrl,
 };
 use aptos_protos::internal::fullnode::v1::{
@@ -19,7 +20,6 @@ use aptos_protos::internal::fullnode::v1::{
     GetTransactionsFromNodeRequest, TransactionsOutput,
 };
 use futures::{self, StreamExt};
-use prost::Message;
 use url::Url;
 
 const FILE_STORE_VERSIONS_RESERVED: u64 = 150_000;
@@ -43,6 +43,7 @@ pub struct Worker {
     fullnode_grpc_address: Url,
     /// File store config
     file_store: IndexerGrpcFileStoreConfig,
+    storage_format: storage_format::StorageFormat,
 }
 
 impl Worker {
@@ -50,6 +51,7 @@ impl Worker {
         fullnode_grpc_address: Url,
         redis_main_instance_address: RedisUrl,
         file_store: IndexerGrpcFileStoreConfig,
+        storage_format: storage_format::StorageFormat,
     ) -> Result<Self> {
         let redis_client = redis::Client::open(redis_main_instance_address.0.clone())
             .with_context(|| {
@@ -62,6 +64,7 @@ impl Worker {
             redis_client,
             file_store,
             fullnode_grpc_address,
+            storage_format,
         })
     }
 
@@ -78,7 +81,8 @@ impl Worker {
             .get_tokio_connection_manager()
             .await
             .context("Get redis connection failed.")?;
-        let mut cache_operator = CacheOperator::new(conn);
+        let storage_format = self.storage_format;
+        let mut cache_operator = CacheOperator::new(conn, storage_format);
 
         // Set up file store operator.
         let file_store_operator: Box<dyn FileStoreOperator> = self.file_store.create();
@@ -260,32 +264,17 @@ async fn process_data_response(
     let start_version = first_transaction.version;
     let first_transaction_pb_timestamp = first_transaction.timestamp.clone();
     let last_transaction_pb_timestamp = last_transaction.timestamp.clone();
-    let transactions_serialized = transactions
-        .iter()
-        .map(|tx| {
-            let timestamp_in_seconds = match tx.timestamp {
-                Some(ref timestamp) => timestamp.seconds as u64,
-                None => 0,
-            };
-            let mut encoded_proto_data = vec![];
-            tx.encode(&mut encoded_proto_data)
-                .context("Encode transaction failed.")?;
-            let base64_encoded_proto_data = base64::encode(encoded_proto_data);
-            Ok((tx.version, base64_encoded_proto_data, timestamp_in_seconds))
-        })
-        .collect::<Result<Vec<(u64, String, u64)>>>()?;
-    let size_in_bytes = transactions_serialized
-        .iter()
-        .fold(0, |acc, (_, tx, _)| acc + tx.len());
     // Old metrics.
     PROCESSED_VERSIONS_COUNT.inc_by(transaction_count as u64);
     LATEST_PROCESSED_VERSION_OLD.set(start_version as i64);
     PROCESSED_BATCH_SIZE.set(transaction_count as i64);
-    match cache_operator
-        .update_cache_transactions(transactions_serialized)
+
+    // TODO: fix this.
+    let size_in_bytes = match cache_operator
+        .update_cache_transactions(transactions.clone())
         .await
     {
-        Ok(_) => {
+        Ok(size_in_bytes) => {
             log_grpc_step(
                 SERVICE_TYPE,
                 IndexerGrpcStep::CacheWorkerTxnsProcessed,
@@ -298,6 +287,7 @@ async fn process_data_response(
                 Some((last_transaction.version - first_transaction.version + 1) as i64),
                 None,
             );
+            size_in_bytes
         },
         Err(e) => {
             ERROR_COUNT
@@ -305,6 +295,6 @@ async fn process_data_response(
                 .inc();
             bail!("Update cache with version failed: {}", e);
         },
-    }
+    };
     Ok((transaction_count, size_in_bytes))
 }

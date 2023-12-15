@@ -9,11 +9,10 @@ use aptos_indexer_grpc_utils::{
     constants::BLOB_STORAGE_SIZE,
     counters::{log_grpc_step, IndexerGrpcStep},
     file_store_operator::FileStoreOperator,
+    storage_format::StorageFormat,
     types::RedisUrl,
 };
 use aptos_moving_average::MovingAverage;
-use aptos_protos::transaction::v1::Transaction;
-use prost::Message;
 use std::time::Duration;
 use tracing::debug;
 
@@ -36,6 +35,7 @@ impl Worker {
         file_store_config: IndexerGrpcFileStoreConfig,
         enable_expensive_logging: bool,
         chain_id: u64,
+        cacche_storage_format: StorageFormat,
     ) -> Result<()> {
         // Connection to redis is a hard dependency for file store processor.
         let conn = redis::Client::open(redis_main_instance_address.0.clone())
@@ -53,8 +53,7 @@ impl Worker {
                     redis_main_instance_address.0
                 )
             })?;
-
-        let mut cache_operator = CacheOperator::new(conn);
+        let mut cache_operator = CacheOperator::new(conn, cacche_storage_format);
 
         let mut file_store_operator: Box<dyn FileStoreOperator> = file_store_config.create();
 
@@ -118,7 +117,7 @@ impl Worker {
                         .batch_get_encoded_proto_data_x(start_version, BLOB_STORAGE_SIZE as u64)
                         .await
                         .unwrap();
-                    let last_transaction = transactions.last().unwrap().0.clone();
+                    let last_transaction = transactions.last().unwrap().clone();
                     let (start, end) = file_store_operator_clone
                         .upload_transaction_batch(chain_id, transactions)
                         .await
@@ -213,20 +212,8 @@ impl Worker {
             if enable_expensive_logging {
                 // This decoding may be inefficient, but this is the file store so we don't have to be overly
                 // concerned with efficiency.
-                start_version_timestamp = {
-                    let decoded_transaction =
-                        base64::decode(first_version_encoded).expect("Failed to decode base64.");
-                    let transaction = Transaction::decode(&*decoded_transaction)
-                        .expect("Failed to decode protobuf.");
-                    transaction.timestamp
-                };
-                end_version_timestamp = {
-                    let decoded_transaction =
-                        base64::decode(last_version_encoded).expect("Failed to decode base64.");
-                    let transaction = Transaction::decode(&*decoded_transaction)
-                        .expect("Failed to decode protobuf.");
-                    transaction.timestamp
-                };
+                start_version_timestamp = first_version_encoded.timestamp;
+                end_version_timestamp = last_version_encoded.timestamp;
             }
             let full_loop_duration = latest_loop_time.elapsed().as_secs_f64();
             log_grpc_step(

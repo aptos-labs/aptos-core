@@ -6,7 +6,9 @@ pub mod worker;
 
 use anyhow::Result;
 use aptos_indexer_grpc_server_framework::RunnableConfig;
-use aptos_indexer_grpc_utils::{config::IndexerGrpcFileStoreConfig, types::RedisUrl};
+use aptos_indexer_grpc_utils::{
+    config::IndexerGrpcFileStoreConfig, storage_format::StorageFormat, types::RedisUrl,
+};
 use serde::{Deserialize, Serialize};
 use worker::Worker;
 
@@ -17,6 +19,12 @@ pub struct IndexerGrpcFileStoreWorkerConfig {
     pub redis_main_instance_address: RedisUrl,
     pub enable_expensive_logging: Option<bool>,
     pub chain_id: u64,
+    #[serde(default = "default_cacche_storage_format")]
+    pub cacche_storage_format: StorageFormat,
+}
+
+fn default_cacche_storage_format() -> StorageFormat {
+    StorageFormat::Base64UncompressedProto
 }
 
 impl IndexerGrpcFileStoreWorkerConfig {
@@ -25,12 +33,14 @@ impl IndexerGrpcFileStoreWorkerConfig {
         redis_main_instance_address: RedisUrl,
         enable_expensive_logging: Option<bool>,
         chain_id: u64,
+        cacche_storage_format: StorageFormat,
     ) -> Self {
         Self {
             file_store_config,
             redis_main_instance_address,
             enable_expensive_logging,
             chain_id,
+            cacche_storage_format,
         }
     }
 }
@@ -43,6 +53,7 @@ impl RunnableConfig for IndexerGrpcFileStoreWorkerConfig {
             self.file_store_config.clone(),
             self.enable_expensive_logging.unwrap_or(false),
             self.chain_id,
+            self.cacche_storage_format,
         )
         .await
         .expect("File store processor exited unexpectedly");
