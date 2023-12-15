@@ -124,6 +124,7 @@ pub fn run_benchmark<V>(
     config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
 
     let (db, executor) = init_db_and_executor::<V>(&config);
+    let mut root_account = TransactionGenerator::read_root_account(genesis_key, &db);
     let transaction_generators = transaction_mix.clone().map(|transaction_mix| {
         let num_existing_accounts = TransactionGenerator::read_meta(&source_dir);
         let num_accounts_to_be_loaded = std::cmp::min(
@@ -151,6 +152,7 @@ pub fn run_benchmark<V>(
 
         let transaction_generator_creator = init_workload::<V>(
             transaction_mix,
+            &mut root_account,
             main_signer_accounts,
             burner_accounts,
             db.clone(),
@@ -186,7 +188,7 @@ pub fn run_benchmark<V>(
     }
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
-        genesis_key,
+        root_account,
         block_sender,
         source_dir,
         Some(num_accounts_to_load),
@@ -351,6 +353,7 @@ pub fn run_benchmark<V>(
 
 fn init_workload<V>(
     transaction_mix: Vec<(TransactionType, usize)>,
+    root_account: &mut LocalAccount,
     mut main_signer_accounts: Vec<LocalAccount>,
     burner_accounts: Vec<LocalAccount>,
     db: DbReaderWriter,
@@ -369,7 +372,6 @@ where
 
     let runtime = Runtime::new().unwrap();
     let transaction_factory = TransactionGenerator::create_transaction_factory();
-
     let (txn_generator_creator, _address_pool, _account_pool) = runtime.block_on(async {
         let phase = Arc::new(AtomicUsize::new(0));
 
@@ -380,6 +382,7 @@ where
 
         create_txn_generator_creator(
             &[transaction_mix],
+            root_account,
             &mut main_signer_accounts,
             burner_accounts,
             &db_gen_init_transaction_executor,
@@ -457,7 +460,7 @@ fn add_accounts_impl<V>(
 
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
-        genesis_key,
+        TransactionGenerator::read_root_account(genesis_key, &db),
         block_sender,
         &source_dir,
         None,

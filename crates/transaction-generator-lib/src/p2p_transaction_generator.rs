@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use crate::{TransactionGenerator, TransactionGeneratorCreator};
-use aptos_infallible::RwLock;
+use crate::{ObjectPool, TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
@@ -147,21 +146,20 @@ pub struct P2PTransactionGenerator {
     rng: StdRng,
     send_amount: u64,
     txn_factory: TransactionFactory,
-    all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
+    all_addresses: Arc<ObjectPool<AccountAddress>>,
     sampler: Box<dyn Sampler<AccountAddress>>,
     invalid_transaction_ratio: usize,
 }
 
 impl P2PTransactionGenerator {
     pub fn new(
-        mut rng: StdRng,
+        rng: StdRng,
         send_amount: u64,
         txn_factory: TransactionFactory,
-        all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
+        all_addresses: Arc<ObjectPool<AccountAddress>>,
         invalid_transaction_ratio: usize,
         sampler: Box<dyn Sampler<AccountAddress>>,
     ) -> Self {
-        all_addresses.write().shuffle(&mut rng);
         Self {
             rng,
             send_amount,
@@ -264,7 +262,7 @@ impl TransactionGenerator for P2PTransactionGenerator {
         let mut num_valid_tx = num_to_create * (1 - invalid_size);
 
         let receivers: Vec<AccountAddress> = {
-            let mut all_addrs = self.all_addresses.write();
+            let mut all_addrs = self.all_addresses.write_view();
             self.sampler
                 .sample_from_pool(&mut self.rng, all_addrs.as_mut(), num_to_create)
         };
@@ -297,7 +295,7 @@ impl TransactionGenerator for P2PTransactionGenerator {
 pub struct P2PTransactionGeneratorCreator {
     txn_factory: TransactionFactory,
     amount: u64,
-    all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
+    all_addresses: Arc<ObjectPool<AccountAddress>>,
     invalid_transaction_ratio: usize,
     sampling_mode: SamplingMode,
 }
@@ -306,10 +304,13 @@ impl P2PTransactionGeneratorCreator {
     pub fn new(
         txn_factory: TransactionFactory,
         amount: u64,
-        all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
+        all_addresses: Arc<ObjectPool<AccountAddress>>,
         invalid_transaction_ratio: usize,
         sampling_mode: SamplingMode,
     ) -> Self {
+        let mut rng = StdRng::from_entropy();
+        all_addresses.shuffle(&mut rng);
+
         Self {
             txn_factory,
             amount,
