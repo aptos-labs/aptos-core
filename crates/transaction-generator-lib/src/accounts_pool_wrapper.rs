@@ -4,6 +4,7 @@
 use crate::{get_account_to_burn_from_pool, TransactionGenerator, TransactionGeneratorCreator};
 use aptos_infallible::RwLock;
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
+use rand::{rngs::StdRng, SeedableRng};
 use std::sync::Arc;
 
 /// Wrapper that allows inner transaction generator to have unique accounts
@@ -12,16 +13,19 @@ use std::sync::Arc;
 /// and burning (removing accounts from the pool) them - basically using them only once.
 /// (we cannot use more as sequence number is not updated on failure)
 pub struct AccountsPoolWrapperGenerator {
+    rng: StdRng,
     creator: Box<dyn TransactionGenerator>,
     accounts_pool: Arc<RwLock<Vec<LocalAccount>>>,
 }
 
 impl AccountsPoolWrapperGenerator {
     pub fn new(
+        rng: StdRng,
         creator: Box<dyn TransactionGenerator>,
         accounts_pool: Arc<RwLock<Vec<LocalAccount>>>,
     ) -> Self {
         Self {
+            rng,
             creator,
             accounts_pool,
         }
@@ -35,7 +39,7 @@ impl TransactionGenerator for AccountsPoolWrapperGenerator {
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let mut accounts_to_burn =
-            get_account_to_burn_from_pool(&self.accounts_pool, num_to_create);
+            get_account_to_burn_from_pool(&self.accounts_pool, num_to_create, &mut self.rng);
         if accounts_to_burn.is_empty() {
             return Vec::new();
         }
@@ -66,6 +70,7 @@ impl AccountsPoolWrapperCreator {
 impl TransactionGeneratorCreator for AccountsPoolWrapperCreator {
     fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
         Box::new(AccountsPoolWrapperGenerator::new(
+            StdRng::from_entropy(),
             self.creator.create_transaction_generator(),
             self.accounts_pool.clone(),
         ))
