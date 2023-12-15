@@ -16,7 +16,7 @@ use crate::{
         SpecFunId, SpecVarId, StructId, TypeParameter, TypeParameterKind,
     },
     symbol::Symbol,
-    ty::{infer_abilities, infer_and_check_abilities, Constraint, Type, is_phantom_type_arg},
+    ty::{infer_abilities, infer_and_check_abilities, is_phantom_type_arg, Constraint, Type},
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -430,7 +430,14 @@ impl<'env> ModelBuilder<'env> {
     /// if all type params have all abilities.
     pub fn infer_abilities_may_have(&self, ty: &Type) -> AbilitySet {
         // since all type params have all abilities, it doesn't matter whether it's phantom or not
-        infer_abilities(ty, |_| TypeParameterKind { abilities: AbilitySet::ALL, is_phantom: false }, self.gen_get_struct_sig())
+        infer_abilities(
+            ty,
+            |_| TypeParameterKind {
+                abilities: AbilitySet::ALL,
+                is_phantom: false,
+            },
+            self.gen_get_struct_sig(),
+        )
     }
 
     /// Checks whether a struct is well defined.
@@ -440,13 +447,16 @@ impl<'env> ModelBuilder<'env> {
             for (_field_name, (loc, _field_idx, field_ty)) in fields.iter() {
                 // check fields are properly instantiated
                 self.check_instantiation(field_ty, ty_params, loc);
-                if is_phantom_type_arg(|i| {
-                    if let Some(tp) =  ty_params.get(i as usize) {
-                        tp.1.clone()
-                    } else {
-                        panic!("ICE unbound type parameter")
-                    }
-                }, field_ty) {
+                if is_phantom_type_arg(
+                    |i| {
+                        if let Some(tp) = ty_params.get(i as usize) {
+                            tp.1.clone()
+                        } else {
+                            panic!("ICE unbound type parameter")
+                        }
+                    },
+                    field_ty,
+                ) {
                     self.error(loc, "phantom type arguments cannot be used")
                 }
             }

@@ -7,7 +7,9 @@ use itertools::Itertools;
 use move_binary_format::file_format::{Ability, AbilitySet};
 use move_model::{
     ast::TempIndex,
-    model::{FunId, FunctionEnv, Loc, ModuleId, QualifiedId, StructId, TypeParameter, TypeParameterKind},
+    model::{
+        FunId, FunctionEnv, Loc, ModuleId, QualifiedId, StructId, TypeParameter, TypeParameterKind,
+    },
     ty,
     ty::Type,
 };
@@ -144,7 +146,9 @@ fn check_struct_inst(
         ty_args,
         ty_param_kinds(&ty_params),
         get_struct_sig(target),
-        Some((loc, |loc: &Loc, msg: &str| target.global_env().error(loc, msg))),
+        Some((loc, |loc: &Loc, msg: &str| {
+            target.global_env().error(loc, msg)
+        })),
     )
 }
 
@@ -225,11 +229,11 @@ fn check_bytecode(target: &FunctionTarget, bytecode: &Bytecode) {
                     if *dst == *src {
                         check_drop_for_temp_with_msg(target, *dst, &loc, "invalid implicit drop")
                     }
-                }
+                },
                 AssignKind::Move => (),
                 AssignKind::Inferred => {
                     panic!("ICE ability checker given inferred assignment")
-                }
+                },
             }
         },
         Bytecode::Call(attr_id, _, op, srcs, _) => {

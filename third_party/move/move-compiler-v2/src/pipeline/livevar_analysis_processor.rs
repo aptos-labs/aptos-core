@@ -340,7 +340,10 @@ impl<'a> CopyTransformation<'a> {
                 &target,
                 target.get_local_type(temp),
                 &target.get_bytecode_loc(id),
-                &format!("cannot copy {} implicitly", target.get_local_name_for_error_message(temp))
+                &format!(
+                    "cannot copy {} implicitly",
+                    target.get_local_name_for_error_message(temp)
+                ),
             );
         }
         needed
@@ -384,7 +387,10 @@ impl<'a> CopyTransformation<'a> {
                     &target,
                     target.get_local_type(temp),
                     &target.get_bytecode_loc(id),
-                    &format!("cannot copy {} implicitly", target.get_local_name_for_error_message(temp))
+                    &format!(
+                        "cannot copy {} implicitly",
+                        target.get_local_name_for_error_message(temp)
+                    ),
                 );
                 true
             }
@@ -411,7 +417,10 @@ impl<'a> CopyTransformation<'a> {
                 &target,
                 target.get_local_type(temp),
                 &target.get_bytecode_loc(id),
-                &format!("cannot copy {} implicitly", target.get_local_name_for_error_message(temp))
+                &format!(
+                    "cannot copy {} implicitly",
+                    target.get_local_name_for_error_message(temp)
+                ),
             );
         }
     }

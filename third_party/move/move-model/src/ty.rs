@@ -6,7 +6,10 @@
 
 use crate::{
     ast::QualifiedSymbol,
-    model::{GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructEnv, StructId, TypeParameterKind},
+    model::{
+        GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructEnv, StructId,
+        TypeParameterKind,
+    },
     symbol::Symbol,
 };
 use itertools::Itertools;
@@ -2150,7 +2153,7 @@ pub fn instantiate_abilities(
 /// `ty_param_kinds` specifies the abilities and phantomness of the type parameters
 pub fn is_phantom_type_arg<F>(ty_param_kinds: F, ty: &Type) -> bool
 where
-    F: Fn(u16) -> TypeParameterKind
+    F: Fn(u16) -> TypeParameterKind,
 {
     if let Type::TypeParameter(i) = ty {
         ty_param_kinds(*i).is_phantom
@@ -2178,26 +2181,34 @@ where
     let ty_args_abilities_meet = ty_args
         .iter()
         .zip(ty_params)
-        .map(|(ty_arg, TypeParameterKind { abilities: constraints, is_phantom: is_phantom_position })| {
-            let ty_arg_abilities =
-                infer_abilities_opt_check(ty_arg, get_ty_param_kinds, get_struct_sig, on_err);
-            if let Some((loc, on_err)) = on_err {
-                // check ability constraints on the type param
-                if !constraints.is_subset(ty_arg_abilities) {
-                    on_err(loc, "Invalid instantiation")
+        .map(
+            |(
+                ty_arg,
+                TypeParameterKind {
+                    abilities: constraints,
+                    is_phantom: is_phantom_position,
+                },
+            )| {
+                let ty_arg_abilities =
+                    infer_abilities_opt_check(ty_arg, get_ty_param_kinds, get_struct_sig, on_err);
+                if let Some((loc, on_err)) = on_err {
+                    // check ability constraints on the type param
+                    if !constraints.is_subset(ty_arg_abilities) {
+                        on_err(loc, "Invalid instantiation")
+                    }
+                    // check phantomness of the type param
+                    if !is_phantom_position && is_phantom_type_arg(get_ty_param_kinds, ty_arg) {
+                        on_err(loc, "Not a phantom position")
+                    }
                 }
-                // check phantomness of the type param
-                if !is_phantom_position && is_phantom_type_arg(get_ty_param_kinds, ty_arg) {
-                    on_err(loc, "Not a phantom position")
+                if is_phantom_position {
+                    // phantom type parameters don't participte in ability derivations
+                    AbilitySet::ALL
+                } else {
+                    ty_arg_abilities
                 }
-            }
-            if is_phantom_position {
-                // phantom type parameters don't participte in ability derivations
-                AbilitySet::ALL
-            } else {
-                ty_arg_abilities
-            }
-        })
+            },
+        )
         .fold(AbilitySet::ALL, AbilitySet::intersect);
     instantiate_abilities(struct_abilities, ty_args_abilities_meet)
 }

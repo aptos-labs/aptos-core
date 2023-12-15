@@ -79,7 +79,9 @@ impl<'a> ExplicitDropTransformer<'a> {
     /// Add explicit drops at the given code offset.
     fn explicit_drops_at(&mut self, code_offset: CodeOffset, bytecode: &Bytecode) {
         match bytecode {
-            Bytecode::Ret(..) | Bytecode::Jump(..) | Bytecode::Abort(..) | Bytecode::Branch(..) => (),
+            Bytecode::Ret(..) | Bytecode::Jump(..) | Bytecode::Abort(..) | Bytecode::Branch(..) => {
+                ()
+            },
             _ => {
                 let released_temps = self.released_temps_at(code_offset);
                 self.drop_temps(&released_temps, bytecode.get_attr_id())
@@ -98,7 +100,10 @@ impl<'a> ExplicitDropTransformer<'a> {
         let live_var_info = self.get_live_var_info(start_code_offset);
         let lifetime_info = self.get_lifetime_info(start_code_offset);
         for arg in self.target.get_parameters() {
-            if !self.is_primitive(arg) && !live_var_info.before.contains_key(&arg) && !lifetime_info.before.is_borrowed(arg) {
+            if !self.is_primitive(arg)
+                && !live_var_info.before.contains_key(&arg)
+                && !lifetime_info.before.is_borrowed(arg)
+            {
                 // a non-native function has at least one instruction; a single return or abort at minimum
                 let attr_id = self.target.get_bytecode()[start_code_offset as usize].get_attr_id();
                 self.drop_temp(arg, attr_id)

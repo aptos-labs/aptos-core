@@ -30,8 +30,8 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{
-        NoUnificationContext, PrimitiveType, ReferenceKind, Type, TypeDisplayContext,
-        TypeUnificationAdapter, Variance, infer_abilities,
+        infer_abilities, NoUnificationContext, PrimitiveType, ReferenceKind, Type,
+        TypeDisplayContext, TypeUnificationAdapter, Variance,
     },
     well_known,
 };
@@ -50,7 +50,7 @@ use move_binary_format::{
     file_format::{
         AccessKind, Bytecode, CodeOffset, Constant as VMConstant, ConstantPoolIndex,
         FunctionDefinitionIndex, FunctionHandleIndex, SignatureIndex, SignatureToken,
-        StructDefinitionIndex
+        StructDefinitionIndex,
     },
     normalized::Type as MType,
     views::{FunctionDefinitionView, FunctionHandleView, StructHandleView},
@@ -1236,7 +1236,7 @@ impl GlobalEnv {
                     .map(|tp| tp.1.clone())
                     .collect_vec();
                 (ty_params, struct_abilities)
-            }
+            },
         )
     }
 
