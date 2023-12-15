@@ -79,7 +79,8 @@ impl<'a> ExplicitDropTransformer<'a> {
     /// Add explicit drops at the given code offset.
     fn explicit_drops_at(&mut self, code_offset: CodeOffset, bytecode: &Bytecode) {
         match bytecode {
-            Bytecode::Ret(..) | Bytecode::Jump(..) | Bytecode::Abort(..) | Bytecode::Branch(..) => {},
+            Bytecode::Ret(..) | Bytecode::Jump(..) | Bytecode::Abort(..) | Bytecode::Branch(..) => {
+            },
             _ => {
                 let released_temps = self.released_temps_at(code_offset);
                 self.drop_temps(&released_temps, bytecode.get_attr_id())
