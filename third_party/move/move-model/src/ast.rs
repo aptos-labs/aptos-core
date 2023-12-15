@@ -561,8 +561,8 @@ impl From<Exp> for ExpData {
 
 /// Rewrite result
 pub enum RewriteResult {
-    Rewritten(Exp), // was OK
-    Unchanged(Exp), // was Error
+    Rewritten(Exp),
+    Unchanged(Exp),
 }
 
 impl ExpData {

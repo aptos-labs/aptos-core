@@ -668,10 +668,8 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         for arg_exp in non_lambda_function_args {
             env.error(
                 &env.get_node_loc(arg_exp.as_ref().node_id()),
-                concat!(
-                    "Currently, a function-typed parameter to an inline function",
-                    " must be a literal lambda expression",
-                ),
+                "Currently, a function-typed parameter to an inline function \
+                 must be a literal lambda expression",
             );
         }
 
@@ -769,10 +767,8 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                     let node_loc = env.get_node_loc(*node_id);
                     env.error(
                         &node_loc,
-                        concat!(
-                            "Return not currently supported in function-typed arguments",
-                            " (lambda expressions)"
-                        ),
+                        "Return not currently supported in function-typed arguments \
+                         (lambda expressions)",
                     )
                 },
                 ExpData::LoopCont(node_id, is_continue) if !up && in_loop == 0 => {
@@ -780,10 +776,8 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                     env.error(
                         &node_loc,
                         &format!(
-                            concat!(
-                                "{} outside of a loop not supported in function-typed arguments",
-                                " (lambda expressions)"
-                            ),
+                            "{} outside of a loop not supported in function-typed arguments \
+                             (lambda expressions)",
                             if *is_continue { "Continue" } else { "Break" }
                         ),
                     )
@@ -1011,7 +1005,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
                 let node_loc = self.env.get_node_loc(*node_id);
                 self.env.error(
                     &node_loc,
-                    concat!("Return not currently supported in inline functions"),
+                    "Return not currently supported in inline functions",
                 );
                 false
             },
@@ -1093,10 +1087,8 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
                 Severity::Bug,
                 &loc,
                 &format!(
-                    concat!(
-                        "Temporary with invalid index `{}` during inlining",
-                        " of function with `{}` parameters"
-                    ),
+                    "Temporary with invalid index `{}` during inlining \
+                     of function with `{}` parameters",
                     idx,
                     self.inlined_formal_params.len()
                 ),
