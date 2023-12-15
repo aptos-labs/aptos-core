@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{constants::BLOB_STORAGE_SIZE, EncodedTransactionWithVersion};
-use anyhow::{bail, Context, Ok};
+use anyhow::Context;
 use redis::{AsyncCommands, RedisError, RedisResult};
 
 // Configurations for cache.
@@ -26,42 +26,22 @@ const BASE_EXPIRATION_EPOCH_TIME_IN_SECONDS: u64 = 253_402_300_799;
 const CACHE_DEFAULT_LATEST_VERSION_NUMBER: &str = "0";
 const FILE_STORE_LATEST_VERSION: &str = "file_store_latest_version";
 
-// Returns 1 if the chain id is updated or verified. Otherwise(chain id not match), returns 0.
-// TODO(larry): add a test for this script.
-const CACHE_SCRIPT_UPDATE_OR_VERIFY_CHAIN_ID: &str = r#"
-    local chain_id = redis.call("GET", KEYS[1])
-    if chain_id then
-        if chain_id == ARGV[1] then
-            return 1
-        else
-            return 0
-        end
-    else
-        redis.call("SET", KEYS[1], ARGV[1])
-        return 1
-    end
-"#;
-
 /// This Lua script is used to update the latest version in cache.
 ///   Returns 0 if the cache is updated to 0 or sequentially update.
-///   Returns 1 if the cache is updated but overlap detected.
-///   Returns 2 if the cache is not updated and gap detected.
-const CACHE_SCRIPT_UPDATE_LATEST_VERSION: &str = r#"
+///   Returns 1 if the cache is not updated and gap detected.
+const CACHE_SCRIPT_UPDATE_LATEST_VERSION_WITH_CHECK: &str = r#"
     local latest_version = redis.call("GET", KEYS[1])
-    local num_of_versions = tonumber(ARGV[1])
-    local current_version = tonumber(ARGV[2])
+    local start_version = tonumber(ARGV[1])
+    local end_version_inclusive = tonumber(ARGV[2])
     if latest_version then
-        if tonumber(latest_version) + num_of_versions < current_version then
-            return 2
-        elseif tonumber(latest_version) + num_of_versions == current_version then
-            redis.call("SET", KEYS[1], current_version)
-            return 0
-        else
-            redis.call("SET", KEYS[1], math.max(current_version, tonumber(latest_version)))
+        if tonumber(latest_version) < start_version then
             return 1
+        else
+            redis.call("SET", KEYS[1], math.max(tonumber(latest_version), end_version_inclusive))
+            return 0
         end
     else
-        redis.call("SET", KEYS[1], ARGV[1])
+        redis.call("SET", KEYS[1], end_version_inclusive)
         return 0
     end
 "#;
@@ -152,9 +132,12 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
     //     Ok(())
     // }
 
-    pub async fn set_chain_id(&mut self) -> anyhow::Result<Option<u64>> {
-        // TODO
-        self.get_config_by_key(CACHE_KEY_CHAIN_ID).await
+    pub async fn set_chain_id(&mut self, chain_id: u64) -> anyhow::Result<()> {
+        self.conn
+            .set(CACHE_KEY_CHAIN_ID, chain_id)
+            .await
+            .context("Redis chain id update failed.")?;
+        Ok(())
     }
 
     pub async fn get_chain_id(&mut self) -> anyhow::Result<Option<u64>> {
@@ -256,7 +239,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
 
     // Overwrite the latest version in cache.
     // Only call this function during cache worker startup.
-    pub async fn overwrite_cache_latest_version(&mut self, version: u64) -> anyhow::Result<()> {
+    pub async fn update_cache_latest_version(&mut self, version: u64) -> anyhow::Result<()> {
         self.conn
             .set(CACHE_KEY_LATEST_VERSION, version)
             .await
@@ -265,27 +248,29 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
     }
 
     // Update the latest version in cache.
-    pub async fn update_cache_latest_version(
+    pub async fn update_cache_latest_version_with_check(
         &mut self,
-        num_of_versions: u64,
-        version: u64,
+        start_version: u64,
+        end_version_inclusive: u64,
     ) -> anyhow::Result<()> {
-        let script = redis::Script::new(CACHE_SCRIPT_UPDATE_LATEST_VERSION);
+        let script = redis::Script::new(CACHE_SCRIPT_UPDATE_LATEST_VERSION_WITH_CHECK);
         tracing::debug!(
-            num_of_versions = num_of_versions,
-            version = version,
+            start_version = start_version,
+            end_version_inclusive = end_version_inclusive,
             "Updating latest version in cache."
         );
         match script
             .key(CACHE_KEY_LATEST_VERSION)
-            .arg(num_of_versions)
-            .arg(version)
+            .arg(start_version)
+            .arg(end_version_inclusive)
             .invoke_async(&mut self.conn)
             .await
             .context("Redis latest version update failed.")?
         {
-            2 => {
-                tracing::error!(version=version, "Redis latest version update failed. The version is beyond the next expected version.");
+            1 => {
+                tracing::error!(
+                    end_version_inclusive=end_version_inclusive,
+                    "Redis latest version update failed. The version is beyond the next expected version.");
                 Err(anyhow::anyhow!("Version is not right."))
             },
             _ => Ok(()),
@@ -553,22 +538,7 @@ mod tests {
         let mut cache_operator: CacheOperator<MockRedisConnection> =
             CacheOperator::new(mock_connection);
 
-        assert_eq!(cache_operator.get_chain_id().await.unwrap(), 123);
-    }
-
-    // Cache latest version tests.
-    #[tokio::test]
-    async fn cache_latest_version_ok() {
-        let version = 123_u64;
-        let cmds = vec![MockCmd::new(
-            redis::cmd("GET").arg(CACHE_KEY_LATEST_VERSION),
-            Ok(version.to_string()),
-        )];
-        let mock_connection = MockRedisConnection::new(cmds);
-        let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
-
-        assert_eq!(cache_operator.get_latest_version().await.unwrap(), version);
+        assert_eq!(cache_operator.get_chain_id().await.unwrap(), Some(123));
     }
 
     // Cache update cache transactions tests.

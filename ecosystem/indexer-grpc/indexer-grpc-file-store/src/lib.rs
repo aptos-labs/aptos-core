@@ -4,7 +4,7 @@
 pub mod metrics;
 pub mod worker;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use aptos_indexer_grpc_server_framework::RunnableConfig;
 use aptos_indexer_grpc_utils::{config::IndexerGrpcFileStoreConfig, types::RedisUrl};
 use serde::{Deserialize, Serialize};
@@ -38,7 +38,7 @@ impl IndexerGrpcFileStoreWorkerConfig {
 #[async_trait::async_trait]
 impl RunnableConfig for IndexerGrpcFileStoreWorkerConfig {
     async fn run(&self) -> Result<()> {
-        let mut processor = Worker::run(
+        Worker::run(
             self.redis_main_instance_address.clone(),
             self.file_store_config.clone(),
             self.enable_expensive_logging.unwrap_or(false),

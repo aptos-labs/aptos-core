@@ -191,17 +191,11 @@ impl RawData for RawDataServerWrapper {
 
                 // Validate redis chain id
                 let chain_id = match cache_operator.get_chain_id().await {
-                    Ok(chain_id) => chain_id,
+                    Ok(Some(chain_id)) => chain_id,
+                    Ok(None) => panic!("Chain id must be present at this point."),
                     Err(e) => {
                         ERROR_COUNT
                             .with_label_values(&["redis_get_chain_id_failed"])
-                            .inc();
-                        SHORT_CONNECTION_COUNT
-                            .with_label_values(&[
-                                request_metadata.request_api_key_name.as_str(),
-                                request_metadata.request_email.as_str(),
-                                request_metadata.processor_name.as_str(),
-                            ])
                             .inc();
                         // Connection will be dropped anyway, so we ignore the error here.
                         let _result = tx
