@@ -7,7 +7,7 @@ use itertools::Itertools;
 use move_binary_format::file_format::{Ability, AbilitySet};
 use move_model::{
     ast::TempIndex,
-    model::{FunId, FunctionEnv, Loc, ModuleId, QualifiedId, StructId, TypeParameter},
+    model::{FunId, FunctionEnv, Loc, ModuleId, QualifiedId, StructId, TypeParameter, TypeParameterKind},
     ty,
     ty::Type,
 };
@@ -99,10 +99,10 @@ fn check_key_for_struct(
     }
 }
 
-fn ty_param_abilities(ty_params: &[TypeParameter]) -> impl Fn(u16) -> AbilitySet + Copy + '_ {
+fn ty_param_abilities(ty_params: &[TypeParameter]) -> impl Fn(u16) -> TypeParameterKind + Copy + '_ {
     |i| {
         if let Some(tp) = ty_params.get(i as usize) {
-            tp.1.abilities
+            tp.1.clone()
         } else {
             panic!("ICE ability checker: unbound type parameter")
         }
@@ -111,7 +111,7 @@ fn ty_param_abilities(ty_params: &[TypeParameter]) -> impl Fn(u16) -> AbilitySet
 
 fn get_abilities<'a>(
     target: &'a FunctionTarget,
-) -> impl Fn(ModuleId, StructId) -> (Vec<AbilitySet>, AbilitySet) + Copy + 'a {
+) -> impl Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy + 'a {
     |mid, sid| {
         let qid = QualifiedId {
             module_id: mid,
@@ -119,12 +119,12 @@ fn get_abilities<'a>(
         };
         let struct_env = target.global_env().get_struct(qid);
         let struct_abilities = struct_env.get_abilities();
-        let params_ability_constraints = struct_env
+        let ty_param_kinds = struct_env
             .get_type_parameters()
             .iter()
-            .map(|tp| tp.1.abilities)
+            .map(|tp| tp.1.clone())
             .collect_vec();
-        (params_ability_constraints, struct_abilities)
+        (ty_param_kinds, struct_abilities)
     }
 }
 

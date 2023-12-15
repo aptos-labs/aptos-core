@@ -13,10 +13,10 @@ use crate::{
     intrinsics::IntrinsicDecl,
     model::{
         FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId, QualifiedInstId,
-        SpecFunId, SpecVarId, StructId, TypeParameter,
+        SpecFunId, SpecVarId, StructId, TypeParameter, TypeParameterKind,
     },
     symbol::Symbol,
-    ty::{infer_abilities, infer_and_check_abilities, Constraint, Type},
+    ty::{infer_abilities, infer_and_check_abilities, Constraint, Type, is_phantom_type_arg},
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -390,21 +390,21 @@ impl<'env> ModelBuilder<'env> {
             .expect("invalid Type::Struct")
     }
 
-    /// returns the abilities for the generics and the abilities of the struct
-    fn get_abilities(&self, mid: ModuleId, sid: StructId) -> (Vec<AbilitySet>, AbilitySet) {
+    /// returns the type parameter kinds and the abilities of the struct
+    fn get_abilities(&self, mid: ModuleId, sid: StructId) -> (Vec<TypeParameterKind>, AbilitySet) {
         let struct_entry = self.lookup_struct_entry(mid.qualified(sid));
         let struct_abilities = struct_entry.abilities;
-        let params_ability_constraints = struct_entry
+        let ty_param_kinds = struct_entry
             .type_params
             .iter()
-            .map(|tp| tp.1.abilities)
+            .map(|tp| tp.1.clone())
             .collect_vec();
-        (params_ability_constraints, struct_abilities)
+        (ty_param_kinds, struct_abilities)
     }
 
     fn gen_get_abilities(
         &self,
-    ) -> impl Fn(ModuleId, StructId) -> (Vec<AbilitySet>, AbilitySet) + Copy + '_ {
+    ) -> impl Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy + '_ {
         |mid, sid| self.get_abilities(mid, sid)
     }
 
@@ -415,7 +415,7 @@ impl<'env> ModelBuilder<'env> {
             ty,
             |i| {
                 if let Some(tp) = ty_params.get(i as usize) {
-                    tp.1.abilities
+                    tp.1.clone()
                 } else {
                     panic!("ICE unbound type parameter")
                 }
@@ -429,7 +429,8 @@ impl<'env> ModelBuilder<'env> {
     /// Infers the abilities the given type may have,
     /// if all type params have all abilities.
     pub fn infer_abilities_may_have(&self, ty: &Type) -> AbilitySet {
-        infer_abilities(ty, |_| AbilitySet::ALL, self.gen_get_abilities())
+        // since all type params have all abilities, it doesn't matter whether it's phantom or not
+        infer_abilities(ty, |_| TypeParameterKind { abilities: AbilitySet::ALL, is_phantom: false }, self.gen_get_abilities())
     }
 
     /// Checks whether a struct is well defined.
@@ -439,6 +440,15 @@ impl<'env> ModelBuilder<'env> {
             for (_field_name, (loc, _field_idx, field_ty)) in fields.iter() {
                 // check fields are properly instantiated
                 self.check_instantiation(field_ty, ty_params, loc);
+                if is_phantom_type_arg(|i| {
+                    if let Some(tp) =  ty_params.get(i as usize) {
+                        tp.1.clone()
+                    } else {
+                        panic!("ICE unbound type parameter")
+                    }
+                }, field_ty) {
+                    self.error(loc, "phantom type arguments cannot be used")
+                }
             }
         }
     }

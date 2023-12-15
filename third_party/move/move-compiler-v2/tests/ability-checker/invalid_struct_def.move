@@ -32,4 +32,22 @@ module 0x42::ability {
 		y: T,
 		x: ConditionalDrop<Impotent>
 	}
+
+	struct S1<T> {
+		x: Foo<T>,
+	}
+
+	struct S2<phantom T> {
+		x: T
+	}
+
+	struct S3<phantom T> {
+		x: S<T>
+	}
+
+	struct S4<phantom T> has drop {}
+
+	struct S5 has drop {
+		x: S4<Impotent>
+	}
 }

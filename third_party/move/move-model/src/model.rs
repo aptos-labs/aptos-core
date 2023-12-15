@@ -1222,7 +1222,7 @@ impl GlobalEnv {
             ty,
             |i| {
                 if let Some(tp) = ty_params.get(i as usize) {
-                    tp.1.abilities
+                    tp.1.clone()
                 } else {
                     panic!("ICE unbound type parameter")
                 }
@@ -1230,12 +1230,12 @@ impl GlobalEnv {
             |mid, sid| {
                 let struct_env = self.get_struct(mid.qualified(sid));
                 let struct_abilities = struct_env.get_abilities();
-                let params_ability_constraints = struct_env
+                let ty_params = struct_env
                     .get_type_parameters()
                     .iter()
-                    .map(|tp| tp.1.abilities)
+                    .map(|tp| tp.1.clone())
                     .collect_vec();
-                (params_ability_constraints, struct_abilities)
+                (ty_params, struct_abilities)
             }
         )
     }
