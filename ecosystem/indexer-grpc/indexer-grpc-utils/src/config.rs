@@ -11,14 +11,19 @@ pub struct GcsFileStore {
     pub gcs_file_store_bucket_name: String,
     // Required to operate on GCS.
     pub gcs_file_store_service_account_key_path: String,
-
+    #[serde(default = "default_storage_format")]
     storage_format: StorageFormat,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LocalFileStore {
     pub local_file_store_path: PathBuf,
+    #[serde(default = "default_storage_format")]
     storage_format: StorageFormat,
+}
+
+fn default_storage_format() -> StorageFormat {
+    StorageFormat::JsonBase64UncompressedProto
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

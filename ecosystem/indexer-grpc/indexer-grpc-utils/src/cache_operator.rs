@@ -38,7 +38,7 @@ const CACHE_SCRIPT_UPDATE_LATEST_VERSION_WITH_CHECK: &str = r#"
     local start_version = tonumber(ARGV[1])
     local end_version_inclusive = tonumber(ARGV[2])
     if latest_version then
-        if tonumber(latest_version) < start_version then
+        if tonumber(latest_version) + 1 < start_version then
             return 1
         else
             redis.call("SET", KEYS[1], math.max(tonumber(latest_version), end_version_inclusive))
@@ -122,23 +122,6 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         }
         Ok(version_inserted)
     }
-
-    // Update the chain id in cache if missing; otherwise, verify the chain id.
-    // It's a fatal error if the chain id is not correct.
-    // TODO: remove and use getter and setters
-    // pub async fn update_or_verify_chain_id(&mut self, chain_id: u64) -> anyhow::Result<()> {
-    //     let script = redis::Script::new(CACHE_SCRIPT_UPDATE_OR_VERIFY_CHAIN_ID);
-    //     let result: u8 = script
-    //         .key(CACHE_KEY_CHAIN_ID)
-    //         .arg(chain_id)
-    //         .invoke_async(&mut self.conn)
-    //         .await
-    //         .context("Redis chain id update/verification failed.")?;
-    //     if result != 1 {
-    //         anyhow::bail!("Chain id is not correct.");
-    //     }
-    //     Ok(())
-    // }
 
     pub async fn set_chain_id(&mut self, chain_id: u64) -> anyhow::Result<()> {
         self.conn
@@ -309,6 +292,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
             1 => {
                 tracing::error!(
                     end_version_inclusive=end_version_inclusive,
+                    start_version=start_version,
                     "Redis latest version update failed. The version is beyond the next expected version.");
                 Err(anyhow::anyhow!("Version is not right."))
             },
@@ -353,7 +337,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
     }
 
     /// Fail if not all transactions requested are returned
-    pub async fn batch_get_encoded_proto_data_x(
+    pub async fn batch_get_transactions(
         &mut self,
         start_version: u64,
         transaction_count: u64,

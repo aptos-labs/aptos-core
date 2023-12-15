@@ -69,12 +69,14 @@ impl Worker {
         ensure!(metadata.chain_id == chain_id, "Chain ID mismatch.");
         let mut batch_start_version = metadata.version;
         // Cache config in the cache
+        cache_operator.cache_setup_if_needed().await?;
         match cache_operator.get_chain_id().await? {
             Some(id) => {
                 ensure!(id == chain_id, "Chain ID mismatch.");
             },
             None => {
                 cache_operator.set_chain_id(chain_id).await?;
+                
             },
         }
         cache_operator
@@ -114,7 +116,7 @@ impl Worker {
                 let mut file_store_operator_clone = file_store_operator.clone_box();
                 let task = tokio::spawn(async move {
                     let transactions = cache_operator_clone
-                        .batch_get_encoded_proto_data_x(start_version, BLOB_STORAGE_SIZE as u64)
+                        .batch_get_transactions(start_version, BLOB_STORAGE_SIZE as u64)
                         .await
                         .unwrap();
                     let last_transaction = transactions.last().unwrap().clone();

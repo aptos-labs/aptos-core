@@ -65,6 +65,7 @@ pub struct RawDataServerWrapper {
     pub redis_client: Arc<redis::Client>,
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub data_service_response_channel_size: usize,
+    pub cache_storage_format: storage_format::StorageFormat,
 }
 
 impl RawDataServerWrapper {
@@ -72,6 +73,7 @@ impl RawDataServerWrapper {
         redis_address: RedisUrl,
         file_store_config: IndexerGrpcFileStoreConfig,
         data_service_response_channel_size: usize,
+        cache_storage_format: storage_format::StorageFormat,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             redis_client: Arc::new(
@@ -81,6 +83,7 @@ impl RawDataServerWrapper {
             ),
             file_store_config,
             data_service_response_channel_size,
+            cache_storage_format,
         })
     }
 }
@@ -148,7 +151,7 @@ impl RawData for RawDataServerWrapper {
         );
 
         let redis_client = self.redis_client.clone();
-        let storage_format = storage_format::StorageFormat::GzipCompressionProto;
+        let storage_format = self.cache_storage_format;
         tokio::spawn({
             let request_metadata = request_metadata.clone();
             async move {
