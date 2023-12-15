@@ -25,6 +25,7 @@ This module provides an interface to burn or collect and redistribute transactio
 -  [Function `initialize_storage_refund`](#0x1_transaction_fee_initialize_storage_refund)
 -  [Function `emit_fee_statement`](#0x1_transaction_fee_emit_fee_statement)
 -  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
     -  [Resource `CollectedFeesPerBlock`](#@Specification_1_CollectedFeesPerBlock)
     -  [Function `initialize_fee_collection_and_distribution`](#@Specification_1_initialize_fee_collection_and_distribution)
     -  [Function `upgrade_burn_percentage`](#@Specification_1_upgrade_burn_percentage)
@@ -691,8 +692,72 @@ Only called during genesis.
 
 
 
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Property</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>Given the blockchain is in an operating state, it guarantees that the Aptos framework signer may burn Aptos coins.</td>
+<td>Critical</td>
+<td>The AptosCoinCapabilities structure is defined in this module and it stores burn capability to burn the gas fees.</td>
+<td>Formally Verified via <a href="#high-level-req-1">module</a>.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>The initialization function may only be called once.</td>
+<td>Medium</td>
+<td>The initialize_fee_collection_and_distribution function ensures CollectedFeesPerBlock does not already exist.</td>
+<td>Formally verified via <a href="#high-level-req-2">initialize_fee_collection_and_distribution</a>.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>Only the admin address is authorized to call the initialization function.</td>
+<td>Critical</td>
+<td>The initialize_fee_collection_and_distribution function ensures only the Aptos framework address calls it.</td>
+<td>Formally verified via <a href="#high-level-req-3">initialize_fee_collection_and_distribution</a>.</td>
+</tr>
+
+<tr>
+<td>4</td>
+<td>The percentage of the burnt collected fee is always a value from 0 to 100.</td>
+<td>Medium</td>
+<td>During the initialization of CollectedFeesPerBlock in Initialize_fee_collection_and_distribution, and while upgrading burn percentage, it asserts that burn_percentage is within the specified limits.</td>
+<td>Formally verified via <a href="#high-level-req-4">CollectedFeesPerBlock</a>.</td>
+</tr>
+
+<tr>
+<td>5</td>
+<td>Prior to upgrading the burn percentage, it must process all the fees collected up to that point.</td>
+<td>Critical</td>
+<td>The upgrade_burn_percentage function ensures process_collected_fees function is called before updating the burn percentage.</td>
+<td>Formally verified in <a href="#high-level-req-5">ProcessCollectedFeesRequiresAndEnsures</a>.</td>
+</tr>
+
+<tr>
+<td>6</td>
+<td>The presence of the resource, indicating collected fees per block under the Aptos framework account, Registering a block proposer. Processing collected fees.</td>
+<td>Low</td>
+<td>The functions: upgrade_burn_percentage, register_proposer_for_fee_collection, and process_collected_fees all ensure that the CollectedFeesPerBlock resource exists under aptos_framework by calling the is_fees_collection_enabled method, which returns a boolean value confirming if the resource exists or not.</td>
+<td>Formally verified via <a href="#high-level-req-6.1">register_proposer_for_fee_collection</a>, <a href="#high-level-req-6.1">process_collected_fees</a>, and <a href="#high-level-req-6.1">upgrade_burn_percentage</a>.</td>
+</tr>
+
+</table>
+
+
+
+
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
+// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
 <b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework);
 </code></pre>
 
@@ -731,7 +796,8 @@ Only called during genesis.
 
 
 
-<pre><code><b>invariant</b> burn_percentage &lt;= 100;
+<pre><code>// This enforces <a id="high-level-req-4" href="#high-level-req">high level requirement 4</a>:
+<b>invariant</b> burn_percentage &lt;= 100;
 </code></pre>
 
 
@@ -747,9 +813,11 @@ Only called during genesis.
 
 
 
-<pre><code><b>aborts_if</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework);
+<pre><code>// This enforces <a id="high-level-req-2" href="#high-level-req">high level requirement 2</a>:
+<b>aborts_if</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework);
 <b>aborts_if</b> burn_percentage &gt; 100;
 <b>let</b> aptos_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+// This enforces <a id="high-level-req-3" href="#high-level-req">high level requirement 3</a>:
 <b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(aptos_addr);
 <b>aborts_if</b> <b>exists</b>&lt;ValidatorFees&gt;(aptos_addr);
 <b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a> { <a href="account.md#0x1_account">account</a>: aptos_framework };
@@ -775,6 +843,7 @@ Only called during genesis.
 <pre><code><b>aborts_if</b> new_burn_percentage &gt; 100;
 <b>let</b> aptos_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(aptos_addr);
+// This enforces <a id="high-level-req-5" href="#high-level-req">high level requirement 5</a> and <a id="high-level-req-6.3" href="#high-level-req">high level requirement 6</a>:
 <b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_ProcessCollectedFeesRequiresAndEnsures">ProcessCollectedFeesRequiresAndEnsures</a>;
 <b>ensures</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework) ==&gt;
     <b>global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework).burn_percentage == new_burn_percentage;
@@ -794,6 +863,7 @@ Only called during genesis.
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
+// This enforces <a id="high-level-req-6.1" href="#high-level-req">high level requirement 6</a>:
 <b>ensures</b> <a href="transaction_fee.md#0x1_transaction_fee_is_fees_collection_enabled">is_fees_collection_enabled</a>() ==&gt;
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(<b>global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework).proposer) == proposer_addr;
 </code></pre>
@@ -898,7 +968,8 @@ Only called during genesis.
 
 
 
-<pre><code><b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_ProcessCollectedFeesRequiresAndEnsures">ProcessCollectedFeesRequiresAndEnsures</a>;
+<pre><code>// This enforces <a id="high-level-req-6.2" href="#high-level-req">high level requirement 6</a>:
+<b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_ProcessCollectedFeesRequiresAndEnsures">ProcessCollectedFeesRequiresAndEnsures</a>;
 </code></pre>
 
 

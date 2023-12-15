@@ -5,22 +5,22 @@ spec aptos_framework::managed_coin {
     /// Criticality: Critical
     /// Implementation: The capabilities are stored under the initializing account under the Capabilities resource,
     /// which is distinct for a distinct type of coin.
-    /// Enforcement: Enforced via: initialize
+    /// Enforcement: Enforced via [high-level-req-1](initialize).
     ///
     /// No.: 2
     /// Property: A new coin should be properly initialized.
     /// Criticality: High
     /// Implementation: In the initialize function, a new coin is initialized via the coin module with the specified
     /// properties.
-    /// Enforcement: Enforced via: initialize_internal
+    /// Enforcement: Enforced via [coin::high-level-req-2](initialize_internal).
     ///
     /// No.: 3
     /// Property: Minting/Burning should only be done by the account who hold the valid capabilities.
     /// Criticality: High
     /// Implementation: The mint and burn capabilities are moved under the initializing account and retrieved, while
     /// minting/burning
-    /// Enforcement: Enforced via: [managed_coin::high-level-spec-3.1](initialize), [high-level-spec-3.2](burn),
-    /// [high-level-spec-3.3](mint).
+    /// Enforcement: Enforced via: [high-level-req-3.1](initialize), [high-level-req-3.2](burn),
+    /// [high-level-req-3.3](mint).
     ///
     /// No.: 4
     /// Property: If the total supply of coins is being monitored, burn and mint operations will appropriately adjust
@@ -28,14 +28,21 @@ spec aptos_framework::managed_coin {
     /// Criticality: High
     /// Implementation: The coin::burn and coin::mint functions, when tracking the supply, adjusts the total coin
     /// supply accordingly.
-    /// Enforcement: Formally Verified: TotalSupplyNoChange
+    /// Enforcement: Enforced via [coin::high-level-req-4](TotalSupplyNoChange).
     ///
     /// No.: 5
     /// Property: Before burning coins, exact amount of coins are withdrawn.
     /// Criticality: High
     /// Implementation: After utilizing the coin::withdraw function to withdraw coins, they are then burned,
     /// and the function ensures the precise return of the initially specified coin amount.
-    /// Enforcement: Enforced via: burn_from
+    /// Enforcement: Enforced via [coin::high-level-req-5](burn_from).
+    ///
+    /// No.: 6
+    /// Property: Minted coins are deposited to the provided destination address.
+    /// Criticality: High
+    /// Implementation: After the coins are minted via coin::mint they are deposited into the coinstore of the
+    /// destination address.
+    /// Enforcement: Enforced via [high-level-req-6](mint).
     /// </high-level-req>
     ///
     spec module {
@@ -58,6 +65,7 @@ spec aptos_framework::managed_coin {
 
         // Resource CoinStore<CoinType> should exists in the signer.
         /// [high-level-spec-3.2]
+        /// [high-level-spec-4.1]
         aborts_if !exists<coin::CoinStore<CoinType>>(account_addr);
 
         // Account should not be frozen and should have sufficient balance.
@@ -91,7 +99,8 @@ spec aptos_framework::managed_coin {
         aborts_if !string::spec_internal_check_utf8(name);
         aborts_if !string::spec_internal_check_utf8(symbol);
         aborts_if exists<Capabilities<CoinType>>(signer::address_of(account));
-        /// [managed_coin::high-level-spec-3.1]
+        /// [high-level-req-1]
+        /// [high-level-req-3.1]
         ensures exists<Capabilities<CoinType>>(signer::address_of(account));
     }
 
@@ -113,6 +122,7 @@ spec aptos_framework::managed_coin {
         aborts_if coin_store.frozen;
         include coin::CoinAddAbortsIf<CoinType>;
         ensures coin::supply<CoinType> == old(coin::supply<CoinType>) + amount;
+        /// [high-level-req-6]
         ensures global<coin::CoinStore<CoinType>>(dst_addr).coin.value == old(global<coin::CoinStore<CoinType>>(dst_addr)).coin.value + amount;
     }
 
