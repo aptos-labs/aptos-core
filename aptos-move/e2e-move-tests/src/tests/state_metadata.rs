@@ -35,7 +35,7 @@ fn test_metadata_tracking() {
     // Observe that metadata is not tracked for address2 resources
     assert_eq!(
         harness.read_resource_metadata(&address2, coin_store.clone()),
-        Some(None),
+        Some(StateValueMetadata::none()),
     );
 
     // Enable storage slot metadata tracking
@@ -59,7 +59,7 @@ fn test_metadata_tracking() {
     // Observe that metadata is tracked for address3 resources
     assert_eq!(
         harness.read_resource_metadata(&address3, coin_store.clone()),
-        Some(Some(StateValueMetadata::new(slot_fee, &timestamp,))),
+        Some(StateValueMetadata::legacy(slot_fee, &timestamp)),
     );
 
     // Bump the timestamp and modify the resources, observe that metadata doesn't change.
@@ -74,10 +74,10 @@ fn test_metadata_tracking() {
     );
     assert_eq!(
         harness.read_resource_metadata(&address2, coin_store.clone()),
-        Some(None),
+        Some(StateValueMetadata::none()),
     );
     assert_eq!(
         harness.read_resource_metadata(&address3, coin_store),
-        Some(Some(StateValueMetadata::new(slot_fee, &timestamp))),
+        Some(StateValueMetadata::legacy(slot_fee, &timestamp)),
     );
 }

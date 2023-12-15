@@ -5,10 +5,7 @@ use crate::move_vm_ext::{session::BytesWithResourceLayout, AptosMoveResolver};
 use aptos_aggregator::delta_change_set::serialize;
 use aptos_types::{
     on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
-    state_store::{
-        state_key::StateKey,
-        state_value::{StateValueMetadata, StateValueMetadataKind},
-    },
+    state_store::{state_key::StateKey, state_value::StateValueMetadata},
     write_set::WriteOp,
 };
 use aptos_vm_types::{
@@ -154,7 +151,7 @@ impl<'r> WriteOpConverter<'r> {
             if let Some(current_time) = CurrentTimeMicroseconds::fetch_config(remote) {
                 // The deposit on the metadata is a placeholder (0), it will be updated later when
                 // storage fee is charged.
-                new_slot_metadata = Some(StateValueMetadata::new(0, &current_time));
+                new_slot_metadata = Some(StateValueMetadata::placeholder(&current_time));
             }
         }
 
@@ -247,11 +244,13 @@ impl<'r> WriteOpConverter<'r> {
             };
 
             let legacy_op = match current_op {
-                MoveStorageOp::Delete => (WriteOp::Deletion, None),
+                MoveStorageOp::Delete => (WriteOp::legacy_deletion(), None),
                 MoveStorageOp::Modify((data, maybe_layout)) => {
-                    (WriteOp::Modification(data), maybe_layout)
+                    (WriteOp::legacy_modification(data), maybe_layout)
                 },
-                MoveStorageOp::New((data, maybe_layout)) => (WriteOp::Creation(data), maybe_layout),
+                MoveStorageOp::New((data, maybe_layout)) => {
+                    (WriteOp::legacy_creation(data), maybe_layout)
+                },
             };
             inner_ops.insert(tag, legacy_op);
         }
@@ -279,7 +278,7 @@ impl<'r> WriteOpConverter<'r> {
 
     fn convert(
         &self,
-        state_value_metadata_result: anyhow::Result<Option<StateValueMetadataKind>>,
+        state_value_metadata_result: anyhow::Result<Option<StateValueMetadata>>,
         move_storage_op: MoveStorageOp<BytesWithResourceLayout>,
         legacy_creation_as_modification: bool,
     ) -> Result<WriteOp, VMStatus> {
@@ -311,28 +310,27 @@ impl<'r> WriteOpConverter<'r> {
             (None, New((data, _))) => match &self.new_slot_metadata {
                 None => {
                     if legacy_creation_as_modification {
-                        Modification(data)
+                        WriteOp::legacy_modification(data)
                     } else {
-                        Creation(data)
+                        WriteOp::legacy_creation(data)
                     }
                 },
-                Some(metadata) => CreationWithMetadata {
+                Some(metadata) => Creation {
                     data,
                     metadata: metadata.clone(),
                 },
             },
             (Some(existing_metadata), Modify((data, _))) => {
                 // Inherit metadata even if the feature flags is turned off, for compatibility.
-                match existing_metadata {
-                    None => Modification(data),
-                    Some(metadata) => ModificationWithMetadata { data, metadata },
+                Modification {
+                    data,
+                    metadata: existing_metadata,
                 }
             },
             (Some(existing_metadata), Delete) => {
                 // Inherit metadata even if the feature flags is turned off, for compatibility.
-                match existing_metadata {
-                    None => Deletion,
-                    Some(metadata) => DeletionWithMetadata { metadata },
+                Deletion {
+                    metadata: existing_metadata,
                 }
             },
         };
@@ -359,17 +357,14 @@ impl<'r> WriteOpConverter<'r> {
             None => {
                 match &self.new_slot_metadata {
                     // n.b. Aggregator writes historically did not distinguish Create vs Modify.
-                    None => WriteOp::Modification(data),
-                    Some(metadata) => WriteOp::CreationWithMetadata {
+                    None => WriteOp::legacy_modification(data),
+                    Some(metadata) => WriteOp::Creation {
                         data,
                         metadata: metadata.clone(),
                     },
                 }
             },
-            Some(existing_metadata) => match existing_metadata {
-                None => WriteOp::Modification(data),
-                Some(metadata) => WriteOp::ModificationWithMetadata { data, metadata },
-            },
+            Some(metadata) => WriteOp::Modification { data, metadata },
         };
 
         Ok(op)
@@ -396,7 +391,7 @@ mod tests {
     };
 
     fn raw_metadata(v: u64) -> StateValueMetadata {
-        StateValueMetadata::new(v, &CurrentTimeMicroseconds { microseconds: v })
+        StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })
     }
 
     // TODO: Can re-use some of these testing definitions with aptos-vm-types.
@@ -488,7 +483,7 @@ mod tests {
             .convert_resource_group_v1(&key, group_changes)
             .unwrap();
 
-        assert_eq!(group_write.metadata_op().metadata(), Some(&metadata));
+        assert_eq!(group_write.metadata_op().metadata(), &metadata);
         let expected_new_size = bcs::serialized_size(&mock_tag_1()).unwrap()
             + bcs::serialized_size(&mock_tag_2()).unwrap()
             + 7; // values bytes size: 2 + 5
@@ -496,11 +491,14 @@ mod tests {
         assert_eq!(group_write.inner_ops().len(), 2);
         assert_some_eq!(
             group_write.inner_ops().get(&mock_tag_0()),
-            &(WriteOp::Deletion, None)
+            &(WriteOp::legacy_deletion(), None)
         );
         assert_some_eq!(
             group_write.inner_ops().get(&mock_tag_2()),
-            &(WriteOp::Modification(vec![5, 5, 5, 5, 5].into()), None)
+            &(
+                WriteOp::legacy_modification(vec![5, 5, 5, 5, 5].into()),
+                None
+            )
         );
     }
 
@@ -532,7 +530,7 @@ mod tests {
             .convert_resource_group_v1(&key, group_changes)
             .unwrap();
 
-        assert_eq!(group_write.metadata_op().metadata(), Some(&metadata));
+        assert_eq!(group_write.metadata_op().metadata(), &metadata);
         let expected_new_size = bcs::serialized_size(&mock_tag_0()).unwrap()
             + bcs::serialized_size(&mock_tag_1()).unwrap()
             + bcs::serialized_size(&mock_tag_2()).unwrap()
@@ -541,7 +539,7 @@ mod tests {
         assert_eq!(group_write.inner_ops().len(), 1);
         assert_some_eq!(
             group_write.inner_ops().get(&mock_tag_2()),
-            &(WriteOp::Creation(vec![3, 3, 3].into()), None)
+            &(WriteOp::legacy_creation(vec![3, 3, 3].into()), None)
         );
     }
 
@@ -561,13 +559,13 @@ mod tests {
             .convert_resource_group_v1(&key, group_changes)
             .unwrap();
 
-        assert_none!(group_write.metadata_op().metadata());
+        assert!(group_write.metadata_op().metadata().is_none());
         let expected_new_size = bcs::serialized_size(&mock_tag_1()).unwrap() + 2;
         assert_some_eq!(group_write.maybe_group_op_size(), expected_new_size as u64);
         assert_eq!(group_write.inner_ops().len(), 1);
         assert_some_eq!(
             group_write.inner_ops().get(&mock_tag_1()),
-            &(WriteOp::Creation(vec![2, 2].into()), None)
+            &(WriteOp::legacy_creation(vec![2, 2].into()), None)
         );
     }
 
@@ -599,10 +597,8 @@ mod tests {
             .unwrap();
 
         // Deletion should still contain the metadata - for storage refunds.
-        assert_eq!(group_write.metadata_op().metadata(), Some(&metadata));
-        assert_eq!(group_write.metadata_op(), &WriteOp::DeletionWithMetadata {
-            metadata
-        });
+        assert_eq!(group_write.metadata_op().metadata(), &metadata);
+        assert_eq!(group_write.metadata_op(), &WriteOp::Deletion { metadata });
         assert_none!(group_write.metadata_op().bytes());
     }
 }
