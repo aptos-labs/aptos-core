@@ -183,7 +183,7 @@ impl TableInfoService {
         ledger_version: u64,
         batch: TransactionBatchInfo,
         end_early_if_pending_on_empty: bool,
-        enable_verbose_logging: bool,
+        _enable_verbose_logging: bool,
     ) -> Result<EndVersion, Status> {
         let start_time = std::time::Instant::now();
 
