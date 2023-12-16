@@ -1,6 +1,7 @@
 module tournament::rps_utils {
     use std::hash;
     use std::signer;
+    use std::string;
     use std::vector;
     use std::table::{Self, Table};
     use std::option::{Self, Option};
@@ -13,6 +14,12 @@ module tournament::rps_utils {
     use tournament::rock_paper_scissor::{Self, MyAddress, RockPaperScissorsGame};
     use tournament::token_manager;
     use tournament::tournament_manager;
+
+    const ETOURNAMENT_DOES_NOT_EXIST_1: u64 = 1;
+    const ETOURNAMENT_DOES_NOT_EXIST_2: u64 = 1;
+    const EPLAYER_DOES_NOT_EXIST: u64 = 2;
+    const EMAPPING_ALREADY_EXISTS: u64 = 3;
+    const EMAPPING_DOESNT_EXIST: u64 = 4;
 
     struct TournamentConfig has key {
         tournament_address: address,
@@ -33,8 +40,8 @@ module tournament::rps_utils {
     public entry fun setup_tournament(
         admin: &signer
     ) {
-        token_manager::init_module_for_test(admin);
-        aptos_tournament::init_module_for_test(admin);
+        // token_manager::init_module_for_test(admin);
+        // aptos_tournament::init_module_for_test(admin);
         admin::set_admin_signer(admin, signer::address_of(admin));
         let tournament_address = aptos_tournament::create_new_tournament_returning(admin);
         let admin2 = admin::get_admin_signer_as_admin(admin);
@@ -52,14 +59,15 @@ module tournament::rps_utils {
     ) acquires TournamentConfig, PlayerConfig {
         let user_address = signer::address_of(user);
         // TODO: Does this create a new resource account for each tournament? Should we just use one resource account for all tournaments?
-        let player_name = to_string<address>(&user_address);
+        let player_name = string::sub_string(&to_string<address>(&user_address), 0, 15);
+        assert!(exists<TournamentConfig>(admin_address), ETOURNAMENT_DOES_NOT_EXIST_1);
         let tournament_address = borrow_global<TournamentConfig>(admin_address).tournament_address;
         let player_token = tournament_manager::join_tournament_with_return(
             user,
             tournament_address,
             player_name
         );
-        if (exists<PlayerConfig>(user_address)) {
+        if (!exists<PlayerConfig>(user_address)) {
             move_to(user, PlayerConfig {
                 player_tokens: table::new(),
             })
@@ -69,12 +77,20 @@ module tournament::rps_utils {
         table::upsert(&mut player_config.player_tokens, tournament_address, player_token);
     }
 
-    public entry fun start_new_round(admin: &signer, player_addresses: vector<address>) acquires PlayerConfig, TournamentConfig {
+    public entry fun start_new_round(_fee_payer: &signer, admin: &signer, player_addresses: vector<address>) acquires PlayerConfig, TournamentConfig, PlayerToGameMapping {
         let admin_address = signer::address_of(admin);
+        if (exists<PlayerToGameMapping>(admin_address)) {
+           move_to<PlayerToGameMapping>(admin, PlayerToGameMapping {
+                mapping: table::new(),
+            });
+        };
+
+        assert!(exists<TournamentConfig>(admin_address), ETOURNAMENT_DOES_NOT_EXIST_2);
         let tournament_address = borrow_global<TournamentConfig>(admin_address).tournament_address;
         aptos_tournament::start_new_round<RockPaperScissorsGame>(admin, tournament_address);
 
         let player_tokens: vector<Object<Token>> = vector::map_ref(&player_addresses, |player_address| {
+            assert!(exists<PlayerConfig>(*player_address), EPLAYER_DOES_NOT_EXIST);
             let player_config = borrow_global_mut<PlayerConfig>(*player_address);
             table::remove(&mut player_config.player_tokens, admin_address)
         });
@@ -84,10 +100,10 @@ module tournament::rps_utils {
             tournament_address,
             player_tokens
         );
-        let player_to_game_mapping = rock_paper_scissor::get_player_to_game_mapping(&game_addresses);
-        move_to<PlayerToGameMapping>(admin, PlayerToGameMapping {
-            mapping: player_to_game_mapping
-        });
+
+        let player_to_game_mapping = &mut borrow_global_mut<PlayerToGameMapping>(admin_address).mapping;
+
+        rock_paper_scissor::update_player_to_game_mapping(&game_addresses, player_to_game_mapping);
 
         let round_address = tournament_manager::get_round_address(tournament_address);
         let tournament_config = borrow_global_mut<TournamentConfig>(admin_address);
@@ -105,6 +121,7 @@ module tournament::rps_utils {
         admin_address: address,
     ) acquires PlayerToGameMapping {
         let player_address = signer::address_of(player);
+        assert!(exists<PlayerToGameMapping>(admin_address), EMAPPING_DOESNT_EXIST);
         let player_to_game_mapping = borrow_global<PlayerToGameMapping>(admin_address);
         let game_address = rock_paper_scissor::get_address(*table::borrow(&player_to_game_mapping.mapping, player_address));
         let action = b"Rock";

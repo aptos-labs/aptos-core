@@ -667,10 +667,7 @@ mod tests {
         AptosVM::set_concurrency_level_once(4);
         AptosVM::set_processed_transactions_detailed_counters();
         NativeExecutor::set_concurrency_level_once(4);
-        test_generic_benchmark::<AptosVM>(
-            Some(TransactionTypeArg::ModifyGlobalResourceAggV2),
-            true,
-        );
+        test_generic_benchmark::<AptosVM>(Some(TransactionTypeArg::Tournament10), true);
     }
 
     #[test]

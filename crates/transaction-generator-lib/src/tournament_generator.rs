@@ -1,128 +1,87 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use crate::{TransactionGenerator, TransactionGeneratorCreator};
-use aptos_infallible::RwLock;
+use crate::{ObjectPool, call_custom_modules::{UserModuleTransactionGenerator, TransactionGeneratorWorker}, publishing::publish_util::Package, ReliableTransactionSubmitter};
 use aptos_sdk::{
+    bcs,
     move_types::account_address::AccountAddress,
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
+use async_trait::async_trait;
 use move_core_types::{
     ident_str,
     language_storage::ModuleId,
 };
 use aptos_types::transaction::{EntryFunction, TransactionPayload};
-use rand::{
-    prelude::SliceRandom,
-    rngs::StdRng,
-    SeedableRng,
-};
+use rand::rngs::StdRng;
 use std::sync::Arc;
 
 /// Starts new round in the tournament and divides all the players into games.
 pub fn setup_new_round(
-    player_accounts: Arc<RwLock<Vec<AccountAddress>>>,
+    module_id: ModuleId,
+    player_accounts: Vec<AccountAddress>,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            // TODO: Need to get the module id for the aptos-tournament
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("rps_utils").to_owned(),
-        ),
+        module_id,
         ident_str!("setup_new_rund").to_owned(),
         vec![],
-        // TODO: Need to format these arguments properly. Expected Vec<u8>
-        vec![player_accounts.read()],
+        vec![
+            bcs::to_bytes(&player_accounts).unwrap()
+        ],
     ))
 }
 
-pub struct TournamentTransactionGenerator {
-    rng: StdRng,
-    num_tournaments: usize,
-    txn_factory: TransactionFactory,
-    admin_account: Arc<RwLock<LocalAccount>>,
-    player_addresses: Arc<RwLock<Vec<AccountAddress>>>,
+pub struct TournamentSetupNewRoundTransactionGenerator {
+    to_join: Arc<ObjectPool<LocalAccount>>,
+    joined: Arc<ObjectPool<LocalAccount>>,
+    batch_size: usize,
 }
 
-impl TournamentTransactionGenerator {
+impl TournamentSetupNewRoundTransactionGenerator {
     pub fn new(
-        mut rng: StdRng,
-        txn_factory: TransactionFactory,
-        num_tournaments: usize,
-        admin_account: Arc<RwLock<LocalAccount>>,
-        player_addresses: Arc<RwLock<Vec<AccountAddress>>>,
+        to_join: Arc<ObjectPool<LocalAccount>>,
+        joined: Arc<ObjectPool<LocalAccount>>,
+        batch_size: usize,
     ) -> Self {
-        player_addresses.write().shuffle(&mut rng);
         Self {
-            rng,
-            txn_factory,
-            num_tournaments,
-            admin_account,
-            player_addresses
+            to_join,
+            joined,
+            batch_size,
         }
-    }
-
-    fn gen_single_txn(
-        &mut self,
-        admin_account: &mut LocalAccount,
-        txn_factory: &TransactionFactory,
-    ) -> SignedTransaction {
-        admin_account.sign_with_transaction_builder(
-            txn_factory.payload(setup_new_round(self.player_addresses.clone())),
-        )
     }
 }
 
-impl TransactionGenerator for TournamentTransactionGenerator {
-    fn generate_transactions(
+#[async_trait]
+impl UserModuleTransactionGenerator for TournamentSetupNewRoundTransactionGenerator {
+    fn initialize_package(
         &mut self,
-        // TODO: Is this admin account?
-        _account: &LocalAccount,
-        num_to_create: usize,
+        _package: &Package,
+        _publisher: &mut LocalAccount,
+        _txn_factory: &TransactionFactory,
+        _rng: &mut StdRng,
     ) -> Vec<SignedTransaction> {
-        vec![self.gen_single_txn(&mut self.admin_account.write(), &self.txn_factory)]
+        vec![]
     }
-}
 
+    async fn create_generator_fn(
+        &self,
+        _root_account: &mut LocalAccount,
+        _txn_factory: &TransactionFactory,
+        _txn_executor: &dyn ReliableTransactionSubmitter,
+        _rng: &mut StdRng,
+    ) -> Arc<TransactionGeneratorWorker> {
+        let batch_size = self.batch_size;
+        let to_join = self.to_join.clone();
+        let joined = self.joined.clone();
+        Arc::new(move |account, package, publisher, txn_factory, rng| {
+            let batch = to_join.take_from_pool(batch_size, true, rng);
 
-pub struct TournamentTransactionGeneratorCreator {
-    txn_factory: TransactionFactory,
-    num_tournaments: usize,
-    admin_account: Arc<RwLock<LocalAccount>>,
-    player_addresses: Arc<RwLock<Vec<AccountAddress>>>,
-}
-
-
-impl TournamentTransactionGeneratorCreator {
-    pub async fn new(
-        txn_factory: TransactionFactory,
-        num_tournaments: usize,
-        admin_account: Arc<RwLock<LocalAccount>>,
-        player_addresses: Arc<RwLock<Vec<AccountAddress>>>,
-    ) -> Self {
-        Self {
-            txn_factory,
-            num_tournaments,
-            admin_account,
-            player_addresses
-        }
-    }
-}
-
-impl TransactionGeneratorCreator for TournamentTransactionGeneratorCreator {
-    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
-        let rng = StdRng::from_entropy();
-
-        // Create tournaments for each admin
-        Box::new(TournamentTransactionGenerator::new(
-            rng,
-            self.txn_factory.clone(),
-            self.num_tournaments,
-            self.admin_account.clone(),
-            self.player_addresses.clone()
-        ))
+            if batch.is_empty() {
+                return None;
+            }
+            let builder = txn_factory.payload(setup_new_round(package.get_module_id("rps_utils"), batch.iter().map(|a| a.address()).collect()));
+            joined.add_to_pool(batch);
+            Some(account.sign_multi_agent_with_transaction_builder(vec![publisher], builder))
+        })
     }
 }
