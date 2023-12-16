@@ -1219,7 +1219,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         self.parent.infer_abilities_may_have(ty)
     }
 
-    // checks whether the field has the abilities required by the declared abilities of the struct
+    /// Checks whether a struct's field type `field_ty` has the abilities required by the declared abilities `struct_abilities` of the struct.
     fn ability_check_field(
         &self,
         struct_abilities: AbilitySet,
