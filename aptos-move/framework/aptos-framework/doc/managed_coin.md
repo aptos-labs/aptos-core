@@ -16,6 +16,7 @@ By utilizing this current module, a developer can create his own coin and care l
 -  [Function `register`](#0x1_managed_coin_register)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `burn`](#@Specification_1_burn)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `mint`](#@Specification_1_mint)
@@ -299,6 +300,11 @@ Required if user wants to start accepting deposits of <code>CoinType</code> in h
 </table>
 
 
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;

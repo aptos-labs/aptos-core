@@ -18,6 +18,7 @@ can be enabled for the public.
 -  [Function `new_aggregator`](#0x1_aggregator_factory_new_aggregator)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `initialize_aggregator_factory`](#@Specification_1_initialize_aggregator_factory)
     -  [Function `create_aggregator_internal`](#@Specification_1_create_aggregator_internal)
     -  [Function `create_aggregator`](#@Specification_1_create_aggregator)
@@ -239,6 +240,11 @@ Returns a new aggregator.
 </table>
 
 
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> aborts_if_is_strict;

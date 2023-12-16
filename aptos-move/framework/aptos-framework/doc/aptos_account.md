@@ -20,6 +20,7 @@
 -  [Function `can_receive_direct_coin_transfers`](#0x1_aptos_account_can_receive_direct_coin_transfers)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `create_account`](#@Specification_1_create_account)
     -  [Function `batch_transfer`](#@Specification_1_batch_transfer)
     -  [Function `transfer`](#@Specification_1_transfer)
@@ -558,6 +559,11 @@ By default, this returns true if an account has not explicitly set whether the c
 </table>
 
 
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> aborts_if_is_strict;

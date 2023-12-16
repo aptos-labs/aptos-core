@@ -57,6 +57,7 @@ on a proposal multiple times as long as the total voting power of these votes do
 -  [Function `initialize_for_verification`](#0x1_aptos_governance_initialize_for_verification)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `store_signer_cap`](#@Specification_1_store_signer_cap)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `update_governance_config`](#@Specification_1_update_governance_config)
@@ -1736,6 +1737,11 @@ Return a signer for making changes to 0x1 as part of on-chain governance proposa
 </table>
 
 
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;

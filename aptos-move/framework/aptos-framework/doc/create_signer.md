@@ -18,6 +18,7 @@ on account to have access to this.
 -  [Function `create_signer`](#0x1_create_signer_create_signer)
 -  [Specification](#@Specification_0)
     -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `create_signer`](#@Specification_0_create_signer)
 
 
@@ -76,7 +77,7 @@ on account to have access to this.
 <td>The account owner should have the ability to create a signer for their account.</td>
 <td>Medium</td>
 <td>Before an Account resource is created, a signer is created for the specified new_address, and later, the Account resource is assigned to this signer.</td>
-<td>Enforced by the move vm</td>
+<td>Enforced by the <a href="https://github.com/aptos-labs/aptos-core/blob/main/third_party/move/move-vm/types/src/values/values_impl.rs#L1129">move vm</a>.</td>
 </tr>
 
 <tr>
@@ -92,12 +93,17 @@ on account to have access to this.
 <td>A signer should be returned for addresses that are not registered as accounts.</td>
 <td>Low</td>
 <td>The signer is just a struct that wraps an address, allows for non-accounts to have a signer.</td>
-<td>Formally verified via create_signer</td>
+<td>Formally verified via <a href="#0x1_create_signer_create_signer">create_signer</a>.</td>
 </tr>
 
 </table>
 
 
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;

@@ -14,6 +14,7 @@ This is separate from the AptosGovernance module to avoid circular dependency be
 -  [Specification](#@Specification_0)
     -  [Function `create_proposal`](#@Specification_0_create_proposal)
     -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `create_empty_proposal`](#@Specification_0_create_empty_proposal)
 
 
@@ -143,6 +144,11 @@ Useful for AptosGovernance to create an empty proposal as proof.
 </table>
 
 
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;

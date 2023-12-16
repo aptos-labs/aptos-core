@@ -20,6 +20,7 @@
 -  [Function `is_reserved_address`](#0x1_system_addresses_is_reserved_address)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `assert_core_resource`](#@Specification_1_assert_core_resource)
     -  [Function `assert_core_resource_address`](#@Specification_1_assert_core_resource_address)
     -  [Function `is_core_resource_address`](#@Specification_1_is_core_resource_address)
@@ -432,6 +433,11 @@ Return true if <code>addr</code> is either the VM address or an Aptos Framework 
 </table>
 
 
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;

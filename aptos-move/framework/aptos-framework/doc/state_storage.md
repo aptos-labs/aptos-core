@@ -16,6 +16,7 @@
 -  [Function `on_reconfig`](#0x1_state_storage_on_reconfig)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `on_new_block`](#@Specification_1_on_new_block)
     -  [Function `current_items_and_bytes`](#@Specification_1_current_items_and_bytes)
@@ -343,6 +344,11 @@ guarantees a fresh state view then.
 </table>
 
 
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;

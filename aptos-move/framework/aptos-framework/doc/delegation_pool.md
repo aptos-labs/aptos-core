@@ -207,6 +207,8 @@ transferred to A
 -  [Function `update_governanace_records_for_redeem_pending_inactive_shares`](#0x1_delegation_pool_update_governanace_records_for_redeem_pending_inactive_shares)
 -  [Function `multiply_then_divide`](#0x1_delegation_pool_multiply_then_divide)
 -  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -4199,6 +4201,114 @@ Deprecated, prefer math64::mul_div
 
 ## Specification
 
+
+
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Property</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>Every DelegationPool has only one corresponding StakePool stored at the same address.</td>
+<td>Critical</td>
+<td>Upon calling the initialize_delegation_pool function, a resource account is created from the "owner" signer to host the delegation pool resource and own the underlying stake pool.</td>
+<td>Audited that the address of StakePool equals address of DelegationPool and the data invariant on the DelegationPool.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>The signer capability within the delegation pool has an address equal to the address of the delegation pool.</td>
+<td>Critical</td>
+<td>The initialize_delegation_pool function moves the DelegationPool resource to the address associated with stake_pool_signer, which also possesses the signer capability.</td>
+<td>Audited that the address of signer cap equals address of DelegationPool.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>A delegator holds shares exclusively in one inactive shares pool, which could either be an already inactive pool or the pending_inactive pool.</td>
+<td>High</td>
+<td>The get_stake function returns the inactive stake owned by a delegator and checks which state the shares are in via the get_pending_withdrawal function.</td>
+<td>Audited that either inactive or pending_inactive stake after invoking the get_stake function is zero and both are never non-zero.</td>
+</tr>
+
+<tr>
+<td>4</td>
+<td>The specific pool in which the delegator possesses inactive shares becomes designated as the pending withdrawal pool for that delegator.</td>
+<td>Medium</td>
+<td>The get_pending_withdrawal function checks if any pending withdrawal exists for a delegate address and if there is neither inactive nor pending_inactive stake, the pending_withdrawal_exists returns false.</td>
+<td>This has been audited.</td>
+</tr>
+
+<tr>
+<td>5</td>
+<td>The existence of a pending withdrawal implies that it is associated with a pool where the delegator possesses inactive shares.</td>
+<td>Medium</td>
+<td>In the get_pending_withdrawal function, if withdrawal_exists is true, the function returns true and a non-zero amount</td>
+<td>get_pending_withdrawal has been audited.</td>
+</tr>
+
+<tr>
+<td>6</td>
+<td>An inactive shares pool should have coins allocated to it; otherwise, it should become deleted.</td>
+<td>Medium</td>
+<td>The redeem_inactive_shares function has a check that destroys the inactive shares pool, given that it is empty.</td>
+<td>shares pools have been audited.</td>
+</tr>
+
+<tr>
+<td>7</td>
+<td>The index of the pending withdrawal will not exceed the current OLC on DelegationPool.</td>
+<td>High</td>
+<td>The get_pending_withdrawal function has a check which ensures that withdrawal_olc.index < pool.observed_lockup_cycle.index.</td>
+<td>This has been audited.</td>
+</tr>
+
+<tr>
+<td>8</td>
+<td>Slashing is not possible for inactive stakes.</td>
+<td>Critical</td>
+<td>The number of inactive staked coins must be greater than or equal to the total_coins_inactive of the pool.</td>
+<td>This has been audited.</td>
+</tr>
+
+<tr>
+<td>9</td>
+<td>The delegator's active or pending inactive stake will always meet or exceed the minimum allowed value.</td>
+<td>Medium</td>
+<td>The add_stake, unlock and reactivate_stake functions ensure the active_shares or pending_inactive_shares balance for the delegator is greater than or equal to the MIN_COINS_ON_SHARES_POOL value.</td>
+<td>Audited the comparison of active_shares or inactive_shares balance for the delegator with the MIN_COINS_ON_SHARES_POOL value.</td>
+</tr>
+
+<tr>
+<td>10</td>
+<td>The delegation pool exists at a given address.</td>
+<td>Low</td>
+<td>Functions that operate on the DelegationPool abort if there is no DelegationPool struct under the given pool_address.</td>
+<td>Audited that there is no DelegationPool structure assigned to the pool_address given as a parameter.</td>
+</tr>
+
+<tr>
+<td>11</td>
+<td>The initialization of the delegation pool is contingent upon enabling the delegation pools feature.</td>
+<td>Critical</td>
+<td>The initialize_delegation_pool function should proceed if the DELEGATION_POOLS feature is enabled.</td>
+<td>This has been audited.</td>
+</tr>
+
+</table>
+
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> verify=<b>false</b>;
