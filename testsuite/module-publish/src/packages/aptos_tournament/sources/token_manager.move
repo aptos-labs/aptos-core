@@ -16,6 +16,8 @@ module tournament::token_manager {
     /// The player name is too long: max 20
     const EPLAYER_NAME_TOO_LONG: u64 = 2;
 
+    const ECOLLECTION_ALREADY_EXISTS: u64 = 3;
+
     const COLLECTION_NAME: vector<u8> = b"The Game";
     const COLLECTION_DESCRIPTION: vector<u8> = b"Welcome to THE GAME - An interactive, risk based, gamified and social experience on Aptos. Are you going to be the last person standing?";
     const COLLECTION_URI: vector<u8> = b"https://storage.googleapis.com/space-fighters-assets/game_collection.png";
@@ -53,6 +55,7 @@ module tournament::token_manager {
             option::none(),
             string::utf8(COLLECTION_URI),
         );
+        assert!(!exists<CollectionConfig>(deployer_addr), ECOLLECTION_ALREADY_EXISTS);
         move_to(deployer, CollectionConfig {
             creator_addr: obj_addr,
             collection_addr: object::address_from_constructor_ref(&constructor_ref),

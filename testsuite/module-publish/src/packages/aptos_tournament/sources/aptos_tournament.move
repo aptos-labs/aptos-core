@@ -35,7 +35,7 @@ module tournament::aptos_tournament {
         let (_, tournament_address) = tournament_manager::initialize_tournament_with_return(
             &admin_signer,
             string::utf8(b"Aptos Tournament"),
-            1_000,
+            10_000_000,
             10,
         );
 

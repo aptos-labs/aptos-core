@@ -85,6 +85,21 @@ module tournament::rock_paper_scissor {
         player_to_game_mapping
     }
 
+    public fun update_player_to_game_mapping(
+        game_addresses: &vector<address>,
+        player_to_game_mapping: &mut Table<address, MyAddress>,
+    ) acquires RockPaperScissor {
+        // let player_to_game_mapping = vector::empty<(address, address)>();
+        vector::for_each_ref(game_addresses, |game_address| {
+            let game = borrow_global<RockPaperScissor>(*game_address);
+            // vector::push_back(&mut player_to_game_mapping, (game.player1.address, *game_address));
+            // vector::push_back(&mut player_to_game_mapping, (game.player2.address, *game_address));
+            table::upsert(player_to_game_mapping, game.player2.address, MyAddress {
+                inner: *game_address
+            });
+        });
+    }
+
     public(friend) fun add_players_returning(
         tournament_address: address,
         players: vector<Object<Token>>
