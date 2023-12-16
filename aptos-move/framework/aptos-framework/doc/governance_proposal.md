@@ -129,7 +129,7 @@ Useful for AptosGovernance to create an empty proposal as proof.
 <td>Creating a proposal should never abort but should always return a governance proposal resource.</td>
 <td>Medium</td>
 <td>Both create_proposal and create_empty_proposal functions return a GovernanceProposal resource.</td>
-<td>Enforced via <a href="#high-level-spec-1.1">create_proposal</a> and <a href="#high-level-spec-1.2">create_empty_proposal</a>.</td>
+<td>Enforced via <a href="#high-level-req-1.1">create_proposal</a> and <a href="#high-level-req-1.2">create_empty_proposal</a>.</td>
 </tr>
 
 <tr>
@@ -146,7 +146,7 @@ Useful for AptosGovernance to create an empty proposal as proof.
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-// This enforces <a id="high-level-spec-1.1" href="#high-level-req">high level requirement 1</a>:
+// This enforces <a id="high-level-req-1.1" href="#high-level-req">high level requirement 1</a>:
 <b>ensures</b> result == <a href="governance_proposal.md#0x1_governance_proposal_GovernanceProposal">GovernanceProposal</a> {};
 </code></pre>
 
@@ -164,7 +164,7 @@ Useful for AptosGovernance to create an empty proposal as proof.
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-// This enforces <a id="high-level-spec-1.2" href="#high-level-req">high level requirement 1</a>:
+// This enforces <a id="high-level-req-1.2" href="#high-level-req">high level requirement 1</a>:
 <b>ensures</b> result == <a href="governance_proposal.md#0x1_governance_proposal_GovernanceProposal">GovernanceProposal</a> {};
 </code></pre>
 

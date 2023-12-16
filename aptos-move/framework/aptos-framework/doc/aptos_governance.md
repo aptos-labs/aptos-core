@@ -1714,7 +1714,7 @@ Return a signer for making changes to 0x1 as part of on-chain governance proposa
 <td>The proposer must have a stake equal to or greater than the required bond amount.</td>
 <td>High</td>
 <td>The create_proposal_v2 function verifies that the stake balance equals or exceeds the required proposer stake amount.</td>
-<td>Formally verified in <a href="#high-level-spec-2">CreateProposalAbortsIf</a>.</td>
+<td>Formally verified in <a href="#high-level-req-2">CreateProposalAbortsIf</a>.</td>
 </tr>
 
 <tr>
@@ -1722,7 +1722,7 @@ Return a signer for making changes to 0x1 as part of on-chain governance proposa
 <td>The Approved execution hashes resources that exist when the vote function is called.</td>
 <td>Low</td>
 <td>The Vote function acquires the Approved execution hashes resources.</td>
-<td>Formally verified in <a href="#high-level-spec-3">VoteAbortIf</a>.</td>
+<td>Formally verified in <a href="#high-level-req-3">VoteAbortIf</a>.</td>
 </tr>
 
 <tr>
@@ -1730,7 +1730,7 @@ Return a signer for making changes to 0x1 as part of on-chain governance proposa
 <td>The execution script hash of a successful governance proposal is added to the approved list if the proposal can be resolved.</td>
 <td>Medium</td>
 <td>The add_approved_script_hash function asserts that proposal_state == PROPOSAL_STATE_SUCCEEDED.</td>
-<td>Formally verified in <a href="#high-level-spec-4">AddApprovedScriptHash</a>.</td>
+<td>Formally verified in <a href="#high-level-req-4">AddApprovedScriptHash</a>.</td>
 </tr>
 
 </table>
@@ -2140,7 +2140,7 @@ Address @aptos_framework must exist GovernanceEvents.
     <b>let</b> stake_balance_2 = 0;
     <b>let</b> governance_config = <b>global</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceConfig">GovernanceConfig</a>&gt;(@aptos_framework);
     <b>let</b> required_proposer_stake = governance_config.required_proposer_stake;
-    // This enforces <a id="high-level-spec-2" href="#high-level-req">high level requirement 2</a>:
+    // This enforces <a id="high-level-req-2" href="#high-level-req">high level requirement 2</a>:
     <b>aborts_if</b> allow_validator_set_change && stake_balance_0 &lt; required_proposer_stake;
     <b>aborts_if</b> !allow_validator_set_change && <a href="stake.md#0x1_stake_spec_is_current_epoch_validator">stake::spec_is_current_epoch_validator</a>(stake_pool) && stake_balance_1 &lt; required_proposer_stake;
     <b>aborts_if</b> !allow_validator_set_change && !<a href="stake.md#0x1_stake_spec_is_current_epoch_validator">stake::spec_is_current_epoch_validator</a>(stake_pool) && stake_balance_2 &lt; required_proposer_stake;
@@ -2360,7 +2360,7 @@ Address @aptos_framework must exist VotingRecordsV2 if partial_governance_voting
                                      post_proposal.yes_votes + post_proposal.no_votes &gt;= proposal.min_vote_threshold;
     <b>let</b> execution_hash = proposal.execution_hash;
     <b>let</b> <b>post</b> post_approved_hashes = <b>global</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>&gt;(@aptos_framework);
-    // This enforces <a id="high-level-spec-3" href="#high-level-req">high level requirement 3</a>:
+    // This enforces <a id="high-level-req-3" href="#high-level-req">high level requirement 3</a>:
     <b>aborts_if</b>
         <b>if</b> (should_pass) {
             proposal_state_successed_0 && !<b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>&gt;(@aptos_framework)
@@ -2418,7 +2418,7 @@ Address @aptos_framework must exist VotingRecordsV2 if partial_governance_voting
                                                                            proposal.no_votes &gt;= early_resolution_threshold)) &&
         (proposal.yes_votes &lt;= proposal.no_votes || proposal.yes_votes + proposal.no_votes &lt; proposal.min_vote_threshold);
     <b>let</b> <b>post</b> post_approved_hashes = <b>global</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>&gt;(@aptos_framework);
-    // This enforces <a id="high-level-spec-4" href="#high-level-req">high level requirement 4</a>:
+    // This enforces <a id="high-level-req-4" href="#high-level-req">high level requirement 4</a>:
     <b>ensures</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(post_approved_hashes.hashes, proposal_id) &&
         <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(post_approved_hashes.hashes, proposal_id) == proposal.execution_hash;
 }

@@ -302,17 +302,17 @@ guarantees a fresh state view then.
 
 <tr>
 <td>1</td>
-<td>Only the admin address may call the initialization function.</td>
+<td>Given the blockchain is in an operating state, the resources for tracking state storage usage and gas parameters must exist for the Aptos framework address.</td>
 <td>Critical</td>
 <td>The initialize function ensures only the Aptos framework address can call it.</td>
-<td>Formally verified via <a href="#high-level-req-1">initialize</a>.</td>
+<td>Formally verified via <a href="#high-level-req-1">module</a>.</td>
 </tr>
 
 <tr>
 <td>2</td>
-<td>Given the blockchain is in an operating state, the resources for tracking state storage usage and gas parameters must exist for the Aptos framework address.</td>
-<td>Critical</td>
-<td>The initialize function initializes StateStorageUsage for the Aptos framework address.</td>
+<td>During the initialization of the module, it is guaranteed that the resource for tracking state storage usage will be moved under the Aptos framework account with default initial values.</td>
+<td>Medium</td>
+<td>The resource for tracking state storage usage may only be initialized with specific values and published under the aptos_framework account.</td>
 <td>Formally verified via <a href="#high-level-req-2">initialize</a>.</td>
 </tr>
 
@@ -347,7 +347,7 @@ guarantees a fresh state view then.
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
-// This enforces <a id="high-level-req-5.3" href="#high-level-req">high level requirement 5</a>:
+// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a> and <a id="high-level-req-5.3" href="#high-level-req">high level requirement 5</a>:
 <b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
 <b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_GasParameter">GasParameter</a>&gt;(@aptos_framework);
 </code></pre>
@@ -368,14 +368,13 @@ aborts if StateStorageUsage already exists.
 
 
 <pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
-// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
+// This enforces <a id="high-level-req-4" href="#high-level-req">high level requirement 4</a>:
 <b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(addr);
-// This enforces <a id="high-level-req-2" href="#high-level-req">high level requirement 2</a>:
-<b>aborts_if</b> <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
 // This enforces <a id="high-level-req-3" href="#high-level-req">high level requirement 3</a>:
+<b>aborts_if</b> <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
 <b>ensures</b> <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
 <b>let</b> <b>post</b> state_usage = <b>global</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
-// This enforces <a id="high-level-req-4" href="#high-level-req">high level requirement 4</a>:
+// This enforces <a id="high-level-req-2" href="#high-level-req">high level requirement 2</a>:
 <b>ensures</b> state_usage.epoch == 0 && state_usage.usage.bytes == 0 && state_usage.usage.items == 0;
 </code></pre>
 
