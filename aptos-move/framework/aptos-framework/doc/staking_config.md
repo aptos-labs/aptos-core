@@ -989,7 +989,7 @@ Can only be called as part of the Aptos governance proposal process established 
 <td>The voting power increase, in a staking config resource, should always be greater than 0 and less or equal to 50.</td>
 <td>High</td>
 <td>During the initialization and update of the staking config, the value of voting_power_increase_limit is ensured to be in the range of (0 to 50].</td>
-<td>Verified via <a href="#high-level-req-2.1">initialize</a> and <a href="#high-level-req-2.2">update_voting_power_increase_limit</a>.</td>
+<td>Ensured via <a href="#high-level-req-2.1">initialize</a> and <a href="#high-level-req-2.2">update_voting_power_increase_limit</a>. Formally verified via <a href="#high-level-req-2.3">StakingConfig</a>.</td>
 </tr>
 
 <tr>
@@ -997,7 +997,7 @@ Can only be called as part of the Aptos governance proposal process established 
 <td>The recurring lockup duration, in a staking config resource, should always be greater than 0.</td>
 <td>Medium</td>
 <td>During the initialization and update of the staking config, the value of recurring_lockup_duration_secs is ensured to be greater than 0.</td>
-<td>Verified via <a href="#high-level-req-3.1">initialize</a> and <a href="#high-level-req-3.2">update_recurring_lockup_duration_secs</a>.</td>
+<td>Ensured via <a href="#high-level-req-3.1">initialize</a> and <a href="#high-level-req-3.2">update_recurring_lockup_duration_secs</a>. Formally verified via <a href="#high-level-req-3.3">StakingConfig</a>.</td>
 </tr>
 
 <tr>
@@ -1107,7 +1107,9 @@ Can only be called as part of the Aptos governance proposal process established 
 <b>invariant</b> rewards_rate_denominator &gt; 0;
 // This enforces <a id="high-level-req-7" href="#high-level-req">high level requirement 7</a>:
 <b>invariant</b> rewards_rate &lt;= rewards_rate_denominator;
+// This enforces <a id="high-level-req-3.3" href="#high-level-req">high level requirement 3</a>:
 <b>invariant</b> recurring_lockup_duration_secs &gt; 0;
+// This enforces <a id="high-level-req-2.3" href="#high-level-req">high level requirement 2</a>:
 <b>invariant</b> voting_power_increase_limit &gt; 0 && voting_power_increase_limit &lt;= 50;
 </code></pre>
 

@@ -46,7 +46,7 @@ spec aptos_framework::transaction_fee {
     /// process_collected_fees all ensure that the CollectedFeesPerBlock resource exists under aptos_framework by
     /// calling the is_fees_collection_enabled method, which returns a boolean value confirming if the resource exists
     /// or not.
-    /// Enforcement: Formally verified via [high-level-req-6.1](register_proposer_for_fee_collection), [high-level-req-6.1](process_collected_fees), and [high-level-req-6.1](upgrade_burn_percentage).
+    /// Enforcement: Formally verified via [high-level-req-6.1](register_proposer_for_fee_collection), [high-level-req-6.2](process_collected_fees), and [high-level-req-6.3](upgrade_burn_percentage).
     /// </high-level-req>
     ///
     spec module {

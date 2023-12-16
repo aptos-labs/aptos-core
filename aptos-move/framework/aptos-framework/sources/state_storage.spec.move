@@ -1,16 +1,18 @@
 spec aptos_framework::state_storage {
     /// <high-level-req>
     /// No.: 1
-    /// Property: Only the admin address may call the initialization function.
-    /// Criticality: Critical
-    /// Implementation: The initialize function ensures only the Aptos framework address can call it.
-    /// Enforcement: Formally verified via [high-level-req-1](initialize).
-    ///
-    /// No.: 2
     /// Property: Given the blockchain is in an operating state, the resources for tracking state storage usage and gas
     /// parameters must exist for the Aptos framework address.
     /// Criticality: Critical
-    /// Implementation: The initialize function initializes StateStorageUsage for the Aptos framework address.
+    /// Implementation: The initialize function ensures only the Aptos framework address can call it.
+    /// Enforcement: Formally verified via [high-level-req-1](module).
+    ///
+    /// No.: 2
+    /// Property: During the initialization of the module, it is guaranteed that the resource for tracking state
+    /// storage usage will be moved under the Aptos framework account with default initial values.
+    /// Criticality: Medium
+    /// Implementation: The resource for tracking state storage usage may only be initialized with specific values and
+    /// published under the aptos_framework account.
     /// Enforcement: Formally verified via [high-level-req-2](initialize).
     ///
     /// No.: 3
@@ -41,6 +43,7 @@ spec aptos_framework::state_storage {
         pragma verify = true;
         pragma aborts_if_is_strict;
         // After genesis, `StateStorageUsage` and `GasParameter` exist.
+        /// [high-level-req-1]
         /// [high-level-req-5.3]
         invariant [suspendable] chain_status::is_operating() ==> exists<StateStorageUsage>(@aptos_framework);
         invariant [suspendable] chain_status::is_operating() ==> exists<GasParameter>(@aptos_framework);
@@ -51,14 +54,13 @@ spec aptos_framework::state_storage {
     spec initialize(aptos_framework: &signer) {
         use std::signer;
         let addr = signer::address_of(aptos_framework);
-        /// [high-level-req-1]
+        /// [high-level-req-4]
         aborts_if !system_addresses::is_aptos_framework_address(addr);
-        /// [high-level-req-2]
-        aborts_if exists<StateStorageUsage>(@aptos_framework);
         /// [high-level-req-3]
+        aborts_if exists<StateStorageUsage>(@aptos_framework);
         ensures exists<StateStorageUsage>(@aptos_framework);
         let post state_usage = global<StateStorageUsage>(@aptos_framework);
-        /// [high-level-req-4]
+        /// [high-level-req-2]
         ensures state_usage.epoch == 0 && state_usage.usage.bytes == 0 && state_usage.usage.items == 0;
     }
 
