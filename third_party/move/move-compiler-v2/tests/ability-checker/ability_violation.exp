@@ -281,87 +281,87 @@ fun ability::no_key($t0: address) {
 
 Diagnostics:
 error: no key ability
-   ┌─ tests/ability-checker/ability_violation.move:13:3
-   │
-13 │         move_from<Impotent>(addr);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: cannot drop
-   ┌─ tests/ability-checker/ability_violation.move:13:3
-   │
-13 │         move_from<Impotent>(addr);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: no key ability
    ┌─ tests/ability-checker/ability_violation.move:14:3
    │
-14 │         move_from<S<Impotent>>(addr);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+14 │         move_from<Impotent>(addr);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: cannot drop
    ┌─ tests/ability-checker/ability_violation.move:14:3
    │
-14 │         move_from<S<Impotent>>(addr);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+14 │         move_from<Impotent>(addr);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: no key ability
    ┌─ tests/ability-checker/ability_violation.move:15:3
    │
-15 │         borrow_global_mut<Impotent>(addr);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+15 │         move_from<S<Impotent>>(addr);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot drop
+   ┌─ tests/ability-checker/ability_violation.move:15:3
+   │
+15 │         move_from<S<Impotent>>(addr);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: no key ability
    ┌─ tests/ability-checker/ability_violation.move:16:3
    │
-16 │         borrow_global<Impotent>(addr);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+16 │         borrow_global_mut<Impotent>(addr);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: no key ability
    ┌─ tests/ability-checker/ability_violation.move:17:3
    │
-17 │         exists<Impotent>(addr);
+17 │         borrow_global<Impotent>(addr);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: no key ability
+   ┌─ tests/ability-checker/ability_violation.move:18:3
+   │
+18 │         exists<Impotent>(addr);
    │         ^^^^^^^^^^^^^^^^^^^^^^
 
 error: no key ability
-   ┌─ tests/ability-checker/ability_violation.move:21:3
+   ┌─ tests/ability-checker/ability_violation.move:22:3
    │
-21 │         move_to(signer, Impotent {})
+22 │         move_to(signer, Impotent {})
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: cannot copy
-   ┌─ tests/ability-checker/ability_violation.move:25:7
-   │
-25 │         let x = Impotent {};
-   │             ^
-
-error: cannot drop
-   ┌─ tests/ability-checker/ability_violation.move:25:7
-   │
-25 │         let x = Impotent {};
-   │             ^
-
-error: cannot copy
-   ┌─ tests/ability-checker/ability_violation.move:26:4
-   │
-26 │         (x, x);
-   │          ^
-
-error: cannot drop
-   ┌─ tests/ability-checker/ability_violation.move:26:4
-   │
-26 │         (x, x);
-   │          ^
-
-error: cannot copy
    ┌─ tests/ability-checker/ability_violation.move:26:7
    │
-26 │         (x, x);
+26 │         let x = Impotent {};
    │             ^
 
 error: cannot drop
    ┌─ tests/ability-checker/ability_violation.move:26:7
    │
-26 │         (x, x);
+26 │         let x = Impotent {};
+   │             ^
+
+error: cannot copy
+   ┌─ tests/ability-checker/ability_violation.move:27:4
+   │
+27 │         (x, x);
+   │          ^
+
+error: cannot drop
+   ┌─ tests/ability-checker/ability_violation.move:27:4
+   │
+27 │         (x, x);
+   │          ^
+
+error: cannot copy
+   ┌─ tests/ability-checker/ability_violation.move:27:7
+   │
+27 │         (x, x);
+   │             ^
+
+error: cannot drop
+   ┌─ tests/ability-checker/ability_violation.move:27:7
+   │
+27 │         (x, x);
    │             ^
 
 ============ after AbilityChecker: ================
