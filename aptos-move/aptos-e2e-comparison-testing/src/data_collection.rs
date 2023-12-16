@@ -12,7 +12,6 @@ use aptos_language_e2e_tests::data_store::FakeDataStore;
 use aptos_rest_client::Client;
 use aptos_state_view::TStateView;
 use aptos_types::{
-    block_executor::config::BlockExecutorConfigFromOnchain,
     on_chain_config::{FeatureFlag, Features, OnChainConfig},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
