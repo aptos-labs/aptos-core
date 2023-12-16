@@ -201,9 +201,9 @@ impl RawData for RawDataServerWrapper {
                 let mut cache_operator = CacheOperator::new(conn);
                 file_store_operator.verify_storage_bucket_existence().await;
 
-                // Validate redis chain id
+                // Validate redis chain id. Must be present by the time it gets here
                 let chain_id = match cache_operator.get_chain_id().await {
-                    Ok(chain_id) => chain_id,
+                    Ok(chain_id) => chain_id.unwrap(),
                     Err(e) => {
                         ERROR_COUNT
                             .with_label_values(&["redis_get_chain_id_failed"])
