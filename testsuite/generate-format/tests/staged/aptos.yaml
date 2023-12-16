@@ -444,7 +444,11 @@ TypeTag:
 ValidatorTransaction:
   ENUM:
     0:
-      DummyTopic:
+      DummyTopic1:
+        NEWTYPE:
+          TYPENAME: DummyValidatorTransaction
+    1:
+      DummyTopic2:
         NEWTYPE:
           TYPENAME: DummyValidatorTransaction
 WriteOp:

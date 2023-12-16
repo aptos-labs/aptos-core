@@ -23,6 +23,7 @@ use move_core_types::language_storage;
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_reflection::{Registry, Result, Samples, Tracer, TracerConfig};
+use aptos_types::validator_txn::ValidatorTransaction;
 
 /// Return a relative path to start tracking changes in commits.
 pub fn output_file() -> Option<&'static str> {
@@ -90,6 +91,7 @@ pub fn get_registry() -> Result<Registry> {
     // 2. Trace the main entry point(s) + every enum separately.
     tracer.trace_type::<contract_event::ContractEvent>(&samples)?;
     tracer.trace_type::<language_storage::TypeTag>(&samples)?;
+    tracer.trace_type::<ValidatorTransaction>(&samples)?;
     tracer.trace_type::<transaction::Transaction>(&samples)?;
     tracer.trace_type::<transaction::TransactionArgument>(&samples)?;
     tracer.trace_type::<transaction::TransactionPayload>(&samples)?;
