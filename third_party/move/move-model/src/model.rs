@@ -30,8 +30,8 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{
-        NoUnificationContext, PrimitiveType, ReferenceKind, Type, TypeDisplayContext,
-        TypeUnificationAdapter, Variance,
+        gen_get_ty_param_kinds, infer_abilities, NoUnificationContext, PrimitiveType,
+        ReferenceKind, Type, TypeDisplayContext, TypeUnificationAdapter, Variance,
     },
     well_known,
 };
@@ -1218,45 +1218,11 @@ impl GlobalEnv {
 
     /// Computes the abilities associated with the given type.
     pub fn type_abilities(&self, ty: &Type, ty_params: &[TypeParameter]) -> AbilitySet {
-        match ty {
-            Type::Primitive(p) => match p {
-                PrimitiveType::Bool
-                | PrimitiveType::U8
-                | PrimitiveType::U16
-                | PrimitiveType::U32
-                | PrimitiveType::U64
-                | PrimitiveType::U128
-                | PrimitiveType::U256
-                | PrimitiveType::Num
-                | PrimitiveType::Range
-                | PrimitiveType::EventStore
-                | PrimitiveType::Address => AbilitySet::PRIMITIVES,
-                PrimitiveType::Signer => AbilitySet::SIGNER,
-            },
-            Type::Vector(et) => AbilitySet::VECTOR.intersect(self.type_abilities(et, ty_params)),
-            Type::Struct(mid, sid, inst) => {
-                let struct_env = self.get_struct(mid.qualified(*sid));
-                let mut abilities = struct_env.get_abilities();
-                for inst_ty in inst {
-                    abilities = abilities.intersect(self.type_abilities(inst_ty, ty_params))
-                }
-                abilities
-            },
-            Type::TypeParameter(i) => {
-                if let Some(tp) = ty_params.get(*i as usize) {
-                    tp.1.abilities
-                } else {
-                    AbilitySet::EMPTY
-                }
-            },
-            Type::Reference(_, _) => AbilitySet::REFERENCES,
-            Type::Fun(_, _)
-            | Type::Tuple(_)
-            | Type::TypeDomain(_)
-            | Type::ResourceDomain(_, _, _)
-            | Type::Error
-            | Type::Var(_) => AbilitySet::EMPTY,
-        }
+        infer_abilities(
+            ty,
+            gen_get_ty_param_kinds(ty_params),
+            self.gen_get_struct_sig(),
+        )
     }
 
     /// Returns associated intrinsics.
@@ -1616,6 +1582,27 @@ impl GlobalEnv {
     /// Return the `StructEnv` for `str`
     pub fn get_struct(&self, str: QualifiedId<StructId>) -> StructEnv<'_> {
         self.get_module(str.module_id).into_struct(str.id)
+    }
+
+    /// Generates a function that given module id, struct id,
+    /// returns the struct signature
+    pub fn gen_get_struct_sig(
+        &self,
+    ) -> impl Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy + '_ {
+        |mid, sid| {
+            let qid = QualifiedId {
+                module_id: mid,
+                id: sid,
+            };
+            let struct_env = self.get_struct(qid);
+            let struct_abilities = struct_env.get_abilities();
+            let ty_param_kinds = struct_env
+                .get_type_parameters()
+                .iter()
+                .map(|tp| tp.1.clone())
+                .collect_vec();
+            (ty_param_kinds, struct_abilities)
+        }
     }
 
     // Gets the number of modules in this environment.

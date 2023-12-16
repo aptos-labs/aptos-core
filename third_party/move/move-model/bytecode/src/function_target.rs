@@ -15,6 +15,7 @@ use move_model::{
     ast::{Exp, ExpData, Spec, TempIndex},
     model::{
         FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, QualifiedId, QualifiedInstId, StructId,
+        TypeParameter,
     },
     symbol::{Symbol, SymbolPool},
     ty::{Type, TypeDisplayContext},
@@ -170,6 +171,11 @@ impl<'env> FunctionTarget<'env> {
     /// Returns true if this function mutates any references (i.e. has &mut parameters).
     pub fn is_mutating(&self) -> bool {
         self.func_env.is_mutating()
+    }
+
+    /// Returns the type parameters of this function.
+    pub fn get_type_parameters(&self) -> Vec<TypeParameter> {
+        self.func_env.get_type_parameters()
     }
 
     /// Returns the number of type parameters associated with this function, this includes both
