@@ -102,7 +102,7 @@ fn check_key_for_struct(
     }
 }
 
-/// Generates the function that given module id, struct id,
+/// Generates a function that given module id, struct id,
 /// returns the struct signature
 fn get_struct_sig<'a>(
     target: &'a FunctionTarget,
