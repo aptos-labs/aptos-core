@@ -636,8 +636,8 @@ mod tests {
         println!("run_benchmark");
 
         super::run_benchmark::<E>(
-            6, /* block_size */
-            5, /* num_blocks */
+            10, /* block_size */
+            30, /* num_blocks */
             transaction_type.map(|t| vec![(t.materialize(2, false), 1)]),
             2,     /* transactions per sender */
             0,     /* connected txn groups in a block */
@@ -663,7 +663,7 @@ mod tests {
     fn test_benchmark_transaction() {
         AptosVM::set_concurrency_level_once(4);
         AptosVM::set_processed_transactions_detailed_counters();
-        test_generic_benchmark::<AptosVM>(Some(TransactionTypeArg::TokenV2AmbassadorMint), true);
+        test_generic_benchmark::<AptosVM>(Some(TransactionTypeArg::Tournament10), true);
     }
 
     #[test]

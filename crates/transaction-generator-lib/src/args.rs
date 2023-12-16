@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{publishing::module_simple::LoopType, EntryPoints, TransactionType};
+use crate::{publishing::module_simple::LoopType, EntryPoints, TransactionType, WorkflowKind};
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 
@@ -51,6 +51,10 @@ pub enum TransactionTypeArg {
     SmartTablePicture30KWith200Change,
     SmartTablePicture1MWith1KChange,
     SmartTablePicture1BWith1KChange,
+    Tournament10,
+    Tournament10kBy1k,
+    Tournament100kBy1k,
+    Tournament1mBy10k,
 }
 
 impl TransactionTypeArg {
@@ -317,6 +321,26 @@ impl TransactionTypeArg {
                     num_modules: module_working_set_size,
                     use_account_pool: sender_use_account_pool,
                 }
+            },
+            TransactionTypeArg::Tournament10 => TransactionType::Workflow{
+                workflow_kind: WorkflowKind::Tournament { num_players: 10, join_batch: 3 },
+                num_modules: module_working_set_size,
+                move_stages_by_phase: false,
+            },
+            TransactionTypeArg::Tournament10kBy1k => TransactionType::Workflow{
+                workflow_kind: WorkflowKind::Tournament { num_players: 10000, join_batch: 1000 },
+                num_modules: module_working_set_size,
+                move_stages_by_phase: false,
+            },
+            TransactionTypeArg::Tournament100kBy1k => TransactionType::Workflow{
+                workflow_kind: WorkflowKind::Tournament { num_players: 100000, join_batch: 1000 },
+                num_modules: module_working_set_size,
+                move_stages_by_phase: false,
+            },
+            TransactionTypeArg::Tournament1mBy10k => TransactionType::Workflow{
+                workflow_kind: WorkflowKind::Tournament { num_players: 1000000, join_batch: 10000 },
+                num_modules: module_working_set_size,
+                move_stages_by_phase: false,
             },
         }
     }
