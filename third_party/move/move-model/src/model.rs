@@ -31,7 +31,7 @@ use crate::{
     symbol::{Symbol, SymbolPool},
     ty::{
         infer_abilities, NoUnificationContext, PrimitiveType, ReferenceKind, Type,
-        TypeDisplayContext, TypeUnificationAdapter, Variance,
+        TypeDisplayContext, TypeUnificationAdapter, Variance, gen_get_ty_param_kinds,
     },
     well_known,
 };
@@ -1220,23 +1220,8 @@ impl GlobalEnv {
     pub fn type_abilities(&self, ty: &Type, ty_params: &[TypeParameter]) -> AbilitySet {
         infer_abilities(
             ty,
-            |i| {
-                if let Some(tp) = ty_params.get(i as usize) {
-                    tp.1.clone()
-                } else {
-                    panic!("ICE unbound type parameter")
-                }
-            },
-            |mid, sid| {
-                let struct_env = self.get_struct(mid.qualified(sid));
-                let struct_abilities = struct_env.get_abilities();
-                let ty_params = struct_env
-                    .get_type_parameters()
-                    .iter()
-                    .map(|tp| tp.1.clone())
-                    .collect_vec();
-                (ty_params, struct_abilities)
-            },
+            gen_get_ty_param_kinds(ty_params),
+            self.gen_get_struct_sig()
         )
     }
 
@@ -1597,6 +1582,27 @@ impl GlobalEnv {
     /// Return the `StructEnv` for `str`
     pub fn get_struct(&self, str: QualifiedId<StructId>) -> StructEnv<'_> {
         self.get_module(str.module_id).into_struct(str.id)
+    }
+
+    /// Generates a function that given module id, struct id,
+    /// returns the struct signature
+    pub fn gen_get_struct_sig<'a>(
+        &'a self,
+    ) -> impl Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy + 'a {
+        |mid, sid| {
+            let qid = QualifiedId {
+                module_id: mid,
+                id: sid,
+            };
+            let struct_env = self.get_struct(qid);
+            let struct_abilities = struct_env.get_abilities();
+            let ty_param_kinds = struct_env
+                .get_type_parameters()
+                .iter()
+                .map(|tp| tp.1.clone())
+                .collect_vec();
+            (ty_param_kinds, struct_abilities)
+        }
     }
 
     // Gets the number of modules in this environment.

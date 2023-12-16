@@ -3,7 +3,6 @@
 //! - liveness analysis and lifetime analysis have been performed
 //! - Copies and moves have been made explicit in assignment instructions
 
-use itertools::Itertools;
 use move_binary_format::file_format::{Ability, AbilitySet};
 use move_model::{
     ast::TempIndex,
@@ -107,20 +106,7 @@ fn check_key_for_struct(
 fn gen_get_struct_sig<'a>(
     target: &'a FunctionTarget,
 ) -> impl Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy + 'a {
-    |mid, sid| {
-        let qid = QualifiedId {
-            module_id: mid,
-            id: sid,
-        };
-        let struct_env = target.global_env().get_struct(qid);
-        let struct_abilities = struct_env.get_abilities();
-        let ty_param_kinds = struct_env
-            .get_type_parameters()
-            .iter()
-            .map(|tp| tp.1.clone())
-            .collect_vec();
-        (ty_param_kinds, struct_abilities)
-    }
+    target.global_env().gen_get_struct_sig()
 }
 
 /// Checks that the type arguments to the struct type identified by `mid::sid` is properly instantiated,
