@@ -2095,7 +2095,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     .unwrap();
 
     let valid_block = Block::new_proposal_ext(
-        vec![ValidatorTransaction::dummy1(vec![0xFF; 25]); 10], // 64 bytes in total
+        vec![ValidatorTransaction::dummy1(vec![0xFF; 16]); 10], // small enough txns
         Payload::empty(false),
         1,
         1,

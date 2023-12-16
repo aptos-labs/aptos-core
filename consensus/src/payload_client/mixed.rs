@@ -179,7 +179,7 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
         .pull_payload(
             Duration::from_millis(50), // max_poll_time
             99,                        // max_items
-            1,                         // size limit: 1 byte
+            all_validator_txns[0].size_in_bytes() as u64,
             vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),
