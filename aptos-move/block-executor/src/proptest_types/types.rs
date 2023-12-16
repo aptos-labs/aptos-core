@@ -1001,7 +1001,7 @@ where
     type Txn = MockTransaction<K, E>;
 
     // TODO[agg_v2](tests): Assigning MoveTypeLayout as None for all the writes for now.
-    // That means, the resources do not have any DelayedFields embededded in them.
+    // That means, the resources do not have any DelayedFields embedded in them.
     // Change it to test resources with DelayedFields as well.
     fn resource_write_set(&self) -> Vec<(K, (ValueType, Option<Arc<MoveTypeLayout>>))> {
         self.writes
