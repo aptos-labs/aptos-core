@@ -40,7 +40,7 @@ pub struct DKGManager {
     epoch_state: EpochState,
     aggregation_request_rx: aptos_channel::Receiver<u64, ()>,
     aggregation_request_tx: aptos_channel::Sender<u64, ()>,
-    vtxn_pool_write_cli: Arc<vtxn_pool::WriteClient>,
+    vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
     private_key: bls12381::PrivateKey,
     reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
 
@@ -60,7 +60,7 @@ impl DKGManager {
         epoch_state: EpochState,
         private_key: bls12381::PrivateKey,
         reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
-        vtxn_pool_write_cli: Arc<vtxn_pool::WriteClient>,
+        vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
     ) -> Self {
         let (aggregation_request_tx, aggregation_request_rx) =
             aptos_channel::new(QueueStyle::KLAST, 1, None);
@@ -87,7 +87,7 @@ impl DKGManager {
         mut self,
         mut start_dkg_event_rx: aptos_channel::Receiver<u64, StartDKGEvent>,
         mut rpc_msg_rx: aptos_channel::Receiver<u64, (AccountAddress, IncomingDKGRequest)>,
-        mut dkg_txn_pulled_rx: vtxn_pool::NotificationReceiver,
+        mut dkg_txn_pulled_rx: vtxn_pool::PullNotificationReceiver,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
         //dkg todo: load states from db

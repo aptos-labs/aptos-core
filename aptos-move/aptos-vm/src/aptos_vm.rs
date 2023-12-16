@@ -1259,7 +1259,7 @@ impl AptosVM {
         debug!("[DKG] process_validator_transaction: BEGIN");
         let session_id = SessionId::validator_txn(&txn);
         let result = match txn {
-            ValidatorTransaction::DummyTopic(_) => Ok((
+            ValidatorTransaction::DummyTopic1(_) | ValidatorTransaction::DummyTopic2(_) => Ok((
                 VMStatus::Executed,
                 VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)),
             )),

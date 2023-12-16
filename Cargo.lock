@@ -4182,6 +4182,9 @@ dependencies = [
  "aptos-channels",
  "aptos-crypto",
  "aptos-types",
+ "async-trait",
+ "futures-util",
+ "tokio",
 ]
 
 [[package]]

@@ -60,8 +60,8 @@ pub fn start_dkg_runtime(
     network_service_events: NetworkServiceEvents<DKGMsg>,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     start_dkg_events: EventNotificationListener,
-    dkg_txn_writer: aptos_validator_transaction_pool::WriteClient,
-    dkg_pulled_rx: aptos_validator_transaction_pool::NotificationReceiver,
+    dkg_txn_writer: aptos_validator_transaction_pool::SingleTopicWriteClient,
+    dkg_pulled_rx: aptos_validator_transaction_pool::PullNotificationReceiver,
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("dkg".into(), Some(4));
     let (self_sender, self_receiver) = aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);

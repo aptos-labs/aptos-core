@@ -660,9 +660,9 @@ pub fn setup_environment_and_start_node(
 
     let (dkg_pulled_tx, dkg_pulled_rx) =
         aptos_channels::aptos_channel::new(QueueStyle::KLAST, 1, None);
-    let (vtxn_pull_client, mut vtxn_writers) =
+    let (vtxn_read_client, mut vtxn_write_clients) =
         aptos_validator_transaction_pool::new(vec![(Topic::RANDOMNESS_DKG, Some(dkg_pulled_tx))]);
-    let dkg_txn_writer = vtxn_writers.pop().unwrap();
+    let vtxn_write_client_for_dkg = vtxn_write_clients.pop().unwrap();
     let dkg_runtime = if let Some(app_network_interfaces) = dkg_network_interfaces {
         let ApplicationNetworkInterfaces {
             network_client,
@@ -674,7 +674,7 @@ pub fn setup_environment_and_start_node(
             network_service_events,
             dkg_reconfig_subscription.unwrap(),
             dkg_start_subscription.unwrap(),
-            dkg_txn_writer,
+            vtxn_write_client_for_dkg,
             dkg_pulled_rx,
         );
         Some(dkg_runtime)
@@ -700,7 +700,7 @@ pub fn setup_environment_and_start_node(
             consensus_network_interfaces,
             consensus_notifier,
             consensus_to_mempool_sender,
-            Arc::new(vtxn_pull_client),
+            vtxn_read_client,
         );
         admin_service.set_consensus_dbs(consensus_db, quorum_store_db);
         runtime

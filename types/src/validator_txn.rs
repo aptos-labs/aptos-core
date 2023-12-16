@@ -9,7 +9,9 @@ use std::fmt::Debug;
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub enum ValidatorTransaction {
     DKGTranscriptForNextEpoch(DKGAggNode),
-    DummyTopic(DummyValidatorTransaction),
+    DummyTopic1(DummyValidatorTransaction),
+    DummyTopic2(DummyValidatorTransaction),
+
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
@@ -19,8 +21,12 @@ pub struct DummyValidatorTransaction {
 }
 
 impl ValidatorTransaction {
-    pub fn dummy(payload: Vec<u8>) -> Self {
-        Self::DummyTopic(DummyValidatorTransaction { payload })
+    pub fn dummy1(payload: Vec<u8>) -> Self {
+        Self::DummyTopic1(DummyValidatorTransaction { payload })
+    }
+
+    pub fn dummy2(payload: Vec<u8>) -> Self {
+        Self::DummyTopic2(DummyValidatorTransaction { payload })
     }
 
     pub fn size_in_bytes(&self) -> usize {
@@ -32,4 +38,6 @@ impl ValidatorTransaction {
 #[allow(non_camel_case_types)]
 pub enum Topic {
     RANDOMNESS_DKG = 0,
+    DUMMY1,
+    DUMMY2,
 }

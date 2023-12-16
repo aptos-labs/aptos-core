@@ -22,14 +22,14 @@ use std::{
 
 pub struct MixedPayloadClient {
     validator_txn_enabled: bool,
-    validator_txn_pool_client: Arc<dyn vtxn_pool::PullClient>,
+    validator_txn_pool_client: Arc<dyn crate::payload_client::validator::ValidatorTxnPayloadClient>,
     user_payload_client: Arc<dyn UserPayloadClient>,
 }
 
 impl MixedPayloadClient {
     pub fn new(
         validator_txn_enabled: bool,
-        validator_txn_pool_client: Arc<dyn vtxn_pool::PullClient>,
+        validator_txn_pool_client: Arc<dyn crate::payload_client::validator::ValidatorTxnPayloadClient>,
         user_payload_client: Arc<dyn UserPayloadClient>,
     ) -> Self {
         Self {
@@ -47,7 +47,7 @@ impl PayloadClient for MixedPayloadClient {
         mut max_poll_time: Duration,
         mut max_items: u64,
         mut max_bytes: u64,
-        validator_txn_filter: vtxn_pool::ValidatorTransactionFilter,
+        validator_txn_filter: vtxn_pool::TransactionFilter,
         user_txn_filter: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,
@@ -63,7 +63,7 @@ impl PayloadClient for MixedPayloadClient {
                 max_items,
                 max_bytes,
                 validator_txn_filter,
-            )
+            ).await
         } else {
             debug!("validator_txn_enabled=0");
             vec![]
@@ -99,9 +99,9 @@ impl PayloadClient for MixedPayloadClient {
 #[tokio::test]
 async fn mixed_payload_client_should_prioritize_validator_txns() {
     let all_validator_txns = vec![
-        ValidatorTransaction::dummy(b"1".to_vec()),
-        ValidatorTransaction::dummy(b"22".to_vec()),
-        ValidatorTransaction::dummy(b"333".to_vec()),
+        ValidatorTransaction::dummy1(b"1".to_vec()),
+        ValidatorTransaction::dummy1(b"22".to_vec()),
+        ValidatorTransaction::dummy1(b"333".to_vec()),
     ];
 
     let all_user_txns = crate::test_utils::create_vec_signed_transactions(10);
@@ -118,7 +118,7 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
             Duration::from_millis(50), // max_poll_time
             99,                        // max_items
             1048576,                   // size limit: 1MB
-            vtxn_pool::ValidatorTransactionFilter::PendingTxnHashSet(HashSet::new()),
+            vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),
             false,
@@ -139,7 +139,7 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
             Duration::from_micros(500), // max_poll_time
             99,                         // max_items
             1048576,                    // size limit: 1MB
-            vtxn_pool::ValidatorTransactionFilter::PendingTxnHashSet(HashSet::new()),
+            vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),
             false,
@@ -160,7 +160,7 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
             Duration::from_millis(50), // max_poll_time
             1,                         // max_items
             1048576,                   // size limit: 1MB
-            vtxn_pool::ValidatorTransactionFilter::PendingTxnHashSet(HashSet::new()),
+            vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),
             false,
@@ -181,7 +181,7 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
             Duration::from_millis(50), // max_poll_time
             99,                        // max_items
             1,                         // size limit: 1 byte
-            vtxn_pool::ValidatorTransactionFilter::PendingTxnHashSet(HashSet::new()),
+            vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),
             false,
@@ -201,9 +201,9 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
 #[tokio::test]
 async fn mixed_payload_client_should_respect_validator_txn_feature_flag() {
     let all_validator_txns = vec![
-        ValidatorTransaction::dummy(b"1".to_vec()),
-        ValidatorTransaction::dummy(b"22".to_vec()),
-        ValidatorTransaction::dummy(b"333".to_vec()),
+        ValidatorTransaction::dummy1(b"1".to_vec()),
+        ValidatorTransaction::dummy1(b"22".to_vec()),
+        ValidatorTransaction::dummy1(b"333".to_vec()),
     ];
 
     let all_user_txns = crate::test_utils::create_vec_signed_transactions(10);
@@ -220,7 +220,7 @@ async fn mixed_payload_client_should_respect_validator_txn_feature_flag() {
             Duration::from_millis(50), // max_poll_time
             99,                        // max_items
             1048576,                   // size limit: 1MB
-            vtxn_pool::ValidatorTransactionFilter::PendingTxnHashSet(HashSet::new()),
+            vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),
             false,

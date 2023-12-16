@@ -76,7 +76,7 @@ impl SMRNode {
         consensus_config: OnChainConsensusConfig,
         storage: Arc<MockStorage>,
         twin_id: TwinId,
-        vtxn_pool_pull_cli: Arc<dyn vtxn_pool::PullClient>,
+        vtxn_pool_pull_cli: Arc<dyn crate::payload_client::validator::ReadClient>,
     ) -> Self {
         // Create a runtime for the twin
         let thread_name = format!("twin-{}", twin_id.id);

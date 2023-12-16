@@ -46,9 +46,9 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     self_sender: aptos_channels::Sender<Event<DKGMsg>>,
     network_sender: DKGNetworkClient<NetworkClient<DKGMsg>>,
     start_dkg_event_tx: Option<aptos_channel::Sender<u64, StartDKGEvent>>,
-    dkg_txn_writer: Arc<vtxn_pool::WriteClient>,
-    dkg_txn_pulled_rx_from_pool: vtxn_pool::NotificationReceiver,
-    dkg_txn_pulled_tx_to_dkg_mgr: Option<vtxn_pool::NotificationSender>,
+    dkg_txn_writer: Arc<vtxn_pool::SingleTopicWriteClient>,
+    dkg_txn_pulled_rx_from_pool: vtxn_pool::PullNotificationReceiver,
+    dkg_txn_pulled_tx_to_dkg_mgr: Option<vtxn_pool::PullNotificationSender>,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -58,8 +58,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         start_dkg_events: EventNotificationListener,
         self_sender: aptos_channels::Sender<Event<DKGMsg>>,
         network_sender: DKGNetworkClient<NetworkClient<DKGMsg>>,
-        dkg_txn_writer: vtxn_pool::WriteClient,
-        dkg_pulled_rx: vtxn_pool::NotificationReceiver,
+        dkg_txn_writer: vtxn_pool::SingleTopicWriteClient,
+        dkg_pulled_rx: vtxn_pool::PullNotificationReceiver,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         Self {

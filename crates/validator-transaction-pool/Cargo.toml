@@ -16,3 +16,6 @@ rust-version = { workspace = true }
 aptos-channels = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-types = { workspace = true }
+async-trait = { workspace = true }
+futures-util = { workspace = true }
+tokio = { workspace = true }

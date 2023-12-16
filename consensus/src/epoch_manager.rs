@@ -120,6 +120,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use crate::payload_client::validator::ValidatorTxnPayloadClient;
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -150,7 +151,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     commit_state_computer: Arc<dyn StateComputer>,
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: Arc<SafetyRulesManager>,
-    validator_txn_pool_client: Arc<dyn vtxn_pool::PullClient>,
+    validator_txn_pool_client: Arc<dyn ValidatorTxnPayloadClient>,
     reconfig_events: ReconfigNotificationListener<P>,
     // channels to rand manager
     rand_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingRandRequest>>,
@@ -197,7 +198,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         reconfig_events: ReconfigNotificationListener<P>,
         bounded_executor: BoundedExecutor,
         aptos_time_service: aptos_time_service::TimeService,
-        validator_txn_pool_client: Arc<dyn vtxn_pool::PullClient>,
+        validator_txn_pool_client: vtxn_pool::ReadClient,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -217,7 +218,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             commit_state_computer,
             storage,
             safety_rules_manager,
-            validator_txn_pool_client,
+            validator_txn_pool_client: Arc::new(validator_txn_pool_client),
             reconfig_events,
             rand_manager_msg_tx: None,
             rand_manager_reset_tx: None,
