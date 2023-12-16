@@ -13,13 +13,13 @@ use aptos_consensus_types::{
 };
 use aptos_types::{
     transaction::{ExecutionStatus, TransactionStatus},
-    validator_txn::{ValidatorTransaction},
+    validator_txn::ValidatorTransaction,
     vm_status::StatusCode,
 };
+use aptos_validator_transaction_pool as vtxn_pool;
 use futures::{channel::mpsc, future::BoxFuture};
 use rand::Rng;
 use std::time::Duration;
-use aptos_validator_transaction_pool as vtxn_pool;
 
 #[allow(dead_code)]
 pub struct MockPayloadManager {

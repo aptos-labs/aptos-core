@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 
 use aptos_channels::aptos_channel;
+#[cfg(test)]
+use aptos_channels::message_queues::QueueStyle;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::validator_txn::{Topic, ValidatorTransaction};
 #[cfg(test)]
@@ -12,8 +14,6 @@ use std::{
 };
 #[cfg(test)]
 use tokio::time::timeout;
-#[cfg(test)]
-use aptos_channels::message_queues::QueueStyle;
 
 pub enum TransactionFilter {
     PendingTxnHashSet(HashSet<HashValue>),

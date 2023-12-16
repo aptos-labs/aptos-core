@@ -8,7 +8,8 @@ use std::fmt::Debug;
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub enum ValidatorTransaction {
     DummyTopic1(DummyValidatorTransaction),
-    DummyTopic2(DummyValidatorTransaction),}
+    DummyTopic2(DummyValidatorTransaction),
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct DummyValidatorTransaction {

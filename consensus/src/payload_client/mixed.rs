@@ -29,7 +29,9 @@ pub struct MixedPayloadClient {
 impl MixedPayloadClient {
     pub fn new(
         validator_txn_enabled: bool,
-        validator_txn_pool_client: Arc<dyn crate::payload_client::validator::ValidatorTxnPayloadClient>,
+        validator_txn_pool_client: Arc<
+            dyn crate::payload_client::validator::ValidatorTxnPayloadClient,
+        >,
         user_payload_client: Arc<dyn UserPayloadClient>,
     ) -> Self {
         Self {
@@ -58,12 +60,9 @@ impl PayloadClient for MixedPayloadClient {
         let validator_txn_pull_timer = Instant::now();
         let validator_txns = if self.validator_txn_enabled {
             debug!("validator_txn_enabled=1");
-            self.validator_txn_pool_client.pull(
-                max_poll_time,
-                max_items,
-                max_bytes,
-                validator_txn_filter,
-            ).await
+            self.validator_txn_pool_client
+                .pull(max_poll_time, max_items, max_bytes, validator_txn_filter)
+                .await
         } else {
             debug!("validator_txn_enabled=0");
             vec![]

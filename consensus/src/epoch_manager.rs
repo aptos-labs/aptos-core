@@ -33,7 +33,8 @@ use crate::{
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::{
-        mixed::MixedPayloadClient, user::quorum_store_client::QuorumStoreClient, PayloadClient,
+        mixed::MixedPayloadClient, user::quorum_store_client::QuorumStoreClient,
+        validator::ValidatorTxnPayloadClient, PayloadClient,
     },
     payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
@@ -86,7 +87,6 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
 };
 use aptos_validator_transaction_pool as vtxn_pool;
-
 use fail::fail_point;
 use futures::{
     channel::{
@@ -105,7 +105,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use crate::payload_client::validator::ValidatorTxnPayloadClient;
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.

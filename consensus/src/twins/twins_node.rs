@@ -47,11 +47,11 @@ use aptos_types::{
     validator_info::ValidatorInfo,
     waypoint::Waypoint,
 };
+use aptos_validator_transaction_pool as vtxn_pool;
 use futures::{channel::mpsc, StreamExt};
 use maplit::hashmap;
 use std::{collections::HashMap, iter::FromIterator, sync::Arc};
 use tokio::runtime::Runtime;
-use aptos_validator_transaction_pool as vtxn_pool;
 
 /// Auxiliary struct that is preparing SMR for the test
 pub struct SMRNode {
