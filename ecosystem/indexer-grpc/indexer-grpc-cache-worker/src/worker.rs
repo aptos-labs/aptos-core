@@ -124,9 +124,7 @@ impl Worker {
                     LocalFileStoreOperator::new(local_file_store.local_file_store_path.clone()),
                 ),
             };
-            // TODO: this is unnecessary
             // TODO: move chain id check somewhere around here
-            file_store_operator.verify_storage_bucket_existence().await;
             // This ensures that metadata is created before we start the cache worker
             let mut starting_version = file_store_operator.get_latest_version().await;
             while starting_version.is_none() {
