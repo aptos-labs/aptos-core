@@ -26,22 +26,6 @@ const BASE_EXPIRATION_EPOCH_TIME_IN_SECONDS: u64 = 253_402_300_799;
 const CACHE_DEFAULT_LATEST_VERSION_NUMBER: &str = "0";
 const FILE_STORE_LATEST_VERSION: &str = "file_store_latest_version";
 
-// Returns 1 if the chain id is updated or verified. Otherwise(chain id not match), returns 0.
-// TODO(larry): add a test for this script.
-const CACHE_SCRIPT_UPDATE_OR_VERIFY_CHAIN_ID: &str = r#"
-    local chain_id = redis.call("GET", KEYS[1])
-    if chain_id then
-        if chain_id == ARGV[1] then
-            return 1
-        else
-            return 0
-        end
-    else
-        redis.call("SET", KEYS[1], ARGV[1])
-        return 1
-    end
-"#;
-
 /// This Lua script is used to update the latest version in cache.
 ///   Returns 0 if the cache is updated to 0 or sequentially update.
 ///   Returns 1 if the cache is updated but overlap detected.
@@ -135,47 +119,37 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         Ok(version_inserted)
     }
 
-    // Update the chain id in cache if missing; otherwise, verify the chain id.
-    // It's a fatal error if the chain id is not correct.
-    pub async fn update_or_verify_chain_id(&mut self, chain_id: u64) -> anyhow::Result<()> {
-        let script = redis::Script::new(CACHE_SCRIPT_UPDATE_OR_VERIFY_CHAIN_ID);
-        let result: u8 = script
-            .key(CACHE_KEY_CHAIN_ID)
-            .arg(chain_id)
-            .invoke_async(&mut self.conn)
+    pub async fn set_chain_id(&mut self, chain_id: u64) -> anyhow::Result<()> {
+        self.conn
+            .set(CACHE_KEY_CHAIN_ID, chain_id)
             .await
-            .context("Redis chain id update/verification failed.")?;
-        if result != 1 {
-            anyhow::bail!("Chain id is not correct.");
-        }
+            .context("Redis chain id update failed.")?;
         Ok(())
     }
 
-    // Downstream system can infer the chain id from cache.
-    pub async fn get_chain_id(&mut self) -> anyhow::Result<u64> {
-        let chain_id: u64 = match self.conn.get::<&str, String>(CACHE_KEY_CHAIN_ID).await {
-            Ok(v) => v
-                .parse::<u64>()
-                .with_context(|| format!("Redis key {} is not a number.", CACHE_KEY_CHAIN_ID))?,
-            Err(err) => return Err(err.into()),
-        };
-        Ok(chain_id)
+    pub async fn get_chain_id(&mut self) -> anyhow::Result<Option<u64>> {
+        self.get_config_by_key(CACHE_KEY_CHAIN_ID).await
     }
 
-    pub async fn get_latest_version(&mut self) -> anyhow::Result<u64> {
-        self.conn
-            .get::<&str, String>(CACHE_KEY_LATEST_VERSION)
-            .await?
-            .parse::<u64>()
-            .context("Redis latest_version is not a number.")
+    pub async fn get_latest_version(&mut self) -> anyhow::Result<Option<u64>> {
+        self.get_config_by_key(CACHE_KEY_LATEST_VERSION).await
     }
 
-    pub async fn get_file_store_latest_version(&mut self) -> anyhow::Result<u64> {
-        self.conn
-            .get::<&str, String>(FILE_STORE_LATEST_VERSION)
-            .await?
-            .parse::<u64>()
-            .context("Redis file_store_latest_version is not a number.")
+    pub async fn get_file_store_latest_version(&mut self) -> anyhow::Result<Option<u64>> {
+        self.get_config_by_key(FILE_STORE_LATEST_VERSION).await
+    }
+
+    /// This gets latest version, chain id, and file store latest version
+    async fn get_config_by_key(&mut self, key: &str) -> anyhow::Result<Option<u64>> {
+        let result = self.conn.get::<&str, Vec<u8>>(key).await?;
+        if result.is_empty() {
+            Ok(None)
+        } else {
+            let result_string = String::from_utf8(result).unwrap();
+            Ok(Some(result_string.parse::<u64>().with_context(|| {
+                format!("Redis key {} is not a number.", key)
+            })?))
+        }
     }
 
     pub async fn update_file_store_latest_version(
@@ -539,7 +513,7 @@ mod tests {
         let mut cache_operator: CacheOperator<MockRedisConnection> =
             CacheOperator::new(mock_connection);
 
-        assert_eq!(cache_operator.get_chain_id().await.unwrap(), 123);
+        assert_eq!(cache_operator.get_chain_id().await.unwrap(), Some(123));
     }
 
     // Cache latest version tests.
@@ -554,7 +528,10 @@ mod tests {
         let mut cache_operator: CacheOperator<MockRedisConnection> =
             CacheOperator::new(mock_connection);
 
-        assert_eq!(cache_operator.get_latest_version().await.unwrap(), version);
+        assert_eq!(
+            cache_operator.get_latest_version().await.unwrap(),
+            Some(version)
+        );
     }
 
     // Cache update cache transactions tests.

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{METADATA_UPLOAD_FAILURE_COUNT, PROCESSED_VERSIONS_COUNT};
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, ensure, Context, Result};
 use aptos_indexer_grpc_utils::{
     build_protobuf_encoded_transaction_wrappers,
     cache_operator::{CacheBatchGetStatus, CacheOperator},
@@ -36,6 +36,7 @@ impl Processor {
         redis_main_instance_address: RedisUrl,
         file_store_config: IndexerGrpcFileStoreConfig,
         enable_expensive_logging: bool,
+        chain_id: u64,
     ) -> Result<Self> {
         // Connection to redis is a hard dependency for file store processor.
         let conn = redis::Client::open(redis_main_instance_address.0.clone())
@@ -55,12 +56,8 @@ impl Processor {
             })?;
 
         let mut cache_operator = CacheOperator::new(conn);
-        let cache_chain_id = cache_operator
-            .get_chain_id()
-            .await
-            .context("Get chain id failed.")?;
 
-        let file_store_operator: Box<dyn FileStoreOperator> = match &file_store_config {
+        let mut file_store_operator: Box<dyn FileStoreOperator> = match &file_store_config {
             IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => {
                 Box::new(GcsFileStoreOperator::new(
                     gcs_file_store.gcs_file_store_bucket_name.clone(),
@@ -75,10 +72,35 @@ impl Processor {
         };
         file_store_operator.verify_storage_bucket_existence().await;
 
+        let file_store_metadata = file_store_operator.get_file_store_metadata().await;
+        if file_store_metadata.is_none() {
+            file_store_operator
+                .update_file_store_metadata_internal(chain_id, 0)
+                .await?;
+        }
+        // Metadata is guaranteed to exist now
+        let metadata = file_store_operator.get_file_store_metadata().await.unwrap();
+
+        ensure!(metadata.chain_id == chain_id, "Chain ID mismatch.");
+        let batch_start_version = metadata.version;
+        // Cache config in the cache
+        cache_operator.cache_setup_if_needed().await?;
+        match cache_operator.get_chain_id().await? {
+            Some(id) => {
+                ensure!(id == chain_id, "Chain ID mismatch.");
+            },
+            None => {
+                cache_operator.set_chain_id(chain_id).await?;
+            },
+        }
+        cache_operator
+            .update_file_store_latest_version(batch_start_version)
+            .await?;
+
         Ok(Self {
             cache_operator,
             file_store_operator,
-            cache_chain_id,
+            cache_chain_id: chain_id,
             enable_expensive_logging,
         })
     }
@@ -104,7 +126,7 @@ impl Processor {
         let mut tps_calculator = MovingAverage::new(10_000);
         loop {
             let latest_loop_time = std::time::Instant::now();
-            let cache_worker_latest = self.cache_operator.get_latest_version().await?;
+            let cache_worker_latest = self.cache_operator.get_latest_version().await?.unwrap();
 
             // batches tracks the start version of the batches to fetch. 1000 at the time
             let mut batches = vec![];

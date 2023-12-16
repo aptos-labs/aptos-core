@@ -5,7 +5,7 @@ use crate::metrics::{
     ERROR_COUNT, LATEST_PROCESSED_VERSION as LATEST_PROCESSED_VERSION_OLD, PROCESSED_BATCH_SIZE,
     PROCESSED_VERSIONS_COUNT, WAIT_FOR_FILE_STORE_COUNTER,
 };
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, ensure, Context, Result};
 use aptos_indexer_grpc_utils::{
     cache_operator::CacheOperator,
     config::IndexerGrpcFileStoreConfig,
@@ -285,10 +285,9 @@ async fn setup_cache_with_init_signal(
 
     let mut cache_operator = CacheOperator::new(conn);
     cache_operator.cache_setup_if_needed().await?;
-    cache_operator
-        .update_or_verify_chain_id(fullnode_chain_id as u64)
-        .await
-        .context("[Indexer Cache] Chain id mismatch between cache and fullnode.")?;
+    // Guaranteed that chain id is here at this point because we already ensure that fileworker did the set up
+    let chain_id = cache_operator.get_chain_id().await?.unwrap();
+    ensure!(chain_id == fullnode_chain_id as u64, "Chain ID mismatch.");
 
     Ok((cache_operator, fullnode_chain_id, starting_version))
 }
@@ -431,7 +430,7 @@ async fn process_streaming_response(
         loop {
             let file_store_version = cache_operator
                 .get_file_store_latest_version()
-                .await
+                .await?
                 .unwrap();
             if file_store_version + FILE_STORE_VERSIONS_RESERVED < current_version {
                 tokio::time::sleep(std::time::Duration::from_millis(
