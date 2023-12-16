@@ -15,8 +15,11 @@
 -  [Function `auid_address`](#0x1_transaction_context_auid_address)
 -  [Specification](#@Specification_0)
     -  [Function `get_txn_hash`](#@Specification_0_get_txn_hash)
+    -  [Function `get_transaction_hash`](#@Specification_0_get_transaction_hash)
     -  [Function `generate_unique_address`](#@Specification_0_generate_unique_address)
+    -  [Function `generate_auid_address`](#@Specification_0_generate_auid_address)
     -  [Function `get_script_hash`](#@Specification_0_get_script_hash)
+    -  [Function `auid_address`](#@Specification_0_auid_address)
 
 
 <pre><code></code></pre>
@@ -250,7 +253,7 @@ the generated unique address wrapped in the AUID class.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> <b>false</b>;
+<b>aborts_if</b> [abstract] <b>false</b>;
 <b>ensures</b> result == <a href="transaction_context.md#0x1_transaction_context_spec_get_txn_hash">spec_get_txn_hash</a>();
 </code></pre>
 
@@ -261,6 +264,23 @@ the generated unique address wrapped in the AUID class.
 
 
 <pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_spec_get_txn_hash">spec_get_txn_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+<a id="@Specification_0_get_transaction_hash"></a>
+
+### Function `get_transaction_hash`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_transaction_hash">get_transaction_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>ensures</b> [abstract] len(result) == 32;
 </code></pre>
 
 
@@ -291,6 +311,23 @@ the generated unique address wrapped in the AUID class.
 
 
 
+<a id="@Specification_0_generate_auid_address"></a>
+
+### Function `generate_auid_address`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_auid_address">generate_auid_address</a>(): <b>address</b>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>ensures</b> [abstract] result == <a href="transaction_context.md#0x1_transaction_context_spec_generate_unique_address">spec_generate_unique_address</a>();
+</code></pre>
+
+
+
 <a id="@Specification_0_get_script_hash"></a>
 
 ### Function `get_script_hash`
@@ -303,8 +340,9 @@ the generated unique address wrapped in the AUID class.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == <a href="transaction_context.md#0x1_transaction_context_spec_get_script_hash">spec_get_script_hash</a>();
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="transaction_context.md#0x1_transaction_context_spec_get_script_hash">spec_get_script_hash</a>();
+<b>ensures</b> [abstract] len(result) == 32;
 </code></pre>
 
 
@@ -314,6 +352,22 @@ the generated unique address wrapped in the AUID class.
 
 
 <pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_spec_get_script_hash">spec_get_script_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+<a id="@Specification_0_auid_address"></a>
+
+### Function `auid_address`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_auid_address">auid_address</a>(auid: &<a href="transaction_context.md#0x1_transaction_context_AUID">transaction_context::AUID</a>): <b>address</b>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
