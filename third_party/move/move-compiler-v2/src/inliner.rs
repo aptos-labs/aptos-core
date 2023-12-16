@@ -987,7 +987,8 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         }
     }
 
-    /// Convert a single-variable pattern into a `Pattern::Tuple` if needed.
+    /// Convert any non-`Tuple` pattern `pat` into a a singleton `Pattern::Tuple` if needed,
+    /// for convenience in matching it to a `Tuple` of expressions.
     fn make_lambda_pattern_a_tuple(&mut self, pat: &Pattern) -> Pattern {
         if !matches!(pat, Pattern::Tuple(..)) {
             let id = pat.node_id();

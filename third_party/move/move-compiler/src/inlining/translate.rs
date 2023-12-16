@@ -233,6 +233,9 @@ impl<'l> Inliner<'l> {
         }
     }
 
+    /// Create a symbol uniquely based on the provided `var_sym` string to
+    /// avoid conflicts, while remaining somewhat recognizable for debugging
+    /// purposes (or if it leaks to the user somehow).
     fn rename_symbol(&mut self, var_sym: &str) -> Symbol {
         let new_name = Symbol::from(format!("{}#{}", var_sym, self.rename_counter));
         self.rename_counter += 1;
