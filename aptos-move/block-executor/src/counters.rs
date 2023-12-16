@@ -152,7 +152,7 @@ pub static EFFECTIVE_BLOCK_GAS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_execution_effective_block_gas",
         "Histogram for different effective block gas costs - used for evaluating block gas limit. \
-        This can be different from actual gas consumed in a block, due to applied adjustements",
+        This can be different from actual gas consumed in a block, due to applied adjustments",
         &["mode"]
     )
     .unwrap()
@@ -161,7 +161,7 @@ pub static EFFECTIVE_BLOCK_GAS: Lazy<HistogramVec> = Lazy::new(|| {
 pub static APPROX_BLOCK_OUTPUT_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_execution_approx_block_output_size",
-        "Historgram for different approx block output sizes - used for evaluting block ouptut limit.",
+        "Histogram for different approx block output sizes - used for evaluating block output limit.",
         &["mode"]
     )
     .unwrap()

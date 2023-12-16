@@ -411,7 +411,7 @@ where
     /// is concurrent and deals with logic such as patching delayed fields / resource groups
     /// in outputs, which is heavier (due to serialization / deserialization, copies, etc). Moreover,
     /// since prepare_and_queue_commit_ready_txns takes care of synchronization in the flag-combining
-    /// way, the materialization can be almost embarassingly parallelizable.
+    /// way, the materialization can be almost embarrassingly parallelizable.
     fn prepare_and_queue_commit_ready_txns(
         &self,
         block_gas_limit_type: &BlockGasLimitType,
