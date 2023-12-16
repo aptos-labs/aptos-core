@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::loader::Loader;
+use crate::loader::{Loader, ModuleStorageAdapter};
 use bytes::Bytes;
 use move_binary_format::errors::*;
 use move_core_types::{
@@ -162,6 +162,7 @@ impl<'r> TransactionDataCache<'r> {
         loader: &Loader,
         addr: AccountAddress,
         ty: &Type,
+        module_store: &ModuleStorageAdapter,
     ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
         let account_cache = Self::get_mut_or_insert_with(&mut self.account_map, &addr, || {
             (addr, AccountDataCache::new())
@@ -179,9 +180,9 @@ impl<'r> TransactionDataCache<'r> {
             };
             // TODO(Gas): Shall we charge for this?
             let (ty_layout, has_aggregator_lifting) =
-                loader.type_to_type_layout_with_identifier_mappings(ty)?;
+                loader.type_to_type_layout_with_identifier_mappings(ty, module_store)?;
 
-            let module = loader.get_module(&ty_tag.module_id());
+            let module = module_store.module_at(&ty_tag.module_id());
             let metadata: &[Metadata] = match &module {
                 Some(module) => &module.module().metadata,
                 None => &[],
