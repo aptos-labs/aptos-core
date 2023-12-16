@@ -104,7 +104,7 @@ fn check_key_for_struct(
 
 /// Generates a function that given module id, struct id,
 /// returns the struct signature
-fn get_struct_sig<'a>(
+fn gen_get_struct_sig<'a>(
     target: &'a FunctionTarget,
 ) -> impl Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy + 'a {
     |mid, sid| {
@@ -138,7 +138,7 @@ fn check_struct_inst(
         sid,
         ty_args,
     gen_get_ty_param_kinds(&ty_params),
-        get_struct_sig(target),
+        gen_get_struct_sig(target),
         Some((loc, |loc: &Loc, msg: &str| {
             target.global_env().error(loc, msg)
         })),
@@ -169,7 +169,7 @@ pub fn check_instantiation(target: &FunctionTarget, ty: &Type, loc: &Loc) -> Abi
     ty::infer_and_check_abilities(
         ty,
         gen_get_ty_param_kinds(&ty_params),
-        get_struct_sig(target),
+        gen_get_struct_sig(target),
         loc,
         |loc, msg| target.global_env().error(loc, msg),
     )
