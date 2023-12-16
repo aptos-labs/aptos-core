@@ -358,6 +358,20 @@ impl<'a> CopyTransformation<'a> {
             .map(|loc| (loc.clone(), "used here".to_owned()))
     }
 
+    /// Checks whether the given temp has copy ability
+    /// add diagnostics if not
+    fn check_copy_for_temp(&self, target: &FunctionTarget, temp: TempIndex, id: AttrId) {
+        check_copy(
+            &target,
+            target.get_local_type(temp),
+            &target.get_bytecode_loc(id),
+            &format!(
+                "cannot copy {} implicitly",
+                target.get_local_name_for_error_message(temp)
+            ),
+        );
+    }
+
     /// Checks whether an implicit copy is needed because the value is used again in
     /// an argument list. This cannot be determined from the livevar analysis result
     /// because the 2nd usage appears at the same program point.
@@ -383,15 +397,7 @@ impl<'a> CopyTransformation<'a> {
                 );
                 false
             } else {
-                check_copy(
-                    &target,
-                    target.get_local_type(temp),
-                    &target.get_bytecode_loc(id),
-                    &format!(
-                        "cannot copy {} implicitly",
-                        target.get_local_name_for_error_message(temp)
-                    ),
-                );
+                self.check_copy_for_temp(&target, temp, id);
                 true
             }
         } else {
@@ -413,15 +419,7 @@ impl<'a> CopyTransformation<'a> {
                 empty(),
             );
         } else {
-            check_copy(
-                &target,
-                target.get_local_type(temp),
-                &target.get_bytecode_loc(id),
-                &format!(
-                    "cannot copy {} implicitly",
-                    target.get_local_name_for_error_message(temp)
-                ),
-            );
+            self.check_copy_for_temp(&target, temp, id)
         }
     }
 
