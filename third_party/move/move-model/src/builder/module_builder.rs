@@ -3820,7 +3820,7 @@ pub(crate) fn extract_schema_access<'a>(exp: &'a EA::Exp, res: &mut Vec<&'a EA::
     }
 }
 
-// returns the abilities that a field should have but not
+/// Returns the abilities that a struct's field should have but does not, based on constraints placed by the containing struct.
 fn field_missing_abilities(
     struct_abilities: AbilitySet,
     field_abilities: AbilitySet,
