@@ -8,7 +8,7 @@ use move_binary_format::file_format::{Ability, AbilitySet};
 use move_model::{
     ast::TempIndex,
     model::{
-        FunId, FunctionEnv, Loc, ModuleId, QualifiedId, StructId, TypeParameter, TypeParameterKind,
+        FunId, FunctionEnv, Loc, ModuleId, QualifiedId, StructId, TypeParameterKind,
     },
     ty::{self, gen_get_ty_param_kinds},
     ty::Type,
