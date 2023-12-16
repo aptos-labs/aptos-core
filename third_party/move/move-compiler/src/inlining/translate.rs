@@ -415,7 +415,7 @@ impl<'l, 'r> SubstitutionVisitor<'l, 'r> {
                 match repl.exp.value {
                     UnannotatedExp_::Lambda(decls, mut body) => {
                         let loc = args.exp.loc;
-                        let params_from_decls = get_params_from_decls(&mut self.inliner, &decls);
+                        let params_from_decls = get_params_from_decls(self.inliner, &decls);
                         let (decls_for_let, bindings) = self.inliner.process_parameters(
                             loc,
                             params_from_decls
