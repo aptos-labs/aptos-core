@@ -7,7 +7,9 @@ use std::fmt::Debug;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub enum ValidatorTransaction {
+    #[cfg(any(test, feature = "fuzzing"))]
     DummyTopic1(DummyValidatorTransaction),
+    #[cfg(any(test, feature = "fuzzing"))]
     DummyTopic2(DummyValidatorTransaction),
 }
 
@@ -18,10 +20,12 @@ pub struct DummyValidatorTransaction {
 }
 
 impl ValidatorTransaction {
+    #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy1(payload: Vec<u8>) -> Self {
         Self::DummyTopic1(DummyValidatorTransaction { payload })
     }
 
+    #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy2(payload: Vec<u8>) -> Self {
         Self::DummyTopic2(DummyValidatorTransaction { payload })
     }
@@ -34,7 +38,8 @@ impl ValidatorTransaction {
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 #[allow(non_camel_case_types)]
 pub enum Topic {
-    RANDOMNESS_DKG = 0,
+    #[cfg(any(test, feature = "fuzzing"))]
     DUMMY1,
+    #[cfg(any(test, feature = "fuzzing"))]
     DUMMY2,
 }
