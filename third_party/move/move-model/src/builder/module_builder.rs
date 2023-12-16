@@ -1214,6 +1214,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 /// ## Struct Definition Analysis
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+    /// Same as ModelBuilder::infer_abilities_may_have
     fn infer_abilities_may_have(&self, ty: &Type) -> AbilitySet {
         self.parent.infer_abilities_may_have(ty)
     }
