@@ -156,7 +156,7 @@ fn check_fun_inst(target: &FunctionTarget, mid: ModuleId, fid: FunId, inst: &[Ty
         let required_abilities = param.1.abilities;
         let given_abilities = check_instantiation(target, ty, loc);
         if !required_abilities.is_subset(given_abilities) {
-            // TODO: which field, why
+            // TODO(#11376): specify which field, why
             target.global_env().error(loc, "invalid instantiation")
         }
     }

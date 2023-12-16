@@ -1,4 +1,5 @@
 module 0x42::ability {
+	// TODO(#11377): uncomment will result in a crash
 	// fun move_from_no_key<T>(addr: address) {
 	// 	move_from<T>(addr);
 	// }
