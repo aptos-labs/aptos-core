@@ -6,6 +6,7 @@ pub mod config;
 pub mod constants;
 pub mod counters;
 pub mod file_store_operator;
+pub mod storage_format;
 pub mod types;
 
 use anyhow::{Context, Result};
@@ -21,8 +22,8 @@ use url::Url;
 pub type GrpcClientType = FullnodeDataClient<tonic::transport::Channel>;
 
 /// Create a gRPC client with exponential backoff.
-pub async fn create_grpc_client(address: Url) -> GrpcClientType {
-    backoff::future::retry(backoff::ExponentialBackoff::default(), || async {
+pub async fn create_grpc_client_with_retry(address: Url) -> Result<GrpcClientType> {
+    let res = backoff::future::retry(backoff::ExponentialBackoff::default(), || async {
         match FullnodeDataClient::connect(address.to_string()).await {
             Ok(client) => {
                 tracing::info!(
@@ -43,8 +44,8 @@ pub async fn create_grpc_client(address: Url) -> GrpcClientType {
             },
         }
     })
-    .await
-    .unwrap()
+    .await;
+    res.context("Failed to create gRPC client")
 }
 
 pub type GrpcDataServiceClientType = RawDataClient<tonic::transport::Channel>;
@@ -86,18 +87,6 @@ pub async fn create_data_service_grpc_client(
 // (Protobuf encoded transaction, version)
 type Version = u64;
 pub type EncodedTransactionWithVersion = (String, Version);
-/// Build the EncodedTransactionWithVersion from the encoded transactions and starting version.
-#[inline]
-pub fn build_protobuf_encoded_transaction_wrappers(
-    encoded_transactions: Vec<String>,
-    starting_version: u64,
-) -> Vec<EncodedTransactionWithVersion> {
-    encoded_transactions
-        .into_iter()
-        .enumerate()
-        .map(|(ind, encoded_transaction)| (encoded_transaction, starting_version + ind as u64))
-        .collect()
-}
 
 pub fn time_diff_since_pb_timestamp_in_secs(timestamp: &Timestamp) -> f64 {
     let current_timestamp = std::time::SystemTime::now()

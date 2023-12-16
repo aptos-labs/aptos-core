@@ -1,10 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{constants::BLOB_STORAGE_SIZE, file_store_operator::*, EncodedTransactionWithVersion};
+use crate::{
+    constants::BLOB_STORAGE_SIZE,
+    file_store_operator::*,
+    storage_format::{FileEntry, FileEntryBuilder, FileEntryKey, StorageFormat},
+};
 use anyhow::bail;
+use aptos_protos::indexer::v1::TransactionsInStorage;
 use cloud_storage::{Bucket, Object};
-use itertools::Itertools;
 use std::env;
 
 const JSON_FILE_TYPE: &str = "application/json";
@@ -16,14 +20,20 @@ const FILE_STORE_METADATA_TIMEOUT_MILLIS: u128 = 200;
 pub struct GcsFileStoreOperator {
     bucket_name: String,
     file_store_metadata_last_updated: std::time::Instant,
+    storage_format: StorageFormat,
 }
 
 impl GcsFileStoreOperator {
-    pub fn new(bucket_name: String, service_account_path: String) -> Self {
+    pub fn new(
+        bucket_name: String,
+        service_account_path: String,
+        storage_format: StorageFormat,
+    ) -> Self {
         env::set_var(SERVICE_ACCOUNT_ENV_VAR, service_account_path);
         Self {
             bucket_name,
             file_store_metadata_last_updated: std::time::Instant::now(),
+            storage_format,
         }
     }
 }
@@ -43,14 +53,13 @@ impl FileStoreOperator for GcsFileStoreOperator {
     }
 
     /// Gets the transactions files from the file store. version has to be a multiple of BLOB_STORAGE_SIZE.
-    async fn get_transactions(&self, version: u64) -> anyhow::Result<Vec<String>> {
-        let batch_start_version = version / BLOB_STORAGE_SIZE as u64 * BLOB_STORAGE_SIZE as u64;
-        let current_file_name = generate_blob_name(batch_start_version);
-        match Object::download(&self.bucket_name, current_file_name.as_str()).await {
+    async fn get_transactions(&self, version: u64) -> anyhow::Result<Vec<Transaction>> {
+        let file_entry_key = FileEntryKey::new(version, self.storage_format).to_string();
+        match Object::download(&self.bucket_name, file_entry_key.as_str()).await {
             Ok(file) => {
-                let file: TransactionsFile =
-                    serde_json::from_slice(&file).map_err(|e| anyhow::anyhow!(e.to_string()))?;
-                Ok(file
+                let file_entry = FileEntry::from_bytes(file, self.storage_format);
+                let transactions_in_storage: TransactionsInStorage = file_entry.try_into()?;
+                Ok(transactions_in_storage
                     .transactions
                     .into_iter()
                     .skip((version % BLOB_STORAGE_SIZE as u64) as usize)
@@ -155,10 +164,10 @@ impl FileStoreOperator for GcsFileStoreOperator {
     async fn upload_transaction_batch(
         &mut self,
         _chain_id: u64,
-        transactions: Vec<EncodedTransactionWithVersion>,
+        transactions: Vec<Transaction>,
     ) -> anyhow::Result<(u64, u64)> {
-        let start_version = transactions.first().unwrap().1;
-        let end_version = transactions.last().unwrap().1;
+        let start_version = transactions.first().unwrap().version;
+        let end_version = transactions.last().unwrap().version;
         let batch_size = transactions.len();
         anyhow::ensure!(
             start_version % BLOB_STORAGE_SIZE as u64 == 0,
@@ -169,13 +178,14 @@ impl FileStoreOperator for GcsFileStoreOperator {
             "The number of transactions to upload has to be multiplier of BLOB_STORAGE_SIZE."
         );
 
+        let file_entry_key = FileEntryKey::new(start_version, self.storage_format).to_string();
+        let file_entry: FileEntry =
+            FileEntryBuilder::new(transactions, self.storage_format).try_into()?;
         let bucket_name = self.bucket_name.clone();
-        let current_batch = transactions.iter().cloned().collect_vec();
-        let transactions_file = build_transactions_file(current_batch).unwrap();
         Object::create(
             bucket_name.clone().as_str(),
-            serde_json::to_vec(&transactions_file).unwrap(),
-            generate_blob_name(transactions_file.starting_version).as_str(),
+            file_entry.into_inner(),
+            file_entry_key.as_str(),
             JSON_FILE_TYPE,
         )
         .await?;

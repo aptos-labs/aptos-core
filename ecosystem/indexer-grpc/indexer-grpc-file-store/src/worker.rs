@@ -2,20 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{METADATA_UPLOAD_FAILURE_COUNT, PROCESSED_VERSIONS_COUNT};
-use anyhow::{bail, Context, Result};
+use anyhow::{ensure, Context, Result};
 use aptos_indexer_grpc_utils::{
-    build_protobuf_encoded_transaction_wrappers,
-    cache_operator::{CacheBatchGetStatus, CacheOperator},
+    cache_operator::CacheOperator,
     config::IndexerGrpcFileStoreConfig,
     constants::BLOB_STORAGE_SIZE,
     counters::{log_grpc_step, IndexerGrpcStep},
-    file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
+    file_store_operator::FileStoreOperator,
+    storage_format::StorageFormat,
     types::RedisUrl,
-    EncodedTransactionWithVersion,
 };
 use aptos_moving_average::MovingAverage;
-use aptos_protos::transaction::v1::Transaction;
-use prost::Message;
 use std::time::Duration;
 use tracing::debug;
 
@@ -23,20 +20,23 @@ use tracing::debug;
 const AHEAD_OF_CACHE_SLEEP_DURATION_IN_MILLIS: u64 = 100;
 const SERVICE_TYPE: &str = "file_worker";
 
-/// Processor tails the data in cache and stores the data in file store.
-pub struct Processor {
-    cache_operator: CacheOperator<redis::aio::ConnectionManager>,
-    file_store_operator: Box<dyn FileStoreOperator>,
-    cache_chain_id: u64,
-    enable_expensive_logging: bool,
-}
+pub struct Worker {}
 
-impl Processor {
-    pub async fn new(
+impl Worker {
+    /// Starts the processing. The steps are
+    /// 1. Check chain id at the beginning and every step after
+    /// 2. Get the batch start version from file store metadata
+    /// 3. Start loop
+    ///   3.1 Check head from cache, decide whether we need to parallel process or just wait
+    ///   3.2 If we're ready to process, create max of 10 threads and fetch / upload data
+    ///   3.3 Update file store metadata at the end of a batch
+    pub async fn run(
         redis_main_instance_address: RedisUrl,
         file_store_config: IndexerGrpcFileStoreConfig,
         enable_expensive_logging: bool,
-    ) -> Result<Self> {
+        chain_id: u64,
+        cacche_storage_format: StorageFormat,
+    ) -> Result<()> {
         // Connection to redis is a hard dependency for file store processor.
         let conn = redis::Client::open(redis_main_instance_address.0.clone())
             .with_context(|| {
@@ -53,58 +53,38 @@ impl Processor {
                     redis_main_instance_address.0
                 )
             })?;
+        let mut cache_operator = CacheOperator::new(conn, cacche_storage_format);
 
-        let mut cache_operator = CacheOperator::new(conn);
-        let cache_chain_id = cache_operator
-            .get_chain_id()
-            .await
-            .context("Get chain id failed.")?;
+        let mut file_store_operator: Box<dyn FileStoreOperator> = file_store_config.create();
 
-        let file_store_operator: Box<dyn FileStoreOperator> = match &file_store_config {
-            IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => {
-                Box::new(GcsFileStoreOperator::new(
-                    gcs_file_store.gcs_file_store_bucket_name.clone(),
-                    gcs_file_store
-                        .gcs_file_store_service_account_key_path
-                        .clone(),
-                ))
+        let file_store_metadata = file_store_operator.get_file_store_metadata().await;
+        if file_store_metadata.is_none() {
+            file_store_operator
+                .update_file_store_metadata_internal(chain_id, 0)
+                .await?;
+        }
+        // Metadata is guaranteed to exist now
+        let metadata = file_store_operator.get_file_store_metadata().await.unwrap();
+
+        ensure!(metadata.chain_id == chain_id, "Chain ID mismatch.");
+        let mut batch_start_version = metadata.version;
+        // Cache config in the cache
+        cache_operator.cache_setup_if_needed().await?;
+        match cache_operator.get_chain_id().await? {
+            Some(id) => {
+                ensure!(id == chain_id, "Chain ID mismatch.");
             },
-            IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => Box::new(
-                LocalFileStoreOperator::new(local_file_store.local_file_store_path.clone()),
-            ),
-        };
-        file_store_operator.verify_storage_bucket_existence().await;
-
-        Ok(Self {
-            cache_operator,
-            file_store_operator,
-            cache_chain_id,
-            enable_expensive_logging,
-        })
-    }
-
-    /// Starts the processing. The steps are
-    /// 1. Check chain id at the beginning and every step after
-    /// 2. Get the batch start version from file store metadata
-    /// 3. Start loop
-    ///   3.1 Check head from cache, decide whether we need to parallel process or just wait
-    ///   3.2 If we're ready to process, create max of 10 threads and fetch / upload data
-    ///   3.3 Update file store metadata at the end of a batch
-    pub async fn run(&mut self) -> Result<()> {
-        let cache_chain_id = self.cache_chain_id;
-
-        let mut batch_start_version =
-            if let Some(metadata) = self.file_store_operator.get_file_store_metadata().await {
-                anyhow::ensure!(metadata.chain_id == cache_chain_id, "Chain ID mismatch.");
-                metadata.version
-            } else {
-                0
-            };
-
+            None => {
+                cache_operator.set_chain_id(chain_id).await?;
+            },
+        }
+        cache_operator
+            .update_file_store_latest_version(batch_start_version)
+            .await?;
         let mut tps_calculator = MovingAverage::new(10_000);
         loop {
             let latest_loop_time = std::time::Instant::now();
-            let cache_worker_latest = self.cache_operator.get_latest_version().await?;
+            let cache_worker_latest = cache_operator.get_latest_version().await?.unwrap();
 
             // batches tracks the start version of the batches to fetch. 1000 at the time
             let mut batches = vec![];
@@ -131,16 +111,16 @@ impl Processor {
             // Create thread and fetch transactions
             let mut tasks = vec![];
             for start_version in batches {
-                let mut cache_operator_clone = self.cache_operator.clone();
-                let mut file_store_operator_clone = self.file_store_operator.clone_box();
+                let mut cache_operator_clone = cache_operator.clone();
+                let mut file_store_operator_clone = file_store_operator.clone_box();
                 let task = tokio::spawn(async move {
                     let transactions = cache_operator_clone
-                        .batch_get_encoded_proto_data_x(start_version, BLOB_STORAGE_SIZE as u64)
+                        .batch_get_transactions(start_version, BLOB_STORAGE_SIZE as u64)
                         .await
                         .unwrap();
-                    let last_transaction = transactions.last().unwrap().0.clone();
+                    let last_transaction = transactions.last().unwrap().clone();
                     let (start, end) = file_store_operator_clone
-                        .upload_transaction_batch(cache_chain_id, transactions)
+                        .upload_transaction_batch(chain_id, transactions)
                         .await
                         .unwrap();
                     (start, end, last_transaction)
@@ -201,12 +181,11 @@ impl Processor {
 
             // Update filestore metadata. First do it in cache for performance then update metadata file
             let start_metadata_upload_time = std::time::Instant::now();
-            self.cache_operator
+            cache_operator
                 .update_file_store_latest_version(batch_start_version)
                 .await?;
-            while self
-                .file_store_operator
-                .update_file_store_metadata_with_timeout(cache_chain_id, batch_start_version)
+            while file_store_operator
+                .update_file_store_metadata_with_timeout(chain_id, batch_start_version)
                 .await
                 .is_err()
             {
@@ -231,23 +210,11 @@ impl Processor {
             );
 
             let (mut start_version_timestamp, mut end_version_timestamp) = (None, None);
-            if self.enable_expensive_logging {
+            if enable_expensive_logging {
                 // This decoding may be inefficient, but this is the file store so we don't have to be overly
                 // concerned with efficiency.
-                start_version_timestamp = {
-                    let decoded_transaction =
-                        base64::decode(first_version_encoded).expect("Failed to decode base64.");
-                    let transaction = Transaction::decode(&*decoded_transaction)
-                        .expect("Failed to decode protobuf.");
-                    transaction.timestamp
-                };
-                end_version_timestamp = {
-                    let decoded_transaction =
-                        base64::decode(last_version_encoded).expect("Failed to decode base64.");
-                    let transaction = Transaction::decode(&*decoded_transaction)
-                        .expect("Failed to decode protobuf.");
-                    transaction.timestamp
-                };
+                start_version_timestamp = first_version_encoded.timestamp;
+                end_version_timestamp = last_version_encoded.timestamp;
             }
             let full_loop_duration = latest_loop_time.elapsed().as_secs_f64();
             log_grpc_step(
@@ -263,25 +230,5 @@ impl Processor {
                 None,
             );
         }
-    }
-}
-
-fn _handle_batch_from_cache(
-    fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus>,
-    batch_start_version: u64,
-) -> Result<Option<Vec<EncodedTransactionWithVersion>>> {
-    match fullnode_rpc_status {
-        Ok(CacheBatchGetStatus::Ok(encoded_transactions)) => Ok(Some(
-            build_protobuf_encoded_transaction_wrappers(encoded_transactions, batch_start_version),
-        )),
-        Ok(CacheBatchGetStatus::NotReady) => Ok(None),
-        Ok(CacheBatchGetStatus::EvictedFromCache) => {
-            bail!(
-                "[indexer file] Cache evicted from cache. For file store worker, this is not expected."
-            );
-        },
-        Err(err) => {
-            bail!("Batch get encoded proto data failed: {}", err);
-        },
     }
 }

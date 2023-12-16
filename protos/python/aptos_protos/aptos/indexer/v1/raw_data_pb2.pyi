@@ -11,6 +11,22 @@ from google.protobuf.internal import containers as _containers
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
+class TransactionsInStorage(_message.Message):
+    __slots__ = ["transactions", "starting_version"]
+    TRANSACTIONS_FIELD_NUMBER: _ClassVar[int]
+    STARTING_VERSION_FIELD_NUMBER: _ClassVar[int]
+    transactions: _containers.RepeatedCompositeFieldContainer[
+        _transaction_pb2.Transaction
+    ]
+    starting_version: int
+    def __init__(
+        self,
+        transactions: _Optional[
+            _Iterable[_Union[_transaction_pb2.Transaction, _Mapping]]
+        ] = ...,
+        starting_version: _Optional[int] = ...,
+    ) -> None: ...
+
 class GetTransactionsRequest(_message.Message):
     __slots__ = ["starting_version", "transactions_count", "batch_size"]
     STARTING_VERSION_FIELD_NUMBER: _ClassVar[int]
