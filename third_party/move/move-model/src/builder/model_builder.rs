@@ -16,7 +16,10 @@ use crate::{
         SpecFunId, SpecVarId, StructId, TypeParameter, TypeParameterKind,
     },
     symbol::Symbol,
-    ty::{infer_abilities, infer_and_check_abilities, is_phantom_type_arg, Constraint, Type, gen_get_ty_param_kinds},
+    ty::{
+        gen_get_ty_param_kinds, infer_abilities, infer_and_check_abilities, is_phantom_type_arg,
+        Constraint, Type,
+    },
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -441,10 +444,7 @@ impl<'env> ModelBuilder<'env> {
             for (_field_name, (loc, _field_idx, field_ty)) in fields.iter() {
                 // check fields are properly instantiated
                 self.check_instantiation(field_ty, ty_params, loc);
-                if is_phantom_type_arg(
-                    gen_get_ty_param_kinds(ty_params),
-                    field_ty,
-                ) {
+                if is_phantom_type_arg(gen_get_ty_param_kinds(ty_params), field_ty) {
                     self.error(loc, "phantom type arguments cannot be used")
                 }
             }

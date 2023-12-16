@@ -7,8 +7,8 @@
 use crate::{
     ast::QualifiedSymbol,
     model::{
-        GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructEnv, StructId,
-        TypeParameterKind, TypeParameter,
+        GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructEnv, StructId, TypeParameter,
+        TypeParameterKind,
     },
     symbol::Symbol,
 };
@@ -2165,7 +2165,9 @@ where
 /// Return a function that
 /// returns the type paramter kind bases on `ty_params`
 /// panics if a type parameter is not in `ty_params`
-pub fn gen_get_ty_param_kinds(ty_params: &[TypeParameter]) -> impl Fn(u16) -> TypeParameterKind + Copy + '_ {
+pub fn gen_get_ty_param_kinds(
+    ty_params: &[TypeParameter],
+) -> impl Fn(u16) -> TypeParameterKind + Copy + '_ {
     |i| {
         if let Some(tp) = ty_params.get(i as usize) {
             tp.1.clone()

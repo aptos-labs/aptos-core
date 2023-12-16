@@ -30,8 +30,8 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{
-        infer_abilities, NoUnificationContext, PrimitiveType, ReferenceKind, Type,
-        TypeDisplayContext, TypeUnificationAdapter, Variance, gen_get_ty_param_kinds,
+        gen_get_ty_param_kinds, infer_abilities, NoUnificationContext, PrimitiveType,
+        ReferenceKind, Type, TypeDisplayContext, TypeUnificationAdapter, Variance,
     },
     well_known,
 };
@@ -1221,7 +1221,7 @@ impl GlobalEnv {
         infer_abilities(
             ty,
             gen_get_ty_param_kinds(ty_params),
-            self.gen_get_struct_sig()
+            self.gen_get_struct_sig(),
         )
     }
 
@@ -1586,9 +1586,9 @@ impl GlobalEnv {
 
     /// Generates a function that given module id, struct id,
     /// returns the struct signature
-    pub fn gen_get_struct_sig<'a>(
-        &'a self,
-    ) -> impl Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy + 'a {
+    pub fn gen_get_struct_sig(
+        &self,
+    ) -> impl Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy + '_ {
         |mid, sid| {
             let qid = QualifiedId {
                 module_id: mid,

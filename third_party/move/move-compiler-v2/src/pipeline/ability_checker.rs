@@ -6,11 +6,8 @@
 use move_binary_format::file_format::{Ability, AbilitySet};
 use move_model::{
     ast::TempIndex,
-    model::{
-        FunId, FunctionEnv, Loc, ModuleId, QualifiedId, StructId, TypeParameterKind,
-    },
-    ty::{self, gen_get_ty_param_kinds},
-    ty::Type,
+    model::{FunId, FunctionEnv, Loc, ModuleId, QualifiedId, StructId, TypeParameterKind},
+    ty::{self, gen_get_ty_param_kinds, Type},
 };
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
@@ -123,7 +120,7 @@ fn check_struct_inst(
         mid,
         sid,
         ty_args,
-    gen_get_ty_param_kinds(&ty_params),
+        gen_get_ty_param_kinds(&ty_params),
         gen_get_struct_sig(target),
         Some((loc, |loc: &Loc, msg: &str| {
             target.global_env().error(loc, msg)
