@@ -362,7 +362,7 @@ impl<'a> CopyTransformation<'a> {
     /// add diagnostics if not
     fn check_copy_for_temp(&self, target: &FunctionTarget, temp: TempIndex, id: AttrId) {
         check_copy(
-            &target,
+            target,
             target.get_local_type(temp),
             &target.get_bytecode_loc(id),
             &format!(
