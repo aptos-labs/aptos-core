@@ -88,6 +88,7 @@ fn check_write_ref(target: &FunctionTarget, t: TempIndex, loc: &Loc) {
     }
 }
 
+/// Checks the given struct type (`Type::Struct(mod_id, struct_id, insts)`) has key ability
 fn check_key_for_struct(
     target: &FunctionTarget,
     mod_id: ModuleId,
@@ -101,6 +102,8 @@ fn check_key_for_struct(
     }
 }
 
+/// Generates the function that given module id, struct id,
+/// returns the struct signature
 fn get_struct_sig<'a>(
     target: &'a FunctionTarget,
 ) -> impl Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy + 'a {
@@ -120,8 +123,8 @@ fn get_struct_sig<'a>(
     }
 }
 
-/// checks that the given type is instantiated with types satisfying their ability constraints
-/// on the type parameter
+/// Checks that the type arguments to the struct type identified by `mid::sid` is properly instantiated,
+/// and returns the abilities of the resulting instantiated struct type.
 fn check_struct_inst(
     target: &FunctionTarget,
     mid: ModuleId,
@@ -142,6 +145,7 @@ fn check_struct_inst(
     )
 }
 
+/// Checks if the given function is properly instantiated
 fn check_fun_inst(target: &FunctionTarget, mid: ModuleId, fid: FunId, inst: &[Type], loc: &Loc) {
     let qid = QualifiedId {
         module_id: mid,
@@ -151,8 +155,8 @@ fn check_fun_inst(target: &FunctionTarget, mid: ModuleId, fid: FunId, inst: &[Ty
     for (param, ty) in fun_env.get_type_parameters().iter().zip(inst.iter()) {
         let required_abilities = param.1.abilities;
         let given_abilities = check_instantiation(target, ty, loc);
-        // TODO: which field, why
         if !required_abilities.is_subset(given_abilities) {
+            // TODO: which field, why
             target.global_env().error(loc, "invalid instantiation")
         }
     }

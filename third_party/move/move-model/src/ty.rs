@@ -2177,6 +2177,8 @@ pub fn gen_get_ty_param_kinds(ty_params: &[TypeParameter]) -> impl Fn(u16) -> Ty
 
 /// See `infer_abilities_opt_check`
 /// but this is for struct types
+/// More specifically, checks that the type arguments to the struct type identified by `mid::sid` is instantiated properly
+/// and returns the abilities of the resulting instantiated struct type.
 pub fn check_struct_inst<F, G, H>(
     mid: ModuleId,
     sid: StructId,
