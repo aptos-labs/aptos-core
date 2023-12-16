@@ -494,7 +494,15 @@ impl Bytecode {
                 vec![*dst]
             },
             Bytecode::Call(_, dsts, _, _, _) => dsts.clone(),
-            _ => Vec::new(),
+            Bytecode::Ret(_, _)
+            | Bytecode::Branch(_, _, _, _)
+            | Bytecode::Jump(_, _)
+            | Bytecode::Label(_, _)
+            | Bytecode::Abort(_, _)
+            | Bytecode::Nop(_)
+            | Bytecode::SaveMem(_, _, _)
+            | Bytecode::SaveSpecVar(_, _, _)
+            | Bytecode::Prop(_, _, _) => Vec::new(),
         }
     }
 
