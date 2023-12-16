@@ -248,6 +248,7 @@ spec aptos_framework::coin {
         aborts_if option::spec_is_some(maybe_supply) && value < amount;
 
         ensures post_coin_store.coin.value == coin_store.coin.value - amount;
+        /// [managed_coin::high-level-req-5]
         ensures if (option::spec_is_some(maybe_supply)) {
             post_value == value - amount
         } else {
@@ -410,6 +411,7 @@ spec aptos_framework::coin {
         modifies global<CoinInfo<CoinType>>(account_addr);
         aborts_if monitor_supply && parallelizable
             && !exists<aggregator_factory::AggregatorFactory>(@aptos_framework);
+        /// [managed_coin::high-level-req-2]
         ensures exists<CoinInfo<CoinType>>(account_addr)
             && coin_info.name == name
             && coin_info.symbol == symbol

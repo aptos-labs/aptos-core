@@ -1,4 +1,36 @@
 spec aptos_framework::storage_gas {
+    /// <high-level-req>
+    /// No.: 1
+    /// Property: The module's initialization guarantees the creation of the StorageGasConfig resource with a precise
+    /// configuration, including accurate gas curves for per-item and per-byte operations.
+    /// Criticality: Medium
+    /// Implementation: The initialize function is responsible for setting up the initial state of the module, ensuring
+    /// the fulfillment of the following conditions: (1) the creation of the StorageGasConfig resource, indicating its
+    /// existence within the module's context, and (2) the configuration of the StorageGasConfig resource includes the
+    /// precise gas curves that define the behavior of per-item and per-byte operations.
+    /// Enforcement: Formally verified via [high-level-req-1](initialize). Moreover, the native gas logic has been manually audited.
+    ///
+    /// No.: 2
+    /// Property: The gas curve approximates an exponential curve based on a minimum and maximum gas charge.
+    /// Criticality: High
+    /// Implementation: The validate_points function ensures that the provided vector of points represents a
+    /// monotonically non-decreasing curve.
+    /// Enforcement: Formally verified via [high-level-req-2](validate_points). Moreover, the configuration logic has been manually audited.
+    ///
+    /// No.: 3
+    /// Property: The initialized gas curve structure has values set according to the provided parameters.
+    /// Criticality: Low
+    /// Implementation: The new_gas_curve function initializes the GasCurve structure with values provided as parameters.
+    /// Enforcement: Formally verified via [high-level-req-3](new_gas_curve).
+    ///
+    /// No.: 4
+    /// Property: The initialized usage gas configuration structure has values set according to the provided parameters.
+    /// Criticality: Low
+    /// Implementation: The new_usage_gas_config function initializes the UsageGasConfig structure with values provided
+    /// as parameters.
+    /// Enforcement: Formally verified via [high-level-req-4](new_usage_gas_config).
+    /// </high-level-req>
+    ///
     // -----------------
     // Struct invariants
     // -----------------
@@ -55,6 +87,7 @@ spec aptos_framework::storage_gas {
     spec new_gas_curve(min_gas: u64, max_gas: u64, points: vector<Point>): GasCurve {
         include NewGasCurveAbortsIf;
         include ValidatePointsAbortsIf;
+        /// [high-level-req-3]
         ensures result == GasCurve {
             min_gas,
             max_gas,
@@ -65,6 +98,7 @@ spec aptos_framework::storage_gas {
     spec new_usage_gas_config(target_usage: u64, read_curve: GasCurve, create_curve: GasCurve, write_curve: GasCurve): UsageGasConfig {
         aborts_if target_usage == 0;
         aborts_if target_usage > MAX_U64 / BASIS_POINT_DENOMINATION;
+        /// [high-level-req-4]
         ensures result == UsageGasConfig {
             target_usage,
             read_curve,
@@ -94,6 +128,7 @@ spec aptos_framework::storage_gas {
         aborts_if exists<StorageGasConfig>(@aptos_framework);
         aborts_if exists<StorageGas>(@aptos_framework);
 
+        /// [high-level-req-1]
         ensures exists<StorageGasConfig>(@aptos_framework);
         ensures exists<StorageGas>(@aptos_framework);
     }
@@ -151,6 +186,7 @@ spec aptos_framework::storage_gas {
     spec schema ValidatePointsAbortsIf {
         points: vector<Point>;
 
+        /// [high-level-req-2]
         aborts_if exists i in 0..len(points) - 1: (
             points[i].x >= points[i + 1].x || points[i].y > points[i + 1].y
         );

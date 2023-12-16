@@ -12,7 +12,13 @@ use aptos_api_types::{
 };
 use aptos_bitvec::BitVec;
 use aptos_logger::warn;
-use aptos_protos::{transaction::v1 as transaction, util::timestamp};
+use aptos_protos::{
+    transaction::{
+        v1 as transaction,
+        v1::{any_signature, Ed25519, Secp256k1Ecdsa, WebAuthn},
+    },
+    util::timestamp,
+};
 use hex;
 use move_binary_format::file_format::Ability;
 use std::time::Duration;
@@ -585,11 +591,21 @@ fn convert_signature(signature: &Signature) -> transaction::AnySignature {
     match signature {
         Signature::Ed25519(s) => transaction::AnySignature {
             r#type: transaction::any_signature::Type::Ed25519 as i32,
-            signature: s.0.clone(),
+            signature: Some(any_signature::Signature::Ed25519(Ed25519 {
+                signature: s.0.clone(),
+            })),
         },
         Signature::Secp256k1Ecdsa(s) => transaction::AnySignature {
             r#type: transaction::any_signature::Type::Secp256k1Ecdsa as i32,
-            signature: s.0.clone(),
+            signature: Some(any_signature::Signature::Secp256k1Ecdsa(Secp256k1Ecdsa {
+                signature: s.0.clone(),
+            })),
+        },
+        Signature::WebAuthn(s) => transaction::AnySignature {
+            r#type: transaction::any_signature::Type::Webauthn as i32,
+            signature: Some(any_signature::Signature::Webauthn(WebAuthn {
+                signature: s.0.clone(),
+            })),
         },
     }
 }
@@ -602,6 +618,10 @@ fn convert_public_key(public_key: &PublicKey) -> transaction::AnyPublicKey {
         },
         PublicKey::Secp256k1Ecdsa(p) => transaction::AnyPublicKey {
             r#type: transaction::any_public_key::Type::Secp256k1Ecdsa as i32,
+            public_key: p.0.clone(),
+        },
+        PublicKey::Secp256r1Ecdsa(p) => transaction::AnyPublicKey {
+            r#type: transaction::any_public_key::Type::Secp256r1Ecdsa as i32,
             public_key: p.0.clone(),
         },
     }
@@ -727,6 +747,9 @@ pub fn convert_transaction(
             transaction::transaction::TransactionType::StateCheckpoint
         },
         Transaction::PendingTransaction(_) => panic!("PendingTransaction is not supported"),
+        Transaction::ValidatorTransaction(_) => {
+            transaction::transaction::TransactionType::Validator
+        },
     };
 
     let txn_data = match &transaction {
@@ -777,6 +800,9 @@ pub fn convert_transaction(
             )
         },
         Transaction::PendingTransaction(_) => panic!("PendingTransaction not supported"),
+        Transaction::ValidatorTransaction(_) => {
+            transaction::transaction::TxnData::Validator(transaction::ValidatorTransaction {})
+        },
     };
 
     transaction::Transaction {
