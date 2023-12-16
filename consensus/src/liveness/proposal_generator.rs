@@ -25,13 +25,14 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::{error, sample, sample::SampleRate, warn};
-use aptos_types::validator_txn::{pool::ValidatorTransactionFilter, ValidatorTransaction};
+use aptos_types::validator_txn::ValidatorTransaction;
 use futures::future::BoxFuture;
 use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
     time::Duration,
 };
+use aptos_validator_transaction_pool as vtxn_pool;
 
 #[cfg(test)]
 #[path = "proposal_generator_test.rs"]
@@ -327,7 +328,7 @@ impl ProposalGenerator {
                 .map(ValidatorTransaction::hash)
                 .collect();
             let validator_txn_filter =
-                ValidatorTransactionFilter::PendingTxnHashSet(pending_validator_txn_hashes);
+                vtxn_pool::TransactionFilter::PendingTxnHashSet(pending_validator_txn_hashes);
             let (validator_txns, payload) = self
                 .payload_client
                 .pull_payload(

@@ -13,12 +13,13 @@ use aptos_consensus_types::{
 };
 use aptos_types::{
     transaction::{ExecutionStatus, TransactionStatus},
-    validator_txn::{pool::ValidatorTransactionFilter, ValidatorTransaction},
+    validator_txn::{ValidatorTransaction},
     vm_status::StatusCode,
 };
 use futures::{channel::mpsc, future::BoxFuture};
 use rand::Rng;
 use std::time::Duration;
+use aptos_validator_transaction_pool as vtxn_pool;
 
 #[allow(dead_code)]
 pub struct MockPayloadManager {
@@ -58,7 +59,7 @@ impl PayloadClient for MockPayloadManager {
         _max_poll_time: Duration,
         _max_size: u64,
         _max_bytes: u64,
-        _validator_txn_filter: ValidatorTransactionFilter,
+        _validator_txn_filter: vtxn_pool::TransactionFilter,
         _user_txn_filter: PayloadFilter,
         _wait_callback: BoxFuture<'static, ()>,
         _pending_ordering: bool,
@@ -67,7 +68,7 @@ impl PayloadClient for MockPayloadManager {
     ) -> Result<(Vec<ValidatorTransaction>, Payload), QuorumStoreError> {
         // generate 1k txn is too slow with coverage instrumentation
         Ok((
-            vec![ValidatorTransaction::dummy(vec![0xFF; 1024])],
+            vec![ValidatorTransaction::dummy1(vec![0xFF; 1024])],
             random_payload(10),
         ))
     }

@@ -45,13 +45,13 @@ use aptos_types::{
     },
     transaction::SignedTransaction,
     validator_info::ValidatorInfo,
-    validator_txn::pool::{ValidatorTransactionPool, ValidatorTransactionPoolClient},
     waypoint::Waypoint,
 };
 use futures::{channel::mpsc, StreamExt};
 use maplit::hashmap;
 use std::{collections::HashMap, iter::FromIterator, sync::Arc};
 use tokio::runtime::Runtime;
+use aptos_validator_transaction_pool as vtxn_pool;
 
 /// Auxiliary struct that is preparing SMR for the test
 pub struct SMRNode {
@@ -74,7 +74,7 @@ impl SMRNode {
         consensus_config: OnChainConsensusConfig,
         storage: Arc<MockStorage>,
         twin_id: TwinId,
-        validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
+        validator_txn_pool_client: vtxn_pool::ReadClient,
     ) -> Self {
         // Create a runtime for the twin
         let thread_name = format!("twin-{}", twin_id.id);
@@ -286,14 +286,14 @@ impl SMRNode {
                 ..ConsensusConfigV1::default()
             });
 
-            let validator_txn_pool = Arc::new(ValidatorTransactionPool::new());
+            let (vtxn_pool_read_cli, _) = vtxn_pool::new(vec![]);
             smr_nodes.push(Self::start(
                 playground,
                 config,
                 consensus_config,
                 storage,
                 twin_id,
-                validator_txn_pool,
+                vtxn_pool_read_cli,
             ));
         }
         smr_nodes
