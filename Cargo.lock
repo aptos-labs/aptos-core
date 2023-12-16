@@ -259,7 +259,6 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-telemetry",
  "aptos-temppath",
- "aptos-transactional-test-harness",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",

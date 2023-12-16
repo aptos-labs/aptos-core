@@ -8,7 +8,6 @@ mod manifest;
 pub mod package_hooks;
 mod show;
 pub mod stored_package;
-mod transactional_tests_runner;
 
 use crate::{
     account::derive_resource_account::ResourceAccountSeed,
@@ -41,7 +40,6 @@ use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
 use aptos_rest_client::aptos_api_types::{
     EntryFunctionId, HexEncodedBytes, IdentifierWrapper, MoveModuleId,
 };
-use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     transaction::{TransactionArgument, TransactionPayload},
@@ -67,7 +65,6 @@ use std::{
 };
 pub use stored_package::*;
 use tokio::task;
-use transactional_tests_runner::TransactionalTestOpts;
 
 /// Tool for Move related operations
 ///
@@ -95,7 +92,6 @@ pub enum MoveTool {
     #[clap(subcommand, hide = true)]
     Show(show::ShowTool),
     Test(TestPackage),
-    TransactionalTest(TransactionalTestOpts),
     VerifyPackage(VerifyPackage),
     View(ViewFunction),
 }
@@ -122,7 +118,6 @@ impl MoveTool {
             MoveTool::RunScript(tool) => tool.execute_serialized().await,
             MoveTool::Show(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
-            MoveTool::TransactionalTest(tool) => tool.execute_serialized_success().await,
             MoveTool::VerifyPackage(tool) => tool.execute_serialized().await,
             MoveTool::View(tool) => tool.execute_serialized().await,
         }
@@ -186,24 +181,30 @@ impl FrameworkPackageArgs {
         // Add the framework dependency if it's provided
         let mut dependencies = BTreeMap::new();
         if let Some(ref path) = self.framework_local_dir {
-            dependencies.insert(APTOS_FRAMEWORK.to_string(), Dependency {
-                local: Some(path.display().to_string()),
-                git: None,
-                rev: None,
-                subdir: None,
-                aptos: None,
-                address: None,
-            });
+            dependencies.insert(
+                APTOS_FRAMEWORK.to_string(),
+                Dependency {
+                    local: Some(path.display().to_string()),
+                    git: None,
+                    rev: None,
+                    subdir: None,
+                    aptos: None,
+                    address: None,
+                },
+            );
         } else {
             let git_rev = self.framework_git_rev.as_deref().unwrap_or(DEFAULT_BRANCH);
-            dependencies.insert(APTOS_FRAMEWORK.to_string(), Dependency {
-                local: None,
-                git: Some(APTOS_GIT_PATH.to_string()),
-                rev: Some(git_rev.to_string()),
-                subdir: Some(SUBDIR_PATH.to_string()),
-                aptos: None,
-                address: None,
-            });
+            dependencies.insert(
+                APTOS_FRAMEWORK.to_string(),
+                Dependency {
+                    local: None,
+                    git: Some(APTOS_GIT_PATH.to_string()),
+                    rev: Some(git_rev.to_string()),
+                    subdir: Some(SUBDIR_PATH.to_string()),
+                    aptos: None,
+                    address: None,
+                },
+            );
         }
 
         let manifest = MovePackageManifest {
@@ -511,26 +512,6 @@ impl CliCommand<&'static str> for TestPackage {
             UnitTestResult::Success => Ok("Success"),
             UnitTestResult::Failure => Err(CliError::MoveTestError),
         }
-    }
-}
-
-#[async_trait]
-impl CliCommand<()> for TransactionalTestOpts {
-    fn command_name(&self) -> &'static str {
-        "TransactionalTest"
-    }
-
-    async fn execute(self) -> CliTypedResult<()> {
-        let root_path = self.root_path.display().to_string();
-
-        let requirements = vec![transactional_tests_runner::Requirements::new(
-            run_aptos_test,
-            "tests".to_string(),
-            root_path,
-            self.pattern.clone(),
-        )];
-
-        transactional_tests_runner::runner(&self, &requirements)
     }
 }
 
