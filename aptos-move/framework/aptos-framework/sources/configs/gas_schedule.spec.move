@@ -1,4 +1,34 @@
 spec aptos_framework::gas_schedule {
+    /// <high-level-req>
+    /// No.: 1
+    /// Property: During genesis, the Aptos framework account should be assigned the gas schedule resource.
+    /// Criticality: Medium
+    /// Implementation: The gas_schedule::initialize function calls the assert_aptos_framework function to ensure that
+    /// the signer is the aptos_framework and then assigns the GasScheduleV2 resource to it.
+    /// Enforcement: Formally verified via [high-level-req-1](initialize).
+    ///
+    /// No.: 2
+    /// Property: Only the Aptos framework account should be allowed to update the gas schedule resource.
+    /// Criticality: Critical
+    /// Implementation: The gas_schedule::set_gas_schedule function calls the assert_aptos_framework function to ensure
+    /// that the signer is the aptos framework account.
+    /// Enforcement: Formally verified via [high-level-req-2](set_gas_schedule).
+    ///
+    /// No.: 3
+    /// Property: Only valid gas schedule should be allowed for initialization and update.
+    /// Criticality: Medium
+    /// Implementation: The initialize and set_gas_schedule functions ensures that the gas_schedule_blob is not empty.
+    /// Enforcement: Formally verified via [high-level-req-3.3](initialize) and [high-level-req-3.2](set_gas_schedule).
+    ///
+    /// No.: 4
+    /// Property: Only a gas schedule with the feature version greater or equal than the current feature version is
+    /// allowed to be provided when performing an update operation.
+    /// Criticality: Medium
+    /// Implementation: The set_gas_schedule function validates the feature_version of the new_gas_schedule by ensuring
+    /// that it is greater or equal than the current gas_schedule.feature_version.
+    /// Enforcement: Formally verified via [high-level-req-4](set_gas_schedule).
+    /// </high-level-req>
+    ///
     spec module {
         pragma verify = true;
         pragma aborts_if_is_strict;
@@ -8,7 +38,9 @@ spec aptos_framework::gas_schedule {
         use std::signer;
 
         let addr = signer::address_of(aptos_framework);
+        /// [high-level-req-1]
         include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
+        /// [high-level-req-3.3]
         aborts_if len(gas_schedule_blob) == 0;
         aborts_if exists<GasScheduleV2>(addr);
         ensures exists<GasScheduleV2>(addr);
@@ -30,10 +62,13 @@ spec aptos_framework::gas_schedule {
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         include staking_config::StakingRewardsConfigRequirement;
 
+        /// [high-level-req-2]
         include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
+        /// [high-level-req-3.2]
         aborts_if len(gas_schedule_blob) == 0;
         let new_gas_schedule = util::spec_from_bytes<GasScheduleV2>(gas_schedule_blob);
         let gas_schedule = global<GasScheduleV2>(@aptos_framework);
+        /// [high-level-req-4]
         aborts_if exists<GasScheduleV2>(@aptos_framework) && new_gas_schedule.feature_version < gas_schedule.feature_version;
         ensures exists<GasScheduleV2>(signer::address_of(aptos_framework));
         ensures global<GasScheduleV2>(@aptos_framework) == new_gas_schedule;

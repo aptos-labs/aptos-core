@@ -17,6 +17,7 @@ It interacts with the other modules in the following ways:
 -  [Function `now_seconds`](#0x1_timestamp_now_seconds)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `update_global_time`](#@Specification_1_update_global_time)
 
 
@@ -260,6 +261,11 @@ Gets the current time in seconds.
 </table>
 
 
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a> and <a id="high-level-req-2" href="#high-level-req">high level requirement 2</a>:

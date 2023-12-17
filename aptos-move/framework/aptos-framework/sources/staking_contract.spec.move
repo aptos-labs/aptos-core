@@ -1,4 +1,72 @@
 spec aptos_framework::staking_contract {
+    /// <high-level-req>
+    /// No.: 1
+    /// Property: The Store structure for the staker exists after the staking contract is created.
+    /// Criticality: Medium
+    /// Implementation: The create_staking_contract_with_coins function ensures that the staker account has a Store
+    /// structure assigned.
+    /// Enforcement: Formally verified via [high-level-req-1](CreateStakingContractWithCoinsAbortsifAndEnsures).
+    ///
+    /// No.: 2
+    /// Property: A staking contract is created and stored in a mapping within the Store resource.
+    /// Criticality: High
+    /// Implementation: The create_staking_contract_with_coins function adds the newly created StakingContract to the
+    /// staking_contracts map with the operator as a key of the Store resource, effectively storing the staking contract.
+    /// Enforcement: Formally verified via [high-level-req-2](CreateStakingContractWithCoinsAbortsifAndEnsures).
+    ///
+    /// No.: 3
+    /// Property: Adding stake to the stake pool increases the principal value of the pool, reflecting the additional
+    /// stake amount.
+    /// Criticality: High
+    /// Implementation: The add_stake function transfers the specified amount of staked coins from the staker's account
+    /// to the stake pool associated with the staking contract. It increases the principal value of the staking contract
+    /// by the added stake amount.
+    /// Enforcement: Formally verified via [high-level-req-3](add_stake).
+    ///
+    /// No.: 4
+    /// Property: The staker may update the voter of a staking contract, enabling them to modify the assigned voter
+    /// address and ensure it accurately reflects their desired choice.
+    /// Criticality: High
+    /// Implementation: The update_voter function ensures that the voter address in a staking contract may be updated by
+    /// the staker, resulting in the modification of the delegated voter address in the associated stake pool to reflect
+    /// the new address provided.
+    /// Enforcement: Formally verified via [high-level-req-4](update_voter).
+    ///
+    /// No.: 5
+    /// Property: Only the owner of the stake pool has the permission to reset the lockup period of the pool.
+    /// Criticality: Critical
+    /// Implementation: The reset_lockup function ensures that only the staker who owns the stake pool has the authority
+    /// to reset the lockup period of the pool.
+    /// Enforcement: Formally verified via [high-level-req-5](reset_lockup).
+    ///
+    /// No.: 6
+    /// Property: Unlocked funds are correctly distributed to recipients based on their distribution shares, taking into
+    /// account the associated commission percentage.
+    /// Criticality: High
+    /// Implementation: The distribution process, implemented in the distribute_internal function, accurately allocates
+    /// unlocked funds to their intended recipients based on their distribution shares. It guarantees that each
+    /// recipient receives the correct amount of funds, considering the commission percentage associated with the
+    /// staking contract.
+    /// Enforcement: Audited that the correct amount of unlocked funds is distributed according to distribution shares.
+    ///
+    /// No.: 7
+    /// Property: The stake pool ensures that the commission is correctly requested and paid out from the old operator's
+    /// stake pool before allowing the switch to the new operator.
+    /// Criticality: High
+    /// Implementation: The switch_operator function initiates the commission payout from the stake pool associated with
+    /// the old operator, ensuring a smooth transition. Paying out the commission before the switch guarantees that the
+    /// staker receives the appropriate commission amount and maintains the integrity of the staking process.
+    /// Enforcement: Audited that the commission is paid to the old operator.
+    ///
+    /// No.: 8
+    /// Property: Stakers can withdraw their funds from the staking contract, ensuring the unlocked amount becomes
+    /// available for withdrawal after the lockup period.
+    /// Criticality: High
+    /// Implementation: The unlock_stake function ensures that the requested amount is properly unlocked from the stake
+    /// pool, considering the lockup period and that the funds become available for withdrawal when the lockup expires.
+    /// Enforcement: Audited that funds are unlocked properly.
+    /// </high-level-req>
+    ///
     spec module {
         pragma verify = true;
         pragma aborts_if_is_strict;
@@ -140,7 +208,9 @@ spec aptos_framework::staking_contract {
         let post post_staking_contract = simple_map::spec_get(post_store.staking_contracts, operator);
         aborts_if staking_contract.principal + amount > MAX_U64;
 
-        // property 3: Adding stake to the stake pool increases the principal value of the pool, reflecting the additional stake amount.
+        // property 3: Adding stake to the stake pool increases the principal value of the pool, reflecting the
+        // additional stake amount.
+        /// [high-level-req-3]
         ensures post_staking_contract.principal == staking_contract.principal + amount;
     }
 
@@ -162,6 +232,7 @@ spec aptos_framework::staking_contract {
     /// Only active validator can update locked_until_secs.
     spec reset_lockup(staker: &signer, operator: address) {
         let staker_address = signer::address_of(staker);
+        /// [high-level-req-5]
         include ContractExistsAbortsIf{staker: staker_address};
         include IncreaseLockupWithCapAbortsIf{staker: staker_address};
     }
@@ -201,6 +272,7 @@ spec aptos_framework::staking_contract {
         // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         // TODO: Set because of timeout (estimate unknown).
         pragma verify = false;
+        /// [high-level-req-4]
         requires staking_contract.commission_percentage >= 0 && staking_contract.commission_percentage <= 100;
         let staker_address = signer::address_of(staker);
         let staking_contracts = global<Store>(staker_address).staking_contracts;
@@ -470,6 +542,7 @@ spec aptos_framework::staking_contract {
         let account = global<account::Account>(staker_address);
         aborts_if !exists<Store>(staker_address) && !exists<account::Account>(staker_address);
         aborts_if !exists<Store>(staker_address) && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
+        /// [high-level-req-1]
         ensures exists<Store>(staker_address);
 
         let store = global<Store>(staker_address);

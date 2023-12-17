@@ -101,6 +101,8 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 -  [Function `withdraw_stake`](#0x1_vesting_withdraw_stake)
 -  [Function `get_beneficiary`](#0x1_vesting_get_beneficiary)
 -  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `stake_pool_address`](#@Specification_1_stake_pool_address)
     -  [Function `vesting_start_secs`](#@Specification_1_vesting_start_secs)
     -  [Function `period_duration_secs`](#@Specification_1_period_duration_secs)
@@ -2778,8 +2780,116 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Property</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>In order to retrieve the address of the underlying stake pool, the vesting start timestamp of the vesting contract, the duration of the vesting period, the remaining grant of a vesting contract, the beneficiary account of a shareholder in a vesting contract, the percentage of accumulated rewards that is paid to the operator as commission, the operator who runs the validator, the voter who will be voting on-chain, and the vesting schedule of a vesting contract, the supplied vesting contract should exist.</td>
+<td>Low</td>
+<td>The vesting_start_secs, period_duration_secs, remaining_grant, beneficiary, operator_commission_percentage, operator, voter, and vesting_schedule functions ensure that the supplied vesting contract address exists by calling the assert_vesting_contract_exists function.</td>
+<td>Formally verified via <a href="#high-level-req-1">assert_vesting_contract_exists</a>.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>The vesting pool should not exceed a maximum of 30 shareholders.</td>
+<td>Medium</td>
+<td>The maximum number of shareholders a vesting pool can support is stored as a constant in</td>
+<td>Formally verified via a <a href="#high-level-spec-2">global invariant</a>.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>Retrieving all the vesting contracts of a given address and retrieving the list of beneficiaries from a vesting contract should never fail.</td>
+<td>Medium</td>
+<td>The function vesting_contracts checks if the supplied admin address contains an AdminStore resource and returns all the vesting contracts as a vector<address>. Otherwise it returns an empty vector. The function get_beneficiary checks for a given vesting contract, a specific shareholder exists, and if so, the beneficiary will be returned, otherwise it will simply return the address of the shareholder.</td>
+<td>Formally verified via <a href="#high-level-spec-3.1">vesting_contracts</a> and <a href="#high-level-spec-3.2">get_beneficiary</a>.</td>
+</tr>
+
+<tr>
+<td>4</td>
+<td>The shareholders should be able to start vesting only after the vesting cliff and the first vesting period have transpired.</td>
+<td>High</td>
+<td>The end of the vesting cliff is stored under VestingContract.vesting_schedule.start_timestamp_secs. period.</td>
+<td>Audited the check for the end of vesting cliff: <a href="https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/vesting.move#L566">vest</a> module.</td>
+</tr>
+
+<tr>
+<td>5</td>
+<td>In order to retrieve the total accumulated rewards that have not been distributed, the accumulated rewards of a given beneficiary, the list of al shareholders in a vesting contract,the shareholder address given the beneficiary address in a given vesting contract, to terminate a vesting contract and to distribute any withdrawable stake from the stake pool, the supplied vesting contract should exist and be active.</td>
+<td>Low</td>
+<td>The distribute, terminate_vesting_contract, shareholder, shareholders, accumulated_rewards, and total_accumulated_rewards functions ensure that the supplied vesting contract address exists and is active by calling the assert_active_vesting_contract function.</td>
+<td>Formally verified via <a href="#high-level-spec-5">ActiveVestingContractAbortsIf</a>.</td>
+</tr>
+
+<tr>
+<td>6</td>
+<td>A new vesting schedule should not be allowed to start vesting in the past or to supply an empty schedule or for the period duration to be zero.</td>
+<td>High</td>
+<td>The create_vesting_schedule function ensures that the length of the schedule vector is greater than 0, that the period duration is greater than 0 and that the start_timestamp_secs is greater or equal to</td>
+<td>Formally verified via <a href="#high-level-req-6">create_vesting_schedule</a>.</td>
+</tr>
+
+<tr>
+<td>7</td>
+<td>The shareholders should be able to vest the tokens from previous periods.</td>
+<td>High</td>
+<td>When vesting, the last_completed_period is checked against the next period to vest. This allows to unlock vested tokens for the next period since last vested, in case they didn't call vest for some periods.</td>
+<td>Audited that vesting doesn't skip periods, but gradually increments to allow shareholders to retrieve all the vested tokens.</td>
+</tr>
+
+<tr>
+<td>8</td>
+<td>Actions such as obtaining a list of shareholders, calculating accrued rewards, distributing withdrawable stake, and terminating the vesting contract should be accessible exclusively while the vesting contract remains active.</td>
+<td>Low</td>
+<td>Restricting access to inactive vesting contracts is achieved through the assert_active_vesting_contract function.</td>
+<td>Formally verified via <a href="#high-level-spec-8">ActiveVestingContractAbortsIf</a>.</td>
+</tr>
+
+<tr>
+<td>9</td>
+<td>The ability to terminate a vesting contract should only be available to the owner.</td>
+<td>High</td>
+<td>Limiting the access of accounts to specific function, is achieved by asserting that the signer matches the admin of the VestingContract.</td>
+<td>Formally verified via <a href="#high-level-req-9">verify_admin</a>.</td>
+</tr>
+
+<tr>
+<td>10</td>
+<td>A new vesting contract should not be allowed to have an empty list of shareholders, have a different amount of shareholders than buy-ins, and provide a withdrawal address which is either reserved or not registered for apt.</td>
+<td>High</td>
+<td>The create_vesting_contract function ensures that the withdrawal_address is not a reserved address, that it is registered for apt, that the list of shareholders is non-empty, and that the amount of shareholders matches the amount of buy_ins.</td>
+<td>Formally verified via <a href="#high-level-req-10">create_vesting_contract</a>.</td>
+</tr>
+
+<tr>
+<td>11</td>
+<td>Creating a vesting contract account should require the signer (admin) to own an admin store and should enforce that the seed of the resource account is composed of the admin store's nonce, the vesting pool salt, and the custom contract creation seed.</td>
+<td>Medium</td>
+<td>The create_vesting_contract_account concatenates to the seed first the admin_store.nonce then the VESTING_POOL_SALT then the contract_creation_seed and then it is passed to the create_resource_account function.</td>
+<td>Enforced via <a href="#high-level-req-11">create_vesting_contract_account</a>.</td>
+</tr>
+
+</table>
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
+
+
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
+// This enforces <a id="high-level-spec-2" href="#high-level-req">high level requirement 2</a>:
 <b>invariant</b> <b>forall</b> pool: Pool: len(pool.shareholders) &lt;= <a href="vesting.md#0x1_vesting_MAXIMUM_SHAREHOLDERS">MAXIMUM_SHAREHOLDERS</a>;
 </code></pre>
 
@@ -2899,7 +3009,8 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code><b>aborts_if</b> <b>false</b>;
+<pre><code>// This enforces <a id="high-level-spec-3.1" href="#high-level-req">high level requirement 3</a>:
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
@@ -3098,7 +3209,8 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code><b>aborts_if</b> !(len(schedule) &gt; 0);
+<pre><code>// This enforces <a id="high-level-req-6" href="#high-level-req">high level requirement 6</a>:
+<b>aborts_if</b> !(len(schedule) &gt; 0);
 <b>aborts_if</b> !(period_duration &gt; 0);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
 <b>aborts_if</b> !(start_timestamp_secs &gt;= <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>());
@@ -3118,6 +3230,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
+// This enforces <a id="high-level-req-10" href="#high-level-req">high level requirement 10</a>:
 <b>aborts_if</b> withdrawal_address == @aptos_framework || withdrawal_address == @vm_reserved;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(withdrawal_address);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(withdrawal_address);
@@ -3590,6 +3703,7 @@ This address should be deterministic for the same admin and vesting contract cre
 <b>let</b> first = concat(seed, nonce);
 <b>let</b> second = concat(first, <a href="vesting.md#0x1_vesting_VESTING_POOL_SALT">VESTING_POOL_SALT</a>);
 <b>let</b> end = concat(second, contract_creation_seed);
+// This enforces <a id="high-level-req-11" href="#high-level-req">high level requirement 11</a>:
 <b>let</b> resource_addr = <a href="account.md#0x1_account_spec_create_resource_address">account::spec_create_resource_address</a>(admin_addr, end);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_AdminStore">AdminStore</a>&gt;(admin_addr);
 <b>aborts_if</b> len(<a href="account.md#0x1_account_ZERO_AUTH_KEY">account::ZERO_AUTH_KEY</a>) != 32;
@@ -3620,7 +3734,8 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code><b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin) != vesting_contract.admin;
+<pre><code>// This enforces <a id="high-level-req-9" href="#high-level-req">high level requirement 9</a>:
+<b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin) != vesting_contract.admin;
 </code></pre>
 
 
@@ -3636,7 +3751,8 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
+<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
 </code></pre>
 
 
@@ -3771,7 +3887,8 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code><b>aborts_if</b> <b>false</b>;
+<pre><code>// This enforces <a id="high-level-spec-3.2" href="#high-level-req">high level requirement 3</a>:
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
@@ -3812,8 +3929,10 @@ This address should be deterministic for the same admin and vesting contract cre
 
 <pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt; {
     contract_address: <b>address</b>;
+    // This enforces <a id="high-level-spec-5" href="#high-level-req">high level requirement 5</a>:
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
     <b>let</b> vesting_contract = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
+    // This enforces <a id="high-level-spec-8" href="#high-level-req">high level requirement 8</a>:
     <b>aborts_if</b> vesting_contract.state != <a href="vesting.md#0x1_vesting_VESTING_POOL_ACTIVE">VESTING_POOL_ACTIVE</a>;
 }
 </code></pre>

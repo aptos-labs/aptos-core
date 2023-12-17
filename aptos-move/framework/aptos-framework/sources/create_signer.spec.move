@@ -14,7 +14,7 @@ spec aptos_framework::create_signer {
     /// Criticality: Medium
     /// Implementation: Before an Account resource is created, a signer is created for the specified new_address, and
     /// later, the Account resource is assigned to this signer.
-    /// Enforcement: Enforced by the move vm
+    /// Enforcement: Enforced by the [https://github.com/aptos-labs/aptos-core/blob/main/third_party/move/move-vm/types/src/values/values_impl.rs#L1129](move vm).
     ///
     /// No.: 3
     /// Property: An account should only be able to create a signer for another account if that account has granted it
@@ -28,7 +28,7 @@ spec aptos_framework::create_signer {
     /// Property: A signer should be returned for addresses that are not registered as accounts.
     /// Criticality: Low
     /// Implementation: The signer is just a struct that wraps an address, allows for non-accounts to have a signer.
-    /// Enforcement: Formally verified via create_signer
+    /// Enforcement: Formally verified via [0x1_create_signer_create_signer](create_signer).
     /// </high-level-req>
     ///
     spec module {

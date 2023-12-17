@@ -828,22 +828,26 @@ impl<'env> Docgen<'env> {
         // Regular expression to match Markdown link format [text](link)
         let re = Regex::new(r"\[(.*?)\]\((.*?)\)").unwrap();
         re.replace_all(input, |caps: &regex::Captures| {
-            let mut href = &caps[1];
+            let tag = &caps[1];
             let text = &caps[2];
 
-            let mut module_link = String::new();
-            if href.contains("::") {
-                let parts = href.split("::").collect::<Vec<_>>();
+            if tag.starts_with("http://") || tag.starts_with("https://") {
+                format!("<a href=\"{}\">{}</a>", tag, text)
+            } else if tag.contains("::") {
+                let parts = tag.clone().split("::").collect::<Vec<_>>();
                 if let Some(module_name) = parts.first() {
                     let label_link = self
                         .resolve_to_label(module_name, false)
                         .unwrap_or_default();
-                    module_link = label_link.split('#').next().unwrap_or("").to_string();
+                    let module_link = label_link.split('#').next().unwrap_or("").to_string();
+                    let spec_tag = parts.get(1).unwrap_or(&"");
+                    format!("<a href=\"{}#{}\">{}</a>", module_link, spec_tag, text)
+                } else {
+                    format!("<a href=\"#t{}\">{}</a>", tag, text)
                 }
-                href = parts.get(1).unwrap_or(&"");
+            } else {
+                format!("<a href=\"#{}\">{}</a>", tag, text)
             }
-
-            format!("<a href=\"{}#{}\">{}</a>", module_link, href, text)
         })
         .to_string()
     }
@@ -1344,13 +1348,13 @@ impl<'env> Docgen<'env> {
                     ];
                     self.gen_html_table(table_text, column_names);
                     self.doc_text(&text[end + end_tag.len()..text.len()]);
+                    self.section_header("Module-level Specification", "module-level-spec");
                 } else {
                     self.doc_text("");
                 }
             } else {
                 self.doc_text(text);
             }
-
             let mut in_code = false;
             let (is_schema, schema_header) =
                 if let SpecBlockTarget::Schema(_, sid, type_params) = &block.target {

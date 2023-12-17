@@ -19,6 +19,8 @@
     -  [Function `generate_unique_address`](#@Specification_0_generate_unique_address)
     -  [Function `generate_auid_address`](#@Specification_0_generate_auid_address)
     -  [Function `get_script_hash`](#@Specification_0_get_script_hash)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `auid_address`](#@Specification_0_auid_address)
 
 
@@ -280,6 +282,7 @@ the generated unique address wrapped in the AUID class.
 
 
 <pre><code><b>pragma</b> opaque;
+// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
 <b>ensures</b> [abstract] len(result) == 32;
 </code></pre>
 
@@ -323,6 +326,7 @@ the generated unique address wrapped in the AUID class.
 
 
 <pre><code><b>pragma</b> opaque;
+// This enforces <a id="high-level-req-3" href="#high-level-req">high level requirement 3</a>:
 <b>ensures</b> [abstract] result == <a href="transaction_context.md#0x1_transaction_context_spec_generate_unique_address">spec_generate_unique_address</a>();
 </code></pre>
 
@@ -339,7 +343,59 @@ the generated unique address wrapped in the AUID class.
 
 
 
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Property</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>Fetching the transaction hash should return a vector with 32 bytes.</td>
+<td>Medium</td>
+<td>The get_transaction_hash function calls the native function get_txn_hash, which fetches the NativeTransactionContext struct and returns the txn_hash field.</td>
+<td>Audited that the native function returns the txn hash, whose size is 32 bytes. This has been modeled as the abstract postcondition that the returned vector is of length 32. Formally verified via <a href="#high-level-req-1">get_txn_hash</a>.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>Fetching the unique address should never abort.</td>
+<td>Low</td>
+<td>The function auid_address returns the unique address from a supplied AUID resource.</td>
+<td>Formally verified via <a href="#high-level-req-2">auid_address</a>.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>Generating the unique address should return a vector with 32 bytes.</td>
+<td>Medium</td>
+<td>The generate_auid_address function checks calls the native function generate_unique_address which fetches the NativeTransactionContext struct, increments the auid_counter by one, and then creates a new authentication key from a preimage, which is then returned.</td>
+<td>Audited that the native function returns an address, and the length of an address is 32 bytes. This has been modeled as the abstract postcondition that the returned vector is of length 32. Formally verified via <a href="#high-level-req-3">generate_auid_address</a>.</td>
+</tr>
+
+<tr>
+<td>4</td>
+<td>Fetching the script hash of the current entry function should never fail and should return a vector with 32 bytes if the transaction payload is a script, otherwise an empty vector.</td>
+<td>Low</td>
+<td>The native function get_script_hash returns the NativeTransactionContext.script_hash field.</td>
+<td>Audited that the native function holds the required property. This has been modeled as the abstract spec. Formally verified via <a href="#high-level-req-4">get_script_hash</a>.</td>
+</tr>
+
+</table>
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
+
+
 <pre><code><b>pragma</b> opaque;
+// This enforces <a id="high-level-req-4" href="#high-level-req">high level requirement 4</a>:
 <b>aborts_if</b> [abstract] <b>false</b>;
 <b>ensures</b> [abstract] result == <a href="transaction_context.md#0x1_transaction_context_spec_get_script_hash">spec_get_script_hash</a>();
 <b>ensures</b> [abstract] len(result) == 32;
@@ -367,7 +423,8 @@ the generated unique address wrapped in the AUID class.
 
 
 
-<pre><code><b>aborts_if</b> <b>false</b>;
+<pre><code>// This enforces <a id="high-level-req-2" href="#high-level-req">high level requirement 2</a>:
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
