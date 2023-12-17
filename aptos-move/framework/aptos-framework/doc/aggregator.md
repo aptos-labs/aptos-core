@@ -27,6 +27,7 @@ at the moment.**
 -  [Specification](#@Specification_1)
     -  [Struct `Aggregator`](#@Specification_1_Aggregator)
     -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `limit`](#@Specification_1_limit)
     -  [Function `add`](#@Specification_1_add)
     -  [Function `sub`](#@Specification_1_sub)
@@ -306,6 +307,11 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 </table>
 
 
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> intrinsic;

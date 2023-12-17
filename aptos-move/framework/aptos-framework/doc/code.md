@@ -28,6 +28,8 @@ This module supports functionality related to code management.
 -  [Function `request_publish`](#0x1_code_request_publish)
 -  [Function `request_publish_with_allowed_deps`](#0x1_code_request_publish_with_allowed_deps)
 -  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `publish_package`](#@Specification_1_publish_package)
     -  [Function `publish_package_txn`](#@Specification_1_publish_package_txn)
@@ -884,6 +886,82 @@ Native function to initiate module loading, including a list of allowed dependen
 
 ## Specification
 
+
+
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Property</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>Updating a package should fail if the user is not the owner of it.</td>
+<td>Critical</td>
+<td>The publish_package function may only be able to update the package if the signer is the actual owner of the package.</td>
+<td>The Aptos upgrade native functions have been manually audited.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>The arbitrary upgrade policy should never be used.</td>
+<td>Critical</td>
+<td>There should never be a pass of an arbitrary upgrade policy to the request_publish native function.</td>
+<td>Manually audited that it aborts if package.upgrade_policy.policy == 0.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>Should perform accurate compatibility checks when the policy indicates compatibility, ensuring it meets the required conditions.</td>
+<td>Critical</td>
+<td>Specifies if it should perform compatibility checks for upgrades. The check only passes if a new module has (a) the same public functions, and (b) for existing resources, no layout change.</td>
+<td>The Move upgradability patterns have been manually audited.</td>
+</tr>
+
+<tr>
+<td>4</td>
+<td>Package upgrades should abide by policy change rules. In particular, The new upgrade policy must be equal to or stricter when compared to the old one. The original upgrade policy must not be immutable. The new package must contain all modules contained in the old package.</td>
+<td>Medium</td>
+<td>A package may only be updated using the publish_package function when the check_upgradability function returns true.</td>
+<td>This is audited by a manual review of the check_upgradability patterns.</td>
+</tr>
+
+<tr>
+<td>5</td>
+<td>The upgrade policy of a package must not exceed the strictness level imposed by its dependencies.</td>
+<td>Medium</td>
+<td>The upgrade_policy of a package may only be less than its dependencies throughout the upgrades. In addition, the native code properly restricts the use of dependencies outside the passed-in metadata.</td>
+<td>This has been manually audited.</td>
+</tr>
+
+<tr>
+<td>6</td>
+<td>The extension for package metadata is currently unused.</td>
+<td>Medium</td>
+<td>The extension field in PackageMetadata should be unused.</td>
+<td>Data invariant on the extension field has been manually audited.</td>
+</tr>
+
+<tr>
+<td>7</td>
+<td>The upgrade number of a package increases incrementally in a monotonic manner with each subsequent upgrade.</td>
+<td>Low</td>
+<td>On each upgrade of a particular package, the publish_package function updates the upgrade_number for that package.</td>
+<td>Post condition on upgrade_number has been manually audited.</td>
+</tr>
+
+</table>
+
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;

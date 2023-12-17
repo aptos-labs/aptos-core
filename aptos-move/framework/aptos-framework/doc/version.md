@@ -14,6 +14,7 @@ Maintains the version number for the blockchain.
 -  [Function `initialize_for_test`](#0x1_version_initialize_for_test)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `set_version`](#@Specification_1_set_version)
     -  [Function `initialize_for_test`](#@Specification_1_initialize_for_test)
@@ -234,6 +235,11 @@ to update the version.
 </table>
 
 
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;

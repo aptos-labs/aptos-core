@@ -108,6 +108,7 @@ or if their stake drops below the min required, they would get removed at the en
 -  [Function `assert_owner_cap_exists`](#0x1_stake_assert_owner_cap_exists)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Resource `ValidatorSet`](#@Specification_1_ValidatorSet)
     -  [Function `initialize_validator_fees`](#@Specification_1_initialize_validator_fees)
     -  [Function `add_transaction_fee`](#@Specification_1_add_transaction_fee)
@@ -3642,6 +3643,11 @@ Returns validator's next epoch voting power, including pending_active, active, a
 </table>
 
 
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>invariant</b> [suspendable] <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework) ==&gt; <a href="stake.md#0x1_stake_validator_set_is_valid">validator_set_is_valid</a>();

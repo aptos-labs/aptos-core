@@ -26,6 +26,7 @@ This module provides an interface to burn or collect and redistribute transactio
 -  [Function `emit_fee_statement`](#0x1_transaction_fee_emit_fee_statement)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Resource `CollectedFeesPerBlock`](#@Specification_1_CollectedFeesPerBlock)
     -  [Function `initialize_fee_collection_and_distribution`](#@Specification_1_initialize_fee_collection_and_distribution)
     -  [Function `upgrade_burn_percentage`](#@Specification_1_upgrade_burn_percentage)
@@ -747,12 +748,17 @@ Only called during genesis.
 <td>The presence of the resource, indicating collected fees per block under the Aptos framework account, Registering a block proposer. Processing collected fees.</td>
 <td>Low</td>
 <td>The functions: upgrade_burn_percentage, register_proposer_for_fee_collection, and process_collected_fees all ensure that the CollectedFeesPerBlock resource exists under aptos_framework by calling the is_fees_collection_enabled method, which returns a boolean value confirming if the resource exists or not.</td>
-<td>Formally verified via <a href="#high-level-req-6.1">register_proposer_for_fee_collection</a>, <a href="#high-level-req-6.1">process_collected_fees</a>, and <a href="#high-level-req-6.1">upgrade_burn_percentage</a>.</td>
+<td>Formally verified via <a href="#high-level-req-6.1">register_proposer_for_fee_collection</a>, <a href="#high-level-req-6.2">process_collected_fees</a>, and <a href="#high-level-req-6.3">upgrade_burn_percentage</a>.</td>
 </tr>
 
 </table>
 
 
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;

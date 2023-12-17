@@ -23,6 +23,8 @@
 -  [Function `set_genesis_end`](#0x1_genesis_set_genesis_end)
 -  [Function `initialize_for_verification`](#0x1_genesis_initialize_for_verification)
 -  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `initialize_aptos_coin`](#@Specification_1_initialize_aptos_coin)
     -  [Function `create_initialize_validators_with_commission`](#@Specification_1_create_initialize_validators_with_commission)
@@ -896,6 +898,65 @@ The last step of genesis.
 
 
 
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Property</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>All the core resources and modules should be created during genesis and owned by the Aptos framework account.</td>
+<td>Critical</td>
+<td>Resources created during genesis initialization: GovernanceResponsbility, ConsensusConfig, ExecutionConfig, Version, SetVersionCapability, ValidatorSet, ValidatorPerformance, StakingConfig, StorageGasConfig, StorageGas, GasScheduleV2, AggregatorFactory, SupplyConfig, ChainId, Configuration, BlockResource, StateStorageUsage, CurrentTimeMicroseconds. If some of the resources were to be owned by a malicious account, it could lead to the compromise of the chain, as these are core resources. It should be formally verified by a post condition to ensure that all the critical resources are owned by the Aptos framework.</td>
+<td>Formally verified via <a href="#high-level-req-1">initialize</a>.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>Addresses ranging from 0x0 - 0xa should be reserved for the framework and part of aptos governance.</td>
+<td>Critical</td>
+<td>The function genesis::initialize calls account::create_framework_reserved_account for addresses 0x0, 0x2, 0x3, 0x4, ..., 0xa which creates an account and authentication_key for them. This should be formally the reserved addresses, and at the end of the function, an Account resource exists.</td>
+<td>Formally verified via <a href="#high-level-req-2">initialize</a>.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>The Aptos coin should be initialized during genesis and only the Aptos framework account should own the mint and burn capabilities for the APT token.</td>
+<td>Critical</td>
+<td>Both mint and burn capabilities are wrapped inside the stake::AptosCoinCapabilities and</td>
+<td>Formally verified via <a href="#high-level-req-3">initialize_aptos_coin</a>.</td>
+</tr>
+
+<tr>
+<td>4</td>
+<td>An initial set of validators should exist before the end of genesis.</td>
+<td>Low</td>
+<td>To ensure that there will be a set of validators available to validate the genesis block, the length of the ValidatorSet.active_validators vector should be > 0.</td>
+<td>Formally verified via <a href="#high-level-req-4">set_genesis_end</a>.</td>
+</tr>
+
+<tr>
+<td>5</td>
+<td>The end of genesis should be marked on chain.</td>
+<td>Low</td>
+<td>The end of genesis is marked, on chain, via the chain_status::GenesisEndMarker resource. The ownership of this resource marks the operating state of the chain.</td>
+<td>Formally verified via <a href="#high-level-req-5">set_genesis_end</a>.</td>
+</tr>
+
+</table>
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
+
+
 <pre><code><b>pragma</b> verify = <b>true</b>;
 </code></pre>
 
@@ -914,6 +975,7 @@ The last step of genesis.
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
 <b>include</b> <a href="genesis.md#0x1_genesis_InitalizeRequires">InitalizeRequires</a>;
+// This enforces <a id="high-level-req-2" href="#high-level-req">high level requirement 2</a>:
 <b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x0);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x2);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x3);
@@ -934,6 +996,7 @@ The last step of genesis.
 <b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x8);
 <b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x9);
 <b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0xa);
+// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
 <b>ensures</b> <b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceResponsbility">aptos_governance::GovernanceResponsbility</a>&gt;(@aptos_framework);
 <b>ensures</b> <b>exists</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">consensus_config::ConsensusConfig</a>&gt;(@aptos_framework);
 <b>ensures</b> <b>exists</b>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">execution_config::ExecutionConfig</a>&gt;(@aptos_framework);
@@ -968,7 +1031,8 @@ The last step of genesis.
 
 
 
-<pre><code><b>requires</b> !<b>exists</b>&lt;<a href="stake.md#0x1_stake_AptosCoinCapabilities">stake::AptosCoinCapabilities</a>&gt;(@aptos_framework);
+<pre><code>// This enforces <a id="high-level-req-3" href="#high-level-req">high level requirement 3</a>:
+<b>requires</b> !<b>exists</b>&lt;<a href="stake.md#0x1_stake_AptosCoinCapabilities">stake::AptosCoinCapabilities</a>&gt;(@aptos_framework);
 <b>ensures</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_AptosCoinCapabilities">stake::AptosCoinCapabilities</a>&gt;(@aptos_framework);
 <b>requires</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">transaction_fee::AptosCoinCapabilities</a>&gt;(@aptos_framework);
 <b>ensures</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">transaction_fee::AptosCoinCapabilities</a>&gt;(@aptos_framework);
@@ -1041,7 +1105,9 @@ The last step of genesis.
 
 
 <pre><code><b>pragma</b> delegate_invariants_to_caller;
+// This enforces <a id="high-level-req-4" href="#high-level-req">high level requirement 4</a>:
 <b>requires</b> len(<b>global</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>&gt;(@aptos_framework).active_validators) &gt;= 1;
+// This enforces <a id="high-level-req-5" href="#high-level-req">high level requirement 5</a>:
 <b>let</b> addr = std::signer::address_of(aptos_framework);
 <b>aborts_if</b> addr != @aptos_framework;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">chain_status::GenesisEndMarker</a>&gt;(@aptos_framework);

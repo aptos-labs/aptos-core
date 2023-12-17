@@ -53,6 +53,8 @@
 -  [Function `get_signer_capability_address`](#0x1_account_get_signer_capability_address)
 -  [Function `verify_signed_message`](#0x1_account_verify_signed_message)
 -  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `create_account_if_does_not_exist`](#@Specification_1_create_account_if_does_not_exist)
     -  [Function `create_account`](#@Specification_1_create_account)
@@ -2090,6 +2092,122 @@ Capability based functions for efficient use.
 
 
 
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Property</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>The initialization of the account module should result in the proper system initialization with valid and consistent resources.</td>
+<td>High</td>
+<td>Initialization of the account module creates a valid address_map table and moves the resources to the OriginatingAddress under the aptos_framework account.</td>
+<td>Audited that the address_map table is created and populated correctly with the expected initial values.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>After successfully creating an account, the account resources should initialize with the default data, ensuring the proper initialization of the account state.</td>
+<td>High</td>
+<td>Creating an account via the create_account function validates the state and moves a new account resource under new_address.</td>
+<td>Formally verified via <a href="#high-level-req-2">create_account</a>.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>Checking the existence of an account under a given address never results in an abort.</td>
+<td>Low</td>
+<td>The exists_at function returns a boolean value indicating the existence of an account under the given address.</td>
+<td>Formally verified by the <a href="#high-level-req-3">aborts_if</a> condition.</td>
+</tr>
+
+<tr>
+<td>4</td>
+<td>The account module maintains bounded sequence numbers for all accounts, guaranteeing they remain within the specified limit.</td>
+<td>Medium</td>
+<td>The sequence number of an account may only increase up to MAX_U64 in a succeeding manner.</td>
+<td>Formally verified via <a href="#high-level-req-4">increment_sequence_number</a> that it remains within the defined boundary of MAX_U64.</td>
+</tr>
+
+<tr>
+<td>5</td>
+<td>Only the ed25519 and multied25519 signature schemes are permissible.</td>
+<td>Low</td>
+<td>Exclusively perform key rotation using either the ed25519 or multied25519 signature schemes. Currently restricts the offering of rotation/signing capabilities to the ed25519 or multied25519 schemes.</td>
+<td>Formally Verified: <a href="#high-level-req-5.1">rotate_authentication_key</a>, <a href="#high-level-req-5.2">offer_rotation_capability</a>, and <a href="#high-level-req-5.3">offer_signer_capability</a>. Verified that it aborts if the account_scheme is not ED25519_SCHEME and not MULTI_ED25519_SCHEME. Audited that the scheme enums correspond correctly to signature logic.</td>
+</tr>
+
+<tr>
+<td>6</td>
+<td>Exclusively permit the rotation of the authentication key of an account for the account owner or any user who possesses rotation capabilities associated with that account.</td>
+<td>Critical</td>
+<td>In the rotate_authentication_key function, the authentication key derived from the from_public_key_bytes should match the signer's current authentication key. Only the delegate_signer granted the rotation capabilities may invoke the rotate_authentication_key_with_rotation_capability function.</td>
+<td>Formally Verified via <a href="#high-level-req-6.1">rotate_authentication_key</a> and <a href="#high-level-req-6.2">rotate_authentication_key_with_rotation_capability</a>.</td>
+</tr>
+
+<tr>
+<td>7</td>
+<td>Only the owner of an account may offer or revoke the following capabilities: (1) offer_rotation_capability, (2) offer_signer_capability, (3) revoke_rotation_capability, and (4) revoke_signer_capability.</td>
+<td>Critical</td>
+<td>An account resource may only be modified by the owner of the account utilizing: rotation_capability_offer, signer_capability_offer.</td>
+<td>Formally verified via <a href="#high-level-req-7.1">offer_rotation_capability</a>, <a href="#high-level-req-7.2">offer_signer_capability</a>, and <a href="#high-level-req-7.3">revoke_rotation_capability</a>. and <a href="#high-level-req-7.4">revoke_signer_capability</a>.</td>
+</tr>
+
+<tr>
+<td>8</td>
+<td>The capability to create a signer for the account is exclusively reserved for either the account owner or the account that has been granted the signing capabilities.</td>
+<td>Critical</td>
+<td>Signer creation for the account may only be successfully executed by explicitly granting the signing capabilities with the create_authorized_signer function.</td>
+<td>Formally verified via <a href="#high-level-req-8">create_authorized_signer</a>.</td>
+</tr>
+
+<tr>
+<td>9</td>
+<td>Rotating the authentication key requires two valid signatures. With the private key of the current authentication key. With the private key of the new authentication key.</td>
+<td>Critical</td>
+<td>The rotate_authentication_key verifies two signatures (current and new) before rotating to the new key. The first signature ensures the user has the intended capability, and the second signature ensures that the user owns the new key.</td>
+<td>Formally verified via <a href="#high-level-req-9.1">rotate_authentication_key</a> and <a href="#high-level-req-9.2">rotate_authentication_key_with_rotation_capability</a>.</td>
+</tr>
+
+<tr>
+<td>10</td>
+<td>The rotation of the authentication key updates the account's authentication key with the newly supplied one.</td>
+<td>High</td>
+<td>The auth_key may only update to the provided new_auth_key after verifying the signature.</td>
+<td>Formally Verified in <a href="#high-level-req-10">rotate_authentication_key_internal</a> that the authentication key of an account is modified to the provided authentication key if the signature verification was successful.</td>
+</tr>
+
+<tr>
+<td>11</td>
+<td>The creation number is monotonically increasing.</td>
+<td>Low</td>
+<td>The guid_creation_num in the Account structure is monotonically increasing.</td>
+<td>Formally Verified via <a href="#high-level-req-11">guid_creation_num</a>.</td>
+</tr>
+
+<tr>
+<td>12</td>
+<td>The Account resource is persistent.</td>
+<td>Low</td>
+<td>The Account structure assigned to the address should be persistent.</td>
+<td>Audited that the Account structure is persistent.</td>
+</tr>
+
+</table>
+
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
+
+
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
 </code></pre>
@@ -2136,6 +2254,7 @@ Ensure that the account exists at the end of the call.
     || account_address == @aptos_token
     || !(len(authentication_key) == 32)
 );
+// This enforces <a id="high-level-req-2" href="#high-level-req">high level requirement 2</a>:
 <b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_address);
 </code></pre>
 
@@ -2195,7 +2314,8 @@ The Account does not exist under the new address before creating the account.
 
 
 
-<pre><code><b>aborts_if</b> <b>false</b>;
+<pre><code>// This enforces <a id="high-level-req-3" href="#high-level-req">high level requirement 3</a>:
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
@@ -2266,6 +2386,7 @@ The sequence_number of the Account is up to MAX_U64.
 
 <pre><code><b>let</b> sequence_number = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).sequence_number;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+// This enforces <a id="high-level-req-4" href="#high-level-req">high level requirement 4</a>:
 <b>aborts_if</b> sequence_number == <a href="account.md#0x1_account_MAX_U64">MAX_U64</a>;
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
 <b>let</b> <b>post</b> post_sequence_number = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).sequence_number;
@@ -2306,6 +2427,7 @@ The length of new_auth_key is 32.
 
 
 <pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+// This enforces <a id="high-level-req-10" href="#high-level-req">high level requirement 10</a>:
 <b>let</b> <b>post</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
 <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(new_auth_key) != 32;
@@ -2340,6 +2462,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 <pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
 <b>let</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+// This enforces <a id="high-level-req-6.1" href="#high-level-req">high level requirement 6</a>:
 <b>include</b> from_scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> ==&gt; <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_NewUnvalidatedPublicKeyFromBytesAbortsIf">ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf</a> { bytes: from_public_key_bytes };
 <b>aborts_if</b> from_scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> && ({
     <b>let</b> expected_auth_key = <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_spec_public_key_bytes_to_authentication_key">ed25519::spec_public_key_bytes_to_authentication_key</a>(from_public_key_bytes);
@@ -2350,6 +2473,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
     <b>let</b> from_auth_key = <a href="../../aptos-stdlib/doc/multi_ed25519.md#0x1_multi_ed25519_spec_public_key_bytes_to_authentication_key">multi_ed25519::spec_public_key_bytes_to_authentication_key</a>(from_public_key_bytes);
     account_resource.authentication_key != from_auth_key
 });
+// This enforces <a id="high-level-req-5.1" href="#high-level-req">high level requirement 5</a>:
 <b>aborts_if</b> from_scheme != <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> && from_scheme != <a href="account.md#0x1_account_MULTI_ED25519_SCHEME">MULTI_ED25519_SCHEME</a>;
 <b>let</b> curr_auth_key = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>&lt;<b>address</b>&gt;(account_resource.authentication_key);
 <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;<b>address</b>&gt;(account_resource.authentication_key);
@@ -2359,11 +2483,12 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
     current_auth_key: curr_auth_key,
     new_public_key: to_public_key_bytes,
 };
+// This enforces <a id="high-level-req-9.1" href="#high-level-req">high level requirement 9</a>:
 <b>include</b> <a href="account.md#0x1_account_AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf">AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf</a> {
     scheme: from_scheme,
     public_key_bytes: from_public_key_bytes,
     signature: cap_rotate_key,
-    challenge: challenge,
+    challenge,
 };
 <b>include</b> <a href="account.md#0x1_account_AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf">AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf</a> {
     scheme: to_scheme,
@@ -2413,12 +2538,14 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
     current_auth_key: curr_auth_key,
     new_public_key: new_public_key_bytes,
 };
+// This enforces <a id="high-level-req-6.2" href="#high-level-req">high level requirement 6</a>:
 <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_contains">option::spec_contains</a>(offerer_account_resource.rotation_capability_offer.for, delegate_address);
+// This enforces <a id="high-level-req-9.1" href="#high-level-req">high level requirement 9</a>:
 <b>include</b> <a href="account.md#0x1_account_AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf">AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf</a> {
     scheme: new_scheme,
     public_key_bytes: new_public_key_bytes,
     signature: cap_update_table,
-    challenge: challenge,
+    challenge,
 };
 <b>let</b> new_auth_key_vector = <a href="account.md#0x1_account_spec_assert_valid_rotation_proof_signature_and_get_auth_key">spec_assert_valid_rotation_proof_signature_and_get_auth_key</a>(new_scheme, new_public_key_bytes, cap_update_table, challenge);
 <b>let</b> address_map = <b>global</b>&lt;<a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>&gt;(@aptos_framework).address_map;
@@ -2483,7 +2610,9 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
     <a href="../../aptos-stdlib/doc/multi_ed25519.md#0x1_multi_ed25519_UnvalidatedPublicKey">multi_ed25519::UnvalidatedPublicKey</a> { bytes: account_public_key_bytes },
     proof_challenge
 );
+// This enforces <a id="high-level-req-5.2" href="#high-level-req">high level requirement 5</a>:
 <b>aborts_if</b> account_scheme != <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> && account_scheme != <a href="account.md#0x1_account_MULTI_ED25519_SCHEME">MULTI_ED25519_SCHEME</a>;
+// This enforces <a id="high-level-req-7.1" href="#high-level-req">high level requirement 7</a>:
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(source_address);
 <b>let</b> <b>post</b> offer_for = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(source_address).rotation_capability_offer.for;
 <b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(offer_for) == recipient_address;
@@ -2566,6 +2695,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
 <b>let</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+// This enforces <a id="high-level-req-7.3" href="#high-level-req">high level requirement 7</a>:
 <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(account_resource.rotation_capability_offer.for);
 <b>let</b> <b>post</b> offer_for = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).rotation_capability_offer.for;
 <b>ensures</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(offer_for);
@@ -2617,7 +2747,9 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME.
     <a href="../../aptos-stdlib/doc/multi_ed25519.md#0x1_multi_ed25519_UnvalidatedPublicKey">multi_ed25519::UnvalidatedPublicKey</a> { bytes: account_public_key_bytes },
     proof_challenge
 );
+// This enforces <a id="high-level-req-5.3" href="#high-level-req">high level requirement 5</a>:
 <b>aborts_if</b> account_scheme != <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> && account_scheme != <a href="account.md#0x1_account_MULTI_ED25519_SCHEME">MULTI_ED25519_SCHEME</a>;
+// This enforces <a id="high-level-req-7.2" href="#high-level-req">high level requirement 7</a>:
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(source_address);
 <b>let</b> <b>post</b> offer_for = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(source_address).signer_capability_offer.for;
 <b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(offer_for) == recipient_address;
@@ -2697,6 +2829,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 <pre><code><b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
+// This enforces <a id="high-level-req-7.4" href="#high-level-req">high level requirement 7</a>:
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
 <b>let</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
 <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(account_resource.signer_capability_offer.for);
@@ -2717,8 +2850,9 @@ The Account existed under the signer.
 The value of signer_capability_offer.for of Account resource under the signer is offerer_address.
 
 
-<pre><code><b>include</b> <a href="account.md#0x1_account_AccountContainsAddr">AccountContainsAddr</a>{
-    <a href="account.md#0x1_account">account</a>: <a href="account.md#0x1_account">account</a>,
+<pre><code>// This enforces <a id="high-level-req-8" href="#high-level-req">high level requirement 8</a>:
+<b>include</b> <a href="account.md#0x1_account_AccountContainsAddr">AccountContainsAddr</a>{
+    <a href="account.md#0x1_account">account</a>,
     <b>address</b>: offerer_address,
 };
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(offerer_address);
@@ -2946,6 +3080,7 @@ The guid_creation_num of the ccount resource is up to MAX_U64.
     <a href="account.md#0x1_account">account</a>: account_signer,
 };
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+// This enforces <a id="high-level-req-11" href="#high-level-req">high level requirement 11</a>:
 <b>ensures</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).guid_creation_num == <b>old</b>(<b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).guid_creation_num) + 1;
 </code></pre>
 

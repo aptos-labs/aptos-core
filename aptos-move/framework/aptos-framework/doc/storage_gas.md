@@ -239,6 +239,7 @@ The below index is automatically generated from source code:
 -  [Specification](#@Specification_16)
     -  [Struct `Point`](#@Specification_16_Point)
     -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Struct `UsageGasConfig`](#@Specification_16_UsageGasConfig)
     -  [Struct `GasCurve`](#@Specification_16_GasCurve)
     -  [Function `base_8192_exponential_curve`](#@Specification_16_base_8192_exponential_curve)
@@ -1286,6 +1287,11 @@ A non decreasing curve must ensure that next is greater than cur.
 </table>
 
 
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>invariant</b> x &lt;= <a href="storage_gas.md#0x1_storage_gas_BASIS_POINT_DENOMINATION">BASIS_POINT_DENOMINATION</a>;

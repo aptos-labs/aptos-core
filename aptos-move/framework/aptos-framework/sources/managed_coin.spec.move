@@ -64,8 +64,8 @@ spec aptos_framework::managed_coin {
         let balance = coin_store.coin.value;
 
         // Resource CoinStore<CoinType> should exists in the signer.
-        /// [high-level-spec-3.2]
-        /// [high-level-spec-4.1]
+        /// [high-level-req-3.2]
+        /// [high-level-req-4.1]
         aborts_if !exists<coin::CoinStore<CoinType>>(account_addr);
 
         // Account should not be frozen and should have sufficient balance.
@@ -113,7 +113,7 @@ spec aptos_framework::managed_coin {
     ) {
         use aptos_std::type_info;
         let account_addr = signer::address_of(account);
-        /// [high-level-spec-3.3]
+        /// [high-level-req-3.3]
         aborts_if !exists<Capabilities<CoinType>>(account_addr);
         let addr = type_info::type_of<CoinType>().account_address;
         aborts_if (amount != 0) && !exists<coin::CoinInfo<CoinType>>(addr);

@@ -39,7 +39,7 @@ use crate::{
     payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
     pipeline::{
-        buffer_manager::{OrderedBlocks, ResetRequest},
+        buffer_manager::{OrderedBlocks, ResetRequest, ResetSignal},
         decoupled_execution_utils::prepare_phases_and_buffer_manager,
         ordering_state_computer::{DagStateSyncComputer, OrderingStateComputer},
         signing_phase::CommitSignerProvider,
@@ -645,7 +645,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let (ack_tx, ack_rx) = oneshot::channel();
             tx.send(ResetRequest {
                 tx: ack_tx,
-                stop: true,
+                signal: ResetSignal::Stop,
             })
             .await
             .expect("[EpochManager] Fail to drop buffer manager");

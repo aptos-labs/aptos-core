@@ -3,7 +3,7 @@
 
 use crate::{
     network::{IncomingRandGenRequest, NetworkSender, TConsensusMsg},
-    pipeline::buffer_manager::{OrderedBlocks, ResetAck, ResetRequest},
+    pipeline::buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
     rand::rand_gen::{
         aug_data_store::AugDataStore,
         block_queue::QueueItem,
@@ -115,9 +115,13 @@ impl<
     }
 
     fn process_reset(&mut self, request: ResetRequest) {
-        let ResetRequest { tx, stop } = request;
-        self.rand_store.reset();
-        self.stop = stop;
+        let ResetRequest { tx, signal } = request;
+        let target_round = match signal {
+            ResetSignal::Stop => 0,
+            ResetSignal::TargetRound(round) => round,
+        };
+        self.rand_store.reset(target_round);
+        self.stop = matches!(signal, ResetSignal::Stop);
         let _ = tx.send(ResetAck::default());
     }
 

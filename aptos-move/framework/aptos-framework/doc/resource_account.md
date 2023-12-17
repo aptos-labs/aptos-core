@@ -86,6 +86,7 @@ module.resource_signer_cap = option::some(resource_signer_cap);
 -  [Function `retrieve_resource_account_cap`](#0x1_resource_account_retrieve_resource_account_cap)
 -  [Specification](#@Specification_3)
     -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `create_resource_account`](#@Specification_3_create_resource_account)
     -  [Function `create_resource_account_and_fund`](#@Specification_3_create_resource_account_and_fund)
     -  [Function `create_resource_account_and_publish_package`](#@Specification_3_create_resource_account_and_publish_package)
@@ -456,6 +457,11 @@ the SignerCapability.
 </table>
 
 
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;

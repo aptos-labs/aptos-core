@@ -11,6 +11,7 @@ Utility functions used by the framework modules.
 -  [Specification](#@Specification_0)
     -  [Function `from_bytes`](#@Specification_0_from_bytes)
     -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `address_from_bytes`](#@Specification_0_address_from_bytes)
 
 
@@ -106,6 +107,11 @@ owned.
 </table>
 
 
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> opaque;

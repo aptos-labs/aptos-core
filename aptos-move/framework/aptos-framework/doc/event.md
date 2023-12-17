@@ -20,6 +20,7 @@ events emitted to a handle and emit events to the event store.
 -  [Function `destroy_handle`](#0x1_event_destroy_handle)
 -  [Specification](#@Specification_0)
     -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `emit`](#@Specification_0_emit)
     -  [Function `write_module_event_to_store`](#@Specification_0_write_module_event_to_store)
     -  [Function `emit_event`](#@Specification_0_emit_event)
@@ -339,6 +340,11 @@ Destroy a unique handle.
 
 </table>
 
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
