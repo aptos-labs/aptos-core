@@ -40,6 +40,7 @@ pub struct RandManager<S: Share, P: Proof<Share = S>, D: AugmentedData, Storage>
     stop: bool,
     config: RandConfig,
     reliable_broadcast: Arc<ReliableBroadcast<RandMessage<S, D>, ExponentialBackoff>>,
+    network_sender: Arc<NetworkSender>,
 
     // downstream channels
     outgoing_blocks: Sender<OrderedBlocks>,
@@ -90,6 +91,7 @@ impl<
             stop: false,
             config,
             reliable_broadcast,
+            network_sender,
 
             outgoing_blocks,
 
@@ -110,10 +112,13 @@ impl<
     }
 
     fn process_incoming_metadata(&self, metadata: RandMetadata) -> DropGuard {
-        let share = S::generate(&self.config, metadata.clone());
+        let self_share = S::generate(&self.config, metadata.clone());
+        self.network_sender.broadcast_without_self(
+            RandMessage::<S, D>::Share(self_share.clone()).into_network_message(),
+        );
         self.rand_store
             .lock()
-            .add_share(share)
+            .add_share(self_share)
             .expect("Add self share should succeed");
         self.aggregate_shares_task(metadata)
     }
@@ -187,12 +192,21 @@ impl<
             metadata.clone(),
             self.config.clone(),
         ));
+        let epoch = metadata.epoch();
         let round = metadata.round();
         let request = RequestShare::new(self.epoch_state.epoch, metadata);
         let task = async move {
-            info!("[RandManager] Start broadcasting share for {}", round);
+            info!(
+                epoch = epoch,
+                round = round,
+                "[RandManager] Start broadcasting share request",
+            );
             rb.broadcast(request, aggregate_state).await;
-            info!("[RandManager] Finish broadcasting share for {}", round);
+            info!(
+                epoch = epoch,
+                round = round,
+                "[RandManager] Finish broadcasting share request",
+            );
         };
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         tokio::spawn(Abortable::new(task, abort_registration));
@@ -266,6 +280,11 @@ impl<
                         RandMessage::RequestShare(request) => {
                             if let Some(share) = self.rand_store.lock().get_self_share(request.rand_metadata()) {
                                 self.process_response(protocol, response_sender, RandMessage::Share(share));
+                            }
+                        }
+                        RandMessage::Share(share) => {
+                            if let Err(e) = self.rand_store.lock().add_share(share) {
+                                warn!("[RandManager] Failed to add share: {}", e);
                             }
                         }
                         RandMessage::AugData(aug_data) => {

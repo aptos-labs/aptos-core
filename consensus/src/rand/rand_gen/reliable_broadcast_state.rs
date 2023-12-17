@@ -36,11 +36,11 @@ impl<D> AugDataCertBuilder<D> {
 impl<S: Share, D: AugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessage<S, D>>
     for Arc<AugDataCertBuilder<D>>
 {
-    type Ack = AugDataSignature;
     type Aggregated = CertifiedAugData<D>;
     type Message = AugData<D>;
+    type Response = AugDataSignature;
 
-    fn add(&self, peer: Author, ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
+    fn add(&self, peer: Author, ack: Self::Response) -> anyhow::Result<Option<Self::Aggregated>> {
         ack.verify(peer, &self.epoch_state.verifier, &self.aug_data)?;
         let mut parital_signatures_guard = self.partial_signatures.lock();
         parital_signatures_guard.add_signature(peer, ack.into_signature());
@@ -75,11 +75,11 @@ impl CertifiedAugDataAckState {
 impl<S: Share, D: AugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessage<S, D>>
     for Arc<CertifiedAugDataAckState>
 {
-    type Ack = CertifiedAugDataAck;
     type Aggregated = ();
     type Message = CertifiedAugData<D>;
+    type Response = CertifiedAugDataAck;
 
-    fn add(&self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
+    fn add(&self, peer: Author, _ack: Self::Response) -> anyhow::Result<Option<Self::Aggregated>> {
         let mut validators_guard = self.validators.lock();
         ensure!(
             validators_guard.remove(&peer),
@@ -119,11 +119,11 @@ impl<S: Share, P: Proof<Share = S>, D: AugmentedData, Storage: RandStorage<S, P>
     BroadcastStatus<RandMessage<S, D>, RandMessage<S, D>>
     for Arc<ShareAggregateState<S, P, Storage>>
 {
-    type Ack = RandShare<S>;
     type Aggregated = ();
     type Message = RequestShare;
+    type Response = RandShare<S>;
 
-    fn add(&self, peer: Author, share: Self::Ack) -> anyhow::Result<Option<()>> {
+    fn add(&self, peer: Author, share: Self::Response) -> anyhow::Result<Option<()>> {
         ensure!(share.author() == &peer, "Author does not match");
         ensure!(
             share.metadata() == &self.rand_metadata,

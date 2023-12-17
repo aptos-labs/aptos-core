@@ -54,7 +54,7 @@ impl<S: Share, D: AugmentedData> RBMessage for RandMessage<S, D> {}
 impl<S: Share, D: AugmentedData> TConsensusMsg for RandMessage<S, D> {
     fn epoch(&self) -> u64 {
         match self {
-            RandMessage::RequestShare(ack) => ack.epoch(),
+            RandMessage::RequestShare(request) => request.epoch(),
             RandMessage::Share(share) => share.epoch(),
             RandMessage::AugData(aug_data) => aug_data.epoch(),
             RandMessage::AugDataSignature(signature) => signature.epoch(),

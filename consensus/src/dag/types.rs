@@ -549,11 +549,11 @@ impl SignatureBuilder {
 }
 
 impl BroadcastStatus<DAGMessage, DAGRpcResult> for Arc<SignatureBuilder> {
-    type Ack = Vote;
     type Aggregated = NodeCertificate;
     type Message = Node;
+    type Response = Vote;
 
-    fn add(&self, peer: Author, ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
+    fn add(&self, peer: Author, ack: Self::Response) -> anyhow::Result<Option<Self::Aggregated>> {
         ensure!(self.metadata == ack.metadata, "Digest mismatch");
         ack.verify(peer, &self.epoch_state.verifier)?;
         debug!(LogSchema::new(LogEvent::ReceiveVote)
@@ -618,11 +618,11 @@ impl TryFrom<DAGRpcResult> for CertifiedAck {
 }
 
 impl BroadcastStatus<DAGMessage, DAGRpcResult> for Arc<CertificateAckState> {
-    type Ack = CertifiedAck;
     type Aggregated = ();
     type Message = CertifiedNodeMessage;
+    type Response = CertifiedAck;
 
-    fn add(&self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
+    fn add(&self, peer: Author, _ack: Self::Response) -> anyhow::Result<Option<Self::Aggregated>> {
         debug!(LogSchema::new(LogEvent::ReceiveAck).remote_peer(peer));
         let mut received = self.received.lock();
         received.insert(peer);
