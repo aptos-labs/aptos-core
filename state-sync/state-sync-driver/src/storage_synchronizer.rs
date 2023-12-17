@@ -34,10 +34,7 @@ use aptos_types::{
     },
 };
 use async_trait::async_trait;
-use futures::{
-    channel::{mpsc, mpsc::UnboundedSender},
-    SinkExt, StreamExt,
-};
+use futures::{channel::mpsc, SinkExt, StreamExt};
 use std::{
     future::Future,
     sync::{
@@ -190,7 +187,7 @@ impl<
         metadata_storage: MetadataStorage,
         storage: DbReaderWriter,
         runtime: Option<&Runtime>,
-    ) -> (Self, JoinHandle<()>, JoinHandle<()>, JoinHandle<()>) {
+    ) -> (Self, StorageSynchronizerHandles) {
         // Create a channel to notify the executor when data chunks are ready
         let max_pending_data_chunks = driver_config.max_pending_data_chunks as usize;
         let (executor_notifier, executor_listener) = mpsc::channel(max_pending_data_chunks);
@@ -201,6 +198,10 @@ impl<
 
         // Create a channel to notify the committer when the ledger has been updated
         let (committer_notifier, committer_listener) = mpsc::channel(max_pending_data_chunks);
+
+        // Create a channel to notify the commit post-processor when a chunk has been committed
+        let (commit_post_processor_notifier, commit_post_processor_listener) =
+            mpsc::channel(max_pending_data_chunks);
 
         // Create a shared pending data chunk counter
         let pending_data_chunks = Arc::new(AtomicU64::new(0));
@@ -229,8 +230,16 @@ impl<
         // Spawn the committer that commits executed (but pending) chunks
         let committer_handle = spawn_committer(
             chunk_executor.clone(),
-            committer_listener,
             error_notification_sender.clone(),
+            committer_listener,
+            commit_post_processor_notifier,
+            pending_data_chunks.clone(),
+            runtime.clone(),
+        );
+
+        // Spawn the commit post-processor that handles commit notifications
+        let commit_post_processor_handle = spawn_commit_post_processor(
+            commit_post_processor_listener,
             event_subscription_service,
             mempool_notification_handler,
             storage_service_notification_handler,
@@ -243,6 +252,7 @@ impl<
         utils::initialize_sync_gauges(storage.reader.clone())
             .expect("Failed to initialize the metric gauges!");
 
+        // Create the storage synchronizer
         let storage_synchronizer = Self {
             chunk_executor,
             commit_notification_sender,
@@ -256,12 +266,15 @@ impl<
             storage,
         };
 
-        (
-            storage_synchronizer,
-            executor_handle,
-            ledger_updater_handle,
-            committer_handle,
-        )
+        // Create the storage synchronizer handles
+        let storage_synchronizer_handles = StorageSynchronizerHandles {
+            executor: executor_handle,
+            ledger_updater: ledger_updater_handle,
+            committer: committer_handle,
+            commit_post_processor: commit_post_processor_handle,
+        };
+
+        (storage_synchronizer, storage_synchronizer_handles)
     }
 
     /// Notifies the executor of new data chunks
@@ -383,6 +396,14 @@ impl<
     fn finish_chunk_executor(&self) {
         self.chunk_executor.finish()
     }
+}
+
+/// A simple container that holds the handles to the spawned storage synchronizer threads
+pub struct StorageSynchronizerHandles {
+    pub executor: JoinHandle<()>,
+    pub ledger_updater: JoinHandle<()>,
+    pub committer: JoinHandle<()>,
+    pub commit_post_processor: JoinHandle<()>,
 }
 
 /// A chunk of data to be executed and/or committed to storage (i.e., states,
@@ -612,20 +633,13 @@ fn spawn_ledger_updater<ChunkExecutor: ChunkExecutorTrait + 'static>(
 }
 
 /// Spawns a dedicated committer that commits executed (but pending) chunks
-fn spawn_committer<
-    ChunkExecutor: ChunkExecutorTrait + 'static,
-    MempoolNotifier: MempoolNotificationSender,
-    StorageServiceNotifier: StorageServiceNotificationSender,
->(
+fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
     chunk_executor: Arc<ChunkExecutor>,
-    mut committer_listener: mpsc::Receiver<NotificationId>,
     error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
-    event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
-    mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
-    storage_service_notification_handler: StorageServiceNotificationHandler<StorageServiceNotifier>,
+    mut committer_listener: mpsc::Receiver<NotificationId>,
+    mut commit_post_processor_notifier: mpsc::Sender<ChunkCommitNotification>,
     pending_data_chunks: Arc<AtomicU64>,
     runtime: Option<Handle>,
-    storage: Arc<dyn DbReader>,
 ) -> JoinHandle<()> {
     // Create a committer
     let committer = async move {
@@ -656,21 +670,20 @@ fn spawn_committer<
                         utils::update_new_epoch_metrics();
                     }
 
-                    // Handle the committed transaction notification (e.g., notify mempool).
-                    // We do this here due to synchronization issues with mempool and
-                    // storage. See: https://github.com/aptos-labs/aptos-core/issues/553
-                    let committed_transactions = CommittedTransactions {
-                        events: notification.committed_events,
-                        transactions: notification.committed_transactions,
-                    };
-                    utils::handle_committed_transactions(
-                        committed_transactions,
-                        storage.clone(),
-                        mempool_notification_handler.clone(),
-                        event_subscription_service.clone(),
-                        storage_service_notification_handler.clone(),
-                    )
-                    .await;
+                    // Notify the commit post-processor of the committed chunk
+                    if let Err(error) = commit_post_processor_notifier.send(notification).await {
+                        let error = format!(
+                            "Failed to notify the commit post-processor! Error: {:?}",
+                            error
+                        );
+                        send_storage_synchronizer_error(
+                            error_notification_sender.clone(),
+                            notification_id,
+                            error,
+                        )
+                        .await;
+                        decrement_pending_data_chunks(pending_data_chunks.clone());
+                    }
                 },
                 Err(error) => {
                     let error = format!("Failed to commit executed chunk! Error: {:?}", error);
@@ -680,14 +693,56 @@ fn spawn_committer<
                         error,
                     )
                     .await;
+                    decrement_pending_data_chunks(pending_data_chunks.clone());
                 },
             };
-            decrement_pending_data_chunks(pending_data_chunks.clone());
         }
     };
 
     // Spawn the committer
     spawn(runtime, committer)
+}
+
+/// Spawns a dedicated commit post-processor that handles commit notifications
+fn spawn_commit_post_processor<
+    MempoolNotifier: MempoolNotificationSender,
+    StorageServiceNotifier: StorageServiceNotificationSender,
+>(
+    mut commit_post_processor_listener: mpsc::Receiver<ChunkCommitNotification>,
+    event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
+    mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
+    storage_service_notification_handler: StorageServiceNotificationHandler<StorageServiceNotifier>,
+    pending_data_chunks: Arc<AtomicU64>,
+    runtime: Option<Handle>,
+    storage: Arc<dyn DbReader>,
+) -> JoinHandle<()> {
+    // Create a commit post-processor
+    let commit_post_processor = async move {
+        while let Some(notification) = commit_post_processor_listener.next().await {
+            let _timer = metrics::start_timer(
+                &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
+                metrics::STORAGE_SYNCHRONIZER_COMMIT_POST_PROCESS,
+            );
+
+            // Handle the committed transaction notification (e.g., notify mempool)
+            let committed_transactions = CommittedTransactions {
+                events: notification.committed_events,
+                transactions: notification.committed_transactions,
+            };
+            utils::handle_committed_transactions(
+                committed_transactions,
+                storage.clone(),
+                mempool_notification_handler.clone(),
+                event_subscription_service.clone(),
+                storage_service_notification_handler.clone(),
+            )
+            .await;
+            decrement_pending_data_chunks(pending_data_chunks.clone());
+        }
+    };
+
+    // Spawn the commit post-processor
+    spawn(runtime, commit_post_processor)
 }
 
 /// Spawns a dedicated receiver that commits state values from a state snapshot
@@ -910,7 +965,7 @@ async fn finalize_storage_and_send_commit<
     MetadataStorage: MetadataStorageInterface + Clone + Send + Sync + 'static,
 >(
     chunk_executor: Arc<ChunkExecutor>,
-    commit_notification_sender: &mut UnboundedSender<CommitNotification>,
+    commit_notification_sender: &mut mpsc::UnboundedSender<CommitNotification>,
     metadata_storage: MetadataStorage,
     state_snapshot_receiver: Box<
         dyn StateSnapshotReceiver<StateKey, StateValue> + 'receiver_lifetime,

@@ -396,14 +396,12 @@ impl FusedStream for ErrorNotificationListener {
 /// A simple handler for sending notifications to mempool
 #[derive(Clone)]
 pub struct MempoolNotificationHandler<M> {
-    mempool_commit_ack_timeout_ms: u64,
     mempool_notification_sender: M,
 }
 
 impl<M: MempoolNotificationSender> MempoolNotificationHandler<M> {
-    pub fn new(mempool_notification_sender: M, mempool_commit_ack_timeout_ms: u64) -> Self {
+    pub fn new(mempool_notification_sender: M) -> Self {
         Self {
-            mempool_commit_ack_timeout_ms,
             mempool_notification_sender,
         }
     }
@@ -416,11 +414,7 @@ impl<M: MempoolNotificationSender> MempoolNotificationHandler<M> {
     ) -> Result<(), Error> {
         let result = self
             .mempool_notification_sender
-            .notify_new_commit(
-                committed_transactions,
-                block_timestamp_usecs,
-                self.mempool_commit_ack_timeout_ms,
-            )
+            .notify_new_commit(committed_transactions, block_timestamp_usecs)
             .await;
 
         if let Err(error) = result {

@@ -96,8 +96,9 @@ pub fn start_state_sync_and_get_notification_handles(
         setup_aptos_data_client(node_config, network_client, db_rw.reader.clone())?;
 
     // Start the data streaming service
+    let state_sync_config = node_config.state_sync;
     let (streaming_service_client, streaming_service_runtime) =
-        setup_data_streaming_service(node_config.state_sync, aptos_data_client.clone())?;
+        setup_data_streaming_service(state_sync_config, aptos_data_client.clone())?;
 
     // Create the chunk executor and persistent storage
     let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
@@ -105,11 +106,14 @@ pub fn start_state_sync_and_get_notification_handles(
 
     // Create notification senders and listeners for mempool, consensus and the storage service
     let (mempool_notifier, mempool_listener) =
-        aptos_mempool_notifications::new_mempool_notifier_listener_pair();
+        aptos_mempool_notifications::new_mempool_notifier_listener_pair(
+            state_sync_config
+                .state_sync_driver
+                .max_pending_mempool_notifications,
+        );
     let (consensus_notifier, consensus_listener) =
         aptos_consensus_notifications::new_consensus_notifier_listener_pair(
-            node_config
-                .state_sync
+            state_sync_config
                 .state_sync_driver
                 .commit_notification_timeout_ms,
         );
@@ -118,7 +122,7 @@ pub fn start_state_sync_and_get_notification_handles(
 
     // Start the state sync storage service
     let storage_service_runtime = setup_state_sync_storage_service(
-        node_config.state_sync,
+        state_sync_config,
         peers_and_metadata,
         network_service_events,
         &db_rw,

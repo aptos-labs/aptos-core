@@ -42,11 +42,11 @@ use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
 };
-use tokio::runtime::{Handle, Runtime};
+use tokio::runtime::Handle;
 
 /// Mock of a running instance of shared mempool.
 pub struct MockSharedMempool {
-    _runtime: Option<Runtime>,
+    _runtime: Option<Handle>,
     _handle: Option<Handle>,
     pub ac_client: MempoolClientSender,
     pub mempool: Arc<Mutex<CoreMempool>>,
@@ -59,15 +59,13 @@ impl MockSharedMempool {
     /// Returns the runtime on which the shared mempool is running
     /// and the channel through which shared mempool receives client events.
     pub fn new() -> Self {
-        let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
-        let _entered_runtime = runtime.enter();
         let (ac_client, mempool, quorum_store_sender, mempool_notifier) = Self::start(
-            runtime.handle(),
+            &Handle::current(),
             &DbReaderWriter::new(MockDbReaderWriter),
             MockVMValidator,
         );
         Self {
-            _runtime: Some(runtime),
+            _runtime: Some(Handle::current()),
             _handle: None,
             ac_client,
             mempool,
@@ -121,7 +119,7 @@ impl MockSharedMempool {
         let (ac_client, client_events) = mpsc::channel(1_024);
         let (quorum_store_sender, quorum_store_receiver) = mpsc::channel(1_024);
         let (mempool_notifier, mempool_listener) =
-            aptos_mempool_notifications::new_mempool_notifier_listener_pair();
+            aptos_mempool_notifications::new_mempool_notifier_listener_pair(100);
         let (reconfig_sender, reconfig_events) = aptos_channel::new(QueueStyle::LIFO, 1, None);
         let reconfig_event_subscriber = ReconfigNotificationListener {
             notification_receiver: reconfig_events,
