@@ -85,7 +85,7 @@ fn test_mempool_notify_committed_txns() {
     block_on(async {
         assert!(smp
             .mempool_notifier
-            .notify_new_commit(committed_txns, 1, 1000)
+            .notify_new_commit(committed_txns, 1)
             .await
             .is_ok());
     });

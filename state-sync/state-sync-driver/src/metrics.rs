@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    histogram_opts, register_histogram_vec, register_int_counter_vec, register_int_gauge_vec,
-    HistogramTimer, HistogramVec, IntCounterVec, IntGaugeVec,
+    exponential_buckets, histogram_opts, register_histogram_vec, register_int_counter_vec,
+    register_int_gauge_vec, HistogramTimer, HistogramVec, IntCounterVec, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -16,6 +16,7 @@ pub const STORAGE_SYNCHRONIZER_APPLY_CHUNK: &str = "apply_chunk";
 pub const STORAGE_SYNCHRONIZER_EXECUTE_CHUNK: &str = "execute_chunk";
 pub const STORAGE_SYNCHRONIZER_UPDATE_LEDGER: &str = "update_ledger";
 pub const STORAGE_SYNCHRONIZER_COMMIT_CHUNK: &str = "commit_chunk";
+pub const STORAGE_SYNCHRONIZER_COMMIT_POST_PROCESS: &str = "commit_post_process";
 
 /// An enum representing the component currently executing
 pub enum ExecutingComponent {
@@ -84,6 +85,17 @@ pub static CONTINUOUS_SYNCER_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter for tracking data notification latencies
+pub static DATA_NOTIFICATION_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_state_sync_data_notification_latencies",
+        "Counters related to the data notification latencies",
+        &["label"],
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
 /// Counters related to the state sync driver
 pub static DRIVER_COUNTERS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
@@ -144,19 +156,13 @@ pub static STORAGE_SYNCHRONIZER_GAUGES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
-// Latency buckets for storage synchronizer operations
-const STORAGE_SYNCHRONIZER_LATENCY_BUCKETS_SECS: &[f64] = &[
-    0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 5.0, 7.5, 10.0, 15.0, 20.0, 30.0, 40.0,
-    60.0, 120.0, 180.0, 240.0, 300.0,
-];
-
 /// Counter for tracking storage synchronizer latencies
 pub static STORAGE_SYNCHRONIZER_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_state_sync_storage_synchronizer_latencies",
         "Counters related to the storage synchronizer latencies",
         &["label"],
-        STORAGE_SYNCHRONIZER_LATENCY_BUCKETS_SECS.to_vec()
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
     )
     .unwrap()
 });

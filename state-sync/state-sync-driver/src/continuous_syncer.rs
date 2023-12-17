@@ -210,7 +210,7 @@ impl<
         {
             // Fetch and process any data notifications
             let data_notification = self.fetch_next_data_notification().await?;
-            match data_notification.data_payload {
+            match data_notification.data_payload.clone() {
                 DataPayload::ContinuousTransactionOutputsWithProof(
                     ledger_info_with_sigs,
                     transaction_outputs_with_proof,
@@ -219,7 +219,7 @@ impl<
                         transaction_outputs_with_proof.first_transaction_output_version;
                     self.process_transaction_or_output_payload(
                         consensus_sync_request.clone(),
-                        data_notification.notification_id,
+                        data_notification,
                         ledger_info_with_sigs,
                         None,
                         Some(transaction_outputs_with_proof),
@@ -234,7 +234,7 @@ impl<
                     let payload_start_version = transactions_with_proof.first_transaction_version;
                     self.process_transaction_or_output_payload(
                         consensus_sync_request.clone(),
-                        data_notification.notification_id,
+                        data_notification,
                         ledger_info_with_sigs,
                         Some(transactions_with_proof),
                         None,
@@ -270,7 +270,7 @@ impl<
     async fn process_transaction_or_output_payload(
         &mut self,
         consensus_sync_request: Arc<Mutex<Option<ConsensusSyncRequest>>>,
-        notification_id: NotificationId,
+        data_notification: DataNotification,
         ledger_info_with_signatures: LedgerInfoWithSignatures,
         transaction_list_with_proof: Option<TransactionListWithProof>,
         transaction_outputs_with_proof: Option<TransactionOutputListWithProof>,
@@ -278,13 +278,13 @@ impl<
     ) -> Result<(), Error> {
         // Verify the payload starting version
         let payload_start_version = self
-            .verify_payload_start_version(notification_id, payload_start_version)
+            .verify_payload_start_version(data_notification.notification_id, payload_start_version)
             .await?;
 
         // Verify the given proof ledger info
         self.verify_proof_ledger_info(
             consensus_sync_request.clone(),
-            notification_id,
+            data_notification.notification_id,
             &ledger_info_with_signatures,
         )
         .await?;
@@ -295,7 +295,8 @@ impl<
                 if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof {
                     utils::apply_transaction_outputs(
                         self.storage_synchronizer.clone(),
-                        notification_id,
+                        data_notification.notification_id,
+                        data_notification.notification_creation_time,
                         ledger_info_with_signatures.clone(),
                         None,
                         transaction_outputs_with_proof,
@@ -303,7 +304,7 @@ impl<
                     .await?
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(
-                        notification_id,
+                        data_notification.notification_id,
                         NotificationFeedback::PayloadTypeIsIncorrect,
                     )))
                     .await?;
@@ -316,7 +317,8 @@ impl<
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     utils::execute_transactions(
                         self.storage_synchronizer.clone(),
-                        notification_id,
+                        data_notification.notification_id,
+                        data_notification.notification_creation_time,
                         ledger_info_with_signatures.clone(),
                         None,
                         transaction_list_with_proof,
@@ -324,7 +326,7 @@ impl<
                     .await?
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(
-                        notification_id,
+                        data_notification.notification_id,
                         NotificationFeedback::PayloadTypeIsIncorrect,
                     )))
                     .await?;
@@ -337,7 +339,8 @@ impl<
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     utils::execute_transactions(
                         self.storage_synchronizer.clone(),
-                        notification_id,
+                        data_notification.notification_id,
+                        data_notification.notification_creation_time,
                         ledger_info_with_signatures.clone(),
                         None,
                         transaction_list_with_proof,
@@ -347,7 +350,8 @@ impl<
                 {
                     utils::apply_transaction_outputs(
                         self.storage_synchronizer.clone(),
-                        notification_id,
+                        data_notification.notification_id,
+                        data_notification.notification_creation_time,
                         ledger_info_with_signatures.clone(),
                         None,
                         transaction_outputs_with_proof,
@@ -355,7 +359,7 @@ impl<
                     .await?
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(
-                        notification_id,
+                        data_notification.notification_id,
                         NotificationFeedback::PayloadTypeIsIncorrect,
                     )))
                     .await?;

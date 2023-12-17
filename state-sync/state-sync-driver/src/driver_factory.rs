@@ -124,13 +124,8 @@ impl DriverFactory {
         let consensus_notification_handler = ConsensusNotificationHandler::new(consensus_listener);
         let (error_notification_sender, error_notification_listener) =
             ErrorNotificationListener::new();
-        let mempool_notification_handler = MempoolNotificationHandler::new(
-            mempool_notification_sender,
-            node_config
-                .state_sync
-                .state_sync_driver
-                .mempool_commit_ack_timeout_ms,
-        );
+        let mempool_notification_handler =
+            MempoolNotificationHandler::new(mempool_notification_sender);
         let storage_service_notification_handler =
             StorageServiceNotificationHandler::new(storage_service_notification_sender);
 
@@ -144,7 +139,7 @@ impl DriverFactory {
 
         // Create the storage synchronizer
         let event_subscription_service = Arc::new(Mutex::new(event_subscription_service));
-        let (storage_synchronizer, _, _, _) = StorageSynchronizer::new(
+        let (storage_synchronizer, _) = StorageSynchronizer::new(
             node_config.state_sync.state_sync_driver,
             chunk_executor,
             commit_notification_sender.clone(),

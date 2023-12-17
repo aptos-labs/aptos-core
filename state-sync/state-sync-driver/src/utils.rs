@@ -7,6 +7,7 @@ use crate::{
     error::Error,
     logging::{LogEntry, LogSchema},
     metrics,
+    metrics::DATA_NOTIFICATION_LATENCIES,
     notification_handlers::{
         CommitNotification, CommittedTransactions, MempoolNotificationHandler,
         StorageServiceNotificationHandler,
@@ -209,6 +210,18 @@ pub async fn get_data_notification(
     let timeout_ms = Duration::from_millis(max_stream_wait_time_ms);
     if let Ok(data_notification) = timeout(timeout_ms, active_data_stream.select_next_some()).await
     {
+        // Update the metrics for how long it's taken to receive the notification
+        if let Some(payload_receive_time) = data_notification.payload_receive_time {
+            DATA_NOTIFICATION_LATENCIES
+                .with_label_values(&["payload_receive_time"])
+                .observe(payload_receive_time.elapsed().as_secs_f64());
+        }
+        if let Some(notification_creation_time) = data_notification.notification_creation_time {
+            DATA_NOTIFICATION_LATENCIES
+                .with_label_values(&["notification_creation_time_1"])
+                .observe(notification_creation_time.elapsed().as_secs_f64());
+        }
+
         // Reset the number of consecutive timeouts for the data stream
         active_data_stream.num_consecutive_timeouts = 0;
         Ok(data_notification)
@@ -372,6 +385,7 @@ pub fn update_new_epoch_metrics() {
 pub async fn execute_transactions<StorageSyncer: StorageSynchronizerInterface + Clone>(
     mut storage_synchronizer: StorageSyncer,
     notification_id: NotificationId,
+    notification_creation_time: Option<Instant>,
     proof_ledger_info: LedgerInfoWithSignatures,
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     transaction_list_with_proof: TransactionListWithProof,
@@ -380,6 +394,7 @@ pub async fn execute_transactions<StorageSyncer: StorageSynchronizerInterface + 
     storage_synchronizer
         .execute_transactions(
             notification_id,
+            notification_creation_time,
             transaction_list_with_proof,
             proof_ledger_info,
             end_of_epoch_ledger_info,
@@ -393,6 +408,7 @@ pub async fn execute_transactions<StorageSyncer: StorageSynchronizerInterface + 
 pub async fn apply_transaction_outputs<StorageSyncer: StorageSynchronizerInterface + Clone>(
     mut storage_synchronizer: StorageSyncer,
     notification_id: NotificationId,
+    notification_creation_time: Option<Instant>,
     proof_ledger_info: LedgerInfoWithSignatures,
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     transaction_outputs_with_proof: TransactionOutputListWithProof,
@@ -403,6 +419,7 @@ pub async fn apply_transaction_outputs<StorageSyncer: StorageSynchronizerInterfa
     storage_synchronizer
         .apply_transaction_outputs(
             notification_id,
+            notification_creation_time,
             transaction_outputs_with_proof,
             proof_ledger_info,
             end_of_epoch_ledger_info,

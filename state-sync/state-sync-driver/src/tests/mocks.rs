@@ -43,7 +43,7 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use mockall::mock;
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 use tokio::task::JoinHandle;
 
 // TODO(joshlind): if we see these as generally useful, we should
@@ -453,6 +453,7 @@ mock! {
         async fn apply_transaction_outputs(
             &mut self,
             notification_id: NotificationId,
+            notification_creation_time: Option<Instant>,
             output_list_with_proof: TransactionOutputListWithProof,
             target_ledger_info: LedgerInfoWithSignatures,
             end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
@@ -461,6 +462,7 @@ mock! {
         async fn execute_transactions(
             &mut self,
             notification_id: NotificationId,
+            notification_creation_time: Option<Instant>,
             transaction_list_with_proof: TransactionListWithProof,
             target_ledger_info: LedgerInfoWithSignatures,
             end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,

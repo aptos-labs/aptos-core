@@ -1088,6 +1088,7 @@ dependencies = [
  "aptos-storage-service-types",
  "aptos-time-service",
  "aptos-types",
+ "arc-swap",
  "async-trait",
  "claims",
  "enum_dispatch",

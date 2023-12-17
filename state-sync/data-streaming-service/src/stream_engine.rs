@@ -2131,10 +2131,7 @@ fn create_data_notification(
         _ => invalid_response_type!(client_response_type),
     };
 
-    Ok(DataNotification {
-        notification_id,
-        data_payload,
-    })
+    Ok(DataNotification::new(notification_id, data_payload))
 }
 
 /// Extracts the number of new versions and target

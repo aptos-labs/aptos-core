@@ -13,6 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+arc-swap = { workspace = true }
 aptos-channels = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }

@@ -10,7 +10,7 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::{fmt, time::Instant};
 
 /// The API offered by the Aptos Data Client.
 #[async_trait]
@@ -215,6 +215,18 @@ pub struct ResponseContext {
     /// A callback for notifying the data-client source about an error with this
     /// response.
     pub response_callback: Box<dyn ResponseCallback>,
+    /// The time at which this response was created
+    pub creation_time: Instant,
+}
+
+impl ResponseContext {
+    pub fn new(id: ResponseId, response_callback: Box<dyn ResponseCallback>) -> Self {
+        Self {
+            id,
+            response_callback,
+            creation_time: Instant::now(),
+        }
+    }
 }
 
 /// A response from the Data Client for a single API call.

@@ -193,13 +193,13 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
     /// Initializes the data client requests by sending out the first batch
     pub fn initialize_data_requests(
         &mut self,
-        global_data_summary: GlobalDataSummary,
+        global_data_summary: Arc<GlobalDataSummary>,
     ) -> Result<(), Error> {
         // Initialize the data client requests queue
         self.sent_data_requests = Some(VecDeque::new());
 
         // Create and send the data client requests to the network
-        self.create_and_send_client_requests(&global_data_summary)
+        self.create_and_send_client_requests(global_data_summary)
     }
 
     /// Returns true iff the given `notification_id` was sent by this stream
@@ -261,7 +261,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
     /// Creates and sends a batch of aptos data client requests to the network
     fn create_and_send_client_requests(
         &mut self,
-        global_data_summary: &GlobalDataSummary,
+        global_data_summary: Arc<GlobalDataSummary>,
     ) -> Result<(), Error> {
         // Calculate the number of in-flight requests (i.e., requests that haven't completed)
         let num_pending_requests = self.get_num_pending_data_requests()?;
@@ -287,7 +287,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         if max_num_requests_to_send > 0 {
             let client_requests = self.stream_engine.create_data_client_requests(
                 max_num_requests_to_send,
-                global_data_summary,
+                global_data_summary.as_ref(),
                 self.notification_id_generator.clone(),
             )?;
             for client_request in &client_requests {
@@ -414,10 +414,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
     async fn send_end_of_stream_notification(&mut self) -> Result<(), Error> {
         // Create end of stream notification
         let notification_id = self.notification_id_generator.next();
-        let data_notification = DataNotification {
-            notification_id,
-            data_payload: DataPayload::EndOfStream,
-        };
+        let data_notification = DataNotification::new(notification_id, DataPayload::EndOfStream);
 
         // Send the data notification
         info!(
@@ -434,7 +431,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
     /// responses must be processed in FIFO order.
     pub async fn process_data_responses(
         &mut self,
-        global_data_summary: GlobalDataSummary,
+        global_data_summary: Arc<GlobalDataSummary>,
     ) -> Result<(), Error> {
         if self.stream_engine.is_stream_complete()
             || self.request_failure_count >= self.streaming_service_config.max_request_retry
@@ -492,7 +489,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                             // engine should be notified (e.g., so that it can catch up).
                             if client_request.is_subscription_request() {
                                 if let Err(error) = self.check_subscription_stream_lag(
-                                    &global_data_summary,
+                                    global_data_summary.clone(),
                                     &client_response_payload,
                                 ) {
                                     self.notify_new_data_request_error(client_request, error)?;
@@ -530,14 +527,14 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
 
         // Create and send further client requests to the network
         // to ensure we're maximizing the number of concurrent requests.
-        self.create_and_send_client_requests(&global_data_summary)
+        self.create_and_send_client_requests(global_data_summary)
     }
 
     /// Verifies that the subscription stream is not lagging too much (i.e.,
     /// behind the data advertisements). If it is, an error is returned.
     fn check_subscription_stream_lag(
         &mut self,
-        global_data_summary: &GlobalDataSummary,
+        global_data_summary: Arc<GlobalDataSummary>,
         response_payload: &ResponsePayload,
     ) -> Result<(), aptos_data_client::error::Error> {
         // Get the highest version sent in the subscription response
@@ -756,7 +753,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         let (response_context, response_payload) = data_client_response.into_parts();
 
         // Create a new data notification
-        if let Some(data_notification) = self
+        if let Some(mut data_notification) = self
             .stream_engine
             .transform_client_response_into_notification(
                 data_client_request,
@@ -764,6 +761,9 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                 self.notification_id_generator.clone(),
             )?
         {
+            // Set the timestamps on the data notification
+            data_notification.start_creation_timer(response_context.creation_time);
+
             // Save the response context for this notification ID
             let notification_id = data_notification.notification_id;
             self.insert_notification_response_mapping(notification_id, response_context)?;

@@ -399,10 +399,10 @@ async fn test_data_stream_state_values() {
         .unwrap();
 
     // Send an invalid output along the stream
-    let data_notification = DataNotification {
+    let data_notification = DataNotification::new(
         notification_id,
-        data_payload: DataPayload::TransactionOutputsWithProof(create_output_list_with_proof()),
-    };
+        DataPayload::TransactionOutputsWithProof(create_output_list_with_proof()),
+    );
     notification_sender_1.send(data_notification).await.unwrap();
 
     // Drive progress again and ensure we get a verification error
@@ -471,10 +471,10 @@ async fn test_data_stream_transactions() {
         .unwrap();
 
     // Send an invalid output along the stream
-    let data_notification = DataNotification {
+    let data_notification = DataNotification::new(
         notification_id,
-        data_payload: DataPayload::TransactionsWithProof(create_transaction_list_with_proof()),
-    };
+        DataPayload::TransactionsWithProof(create_transaction_list_with_proof()),
+    );
     notification_sender_1.send(data_notification).await.unwrap();
 
     // Drive progress again and ensure we get a verification error
@@ -543,12 +543,10 @@ async fn test_data_stream_transaction_outputs() {
         .unwrap();
 
     // Send an invalid output along the stream
-    let data_notification = DataNotification {
+    let data_notification = DataNotification::new(
         notification_id,
-        data_payload: DataPayload::TransactionOutputsWithProof(
-            TransactionOutputListWithProof::new_empty(),
-        ),
-    };
+        DataPayload::TransactionOutputsWithProof(TransactionOutputListWithProof::new_empty()),
+    );
     notification_sender_1.send(data_notification).await.unwrap();
 
     // Drive progress again and ensure we get a verification error
@@ -616,10 +614,10 @@ async fn test_data_stream_transactions_or_outputs() {
         .unwrap();
 
     // Send an invalid output along the stream
-    let data_notification = DataNotification {
+    let data_notification = DataNotification::new(
         notification_id,
-        data_payload: DataPayload::EpochEndingLedgerInfos(vec![create_epoch_ending_ledger_info()]),
-    };
+        DataPayload::EpochEndingLedgerInfos(vec![create_epoch_ending_ledger_info()]),
+    );
     notification_sender_1.send(data_notification).await.unwrap();
 
     // Drive progress again and ensure we get an invalid payload error
@@ -1064,10 +1062,10 @@ async fn test_snapshot_sync_existing_state() {
         .unwrap();
 
     // Send an invalid notification (incorrect data type)
-    let data_notification = DataNotification {
+    let data_notification = DataNotification::new(
         notification_id,
-        data_payload: DataPayload::TransactionOutputsWithProof(create_output_list_with_proof()),
-    };
+        DataPayload::TransactionsWithProof(create_transaction_list_with_proof()),
+    );
     notification_sender_1.send(data_notification).await.unwrap();
 
     // Drive progress again and ensure we get an invalid payload error
@@ -1333,10 +1331,10 @@ async fn test_waypoint_mismatch() {
         waypoint_version,
         waypoint_epoch,
     )];
-    let data_notification = DataNotification {
+    let data_notification = DataNotification::new(
         notification_id,
-        data_payload: DataPayload::EpochEndingLedgerInfos(invalid_ledger_info),
-    };
+        DataPayload::EpochEndingLedgerInfos(invalid_ledger_info),
+    );
     notification_sender.send(data_notification).await.unwrap();
 
     // Drive progress again and ensure we get a verification error

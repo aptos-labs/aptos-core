@@ -19,6 +19,7 @@ use aptos_data_client::{
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_logger::prelude::*;
 use aptos_time_service::TimeService;
+use arc_swap::ArcSwap;
 use futures::StreamExt;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::interval;
@@ -42,7 +43,7 @@ pub struct DataStreamingService<T> {
     aptos_data_client: T,
 
     // Cached global data summary
-    global_data_summary: GlobalDataSummary,
+    global_data_summary: Arc<ArcSwap<GlobalDataSummary>>,
 
     // All requested data streams from clients
     data_streams: HashMap<DataStreamId, DataStream<T>>,
@@ -70,7 +71,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
             data_client_config,
             streaming_service_config,
             aptos_data_client,
-            global_data_summary: GlobalDataSummary::empty(),
+            global_data_summary: Arc::new(ArcSwap::from(Arc::new(GlobalDataSummary::empty()))),
             data_streams: HashMap::new(),
             stream_requests,
             stream_id_generator: U64IdGenerator::new(),
@@ -104,6 +105,11 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
                 }
             }
         }
+    }
+
+    /// Fetches the current global data summary
+    fn get_global_data_summary(&self) -> Arc<GlobalDataSummary> {
+        self.global_data_summary.load().clone()
     }
 
     /// Handles new stream request messages from clients
@@ -209,6 +215,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
         self.refresh_global_data_summary();
 
         // Create a new data stream
+        let global_data_summary = self.get_global_data_summary();
         let stream_id = self.stream_id_generator.next();
         let (data_stream, stream_listener) = DataStream::new(
             self.data_client_config,
@@ -217,12 +224,12 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
             &request_message.stream_request,
             self.aptos_data_client.clone(),
             self.notification_id_generator.clone(),
-            &self.global_data_summary.advertised_data,
+            &global_data_summary.advertised_data,
             self.time_service.clone(),
         )?;
 
         // Verify the data stream can be fulfilled using the currently advertised data
-        data_stream.ensure_data_is_available(&self.global_data_summary.advertised_data)?;
+        data_stream.ensure_data_is_available(&global_data_summary.advertised_data)?;
 
         // Store the data stream internally
         if self.data_streams.insert(stream_id, data_stream).is_some() {
@@ -266,7 +273,8 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
             );
         } else {
             verify_optimal_chunk_sizes(&global_data_summary.optimal_chunk_sizes)?;
-            self.global_data_summary = global_data_summary;
+            self.global_data_summary
+                .store(Arc::new(global_data_summary.clone()));
         }
 
         Ok(())
@@ -309,7 +317,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
         &mut self,
         data_stream_id: &DataStreamId,
     ) -> Result<(), Error> {
-        let global_data_summary = self.global_data_summary.clone();
+        let global_data_summary = self.get_global_data_summary();
 
         // If there was a send failure, terminate the stream
         let data_stream = self.get_data_stream(data_stream_id)?;

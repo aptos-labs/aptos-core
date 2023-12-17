@@ -74,10 +74,7 @@ async fn test_stream_blocked() {
                 start_epoch: 0,
                 end_epoch: 0,
             });
-        let context = ResponseContext {
-            id: 0,
-            response_callback: Box::new(NoopResponseCallback),
-        };
+        let context = ResponseContext::new(0, Box::new(NoopResponseCallback));
         let pending_response = PendingClientResponse::new_with_response(
             client_request.clone(),
             Ok(Response::new(context, ResponsePayload::NumberOfStates(10))),
@@ -235,10 +232,7 @@ async fn test_stream_invalid_response() {
         start_epoch: MIN_ADVERTISED_EPOCH_END,
         end_epoch: MIN_ADVERTISED_EPOCH_END + 1,
     });
-    let context = ResponseContext {
-        id: 0,
-        response_callback: Box::new(NoopResponseCallback),
-    };
+    let context = ResponseContext::new(0, Box::new(NoopResponseCallback));
     let pending_response = PendingClientResponse::new_with_response(
         client_request.clone(),
         Ok(Response::new(context, ResponsePayload::NumberOfStates(10))),
@@ -1804,7 +1798,7 @@ async fn test_stream_listener_dropped() {
     // when the notification is sent.
     set_epoch_ending_response_in_queue(&mut data_stream, 0, 0);
     data_stream
-        .process_data_responses(global_data_summary.clone())
+        .process_data_responses(Arc::new(global_data_summary.clone()))
         .await
         .unwrap_err();
     let (_, sent_notifications) = data_stream.get_sent_requests_and_notifications();
@@ -2486,7 +2480,7 @@ fn initialize_data_requests(
     global_data_summary: &GlobalDataSummary,
 ) {
     data_stream
-        .initialize_data_requests(global_data_summary.clone())
+        .initialize_data_requests(Arc::new(global_data_summary.clone()))
         .unwrap();
 }
 
@@ -2496,7 +2490,7 @@ async fn process_data_responses(
     global_data_summary: &GlobalDataSummary,
 ) {
     data_stream
-        .process_data_responses(global_data_summary.clone())
+        .process_data_responses(Arc::new(global_data_summary.clone()))
         .await
         .unwrap();
 }

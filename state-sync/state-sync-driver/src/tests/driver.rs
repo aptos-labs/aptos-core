@@ -358,7 +358,7 @@ async fn create_driver_for_tests(
     let (consensus_notifier, consensus_listener) =
         aptos_consensus_notifications::new_consensus_notifier_listener_pair(5000);
     let (mempool_notifier, mempool_listener) =
-        aptos_mempool_notifications::new_mempool_notifier_listener_pair();
+        aptos_mempool_notifications::new_mempool_notifier_listener_pair(100);
 
     // Create the storage service notifier and listener
     let (storage_service_notifier, storage_service_listener) =

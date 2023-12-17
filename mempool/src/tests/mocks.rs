@@ -121,7 +121,7 @@ impl MockSharedMempool {
         let (ac_client, client_events) = mpsc::channel(1_024);
         let (quorum_store_sender, quorum_store_receiver) = mpsc::channel(1_024);
         let (mempool_notifier, mempool_listener) =
-            aptos_mempool_notifications::new_mempool_notifier_listener_pair();
+            aptos_mempool_notifications::new_mempool_notifier_listener_pair(100);
         let (reconfig_sender, reconfig_events) = aptos_channel::new(QueueStyle::LIFO, 1, None);
         let reconfig_event_subscriber = ReconfigNotificationListener {
             notification_receiver: reconfig_events,

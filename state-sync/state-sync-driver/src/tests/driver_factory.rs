@@ -50,7 +50,7 @@ fn test_new_initialized_configs() {
     bootstrap_genesis::<AptosVM>(&db_rw, get_genesis_txn(&node_config).unwrap()).unwrap();
 
     // Create mempool and consensus notifiers
-    let (mempool_notifier, _) = new_mempool_notifier_listener_pair();
+    let (mempool_notifier, _) = new_mempool_notifier_listener_pair(100);
     let (_, consensus_listener) = new_consensus_notifier_listener_pair(0);
 
     // Create the event subscription service and a reconfig subscriber
