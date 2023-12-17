@@ -19,6 +19,7 @@ use aptos_types::{
     },
     transaction,
     transaction::authenticator::{AccountAuthenticator, TransactionAuthenticator},
+    validator_txn::ValidatorTransaction,
     vm_status::AbortLocation,
     write_set,
 };
@@ -26,7 +27,6 @@ use move_core_types::language_storage;
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_reflection::{Registry, Result, Samples, Tracer, TracerConfig};
-use aptos_types::validator_txn::ValidatorTransaction;
 
 /// Default output file.
 pub fn output_file() -> Option<&'static str> {

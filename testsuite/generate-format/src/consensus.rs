@@ -17,13 +17,14 @@ use aptos_types::{
         state_key::StateKey,
         state_value::{PersistedStateValueMetadata, StateValueMetadata},
     },
-    transaction, write_set,
+    transaction,
+    validator_txn::ValidatorTransaction,
+    write_set,
 };
 use move_core_types::language_storage;
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_reflection::{Registry, Result, Samples, Tracer, TracerConfig};
-use aptos_types::validator_txn::ValidatorTransaction;
 
 /// Return a relative path to start tracking changes in commits.
 pub fn output_file() -> Option<&'static str> {
