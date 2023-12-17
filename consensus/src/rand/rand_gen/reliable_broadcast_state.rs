@@ -3,19 +3,19 @@
 
 use crate::rand::rand_gen::{
     network_messages::RandMessage,
+    rand_store::RandStore,
+    storage::interface::RandStorage,
     types::{
         AugData, AugDataSignature, AugmentedData, CertifiedAugData, CertifiedAugDataAck, Proof,
-        RandConfig, RandDecision, RandShare, Share, ShareAck,
+        RandConfig, RandShare, RequestShare, Share,
     },
 };
 use anyhow::ensure;
 use aptos_consensus_types::{common::Author, randomness::RandMetadata};
 use aptos_infallible::Mutex;
-use aptos_logger::error;
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{aggregate_signature::PartialSignatures, epoch_state::EpochState};
 use std::{collections::HashSet, sync::Arc};
-use tokio::sync::mpsc::UnboundedSender;
 
 pub struct AugDataCertBuilder<D> {
     epoch_state: Arc<EpochState>,
@@ -33,8 +33,8 @@ impl<D> AugDataCertBuilder<D> {
     }
 }
 
-impl<S: Share, P: Proof<Share = S>, D: AugmentedData>
-    BroadcastStatus<RandMessage<S, P, D>, RandMessage<S, P, D>> for Arc<AugDataCertBuilder<D>>
+impl<S: Share, D: AugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessage<S, D>>
+    for Arc<AugDataCertBuilder<D>>
 {
     type Ack = AugDataSignature;
     type Aggregated = CertifiedAugData<D>;
@@ -72,8 +72,8 @@ impl CertifiedAugDataAckState {
     }
 }
 
-impl<S: Share, P: Proof<Share = S>, D: AugmentedData>
-    BroadcastStatus<RandMessage<S, P, D>, RandMessage<S, P, D>> for Arc<CertifiedAugDataAckState>
+impl<S: Share, D: AugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessage<S, D>>
+    for Arc<CertifiedAugDataAckState>
 {
     type Ack = CertifiedAugDataAck;
     type Aggregated = ();
@@ -95,57 +95,49 @@ impl<S: Share, P: Proof<Share = S>, D: AugmentedData>
     }
 }
 
-pub struct ShareAckState<P> {
+pub struct ShareAggregateState<S, P, Storage> {
     rand_metadata: RandMetadata,
-    validators: Mutex<HashSet<Author>>,
+    rand_store: Arc<Mutex<RandStore<S, P, Storage>>>,
     rand_config: RandConfig,
-    decision_tx: UnboundedSender<RandDecision<P>>,
 }
 
-impl<P> ShareAckState<P> {
+impl<S, P, Storage> ShareAggregateState<S, P, Storage> {
     pub fn new(
-        validators: impl Iterator<Item = Author>,
+        rand_store: Arc<Mutex<RandStore<S, P, Storage>>>,
         metadata: RandMetadata,
         rand_config: RandConfig,
-        decision_tx: UnboundedSender<RandDecision<P>>,
     ) -> Self {
         Self {
-            validators: Mutex::new(validators.collect()),
+            rand_store,
             rand_metadata: metadata,
             rand_config,
-            decision_tx,
         }
     }
 }
 
-impl<S: Share, P: Proof<Share = S>, D: AugmentedData>
-    BroadcastStatus<RandMessage<S, P, D>, RandMessage<S, P, D>> for Arc<ShareAckState<P>>
+impl<S: Share, P: Proof<Share = S>, D: AugmentedData, Storage: RandStorage<S, P>>
+    BroadcastStatus<RandMessage<S, D>, RandMessage<S, D>>
+    for Arc<ShareAggregateState<S, P, Storage>>
 {
-    type Ack = ShareAck<P>;
+    type Ack = RandShare<S>;
     type Aggregated = ();
-    type Message = RandShare<S>;
+    type Message = RequestShare;
 
-    fn add(&self, peer: Author, ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
+    fn add(&self, peer: Author, share: Self::Ack) -> anyhow::Result<Option<()>> {
+        ensure!(share.author() == &peer, "Author does not match");
         ensure!(
-            self.validators.lock().remove(&peer),
-            "[RandMessage] Unknown author: {}",
-            peer
+            share.metadata() == &self.rand_metadata,
+            "Metadata does not match: local {:?}, received {:?}",
+            self.rand_metadata,
+            share.metadata()
         );
-        // If receive a decision, verify it and send it to the randomness manager and stop the reliable broadcast
-        if let Some(decision) = ack.into_maybe_decision() {
-            match decision.verify(&self.rand_config, &self.rand_metadata) {
-                Ok(_) => {
-                    let _ = self.decision_tx.send(decision);
-                    return Ok(Some(()));
-                },
-                Err(e) => error!("[RandManager] Failed to verify decision: {}", e),
-            }
-        }
-        // If receive from all validators, stop the reliable broadcast
-        if self.validators.lock().is_empty() {
-            Ok(Some(()))
+        share.verify(&self.rand_config)?;
+        let mut store = self.rand_store.lock();
+        let aggregated = if store.add_share(share)? {
+            Some(())
         } else {
-            Ok(None)
-        }
+            None
+        };
+        Ok(aggregated)
     }
 }
