@@ -15,7 +15,7 @@ use super::{
     },
     order_rule::OrderRule,
     rb_handler::NodeBroadcastHandler,
-    storage::DAGStorage,
+    storage::{CommitEvent, DAGStorage},
     types::{CertifiedNodeMessage, DAGMessage},
     DAGRpcResult, ProofNotifier,
 };
@@ -436,20 +436,38 @@ impl DagBootstrapper {
     ) -> (
         Arc<dyn AnchorElection>,
         Option<Arc<LeaderReputationAdapter>>,
+        Option<Vec<CommitEvent>>,
     ) {
         match &self.onchain_config.anchor_election_mode {
             AnchorElectionMode::RoundRobin => {
                 let election = Arc::new(RoundRobinAnchorElection::new(
                     self.epoch_state.verifier.get_ordered_account_addresses(),
                 ));
-                (election, None)
+                (election, None, None)
             },
             AnchorElectionMode::LeaderReputation(reputation_type) => {
-                let leader_reputation = match reputation_type {
-                    ProposerAndVoterV2(config) => self.build_leader_reputation_components(config),
+                let (commit_events, leader_reputation) = match reputation_type {
+                    ProposerAndVoterV2(config) => {
+                        let commit_events = self
+                            .storage
+                            .get_latest_k_committed_events(
+                                config.voter_window_num_validators_multiplier as u64
+                                    * self.epoch_state.verifier.len() as u64,
+                            )
+                            .expect("Failed to read commit events from storage");
+                        (
+                            commit_events,
+                            self.build_leader_reputation_components(config),
+                        )
+                    },
                     ProposerAndVoter(_) => unreachable!("unsupported mode"),
                 };
-                (leader_reputation.clone(), Some(leader_reputation))
+
+                (
+                    leader_reputation.clone(),
+                    Some(leader_reputation),
+                    Some(commit_events),
+                )
             },
         }
     }
@@ -457,6 +475,7 @@ impl DagBootstrapper {
     fn bootstrap_dag_store(
         &self,
         anchor_election: Arc<dyn AnchorElection>,
+        commit_events: Option<Vec<CommitEvent>>,
         dag_window_size_config: u64,
     ) -> BootstrapBaseState {
         let ledger_info_from_storage = self
@@ -502,8 +521,8 @@ impl DagBootstrapper {
             dag.clone(),
             anchor_election.clone(),
             ordered_notifier.clone(),
-            self.storage.clone(),
             self.onchain_config.dag_ordering_causal_history_window as Round,
+            commit_events,
         );
 
         BootstrapBaseState {
@@ -628,10 +647,12 @@ impl DagBootstrapper {
     }
 
     fn full_bootstrap(&self) -> (BootstrapBaseState, NetworkHandler, DagFetcherService) {
-        let (anchor_election, may_be_leader_reputation) = self.build_anchor_election();
+        let (anchor_election, may_be_leader_reputation, commit_events) =
+            self.build_anchor_election();
 
         let mut base_state = self.bootstrap_dag_store(
             anchor_election.clone(),
+            commit_events,
             self.onchain_config.dag_ordering_causal_history_window as u64,
         );
         base_state.may_be_leader_reputation = may_be_leader_reputation;
