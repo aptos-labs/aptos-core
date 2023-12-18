@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::anchor_election::TChainHealthBackoff;
 use crate::dag::{
     observability::tracing::{observe_round, RoundStage},
     types::NodeCertificate,
@@ -35,6 +34,7 @@ impl RoundState {
         &mut self,
         highest_strong_links_round: Round,
         strong_links: Vec<NodeCertificate>,
+        minimum_delay: Duration,
     ) {
         match self.current_round.cmp(&highest_strong_links_round) {
             // we're behind, move forward immediately
@@ -44,7 +44,7 @@ impl RoundState {
             },
             Ordering::Equal => {
                 self.responsive_check
-                    .check_for_new_round(highest_strong_links_round, strong_links)
+                    .check_for_new_round(highest_strong_links_round, strong_links, minimum_delay)
                     .await
             },
             Ordering::Greater => (),
@@ -68,6 +68,7 @@ pub trait ResponsiveCheck: Send {
         &mut self,
         highest_strong_links_round: Round,
         strong_links: Vec<NodeCertificate>,
+        minimum_delay: Duration,
     );
 
     fn reset(&mut self);
@@ -90,6 +91,7 @@ impl ResponsiveCheck for OptimisticResponsive {
         &mut self,
         highest_strong_links_round: Round,
         _strong_links: Vec<NodeCertificate>,
+        minimum_delay: Duration,
     ) {
         let new_round = highest_strong_links_round + 1;
         let _ = self.event_sender.send(new_round).await;
@@ -114,7 +116,6 @@ pub struct AdaptiveResponsive {
     minimal_wait_time: Duration,
     event_sender: tokio::sync::mpsc::Sender<Round>,
     state: State,
-    chain_backoff: Arc<dyn TChainHealthBackoff>,
 }
 
 impl AdaptiveResponsive {
@@ -122,7 +123,6 @@ impl AdaptiveResponsive {
         event_sender: tokio::sync::mpsc::Sender<Round>,
         epoch_state: Arc<EpochState>,
         minimal_wait_time: Duration,
-        chain_backoff: Arc<dyn TChainHealthBackoff>,
     ) -> Self {
         Self {
             epoch_state,
@@ -130,7 +130,6 @@ impl AdaptiveResponsive {
             minimal_wait_time,
             event_sender,
             state: State::Initial,
-            chain_backoff,
         }
     }
 }
@@ -141,6 +140,7 @@ impl ResponsiveCheck for AdaptiveResponsive {
         &mut self,
         highest_strong_links_round: Round,
         strong_links: Vec<NodeCertificate>,
+        minimum_delay: Duration,
     ) {
         if matches!(self.state, State::Sent) {
             return;
@@ -156,13 +156,8 @@ impl ResponsiveCheck for AdaptiveResponsive {
             .sum_voting_power(strong_links.iter().map(|cert| cert.metadata().author()))
             .expect("Unable to sum voting power from strong links");
 
-        let (_, backoff_duration) = self.chain_backoff.get_round_backoff(new_round);
-        let wait_time = if let Some(duration) = backoff_duration {
-            duration.max(self.minimal_wait_time)
-        } else {
-            self.minimal_wait_time
-        };
-
+        let wait_time = self.minimal_wait_time.max(minimum_delay);
+        
         // voting power == 3f+1 or pass minimal wait time
         let duration_since_start = duration_since_epoch().saturating_sub(self.start_time);
         if voting_power == self.epoch_state.verifier.total_voting_power()
