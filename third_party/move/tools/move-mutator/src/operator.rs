@@ -11,7 +11,7 @@ pub enum MutationOperator {
 
 impl MutationOperator {
     /// Applies the mutation operator to the given source code.
-    /// Returns a vector of mutated source code.
+    /// Returns differently mutated source code listings in a vector.
     pub fn apply(&self, source: &str) -> Vec<String> {
         match self {
             MutationOperator::BinaryOperator(bin_op) => {
@@ -19,6 +19,8 @@ impl MutationOperator {
                 let end = bin_op.loc.end() as usize;
                 let op = &source[start..end];
 
+                // Group of exchangeable binary operators - we only want to replace the operator with a different one
+                // within the same group.
                 let ops: Vec<&str> = match bin_op.value {
                     BinOp_::Add | BinOp_::Sub | BinOp_::Mul | BinOp_::Div | BinOp_::Mod => {
                         vec!["+", "-", "*", "/", "%"]
