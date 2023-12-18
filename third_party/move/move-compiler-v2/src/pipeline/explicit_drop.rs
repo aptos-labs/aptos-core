@@ -1,8 +1,8 @@
 //! Adds explicit destroy instructions for non-primitive types.
 
 use super::{
-    livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
-    reference_safety_processor::{LifetimeAnnotation, LifetimeInfoAtCodeOffset},
+    livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset, LiveVarAnalysisProcessor},
+    reference_safety_processor::{LifetimeAnnotation, LifetimeInfoAtCodeOffset, ReferenceSafetyProcessor, self},
 };
 use move_binary_format::file_format::CodeOffset;
 use move_model::{ast::TempIndex, model::FunctionEnv, ty::Type};
@@ -18,10 +18,10 @@ pub struct ExplicitDrop {}
 impl FunctionTargetProcessor for ExplicitDrop {
     fn process(
         &self,
-        _targets: &mut FunctionTargetsHolder,
+        targets: &mut FunctionTargetsHolder,
         fun_env: &FunctionEnv,
         mut data: FunctionData,
-        _scc_opt: Option<&[FunctionEnv]>,
+        scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
         if fun_env.is_native() {
             return data;
@@ -30,13 +30,30 @@ impl FunctionTargetProcessor for ExplicitDrop {
         let mut transformer = ExplicitDropTransformer::new(target);
         transformer.transform();
         data.code = transformer.transformed;
-        data.annotations.remove::<LiveVarAnnotation>();
-        data.annotations.remove::<LifetimeAnnotation>();
-        data
+        self.recompute_invalidated_analyses(targets, fun_env, data, scc_opt)
     }
 
     fn name(&self) -> String {
         "ExplicitDrop".to_owned()
+    }
+}
+
+impl ExplicitDrop {
+    /// Recomputes livevar analyais and lifetime analysis
+    fn recompute_invalidated_analyses(
+        &self,
+        targets: &mut FunctionTargetsHolder,
+        fun_env: &FunctionEnv,
+        mut data: FunctionData,
+        scc_opt: Option<&[FunctionEnv]>,
+    ) -> FunctionData {
+        // don't run the processor directly to avoid doing copy transformation again
+        let livevar_analysis_processor = LiveVarAnalysisProcessor();
+        let target = FunctionTarget::new(fun_env, &data);
+        let offset_to_live_refs = LiveVarAnnotation::new(livevar_analysis_processor.analyze(&target));
+        data.annotations.set(offset_to_live_refs, true);
+        let reference_safety_processor =  ReferenceSafetyProcessor {};
+        reference_safety_processor.process(targets, fun_env, data, scc_opt)
     }
 }
 

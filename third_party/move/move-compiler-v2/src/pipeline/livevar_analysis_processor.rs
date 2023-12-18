@@ -35,6 +35,10 @@ use std::{
 pub struct LiveVarAnnotation(BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset>);
 
 impl LiveVarAnnotation {
+    pub fn new(annot: BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset>) -> Self {
+        Self(annot)
+    }
+
     /// Get the live var info at the given code offset
     pub fn get_live_var_info_at(
         &self,
@@ -116,7 +120,7 @@ impl FunctionTargetProcessor for LiveVarAnalysisProcessor {
 
 impl LiveVarAnalysisProcessor {
     /// Run the live var analysis.
-    fn analyze(
+    pub fn analyze(
         &self,
         func_target: &FunctionTarget,
     ) -> BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset> {
