@@ -21,6 +21,7 @@ mod storage;
 #[cfg(test)]
 mod tests;
 mod types;
+mod health;
 
 pub use adapter::{ProofNotifier, StorageAdapter};
 pub use bootstrap::DagBootstrapper;

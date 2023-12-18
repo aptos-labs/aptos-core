@@ -30,6 +30,8 @@ use std::{
     sync::Arc,
 };
 
+pub type VotingPowerRatio = f64;
+
 /// Interface to query committed NewBlockEvent.
 pub trait MetadataBackend: Send + Sync {
     /// Return a contiguous NewBlockEvent window in which last one is at target_round or
@@ -576,7 +578,7 @@ impl LeaderReputation {
     // Compute chain health metrics, and
     // - return participating voting power percentage for the window_for_chain_health
     // - update metric counters for different windows
-    fn compute_chain_health_and_add_metrics(&self, history: &[NewBlockEvent], round: Round) -> f64 {
+    fn compute_chain_health_and_add_metrics(&self, history: &[NewBlockEvent], round: Round) -> VotingPowerRatio {
         let candidates = self.epoch_to_proposers.get(&self.epoch).unwrap();
         // use f64 counter, as total voting power is u128
         let total_voting_power = self.voting_powers.iter().map(|v| *v as f64).sum();
@@ -639,7 +641,7 @@ impl LeaderReputation {
 
                 if chosen {
                     // do not treat chain as unhealthy, if chain just started, and we don't have enough history to decide.
-                    let voting_power_participation_ratio =
+                    let voting_power_participation_ratio: VotingPowerRatio =
                         if history.len() < *participants_window_size && self.epoch <= 2 {
                             1.0
                         } else if total_voting_power >= 1.0 {
@@ -671,7 +673,7 @@ impl ProposerElection for LeaderReputation {
     fn get_valid_proposer_and_voting_power_participation_ratio(
         &self,
         round: Round,
-    ) -> (Author, f64) {
+    ) -> (Author, VotingPowerRatio) {
         let target_round = round.saturating_sub(self.exclude_round);
         let (sliding_window, root_hash) = self.backend.get_block_metadata(self.epoch, target_round);
         let voting_power_participation_ratio =
@@ -713,7 +715,7 @@ impl ProposerElection for LeaderReputation {
             .0
     }
 
-    fn get_voting_power_participation_ratio(&self, round: Round) -> f64 {
+    fn get_voting_power_participation_ratio(&self, round: Round) -> VotingPowerRatio {
         self.get_valid_proposer_and_voting_power_participation_ratio(round)
             .1
     }

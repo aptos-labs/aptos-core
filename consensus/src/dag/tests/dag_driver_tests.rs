@@ -3,12 +3,13 @@
 use crate::{
     dag::{
         adapter::TLedgerInfoProvider,
-        anchor_election::{RoundRobinAnchorElection, TChainHealthBackoff},
+        anchor_election::RoundRobinAnchorElection,
         dag_driver::DagDriver,
         dag_fetcher::TFetchRequester,
         dag_network::{RpcWithFallback, TDAGNetworkSender},
         dag_store::Dag,
         errors::DagDriverError,
+        health::{HealthBackoff, NoChainHealth, NoPipelineBackpressure},
         order_rule::OrderRule,
         round_state::{OptimisticResponsive, RoundState},
         tests::{
@@ -96,18 +97,6 @@ impl TLedgerInfoProvider for MockLedgerInfoProvider {
     }
 }
 
-struct MockChainHealthBackoff {}
-
-impl TChainHealthBackoff for MockChainHealthBackoff {
-    fn get_round_backoff(&self, _round: Round) -> (f64, Option<Duration>) {
-        (1.0, None)
-    }
-
-    fn get_round_payload_limits(&self, _round: Round) -> (f64, Option<(u64, u64)>) {
-        (1.0, None)
-    }
-}
-
 struct MockFetchRequester {}
 
 impl TFetchRequester for MockFetchRequester {
@@ -175,7 +164,7 @@ fn setup(
 
     DagDriver::new(
         signers[0].author(),
-        epoch_state,
+        epoch_state.clone(),
         dag,
         Arc::new(MockPayloadClient::new(None)),
         rb,
@@ -187,7 +176,11 @@ fn setup(
         round_state,
         TEST_DAG_WINDOW as Round,
         DagPayloadConfig::default(),
-        Arc::new(MockChainHealthBackoff {}),
+        HealthBackoff::new(
+            epoch_state,
+            NoChainHealth::new(),
+            NoPipelineBackpressure::new(),
+        ),
         false,
     )
 }
