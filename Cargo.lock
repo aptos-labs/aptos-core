@@ -405,7 +405,6 @@ dependencies = [
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
- "aptos-package-builder",
  "aptos-proptest-helpers",
  "aptos-runtimes",
  "aptos-sdk",
@@ -713,6 +712,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-framework",
+ "aptos-package-builder",
  "aptos-types",
  "bcs 0.1.4",
  "include_dir 0.7.2",

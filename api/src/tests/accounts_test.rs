@@ -6,8 +6,6 @@ use super::new_test_context;
 use aptos_api_test_context::{current_function_name, find_value};
 use aptos_api_types::{MoveModuleBytecode, MoveResource, StateKeyWrapper};
 use aptos_cached_packages::aptos_stdlib;
-use aptos_framework::{BuildOptions, BuiltPackage};
-use aptos_package_builder::PackageBuilder;
 use serde_json::json;
 use std::str::FromStr;
 
@@ -156,26 +154,8 @@ async fn test_get_account_resources_by_invalid_ledger_version() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_account_modules_by_ledger_version() {
     let mut context = new_test_context(current_function_name!());
-
-    let mut builder = PackageBuilder::new("test_package");
-    builder.add_source(
-        "test_module.move",
-        r#"
-        module 0xa550c18::test_module {}
-        "#,
-    );
-    let path = builder.write_to_temp().unwrap();
-
-    let package = BuiltPackage::build(path.path().to_path_buf(), BuildOptions::default())
-        .expect("Should be able to build a package");
-    let code = package.extract_code();
-    let metadata = package
-        .extract_metadata()
-        .expect("Should be able to extract metadata");
-    let payload = aptos_stdlib::code_publish_package_txn(
-        bcs::to_bytes(&metadata).expect("Should be able to serialize metadata"),
-        code,
-    );
+    let payload =
+        aptos_stdlib::publish_module_source("test_module", "module 0xa550c18::test_module {}");
 
     let root_account = context.root_account().await;
     let txn =
