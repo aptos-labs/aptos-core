@@ -5,6 +5,7 @@ use crate::dag::{
     dag_fetcher::TFetchRequester,
     dag_store::Dag,
     errors::NodeBroadcastHandleError,
+    health::{HealthBackoff, NoChainHealth, NoPipelineBackpressure},
     rb_handler::NodeBroadcastHandler,
     storage::DAGStorage,
     tests::{
@@ -57,6 +58,12 @@ async fn test_node_broadcast_receiver_succeed() {
         TEST_DAG_WINDOW,
     )));
 
+    let health_backoff = HealthBackoff::new(
+        epoch_state.clone(),
+        NoChainHealth::new(),
+        NoPipelineBackpressure::new(),
+    );
+
     let wellformed_node = new_node(1, 10, signers[0].author(), vec![]);
     let equivocating_node = new_node(1, 20, signers[0].author(), vec![]);
 
@@ -70,7 +77,11 @@ async fn test_node_broadcast_receiver_succeed() {
         Arc::new(MockFetchRequester {}),
         DagPayloadConfig::default(),
         ValidatorTxnConfig::default_disabled(),
+<<<<<<< HEAD
         Features::default(),
+=======
+        health_backoff,
+>>>>>>> 85978d5bc8 ([dag] stop voting based on pipeline latency)
     );
 
     let expected_result = Vote::new(
@@ -117,7 +128,15 @@ async fn test_node_broadcast_receiver_failure() {
                 Arc::new(MockFetchRequester {}),
                 DagPayloadConfig::default(),
                 ValidatorTxnConfig::default_disabled(),
+<<<<<<< HEAD
                 Features::default(),
+=======
+                HealthBackoff::new(
+                    epoch_state.clone(),
+                    NoChainHealth::new(),
+                    NoPipelineBackpressure::new(),
+                ),
+>>>>>>> 85978d5bc8 ([dag] stop voting based on pipeline latency)
             )
         })
         .collect();
@@ -201,7 +220,15 @@ async fn test_node_broadcast_receiver_storage() {
         Arc::new(MockFetchRequester {}),
         DagPayloadConfig::default(),
         ValidatorTxnConfig::default_disabled(),
+<<<<<<< HEAD
         Features::default(),
+=======
+        HealthBackoff::new(
+            epoch_state.clone(),
+            NoChainHealth::new(),
+            NoPipelineBackpressure::new(),
+        ),
+>>>>>>> 85978d5bc8 ([dag] stop voting based on pipeline latency)
     );
     let sig = rb_receiver.process(node).await.expect("must succeed");
 
@@ -213,12 +240,20 @@ async fn test_node_broadcast_receiver_storage() {
     let mut rb_receiver = NodeBroadcastHandler::new(
         dag,
         signers[3].clone(),
-        epoch_state,
+        epoch_state.clone(),
         storage.clone(),
         Arc::new(MockFetchRequester {}),
         DagPayloadConfig::default(),
         ValidatorTxnConfig::default_disabled(),
+<<<<<<< HEAD
         Features::default(),
+=======
+        HealthBackoff::new(
+            epoch_state,
+            NoChainHealth::new(),
+            NoPipelineBackpressure::new(),
+        ),
+>>>>>>> 85978d5bc8 ([dag] stop voting based on pipeline latency)
     );
     assert_ok!(rb_receiver.gc_before_round(2));
     assert_eq!(storage.get_votes().unwrap().len(), 0);
