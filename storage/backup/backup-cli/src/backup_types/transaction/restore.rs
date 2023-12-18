@@ -100,13 +100,12 @@ impl LoadedChunk {
         storage: &Arc<dyn BackupStorage>,
         epoch_history: Option<&Arc<EpochHistory>>,
     ) -> Result<Self> {
-        let mut file = BufReader::new(storage.open_for_read(&manifest.transactions).await?);
         let mut txns = Vec::new();
         let mut txn_infos = Vec::new();
         let mut event_vecs = Vec::new();
         let mut write_sets = Vec::new();
 
-        while let Some(record_bytes) = file.read_record_bytes().await? {
+         for record_bytes in storage.read_all_records(&manifest.transactions).await? {
             let (txn, txn_info, events, write_set): (_, _, _, WriteSet) =
                 bcs::from_bytes(&record_bytes)?;
             txns.push(txn);
