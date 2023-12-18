@@ -1453,20 +1453,20 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     // This is calling a function from another module we already have
                     // translated. In this case, the impurity has already been propagated
                     // in translate_call.
-                    Ok(())
+                    true
                 } else {
                     // This is calling a function from the module we are currently translating.
                     // Need to recursively ensure we have propagated impurity because of
                     // arbitrary call graphs, including cyclic.
                     if !self.propagate_function_impurity(visited, *fid) {
                         is_pure = false;
-                        Err(()) // Short-curcuit the visit; this function is not pure
+                        false // Short-curcuit the visit; this function is not pure
                     } else {
-                        Ok(())
+                        true
                     }
                 }
             } else {
-                Ok(())
+                true
             }
         });
         if is_pure {
@@ -2076,7 +2076,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     );
                     ok = false;
                 }
-                Ok(()) // continue visit
+                true // continue visit, note all problematic subexprs
             };
             cond.exp.visit(&mut visitor);
         } else if let FunctionCode(name, _) | FunctionCodeV2(name, _) = context {
@@ -2108,7 +2108,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         },
                     };
                 }
-                Ok(()) // continue visit
+                true // continue visit, note all problematic subexprs
             };
             cond.exp.visit(&mut visitor);
         }
@@ -3537,7 +3537,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 },
                 _ => {},
             }
-            Ok(())
+            true // continue visit, note all problematic subexprs
         });
         (used_memory, callees)
     }

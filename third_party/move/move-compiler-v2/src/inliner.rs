@@ -755,7 +755,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
     /// Also check for Break or Continue inside a lambda and not inside a loop.
     fn check_for_return_break_continue_in_lambda(env: &GlobalEnv, lambda_body: &Exp) {
         let mut in_loop = 0;
-        let _ = lambda_body.visit_pre_post(&mut |up, e| {
+        lambda_body.visit_pre_post(&mut |up, e| {
             match e {
                 ExpData::Loop(..) if !up => {
                     in_loop += 1;
@@ -784,7 +784,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                 },
                 _ => {},
             }
-            Ok(())
+            true // keep going
         });
     }
 
