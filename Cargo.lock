@@ -880,6 +880,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-time-service",
  "aptos-types",
+ "aptos-validator-transaction-pool",
  "aptos-vm",
  "aptos-vm-validator",
  "arc-swap",
@@ -2984,6 +2985,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-time-service",
  "aptos-types",
+ "aptos-validator-transaction-pool",
  "aptos-vm",
  "bcs 0.1.4",
  "clap 4.3.21",
@@ -4101,6 +4103,18 @@ dependencies = [
  "lru 0.7.8",
  "move-binary-format",
  "move-core-types",
+ "tokio",
+]
+
+[[package]]
+name = "aptos-validator-transaction-pool"
+version = "0.1.0"
+dependencies = [
+ "aptos-channels",
+ "aptos-crypto",
+ "aptos-types",
+ "async-trait",
+ "futures-util",
  "tokio",
 ]
 

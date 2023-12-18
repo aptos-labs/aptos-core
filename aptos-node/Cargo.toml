@@ -61,6 +61,7 @@ aptos-telemetry = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
+aptos-validator-transaction-pool = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }

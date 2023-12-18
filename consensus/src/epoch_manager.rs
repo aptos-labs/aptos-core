@@ -33,7 +33,8 @@ use crate::{
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::{
-        mixed::MixedPayloadClient, user::quorum_store_client::QuorumStoreClient, PayloadClient,
+        mixed::MixedPayloadClient, user::quorum_store_client::QuorumStoreClient,
+        validator::ValidatorTxnPayloadClient, PayloadClient,
     },
     payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
@@ -84,8 +85,8 @@ use aptos_types::{
         OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
     },
     validator_signer::ValidatorSigner,
-    validator_txn::pool::ValidatorTransactionPoolClient,
 };
+use aptos_validator_transaction_pool as vtxn_pool;
 use fail::fail_point;
 use futures::{
     channel::{
@@ -134,7 +135,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     commit_state_computer: Arc<dyn StateComputer>,
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
-    validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
+    validator_txn_pool_client: Arc<dyn ValidatorTxnPayloadClient>,
     reconfig_events: ReconfigNotificationListener<P>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingCommitRequest>>,
@@ -178,7 +179,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         reconfig_events: ReconfigNotificationListener<P>,
         bounded_executor: BoundedExecutor,
         aptos_time_service: aptos_time_service::TimeService,
-        validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
+        validator_txn_pool_client: vtxn_pool::ReadClient,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -200,7 +201,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             commit_state_computer,
             storage,
             safety_rules_manager,
-            validator_txn_pool_client,
+            validator_txn_pool_client: Arc::new(validator_txn_pool_client),
             reconfig_events,
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,

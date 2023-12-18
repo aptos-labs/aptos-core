@@ -143,8 +143,8 @@ async fn schedule_compute_should_discover_validator_txns() {
         TransactionFilter::new(Filter::empty()),
     );
 
-    let validator_txn_0 = ValidatorTransaction::dummy(vec![0xFF; 99]);
-    let validator_txn_1 = ValidatorTransaction::dummy(vec![0xFF; 999]);
+    let validator_txn_0 = ValidatorTransaction::dummy1(vec![0xFF; 99]);
+    let validator_txn_1 = ValidatorTransaction::dummy1(vec![0xFF; 999]);
 
     let block = Block::new_for_testing(
         HashValue::zero(),
@@ -195,8 +195,8 @@ async fn commit_should_discover_validator_txns() {
         TransactionFilter::new(Filter::empty()),
     );
 
-    let validator_txn_0 = ValidatorTransaction::dummy(vec![0xFF; 99]);
-    let validator_txn_1 = ValidatorTransaction::dummy(vec![0xFF; 999]);
+    let validator_txn_0 = ValidatorTransaction::dummy1(vec![0xFF; 99]);
+    let validator_txn_1 = ValidatorTransaction::dummy1(vec![0xFF; 999]);
 
     let block = Block::new_for_testing(
         HashValue::zero(),
