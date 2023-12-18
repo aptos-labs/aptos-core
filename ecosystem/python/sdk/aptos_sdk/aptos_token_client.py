@@ -17,7 +17,9 @@ class Object:
     allow_ungated_transfer: bool
     owner: AccountAddress
 
-    struct_tag: str = "0x1::object::ObjectCore"
+    @staticmethod
+    def struct_tag() -> str:
+        return "0x1::object::ObjectCore"
 
     def __init__(self, allow_ungated_transfer, owner):
         self.allow_ungated_transfer = allow_ungated_transfer
@@ -40,7 +42,9 @@ class Collection:
     name: str
     uri: str
 
-    struct_tag: str = "0x4::collection::Collection"
+    @staticmethod
+    def struct_tag() -> str:
+        return "0x4::collection::Collection"
 
     def __init__(self, creator, description, name, uri):
         self.creator = creator
@@ -66,7 +70,9 @@ class Royalty:
     denominator: int
     payee_address: AccountAddress
 
-    struct_tag: str = "0x4::royalty::Royalty"
+    @staticmethod
+    def struct_tag() -> str:
+        return "0x4::royalty::Royalty"
 
     def __init__(self, numerator, denominator, payee_address):
         self.numerator = numerator
@@ -92,7 +98,9 @@ class Token:
     name: str
     uri: str
 
-    struct_tag: str = "0x4::token::Token"
+    @staticmethod
+    def struct_tag() -> str:
+        return "0x4::token::Token"
 
     def __init__(
         self,
@@ -256,7 +264,9 @@ class Property:
 class PropertyMap:
     properties: List[Property]
 
-    struct_tag: str = "0x4::property_map::PropertyMap"
+    @staticmethod
+    def struct_tag() -> str:
+        return "0x4::property_map::PropertyMap"
 
     def __init__(self, properties: List[Property]):
         self.properties = properties
@@ -300,11 +310,11 @@ class PropertyMap:
 
 class ReadObject:
     resource_map: dict[str, Any] = {
-        Collection.struct_tag: Collection,
-        Object.struct_tag: Object,
-        PropertyMap.struct_tag: PropertyMap,
-        Royalty.struct_tag: Royalty,
-        Token.struct_tag: Token,
+        Collection.struct_tag(): Collection,
+        Object.struct_tag(): Object,
+        PropertyMap.struct_tag(): PropertyMap,
+        Royalty.struct_tag(): Royalty,
+        Token.struct_tag(): Token,
     }
 
     resources: dict[Any, Any]
@@ -315,9 +325,24 @@ class ReadObject:
     def __str__(self) -> str:
         response = "ReadObject"
         for resource_obj, value in self.resources.items():
-            response += f"\n\t{resource_obj.struct_tag}: {value}"
+            response += f"\n\t{resource_obj.struct_tag()}: {value}"
 
         return response
+
+    @staticmethod
+    def parse(
+        data: list[dict[str, Any]], additional_resources: dict[str, Any] = dict()
+    ):
+        resources = {}
+        for resource in data:
+            if resource["type"] in ReadObject.resource_map:
+                resource_obj = ReadObject.resource_map[resource["type"]]
+                resources[resource_obj] = resource_obj.parse(resource["data"])
+            elif resource["type"] in additional_resources:
+                resource_obj = additional_resources[resource["type"]]
+                resources[resource_obj] = resource_obj.parse(resource["data"])
+
+        return ReadObject(resources)
 
 
 class AptosTokenClient:
@@ -328,15 +353,13 @@ class AptosTokenClient:
     def __init__(self, client: RestClient):
         self.client = client
 
-    async def read_object(self, address: AccountAddress) -> ReadObject:
-        resources = {}
-
+    async def read_object(
+        self,
+        address: AccountAddress,
+        additional_resources: dict[str, Any] = dict(),
+    ) -> ReadObject:
         read_resources = await self.client.account_resources(address)
-        for resource in read_resources:
-            if resource["type"] in ReadObject.resource_map:
-                resource_obj = ReadObject.resource_map[resource["type"]]
-                resources[resource_obj] = resource_obj.parse(resource["data"])
-        return ReadObject(resources)
+        return ReadObject.parse(read_resources, additional_resources)
 
     @staticmethod
     def create_collection_payload(

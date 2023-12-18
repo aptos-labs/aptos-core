@@ -226,6 +226,15 @@ fn test_token_objects() {
 }
 
 #[test]
+fn test_token_objects_inscriptions() {
+    let named_addresses = BTreeMap::from([(
+        String::from("inscriptions"),
+        AccountAddress::from_hex_literal("0xcafe").unwrap(),
+    )]);
+    run_tests_for_pkg("token_objects/inscriptions", named_addresses);
+}
+
+#[test]
 fn test_two_by_two_transfer() {
     run_tests_for_pkg("scripts/two_by_two_transfer", BTreeMap::new());
 }

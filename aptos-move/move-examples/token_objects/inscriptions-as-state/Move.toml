@@ -1,0 +1,10 @@
+[package]
+name = 'inscriptions'
+version = '0.0.0'
+
+[addresses]
+inscriptions = "_"
+
+[dependencies]
+AptosFramework = { local = "../../../framework/aptos-framework" }
+AptosTokenObjects = { local = "../../../framework/aptos-token-objects" }
