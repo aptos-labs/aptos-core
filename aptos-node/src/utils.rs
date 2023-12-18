@@ -3,10 +3,10 @@
 
 use anyhow::anyhow;
 use aptos_config::config::NodeConfig;
-use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, account_view::AccountView, chain_id::ChainId,
+    state_store::account_with_state_view::AsAccountWithStateView,
 };
 use aptos_vm::AptosVM;
 

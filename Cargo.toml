@@ -162,7 +162,6 @@ members = [
     "storage/rocksdb-options",
     "storage/schemadb",
     "storage/scratchpad",
-    "storage/state-view",
     "storage/storage-interface",
     "testsuite/aptos-fuzzer",
     "testsuite/aptos-fuzzer/fuzz",
@@ -401,7 +400,6 @@ aptos-secure-storage = { path = "secure/storage" }
 aptos-short-hex-str = { path = "crates/short-hex-str" }
 aptos-speculative-state-helper = { path = "crates/aptos-speculative-state-helper" }
 aptos-state-sync-driver = { path = "state-sync/state-sync-driver" }
-aptos-state-view = { path = "storage/state-view" }
 aptos-storage-interface = { path = "storage/storage-interface" }
 aptos-storage-service-client = { path = "state-sync/storage-service/client" }
 aptos-storage-service-notifications = { path = "state-sync/inter-component/storage-service-notifications" }

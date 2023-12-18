@@ -4,12 +4,12 @@
 
 use super::{balance_ap, encode_mint_transaction, encode_transfer_transaction, seqnum_ap, MockVM};
 use anyhow::Result;
-use aptos_state_view::TStateView;
 use aptos_types::{
     account_address::AccountAddress,
     bytes::NumToBytes,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        TStateView,
     },
     transaction::signature_verified_transaction::into_signature_verified_block,
     write_set::WriteOp,
