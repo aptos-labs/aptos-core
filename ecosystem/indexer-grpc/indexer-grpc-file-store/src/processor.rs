@@ -5,7 +5,7 @@ use crate::metrics::{METADATA_UPLOAD_FAILURE_COUNT, PROCESSED_VERSIONS_COUNT};
 use anyhow::{bail, ensure, Context, Result};
 use aptos_indexer_grpc_utils::{
     build_protobuf_encoded_transaction_wrappers,
-    cache_operator::{self, CacheBatchGetStatus, CacheOperator},
+    cache_operator::{CacheBatchGetStatus, CacheOperator},
     config::IndexerGrpcFileStoreConfig,
     constants::BLOB_STORAGE_SIZE,
     counters::{log_grpc_step, IndexerGrpcStep},
@@ -29,7 +29,7 @@ pub struct Processor {
     file_store_operator: Box<dyn FileStoreOperator>,
     cache_chain_id: u64,
     enable_expensive_logging: bool,
-    chain_id: u64,
+    _chain_id: u64,
 }
 
 impl Processor {
@@ -71,7 +71,6 @@ impl Processor {
             ),
         };
         file_store_operator.verify_storage_bucket_existence().await;
-
         let file_store_metadata = file_store_operator.get_file_store_metadata().await;
         if file_store_metadata.is_none() {
             file_store_operator
@@ -96,13 +95,12 @@ impl Processor {
         cache_operator
             .update_file_store_latest_version(batch_start_version)
             .await?;
-
         Ok(Self {
             cache_operator,
             file_store_operator,
             cache_chain_id: chain_id,
             enable_expensive_logging,
-            chain_id,
+            _chain_id: chain_id,
         })
     }
 

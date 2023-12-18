@@ -309,7 +309,6 @@ async fn setup_cache_with_init_signal(
     // Guaranteed that chain id is here at this point because we already ensure that fileworker did the set up
     let chain_id = cache_operator.get_chain_id().await?.unwrap();
     ensure!(chain_id == fullnode_chain_id as u64, "Chain ID mismatch.");
-
     Ok((cache_operator, fullnode_chain_id, starting_version))
 }
 

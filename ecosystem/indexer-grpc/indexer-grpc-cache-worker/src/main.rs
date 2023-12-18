@@ -11,6 +11,6 @@ async fn main() -> Result<()> {
     let args = ServerArgs::parse();
     args.run::<IndexerGrpcCacheWorkerConfig>()
         .await
-        .expect("Cache worker failed");
+        .expect("Cache worker failed to run");
     Ok(())
 }
