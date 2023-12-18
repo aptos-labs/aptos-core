@@ -7,6 +7,8 @@ pub trait TPipelineHealth: Send + Sync {
     fn get_backoff(&self) -> Option<Duration>;
 
     fn get_payload_limits(&self) -> Option<(u64, u64)>;
+
+    fn stop_voting(&self) -> bool;
 }
 
 pub struct NoPipelineBackpressure {}
@@ -25,19 +27,26 @@ impl TPipelineHealth for NoPipelineBackpressure {
     fn get_payload_limits(&self) -> Option<(u64, u64)> {
         None
     }
+
+    fn stop_voting(&self) -> bool {
+        false
+    }
 }
 
 pub struct PipelineLatencyBasedBackpressure {
+    voter_pipeline_latency_limit: Duration,
     pipeline_config: PipelineBackpressureConfig,
     adapter: Arc<OrderedNotifierAdapter>,
 }
 
 impl PipelineLatencyBasedBackpressure {
     pub(in crate::dag) fn new(
+        voter_pipeline_latency_limit: Duration,
         pipeline_config: PipelineBackpressureConfig,
         adapter: Arc<OrderedNotifierAdapter>,
     ) -> Arc<Self> {
         Arc::new(Self {
+            voter_pipeline_latency_limit,
             pipeline_config,
             adapter,
         })
@@ -60,5 +69,10 @@ impl TPipelineHealth for PipelineLatencyBasedBackpressure {
                 config.max_sending_block_bytes_override,
             )
         })
+    }
+
+    fn stop_voting(&self) -> bool {
+        let latency = self.adapter.pipeline_pending_latency();
+        latency > self.voter_pipeline_latency_limit
     }
 }

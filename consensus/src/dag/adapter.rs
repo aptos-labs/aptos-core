@@ -206,7 +206,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                       commit_decision: LedgerInfoWithSignatures| {
                     block_created_ts
                         .write()
-                        .split_off(&(commit_decision.commit_info().round() + 1));
+                        .retain(|&round, _| round > commit_decision.commit_info().round());
                     dag.write()
                         .commit_callback(commit_decision.commit_info().round());
                     ledger_info_provider

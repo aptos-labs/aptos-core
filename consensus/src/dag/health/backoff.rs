@@ -4,6 +4,7 @@ use aptos_consensus_types::common::Round;
 use aptos_types::epoch_state::EpochState;
 use std::{sync::Arc, time::Duration};
 
+#[derive(Clone)]
 pub struct HealthBackoff {
     epoch_state: Arc<EpochState>,
     chain_health: Arc<dyn TChainHealth>,
@@ -73,5 +74,9 @@ impl HealthBackoff {
         chain_backoff
             .unwrap_or_default()
             .max(pipeline_backoff.unwrap_or_default())
+    }
+
+    pub fn stop_voting(&self) -> bool {
+        self.pipeline_health.stop_voting()
     }
 }

@@ -135,6 +135,24 @@ impl Default for DagRoundStateConfig {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct DagHealthConfig {
+    pub chain_backoff_config: Vec<ChainHealthBackoffValues>,
+    pub voter_pipeline_latency_limit_ms: u64,
+    pub pipeline_backpressure_config: Vec<PipelineBackpressureValues>,
+}
+
+impl Default for DagHealthConfig {
+    fn default() -> Self {
+        Self {
+            chain_backoff_config: Vec::new(),
+            voter_pipeline_latency_limit_ms: 30_000,
+            pipeline_backpressure_config: Vec::new(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DagConsensusConfig {
@@ -142,8 +160,7 @@ pub struct DagConsensusConfig {
     pub rb_config: ReliableBroadcastConfig,
     pub fetcher_config: DagFetcherConfig,
     pub round_state_config: DagRoundStateConfig,
-    pub chain_backoff_config: Vec<ChainHealthBackoffValues>,
-    pub pipeline_backpressure_config: Vec<PipelineBackpressureValues>,
+    pub health_config: DagHealthConfig,
     #[serde(default = "QuorumStoreConfig::default_for_dag")]
     pub quorum_store: QuorumStoreConfig,
 }

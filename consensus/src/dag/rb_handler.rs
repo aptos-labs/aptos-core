@@ -26,6 +26,8 @@ use aptos_types::{
 use async_trait::async_trait;
 use std::{collections::BTreeMap, mem, sync::Arc};
 
+use super::health::HealthBackoff;
+
 pub(crate) struct NodeBroadcastHandler {
     dag: Arc<RwLock<Dag>>,
     votes_by_round_peer: BTreeMap<Round, BTreeMap<Author, Vote>>,
@@ -35,6 +37,7 @@ pub(crate) struct NodeBroadcastHandler {
     fetch_requester: Arc<dyn TFetchRequester>,
     payload_config: DagPayloadConfig,
     vtxn_config: ValidatorTxnConfig,
+    health_backoff: HealthBackoff,
 }
 
 impl NodeBroadcastHandler {
@@ -46,6 +49,7 @@ impl NodeBroadcastHandler {
         fetch_requester: Arc<dyn TFetchRequester>,
         payload_config: DagPayloadConfig,
         vtxn_config: ValidatorTxnConfig,
+        health_backoff: HealthBackoff,
     ) -> Self {
         let epoch = epoch_state.epoch;
         let votes_by_round_peer = read_votes_from_storage(&storage, epoch);
@@ -59,6 +63,7 @@ impl NodeBroadcastHandler {
             fetch_requester,
             payload_config,
             vtxn_config,
+            health_backoff,
         }
     }
 
@@ -174,6 +179,11 @@ impl RpcHandler for NodeBroadcastHandler {
     type Response = Vote;
 
     async fn process(&mut self, node: Self::Request) -> anyhow::Result<Self::Response> {
+        ensure!(
+            !self.health_backoff.stop_voting(),
+            NodeBroadcastHandleError::VoteRefused
+        );
+
         let node = self.validate(node)?;
         observe_node(node.timestamp(), NodeStage::NodeReceived);
         debug!(LogSchema::new(LogEvent::ReceiveNode)
