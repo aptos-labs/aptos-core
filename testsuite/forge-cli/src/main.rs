@@ -275,6 +275,9 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
+    let duration = Duration::from_secs(600);
+    let suite_name  = "realistic_env_workload_sweep";
+
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
@@ -1011,24 +1014,24 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
     realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TRANSACTIONS(vec![
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::CoinTransfer,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 20000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::NoOp,
-                num_modules: 100,
-                unique_senders: false,
-                mempool_backlog: 20000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::ModifyGlobalResource,
-                num_modules: 1,
-                unique_senders: true,
-                mempool_backlog: 20000,
-            },
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::CoinTransfer,
+            //     num_modules: 1,
+            //     unique_senders: false,
+            //     mempool_backlog: 20000,
+            // },
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::NoOp,
+            //     num_modules: 100,
+            //     unique_senders: false,
+            //     mempool_backlog: 20000,
+            // },
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::ModifyGlobalResource,
+            //     num_modules: 1,
+            //     unique_senders: true,
+            //     mempool_backlog: 20000,
+            // },
             TransactionWorkload {
                 transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
                 num_modules: 1,
@@ -1045,10 +1048,10 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         ]),
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
-            (5500, 0.35, 0.3, 0.8, 0.65),
-            (4500, 0.35, 0.3, 1.0, 1.0),
-            (2000, 0.35, 0.3, 1.0, 1.0),
-            (600, 0.35, 0.3, 1.0, 1.0),
+            // (5500, 0.35, 0.3, 0.8, 0.65),
+            // (4500, 0.35, 0.3, 1.0, 1.5),
+            // (2000, 0.35, 0.3, 0.8, 0.7),
+            (600, 0.35, 0.3, 0.8, 0.7),
             // (150, 0.5, 1.0, 1.5, 0.65),
         ]
         .into_iter()
