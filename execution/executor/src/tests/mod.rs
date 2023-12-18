@@ -487,7 +487,7 @@ fn apply_transaction_by_writeset(
     let LedgerUpdateOutput {
         statuses_for_input_txns: _,
         to_commit,
-        reconfig_events: _,
+        events: _,
         transaction_info_hashes: _,
         state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
         sharded_state_cache,
@@ -704,7 +704,7 @@ fn run_transactions_naive(
         let LedgerUpdateOutput {
             statuses_for_input_txns: _,
             to_commit,
-            reconfig_events: _,
+            events: _,
             transaction_info_hashes: _,
             state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
             sharded_state_cache,

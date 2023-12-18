@@ -21,6 +21,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    on_chain_config::OnChainConsensusConfig,
     transaction::{ExecutionStatus, SignedTransaction, Transaction, TransactionStatus},
     validator_txn::ValidatorTransaction,
 };
@@ -45,7 +46,7 @@ impl ConsensusNotificationSender for DummyStateSyncNotifier {
     async fn notify_new_commit(
         &self,
         transactions: Vec<Transaction>,
-        _reconfiguration_events: Vec<ContractEvent>,
+        _subscribable_events: Vec<ContractEvent>,
     ) -> Result<(), Error> {
         self.invocations.lock().push(transactions);
         Ok(())
@@ -156,13 +157,14 @@ async fn schedule_compute_should_discover_validator_txns() {
     );
 
     let epoch_state = EpochState::empty();
-
+    let consensus_config = OnChainConsensusConfig::default();
     execution_policy.new_epoch(
         &epoch_state,
         Arc::new(PayloadManager::DirectMempool),
         Arc::new(NoOpShuffler {}),
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         Arc::new(NoOpDeduper {}),
+        &consensus_config,
     );
 
     // Ensure the dummy executor has received the txns.
@@ -221,13 +223,14 @@ async fn commit_should_discover_validator_txns() {
         state_compute_result,
     ))];
     let epoch_state = EpochState::empty();
-
+    let consensus_config = OnChainConsensusConfig::default();
     execution_policy.new_epoch(
         &epoch_state,
         Arc::new(PayloadManager::DirectMempool),
         Arc::new(NoOpShuffler {}),
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         Arc::new(NoOpDeduper {}),
+        &consensus_config,
     );
 
     let (tx, rx) = oneshot::channel::<()>();

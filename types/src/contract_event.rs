@@ -5,6 +5,7 @@
 use crate::{
     account_config::{DepositEvent, NewBlockEvent, NewEpochEvent, WithdrawEvent},
     event::EventKey,
+    on_chain_config::new_epoch_event_key,
     transaction::Version,
 };
 use anyhow::{bail, Error, Result};
@@ -143,6 +144,13 @@ impl ContractEvent {
         }
 
         Ok(None)
+    }
+
+    pub fn is_new_epoch_event(&self) -> bool {
+        match self {
+            ContractEvent::V1(event) => *event.key() == new_epoch_event_key(),
+            ContractEvent::V2(_event) => false,
+        }
     }
 }
 

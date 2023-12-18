@@ -9,6 +9,7 @@ use crate::{
 };
 use anyhow::{format_err, Result};
 use bytes::Bytes;
+pub use consensus_config::extra_features::ConsensusExtraFeature;
 use move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
@@ -37,8 +38,9 @@ pub use self::{
         Version, APTOS_MAX_KNOWN_VERSION, APTOS_VERSION_2, APTOS_VERSION_3, APTOS_VERSION_4,
     },
     consensus_config::{
-        ConsensusConfigV1, ConsensusConfigV1Ext, ConsensusExtraFeature, DagConsensusConfigV1,
-        LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig, ProposerElectionType,
+        state_sync_notifier, ConsensusConfigV1, ConsensusConfigV1Ext, DagConsensusConfigV1,
+        DagConsensusConfigV2, LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig,
+        ProposerElectionType,
     },
     execution_config::{
         BlockGasLimitType, ExecutionConfigV1, ExecutionConfigV2, OnChainExecutionConfig,

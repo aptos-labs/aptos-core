@@ -2,11 +2,20 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{block_info::Round, on_chain_config::OnChainConfig};
+use crate::{
+    block_info::Round,
+    on_chain_config::{state_sync_notifier::StateSyncNotifierConfig, OnChainConfig},
+};
 use anyhow::{format_err, Result};
+use extra_features::{ConsensusExtraFeature, ConsensusExtraFeatures};
+use gen2::ConsensusConfigGen2;
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+pub mod extra_features;
+pub mod gen2;
+pub mod jolteon;
 
 /// The on-chain consensus config, in order to be able to add fields, we use enum to wrap the actual struct.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -15,6 +24,7 @@ pub enum OnChainConsensusConfig {
     V2(ConsensusConfigV1),
     V3(ConsensusConfigV1Ext),
     DagV1(DagConsensusConfigV1),
+    Gen2(ConsensusConfigGen2),
 }
 
 /// The public interface that exposes all values with safe fallback.
@@ -31,7 +41,9 @@ impl OnChainConsensusConfig {
             | OnChainConsensusConfig::V3(ConsensusConfigV1Ext { main: config, .. }) => {
                 config.exclude_round
             },
-            _ => unimplemented!("method not supported"),
+            OnChainConsensusConfig::DagV1(_) => unimplemented!("method not supported"),
+
+            OnChainConsensusConfig::Gen2(gen2) => gen2.leader_reputation_exclude_round(),
         }
     }
 
@@ -70,17 +82,29 @@ impl OnChainConsensusConfig {
             OnChainConsensusConfig::V1(_config) => false,
             OnChainConsensusConfig::V2(_) | OnChainConsensusConfig::V3(_) => true,
             OnChainConsensusConfig::DagV1(_) => false,
+            OnChainConsensusConfig::Gen2(gen2) => gen2.quorum_store_enabled(),
         }
     }
 
     pub fn is_dag_enabled(&self) -> bool {
-        matches!(self, OnChainConsensusConfig::DagV1(_))
+        match self {
+            OnChainConsensusConfig::V1(_)
+            | OnChainConsensusConfig::V2(_)
+            | OnChainConsensusConfig::V3(_) => false,
+            OnChainConsensusConfig::DagV1(_) => true,
+            OnChainConsensusConfig::Gen2(gen2) => gen2.is_dag_enabled(),
+        }
     }
 
-    pub fn unwrap_dag_config_v1(&self) -> &DagConsensusConfigV1 {
-        match &self {
-            OnChainConsensusConfig::DagV1(config) => config,
-            _ => unreachable!("not a dag config"),
+    pub fn as_dag_config_v2(&self) -> DagConsensusConfigV2 {
+        match self {
+            OnChainConsensusConfig::V1(_)
+            | OnChainConsensusConfig::V2(_)
+            | OnChainConsensusConfig::V3(_) => unreachable!("not a dag config"),
+            OnChainConsensusConfig::DagV1(dag_v1) => DagConsensusConfigV2 {
+                dag_ordering_causal_history_window: dag_v1.dag_ordering_causal_history_window,
+            },
+            OnChainConsensusConfig::Gen2(gen2) => gen2.as_dag_config_v2(),
         }
     }
 
@@ -90,6 +114,16 @@ impl OnChainConsensusConfig {
                 .extra_features
                 .is_enabled(ConsensusExtraFeature::ValidatorTransaction),
             _ => false,
+        }
+    }
+
+    pub fn as_state_sync_notifier_config(&self) -> StateSyncNotifierConfig {
+        match self {
+            OnChainConsensusConfig::V1(_)
+            | OnChainConsensusConfig::V2(_)
+            | OnChainConsensusConfig::V3(_)
+            | OnChainConsensusConfig::DagV1(_) => StateSyncNotifierConfig::default_if_missing(),
+            OnChainConsensusConfig::Gen2(gen2) => gen2.state_sync_notifier.clone(),
         }
     }
 }
@@ -156,55 +190,6 @@ impl Default for ConsensusConfigV1 {
     }
 }
 
-/// An extensible feature flag vector indexed by `ConsensusExtraFeature`.
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-pub struct ConsensusExtraFeatures {
-    features: Vec<bool>,
-}
-
-impl ConsensusExtraFeatures {
-    pub fn is_enabled(&self, feature: ConsensusExtraFeature) -> bool {
-        self.features
-            .get(feature as usize)
-            .copied()
-            .unwrap_or(false)
-    }
-
-    pub fn default_for_genesis() -> Self {
-        Self {
-            features: vec![true],
-        }
-    }
-
-    pub fn default_if_missing() -> Self {
-        Self {
-            features: vec![false],
-        }
-    }
-
-    pub fn update_extra_features(
-        &mut self,
-        features_to_enable: Vec<ConsensusExtraFeature>,
-        features_to_disable: Vec<ConsensusExtraFeature>,
-    ) {
-        for feature in features_to_enable {
-            *self.get_feature_status_mut(feature) = true;
-        }
-
-        for feature in features_to_disable {
-            *self.get_feature_status_mut(feature) = false;
-        }
-    }
-
-    fn get_feature_status_mut(&mut self, feature: ConsensusExtraFeature) -> &mut bool {
-        let idx = feature as usize;
-        if idx >= self.features.len() {
-            self.features.resize(idx + 1, false);
-        }
-        self.features.get_mut(idx).unwrap()
-    }
-}
-
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct ConsensusConfigV1Ext {
     pub main: ConsensusConfigV1,
@@ -225,12 +210,6 @@ impl ConsensusConfigV1Ext {
             extra_features: ConsensusExtraFeatures::default_if_missing(),
         }
     }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-#[allow(non_camel_case_types)]
-pub enum ConsensusExtraFeature {
-    ValidatorTransaction = 0,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -302,6 +281,8 @@ pub struct ProposerAndVoterConfig {
     pub use_history_from_previous_epoch_max_count: u32,
 }
 
+/// DEPRECATED: `extra_features` is supposed to be independent from DAG.
+/// Fixed in `ConsensusConfigGen2'. Please use `DagConsensusConfigV2` if possible.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct DagConsensusConfigV1 {
     pub dag_ordering_causal_history_window: usize,
@@ -317,6 +298,22 @@ impl Default for DagConsensusConfigV1 {
         }
     }
 }
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct DagConsensusConfigV2 {
+    pub dag_ordering_causal_history_window: usize,
+}
+
+impl Default for DagConsensusConfigV2 {
+    /// It is primarily used as `default_if_missing()`.
+    fn default() -> Self {
+        Self {
+            dag_ordering_causal_history_window: 10,
+        }
+    }
+}
+
+pub mod state_sync_notifier;
 
 #[cfg(test)]
 mod test {

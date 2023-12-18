@@ -15,7 +15,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
+    ledger_info::LedgerInfoWithSignatures, on_chain_config::OnChainConsensusConfig,
 };
 use std::sync::Arc;
 
@@ -72,6 +72,7 @@ pub trait StateComputer: Send + Sync {
         transaction_shuffler: Arc<dyn TransactionShuffler>,
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
+        onchain_consensus_config: &OnChainConsensusConfig,
     );
 
     // Reconfigure to clear epoch state at end of epoch.

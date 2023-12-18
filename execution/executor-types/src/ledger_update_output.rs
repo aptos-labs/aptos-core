@@ -22,7 +22,7 @@ use std::sync::Arc;
 pub struct LedgerUpdateOutput {
     pub statuses_for_input_txns: Vec<TransactionStatus>,
     pub to_commit: Vec<TransactionToCommit>,
-    pub reconfig_events: Vec<ContractEvent>,
+    pub events: Vec<ContractEvent>,
     pub transaction_info_hashes: Vec<HashValue>,
     pub state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
     pub sharded_state_cache: ShardedStateCache,
@@ -172,7 +172,7 @@ impl LedgerUpdateOutput {
             next_epoch_state,
             self.statuses_for_input_txns.clone(),
             self.transaction_info_hashes.clone(),
-            self.reconfig_events.clone(),
+            self.events.clone(),
         )
     }
 
@@ -180,7 +180,7 @@ impl LedgerUpdateOutput {
         let Self {
             statuses_for_input_txns,
             to_commit,
-            reconfig_events,
+            events: reconfig_events,
             transaction_info_hashes,
             state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
             sharded_state_cache,
@@ -196,7 +196,7 @@ impl LedgerUpdateOutput {
 
         self.statuses_for_input_txns.extend(statuses_for_input_txns);
         self.to_commit.extend(to_commit);
-        self.reconfig_events.extend(reconfig_events);
+        self.events.extend(reconfig_events);
         self.transaction_info_hashes.extend(transaction_info_hashes);
         self.sharded_state_cache.combine(sharded_state_cache);
         self.transaction_accumulator = transaction_accumulator;
