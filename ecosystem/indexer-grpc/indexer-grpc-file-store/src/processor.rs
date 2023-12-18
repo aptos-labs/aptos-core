@@ -5,7 +5,7 @@ use crate::metrics::{METADATA_UPLOAD_FAILURE_COUNT, PROCESSED_VERSIONS_COUNT};
 use anyhow::{bail, ensure, Context, Result};
 use aptos_indexer_grpc_utils::{
     build_protobuf_encoded_transaction_wrappers,
-    cache_operator::{CacheBatchGetStatus, CacheOperator},
+    cache_operator::{self, CacheBatchGetStatus, CacheOperator},
     config::IndexerGrpcFileStoreConfig,
     constants::BLOB_STORAGE_SIZE,
     counters::{log_grpc_step, IndexerGrpcStep},
@@ -29,6 +29,7 @@ pub struct Processor {
     file_store_operator: Box<dyn FileStoreOperator>,
     cache_chain_id: u64,
     enable_expensive_logging: bool,
+    chain_id: u64,
 }
 
 impl Processor {
@@ -54,7 +55,6 @@ impl Processor {
                     redis_main_instance_address.0
                 )
             })?;
-
         let mut cache_operator = CacheOperator::new(conn);
 
         let mut file_store_operator: Box<dyn FileStoreOperator> = match &file_store_config {
@@ -102,6 +102,7 @@ impl Processor {
             file_store_operator,
             cache_chain_id: chain_id,
             enable_expensive_logging,
+            chain_id,
         })
     }
 
