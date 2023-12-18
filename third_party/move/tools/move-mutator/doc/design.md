@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Move mutator is a tool that mutates Move source code. It is used to help test the robustness of Move analyzers and verifiers by generating different code versions (mutants).
+The Move mutator is a tool that mutates Move source code. It can be used to help test the robustness of Move specifications and unit tests by generating different code versions (mutants).
 
 ## Prototype
 This chapter will be deleted upon implementing the Move mutator tool.
@@ -144,7 +144,7 @@ Move mutator can be integrated with any command line interface. To do so, CLI ap
 
 Currently, the Move mutator tool is integrated with the `move-cli` and `aptos` command line interfaces. There is introduced a new command: `mutate` which allows to pass the mutator arguments. Check README.md for more details.
 
-## Specification verification tool
+## Specification testing tool
 
 The Move mutator tool is designed to create mutants only. It does not perform the proving process as it is not the goal of the tool.
 
