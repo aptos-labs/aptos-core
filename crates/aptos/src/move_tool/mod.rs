@@ -591,25 +591,30 @@ impl CliCommand<&'static str> for TestPackage {
 /// Mutate a Move package
 #[derive(Parser)]
 pub struct MutatePackage {
+    /// Options for parsing and compiling a move package dir (used by the Move compiler)
     #[clap(flatten)]
     move_options: MovePackageDir,
-
+    /// Options specific for the mutator tool
     #[clap(flatten)]
     mutator_options: MutatorOptions,
 }
 
+/// Move mutator tool options
 #[derive(Parser)]
 pub struct MutatorOptions {
+    /// Move source files to mutate (paths)
     #[clap(long, short)]
     pub move_sources: Vec<String>,
 }
 
 #[async_trait]
 impl CliCommand<&'static str> for MutatePackage {
+    /// Returns the name of the command used in the CLI.
     fn command_name(&self) -> &'static str {
         "MutatePackage"
     }
 
+    /// Executes the mutate command and generates mutants with the provided parameters.
     async fn execute(self) -> CliTypedResult<&'static str> {
         let MutatePackage {
             move_options: _,

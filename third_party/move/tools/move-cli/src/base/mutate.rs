@@ -25,6 +25,9 @@ pub struct Mutate {
 }
 
 impl Mutate {
+    /// Executes the mutate command which produces mutants from the Move files or package using
+    /// the provided configuration.
+    /// If no path is provided, the current directory is used.
     pub fn execute(self, path: Option<PathBuf>, config: BuildConfig) -> anyhow::Result<()> {
         let path = path.unwrap_or_else(|| PathBuf::from("."));
 
