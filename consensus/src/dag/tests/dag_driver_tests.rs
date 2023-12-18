@@ -147,8 +147,8 @@ fn setup(
         dag.clone(),
         Arc::new(RoundRobinAnchorElection::new(validators)),
         Arc::new(TestNotifier { tx }),
-        storage.clone(),
         TEST_DAG_WINDOW as Round,
+        None
     );
 
     let fetch_requester = Arc::new(MockFetchRequester {});
