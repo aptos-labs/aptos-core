@@ -30,6 +30,7 @@ use move_stackless_bytecode::function_target_pipeline::{
 };
 use move_symbol_pool::Symbol;
 pub use options::*;
+use pipeline::{ability_checker::AbilityChecker, explicit_drop::ExplicitDrop};
 use std::{collections::BTreeSet, path::Path};
 
 /// Run Move compiler and print errors to stderr.
@@ -168,6 +169,8 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor()));
     if safety_on {
         pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+        pipeline.add_processor(Box::new(ExplicitDrop {}));
+        pipeline.add_processor(Box::new(AbilityChecker {}));
     }
     pipeline
 }
