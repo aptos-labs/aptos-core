@@ -239,6 +239,8 @@ impl NetworkTest for LoadVsPerfBenchmark {
             }
         }
 
+        std::thread::sleep(Duration::from_secs(120));
+
         let table = to_table(self.workloads.type_name(), &results);
         for line in table {
             ctx.report.report_text(line);
