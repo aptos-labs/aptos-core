@@ -71,7 +71,9 @@ impl Processor {
             ),
         };
         file_store_operator.verify_storage_bucket_existence().await;
-        let file_store_metadata = file_store_operator.get_file_store_metadata().await;
+        let file_store_metadata: Option<
+            aptos_indexer_grpc_utils::file_store_operator::FileStoreMetadata,
+        > = file_store_operator.get_file_store_metadata().await;
         if file_store_metadata.is_none() {
             file_store_operator
                 .update_file_store_metadata_internal(chain_id, 0)

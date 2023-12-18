@@ -5,7 +5,7 @@ use crate::metrics::{
     ERROR_COUNT, LATEST_PROCESSED_VERSION as LATEST_PROCESSED_VERSION_OLD, PROCESSED_BATCH_SIZE,
     PROCESSED_VERSIONS_COUNT, WAIT_FOR_FILE_STORE_COUNTER,
 };
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{bail, Context, Result};
 use aptos_indexer_grpc_utils::{
     cache_operator::CacheOperator,
     config::IndexerGrpcFileStoreConfig,
@@ -222,6 +222,8 @@ async fn process_transactions_from_node_response(
                 None,
             );
 
+            let decode_txns_start_time = std::time::Instant::now();
+
             let transactions = data
                 .transactions
                 .clone()
@@ -246,11 +248,13 @@ async fn process_transactions_from_node_response(
                 Some(last_transaction.version as i64),
                 first_transaction_pb_timestamp.as_ref(),
                 last_transaction_pb_timestamp.as_ref(),
-                Some(batch_start_time.elapsed().as_secs_f64()),
+                Some(decode_txns_start_time.elapsed().as_secs_f64()),
                 Some(size_in_bytes),
                 Some((last_transaction.version - first_transaction.version + 1) as i64),
                 None,
             );
+
+            let cache_update_start_time = std::time::Instant::now();
 
             // Push to cache.
             match cache_operator.update_cache_transactions(transactions).await {
@@ -262,7 +266,7 @@ async fn process_transactions_from_node_response(
                         Some(last_transaction.version as i64),
                         first_transaction_pb_timestamp.as_ref(),
                         last_transaction_pb_timestamp.as_ref(),
-                        Some(batch_start_time.elapsed().as_secs_f64()),
+                        Some(cache_update_start_time.elapsed().as_secs_f64()),
                         Some(size_in_bytes),
                         Some((last_transaction.version - first_transaction.version + 1) as i64),
                         None,
