@@ -482,6 +482,8 @@ impl<'a> FunctionGenerator<'a> {
             Operation::Eq => self.gen_builtin(ctx, dest, FF::Bytecode::Eq, source),
             Operation::Neq => self.gen_builtin(ctx, dest, FF::Bytecode::Neq, source),
 
+            Operation::Destroy => {},
+
             Operation::TraceLocal(_)
             | Operation::TraceReturn(_)
             | Operation::TraceAbort
@@ -494,7 +496,6 @@ impl<'a> FunctionGenerator<'a> {
             | Operation::GetField(_, _, _, _)
             | Operation::GetGlobal(_, _, _)
             | Operation::Uninit
-            | Operation::Destroy
             | Operation::Havoc(_)
             | Operation::Stop
             | Operation::IsParent(_, _)
