@@ -90,6 +90,18 @@ jobs:
       - uses: actions/checkout@v3
         with:
           ref: ${{ inputs.GIT_SHA }}
+      - name: Install Gfuse
+        run: |
+          export GCSFUSE_REPO=gcsfuse-`lsb_release -c -s`
+          echo "deb https://packages.cloud.google.com/apt $GCSFUSE_REPO main" | sudo tee /etc/apt/sources.list.d/gcsfuse.list
+          curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+          sudo apt-get update
+          sudo apt-get -y install gcsfuse
+      - name: Mount GCS bucket
+        run: |
+          mkdir -p /tmp/gcs
+          sudo gcsfuse --foreground --implicit-dirs --only-dir ${{ inputs.SUB_DIR }} ${{ inputs.BUCKET }} /tmp/gcs
+          ls -l /tmp/gcs
 
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
         with:

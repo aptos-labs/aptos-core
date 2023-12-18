@@ -139,8 +139,9 @@ def replay_verify_partition(
             "--end-version",
             str(end),
             "--lazy-quit",
-            "--command-adapter-config",
-            backup_config_template_path,
+            "--local-fs-dir",
+            "/tmp/gcs",
+            "--compressed"
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,  # redirect stderr to stdout
