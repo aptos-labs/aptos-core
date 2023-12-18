@@ -144,6 +144,12 @@ impl Worker {
 
             let file_store_metadata = file_store_operator.get_file_store_metadata().await;
 
+            tracing::info!(
+                service_type = SERVICE_TYPE,
+                "[Indexer Cache] Starting cache worker with version {}",
+                starting_version
+            );
+
             // 2. Start streaming RPC.
             let request = tonic::Request::new(GetTransactionsFromNodeRequest {
                 starting_version: Some(starting_version),
