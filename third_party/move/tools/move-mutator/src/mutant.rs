@@ -20,7 +20,8 @@ impl Mutant {
         self.operator.get_file_hash()
     }
 
-    /// Applies the mutation operator to the given source code.
+    /// Applies the mutation operator to the given source code, by calling the mutation operator's apply method.
+    /// Returns differently mutated source code listings in a vector.
     pub fn apply(&self, source: &str) -> Vec<String> {
         self.operator.apply(source)
     }

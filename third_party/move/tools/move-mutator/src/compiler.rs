@@ -11,6 +11,24 @@ use move_package::source_package::layout::SourcePackageLayout;
 use move_package::BuildConfig;
 
 /// Generate the AST from the Move sources.
+///
+/// Generation of the AST is done by the Move compiler. Move compiler is stepped compiler, which means that
+/// it is possible to get the intermediate results of the compilation. This function uses it to get the AST
+/// right after the parsing phase.
+///
+/// Generated AST contains all the information for all the Move files provided in the `source_files` vector.
+/// Compiler searches automatically for all the needed files (like manifest) and dependencies. In case of
+/// any error, that error is returned.
+///
+/// # Arguments
+///
+/// * `source_files` - vector of strings representing the Move source files paths.
+/// * `config` - contains the actual build configuration.
+/// * `package_path` - the path to the Move package.
+///
+/// # Returns
+///
+/// * `Result<(FilesSourceText, move_compiler::parser::ast::Program), anyhow::Error>` - tuple of FilesSourceText and Program if successful, or an error if any error occurs.
 pub fn generate_ast(
     source_files: Vec<String>,
     config: BuildConfig,
