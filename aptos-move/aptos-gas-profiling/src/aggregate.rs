@@ -15,6 +15,7 @@ use std::{
 /// Represents an aggregation of execution gas events, including the count and total gas costs for each type of event.
 ///
 /// The events are sorted by the amount of gas used, from high to low.
+#[derive(Debug)]
 pub struct AggregatedExecutionGasEvents {
     /// The gas scaling factor.
     /// This is included so to make this struct self-contained, suitable for displaying in (external) gas units.

@@ -4,15 +4,117 @@
 use crate::{tests::common::test_dir_path, MoveHarness};
 use aptos_cached_packages::{aptos_stdlib, aptos_token_sdk_builder};
 use aptos_crypto::{bls12381, PrivateKey, Uniform};
+use aptos_gas_algebra::GasQuantity;
 use aptos_gas_profiling::TransactionGasLog;
-use aptos_types::account_address::{default_stake_pool_address, AccountAddress};
+use aptos_language_e2e_tests::account::Account;
+use aptos_transaction_generator_lib::{
+    publishing::{
+        module_simple::{LoopType, MultiSigConfig},
+        publish_util::PackageHandler,
+    },
+    EntryPoints,
+};
+use aptos_types::{
+    account_address::{default_stake_pool_address, AccountAddress},
+    fee_statement::FeeStatement,
+    transaction::TransactionPayload,
+};
 use aptos_vm::AptosVM;
+use rand::{rngs::StdRng, SeedableRng};
 use std::path::Path;
 
 fn save_profiling_results(name: &str, log: &TransactionGasLog) {
     let path = Path::new("gas-profiling").join(name);
     log.generate_html_report(path, format!("Gas Report - {}", name))
         .unwrap();
+}
+
+pub struct SummaryExeAndIO {
+    pub intrinsic_cost: f64,
+    pub execution_cost: f64,
+    pub read_cost: f64,
+    pub write_cost: f64,
+}
+
+fn summarize_exe_and_io(log: TransactionGasLog) -> SummaryExeAndIO {
+    fn cast<T>(gas: GasQuantity<T>) -> f64 {
+        u64::from(gas) as f64
+    }
+
+    let scale = cast(log.exec_io.gas_scaling_factor);
+
+    let aggregated = log.exec_io.aggregate_gas_events();
+
+    let execution = aggregated.ops.iter().map(|(_, _, v)| cast(*v)).sum::<f64>();
+    let read = aggregated
+        .storage_reads
+        .iter()
+        .map(|(_, _, v)| cast(*v))
+        .sum::<f64>();
+    let write = aggregated
+        .storage_writes
+        .iter()
+        .map(|(_, _, v)| cast(*v))
+        .sum::<f64>();
+    SummaryExeAndIO {
+        intrinsic_cost: cast(log.exec_io.intrinsic_cost) / scale,
+        execution_cost: execution / scale,
+        read_cost: read / scale,
+        write_cost: write / scale,
+    }
+}
+
+struct Runner {
+    pub harness: MoveHarness,
+    profile_gas: bool,
+}
+
+impl Runner {
+    pub fn run(&mut self, function: &str, account: &Account, payload: TransactionPayload) {
+        if !self.profile_gas {
+            print_gas_cost(function, self.harness.evaluate_gas(account, payload));
+        } else {
+            let (log, gas_used, fee_statement) =
+                self.harness.evaluate_gas_with_profiler(account, payload);
+            save_profiling_results(function, &log);
+            print_gas_cost_with_statement(function, gas_used, fee_statement);
+        }
+    }
+
+    pub fn run_with_tps_estimate(
+        &mut self,
+        function: &str,
+        account: &Account,
+        payload: TransactionPayload,
+        tps: f64,
+    ) {
+        if !self.profile_gas {
+            print_gas_cost(function, self.harness.evaluate_gas(account, payload));
+        } else {
+            let (log, gas_used, fee_statement) =
+                self.harness.evaluate_gas_with_profiler(account, payload);
+            save_profiling_results(function, &log);
+            print_gas_cost_with_statement_and_tps(
+                function,
+                gas_used,
+                fee_statement,
+                summarize_exe_and_io(log),
+                tps,
+            );
+        }
+    }
+
+    pub fn publish(&mut self, name: &str, account: &Account, path: &Path) {
+        if !self.profile_gas {
+            print_gas_cost(name, self.harness.evaluate_publish_gas(account, path));
+        } else {
+            let (log, gas_used, fee_statement) = self
+                .harness
+                .evaluate_publish_gas_with_profiler(account, path);
+            save_profiling_results(name, &log);
+            print_gas_cost_with_statement(name, gas_used, fee_statement);
+        }
+    }
 }
 
 /// Run with `cargo test test_gas -- --nocapture` to see output.
@@ -38,45 +140,28 @@ fn test_gas() {
         Err(_) => true,
     };
 
-    let run = |harness: &mut MoveHarness, function, account, payload| {
-        if !profile_gas {
-            print_gas_cost(function, harness.evaluate_gas(account, payload));
-        } else {
-            let (log, gas_used) = harness.evaluate_gas_with_profiler(account, payload);
-            save_profiling_results(function, &log);
-            print_gas_cost(function, gas_used);
-        }
-    };
-
-    let publish = |harness: &mut MoveHarness, name, account, path: &Path| {
-        if !profile_gas {
-            print_gas_cost(name, harness.evaluate_publish_gas(account, path));
-        } else {
-            let (log, gas_used) = harness.evaluate_publish_gas_with_profiler(account, path);
-            save_profiling_results(name, &log);
-            print_gas_cost(name, gas_used);
-        }
+    let mut runner = Runner {
+        harness,
+        profile_gas,
     };
 
     AptosVM::set_paranoid_type_checks(true);
 
-    run(
-        &mut harness,
+    runner.run(
         "Transfer",
         account_1,
         aptos_stdlib::aptos_coin_transfer(account_2_address, 1000),
     );
 
-    run(
-        &mut harness,
+    runner.run(
         "CreateAccount",
         account_1,
         aptos_stdlib::aptos_account_create_account(
             AccountAddress::from_hex_literal("0xcafe1").unwrap(),
         ),
     );
-    run(
-        &mut harness,
+
+    runner.run(
         "CreateTransfer",
         account_1,
         aptos_stdlib::aptos_account_transfer(
@@ -84,8 +169,7 @@ fn test_gas() {
             1000,
         ),
     );
-    run(
-        &mut harness,
+    runner.run(
         "CreateStakePool",
         account_1,
         aptos_stdlib::staking_contract_create_staking_contract(
@@ -102,8 +186,7 @@ fn test_gas() {
     let proof_of_possession = bls12381::ProofOfPossession::create(&consensus_key)
         .to_bytes()
         .to_vec();
-    run(
-        &mut harness,
+    runner.run(
         "RotateConsensusKey",
         account_2,
         aptos_stdlib::stake_rotate_consensus_key(
@@ -112,42 +195,36 @@ fn test_gas() {
             proof_of_possession,
         ),
     );
-    run(
-        &mut harness,
+    runner.run(
         "JoinValidator100",
         account_2,
         aptos_stdlib::stake_join_validator_set(pool_address),
     );
-    run(
-        &mut harness,
+    runner.run(
         "AddStake",
         account_1,
         aptos_stdlib::staking_contract_add_stake(account_2_address, 1000),
     );
-    run(
-        &mut harness,
+    runner.run(
         "UnlockStake",
         account_1,
         aptos_stdlib::staking_contract_unlock_stake(account_2_address, 1000),
     );
-    harness.fast_forward(7200);
-    harness.new_epoch();
-    run(
-        &mut harness,
+    runner.harness.fast_forward(7200);
+    runner.harness.new_epoch();
+    runner.run(
         "WithdrawStake",
         account_1,
         aptos_stdlib::staking_contract_distribute(account_1_address, account_2_address),
     );
-    run(
-        &mut harness,
+    runner.run(
         "LeaveValidatorSet100",
         account_2,
         aptos_stdlib::stake_leave_validator_set(pool_address),
     );
     let collection_name = "collection name".to_owned().into_bytes();
     let token_name = "token name".to_owned().into_bytes();
-    run(
-        &mut harness,
+    runner.run(
         "CreateCollection",
         account_1,
         aptos_token_sdk_builder::token_create_collection_script(
@@ -158,8 +235,7 @@ fn test_gas() {
             vec![false, false, false],
         ),
     );
-    run(
-        &mut harness,
+    runner.run(
         "CreateTokenFirstTime",
         account_1,
         aptos_token_sdk_builder::token_create_token_script(
@@ -178,8 +254,7 @@ fn test_gas() {
             vec!["int".as_bytes().to_vec()],
         ),
     );
-    run(
-        &mut harness,
+    runner.run(
         "MintToken",
         account_1,
         aptos_token_sdk_builder::token_mint_script(
@@ -189,8 +264,7 @@ fn test_gas() {
             1,
         ),
     );
-    run(
-        &mut harness,
+    runner.run(
         "MutateToken",
         account_1,
         aptos_token_sdk_builder::token_mutate_token_properties(
@@ -205,8 +279,7 @@ fn test_gas() {
             vec!["int".as_bytes().to_vec()],
         ),
     );
-    run(
-        &mut harness,
+    runner.run(
         "MutateToken2ndTime",
         account_1,
         aptos_token_sdk_builder::token_mutate_token_properties(
@@ -230,8 +303,7 @@ fn test_gas() {
         vals.push(format!("{}", i).as_bytes().to_vec());
         typs.push("u64".as_bytes().to_vec());
     }
-    run(
-        &mut harness,
+    runner.run(
         "MutateTokenAdd10NewProperties",
         account_1,
         aptos_token_sdk_builder::token_mutate_token_properties(
@@ -246,8 +318,7 @@ fn test_gas() {
             typs.clone(),
         ),
     );
-    run(
-        &mut harness,
+    runner.run(
         "MutateTokenMutate10ExistingProperties",
         account_1,
         aptos_token_sdk_builder::token_mutate_token_properties(
@@ -263,22 +334,21 @@ fn test_gas() {
         ),
     );
 
-    let publisher = &harness.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    publish(
-        &mut harness,
+    let publisher = &runner
+        .harness
+        .new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    runner.publish(
         "PublishSmall",
         publisher,
         &test_dir_path("code_publishing.data/pack_initial"),
     );
-    publish(
-        &mut harness,
+    runner.publish(
         "UpgradeSmall",
         publisher,
         &test_dir_path("code_publishing.data/pack_upgrade_compat"),
     );
-    let publisher = &harness.aptos_framework_account();
-    publish(
-        &mut harness,
+    let publisher = &runner.harness.aptos_framework_account();
+    runner.publish(
         "PublishLarge",
         publisher,
         &test_dir_path("code_publishing.data/pack_stdlib"),
@@ -291,11 +361,222 @@ fn dollar_cost(gas_units: u64, price: u64) -> f64 {
 
 pub fn print_gas_cost(function: &str, gas_units: u64) {
     println!(
-        "{:20} | {:8} | {:.6} | {:.6} | {:.6}",
-        function,
+        "{:8} | {:.6} | {:.6} | {:.6} | {}",
         gas_units,
         dollar_cost(gas_units, 5),
         dollar_cost(gas_units, 15),
-        dollar_cost(gas_units, 30)
+        dollar_cost(gas_units, 30),
+        function,
+    );
+}
+
+pub fn print_gas_cost_with_statement(
+    function: &str,
+    gas_units: u64,
+    fee_statement: Option<FeeStatement>,
+) {
+    println!(
+        "{:8} | {:.6} | {:.6} | {:.6} | {:8} | {:8} | {:8} | {}",
+        gas_units,
+        dollar_cost(gas_units, 5),
+        dollar_cost(gas_units, 15),
+        dollar_cost(gas_units, 30),
+        fee_statement.unwrap().execution_gas_used() + fee_statement.unwrap().io_gas_used(),
+        fee_statement.unwrap().execution_gas_used(),
+        fee_statement.unwrap().io_gas_used(),
+        function,
+    );
+}
+
+pub fn print_gas_cost_with_statement_and_tps_header() {
+    println!(
+        "{:9} | {:9.6} | {:9.6} | {:9.6} | {:8} | {:8} | {:8} | {:8} | {:8} | {:8} | {:10}",
+        "gas units",
+        "$ at 5",
+        "$ at 15",
+        "$ at 30",
+        "exe+io g",
+        // "exe gas",
+        // "io gas",
+        "intrins",
+        "execut",
+        "read",
+        "write",
+        "gas / s",
+        "function",
+    );
+}
+
+pub fn print_gas_cost_with_statement_and_tps(
+    function: &str,
+    gas_units: u64,
+    fee_statement: Option<FeeStatement>,
+    summary: SummaryExeAndIO,
+    tps: f64,
+) {
+    println!(
+        "{:9} | {:9.6} | {:9.6} | {:9.6} | {:8} | {:8.2} | {:8.2} | {:8.2} | {:8.2} | {:8.0} | {}",
+        gas_units,
+        dollar_cost(gas_units, 5),
+        dollar_cost(gas_units, 15),
+        dollar_cost(gas_units, 30),
+        fee_statement.unwrap().execution_gas_used() + fee_statement.unwrap().io_gas_used(),
+        // fee_statement.unwrap().execution_gas_used(),
+        // fee_statement.unwrap().io_gas_used(),
+        summary.intrinsic_cost,
+        summary.execution_cost,
+        summary.read_cost,
+        summary.write_cost,
+        (fee_statement.unwrap().execution_gas_used() + fee_statement.unwrap().io_gas_used()) as f64
+            * tps,
+        function,
+    );
+}
+
+#[test]
+#[ignore]
+fn test_simple_calibrate_gas() {
+    // Start with 100 validators.
+    let mut harness = MoveHarness::new_with_validators(100);
+    let account_1 = &harness.new_account_at(AccountAddress::from_hex_literal("0x121").unwrap());
+    let account_2 = &harness.new_account_at(AccountAddress::from_hex_literal("0x122").unwrap());
+    let account_2_address = *account_2.address();
+
+    // Use the gas profiler unless explicitly disabled by the user.
+    //
+    // This is to give us some basic code coverage on the gas profile.
+    let profile_gas = match std::env::var("PROFILE_GAS") {
+        Ok(s) => {
+            let s = s.to_lowercase();
+            s != "0" && s != "false" && s != "no"
+        },
+        Err(_) => true,
+    };
+
+    let mut runner = Runner {
+        harness,
+        profile_gas,
+    };
+
+    AptosVM::set_paranoid_type_checks(true);
+
+    print_gas_cost_with_statement_and_tps_header();
+
+    let use_large_db_numbers = true;
+
+    let entry_points = vec![
+        (2963., 4103., EntryPoints::Nop),
+        (2426., 3411., EntryPoints::BytesMakeOrChange {
+            data_length: Some(32),
+        }),
+        (2388., 3270., EntryPoints::StepDst),
+        (27., 28., EntryPoints::Loop {
+            loop_count: Some(100000),
+            loop_type: LoopType::NoOp,
+        }),
+        (44., 42., EntryPoints::Loop {
+            loop_count: Some(10000),
+            loop_type: LoopType::Arithmetic,
+        }),
+        // This is a cheap bcs (serializing vec<u8>), so not representative of what BCS native call should cost.
+        // (175., EntryPoints::Loop { loop_count: Some(1000), loop_type: LoopType::BCS { len: 1024 }}),
+        (666., 1031., EntryPoints::CreateObjects {
+            num_objects: 10,
+            object_payload_size: 0,
+        }),
+        (103., 108., EntryPoints::CreateObjects {
+            num_objects: 10,
+            object_payload_size: 10 * 1024,
+        }),
+        (93., 148., EntryPoints::CreateObjects {
+            num_objects: 100,
+            object_payload_size: 0,
+        }),
+        (43., 50., EntryPoints::CreateObjects {
+            num_objects: 100,
+            object_payload_size: 10 * 1024,
+        }),
+        (1605., 2100., EntryPoints::InitializeVectorPicture { length: 40 }),
+        (2850., 3400., EntryPoints::VectorPicture { length: 40 }),
+        (2900., 3480., EntryPoints::VectorPictureRead { length: 40 }),
+        (30., 31., EntryPoints::InitializeVectorPicture {
+            length: 30 * 1024,
+        }),
+        (169., 180., EntryPoints::VectorPicture { length: 30 * 1024 }),
+        (189., 200., EntryPoints::VectorPictureRead { length: 30 * 1024 }),
+        (22., 17.8, EntryPoints::SmartTablePicture {
+            length: 30 * 1024,
+            num_points_per_txn: 200,
+        }),
+        (3., 2.75, EntryPoints::SmartTablePicture {
+            length: 1024 * 1024,
+            num_points_per_txn: 1024,
+        }),
+        (1351., 1719., EntryPoints::TokenV1MintAndTransferFT),
+        (971., 1150., EntryPoints::TokenV1MintAndTransferNFTSequential),
+        (1077., 1274., EntryPoints::TokenV2AmbassadorMint),
+    ];
+
+    for (large_db_tps, small_db_tps, entry_point) in &entry_points {
+        if let MultiSigConfig::None = entry_point.multi_sig_additional_num() {
+            let publisher = runner.harness.new_account_with_key_pair();
+            let user = runner.harness.new_account_with_key_pair();
+
+            let mut package_handler = PackageHandler::new(entry_point.package_name());
+            let mut rng = StdRng::seed_from_u64(14);
+            let package = package_handler.pick_package(&mut rng, *publisher.address());
+            runner
+                .harness
+                .run_transaction_payload(&publisher, package.publish_transaction_payload());
+            if let Some(init_entry_point) = entry_point.initialize_entry_point() {
+                runner.harness.run_transaction_payload(
+                    &publisher,
+                    init_entry_point.create_payload(
+                        package.get_module_id(init_entry_point.module_name()),
+                        Some(&mut rng),
+                        Some(publisher.address()),
+                    ),
+                );
+            }
+
+            runner.run_with_tps_estimate(
+                &format!("entry_point_{entry_point:?}"),
+                &user,
+                entry_point.create_payload(
+                    package.get_module_id(entry_point.module_name()),
+                    Some(&mut rng),
+                    Some(publisher.address()),
+                ),
+                if use_large_db_numbers {*large_db_tps } else {*small_db_tps},
+            );
+        } else {
+            println!("Skipping multisig {entry_point:?}");
+        }
+    }
+
+    runner.run_with_tps_estimate(
+        "Transfer",
+        account_1,
+        aptos_stdlib::aptos_coin_transfer(account_2_address, 1000),
+        if use_large_db_numbers {2032.} else {2791.},
+    );
+
+    runner.run_with_tps_estimate(
+        "CreateAccount",
+        account_1,
+        aptos_stdlib::aptos_account_create_account(
+            AccountAddress::from_hex_literal("0xcafe1").unwrap(),
+        ),
+        if use_large_db_numbers {1583.0} else {2215.},
+    );
+
+    let mut package_handler = PackageHandler::new("simple");
+    let mut rng = StdRng::seed_from_u64(14);
+    let package = package_handler.pick_package(&mut rng, *account_1.address());
+    runner.run_with_tps_estimate(
+        "PublishModule",
+        account_1,
+        package.publish_transaction_payload(),
+        if use_large_db_numbers {138.0} else {148.},
     );
 }
