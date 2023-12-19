@@ -44,7 +44,8 @@ where
         register_probes_and_metrics_handler(health_port).await;
         Ok(())
     });
-    let main_task_handler = tokio::spawn(async move { config.run().await });
+    let main_task_handler =
+        tokio::spawn(async move { config.run().await.expect("task should exit with Ok.") });
     tokio::select! {
         res = task_handler => {
             if let Err(e) = res {

@@ -44,7 +44,8 @@ impl RunnableConfig for IndexerGrpcFileStoreWorkerConfig {
             self.enable_expensive_logging.unwrap_or(false),
             self.chain_id,
         )
-        .await.expect("Failed to create file store processor");
+        .await
+        .expect("Failed to create file store processor");
         processor
             .run()
             .await
