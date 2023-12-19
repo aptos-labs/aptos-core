@@ -162,9 +162,16 @@ impl Worker {
                         starting_version
                     )
                 })?;
-
+            info!(
+                service_type = SERVICE_TYPE,
+                "[Indexer Cache] Streaming RPC started.");
             // 3&4. Infinite streaming until error happens. Either stream ends or worker crashes.
             process_streaming_response(conn, file_store_metadata, response.into_inner()).await?;
+
+            info!(
+                service_type = SERVICE_TYPE,
+                "[Indexer Cache] Streaming RPC ended."
+            );
         }
     }
 }
