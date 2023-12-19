@@ -57,14 +57,17 @@ impl QuorumStoreCoordinator {
                         self.proof_manager_cmd_tx
                             .send(ProofManagerCommand::CommitNotification(
                                 block_timestamp,
-                                batches,
+                                batches.clone(),
                             ))
                             .await
                             .expect("Failed to send to ProofManager");
                         // TODO: need a callback or not?
 
                         self.batch_generator_cmd_tx
-                            .send(BatchGeneratorCommand::CommitNotification(block_timestamp))
+                            .send(BatchGeneratorCommand::CommitNotification(
+                                block_timestamp,
+                                batches,
+                            ))
                             .await
                             .expect("Failed to send to BatchGenerator");
                     },
