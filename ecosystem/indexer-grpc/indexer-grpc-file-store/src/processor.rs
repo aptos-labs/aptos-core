@@ -27,9 +27,8 @@ const SERVICE_TYPE: &str = "file_worker";
 pub struct Processor {
     cache_operator: CacheOperator<redis::aio::ConnectionManager>,
     file_store_operator: Box<dyn FileStoreOperator>,
-    cache_chain_id: u64,
+    chain_id: u64,
     enable_expensive_logging: bool,
-    _chain_id: u64,
 }
 
 impl Processor {
@@ -75,9 +74,20 @@ impl Processor {
             aptos_indexer_grpc_utils::file_store_operator::FileStoreMetadata,
         > = file_store_operator.get_file_store_metadata().await;
         if file_store_metadata.is_none() {
-            file_store_operator
-                .update_file_store_metadata_internal(chain_id, 0)
-                .await?;
+            // If metadata doesn't exist, create and upload it and init file store latest version in cache.
+            while file_store_operator
+                .update_file_store_metadata_with_timeout(chain_id, 0)
+                .await
+                .is_err()
+            {
+                tracing::error!(
+                    batch_start_version = 0,
+                    service_type = SERVICE_TYPE,
+                    "[File worker] Failed to update file store metadata. Retrying."
+                );
+                std::thread::sleep(std::time::Duration::from_millis(500));
+                METADATA_UPLOAD_FAILURE_COUNT.inc();
+            }
         }
         // Metadata is guaranteed to exist now
         let metadata = file_store_operator.get_file_store_metadata().await.unwrap();
@@ -100,9 +110,8 @@ impl Processor {
         Ok(Self {
             cache_operator,
             file_store_operator,
-            cache_chain_id: chain_id,
+            chain_id,
             enable_expensive_logging,
-            _chain_id: chain_id,
         })
     }
 
@@ -114,33 +123,16 @@ impl Processor {
     ///   3.2 If we're ready to process, create max of 10 threads and fetch / upload data
     ///   3.3 Update file store metadata at the end of a batch
     pub async fn run(&mut self) -> Result<()> {
-        let cache_chain_id = self.cache_chain_id;
+        let chain_id = self.chain_id;
 
-        let mut batch_start_version =
-            if let Some(metadata) = self.file_store_operator.get_file_store_metadata().await {
-                anyhow::ensure!(metadata.chain_id == cache_chain_id, "Chain ID mismatch.");
-                metadata.version
-            } else {
-                // If metadata doesn't exist, create and upload it and init file store latest version in cache.
-                while self
-                    .file_store_operator
-                    .update_file_store_metadata_with_timeout(cache_chain_id, 0)
-                    .await
-                    .is_err()
-                {
-                    tracing::error!(
-                        batch_start_version = 0,
-                        service_type = SERVICE_TYPE,
-                        "[File worker] Failed to update file store metadata. Retrying."
-                    );
-                    std::thread::sleep(std::time::Duration::from_millis(500));
-                    METADATA_UPLOAD_FAILURE_COUNT.inc();
-                }
-                self.cache_operator
-                    .update_file_store_latest_version(0)
-                    .await?;
-                0
-            };
+        let metadata = self
+            .file_store_operator
+            .get_file_store_metadata()
+            .await
+            .unwrap();
+        ensure!(metadata.chain_id == chain_id, "Chain ID mismatch.");
+
+        let mut batch_start_version = metadata.version;
 
         let mut tps_calculator = MovingAverage::new(10_000);
         loop {
@@ -196,7 +188,7 @@ impl Processor {
 
                     let upload_start_time = std::time::Instant::now();
                     let (start, end) = file_store_operator_clone
-                        .upload_transaction_batch(cache_chain_id, transactions)
+                        .upload_transaction_batch(chain_id, transactions)
                         .await
                         .unwrap();
                     log_grpc_step(
@@ -275,7 +267,7 @@ impl Processor {
                 .await?;
             while self
                 .file_store_operator
-                .update_file_store_metadata_with_timeout(cache_chain_id, batch_start_version)
+                .update_file_store_metadata_with_timeout(chain_id, batch_start_version)
                 .await
                 .is_err()
             {
