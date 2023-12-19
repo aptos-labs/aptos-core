@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
+    logging::{LogEvent, LogSchema},
     monitor,
     network::{NetworkSender, QuorumStoreSender},
     quorum_store::{
@@ -264,6 +265,12 @@ impl BatchGenerator {
                         let info = o.get_mut();
                         if info.decrement() == 0 {
                             o.remove();
+                        } else {
+                            debug!(
+                                LogSchema::new(LogEvent::BatchTxnNotRemoved),
+                                sender = txn.sender,
+                                seq_no = txn.sequence_number,
+                            )
                         }
                     }
                 }
@@ -288,6 +295,15 @@ impl BatchGenerator {
         trace!(
             "QS: excluding txs len: {:?}",
             self.txns_in_progress_sorted.len()
+        );
+        debug!(
+            LogSchema::new(LogEvent::BatchPullExcludedTxns),
+            txns_in_progress = self.txns_in_progress_sorted.len(),
+            batches_in_progress = self
+                .batches_in_progress
+                .values()
+                .map(|txns| txns.len())
+                .sum::<usize>(),
         );
 
         let mut pulled_txns = self

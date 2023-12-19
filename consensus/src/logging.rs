@@ -37,6 +37,8 @@ pub enum LogEvent {
     Timeout,
     Vote,
     VoteNIL,
+    BatchPullExcludedTxns,
+    BatchTxnNotRemoved,
 }
 
 impl LogSchema {
