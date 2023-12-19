@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use crate::StateView;
-use aptos_types::{
-    account_address::AccountAddress, account_view::AccountView, state_store::state_key::StateKey,
+use crate::{
+    account_address::AccountAddress,
+    account_view::AccountView,
+    state_store::{state_key::StateKey, StateView},
 };
 use bytes::Bytes;
 pub struct AccountWithStateView<'a> {

@@ -18,10 +18,9 @@ use aptos_api_types::{
     MoveModuleBytecode, MoveResource, MoveStructTag, MoveValue, RawStateValueRequest,
     RawTableItemRequest, TableItemRequest, VerifyInput, VerifyInputWithRecursion, U64,
 };
-use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
-    state_store::{state_key::StateKey, table::TableHandle},
+    state_store::{state_key::StateKey, table::TableHandle, TStateView},
 };
 use aptos_vm::data_cache::AsMoveResolver;
 use move_core_types::{

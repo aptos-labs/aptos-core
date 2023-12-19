@@ -11,7 +11,7 @@ use std::{
 extern crate itertools;
 use crate::metrics::REMOTE_EXECUTOR_TIMER;
 use aptos_logger::trace;
-use aptos_state_view::{StateView, TStateView};
+use aptos_types::state_store::{StateView, TStateView};
 use itertools::Itertools;
 
 pub struct RemoteStateViewService<S: StateView + Sync + Send + 'static> {
