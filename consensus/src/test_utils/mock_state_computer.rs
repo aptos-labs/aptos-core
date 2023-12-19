@@ -20,8 +20,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures, on_chain_config::OnChainConsensusConfig,
-    transaction::SignedTransaction,
+    ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction,
 };
 use futures::{channel::mpsc, SinkExt};
 use futures_channel::mpsc::UnboundedSender;
@@ -144,7 +143,6 @@ impl StateComputer for MockStateComputer {
         _: Arc<dyn TransactionShuffler>,
         _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
-        _: &OnChainConsensusConfig,
     ) {
     }
 
@@ -183,7 +181,6 @@ impl StateComputer for EmptyStateComputer {
         _: Arc<dyn TransactionShuffler>,
         _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
-        _: &OnChainConsensusConfig,
     ) {
     }
 
@@ -248,7 +245,6 @@ impl StateComputer for RandomComputeResultStateComputer {
         _: Arc<dyn TransactionShuffler>,
         _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
-        _: &OnChainConsensusConfig,
     ) {
     }
 

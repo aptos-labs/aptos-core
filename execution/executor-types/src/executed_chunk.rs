@@ -4,7 +4,7 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{ChunkCommitNotification, LedgerUpdateOutput};
+use crate::{should_forward_to_subscription_service, ChunkCommitNotification, LedgerUpdateOutput};
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_storage_interface::{state_delta::StateDelta, ExecutedTrees};
 use aptos_types::{
@@ -95,7 +95,11 @@ impl ExecutedChunk {
                 ..
             } = txn_to_commit;
             committed_transactions.push(transaction);
-            committed_events.extend(events);
+            committed_events.extend(
+                events
+                    .into_iter()
+                    .filter(should_forward_to_subscription_service),
+            );
             to_drop.push((state_updates, write_set));
         }
         DEFAULT_DROPPER.schedule_drop(to_drop);

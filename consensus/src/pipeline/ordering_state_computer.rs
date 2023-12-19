@@ -21,7 +21,7 @@ use aptos_executor_types::ExecutorResult;
 use aptos_logger::prelude::*;
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures, on_chain_config::OnChainConsensusConfig,
+    ledger_info::LedgerInfoWithSignatures,
 };
 use async_trait::async_trait;
 use fail::fail_point;
@@ -138,7 +138,6 @@ impl StateComputer for OrderingStateComputer {
         _: Arc<dyn TransactionShuffler>,
         _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
-        _: &OnChainConsensusConfig,
     ) {
     }
 
@@ -206,7 +205,6 @@ impl StateComputer for DagStateSyncComputer {
         _transaction_shuffler: Arc<dyn TransactionShuffler>,
         _block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_deduper: Arc<dyn TransactionDeduper>,
-        _onchain_consensus_config: &OnChainConsensusConfig,
     ) {
         unimplemented!("method not supported");
     }

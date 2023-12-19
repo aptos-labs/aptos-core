@@ -20,8 +20,10 @@ use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
-use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResult};
-use aptos_infallible::{Mutex, RwLock};
+use aptos_executor_types::{
+    should_forward_to_subscription_service, BlockExecutorTrait, ExecutorResult, StateComputeResult,
+};
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress,
@@ -29,10 +31,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{
-        state_sync_notifier::StateSyncNotifierConfig, OnChainConsensusConfig,
-        OnChainExecutionConfig,
-    },
+    on_chain_config::OnChainExecutionConfig,
     transaction::{SignedTransaction, Transaction},
 };
 use fail::fail_point;
@@ -86,7 +85,6 @@ pub struct ExecutionProxy {
     txn_notifier: Arc<dyn TxnNotifier>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     async_state_sync_notifier: aptos_channels::Sender<NotificationType>,
-    async_state_sync_notifier_config: RwLock<Option<StateSyncNotifierConfig>>,
     validators: Mutex<Vec<AccountAddress>>,
     write_mutex: AsyncMutex<LogicalTime>,
     payload_manager: Mutex<Option<Arc<PayloadManager>>>,
@@ -126,7 +124,6 @@ impl ExecutionProxy {
             txn_notifier,
             state_sync_notifier,
             async_state_sync_notifier: tx,
-            async_state_sync_notifier_config: RwLock::new(None),
             validators: Mutex::new(vec![]),
             write_mutex: AsyncMutex::new(LogicalTime::new(0, 0)),
             payload_manager: Mutex::new(None),
@@ -209,11 +206,6 @@ impl StateComputer for ExecutionProxy {
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
         let mut latest_logical_time = self.write_mutex.lock().await;
-        let async_state_sync_notifier_config = self
-            .async_state_sync_notifier_config
-            .read()
-            .clone()
-            .unwrap_or_default();
         let mut block_ids = Vec::new();
         let mut txns = Vec::new();
         let mut txn_events_for_state_sync = Vec::new();
@@ -238,11 +230,12 @@ impl StateComputer for ExecutionProxy {
                 block.validator_txns().cloned().unwrap_or_default(),
                 input_txns,
             ));
-            txn_events_for_state_sync.extend(block.events().into_iter().filter(|evt| {
-                async_state_sync_notifier_config
-                    .event_filter
-                    .should_notify(evt)
-            }));
+            txn_events_for_state_sync.extend(
+                block
+                    .events()
+                    .into_iter()
+                    .filter(should_forward_to_subscription_service),
+            );
         }
 
         let executor = self.executor.clone();
@@ -332,7 +325,6 @@ impl StateComputer for ExecutionProxy {
         transaction_shuffler: Arc<dyn TransactionShuffler>,
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
-        onchain_consensus_config: &OnChainConsensusConfig,
     ) {
         *self.validators.lock() = epoch_state
             .verifier
@@ -344,9 +336,6 @@ impl StateComputer for ExecutionProxy {
             .replace(transaction_shuffler);
         *self.block_executor_onchain_config.lock() = block_executor_onchain_config;
         self.transaction_deduper.lock().replace(transaction_deduper);
-        self.async_state_sync_notifier_config
-            .write()
-            .replace(onchain_consensus_config.as_state_sync_notifier_config());
     }
 
     // Clears the epoch-specific state. Only a sync_to call is expected before calling new_epoch
@@ -489,14 +478,12 @@ async fn test_commit_sync_race() {
         TransactionFilter::new(Filter::empty()),
     );
 
-    let consensus_config = OnChainConsensusConfig::default();
     executor.new_epoch(
         &EpochState::empty(),
         Arc::new(PayloadManager::DirectMempool),
         create_transaction_shuffler(TransactionShufflerType::NoShuffling),
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         create_transaction_deduper(TransactionDeduperType::NoDedup),
-        &consensus_config,
     );
     executor
         .commit(&[], generate_li(1, 1), callback.clone())

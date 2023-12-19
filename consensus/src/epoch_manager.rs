@@ -757,7 +757,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         epoch_state: &EpochState,
         payload_manager: Arc<PayloadManager>,
-        onchain_consensus_config: &OnChainConsensusConfig,
         onchain_execution_config: &OnChainExecutionConfig,
     ) {
         let transaction_shuffler =
@@ -772,7 +771,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             transaction_shuffler,
             block_executor_onchain_config,
             transaction_deduper,
-            onchain_consensus_config,
         );
     }
 
@@ -1032,12 +1030,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.validator_txn_pool_client.clone(),
             Arc::new(quorum_store_client),
         );
-        self.init_commit_state_computer(
-            epoch_state,
-            payload_manager.clone(),
-            consensus_config,
-            execution_config,
-        );
+        self.init_commit_state_computer(epoch_state, payload_manager.clone(), execution_config);
         self.start_quorum_store(quorum_store_builder);
         (
             network_sender,
@@ -1104,7 +1097,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             reset_tx,
         ));
 
-        let onchain_dag_consensus_config = onchain_consensus_config.as_dag_config_v2();
+        let onchain_dag_consensus_config = onchain_consensus_config.unwrap_dag_config_v1();
         let epoch_to_validators = self.extract_epoch_proposers(
             &epoch_state,
             onchain_dag_consensus_config.dag_ordering_causal_history_window as u32,
@@ -1124,7 +1117,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let bootstrapper = DagBootstrapper::new(
             self.author,
             self.dag_config.clone(),
-            onchain_dag_consensus_config,
+            onchain_dag_consensus_config.clone(),
             signer,
             epoch_state.clone(),
             dag_storage,

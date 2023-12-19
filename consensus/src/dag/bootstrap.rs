@@ -45,7 +45,7 @@ use aptos_infallible::RwLock;
 use aptos_logger::{debug, info};
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_types::{
-    epoch_state::EpochState, on_chain_config::DagConsensusConfigV2,
+    epoch_state::EpochState, on_chain_config::DagConsensusConfigV1,
     validator_signer::ValidatorSigner,
 };
 use async_trait::async_trait;
@@ -314,7 +314,7 @@ impl SyncMode {
 pub struct DagBootstrapper {
     self_peer: Author,
     config: DagConsensusConfig,
-    onchain_config: DagConsensusConfigV2,
+    onchain_config: DagConsensusConfigV1,
     signer: Arc<ValidatorSigner>,
     epoch_state: Arc<EpochState>,
     storage: Arc<dyn DAGStorage>,
@@ -336,7 +336,7 @@ impl DagBootstrapper {
     pub fn new(
         self_peer: Author,
         config: DagConsensusConfig,
-        onchain_config: DagConsensusConfigV2,
+        onchain_config: DagConsensusConfigV1,
         signer: Arc<ValidatorSigner>,
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
@@ -649,7 +649,7 @@ pub(super) fn bootstrap_dag_for_test(
     let bootstraper = DagBootstrapper::new(
         self_peer,
         DagConsensusConfig::default(),
-        DagConsensusConfigV2::default(),
+        DagConsensusConfigV1::default(),
         signer.into(),
         epoch_state.clone(),
         storage.clone(),
