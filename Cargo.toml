@@ -107,7 +107,6 @@ members = [
     "crates/transaction-emitter-lib",
     "crates/transaction-generator-lib",
     "crates/validator-transaction-pool",
-    "dkg",
     "ecosystem/indexer-grpc/indexer-grpc-cache-worker",
     "ecosystem/indexer-grpc/indexer-grpc-data-access",
     "ecosystem/indexer-grpc/indexer-grpc-data-service",

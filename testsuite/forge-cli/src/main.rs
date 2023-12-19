@@ -988,21 +988,23 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000]),
         criteria: [
-            (9, 1.5, 3., 4.),
-            (95, 1.5, 3., 4.),
-            (950, 2., 3., 4.),
-            (2750, 2.5, 3.5, 4.5),
-            (4600, 3., 4., 5.),
+            (9, 1.5, 3., 4., 0),
+            (95, 1.5, 3., 4., 0),
+            (950, 2., 3., 4., 0),
+            (2750, 2.5, 3.5, 4.5, 0),
+            (4600, 3., 4., 5., 10), // Allow some expired transactions (high-load)
         ]
         .into_iter()
-        .map(|(min_tps, max_lat_p50, max_lat_p90, max_lat_p99)| {
-            SuccessCriteria::new(min_tps)
-                .add_max_expired_tps(0)
-                .add_max_failed_submission_tps(0)
-                .add_latency_threshold(max_lat_p50, LatencyType::P50)
-                .add_latency_threshold(max_lat_p90, LatencyType::P90)
-                .add_latency_threshold(max_lat_p99, LatencyType::P99)
-        })
+        .map(
+            |(min_tps, max_lat_p50, max_lat_p90, max_lat_p99, max_expired_tps)| {
+                SuccessCriteria::new(min_tps)
+                    .add_max_expired_tps(max_expired_tps)
+                    .add_max_failed_submission_tps(0)
+                    .add_latency_threshold(max_lat_p50, LatencyType::P50)
+                    .add_latency_threshold(max_lat_p90, LatencyType::P90)
+                    .add_latency_threshold(max_lat_p99, LatencyType::P99)
+            },
+        )
         .collect(),
     })
 }
@@ -1888,6 +1890,15 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         forge_config = forge_config
             .with_initial_fullnode_count(VALIDATOR_COUNT)
             .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+                // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
+                let max_chunk_size = 10_000;
+                let aptos_data_client_config = &mut config.state_sync.aptos_data_client;
+                let storage_service_config = &mut config.state_sync.storage_service;
+                aptos_data_client_config.max_transaction_chunk_size = max_chunk_size;
+                aptos_data_client_config.max_transaction_output_chunk_size = max_chunk_size;
+                storage_service_config.max_transaction_chunk_size = max_chunk_size;
+                storage_service_config.max_transaction_output_chunk_size = max_chunk_size;
+
                 // Experimental storage optimizations
                 config.storage.rocksdb_configs.enable_storage_sharding = true;
 
@@ -2065,7 +2076,7 @@ fn changing_working_quorum_test_helper(
                         // number of down nodes is close to the quorum limit, so
                         // make a check a bit looser, as state sync might be required
                         // to get the quorum back.
-                        30.0
+                        40.0
                     },
                     max_round_gap: 6,
                 }),

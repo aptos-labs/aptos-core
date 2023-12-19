@@ -7,7 +7,7 @@ use crate::{
     rand::rand_gen::{
         block_queue::{BlockQueue, QueueItem},
         storage::interface::RandStorage,
-        types::{Proof, RandConfig, RandDecision, RandShare, Share, ShareAck},
+        types::{Proof, RandConfig, RandDecision, RandShare, Share},
     },
 };
 use anyhow::ensure;
@@ -23,20 +23,22 @@ use std::{
 
 const FUTURE_ROUNDS_TO_ACCEPT: u64 = 200;
 
-struct ShareAggregator<S> {
+pub struct ShareAggregator<S> {
+    author: Author,
     shares: HashMap<Author, RandShare<S>>,
     total_weight: u64,
 }
 
 impl<S: Share> ShareAggregator<S> {
-    fn new() -> Self {
+    pub fn new(author: Author) -> Self {
         Self {
+            author,
             shares: HashMap::new(),
             total_weight: 0,
         }
     }
 
-    fn add_share(&mut self, weight: u64, share: RandShare<S>) {
+    pub fn add_share(&mut self, weight: u64, share: RandShare<S>) {
         let timestamp = share.metadata().timestamp();
         if self.shares.insert(*share.author(), share).is_none() {
             observe_block(timestamp, BlockStage::RAND_ADD_SHARE);
@@ -44,7 +46,7 @@ impl<S: Share> ShareAggregator<S> {
         }
     }
 
-    fn try_aggregate<P: Proof<Share = S>>(
+    pub fn try_aggregate<P: Proof<Share = S>>(
         &self,
         rand_config: &RandConfig,
         rand_metadata: RandMetadata,
@@ -69,6 +71,10 @@ impl<S: Share> ShareAggregator<S> {
             .sum();
     }
 
+    fn get_self_share(&self) -> Option<RandShare<S>> {
+        self.shares.get(&self.author).cloned()
+    }
+
     fn total_weights(&self) -> u64 {
         self.total_weight
     }
@@ -80,20 +86,21 @@ enum RandItem<S, P> {
         metadata: RandMetadata,
         share_aggregator: ShareAggregator<S>,
     },
-    Decided(RandDecision<P>),
-}
-
-impl<S: Share, P: Proof<Share = S>> Default for RandItem<S, P> {
-    fn default() -> Self {
-        Self::PendingMetadata(ShareAggregator::new())
-    }
+    Decided {
+        decision: RandDecision<P>,
+        self_share: RandShare<S>,
+    },
 }
 
 impl<S: Share, P: Proof<Share = S>> RandItem<S, P> {
+    fn new(author: Author) -> Self {
+        Self::PendingMetadata(ShareAggregator::new(author))
+    }
+
     fn decision(&self) -> Option<&RandDecision<P>> {
         match self {
             RandItem::PendingMetadata(_) | RandItem::PendingDecision { .. } => None,
-            RandItem::Decided(decision) => Some(decision),
+            RandItem::Decided { decision, .. } => Some(decision),
         }
     }
 
@@ -103,7 +110,7 @@ impl<S: Share, P: Proof<Share = S>> RandItem<S, P> {
             RandItem::PendingDecision {
                 share_aggregator, ..
             } => Some(share_aggregator.total_weights()),
-            RandItem::Decided(_) => None,
+            RandItem::Decided { .. } => None,
         }
     }
 
@@ -125,12 +132,12 @@ impl<S: Share, P: Proof<Share = S>> RandItem<S, P> {
                 share_aggregator.add_share(rand_config.get_peer_weight(share.author()), share);
                 Ok(())
             },
-            RandItem::Decided(_) => Ok(()),
+            RandItem::Decided { .. } => Ok(()),
         }
     }
 
     fn try_aggregate(&mut self, rand_config: &RandConfig) {
-        let item = std::mem::take(self);
+        let item = std::mem::replace(self, Self::new(Author::ONE));
         let new_item = match item {
             RandItem::PendingDecision {
                 share_aggregator,
@@ -143,7 +150,12 @@ impl<S: Share, P: Proof<Share = S>> RandItem<S, P> {
                         decision.rand_metadata().timestamp(),
                         BlockStage::RAND_AGG_DECISION,
                     );
-                    Self::Decided(decision)
+                    Self::Decided {
+                        decision,
+                        self_share: share_aggregator
+                            .get_self_share()
+                            .expect("Aggregated item should have self share"),
+                    }
                 } else {
                     Self::PendingDecision {
                         metadata,
@@ -151,13 +163,13 @@ impl<S: Share, P: Proof<Share = S>> RandItem<S, P> {
                     }
                 }
             },
-            item @ (RandItem::Decided(_) | RandItem::PendingMetadata(_)) => item,
+            item @ (RandItem::Decided { .. } | RandItem::PendingMetadata(_)) => item,
         };
         let _ = std::mem::replace(self, new_item);
     }
 
     fn add_metadata(&mut self, rand_config: &RandConfig, rand_metadata: RandMetadata) {
-        let item = std::mem::take(self);
+        let item = std::mem::replace(self, Self::new(Author::ONE));
         let new_item = match item {
             RandItem::PendingMetadata(mut share_aggregator) => {
                 share_aggregator.retain(rand_config, &rand_metadata);
@@ -166,9 +178,19 @@ impl<S: Share, P: Proof<Share = S>> RandItem<S, P> {
                     share_aggregator,
                 }
             },
-            item @ (RandItem::PendingDecision { .. } | RandItem::Decided(_)) => item,
+            item @ (RandItem::PendingDecision { .. } | RandItem::Decided { .. }) => item,
         };
         let _ = std::mem::replace(self, new_item);
+    }
+
+    fn get_self_share(&self) -> Option<RandShare<S>> {
+        match self {
+            RandItem::PendingMetadata(aggr) => aggr.get_self_share(),
+            RandItem::PendingDecision {
+                share_aggregator, ..
+            } => share_aggregator.get_self_share(),
+            RandItem::Decided { self_share, .. } => Some(self_share.clone()),
+        }
     }
 }
 
@@ -195,7 +217,7 @@ impl<S: Share, P: Proof<Share = S>, Storage: RandStorage<S, P>> RandStore<S, P, 
             }
             let rand_item = rand_map
                 .entry(rand_metadata.round())
-                .or_insert_with(Default::default);
+                .or_insert_with(|| RandItem::new(author));
             let _ = rand_item.add_share(share, &rand_config);
         }
         let all_decisions = db.get_all_decisions().unwrap_or_default();
@@ -206,7 +228,15 @@ impl<S: Share, P: Proof<Share = S>, Storage: RandStorage<S, P>> RandStore<S, P, 
                 decisions_to_delete.push(decision);
                 continue;
             }
-            rand_map.insert(round, RandItem::Decided(decision));
+            let self_share = rand_map
+                .get(&round)
+                .expect("Decision should have share")
+                .get_self_share()
+                .expect("Decision should have self share");
+            rand_map.insert(round, RandItem::Decided {
+                decision,
+                self_share,
+            });
         }
         if let Err(e) = db.remove_shares(shares_to_delete.into_iter()) {
             error!("[RandStore] Failed to remove shares: {:?}", e);
@@ -263,13 +293,13 @@ impl<S: Share, P: Proof<Share = S>, Storage: RandStorage<S, P>> RandStore<S, P, 
             let rand_item = self
                 .rand_map
                 .entry(rand_metadata.round())
-                .or_insert_with(Default::default);
-            rand_item.add_metadata(&self.rand_config, rand_metadata);
+                .or_insert_with(|| RandItem::new(self.author));
+            rand_item.add_metadata(&self.rand_config, rand_metadata.clone());
             Self::try_aggregate(&self.rand_config, rand_item, &mut self.block_queue);
         }
     }
 
-    pub fn add_share(&mut self, share: RandShare<S>) -> anyhow::Result<ShareAck<P>> {
+    pub fn add_share(&mut self, share: RandShare<S>) -> anyhow::Result<bool> {
         ensure!(
             share.metadata().epoch() == self.epoch,
             "Share from different epoch"
@@ -283,26 +313,17 @@ impl<S: Share, P: Proof<Share = S>, Storage: RandStorage<S, P>> RandStore<S, P, 
         let rand_item = self
             .rand_map
             .entry(rand_metadata.round())
-            .or_insert_with(Default::default);
+            .or_insert_with(|| RandItem::new(self.author));
         rand_item.add_share(share, &self.rand_config)?;
         Self::try_aggregate(&self.rand_config, rand_item, &mut self.block_queue);
-        Ok(ShareAck::new(self.epoch, rand_item.decision().cloned()))
+        Ok(rand_item.decision().is_some())
     }
 
-    pub fn add_decision(&mut self, decision: RandDecision<P>) -> anyhow::Result<()> {
-        let rand_metadata = decision.rand_metadata();
-        if !self
-            .rand_map
-            .get(&rand_metadata.round())
-            .map_or(false, |item| item.decision().is_some())
-        {
-            self.db.save_decision(&decision)?;
-            self.block_queue
-                .set_randomness(rand_metadata.round(), decision.randomness().clone());
-            self.rand_map
-                .insert(rand_metadata.round(), RandItem::Decided(decision));
-        }
-        Ok(())
+    pub fn get_self_share(&mut self, metadata: &RandMetadata) -> Option<RandShare<S>> {
+        self.rand_map
+            .get(&metadata.round())
+            .and_then(|item| item.get_self_share())
+            .filter(|share| share.metadata() == metadata)
     }
 }
 
@@ -312,9 +333,7 @@ mod tests {
         block_queue::QueueItem,
         rand_store::{RandItem, RandStore, ShareAggregator},
         storage::in_memory::InMemRandDb,
-        test_utils::{
-            create_decision, create_ordered_blocks, create_share, create_share_for_round,
-        },
+        test_utils::{create_ordered_blocks, create_share, create_share_for_round},
         types::{MockAugData, MockProof, MockShare, RandConfig},
     };
     use aptos_consensus_types::{common::Author, randomness::RandMetadata};
@@ -322,7 +341,7 @@ mod tests {
 
     #[test]
     fn test_share_aggregator() {
-        let mut aggr = ShareAggregator::new();
+        let mut aggr = ShareAggregator::new(Author::ONE);
         let weights = HashMap::from([(Author::ONE, 1), (Author::TWO, 2), (Author::ZERO, 3)]);
         let shares = vec![
             create_share_for_round(1, Author::ONE),
@@ -355,7 +374,7 @@ mod tests {
             create_share_for_round(1, Author::ZERO),
         ];
 
-        let mut item = RandItem::<MockShare, MockProof>::default();
+        let mut item = RandItem::<MockShare, MockProof>::new(Author::TWO);
         for share in shares.iter() {
             item.add_share(share.clone(), &config).unwrap();
         }
@@ -365,7 +384,7 @@ mod tests {
         item.try_aggregate(&config);
         assert!(item.decision().is_some());
 
-        let mut item = RandItem::<MockShare, MockProof>::default();
+        let mut item = RandItem::<MockShare, MockProof>::new(Author::ONE);
         item.add_metadata(&config, RandMetadata::new_for_testing(2));
         for share in shares[1..].iter() {
             item.add_share(share.clone(), &config).unwrap_err();
@@ -374,14 +393,15 @@ mod tests {
 
     #[test]
     fn test_rand_store() {
-        let weights: HashMap<Author, u64> = (0..7)
-            .map(|i| (Author::from_str(&format!("{:x}", i)).unwrap(), 1))
+        let authors: Vec<_> = (0..7)
+            .map(|i| Author::from_str(&format!("{:x}", i)).unwrap())
             .collect();
+        let weights: HashMap<Author, u64> = authors.iter().map(|addr| (*addr, 1)).collect();
         let authors: Vec<Author> = weights.keys().cloned().collect();
         let config = RandConfig::new(1, Author::ZERO, weights);
         let mut rand_store = RandStore::new(
             1,
-            Author::ZERO,
+            authors[1],
             config,
             Arc::new(InMemRandDb::<MockShare, MockProof, MockAugData>::new()),
         );
@@ -389,10 +409,8 @@ mod tests {
         let rounds = vec![vec![1], vec![2, 3], vec![5, 8, 13]];
         let blocks_1 = QueueItem::new(create_ordered_blocks(rounds[0].clone()), None);
         let blocks_2 = QueueItem::new(create_ordered_blocks(rounds[1].clone()), None);
-        let blocks_3 = QueueItem::new(create_ordered_blocks(rounds[2].clone()), None);
         let metadata_1 = blocks_1.all_rand_metadata();
         let metadata_2 = blocks_2.all_rand_metadata();
-        let metadata_3 = blocks_3.all_rand_metadata();
 
         // shares come before blocks
         for share in authors[0..5]
@@ -415,33 +433,5 @@ mod tests {
             rand_store.add_share(share).unwrap();
         }
         assert!(rand_store.try_dequeue_rand_ready_prefix().is_none());
-        // decisions comes before blocks
-        rand_store
-            .add_decision(create_decision(metadata_3[0].clone()))
-            .unwrap();
-        assert!(rand_store.try_dequeue_rand_ready_prefix().is_none());
-        rand_store
-            .add_decision(create_decision(metadata_3[2].clone()))
-            .unwrap();
-        assert!(rand_store.try_dequeue_rand_ready_prefix().is_none());
-        rand_store.add_blocks(blocks_3);
-        assert!(rand_store.try_dequeue_rand_ready_prefix().is_none());
-        // decisions comes after blocks
-        rand_store
-            .add_decision(create_decision(metadata_3[1].clone()))
-            .unwrap();
-        assert!(rand_store.try_dequeue_rand_ready_prefix().is_none());
-
-        // last aggregated decision dequeue all
-        for share in authors[2..6]
-            .iter()
-            .map(|author| create_share(metadata_2[1].clone(), *author))
-        {
-            rand_store.add_share(share).unwrap();
-        }
-        rand_store
-            .add_share(create_share(metadata_2[1].clone(), authors[6]))
-            .unwrap();
-        assert_eq!(rand_store.try_dequeue_rand_ready_prefix().unwrap().len(), 2);
     }
 }
