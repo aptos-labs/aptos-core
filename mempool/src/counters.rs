@@ -271,7 +271,7 @@ pub static CORE_MEMPOOL_GC_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
 
 pub static CORE_MEMPOOL_CONSENSUS_PULLED_COUNT: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
-        "aptos_core_mempool_consensus_pulled_count",
+        "aptos_core_mempool_consensus_pulled",
         "Number of times a txn was pulled from core mempool by consensus",
         CONSENSUS_PULLED_BUCKETS.to_vec()
     )
