@@ -356,9 +356,9 @@ async fn process_streaming_response(
     let mut start_time = std::time::Instant::now();
 
     // 4. Process the streaming response.
-    loop  {
+    loop {
         let received = match resp_stream.next().await {
-            Some(Ok(r)) => r,
+            Some(r) => r,
             _ => {
                 error!(
                     service_type = SERVICE_TYPE,

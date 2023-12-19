@@ -53,7 +53,6 @@ where
             } else {
                 panic!("Probes and metrics handler exited unexpectedly");
             }
-            Ok(())
         },
         res = main_task_handler => {
             if let Err(e) = res {
@@ -62,7 +61,6 @@ where
             } else {
                 panic!("Main task exited unexpectedly");
             }
-            Ok(())
         },
     }
 }
