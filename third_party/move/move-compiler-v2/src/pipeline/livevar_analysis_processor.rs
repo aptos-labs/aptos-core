@@ -198,6 +198,7 @@ impl<'a> TransferFunctions for LiveVarAnalysis<'a> {
             Load(_, dst, _) => {
                 state.livevars.remove(dst);
             },
+            Call(_, _, Operation::Destroy, _, _) => {},
             Call(id, dsts, _, srcs, _) => {
                 for dst in dsts {
                     state.livevars.remove(dst);

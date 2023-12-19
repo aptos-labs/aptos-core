@@ -180,7 +180,7 @@ fun explicate_drop::id<#0>($t0: #0): #0 {
      # global_to_label: {}
      #
   0: $t1 := copy($t0)
-     # live vars: $t0, $t1
+     # live vars: $t1
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
@@ -197,7 +197,7 @@ fun explicate_drop::id<#0>($t0: #0): #0 {
 
 [variant baseline]
 fun explicate_drop::unused_arg<#0>($t0: #0) {
-     # live vars: $t0
+     # live vars:
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}

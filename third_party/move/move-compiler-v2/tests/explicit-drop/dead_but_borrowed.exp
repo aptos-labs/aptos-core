@@ -118,15 +118,15 @@ fun explicate_drop::test0(): u8 {
      # global_to_label: {}
      #
   3: $t3 := copy($t4)
-     # live vars: $t3, $t4
+     # live vars: $t3
      # graph: {L512=local($t1)[borrow(false) -> L513],L513=local($t4)[skip -> L769],L769=local($t3)[]}
      # local_to_label: {$t1=L512,$t3=L769,$t4=L513}
      # global_to_label: {}
      #
   4: $t0 := read_ref($t3)
-     # live vars: $t0, $t4
-     # graph: {L512=local($t1)[borrow(false) -> L513],L513=local($t4)[]}
-     # local_to_label: {$t1=L512,$t4=L513}
+     # live vars: $t0
+     # graph: {}
+     # local_to_label: {}
      # global_to_label: {}
      #
   5: destroy($t4)
