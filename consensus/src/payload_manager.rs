@@ -3,6 +3,7 @@
 
 use crate::{
     counters,
+    logging::{LogEvent, LogSchema},
     quorum_store::{batch_store::BatchReader, quorum_store_coordinator::CoordinatorCommand},
 };
 use aptos_consensus_types::{
@@ -80,6 +81,14 @@ impl PayloadManager {
                     .collect();
 
                 let mut tx = coordinator_tx.clone();
+
+                for batch in &batches {
+                    info!(
+                        LogSchema::new(LogEvent::PayloadCommitNotification),
+                        batch_id = batch.batch_id(),
+                        block_timestamp = block_timestamp,
+                    );
+                }
 
                 if let Err(e) = tx.try_send(CoordinatorCommand::CommitNotification(
                     block_timestamp,

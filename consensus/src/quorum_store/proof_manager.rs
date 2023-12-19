@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    logging::{LogEvent, LogSchema},
     monitor,
     quorum_store::{batch_generator::BackPressure, counters, utils::ProofQueue},
 };
@@ -94,6 +95,13 @@ impl ProofManager {
                     max_bytes,
                     return_non_full,
                 );
+
+                for proof in &proof_block {
+                    info!(
+                        LogSchema::new(LogEvent::PulledProof),
+                        batch_id = proof.info().batch_id()
+                    )
+                }
 
                 let res = GetPayloadResponse::GetPayloadResponse(
                     if proof_block.is_empty() {

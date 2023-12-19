@@ -453,6 +453,13 @@ impl BatchGenerator {
                                     debug!(
                                         LogSchema::new(LogEvent::BatchCommitNotification),
                                         batch_id = batch_id,
+                                        removed = true,
+                                    );
+                                } else {
+                                    debug!(
+                                        LogSchema::new(LogEvent::BatchCommitNotification),
+                                        batch_id = batch_id,
+                                        removed = false,
                                     );
                                 }
                             }

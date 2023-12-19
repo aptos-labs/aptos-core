@@ -40,6 +40,8 @@ pub enum LogEvent {
     BatchPullExcludedTxns,
     BatchTxnNotRemoved,
     BatchCommitNotification,
+    PayloadCommitNotification,
+    PulledProof,
 }
 
 impl LogSchema {
