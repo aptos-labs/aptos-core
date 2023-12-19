@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 // This is necessary for building the API with how the code is structured currently.
 pub fn get_fake_context() -> Context {
-    let mempool = MockSharedMempool::new();
+    let mempool = MockSharedMempool::new_with_runtime();
     Context::new(
         ChainId::test(),
         Arc::new(MockDbReaderWriter),

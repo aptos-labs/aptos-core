@@ -638,7 +638,7 @@ impl TestContext {
 
         self.mempool
             .mempool_notifier
-            .notify_new_commit(txns, timestamp, 1000)
+            .notify_new_commit(txns, timestamp)
             .await
             .unwrap();
     }
