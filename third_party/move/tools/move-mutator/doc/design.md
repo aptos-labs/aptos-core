@@ -158,11 +158,11 @@ The report contains information about the generated mutants as well as the kille
 
 ## Mutation operators
 
-Mutation operators can be divided into two groups. The first group is composed of mutation operators that, once replaced, do not change the length of the original program. That operator can be mixed inside on file to achieve more complex mutations. The second group is composed of mutation operators that, once replaced, change the length of the original program. That operator cannot be mixed inside one file, so each mutant has only one mutation of that kind. It should be possible to combine many non-changing file length mutation operators with one changing len mutation operator, but the latter needs to be applied as the last one. Such behaviour needs to be enabled explicitly in the configuration, as by default, it will generate only one mutation at once.
+Mutation operators can be applied alone or mixed with other ones. The decision is made based on the configuration file. The default behaviour is to use one mutation operator at a time (per file). It's worth noting that mixing operators within one file will significantly increase the number of generated mutants.
+
+The mutation tool reads the source file(-s) once and then works on the original AST. If any previous mutation changes the original file, it would demand reloading the modified source (as upon change, all current AST locations become outdated), parsing the AST and again for possible mutations. It would be very inefficient. Once mutation places are identified, mutants are generated in reversed order (based on localization) to avoid that. If operator mixing is allowed, they are applied only for non-overlapping expressions.
 
 The above behaviour can be discussed if it's really needed.
-
-The reason for introducing two groups of mutation operators is connected with the way the Move mutator tool works. It reads the source file(-s) once and then works on the original AST. If any previous mutation changes the original file, then it would demand reloading the modified source (as upon change, all current AST locations become outdated), parsing the AST and again for possible mutations. It would be very inefficient.
 
 The Move mutator tool implements the following mutation operators.
 
@@ -183,21 +183,17 @@ Binary operators are never removed, as it would produce invalid code.
 
 The operator tests the conditions in the specifications and test suites.
 
-It can be mixed with other non-changing file length mutation operators.
-
 ### Unary operator replacement
 
 This mutation operator replaces unary operators with other unary operators. For example, the `!` operator can be replaced with the space. So, in fact, it removes the operator but without changing the file length.
 
 The operator tests the conditions in the specifications and test suites.
 
-Thanks to the fact that, the operator is replaced with space instead of just removing, it can be mixed with other non-changing file length mutation operators.
+Thanks to the fact that, the operator is replaced with space instead of just removing.
 
 ### Type replacement
 
 This mutation operator replaces types with other types. For example, the `u8` type can be replaced with the `u64` type.
-
-It can't be mixed with other mutation operators as it may change the file length.
 
 ### Literal replacement
 
@@ -207,13 +203,9 @@ It's possible to choose the type of the literal to be replaced. For example, it'
 
 The operator tests the different conditions in the specifications (like invariants) and test suites.
 
-It can't be mixed with other mutation operators as it may change the file length.
-
 ### Address replacement
 
 This mutation operator replaces addresses with other addresses. For example, the `0x1`/`@std` address can be replaced with the `0x000A` address or another random address.
-
-It can't be mixed with other mutation operators as it may change the file length.
 
 ### Return value replacement
 
@@ -221,13 +213,9 @@ This mutation operator replaces return values with other return values. For exam
 
 The operator tests the conditions in the test suites and, e.g. the `ensures` statement in specifications.
 
-It can't be mixed with other mutation operators as it may change the file length.
-
 ### Break/continue replacement or deletion
 
 This mutation operator replaces or deletes break/continue statements with other break/continue statements.
-
-It can't be mixed with other mutation operators as it may change the file length.
 
 ## Extending the Move mutator tool
 
