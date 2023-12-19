@@ -9,11 +9,11 @@ use crate::{
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::info;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
-use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use aptos_types::{
     account_address::AccountAddress, account_config::aptos_test_root_address,
-    account_view::AccountView, chain_id::ChainId, transaction::Transaction,
+    account_view::AccountView, chain_id::ChainId,
+    state_store::account_with_state_view::AsAccountWithStateView, transaction::Transaction,
 };
 use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};

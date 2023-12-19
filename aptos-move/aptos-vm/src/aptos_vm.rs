@@ -27,7 +27,6 @@ use aptos_gas_schedule::{AptosGasParameters, VMGasParameters};
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_metrics_core::TimerHelper;
-use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
     account_config::new_block_event_key,
@@ -42,6 +41,7 @@ use aptos_types::{
         new_epoch_event_key, ConfigurationResource, FeatureFlag, Features, OnChainConfig,
         TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,
     },
+    state_store::{StateView, StateViewId},
     transaction::{
         authenticator::{AccountAuthenticator, AnySignature, TransactionAuthenticator},
         signature_verified_transaction::SignatureVerifiedTransaction,
@@ -314,7 +314,7 @@ impl AptosVM {
     /// Returns the internal gas schedule if it has been loaded, or an error if it hasn't.
     #[cfg(any(test, feature = "testing"))]
     pub fn gas_params(&self) -> Result<&AptosGasParameters, VMStatus> {
-        let log_context = AdapterLogSchema::new(aptos_state_view::StateViewId::Miscellaneous, 0);
+        let log_context = AdapterLogSchema::new(StateViewId::Miscellaneous, 0);
         get_or_vm_startup_failure(&self.gas_params, &log_context)
     }
 

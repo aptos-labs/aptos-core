@@ -47,7 +47,6 @@ use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_logger::info;
 use aptos_schemadb::{ReadOptions, SchemaBatch};
 use aptos_scratchpad::{SmtAncestors, SparseMerkleTree};
-use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher,
     cached_state_view::{CachedStateView, ShardedStateCache},
@@ -62,7 +61,7 @@ use aptos_types::{
         state_key_prefix::StateKeyPrefix,
         state_storage_usage::StateStorageUsage,
         state_value::{StaleStateValueIndex, StateValue, StateValueChunkWithProof},
-        ShardedStateUpdates,
+        ShardedStateUpdates, StateViewId,
     },
     transaction::Version,
     write_set::{TransactionWrite, WriteSet},

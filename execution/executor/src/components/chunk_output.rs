@@ -208,8 +208,10 @@ impl ChunkOutput {
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>> {
-        use aptos_state_view::{StateViewId, TStateView};
-        use aptos_types::write_set::WriteSet;
+        use aptos_types::{
+            state_store::{StateViewId, TStateView},
+            write_set::WriteSet,
+        };
 
         let transaction_outputs = match state_view.id() {
             // this state view ID implies a genesis block in non-test cases.

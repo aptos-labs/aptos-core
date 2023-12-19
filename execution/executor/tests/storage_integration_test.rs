@@ -11,14 +11,13 @@ use aptos_executor_test_helpers::{
     },
 };
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_storage_interface::state_view::DbStateViewAtVersion;
 use aptos_types::{
     access_path::AccessPath,
     account_config::{aptos_test_root_address, AccountResource, CORE_CODE_ADDRESS},
     account_view::AccountView,
     block_metadata::BlockMetadata,
-    state_store::state_key::StateKey,
+    state_store::{account_with_state_view::AsAccountWithStateView, state_key::StateKey},
     test_helpers::transaction_test_helpers::TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
     transaction::{
         signature_verified_transaction::into_signature_verified_block, Transaction, WriteSetPayload,
