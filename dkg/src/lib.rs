@@ -1,4 +1,7 @@
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
+use aptos_event_notifications::{
+    DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
+};
 use aptos_network::application::{
     error::Error,
     interface::{NetworkClient, NetworkClientInterface, NetworkServiceEvents},
@@ -15,6 +18,8 @@ pub fn start_dkg_runtime(
     _network_service_events: NetworkServiceEvents<DKGMsg>,
     _vtxn_pool_writer: vtxn_pool::SingleTopicWriteClient,
     _vtxn_pulled_rx: vtxn_pool::PullNotificationReceiver,
+    _reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
+    _start_dkg_events: EventNotificationListener,
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("dkg".into(), Some(4));
     runtime

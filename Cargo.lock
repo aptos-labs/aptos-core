@@ -1232,6 +1232,7 @@ name = "aptos-dkg-runtime"
 version = "0.1.0"
 dependencies = [
  "aptos-config",
+ "aptos-event-notifications",
  "aptos-network",
  "aptos-runtimes",
  "aptos-types",
@@ -2434,6 +2435,7 @@ name = "aptos-jwk-consensus"
 version = "0.1.0"
 dependencies = [
  "aptos-config",
+ "aptos-event-notifications",
  "aptos-network",
  "aptos-runtimes",
  "aptos-types",
