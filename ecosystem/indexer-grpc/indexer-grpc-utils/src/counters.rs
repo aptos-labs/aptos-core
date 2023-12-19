@@ -21,8 +21,10 @@ pub enum IndexerGrpcStep {
     CacheWorkerTxnsProcessed, // [Indexer Cache] Processed transactions in a batch.
     CacheWorkerBatchProcessed, // [Indexer Cache] Successfully process current batch.
 
+    FilestoreFetchTxns,      // [File worker] Fetch transactions from cache.
     FilestoreUploadTxns,     // [File worker] Upload transactions to filestore.
     FilestoreUpdateMetadata, // [File worker] Upload transactions to filestore.
+    FilestoreProcessedBatch, // [File worker] Successfully process current batch.
 
     FullnodeFetchedBatch, // [Indexer Fullnode] Fetched batch of transactions from fullnode
     FullnodeDecodedBatch, // [Indexer Fullnode] Decoded batch of transactions from fullnode
@@ -50,8 +52,10 @@ impl IndexerGrpcStep {
             IndexerGrpcStep::CacheWorkerTxnsProcessed => "3",
             IndexerGrpcStep::CacheWorkerBatchProcessed => "4",
             // Filestore worker steps
-            IndexerGrpcStep::FilestoreUploadTxns => "1",
-            IndexerGrpcStep::FilestoreUpdateMetadata => "1.1",
+            IndexerGrpcStep::FilestoreProcessedBatch => "1",
+            IndexerGrpcStep::FilestoreFetchTxns => "1.0",
+            IndexerGrpcStep::FilestoreUploadTxns => "1.1",
+            IndexerGrpcStep::FilestoreUpdateMetadata => "1.2",
             // Fullnode steps
             IndexerGrpcStep::FullnodeFetchedBatch => "1",
             IndexerGrpcStep::FullnodeDecodedBatch => "2",
@@ -85,6 +89,8 @@ impl IndexerGrpcStep {
             IndexerGrpcStep::CacheWorkerTxnsProcessed => "[Indexer Cache] Processed transactions in a batch.",
             IndexerGrpcStep::CacheWorkerBatchProcessed => "[Indexer Cache] Successfully process current batch.",
             // Filestore worker steps
+            IndexerGrpcStep::FilestoreProcessedBatch => "[File worker] Successfully process current batch.",
+            IndexerGrpcStep::FilestoreFetchTxns => "[File worker] Fetch transactions from cache.",
             IndexerGrpcStep::FilestoreUploadTxns => "[File worker] Finished uploading batch of transactions to filestore.",
             IndexerGrpcStep::FilestoreUpdateMetadata => "[File worker] Update filestore metadata.",
             // Fullnode steps

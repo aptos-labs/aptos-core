@@ -175,15 +175,43 @@ impl Processor {
                 let mut cache_operator_clone = self.cache_operator.clone();
                 let mut file_store_operator_clone = self.file_store_operator.clone_box();
                 let task = tokio::spawn(async move {
+                    let fetch_start_time = std::time::Instant::now();
                     let transactions = cache_operator_clone
                         .batch_get_encoded_proto_data_x(start_version, BLOB_STORAGE_SIZE as u64)
                         .await
                         .unwrap();
                     let last_transaction = transactions.last().unwrap().0.clone();
+                    log_grpc_step(
+                        SERVICE_TYPE,
+                        IndexerGrpcStep::FilestoreFetchTxns,
+                        Some(start_version as i64),
+                        Some((start_version + BLOB_STORAGE_SIZE as u64 - 1) as i64),
+                        None,
+                        None,
+                        Some(fetch_start_time.elapsed().as_secs_f64()),
+                        None,
+                        Some(BLOB_STORAGE_SIZE as i64),
+                        None,
+                    );
+
+                    let upload_start_time = std::time::Instant::now();
                     let (start, end) = file_store_operator_clone
                         .upload_transaction_batch(cache_chain_id, transactions)
                         .await
                         .unwrap();
+                    log_grpc_step(
+                        SERVICE_TYPE,
+                        IndexerGrpcStep::FilestoreUploadTxns,
+                        Some(start_version as i64),
+                        Some((start_version + BLOB_STORAGE_SIZE as u64 - 1) as i64),
+                        None,
+                        None,
+                        Some(upload_start_time.elapsed().as_secs_f64()),
+                        None,
+                        Some(BLOB_STORAGE_SIZE as i64),
+                        None,
+                    );
+
                     (start, end, last_transaction)
                 });
                 tasks.push(task);
@@ -293,7 +321,7 @@ impl Processor {
             let full_loop_duration = latest_loop_time.elapsed().as_secs_f64();
             log_grpc_step(
                 SERVICE_TYPE,
-                IndexerGrpcStep::FilestoreUploadTxns,
+                IndexerGrpcStep::FilestoreProcessedBatch,
                 Some(first_version as i64),
                 Some(last_version as i64),
                 start_version_timestamp.as_ref(),
