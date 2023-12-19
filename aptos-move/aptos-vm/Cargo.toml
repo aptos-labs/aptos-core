@@ -39,6 +39,8 @@ aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 claims = { workspace = true }
+core_affinity = { workspace = true }
+libc = { workspace = true }
 crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
 fail = { workspace = true }
@@ -59,6 +61,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 smallvec = { workspace = true }
 tracing = { workspace = true }
+log = "0.4.17"
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }

@@ -33,6 +33,53 @@ use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;
 
+
+#[cfg(target_os = "linux")]
+use libc::{cpu_set_t, sched_setaffinity, CPU_SET};
+use log::info;
+
+#[cfg(target_os = "linux")]
+fn new_cpu_set() -> cpu_set_t {
+    unsafe { std::mem::zeroed::<cpu_set_t>() }
+}
+
+#[cfg(target_os = "linux")]
+fn pin_cpu_set(cpu_set: cpu_set_t) {
+    move || {
+        unsafe {
+            sched_setaffinity(
+                0, // Defaults to current thread
+                std::mem::size_of::<cpu_set_t>(),
+                &cpu_set,
+            );
+        };
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn set_processor_affinity(shard_id: usize) {
+    let core_ids = core_affinity::get_core_ids().unwrap();
+    let num_cores = core_ids.len();
+
+    let mut cpu_set = new_cpu_set();
+    assert!(num_cores > shard_id);
+    info!("**************** shard_id: {}, num_cores: {}", shard_id, num_cores);
+
+    for (i, core_id) in core_ids.iter().enumerate() {
+        if (shard_id < num_cores / 4) || ((shard_id >= num_cores / 2) && (shard_id < num_cores * 3 / 4)) {
+            if (i < num_cores / 4) || (i >= num_cores / 2) || (i < num_cores * 3 / 4){
+                unsafe { CPU_SET(core_id.id, &mut cpu_set) };
+            }
+        } else {
+            if ((i >= num_cores / 4) && (i < num_cores / 2)) || (i >= num_cores * 3 / 4) {
+                unsafe { CPU_SET(core_id.id, &mut cpu_set) };
+            }
+        }
+    }
+
+    pin_cpu_set(cpu_set);
+}
+
 pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     shard_id: ShardId,
     num_shards: usize,
@@ -55,6 +102,9 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 // that is blocked on waiting for execute block to finish.
                 .thread_name(move |i| format!("sharded-executor-shard-{}-{}", shard_id, i))
                 .num_threads(num_threads + 2)
+                .start_handler(move |_| {
+                    set_processor_affinity(shard_id);
+                })
                 .build()
                 .unwrap(),
         );
