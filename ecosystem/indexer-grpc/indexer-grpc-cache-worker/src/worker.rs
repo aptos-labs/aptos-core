@@ -356,7 +356,18 @@ async fn process_streaming_response(
     let mut start_time = std::time::Instant::now();
 
     // 4. Process the streaming response.
-    while let Some(received) = resp_stream.next().await {
+    loop  {
+        let received = match resp_stream.next().await {
+            Some(Ok(r)) => r,
+            _ => {
+                error!(
+                    service_type = SERVICE_TYPE,
+                    "[Indexer Cache] Streaming error: no response."
+                );
+                ERROR_COUNT.with_label_values(&["streaming_error"]).inc();
+                break;
+            },
+        };
         let received: TransactionsFromNodeResponse = match received {
             Ok(r) => r,
             Err(err) => {
