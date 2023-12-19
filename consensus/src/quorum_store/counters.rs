@@ -163,6 +163,30 @@ pub static EXCLUDED_TXNS_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
         .unwrap()
 });
 
+pub static BATCH_IN_PROGRESS_COMMITTED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_batch_in_progress_committed",
+        "Number of batches that are removed from in progress by a commit."
+    )
+    .unwrap()
+});
+
+pub static BATCH_IN_PROGRESS_EXPIRED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_batch_in_progress_expired",
+        "Number of batches that are removed from in progress by a block timestamp expiration."
+    )
+    .unwrap()
+});
+
+pub static BATCH_IN_PROGRESS_TIMEOUT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_batch_in_progress_timeout",
+        "Number of batches that are removed from in progress by a proof collection timeout."
+    )
+    .unwrap()
+});
+
 pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_SAVE: Lazy<Histogram> = Lazy::new(
     || {
         register_histogram!(

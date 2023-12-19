@@ -39,6 +39,7 @@ pub enum LogEvent {
     VoteNIL,
     BatchPullExcludedTxns,
     BatchTxnNotRemoved,
+    BatchCommitNotification,
 }
 
 impl LogSchema {
