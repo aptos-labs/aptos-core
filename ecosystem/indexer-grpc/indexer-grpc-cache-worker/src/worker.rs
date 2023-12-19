@@ -164,7 +164,8 @@ impl Worker {
                 })?;
             info!(
                 service_type = SERVICE_TYPE,
-                "[Indexer Cache] Streaming RPC started.");
+                "[Indexer Cache] Streaming RPC started."
+            );
             // 3&4. Infinite streaming until error happens. Either stream ends or worker crashes.
             process_streaming_response(conn, file_store_metadata, response.into_inner()).await?;
 
@@ -320,7 +321,7 @@ async fn verify_fullnode_init_signal(
 
     // Guaranteed that chain id is here at this point because we already ensure that fileworker did the set up
     let chain_id = cache_operator.get_chain_id().await?.unwrap();
-    if chain_id == fullnode_chain_id as u64 {
+    if chain_id != fullnode_chain_id as u64 {
         bail!("[Indexer Cache] Chain ID mismatch between fullnode init signal and cache.");
     }
 
