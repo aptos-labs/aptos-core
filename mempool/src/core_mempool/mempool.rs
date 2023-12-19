@@ -144,6 +144,18 @@ impl Mempool {
                 .fetch_add(1, Ordering::Relaxed);
             Self::log_txn_latency(insertion_info, bucket, counters::CONSENSUS_PULLED_LABEL);
             counters::CORE_MEMPOOL_CONSENSUS_PULLED_COUNT.observe((prev_count + 1) as f64);
+            if prev_count > 0 {
+                info!(
+                    LogSchema::new(LogEntry::ConsensusPulledTxn)
+                        .txns(TxnsLog::new_txn(account, sequence_number)),
+                    pulled_count = prev_count + 1,
+                    insertion_time_ms = insertion_info
+                        .insertion_time
+                        .elapsed()
+                        .unwrap_or(Duration::ZERO)
+                        .as_millis(),
+                );
+            }
         }
     }
 
