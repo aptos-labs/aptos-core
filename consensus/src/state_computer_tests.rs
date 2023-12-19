@@ -156,6 +156,7 @@ async fn schedule_compute_should_discover_validator_txns() {
     );
 
     let epoch_state = EpochState::empty();
+
     execution_policy.new_epoch(
         &epoch_state,
         Arc::new(PayloadManager::DirectMempool),
@@ -220,6 +221,7 @@ async fn commit_should_discover_validator_txns() {
         state_compute_result,
     ))];
     let epoch_state = EpochState::empty();
+
     execution_policy.new_epoch(
         &epoch_state,
         Arc::new(PayloadManager::DirectMempool),
