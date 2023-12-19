@@ -9,7 +9,11 @@ script{
     // Operator expression
     let intermediate1: u64 = ((a + b) * (c - d)) / (e + 1);
     let intermediate2: u64 = (a * (c + d)) - (b / (e - 2));
+    let intermediate3: u64 = (a      * {c + d }  )-(b/ { e          - 2 });
     result = (intermediate1 % intermediate2) + 7 * (a - d);
+
+  let x   :   bool = true;
+  x = !    x;
     return result;
   }
 }

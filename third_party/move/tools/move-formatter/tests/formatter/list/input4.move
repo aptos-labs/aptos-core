@@ -3,8 +3,7 @@ module econia::incentives {
 fun init_module(  
     // A reference to the signer  
     econia: &signer  
-) acquires  
-    // The incentive parameters  
+) acquires
     IncentiveParameters  
 {  
     // Vectorize fee store tier parameters  

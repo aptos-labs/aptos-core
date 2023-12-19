@@ -19,7 +19,8 @@ module 0x42::LambdaTest2 {
     use std::vector;  
   
     /** Public inline function */  
-    public inline fun foreach<T>(v: &vector<T>, action: |&T|) {  
+        public inline fun foreach<T>(
+ v: & vector <T >, action : | & T |) {  
         /* Loop through the vector and apply the action to each element */  
         let i = 0;  
         while (i < vector::length(v)) {  

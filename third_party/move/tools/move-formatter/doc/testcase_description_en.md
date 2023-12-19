@@ -4,9 +4,9 @@
 
 2. Provide minimal configuration, such as choice of indentation with 2 or 4 spaces.
 
-3. Internally enforce a maximum width of 90 characters.
+3. Try to maintain a maximum width of 90 characters internally.
 
-4. Internally enforce that the left '{' of a statement block should not be written on a separate line.
+4. The most statement blocks, '{' should not be written on a separate line.
 
 5. Leave one space between keywords like if/while and the following '(' .
 
@@ -14,34 +14,24 @@
 
 7. For long block comments in a single line, refer to industry tools and avoid splitting the comment.
 
-8. For line comments at the end of a code line, maintain two spaces between the code and the comment symbol '//'.
-```rust
-    let y: u64 = 100;  // comment(2 space before '//')
-```
+8. Most of the time, there should be a space between the comment and the code. Block comments after '(' and before ')' do not need to leave a space.
 
-9. Leave one space after the comment symbol '//' or '/*', and before '*/'.
-```rust
-    let y: u64 = 100;  // comment(2 space before '//', 1 space after '//')
-    /* 1 space after '/*', 1 space before '*/' */
-```
+9. Leave a blank line between functions.
 
-10. Leave a blank line between functions.
-
-11. There is a boundary condition, if the left side of '{' is exactly 90 characters long, 
+10. There is a boundary condition, if the left side of '{' is exactly 90 characters long, 
 then '{' does not need to move to the next line.
 
-12. If multiple statements are on the same line, each statement is followed by a semicolon, 
+11. If multiple statements are on the same line, each statement is followed by a semicolon, 
 and a comment is added at the end of the last semicolon. 
 The formatting result should be each statement with a semicolon on a separate line, 
 with the comment located after the last statement with a semicolon. 
 
-13. For statements in the same nested level, keep the same indentation.
+12. For statements in the same nested level, keep the same indentation.
 
-14. If there is a blank line between two lines in a statement block, the blank line will be output.
-
-15. If there are multiple blank lines between two lines in a statement block, 
+13. If there are one or more blank lines between two lines in a statement block, 
 they will be compressed and only one blank line will be output.
 
+14. All the trailing whitespaces will be removed.
 
 ## Comment Types:
 * Block Comment -> /**/
@@ -150,6 +140,36 @@ fun f_multiple() acquires R reads R writes T, S reads G<u64> {
 }
 ```
 
+### case6:
+The comments like "//#publish", "//#[test]", "//#run"
+
+### case7:
+With generic functions (functions taking generic parameters with ability constraints)
+> code snippet from tests/formatter/fun/input7.move
+```rust
+    public fun create_box(value: u64): Box<u64> {
+        Box<u64>{ value }
+    }    public fun value<T: copy>(box: &Box<T>): T acquires SomeStruct{
+        *&box.value
+    }
+```
+
+### case8:
+Many blank lines between functions
+
+### case9:
+Multiple blank lines after module begins and before it ends
+
+### case10:
+There are blank lines at the top of a file before any code begins.
+
+### case11:
+A case for fun with many more args, so that it overflows the 90 limit, into multiple lines
+> code snippet from tests/formatter/fun/input11.move
+```rust
+public fun multi_arg(p1:u64,p2:u64,p3:u64,p4:u64,p5:u64,p6:u64,       p7:u64,p8:u64,p9:u64,p10:u64,p11:u64,p12:u64,p13:u64,p14:u64):u64
+```
+
 ## 3.lambda
 ### case1:
 The function parameter is a lambda expression
@@ -201,6 +221,14 @@ comment accompany the appearance of lambda
         LambdaTest1::inline_apply1(g, LambdaTest1::inline_mul(c, LambdaTest1::inline_apply(|x| { LambdaTest1::inline_apply(|y|y, x) }, 3))) + 4  
     }
 ```
+
+### case6:
+A complex expression with function calls, binops, and parenthesis that spills over 90 columns
+
+### case7:
+A test case where we have multiple statements in a lambda's body (and one where a lambda's body contains a call to an inline function, 
+one of whose arguments is a lambda, so: lambda within a lambda)
+
 
 ## 4.list
 ### case1:
@@ -700,3 +728,6 @@ Multiple blank lines between use statements
         /* use_item before */Coin};
   
 ```
+
+### case6:
+The `use` statements overflows the 90 column limit; Coallescable `use` statements

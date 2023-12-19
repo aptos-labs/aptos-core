@@ -5,7 +5,13 @@ module TestFunFormat{
   }
 
   // test two fun Close together without any blank lines
-  public fun multi_arg(p1: u64, p2: u64): u64{
+    public
+  fun 
+  multi_arg(
+  p1: u64,
+   p2: u64): 
+   u64
+   {
     p1 + p2
   }
   // test two fun Close together without any blank lines, and here is a InlineComment

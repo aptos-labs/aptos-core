@@ -13,7 +13,8 @@ module complex_module {
     // Struct with various comment styles and positions  
     struct ComplexStruct3 {  
         // Field 1 comment (single-line)  
-        field1: u64, // Inline comment (single-line)  
+                field1: u64, // Inline comment (line 1)
+                            // continued on line 2.
         /* Field 2 comment (multi-line) */  
         field2: /* Inline comment (multi-line) */ bool, // Trailing comment (single-line)  
     } // Struct footer comment (single-line)    
