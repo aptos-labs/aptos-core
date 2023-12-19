@@ -151,7 +151,7 @@ pub static STORAGE_SYNCHRONIZER_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
         "aptos_state_sync_storage_synchronizer_latencies",
         "Counters related to the storage synchronizer latencies",
         &["label"],
-        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     )
     .unwrap()
 });
