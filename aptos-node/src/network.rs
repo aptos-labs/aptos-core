@@ -7,7 +7,7 @@ use aptos_config::{
     config::{NetworkConfig, NodeConfig},
     network_id::NetworkId,
 };
-use aptos_consensus::network_interface::{ConsensusMsg, DIRECT_SEND, RPC};
+use aptos_consensus::network_interface::ConsensusMsg;
 use aptos_dkg_runtime::DKGMsg;
 use aptos_event_notifications::EventSubscriptionService;
 use aptos_jwk_consensus::JWKConsensusMsg;
@@ -62,38 +62,6 @@ pub fn consensus_network_configuration(node_config: &NodeConfig) -> NetworkAppli
         direct_send_protocols,
         rpc_protocols,
         aptos_channel::Config::new(node_config.consensus.max_network_channel_size)
-            .queue_style(QueueStyle::FIFO)
-            .counters(&aptos_consensus::counters::PENDING_CONSENSUS_NETWORK_EVENTS),
-    );
-    NetworkApplicationConfig::new(network_client_config, network_service_config)
-}
-
-pub fn dkg_network_configuration(node_config: &NodeConfig) -> NetworkApplicationConfig {
-    let direct_send_protocols: Vec<ProtocolId> = DIRECT_SEND.into();
-    let rpc_protocols: Vec<ProtocolId> = RPC.into();
-
-    let network_client_config =
-        NetworkClientConfig::new(direct_send_protocols.clone(), rpc_protocols.clone());
-    let network_service_config = NetworkServiceConfig::new(
-        direct_send_protocols,
-        rpc_protocols,
-        aptos_channel::Config::new(node_config.dkg.max_network_channel_size)
-            .queue_style(QueueStyle::FIFO)
-            .counters(&aptos_consensus::counters::PENDING_CONSENSUS_NETWORK_EVENTS),
-    );
-    NetworkApplicationConfig::new(network_client_config, network_service_config)
-}
-
-pub fn jwk_consensus_network_configuration(node_config: &NodeConfig) -> NetworkApplicationConfig {
-    let direct_send_protocols: Vec<ProtocolId> = DIRECT_SEND.into();
-    let rpc_protocols: Vec<ProtocolId> = RPC.into();
-
-    let network_client_config =
-        NetworkClientConfig::new(direct_send_protocols.clone(), rpc_protocols.clone());
-    let network_service_config = NetworkServiceConfig::new(
-        direct_send_protocols,
-        rpc_protocols,
-        aptos_channel::Config::new(node_config.jwk_consensus.max_network_channel_size)
             .queue_style(QueueStyle::FIFO)
             .counters(&aptos_consensus::counters::PENDING_CONSENSUS_NETWORK_EVENTS),
     );
