@@ -30,7 +30,7 @@ use move_stackless_bytecode::function_target_pipeline::{
 };
 use move_symbol_pool::Symbol;
 pub use options::*;
-use pipeline::explicit_drop::ExplicitDrop;
+use pipeline::{explicit_drop::ExplicitDrop, ability_checker::AbilityChecker};
 use std::{collections::BTreeSet, path::Path};
 
 /// Run Move compiler and print errors to stderr.
@@ -170,8 +170,7 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     if safety_on {
         pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
         pipeline.add_processor(Box::new(ExplicitDrop {}));
-        // TODO(#11415): cannot turn this on until the issue solved
-        // pipeline.add_processor(Box::new(AbilityChecker {}));
+        pipeline.add_processor(Box::new(AbilityChecker {}));
     }
     pipeline
 }
