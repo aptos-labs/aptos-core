@@ -13,7 +13,6 @@ use crate::sharded_block_executor::{
     ExecutorShardCommand, ShardedBlockExecutor,
 };
 use aptos_logger::trace;
-use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
@@ -22,6 +21,7 @@ use aptos_types::{
             MAX_ALLOWED_PARTITIONING_ROUNDS,
         },
     },
+    state_store::StateView,
     transaction::TransactionOutput,
 };
 use crossbeam_channel::{unbounded, Receiver, Sender};

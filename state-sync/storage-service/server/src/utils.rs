@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    error::Error, handler::Handler, moderator::RequestModerator, network::ResponseSender,
+    error::Error, handler::Handler, metrics, moderator::RequestModerator, network::ResponseSender,
     optimistic_fetch::OptimisticFetchRequest, storage::StorageReaderInterface,
     subscription::SubscriptionStreamRequests,
 };
 use aptos_config::network_id::PeerNetworkId;
+use aptos_metrics_core::HistogramVec;
 use aptos_storage_service_types::{
     requests::{DataRequest, EpochEndingLedgerInfoRequest, StorageServiceRequest},
     responses::{DataResponse, StorageServerSummary, StorageServiceResponse},
@@ -16,7 +17,8 @@ use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use mini_moka::sync::Cache;
-use std::sync::Arc;
+use once_cell::sync::Lazy;
+use std::{sync::Arc, time::Instant};
 
 /// Gets the epoch ending ledger info at the given epoch
 pub fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
@@ -174,4 +176,49 @@ pub fn notify_peer_of_new_data<T: StorageReaderInterface>(
     handler.send_response(missing_data_request, Ok(storage_response), response_sender);
 
     Ok(transformed_data_response)
+}
+
+/// An utility that calls and times the given function. The metric histogram
+/// is updated with the given labels (e.g., peer, request result and duration).
+/// If no start time is specified, the timer begins before calling the function.
+pub fn execute_and_time_duration<T, F>(
+    histogram: &Lazy<HistogramVec>,
+    peer_and_request: Option<(&PeerNetworkId, &StorageServiceRequest)>,
+    histogram_label: Option<String>,
+    function_to_call: F,
+    start_time: Option<Instant>,
+) -> Result<T, Error>
+where
+    F: FnOnce() -> Result<T, Error>,
+{
+    // Start the timer (if not already started)
+    let start_time = start_time.unwrap_or_else(Instant::now);
+
+    // Call the function and get the result
+    let result = function_to_call();
+
+    // Identify the result label
+    let result_label = if result.is_ok() {
+        metrics::RESULT_SUCCESS
+    } else {
+        metrics::RESULT_FAILURE
+    };
+
+    // Determine the label values to use
+    let mut label_values = vec![];
+    if let Some((peer, request)) = peer_and_request {
+        // Add the peer and request labels
+        label_values.push(peer.network_id().as_str().into());
+        label_values.push(request.get_label());
+    }
+    if let Some(histogram_label) = histogram_label {
+        label_values.push(histogram_label); // Add the histogram label
+    }
+    label_values.push(result_label.into()); // Add the result label to the end
+
+    // Observe the function duration
+    metrics::observe_duration(histogram, label_values, start_time);
+
+    // Return the result
+    result
 }

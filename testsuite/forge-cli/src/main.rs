@@ -23,7 +23,9 @@ use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::aptos_stdlib,
-    types::on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig},
+    types::on_chain_config::{
+        BlockGasLimitType, OnChainConsensusConfig, OnChainExecutionConfig, TransactionShufflerType,
+    },
 };
 use aptos_testcases::{
     compatibility_test::SimpleValidatorUpgrade,
@@ -986,21 +988,23 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000]),
         criteria: [
-            (9, 1.5, 3., 4.),
-            (95, 1.5, 3., 4.),
-            (950, 2., 3., 4.),
-            (2750, 2.5, 3.5, 4.5),
-            (4600, 3., 4., 5.),
+            (9, 1.5, 3., 4., 0),
+            (95, 1.5, 3., 4., 0),
+            (950, 2., 3., 4., 0),
+            (2750, 2.5, 3.5, 4.5, 0),
+            (4600, 3., 4., 5., 10), // Allow some expired transactions (high-load)
         ]
         .into_iter()
-        .map(|(min_tps, max_lat_p50, max_lat_p90, max_lat_p99)| {
-            SuccessCriteria::new(min_tps)
-                .add_max_expired_tps(0)
-                .add_max_failed_submission_tps(0)
-                .add_latency_threshold(max_lat_p50, LatencyType::P50)
-                .add_latency_threshold(max_lat_p90, LatencyType::P90)
-                .add_latency_threshold(max_lat_p99, LatencyType::P99)
-        })
+        .map(
+            |(min_tps, max_lat_p50, max_lat_p90, max_lat_p99, max_expired_tps)| {
+                SuccessCriteria::new(min_tps)
+                    .add_max_expired_tps(max_expired_tps)
+                    .add_max_failed_submission_tps(0)
+                    .add_latency_threshold(max_lat_p50, LatencyType::P50)
+                    .add_latency_threshold(max_lat_p90, LatencyType::P90)
+                    .add_latency_threshold(max_lat_p99, LatencyType::P99)
+            },
+        )
         .collect(),
     })
 }
@@ -1043,10 +1047,10 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         ]),
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
-            (3700, 0.35, 0.5, 0.8, 0.65),
-            (2800, 0.35, 0.5, 1.2, 1.3),
-            (1800, 0.35, 2.0, 1.5, 3.0),
-            (950, 0.35, 0.65, 1.5, 2.9),
+            (5500, 0.35, 0.3, 0.8, 0.65),
+            (4500, 0.35, 0.3, 1.0, 1.0),
+            (2000, 0.35, 0.3, 1.0, 1.0),
+            (600, 0.35, 0.3, 1.0, 1.0),
             // (150, 0.5, 1.0, 1.5, 0.65),
         ]
         .into_iter()
@@ -1864,19 +1868,37 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             }
         }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
+            let mut on_chain_execution_config = OnChainExecutionConfig::default_for_genesis();
+            // Need to update if the default changes
+            match &mut on_chain_execution_config {
+                OnChainExecutionConfig::Missing
+                | OnChainExecutionConfig::V1(_)
+                | OnChainExecutionConfig::V2(_)
+                | OnChainExecutionConfig::V3(_) => {
+                    unreachable!("Unexpected on-chain execution config type, if OnChainExecutionConfig::default_for_genesis() has been updated, this test must be updated too.")
+                }
+                OnChainExecutionConfig::V4(config_v4) => {
+                    config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                    config_v4.transaction_shuffler_type = TransactionShufflerType::SenderAwareV2(256);
+                }
+            }
             helm_values["chain"]["on_chain_execution_config"] =
-                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
-                    .expect("must serialize");
-            helm_values["chain"]["on_chain_execution_config"]["V3"]["block_gas_limit"] =
-                serde_yaml::Value::Null;
-            helm_values["chain"]["on_chain_execution_config"]["V3"]["transaction_shuffler_type"]
-                ["sender_aware_v2"] = 256.into();
+                serde_yaml::to_value(on_chain_execution_config).expect("must serialize");
         }));
 
     if ENABLE_VFNS {
         forge_config = forge_config
             .with_initial_fullnode_count(VALIDATOR_COUNT)
             .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+                // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
+                let max_chunk_size = 10_000;
+                let aptos_data_client_config = &mut config.state_sync.aptos_data_client;
+                let storage_service_config = &mut config.state_sync.storage_service;
+                aptos_data_client_config.max_transaction_chunk_size = max_chunk_size;
+                aptos_data_client_config.max_transaction_output_chunk_size = max_chunk_size;
+                storage_service_config.max_transaction_chunk_size = max_chunk_size;
+                storage_service_config.max_transaction_output_chunk_size = max_chunk_size;
+
                 // Experimental storage optimizations
                 config.storage.rocksdb_configs.enable_storage_sharding = true;
 
@@ -2054,7 +2076,7 @@ fn changing_working_quorum_test_helper(
                         // number of down nodes is close to the quorum limit, so
                         // make a check a bit looser, as state sync might be required
                         // to get the quorum back.
-                        30.0
+                        40.0
                     },
                     max_round_gap: 6,
                 }),

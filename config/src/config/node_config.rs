@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::DagConsensusConfig;
+use super::{DagConsensusConfig, IndexerTableInfoConfig};
 use crate::{
     config::{
         netbench::NetbenchConfig, node_config_loader::NodeConfigLoader,
@@ -51,6 +51,8 @@ pub struct NodeConfig {
     pub indexer: IndexerConfig,
     #[serde(default)]
     pub indexer_grpc: IndexerGrpcConfig,
+    #[serde(default)]
+    pub indexer_table_info: IndexerTableInfoConfig,
     #[serde(default)]
     pub inspection_service: InspectionServiceConfig,
     #[serde(default)]

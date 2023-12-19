@@ -5,17 +5,15 @@
 use crate::{
     account_generator::{AccountCache, AccountGenerator},
     metrics::{NUM_TXNS, TIMER},
-    transaction_executor::BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
 };
-use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue};
+use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::info;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
-use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
-use aptos_transaction_generator_lib::TransactionGeneratorCreator;
 use aptos_types::{
     account_address::AccountAddress, account_config::aptos_test_root_address,
-    account_view::AccountView, chain_id::ChainId, transaction::Transaction,
+    account_view::AccountView, chain_id::ChainId,
+    state_store::account_with_state_view::AsAccountWithStateView, transaction::Transaction,
 };
 use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -36,7 +34,7 @@ use std::{
     fs::File,
     io::{Read, Write},
     path::Path,
-    sync::{mpsc, Arc},
+    sync::{mpsc, Arc, Mutex},
 };
 use thread_local::ThreadLocal;
 
@@ -214,8 +212,6 @@ impl TransactionGenerator {
         TransactionFactory::new(ChainId::test())
             .with_transaction_expiration_time(300)
             .with_gas_unit_price(100)
-            // TODO(Gas): double check if this is correct
-            .with_max_gas_amount(100_000)
     }
 
     // Write metadata
@@ -295,9 +291,10 @@ impl TransactionGenerator {
         &mut self,
         block_size: usize,
         num_blocks: usize,
-        transaction_generator_creator: Box<dyn TransactionGeneratorCreator>,
+        transaction_generators: Vec<Box<dyn aptos_transaction_generator_lib::TransactionGenerator>>,
         transactions_per_sender: usize,
     ) {
+        let transaction_generators = Mutex::new(transaction_generators);
         assert!(self.block_sender.is_some());
         let num_senders_per_block =
             (block_size + transactions_per_sender - 1) / transactions_per_sender;
@@ -319,9 +316,7 @@ impl TransactionGenerator {
                     let sender = &self.main_signer_accounts.as_ref().unwrap().accounts[sender_idx];
                     let mut transaction_generator = transaction_generator
                         .get_or(|| {
-                            RefCell::new(
-                                transaction_generator_creator.create_transaction_generator(),
-                            )
+                            RefCell::new(transaction_generators.lock().unwrap().pop().unwrap())
                         })
                         .borrow_mut();
                     Transaction::UserTransaction(
@@ -374,10 +369,6 @@ impl TransactionGenerator {
                     );
                     Transaction::UserTransaction(txn)
                 })
-                .chain(
-                    (!BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG.has_any_block_gas_limit())
-                        .then_some(Transaction::StateCheckpoint(HashValue::random())),
-                )
                 .collect();
             bar.inc(transactions.len() as u64 - 1);
             if let Some(sender) = &self.block_sender {
@@ -671,10 +662,6 @@ impl TransactionGenerator {
         let mut transactions = Vec::new();
         for i in 0..block_size {
             transactions.push(transactions_by_index.get(&i).unwrap().clone());
-        }
-
-        if !BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG.has_any_block_gas_limit() {
-            transactions.push(Transaction::StateCheckpoint(HashValue::random()));
         }
 
         NUM_TXNS

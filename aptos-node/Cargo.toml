@@ -35,6 +35,7 @@ aptos-framework = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-indexer = { workspace = true, optional = true }
 aptos-indexer-grpc-fullnode = { workspace = true }
+aptos-indexer-grpc-table-info = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-inspection-service = { workspace = true }
 aptos-logger = { workspace = true }
@@ -50,7 +51,6 @@ aptos-peer-monitoring-service-types = { workspace = true }
 aptos-runtimes = { workspace = true }
 aptos-secure-storage = { workspace = true }
 aptos-state-sync-driver = { workspace = true }
-aptos-state-view = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-storage-service-client = { workspace = true }
 aptos-storage-service-notifications = { workspace = true }
@@ -60,6 +60,7 @@ aptos-telemetry = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
+aptos-validator-transaction-pool = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }

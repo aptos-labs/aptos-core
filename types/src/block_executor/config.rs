@@ -30,10 +30,6 @@ impl BlockExecutorConfigFromOnchain {
         }
     }
 
-    pub fn has_any_block_gas_limit(&self) -> bool {
-        self.block_gas_limit_type.block_gas_limit().is_some()
-    }
-
     pub const fn on_but_large_for_test() -> Self {
         Self {
             block_gas_limit_type:
@@ -44,6 +40,8 @@ impl BlockExecutorConfigFromOnchain {
                     io_gas_effective_multiplier: 1,
                     block_output_limit: Some(1_000_000_000_000),
                     conflict_penalty_window: 8,
+                    use_module_publishing_block_conflict: false,
+                    include_user_txn_size_in_block_output: true,
                     add_block_limit_outcome_onchain: false,
                     use_granular_resource_group_conflicts: false,
                 },

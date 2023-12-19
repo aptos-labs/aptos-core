@@ -79,7 +79,8 @@ pool.
 -  [Function `create_resource_account_seed`](#0x1_staking_contract_create_resource_account_seed)
 -  [Function `new_staking_contracts_holder`](#0x1_staking_contract_new_staking_contracts_holder)
 -  [Specification](#@Specification_1)
-    -  [Module-level Specification](#@Module-level_Specification_2)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `stake_pool_address`](#@Specification_1_stake_pool_address)
     -  [Function `last_recorded_principal`](#@Specification_1_last_recorded_principal)
     -  [Function `commission_percentage`](#@Specification_1_commission_percentage)
@@ -2171,10 +2172,89 @@ Create a new staking_contracts resource.
 ## Specification
 
 
-<a id="@Module-level_Specification_2"></a>
+
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Property</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>The Store structure for the staker exists after the staking contract is created.</td>
+<td>Medium</td>
+<td>The create_staking_contract_with_coins function ensures that the staker account has a Store structure assigned.</td>
+<td>Formally verified via <a href="#high-level-req-1">CreateStakingContractWithCoinsAbortsifAndEnsures</a>.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>A staking contract is created and stored in a mapping within the Store resource.</td>
+<td>High</td>
+<td>The create_staking_contract_with_coins function adds the newly created StakingContract to the staking_contracts map with the operator as a key of the Store resource, effectively storing the staking contract.</td>
+<td>Formally verified via <a href="#high-level-req-2">CreateStakingContractWithCoinsAbortsifAndEnsures</a>.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>Adding stake to the stake pool increases the principal value of the pool, reflecting the additional stake amount.</td>
+<td>High</td>
+<td>The add_stake function transfers the specified amount of staked coins from the staker's account to the stake pool associated with the staking contract. It increases the principal value of the staking contract by the added stake amount.</td>
+<td>Formally verified via <a href="#high-level-req-3">add_stake</a>.</td>
+</tr>
+
+<tr>
+<td>4</td>
+<td>The staker may update the voter of a staking contract, enabling them to modify the assigned voter address and ensure it accurately reflects their desired choice.</td>
+<td>High</td>
+<td>The update_voter function ensures that the voter address in a staking contract may be updated by the staker, resulting in the modification of the delegated voter address in the associated stake pool to reflect the new address provided.</td>
+<td>Formally verified via <a href="#high-level-req-4">update_voter</a>.</td>
+</tr>
+
+<tr>
+<td>5</td>
+<td>Only the owner of the stake pool has the permission to reset the lockup period of the pool.</td>
+<td>Critical</td>
+<td>The reset_lockup function ensures that only the staker who owns the stake pool has the authority to reset the lockup period of the pool.</td>
+<td>Formally verified via <a href="#high-level-req-5">reset_lockup</a>.</td>
+</tr>
+
+<tr>
+<td>6</td>
+<td>Unlocked funds are correctly distributed to recipients based on their distribution shares, taking into account the associated commission percentage.</td>
+<td>High</td>
+<td>The distribution process, implemented in the distribute_internal function, accurately allocates unlocked funds to their intended recipients based on their distribution shares. It guarantees that each recipient receives the correct amount of funds, considering the commission percentage associated with the staking contract.</td>
+<td>Audited that the correct amount of unlocked funds is distributed according to distribution shares.</td>
+</tr>
+
+<tr>
+<td>7</td>
+<td>The stake pool ensures that the commission is correctly requested and paid out from the old operator's stake pool before allowing the switch to the new operator.</td>
+<td>High</td>
+<td>The switch_operator function initiates the commission payout from the stake pool associated with the old operator, ensuring a smooth transition. Paying out the commission before the switch guarantees that the staker receives the appropriate commission amount and maintains the integrity of the staking process.</td>
+<td>Audited that the commission is paid to the old operator.</td>
+</tr>
+
+<tr>
+<td>8</td>
+<td>Stakers can withdraw their funds from the staking contract, ensuring the unlocked amount becomes available for withdrawal after the lockup period.</td>
+<td>High</td>
+<td>The unlock_stake function ensures that the requested amount is properly unlocked from the stake pool, considering the lockup period and that the funds become available for withdrawal when the lockup expires.</td>
+<td>Audited that funds are unlocked properly.</td>
+</tr>
+
+</table>
+
+
+
+
+<a id="module-level-spec"></a>
 
 ### Module-level Specification
-
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
@@ -2403,7 +2483,8 @@ Account is not frozen and sufficient to withdraw.
 Staking_contract exists the stacker/operator pair.
 
 
-<pre><code><b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">stake::ResourceRequirement</a>;
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">stake::ResourceRequirement</a>;
 <b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_ContractExistsAbortsIf">ContractExistsAbortsIf</a> { staker: staker_address };
 <b>let</b> store = <b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
@@ -2417,6 +2498,7 @@ Staking_contract exists the stacker/operator pair.
 <b>let</b> <b>post</b> post_store = <b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
 <b>let</b> <b>post</b> post_staking_contract = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(post_store.staking_contracts, operator);
 <b>aborts_if</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.principal + amount &gt; MAX_U64;
+// This enforces <a id="high-level-req-3" href="#high-level-req">high level requirement 3</a>:
 <b>ensures</b> post_staking_contract.principal == <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.principal + amount;
 </code></pre>
 
@@ -2459,6 +2541,7 @@ Only active validator can update locked_until_secs.
 
 
 <pre><code><b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
+// This enforces <a id="high-level-req-5" href="#high-level-req">high level requirement 5</a>:
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_ContractExistsAbortsIf">ContractExistsAbortsIf</a>{staker: staker_address};
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_IncreaseLockupWithCapAbortsIf">IncreaseLockupWithCapAbortsIf</a>{staker: staker_address};
 </code></pre>
@@ -2553,6 +2636,7 @@ Staking_contract exists the stacker/operator pair.
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
+// This enforces <a id="high-level-req-4" href="#high-level-req">high level requirement 4</a>:
 <b>requires</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.commission_percentage &gt;= 0 && <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.<a href="staking_contract.md#0x1_staking_contract_commission_percentage">commission_percentage</a> &lt;= 100;
 <b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
 <b>let</b> staking_contracts = <b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address).staking_contracts;
@@ -2854,6 +2938,128 @@ a staking_contract exists for the staker/operator pair.
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
     <b>aborts_if</b> coin_store.frozen;
     <b>aborts_if</b> balance &lt; amount;
+}
+</code></pre>
+
+
+
+
+<a id="0x1_staking_contract_GetStakingContractAmountsAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="staking_contract.md#0x1_staking_contract_GetStakingContractAmountsAbortsIf">GetStakingContractAmountsAbortsIf</a> {
+    <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>: <a href="staking_contract.md#0x1_staking_contract_StakingContract">StakingContract</a>;
+    <b>let</b> pool_address = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.pool_address;
+    <b>let</b> stake_pool = <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address);
+    <b>let</b> active = <a href="coin.md#0x1_coin_value">coin::value</a>(stake_pool.active);
+    <b>let</b> pending_active = <a href="coin.md#0x1_coin_value">coin::value</a>(stake_pool.pending_active);
+    <b>let</b> total_active_stake = active + pending_active;
+    <b>let</b> accumulated_rewards = total_active_stake - <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.principal;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address);
+    <b>aborts_if</b> active + pending_active &gt; MAX_U64;
+    <b>aborts_if</b> total_active_stake &lt; <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.principal;
+    <b>aborts_if</b> accumulated_rewards * <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.commission_percentage &gt; MAX_U64;
+}
+</code></pre>
+
+
+
+
+<a id="0x1_staking_contract_IncreaseLockupWithCapAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="staking_contract.md#0x1_staking_contract_IncreaseLockupWithCapAbortsIf">IncreaseLockupWithCapAbortsIf</a> {
+    staker: <b>address</b>;
+    operator: <b>address</b>;
+    <b>let</b> store = <b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker);
+    <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(store.staking_contracts, operator);
+    <b>let</b> pool_address = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.owner_cap.pool_address;
+    <b>aborts_if</b> !<a href="stake.md#0x1_stake_stake_pool_exists">stake::stake_pool_exists</a>(pool_address);
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">staking_config::StakingConfig</a>&gt;(@aptos_framework);
+    <b>let</b> config = <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">staking_config::StakingConfig</a>&gt;(@aptos_framework);
+    <b>let</b> stake_pool = <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address);
+    <b>let</b> old_locked_until_secs = stake_pool.locked_until_secs;
+    <b>let</b> seconds = <b>global</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework).microseconds / <a href="timestamp.md#0x1_timestamp_MICRO_CONVERSION_FACTOR">timestamp::MICRO_CONVERSION_FACTOR</a>;
+    <b>let</b> new_locked_until_secs = seconds + config.recurring_lockup_duration_secs;
+    <b>aborts_if</b> seconds + config.recurring_lockup_duration_secs &gt; MAX_U64;
+    <b>aborts_if</b> old_locked_until_secs &gt; new_locked_until_secs || old_locked_until_secs == new_locked_until_secs;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
+    <b>let</b> <b>post</b> post_store = <b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker);
+    <b>let</b> <b>post</b> post_staking_contract = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(post_store.staking_contracts, operator);
+    <b>let</b> <b>post</b> post_stake_pool = <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(post_staking_contract.owner_cap.pool_address);
+    <b>ensures</b> post_stake_pool.locked_until_secs == new_locked_until_secs;
+}
+</code></pre>
+
+
+
+
+<a id="0x1_staking_contract_CreateStakingContractWithCoinsAbortsIfAndEnsures"></a>
+
+
+<pre><code><b>schema</b> <a href="staking_contract.md#0x1_staking_contract_CreateStakingContractWithCoinsAbortsIfAndEnsures">CreateStakingContractWithCoinsAbortsIfAndEnsures</a> {
+    staker: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    operator: <b>address</b>;
+    voter: <b>address</b>;
+    amount: u64;
+    commission_percentage: u64;
+    contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+    <b>aborts_if</b> <a href="staking_contract.md#0x1_staking_contract_commission_percentage">commission_percentage</a> &lt; 0 || commission_percentage &gt; 100;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">staking_config::StakingConfig</a>&gt;(@aptos_framework);
+    <b>let</b> config = <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">staking_config::StakingConfig</a>&gt;(@aptos_framework);
+    <b>let</b> min_stake_required = config.minimum_stake;
+    <b>aborts_if</b> amount &lt; min_stake_required;
+    <b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
+    <b>let</b> <a href="account.md#0x1_account">account</a> = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(staker_address);
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address) && !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(staker_address);
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address) && <a href="account.md#0x1_account">account</a>.guid_creation_num + 9 &gt;= <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
+    // This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
+    <b>ensures</b> <b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
+    <b>let</b> store = <b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
+    <b>let</b> staking_contracts = store.staking_contracts;
+    <b>let</b> owner_cap = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(store.staking_contracts, operator).owner_cap;
+    <b>let</b> <b>post</b> post_store = <b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
+    <b>let</b> <b>post</b> post_staking_contracts = post_store.staking_contracts;
+}
+</code></pre>
+
+
+
+
+<a id="0x1_staking_contract_PreconditionsInCreateContract"></a>
+
+
+<pre><code><b>schema</b> <a href="staking_contract.md#0x1_staking_contract_PreconditionsInCreateContract">PreconditionsInCreateContract</a> {
+    <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorPerformance">stake::ValidatorPerformance</a>&gt;(@aptos_framework);
+    <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>&gt;(@aptos_framework);
+    <b>requires</b> <b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">staking_config::StakingRewardsConfig</a>&gt;(@aptos_framework) || !std::features::spec_periodical_reward_rate_decrease_enabled();
+    <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);
+    <b>requires</b> <b>exists</b>&lt;aptos_framework::timestamp::CurrentTimeMicroseconds&gt;(@aptos_framework);
+    <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_AptosCoinCapabilities">stake::AptosCoinCapabilities</a>&gt;(@aptos_framework);
+}
+</code></pre>
+
+
+
+
+<a id="0x1_staking_contract_CreateStakePoolAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="staking_contract.md#0x1_staking_contract_CreateStakePoolAbortsIf">CreateStakePoolAbortsIf</a> {
+    resource_addr: <b>address</b>;
+    operator: <b>address</b>;
+    voter: <b>address</b>;
+    contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+    <b>let</b> acc = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(resource_addr);
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(resource_addr) && (len(acc.signer_capability_offer.for.vec) != 0 || acc.sequence_number != 0);
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(resource_addr) && len(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(resource_addr)) != 32;
+    <b>aborts_if</b> len(<a href="account.md#0x1_account_ZERO_AUTH_KEY">account::ZERO_AUTH_KEY</a>) != 32;
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorConfig">stake::ValidatorConfig</a>&gt;(resource_addr);
+    <b>let</b> allowed = <b>global</b>&lt;<a href="stake.md#0x1_stake_AllowedValidators">stake::AllowedValidators</a>&gt;(@aptos_framework);
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_AllowedValidators">stake::AllowedValidators</a>&gt;(@aptos_framework) && !contains(allowed.accounts, resource_addr);
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(resource_addr);
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">stake::OwnerCapability</a>&gt;(resource_addr);
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(resource_addr) && acc.guid_creation_num + 12 &gt;= <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
 }
 </code></pre>
 

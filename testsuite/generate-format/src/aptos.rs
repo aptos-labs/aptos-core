@@ -6,12 +6,19 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     hash::{CryptoHasher as _, TestOnlyHasher},
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
-    secp256k1_ecdsa,
+    secp256k1_ecdsa, secp256r1_ecdsa,
     traits::{SigningKey, Uniform},
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
-    contract_event, event, state_store::state_key::StateKey, transaction, write_set,
+    contract_event, event,
+    state_store::{
+        state_key::StateKey,
+        state_value::{PersistedStateValueMetadata, StateValueMetadata},
+    },
+    transaction,
+    validator_txn::ValidatorTransaction,
+    write_set,
 };
 use move_core_types::language_storage;
 use rand::{rngs::StdRng, SeedableRng};
@@ -53,6 +60,14 @@ fn trace_crypto_values(tracer: &mut Tracer, samples: &mut Samples) -> Result<()>
     tracer.trace_value(samples, &secp256k1_public_key)?;
     tracer.trace_value(samples, &secp256k1_signature)?;
 
+    let secp256r1_ecdsa_private_key = secp256r1_ecdsa::PrivateKey::generate(&mut rng);
+    let secp256r1_ecdsa_public_key =
+        aptos_crypto::PrivateKey::public_key(&secp256r1_ecdsa_private_key);
+    let secp256r1_ecdsa_signature = secp256r1_ecdsa_private_key.sign(&message).unwrap();
+    tracer.trace_value(samples, &secp256r1_ecdsa_private_key)?;
+    tracer.trace_value(samples, &secp256r1_ecdsa_public_key)?;
+    tracer.trace_value(samples, &secp256r1_ecdsa_signature)?;
+
     Ok(())
 }
 
@@ -63,15 +78,20 @@ pub fn get_registry() -> Result<Registry> {
     // 1. Record samples for types with custom deserializers.
     trace_crypto_values(&mut tracer, &mut samples)?;
     tracer.trace_value(&mut samples, &event::EventKey::random())?;
+    tracer.trace_value(&mut samples, &write_set::WriteOp::Deletion {
+        metadata: StateValueMetadata::none(),
+    })?;
 
     // 2. Trace the main entry point(s) + every enum separately.
     tracer.trace_type::<contract_event::ContractEvent>(&samples)?;
     tracer.trace_type::<language_storage::TypeTag>(&samples)?;
+    tracer.trace_type::<ValidatorTransaction>(&samples)?;
     tracer.trace_type::<transaction::Transaction>(&samples)?;
     tracer.trace_type::<transaction::TransactionArgument>(&samples)?;
     tracer.trace_type::<transaction::TransactionPayload>(&samples)?;
     tracer.trace_type::<transaction::WriteSetPayload>(&samples)?;
     tracer.trace_type::<StateKey>(&samples)?;
+    tracer.trace_type::<PersistedStateValueMetadata>(&samples)?;
 
     tracer.trace_type::<transaction::authenticator::AccountAuthenticator>(&samples)?;
     tracer.trace_type::<transaction::authenticator::TransactionAuthenticator>(&samples)?;

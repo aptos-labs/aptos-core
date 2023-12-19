@@ -3,8 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::VMConfig, data_cache::TransactionDataCache, native_extensions::NativeContextExtensions,
-    native_functions::NativeFunction, runtime::VMRuntime, session::Session,
+    config::VMConfig,
+    data_cache::TransactionDataCache,
+    loader::{ModuleStorage, ModuleStorageAdapter},
+    native_extensions::NativeContextExtensions,
+    native_functions::NativeFunction,
+    runtime::VMRuntime,
+    session::Session,
 };
 use move_binary_format::{
     errors::{Location, VMResult},
@@ -14,7 +19,7 @@ use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     metadata::Metadata, resolver::MoveResolver,
 };
-use std::{collections::BTreeSet, sync::Arc};
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct MoveVM {
@@ -65,6 +70,22 @@ impl MoveVM {
         Session {
             move_vm: self,
             data_cache: TransactionDataCache::new(remote),
+            module_store: ModuleStorageAdapter::new(self.runtime.module_storage()),
+            native_extensions,
+        }
+    }
+
+    /// Create a new session, as in `new_session`, but provide native context extensions and custome storage for resolved modules.
+    pub fn new_session_with_extensions_and_modules<'r>(
+        &self,
+        remote: &'r dyn MoveResolver,
+        module_storage: Arc<dyn ModuleStorage>,
+        native_extensions: NativeContextExtensions<'r>,
+    ) -> Session<'r, '_> {
+        Session {
+            move_vm: self,
+            data_cache: TransactionDataCache::new(remote),
+            module_store: ModuleStorageAdapter::new(module_storage),
             native_extensions,
         }
     }
@@ -77,7 +98,11 @@ impl MoveVM {
     ) -> VMResult<Arc<CompiledModule>> {
         self.runtime
             .loader()
-            .load_module(module_id, &TransactionDataCache::new(remote))
+            .load_module(
+                module_id,
+                &TransactionDataCache::new(remote),
+                &ModuleStorageAdapter::new(self.runtime.module_storage()),
+            )
             .map(|arc_module| arc_module.arc_module())
     }
 
@@ -99,17 +124,16 @@ impl MoveVM {
     /// If the loader cache has been invalidated (either by the above call or by internal logic)
     /// flush it so it is valid again. Notice that should only be called if there are no
     /// outstanding sessions created from this VM.
-    /// TODO: new loader architecture
     pub fn flush_loader_cache_if_invalidated(&self) {
+        // Flush the module cache inside the VMRuntime. This code is there for a legacy reason:
+        // - In the old session api that we provide, MoveVM will hold a cache for loaded module and the session will be created against that cache.
+        //   Thus if an module invalidation event happens (e.g, by upgrade request), we will need to flush this internal cache as well.
+        // - If we can deprecate this session api, we will be able to get rid of this internal loaded cache and make the MoveVM "stateless" and
+        //   invulnerable to module invalidation.
+        if self.runtime.loader().is_invalidated() {
+            self.runtime.module_cache.flush();
+        };
         self.runtime.loader().flush_if_invalidated()
-    }
-
-    /// Gets and clears module cache hits. This is hack which allows the adapter to see module
-    /// reads if executing multiple transactions in a VM. Without this, the adapter only sees
-    /// the first load of a module.
-    /// TODO: new loader architecture
-    pub fn get_and_clear_module_cache_hits(&self) -> BTreeSet<ModuleId> {
-        self.runtime.loader().get_and_clear_module_cache_hits()
     }
 
     /// Attempts to discover metadata in a given module with given key. Availability
@@ -129,6 +153,11 @@ impl MoveVM {
     where
         F: FnOnce(&[Metadata]) -> Option<T>,
     {
-        f(&self.runtime.loader().get_module(module)?.module().metadata)
+        f(&self
+            .runtime
+            .module_cache
+            .fetch_module(module)?
+            .module()
+            .metadata)
     }
 }

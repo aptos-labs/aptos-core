@@ -186,7 +186,6 @@ impl TestContext {
                     .cloned()
                     .map(Transaction::UserTransaction),
             )
-            .chain(once(Transaction::StateCheckpoint(metadata.id())))
             .collect();
 
         // Check that txn execution was successful.
@@ -195,14 +194,10 @@ impl TestContext {
             .executor
             .execute_block((metadata.id(), txns.clone()), parent_id)
             .unwrap();
-        let mut compute_status = result.compute_status().clone();
+        let mut compute_status = result.compute_status_for_input_txns().clone();
         assert_eq!(compute_status.len(), txns.len(), "{:?}", result);
-        if matches!(compute_status.last(), Some(TransactionStatus::Retry)) {
-            // a state checkpoint txn can be Retry if prefixed by a write set txn
-            compute_status.pop();
-        }
-        // But the rest of the txns must be Kept.
-        for st in result.compute_status() {
+        // all of the txns must be Kept.
+        for st in result.compute_status_for_input_txns() {
             match st {
                 TransactionStatus::Discard(st) => panic!("transaction is discarded: {:?}", st),
                 TransactionStatus::Retry => panic!("should not retry"),

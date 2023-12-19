@@ -18,12 +18,16 @@ pub enum IndexerGrpcStep {
     CacheWorkerTxnsProcessed, // [Indexer Cache] Processed transactions in a batch.
     CacheWorkerBatchProcessed, // [Indexer Cache] Successfully process current batch.
 
-    FilestoreUploadTxns, // [File worker] Upload transactions to filestore.
+    FilestoreUploadTxns,     // [File worker] Upload transactions to filestore.
+    FilestoreUpdateMetadata, // [File worker] Upload transactions to filestore.
 
     FullnodeFetchedBatch, // [Indexer Fullnode] Fetched batch of transactions from fullnode
     FullnodeDecodedBatch, // [Indexer Fullnode] Decoded batch of transactions from fullnode
     FullnodeProcessedBatch, // [Indexer Fullnode] Processed batch of transactions from fullnode
     FullnodeSentBatch,    // [Indexer Fullnode] Sent batch successfully
+
+    TableInfoProcessedBatch, // [Indexer Table Info] Processed batch of transactions from fullnode
+    TableInfoProcessed,      // [Indexer Table Info] Processed transactions from fullnode
 }
 
 impl IndexerGrpcStep {
@@ -42,11 +46,15 @@ impl IndexerGrpcStep {
             IndexerGrpcStep::CacheWorkerBatchProcessed => "2",
             // Filestore worker steps
             IndexerGrpcStep::FilestoreUploadTxns => "1",
+            IndexerGrpcStep::FilestoreUpdateMetadata => "1.1",
             // Fullnode steps
             IndexerGrpcStep::FullnodeFetchedBatch => "1",
             IndexerGrpcStep::FullnodeDecodedBatch => "2",
-            IndexerGrpcStep::FullnodeProcessedBatch => "3",
-            IndexerGrpcStep::FullnodeSentBatch => "4",
+            IndexerGrpcStep::FullnodeSentBatch => "3",
+            IndexerGrpcStep::FullnodeProcessedBatch => "4",
+            // Table info service steps
+            IndexerGrpcStep::TableInfoProcessedBatch => "1",
+            IndexerGrpcStep::TableInfoProcessed => "2",
         }
     }
 
@@ -70,12 +78,20 @@ impl IndexerGrpcStep {
             IndexerGrpcStep::CacheWorkerTxnsProcessed => "[Indexer Cache] Processed transactions in a batch.",
             IndexerGrpcStep::CacheWorkerBatchProcessed => "[Indexer Cache] Successfully process current batch.",
             // Filestore worker steps
-            IndexerGrpcStep::FilestoreUploadTxns => "[File worker] Upload transactions to filestore.",
+            IndexerGrpcStep::FilestoreUploadTxns => "[File worker] Finished uploading batch of transactions to filestore.",
+            IndexerGrpcStep::FilestoreUpdateMetadata => "[File worker] Update filestore metadata.",
             // Fullnode steps
             IndexerGrpcStep::FullnodeFetchedBatch => "[Indexer Fullnode] Fetched batch of transactions from fullnode",
             IndexerGrpcStep::FullnodeDecodedBatch => "[Indexer Fullnode] Decoded batch of transactions from fullnode",
             IndexerGrpcStep::FullnodeProcessedBatch => "[Indexer Fullnode] Processed batch of transactions from fullnode",
             IndexerGrpcStep::FullnodeSentBatch => "[Indexer Fullnode] Sent batch successfully",
+            // Table info service steps
+            IndexerGrpcStep::TableInfoProcessedBatch => {
+                "[Indexer Table Info] Processed batch successfully"
+            },
+            IndexerGrpcStep::TableInfoProcessed => {
+                "[Indexer Table Info] Processed successfully"
+            },
         }
     }
 }
@@ -133,7 +149,6 @@ pub static TRANSACTION_UNIX_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
 pub fn log_grpc_step(
     service_type: &str,
     step: IndexerGrpcStep,
-    enable_logging: bool,
     start_version: Option<i64>,
     end_version: Option<i64>,
     start_version_timestamp: Option<&Timestamp>,
@@ -172,62 +187,59 @@ pub fn log_grpc_step(
             .set(size_in_bytes as i64);
     }
 
-    if enable_logging {
-        let start_txn_timestamp_iso = start_version_timestamp.map(timestamp_to_iso);
-        let end_txn_timestamp_iso = end_version_timestamp.map(timestamp_to_iso);
-        if request_metadata.is_none() {
-            tracing::info!(
-                start_version,
-                end_version,
-                start_txn_timestamp_iso,
-                end_txn_timestamp_iso,
-                num_transactions,
-                duration_in_secs,
-                size_in_bytes,
-                service_type,
-                step = step.get_step(),
-                "{}",
-                step.get_label(),
-            );
-        } else {
-            tracing::info!(
-                start_version,
-                end_version,
-                start_txn_timestamp_iso,
-                end_txn_timestamp_iso,
-                num_transactions,
-                duration_in_secs,
-                size_in_bytes,
-                // Request metadata variables
-                request_name = request_metadata.clone().unwrap().processor_name.as_str(),
-                request_email = request_metadata.clone().unwrap().request_email.as_str(),
-                request_api_key_name = request_metadata
-                    .clone()
-                    .unwrap()
-                    .request_api_key_name
-                    .as_str(),
-                processor_name = request_metadata.clone().unwrap().processor_name.as_str(),
-                connection_id = request_metadata
-                    .clone()
-                    .unwrap()
-                    .request_connection_id
-                    .as_str(),
-                request_user_classification = request_metadata
-                    .unwrap()
-                    .request_user_classification
-                    .as_str(),
-                service_type,
-                step = step.get_step(),
-                "{}",
-                step.get_label(),
-            );
-        }
+    let start_txn_timestamp_iso = start_version_timestamp.map(timestamp_to_iso);
+    let end_txn_timestamp_iso = end_version_timestamp.map(timestamp_to_iso);
+    if request_metadata.is_none() {
+        tracing::info!(
+            start_version,
+            end_version,
+            start_txn_timestamp_iso,
+            end_txn_timestamp_iso,
+            num_transactions,
+            duration_in_secs,
+            size_in_bytes,
+            service_type,
+            step = step.get_step(),
+            "{}",
+            step.get_label(),
+        );
+    } else {
+        tracing::info!(
+            start_version,
+            end_version,
+            start_txn_timestamp_iso,
+            end_txn_timestamp_iso,
+            num_transactions,
+            duration_in_secs,
+            size_in_bytes,
+            // Request metadata variables
+            request_name = request_metadata.clone().unwrap().processor_name.as_str(),
+            request_email = request_metadata.clone().unwrap().request_email.as_str(),
+            request_api_key_name = request_metadata
+                .clone()
+                .unwrap()
+                .request_api_key_name
+                .as_str(),
+            processor_name = request_metadata.clone().unwrap().processor_name.as_str(),
+            connection_id = request_metadata
+                .clone()
+                .unwrap()
+                .request_connection_id
+                .as_str(),
+            request_user_classification = request_metadata
+                .unwrap()
+                .request_user_classification
+                .as_str(),
+            service_type,
+            step = step.get_step(),
+            "{}",
+            step.get_label(),
+        );
     }
 }
 
 pub fn log_grpc_step_fullnode(
     step: IndexerGrpcStep,
-    enable_logging: bool,
     start_version: Option<i64>,
     end_version: Option<i64>,
     end_version_timestamp: Option<&Timestamp>,
@@ -260,18 +272,16 @@ pub fn log_grpc_step_fullnode(
             .set(end_txn_timestamp_unixtime);
     }
 
-    if enable_logging {
-        tracing::info!(
-            start_version,
-            end_version,
-            num_transactions,
-            duration_in_secs,
-            highest_known_version,
-            tps,
-            service_type,
-            step = step.get_step(),
-            "{}",
-            step.get_label(),
-        );
-    }
+    tracing::info!(
+        start_version,
+        end_version,
+        num_transactions,
+        duration_in_secs,
+        highest_known_version,
+        tps,
+        service_type,
+        step = step.get_step(),
+        "{}",
+        step.get_label(),
+    );
 }

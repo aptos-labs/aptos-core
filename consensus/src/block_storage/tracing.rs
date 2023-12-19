@@ -18,6 +18,11 @@ impl BlockStage {
     pub const ORDERED: &'static str = "ordered";
     pub const QC_ADDED: &'static str = "qc_added";
     pub const QC_AGGREGATED: &'static str = "qc_aggregated";
+    pub const RAND_ADD_DECISION: &'static str = "rand_add_decision";
+    pub const RAND_ADD_SHARE: &'static str = "rand_add_share";
+    pub const RAND_AGG_DECISION: &'static str = "rand_agg_decision";
+    pub const RAND_ENTER: &'static str = "rand_enter";
+    pub const RAND_READY: &'static str = "rand_ready";
     pub const ROUND_MANAGER_RECEIVED: &'static str = "round_manager_received";
     pub const SIGNED: &'static str = "signed";
     pub const SYNCED: &'static str = "synced";

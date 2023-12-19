@@ -59,11 +59,11 @@ use std::{
 
 impl WriteOp {
     pub fn value_strategy() -> impl Strategy<Value = Self> {
-        vec(any::<u8>(), 0..64).prop_map(|bytes| WriteOp::Modification(bytes.into()))
+        vec(any::<u8>(), 0..64).prop_map(|bytes| WriteOp::legacy_modification(bytes.into()))
     }
 
     pub fn deletion_strategy() -> impl Strategy<Value = Self> {
-        Just(WriteOp::Deletion)
+        Just(WriteOp::legacy_deletion())
     }
 }
 
@@ -812,7 +812,7 @@ impl TransactionToCommitGen {
                                 state_key.clone(),
                                 Some(StateValue::new_legacy(Bytes::copy_from_slice(&value))),
                             ),
-                            (state_key, WriteOp::Modification(value.into())),
+                            (state_key, WriteOp::legacy_modification(value.into())),
                         )
                     })
             })
@@ -1223,7 +1223,7 @@ impl Arbitrary for ValidatorTransaction {
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         Just(Value::Null)
             .prop_map(|_| {
-                ValidatorTransaction::DummyTopic(DummyValidatorTransaction {
+                ValidatorTransaction::DummyTopic1(DummyValidatorTransaction {
                     payload: vec![0xFF; 16],
                 })
             })

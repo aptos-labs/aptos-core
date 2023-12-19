@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::{stream_coordinator::IndexerStreamCoordinator, ServiceContext};
+use crate::{counters::CHANNEL_SIZE, stream_coordinator::IndexerStreamCoordinator, ServiceContext};
 use aptos_indexer_grpc_utils::counters::{log_grpc_step_fullnode, IndexerGrpcStep};
 use aptos_logger::{error, info};
 use aptos_moving_average::MovingAverage;
@@ -16,7 +16,7 @@ use tonic::{Request, Response, Status};
 
 pub struct FullnodeDataService {
     pub service_context: ServiceContext,
-    pub enable_verbose_logging: bool,
+    pub enable_expensive_logging: bool,
 }
 
 type FullnodeResponseStream =
@@ -50,7 +50,7 @@ impl FullnodeData for FullnodeDataService {
         let processor_task_count = self.service_context.processor_task_count;
         let processor_batch_size = self.service_context.processor_batch_size;
         let output_batch_size = self.service_context.output_batch_size;
-        let enable_verbose_logging = self.enable_verbose_logging;
+        let enable_expensive_logging = self.enable_expensive_logging;
 
         // Some node metadata
         let context = self.service_context.context.clone();
@@ -93,7 +93,9 @@ impl FullnodeData for FullnodeDataService {
             loop {
                 let start_time = std::time::Instant::now();
                 // Processes and sends batch of transactions to client
-                let results = coordinator.process_next_batch(enable_verbose_logging).await;
+                let results = coordinator
+                    .process_next_batch(enable_expensive_logging)
+                    .await;
                 let max_version = match IndexerStreamCoordinator::get_max_batch_version(results) {
                     Ok(max_version) => max_version,
                     Err(e) => {
@@ -102,18 +104,6 @@ impl FullnodeData for FullnodeDataService {
                     },
                 };
                 let highest_known_version = coordinator.highest_known_version;
-
-                log_grpc_step_fullnode(
-                    IndexerGrpcStep::FullnodeProcessedBatch,
-                    enable_verbose_logging,
-                    Some(coordinator.current_version as i64),
-                    Some(max_version as i64),
-                    None,
-                    Some(coordinator.highest_known_version as i64),
-                    None,
-                    Some(start_time.elapsed().as_secs_f64()),
-                    Some(ma.sum() as i64),
-                );
 
                 // send end batch message (each batch) upon success of the entire batch
                 // client can use the start and end version to ensure that there are no gaps
@@ -124,6 +114,10 @@ impl FullnodeData for FullnodeDataService {
                     Some(max_version),
                     ledger_chain_id,
                 );
+                let channel_size = TRANSACTION_CHANNEL_SIZE - tx.capacity();
+                CHANNEL_SIZE
+                    .with_label_values(&["2"])
+                    .set(channel_size as i64);
                 match tx.send(Result::<_, Status>::Ok(batch_end_status)).await {
                     Ok(_) => {
                         // tps logging
@@ -134,7 +128,6 @@ impl FullnodeData for FullnodeDataService {
 
                             log_grpc_step_fullnode(
                                 IndexerGrpcStep::FullnodeProcessedBatch,
-                                enable_verbose_logging,
                                 Some(coordinator.current_version as i64),
                                 Some(max_version as i64),
                                 None,

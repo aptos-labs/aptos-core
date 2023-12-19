@@ -5,12 +5,12 @@ use aptos_aggregator::{
     resolver::{TAggregatorV1View, TDelayedFieldView},
     types::DelayedFieldID,
 };
-use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     state_store::{
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
-        state_value::{StateValue, StateValueMetadataKind},
+        state_value::{StateValue, StateValueMetadata},
+        StateView, StateViewId,
     },
     write_set::WriteOp,
 };
@@ -45,7 +45,7 @@ pub trait TResourceView {
     fn get_resource_state_value_metadata(
         &self,
         state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+    ) -> anyhow::Result<Option<StateValueMetadata>> {
         // For metadata, layouts are not important.
         self.get_resource_state_value(state_key, None)
             .map(|maybe_state_value| maybe_state_value.map(StateValue::into_metadata))
@@ -151,7 +151,7 @@ pub trait TModuleView {
     fn get_module_state_value_metadata(
         &self,
         state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+    ) -> anyhow::Result<Option<StateValueMetadata>> {
         let maybe_state_value = self.get_module_state_value(state_key)?;
         Ok(maybe_state_value.map(StateValue::into_metadata))
     }
@@ -275,13 +275,13 @@ pub trait StateValueMetadataResolver {
     fn get_module_state_value_metadata(
         &self,
         state_key: &StateKey,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>>;
+    ) -> anyhow::Result<Option<StateValueMetadata>>;
 
     /// Can also be used to get the metadata of a resource group at a provided group key.
     fn get_resource_state_value_metadata(
         &self,
         state_key: &StateKey,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>>;
+    ) -> anyhow::Result<Option<StateValueMetadata>>;
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

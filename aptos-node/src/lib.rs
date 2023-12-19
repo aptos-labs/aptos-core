@@ -23,7 +23,8 @@ use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
-use aptos_types::{chain_id::ChainId, validator_txn::pool::ValidatorTransactionPool};
+use aptos_types::chain_id::ChainId;
+use aptos_validator_transaction_pool as vtxn_pool;
 use clap::Parser;
 use futures::channel::mpsc;
 use hex::{FromHex, FromHexError};
@@ -187,6 +188,7 @@ pub struct AptosHandle {
     _consensus_runtime: Option<Runtime>,
     _indexer_grpc_runtime: Option<Runtime>,
     _indexer_runtime: Option<Runtime>,
+    _indexer_table_info_runtime: Option<Runtime>,
     _mempool_runtime: Runtime,
     _network_runtimes: Vec<Runtime>,
     _peer_monitoring_service_runtime: Runtime,
@@ -558,7 +560,7 @@ pub fn setup_environment_and_start_node(
     let admin_service = services::start_admin_service(&node_config);
 
     // Set up the storage database and any RocksDB checkpoints
-    let (aptos_db, db_rw, backup_service, genesis_waypoint) =
+    let (db_rw, backup_service, genesis_waypoint) =
         storage::initialize_database_and_checkpoints(&mut node_config)?;
 
     admin_service.set_aptos_db(db_rw.clone().into());
@@ -627,8 +629,13 @@ pub fn setup_environment_and_start_node(
     );
 
     // Bootstrap the API and indexer
-    let (mempool_client_receiver, api_runtime, indexer_runtime, indexer_grpc_runtime) =
-        services::bootstrap_api_and_indexer(&node_config, aptos_db, chain_id)?;
+    let (
+        mempool_client_receiver,
+        api_runtime,
+        indexer_table_info_runtime,
+        indexer_runtime,
+        indexer_grpc_runtime,
+    ) = services::bootstrap_api_and_indexer(&node_config, db_rw.clone(), chain_id)?;
 
     // Create mempool and get the consensus to mempool sender
     let (mempool_runtime, consensus_to_mempool_sender) =
@@ -642,7 +649,7 @@ pub fn setup_environment_and_start_node(
             peers_and_metadata,
         );
 
-    let validator_txn_pool = Arc::new(ValidatorTransactionPool::new());
+    let (vtxn_read_client, _) = vtxn_pool::new(vec![]);
 
     // Create the consensus runtime (this blocks on state sync first)
     let consensus_runtime = consensus_network_interfaces.map(|consensus_network_interfaces| {
@@ -659,7 +666,7 @@ pub fn setup_environment_and_start_node(
             consensus_network_interfaces,
             consensus_notifier,
             consensus_to_mempool_sender,
-            validator_txn_pool,
+            vtxn_read_client,
         );
         admin_service.set_consensus_dbs(consensus_db, quorum_store_db);
         runtime
@@ -672,6 +679,7 @@ pub fn setup_environment_and_start_node(
         _consensus_runtime: consensus_runtime,
         _indexer_grpc_runtime: indexer_grpc_runtime,
         _indexer_runtime: indexer_runtime,
+        _indexer_table_info_runtime: indexer_table_info_runtime,
         _mempool_runtime: mempool_runtime,
         _network_runtimes: network_runtimes,
         _peer_monitoring_service_runtime: peer_monitoring_service_runtime,
