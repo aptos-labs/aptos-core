@@ -29,12 +29,4 @@ error[E04003]: built-in operation not supported
 7 │ │         };
   │ ╰─────────^ Invalid argument to '<'
 
-error[E04003]: built-in operation not supported
-  ┌─ TEMPFILE:5:25
-  │
-5 │         for (i in true..false) {
-  │                   ----  ^^^^^ Invalid argument to '<'
-  │                   │      
-  │                   Found: 'bool'. But expected: 'u8', 'u16', 'u32', 'u64', 'u128', 'u256'
-
 
