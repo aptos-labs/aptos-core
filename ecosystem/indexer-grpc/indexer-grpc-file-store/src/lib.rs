@@ -44,12 +44,13 @@ impl RunnableConfig for IndexerGrpcFileStoreWorkerConfig {
             self.enable_expensive_logging.unwrap_or(false),
             self.chain_id,
         )
-        .await?;
+        .await
+        .expect("Failed to create file store processor");
         processor
             .run()
             .await
             .expect("File store processor exited unexpectedly");
-        Err(anyhow::anyhow!("File store processor exited unexpectedly"))
+        Ok(())
     }
 
     fn get_server_name(&self) -> String {
