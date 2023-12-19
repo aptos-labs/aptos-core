@@ -38,6 +38,8 @@ impl ValidatorTransaction {
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 #[allow(non_camel_case_types)]
 pub enum Topic {
+    DKG = 0,
+    JWK_CONSENSUS = 1,
     #[cfg(any(test, feature = "fuzzing"))]
     DUMMY1,
     #[cfg(any(test, feature = "fuzzing"))]

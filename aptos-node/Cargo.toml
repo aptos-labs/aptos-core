@@ -28,6 +28,7 @@ aptos-crypto = { workspace = true }
 aptos-data-client = { workspace = true }
 aptos-data-streaming-service = { workspace = true }
 aptos-db = { workspace = true }
+aptos-dkg-runtime = { workspace = true }
 aptos-event-notifications = { workspace = true }
 aptos-executor = { workspace = true }
 aptos-executor-types = { workspace = true }
@@ -38,6 +39,7 @@ aptos-indexer-grpc-fullnode = { workspace = true }
 aptos-indexer-grpc-table-info = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-inspection-service = { workspace = true }
+aptos-jwk-consensus = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-mempool = { workspace = true }
 aptos-mempool-notifications = { workspace = true }
@@ -93,3 +95,4 @@ failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "aptos-executor/f
 indexer = ["aptos-indexer"]
 network-perf-test = ["aptos-peer-monitoring-service-client/network-perf-test", "aptos-peer-monitoring-service-server/network-perf-test", "aptos-peer-monitoring-service-types/network-perf-test", "aptos-config/network-perf-test"]
 tokio-console = ["aptos-logger/tokio-console", "aptos-config/tokio-console"]
+smoke-test = ["aptos-jwk-consensus/smoke-test", "aptos-dkg-runtime/smoke-test"]

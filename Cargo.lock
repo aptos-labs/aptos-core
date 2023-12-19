@@ -1222,6 +1222,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-dkg-runtime"
+version = "0.1.0"
+dependencies = [
+ "aptos-config",
+ "aptos-network",
+ "aptos-runtimes",
+ "aptos-types",
+ "aptos-validator-transaction-pool",
+ "serde",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-drop-helper"
 version = "0.1.0"
 dependencies = [
@@ -2402,6 +2415,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-jwk-consensus"
+version = "0.1.0"
+dependencies = [
+ "aptos-config",
+ "aptos-network",
+ "aptos-runtimes",
+ "aptos-types",
+ "aptos-validator-transaction-pool",
+ "serde",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-keygen"
 version = "0.1.0"
 dependencies = [
@@ -2935,6 +2961,7 @@ dependencies = [
  "aptos-data-client",
  "aptos-data-streaming-service",
  "aptos-db",
+ "aptos-dkg-runtime",
  "aptos-event-notifications",
  "aptos-executor",
  "aptos-executor-types",
@@ -2945,6 +2972,7 @@ dependencies = [
  "aptos-indexer-grpc-table-info",
  "aptos-infallible",
  "aptos-inspection-service",
+ "aptos-jwk-consensus",
  "aptos-logger",
  "aptos-mempool",
  "aptos-mempool-notifications",
