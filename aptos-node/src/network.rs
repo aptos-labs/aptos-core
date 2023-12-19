@@ -79,8 +79,7 @@ pub fn dkg_network_configuration(node_config: &NodeConfig) -> NetworkApplication
         direct_send_protocols,
         rpc_protocols,
         aptos_channel::Config::new(node_config.dkg.max_network_channel_size)
-            .queue_style(QueueStyle::FIFO)
-            .counters(&aptos_consensus::counters::PENDING_CONSENSUS_NETWORK_EVENTS),
+            .queue_style(QueueStyle::FIFO),
     );
     NetworkApplicationConfig::new(network_client_config, network_service_config)
 }
@@ -96,8 +95,7 @@ pub fn jwk_consensus_network_configuration(node_config: &NodeConfig) -> NetworkA
         direct_send_protocols,
         rpc_protocols,
         aptos_channel::Config::new(node_config.jwk_consensus.max_network_channel_size)
-            .queue_style(QueueStyle::FIFO)
-            .counters(&aptos_consensus::counters::PENDING_CONSENSUS_NETWORK_EVENTS),
+            .queue_style(QueueStyle::FIFO),
     );
     NetworkApplicationConfig::new(network_client_config, network_service_config)
 }
