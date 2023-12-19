@@ -170,7 +170,8 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     if safety_on {
         pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
         pipeline.add_processor(Box::new(ExplicitDrop {}));
-        pipeline.add_processor(Box::new(AbilityChecker {}));
+        // TODO(#11415): cannot turn this on until the issue solved
+        // pipeline.add_processor(Box::new(AbilityChecker {}));
     }
     pipeline
 }
