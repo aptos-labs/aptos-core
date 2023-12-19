@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

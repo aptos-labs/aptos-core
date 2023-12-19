@@ -8,7 +8,6 @@ mod mock_vm_test;
 use crate::{block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput};
 use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
-use aptos_state_view::StateView;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     access_path::AccessPath,
@@ -26,7 +25,7 @@ use aptos_types::{
         access_path_for_config, new_epoch_event_key, ConfigurationResource, OnChainConfig,
         ValidatorSet,
     },
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, StateView},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, ChangeSet,
         ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,

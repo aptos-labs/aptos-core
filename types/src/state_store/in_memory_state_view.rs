@@ -1,12 +1,12 @@
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
-#![forbid(unsafe_code)]
-use crate::TStateView;
-use anyhow::Result;
-use aptos_types::state_store::{
+
+use crate::state_store::{
     state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    TStateView,
 };
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

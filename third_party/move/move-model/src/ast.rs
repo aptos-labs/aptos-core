@@ -1585,19 +1585,16 @@ impl ModuleName {
         self.1
     }
 
-    /// Return the pseudo module name used for scripts. The move-compiler infrastructure uses MAX_ADDR
-    /// for pseudo modules created from scripts.
-    pub fn pseudo_script_name(pool: &SymbolPool) -> ModuleName {
-        let name = pool.make(SCRIPT_MODULE_NAME);
-        ModuleName(
-            Address::Numerical(AccountAddress::new([0xFF; AccountAddress::LENGTH])),
-            name,
-        )
+    /// Return the pseudo module name used for scripts, incorporating the `index`.
+    /// Our compiler infrastructure uses `MAX_ADDRESS` for pseudo modules created from scripts.
+    pub fn pseudo_script_name(pool: &SymbolPool, index: usize) -> ModuleName {
+        let name = pool.make(format!("{}_{}", SCRIPT_MODULE_NAME, index).as_str());
+        ModuleName(Address::Numerical(AccountAddress::MAX_ADDRESS), name)
     }
 
     /// Determine whether this is a script.
     pub fn is_script(&self) -> bool {
-        self.0 == Address::Numerical(AccountAddress::new([0xFF; AccountAddress::LENGTH]))
+        self.0 == Address::Numerical(AccountAddress::MAX_ADDRESS)
     }
 }
 

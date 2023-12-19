@@ -42,7 +42,7 @@ impl OrderRule {
         dag_window_size_config: Round,
     ) -> Self {
         let commit_events = storage
-            .get_latest_k_committed_events(dag_window_size_config)
+            .get_latest_k_committed_events(10 * epoch_state.verifier.len() as u64)
             .expect("Failed to read commit events from storage");
         // make sure it's sorted
         assert!(commit_events

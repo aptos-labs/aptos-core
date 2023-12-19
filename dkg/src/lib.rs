@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
@@ -50,3 +52,5 @@ impl<NetworkClient: NetworkClientInterface<DKGMsg>> DKGNetworkClient<NetworkClie
             .await
     }
 }
+
+pub mod network_interface;

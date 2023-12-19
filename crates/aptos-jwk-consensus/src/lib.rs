@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
@@ -49,3 +51,5 @@ impl<NetworkClient: NetworkClientInterface<JWKConsensusMsg>> JWKNetworkClient<Ne
             .await
     }
 }
+
+pub mod network_interface;

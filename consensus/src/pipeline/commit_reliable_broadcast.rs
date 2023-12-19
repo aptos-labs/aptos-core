@@ -51,11 +51,11 @@ impl AckState {
 }
 
 impl BroadcastStatus<CommitMessage> for Arc<AckState> {
-    type Ack = CommitMessage;
     type Aggregated = ();
     type Message = CommitMessage;
+    type Response = CommitMessage;
 
-    fn add(&self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
+    fn add(&self, peer: Author, _ack: Self::Response) -> anyhow::Result<Option<Self::Aggregated>> {
         let mut validators = self.validators.lock();
         if validators.remove(&peer) {
             if validators.is_empty() {
