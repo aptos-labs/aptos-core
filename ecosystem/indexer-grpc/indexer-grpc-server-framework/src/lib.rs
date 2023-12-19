@@ -50,6 +50,8 @@ where
             if let Err(e) = res {
                 error!("Probes and metrics handler panicked or was shutdown: {:?}", e);
                 process::exit(1);
+            } else {
+                panic!("Probes and metrics handler exited unexpectedly");
             }
             Ok(())
         },
@@ -57,6 +59,8 @@ where
             if let Err(e) = res {
                 error!("Main task panicked or was shutdown: {:?}", e);
                 process::exit(1);
+            } else {
+                panic!("Main task exited unexpectedly");
             }
             Ok(())
         },
