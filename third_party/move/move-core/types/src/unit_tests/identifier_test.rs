@@ -23,8 +23,12 @@ fn valid_identifiers() {
         "_0",
         "__",
         "____________________",
-        // TODO: <SELF> is an exception. It should be removed once CompiledScript goes away.
+        // TODO: <SELF> and <SELF>_[0-9]+ are exceptions.
+        // They should be removed once CompiledScript goes away.
         "<SELF>",
+        "<SELF>_0",
+        "<SELF>_1",
+        "<SELF>_222",
     ];
     for identifier in &valid_identifiers {
         assert!(
@@ -50,6 +54,8 @@ fn invalid_identifiers() {
         "foo.",
         "foo-bar",
         "foo\u{1f389}",
+        "<SELF>_",
+        "<SELF>_foo",
     ];
     for identifier in &invalid_identifiers {
         assert!(

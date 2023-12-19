@@ -68,6 +68,7 @@ members = [
     "crates/aptos-id-generator",
     "crates/aptos-infallible",
     "crates/aptos-inspection-service",
+    "crates/aptos-jwk-consensus",
     "crates/aptos-keygen",
     "crates/aptos-ledger",
     "crates/aptos-log-derive",
@@ -105,6 +106,7 @@ members = [
     "crates/transaction-emitter",
     "crates/transaction-emitter-lib",
     "crates/transaction-generator-lib",
+    "crates/validator-transaction-pool",
     "ecosystem/indexer-grpc/indexer-grpc-cache-worker",
     "ecosystem/indexer-grpc/indexer-grpc-data-access",
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
@@ -161,7 +163,6 @@ members = [
     "storage/rocksdb-options",
     "storage/schemadb",
     "storage/scratchpad",
-    "storage/state-view",
     "storage/storage-interface",
     "testsuite/aptos-fuzzer",
     "testsuite/aptos-fuzzer/fuzz",
@@ -301,6 +302,7 @@ aptos-db = { path = "storage/aptosdb" }
 aptos-db-indexer = { path = "storage/indexer" }
 aptos-db-tool = { path = "storage/db-tool" }
 aptos-debugger = { path = "crates/aptos-debugger" }
+aptos-dkg-runtime = { path = "dkg" }
 aptos-drop-helper = { path = "crates/aptos-drop-helper" }
 aptos-event-notifications = { path = "state-sync/inter-component/event-notifications" }
 aptos-executable-store = { path = "storage/executable-store" }
@@ -344,6 +346,7 @@ aptos-indexer-grpc-server-framework = { path = "ecosystem/indexer-grpc/indexer-g
 aptos-infallible = { path = "crates/aptos-infallible" }
 aptos-inspection-service = { path = "crates/aptos-inspection-service" }
 aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
+aptos-jwk-consensus = { path = "crates/aptos-jwk-consensus" }
 aptos-keygen = { path = "crates/aptos-keygen" }
 aptos-language-e2e-tests = { path = "aptos-move/e2e-tests" }
 aptos-ledger = { path = "crates/aptos-ledger" }
@@ -400,7 +403,6 @@ aptos-secure-storage = { path = "secure/storage" }
 aptos-short-hex-str = { path = "crates/short-hex-str" }
 aptos-speculative-state-helper = { path = "crates/aptos-speculative-state-helper" }
 aptos-state-sync-driver = { path = "state-sync/state-sync-driver" }
-aptos-state-view = { path = "storage/state-view" }
 aptos-storage-interface = { path = "storage/storage-interface" }
 aptos-storage-service-client = { path = "state-sync/storage-service/client" }
 aptos-storage-service-notifications = { path = "state-sync/inter-component/storage-service-notifications" }
@@ -418,6 +420,7 @@ aptos-transaction-generator-lib = { path = "crates/transaction-generator-lib" }
 aptos-types = { path = "types" }
 aptos-utils = { path = "aptos-utils" }
 aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }
+aptos-validator-transaction-pool = { path = "crates/validator-transaction-pool" }
 aptos-vault-client = { path = "secure/storage/vault" }
 aptos-vm = { path = "aptos-move/aptos-vm" }
 aptos-vm-logging = { path = "aptos-move/aptos-vm-logging" }

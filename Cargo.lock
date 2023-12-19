@@ -376,7 +376,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-logger",
- "aptos-state-view",
  "aptos-types",
  "bcs 0.1.4",
  "claims",
@@ -409,7 +408,6 @@ dependencies = [
  "aptos-proptest-helpers",
  "aptos-runtimes",
  "aptos-sdk",
- "aptos-state-view",
  "aptos-storage-interface",
  "aptos-types",
  "aptos-utils",
@@ -642,7 +640,6 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-mvhashmap",
- "aptos-state-view",
  "aptos-types",
  "aptos-vm-logging",
  "aptos-vm-types",
@@ -715,6 +712,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-framework",
+ "aptos-package-builder",
  "aptos-types",
  "bcs 0.1.4",
  "include_dir 0.7.2",
@@ -762,7 +760,6 @@ dependencies = [
  "aptos-memory-usage-tracker",
  "aptos-resource-viewer",
  "aptos-rest-client",
- "aptos-state-view",
  "aptos-table-natives",
  "aptos-types",
  "aptos-validator-interface",
@@ -880,6 +877,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-time-service",
  "aptos-types",
+ "aptos-validator-transaction-pool",
  "aptos-vm",
  "aptos-vm-validator",
  "arc-swap",
@@ -1122,7 +1120,6 @@ dependencies = [
  "aptos-rocksdb-options",
  "aptos-schemadb",
  "aptos-scratchpad",
- "aptos-state-view",
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
@@ -1167,7 +1164,6 @@ dependencies = [
  "aptos-rocksdb-options",
  "aptos-schemadb",
  "aptos-scratchpad",
- "aptos-state-view",
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
@@ -1199,7 +1195,6 @@ dependencies = [
  "aptos-executor-types",
  "aptos-logger",
  "aptos-push-metrics",
- "aptos-state-view",
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
@@ -1223,6 +1218,19 @@ dependencies = [
  "aptos-move-debugger",
  "aptos-push-metrics",
  "clap 4.3.21",
+ "tokio",
+]
+
+[[package]]
+name = "aptos-dkg-runtime"
+version = "0.1.0"
+dependencies = [
+ "aptos-config",
+ "aptos-network",
+ "aptos-runtimes",
+ "aptos-types",
+ "aptos-validator-transaction-pool",
+ "serde",
  "tokio",
 ]
 
@@ -1259,7 +1267,6 @@ dependencies = [
  "aptos-executor-test-helpers",
  "aptos-id-generator",
  "aptos-infallible",
- "aptos-state-view",
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
@@ -1311,7 +1318,6 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-scratchpad",
  "aptos-secure-net",
- "aptos-state-view",
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
@@ -1355,7 +1361,6 @@ dependencies = [
  "aptos-profiler",
  "aptos-push-metrics",
  "aptos-sdk",
- "aptos-state-view",
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-transaction-generator-lib",
@@ -1397,7 +1402,6 @@ dependencies = [
  "aptos-push-metrics",
  "aptos-retrier",
  "aptos-secure-net",
- "aptos-state-view",
  "aptos-storage-interface",
  "aptos-types",
  "aptos-vm",
@@ -1431,7 +1435,6 @@ dependencies = [
  "aptos-executor-types",
  "aptos-genesis",
  "aptos-sdk",
- "aptos-state-view",
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
@@ -1450,7 +1453,6 @@ dependencies = [
  "aptos-drop-helper",
  "aptos-scratchpad",
  "aptos-secure-net",
- "aptos-state-view",
  "aptos-storage-interface",
  "aptos-types",
  "bcs 0.1.4",
@@ -1474,7 +1476,6 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
- "aptos-state-view",
  "aptos-storage-interface",
  "aptos-types",
  "aptos-vm",
@@ -1707,7 +1708,6 @@ dependencies = [
  "aptos-move-stdlib",
  "aptos-native-interface",
  "aptos-sdk-builder",
- "aptos-state-view",
  "aptos-table-natives",
  "aptos-types",
  "aptos-vm",
@@ -1940,7 +1940,6 @@ dependencies = [
  "aptos-framework",
  "aptos-keygen",
  "aptos-logger",
- "aptos-state-view",
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
@@ -2416,6 +2415,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-jwk-consensus"
+version = "0.1.0"
+dependencies = [
+ "aptos-config",
+ "aptos-network",
+ "aptos-runtimes",
+ "aptos-types",
+ "aptos-validator-transaction-pool",
+ "serde",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-keygen"
 version = "0.1.0"
 dependencies = [
@@ -2444,7 +2456,6 @@ dependencies = [
  "aptos-memory-usage-tracker",
  "aptos-native-interface",
  "aptos-proptest-helpers",
- "aptos-state-view",
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
@@ -2623,7 +2634,6 @@ dependencies = [
  "aptos-memory-usage-tracker",
  "aptos-resource-viewer",
  "aptos-rest-client",
- "aptos-state-view",
  "aptos-table-natives",
  "aptos-types",
  "aptos-validator-interface",
@@ -2951,6 +2961,7 @@ dependencies = [
  "aptos-data-client",
  "aptos-data-streaming-service",
  "aptos-db",
+ "aptos-dkg-runtime",
  "aptos-event-notifications",
  "aptos-executor",
  "aptos-executor-types",
@@ -2961,6 +2972,7 @@ dependencies = [
  "aptos-indexer-grpc-table-info",
  "aptos-infallible",
  "aptos-inspection-service",
+ "aptos-jwk-consensus",
  "aptos-logger",
  "aptos-mempool",
  "aptos-mempool-notifications",
@@ -2974,7 +2986,6 @@ dependencies = [
  "aptos-runtimes",
  "aptos-secure-storage",
  "aptos-state-sync-driver",
- "aptos-state-view",
  "aptos-storage-interface",
  "aptos-storage-service-client",
  "aptos-storage-service-notifications",
@@ -2984,6 +2995,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-time-service",
  "aptos-types",
+ "aptos-validator-transaction-pool",
  "aptos-vm",
  "bcs 0.1.4",
  "clap 4.3.21",
@@ -3656,20 +3668,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-state-view"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-crypto",
- "aptos-types",
- "bcs 0.1.4",
- "bytes",
- "serde",
- "serde_bytes",
- "serde_json",
-]
-
-[[package]]
 name = "aptos-storage-interface"
 version = "0.1.0"
 dependencies = [
@@ -3680,7 +3678,6 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-scratchpad",
  "aptos-secure-net",
- "aptos-state-view",
  "aptos-types",
  "aptos-vm",
  "arr_macro",
@@ -4090,7 +4087,6 @@ dependencies = [
  "aptos-framework",
  "aptos-language-e2e-tests",
  "aptos-rest-client",
- "aptos-state-view",
  "aptos-storage-interface",
  "aptos-types",
  "async-recursion",
@@ -4101,6 +4097,18 @@ dependencies = [
  "lru 0.7.8",
  "move-binary-format",
  "move-core-types",
+ "tokio",
+]
+
+[[package]]
+name = "aptos-validator-transaction-pool"
+version = "0.1.0"
+dependencies = [
+ "aptos-channels",
+ "aptos-crypto",
+ "aptos-types",
+ "async-trait",
+ "futures-util",
  "tokio",
 ]
 
@@ -4145,7 +4153,6 @@ dependencies = [
  "aptos-move-stdlib",
  "aptos-mvhashmap",
  "aptos-native-interface",
- "aptos-state-view",
  "aptos-table-natives",
  "aptos-types",
  "aptos-utils",
@@ -4204,7 +4211,6 @@ dependencies = [
  "aptos-framework",
  "aptos-gas-schedule",
  "aptos-proptest-helpers",
- "aptos-state-view",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-types",
@@ -4227,7 +4233,6 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-speculative-state-helper",
- "aptos-state-view",
  "aptos-types",
  "arc-swap",
  "once_cell",
@@ -4270,7 +4275,6 @@ dependencies = [
  "aptos-gas-algebra",
  "aptos-gas-schedule",
  "aptos-language-e2e-tests",
- "aptos-state-view",
  "aptos-types",
  "aptos-vm",
  "bcs 0.1.4",
@@ -4295,7 +4299,6 @@ dependencies = [
  "aptos-executor-test-helpers",
  "aptos-gas-schedule",
  "aptos-logger",
- "aptos-state-view",
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
@@ -4332,7 +4335,6 @@ dependencies = [
  "aptos-crypto-derive",
  "aptos-framework",
  "aptos-gas-schedule",
- "aptos-state-view",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-types",
@@ -6774,7 +6776,6 @@ dependencies = [
  "aptos-language-e2e-tests",
  "aptos-logger",
  "aptos-package-builder",
- "aptos-state-view",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
@@ -9102,7 +9103,6 @@ dependencies = [
  "aptos-language-e2e-tests",
  "aptos-logger",
  "aptos-memory-usage-tracker",
- "aptos-state-view",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",

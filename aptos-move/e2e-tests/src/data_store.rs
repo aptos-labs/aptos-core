@@ -6,12 +6,12 @@
 
 use crate::account::AccountData;
 use anyhow::Result;
-use aptos_state_view::{in_memory_state_view::InMemoryStateView, TStateView};
 use aptos_types::{
     access_path::AccessPath,
     account_config::CoinInfoResource,
     state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        in_memory_state_view::InMemoryStateView, state_key::StateKey,
+        state_storage_usage::StateStorageUsage, state_value::StateValue, TStateView,
     },
     transaction::ChangeSet,
     write_set::{TransactionWrite, WriteSet},

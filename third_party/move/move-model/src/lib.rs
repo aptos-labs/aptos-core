@@ -377,9 +377,9 @@ fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
         let mut module_translator = ModuleBuilder::new(&mut builder, module_id, module_name);
         module_translator.translate(loc, module_def, None);
     }
-    for (_, script_def) in program.scripts.into_iter() {
+    for (i, (_, script_def)) in program.scripts.into_iter().enumerate() {
         let loc = builder.to_loc(&script_def.loc);
-        let module_name = ModuleName::pseudo_script_name(builder.env.symbol_pool());
+        let module_name = ModuleName::pseudo_script_name(builder.env.symbol_pool(), i);
         let module_id = ModuleId::new(builder.env.module_data.len());
         let mut module_translator = ModuleBuilder::new(&mut builder, module_id, module_name);
         let module_def = expansion_script_to_module(script_def);
@@ -476,8 +476,8 @@ fn script_into_module(compiled_script: CompiledScript) -> CompiledModule {
         },
     };
 
-    // Add a dummy adress if none exists.
-    let dummy_addr = AccountAddress::new([0xFF; AccountAddress::LENGTH]);
+    // Add a dummy address if none exists.
+    let dummy_addr = AccountAddress::MAX_ADDRESS;
     let dummy_addr_idx = match script
         .address_identifiers
         .iter()

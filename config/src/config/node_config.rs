@@ -4,11 +4,12 @@
 use super::{DagConsensusConfig, IndexerTableInfoConfig};
 use crate::{
     config::{
-        netbench::NetbenchConfig, node_config_loader::NodeConfigLoader,
-        persistable_config::PersistableConfig, utils::RootPath, AdminServiceConfig, ApiConfig,
-        BaseConfig, ConsensusConfig, Error, ExecutionConfig, IndexerConfig, IndexerGrpcConfig,
-        InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
-        PeerMonitoringServiceConfig, SafetyRulesTestConfig, StateSyncConfig, StorageConfig,
+        dkg_config::DKGConfig, jwk_consensus_config::JWKConsensusConfig, netbench::NetbenchConfig,
+        node_config_loader::NodeConfigLoader, persistable_config::PersistableConfig,
+        utils::RootPath, AdminServiceConfig, ApiConfig, BaseConfig, ConsensusConfig, Error,
+        ExecutionConfig, IndexerConfig, IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig,
+        MempoolConfig, NetworkConfig, PeerMonitoringServiceConfig, SafetyRulesTestConfig,
+        StateSyncConfig, StorageConfig,
     },
     network_id::NetworkId,
 };
@@ -42,6 +43,8 @@ pub struct NodeConfig {
     #[serde(default)]
     pub dag_consensus: DagConsensusConfig,
     #[serde(default)]
+    pub dkg: DKGConfig,
+    #[serde(default)]
     pub execution: ExecutionConfig,
     #[serde(default)]
     pub failpoints: Option<HashMap<String, String>>,
@@ -55,6 +58,8 @@ pub struct NodeConfig {
     pub indexer_table_info: IndexerTableInfoConfig,
     #[serde(default)]
     pub inspection_service: InspectionServiceConfig,
+    #[serde(default)]
+    pub jwk_consensus: JWKConsensusConfig,
     #[serde(default)]
     pub logger: LoggerConfig,
     #[serde(default)]

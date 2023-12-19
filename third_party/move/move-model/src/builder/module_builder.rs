@@ -429,7 +429,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         if self.parent.const_table.contains_key(&qsym) {
             self.parent.env.error(
                 &self.parent.to_loc(&name.loc()),
-                &format!("duplicate declaration of `{}`", &name.value()),
+                &format!("duplicate declaration of const `{}`", &name.value()),
             )
         }
         let mut et = ExpTranslator::new(self);

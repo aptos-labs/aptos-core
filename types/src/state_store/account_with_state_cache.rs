@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use aptos_types::{
+use crate::{
     account_address::AccountAddress,
     account_view::AccountView,
     state_store::{state_key::StateKey, state_value::StateValue},

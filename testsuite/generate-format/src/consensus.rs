@@ -17,7 +17,9 @@ use aptos_types::{
         state_key::StateKey,
         state_value::{PersistedStateValueMetadata, StateValueMetadata},
     },
-    transaction, write_set,
+    transaction,
+    validator_txn::ValidatorTransaction,
+    write_set,
 };
 use move_core_types::language_storage;
 use rand::{rngs::StdRng, SeedableRng};
@@ -90,6 +92,7 @@ pub fn get_registry() -> Result<Registry> {
     // 2. Trace the main entry point(s) + every enum separately.
     tracer.trace_type::<contract_event::ContractEvent>(&samples)?;
     tracer.trace_type::<language_storage::TypeTag>(&samples)?;
+    tracer.trace_type::<ValidatorTransaction>(&samples)?;
     tracer.trace_type::<transaction::Transaction>(&samples)?;
     tracer.trace_type::<transaction::TransactionArgument>(&samples)?;
     tracer.trace_type::<transaction::TransactionPayload>(&samples)?;

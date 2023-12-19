@@ -9,7 +9,6 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_state_view::StateView;
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, ShardedStateCache},
     state_delta::StateDelta,
@@ -21,7 +20,7 @@ use aptos_types::{
         partitioner::{ExecutableTransactions, PartitionedTransactions},
     },
     ledger_info::LedgerInfoWithSignatures,
-    state_store::ShardedStateUpdates,
+    state_store::{ShardedStateUpdates, StateView},
     test_helpers::transaction_test_helpers::TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
     transaction::{
         signature_verified_transaction::{

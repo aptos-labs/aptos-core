@@ -1,6 +1,6 @@
 [package]
-name = "aptos-state-view"
-description = "Aptos state view"
+name = "aptos-validator-transaction-pool"
+description = "Aptos Validator Transaction Pool"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -13,15 +13,9 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = { workspace = true }
+aptos-channels = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-types = { workspace = true }
-bcs = { workspace = true }
-bytes = { workspace = true }
-serde = { workspace = true }
-serde_bytes = { workspace = true }
-serde_json = { workspace = true }
-
-[features]
-default = []
-fuzzing = ["aptos-types/fuzzing"]
+async-trait = { workspace = true }
+futures-util = { workspace = true }
+tokio = { workspace = true }
