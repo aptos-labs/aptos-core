@@ -135,7 +135,7 @@ impl TransactionTypeArg {
                 use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::ModifyGlobalBoundedAggV2 => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::ModifyBoundedAggV2 { step : 10 },
+                entry_point: EntryPoints::ModifyBoundedAggV2 { step: 10 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
