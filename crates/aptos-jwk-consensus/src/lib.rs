@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_network::application::{
     error::Error,
@@ -44,3 +46,5 @@ impl<NetworkClient: NetworkClientInterface<JWKConsensusMsg>> JWKNetworkClient<Ne
             .await
     }
 }
+
+pub mod network_interface;

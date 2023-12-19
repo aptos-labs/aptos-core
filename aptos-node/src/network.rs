@@ -7,7 +7,7 @@ use aptos_config::{
     config::{NetworkConfig, NodeConfig},
     network_id::NetworkId,
 };
-use aptos_consensus::network_interface::{ConsensusMsg, DIRECT_SEND, RPC};
+use aptos_consensus::network_interface::ConsensusMsg;
 use aptos_dkg_runtime::DKGMsg;
 use aptos_event_notifications::EventSubscriptionService;
 use aptos_jwk_consensus::JWKConsensusMsg;
@@ -69,8 +69,8 @@ pub fn consensus_network_configuration(node_config: &NodeConfig) -> NetworkAppli
 }
 
 pub fn dkg_network_configuration(node_config: &NodeConfig) -> NetworkApplicationConfig {
-    let direct_send_protocols: Vec<ProtocolId> = DIRECT_SEND.into();
-    let rpc_protocols: Vec<ProtocolId> = RPC.into();
+    let direct_send_protocols: Vec<ProtocolId> = aptos_dkg_runtime::network_interface::DIRECT_SEND.into();
+    let rpc_protocols: Vec<ProtocolId> = aptos_dkg_runtime::network_interface::RPC.into();
 
     let network_client_config =
         NetworkClientConfig::new(direct_send_protocols.clone(), rpc_protocols.clone());
@@ -85,8 +85,8 @@ pub fn dkg_network_configuration(node_config: &NodeConfig) -> NetworkApplication
 }
 
 pub fn jwk_consensus_network_configuration(node_config: &NodeConfig) -> NetworkApplicationConfig {
-    let direct_send_protocols: Vec<ProtocolId> = DIRECT_SEND.into();
-    let rpc_protocols: Vec<ProtocolId> = RPC.into();
+    let direct_send_protocols: Vec<ProtocolId> = aptos_jwk_consensus::network_interface::DIRECT_SEND.into();
+    let rpc_protocols: Vec<ProtocolId> = aptos_jwk_consensus::network_interface::RPC.into();
 
     let network_client_config =
         NetworkClientConfig::new(direct_send_protocols.clone(), rpc_protocols.clone());

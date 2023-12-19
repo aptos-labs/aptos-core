@@ -20,6 +20,8 @@ pub enum CompressionClient {
     Consensus,
     Mempool,
     StateSync,
+    DKG,
+    JWKConsensus,
 }
 
 impl CompressionClient {

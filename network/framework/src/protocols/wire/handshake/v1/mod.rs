@@ -28,6 +28,7 @@ use std::{
     ops::{BitAnd, BitOr},
 };
 use thiserror::Error;
+use crate::protocols::wire::handshake::v1::ProtocolId::{JWKConsensusDirectSendBcs, JWKConsensusDirectSendCompressed};
 
 #[cfg(test)]
 mod test;
@@ -59,6 +60,18 @@ pub enum ProtocolId {
     ConsensusDirectSendCompressed = 12,
     NetbenchDirectSend = 13,
     NetbenchRpc = 14,
+    DKGDirectSendCompressed = 15,
+    DKGDirectSendBcs = 16,
+    DKGDirectSendJson = 17,
+    DKGRpcCompressed = 18,
+    DKGRpcBcs = 19,
+    DKGRpcJson = 20,
+    JWKConsensusDirectSendCompressed = 21,
+    JWKConsensusDirectSendBcs = 22,
+    JWKConsensusDirectSendJson = 23,
+    JWKConsensusRpcCompressed = 24,
+    JWKConsensusRpcBcs = 25,
+    JWKConsensusRpcJson = 26,
 }
 
 /// The encoding types for Protocols
@@ -87,6 +100,18 @@ impl ProtocolId {
             ConsensusDirectSendCompressed => "ConsensusDirectSendCompressed",
             NetbenchDirectSend => "NetbenchDirectSend",
             NetbenchRpc => "NetbenchRpc",
+            DKGDirectSendCompressed => "DKGDirectSendCompressed",
+            DKGDirectSendBcs => "DKGDirectSendBcs",
+            DKGDirectSendJson => "DKGDirectSendJson",
+            DKGRpcCompressed => "DKGRpcCompressed",
+            DKGRpcBcs => "DKGRpcBcs",
+            DKGRpcJson => "DKGRpcJson",
+            JWKConsensusDirectSendCompressed => "JWKConsensusDirectSendCompressed",
+            JWKConsensusDirectSendBcs => "JWKConsensusDirectSendBcs",
+            JWKConsensusDirectSendJson => "JWKConsensusDirectSendJson",
+            JWKConsensusRpcCompressed => "JWKConsensusRpcCompressed",
+            JWKConsensusRpcBcs => "JWKConsensusRpcBcs",
+            JWKConsensusRpcJson => "JWKConsensusRpcJson",
         }
     }
 
@@ -108,6 +133,18 @@ impl ProtocolId {
             ProtocolId::ConsensusDirectSendCompressed,
             ProtocolId::NetbenchDirectSend,
             ProtocolId::NetbenchRpc,
+            ProtocolId::DKGDirectSendCompressed,
+            ProtocolId::DKGDirectSendBcs,
+            ProtocolId::DKGDirectSendJson,
+            ProtocolId::DKGRpcCompressed,
+            ProtocolId::DKGRpcBcs,
+            ProtocolId::DKGRpcJson,
+            ProtocolId::JWKConsensusDirectSendCompressed,
+            ProtocolId::JWKConsensusDirectSendBcs,
+            ProtocolId::JWKConsensusDirectSendJson,
+            ProtocolId::JWKConsensusRpcCompressed,
+            ProtocolId::JWKConsensusRpcBcs,
+            ProtocolId::JWKConsensusRpcJson,
         ]
     }
 
@@ -116,6 +153,12 @@ impl ProtocolId {
         match self {
             ProtocolId::ConsensusDirectSendJson | ProtocolId::ConsensusRpcJson => Encoding::Json,
             ProtocolId::ConsensusDirectSendCompressed | ProtocolId::ConsensusRpcCompressed => {
+                Encoding::CompressedBcs(RECURSION_LIMIT)
+            },
+            ProtocolId::DKGDirectSendCompressed | ProtocolId::DKGRpcCompressed => {
+                Encoding::CompressedBcs(RECURSION_LIMIT)
+            },
+            ProtocolId::JWKConsensusDirectSendCompressed | ProtocolId::JWKConsensusRpcCompressed => {
                 Encoding::CompressedBcs(RECURSION_LIMIT)
             },
             ProtocolId::MempoolDirectSend => Encoding::CompressedBcs(USER_INPUT_RECURSION_LIMIT),
@@ -131,6 +174,12 @@ impl ProtocolId {
                 CompressionClient::Consensus
             },
             ProtocolId::MempoolDirectSend => CompressionClient::Mempool,
+            ProtocolId::DKGDirectSendCompressed | ProtocolId::DKGRpcCompressed => {
+                CompressionClient::DKG,
+            }
+            ProtocolId::JWKConsensusDirectSendCompressed | ProtocolId::JWKConsensusRpcCompressed => {
+                CompressionClient::JWKConsensus,
+            }
             protocol_id => unreachable!(
                 "The given protocol ({:?}) should not be using compression!",
                 protocol_id
