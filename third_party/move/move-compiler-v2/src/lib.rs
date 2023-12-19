@@ -30,7 +30,7 @@ use move_stackless_bytecode::function_target_pipeline::{
 };
 use move_symbol_pool::Symbol;
 pub use options::*;
-use pipeline::{ability_checker::AbilityChecker, explicit_drop::ExplicitDrop};
+use pipeline::explicit_drop::ExplicitDrop;
 use std::{collections::BTreeSet, path::Path};
 
 /// Run Move compiler and print errors to stderr.
