@@ -30,6 +30,7 @@ use std::{
     collections::HashMap,
     mem::size_of,
     ops::Bound,
+    sync::atomic::Ordering,
     time::{Duration, SystemTime},
 };
 
@@ -734,15 +735,30 @@ impl TransactionStore {
                     } else {
                         counters::GC_PARKED_TXN_LABEL
                     };
+                    let consensus_pulled = txn
+                        .insertion_info
+                        .consensus_pulled_counter
+                        .load(Ordering::Relaxed);
                     let account = txn.get_sender();
                     let txn_sequence_number = txn.sequence_info.transaction_sequence_number;
-                    gc_txns_log.add_with_status(account, txn_sequence_number, status);
                     if let Ok(time_delta) =
                         SystemTime::now().duration_since(txn.insertion_info.insertion_time)
                     {
+                        gc_txns_log.add_with_status(
+                            account,
+                            txn_sequence_number,
+                            format!("{}:{}:{}", status, consensus_pulled, time_delta.as_millis())
+                                .as_str(),
+                        );
                         counters::CORE_MEMPOOL_GC_LATENCY
                             .with_label_values(&[metric_label, status])
                             .observe(time_delta.as_secs_f64());
+                    } else {
+                        gc_txns_log.add_with_status(
+                            account,
+                            txn_sequence_number,
+                            format!("{}:{}", status, consensus_pulled).as_str(),
+                        );
                     }
 
                     // remove txn
