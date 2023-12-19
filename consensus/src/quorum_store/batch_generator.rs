@@ -13,7 +13,7 @@ use crate::{
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
     common::{TransactionInProgress, TransactionSummary},
-    proof_of_store::BatchId,
+    proof_of_store::{BatchId, BatchInfo},
 };
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
@@ -28,7 +28,7 @@ use tokio::time::Interval;
 
 #[derive(Debug)]
 pub enum BatchGeneratorCommand {
-    CommitNotification(u64),
+    CommitNotification(u64, Vec<BatchInfo>),
     ProofExpiration(Vec<BatchId>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
@@ -420,7 +420,7 @@ impl BatchGenerator {
                 }),
                 Some(cmd) = cmd_rx.recv() => monitor!("batch_generator_handle_command", {
                     match cmd {
-                        BatchGeneratorCommand::CommitNotification(block_timestamp) => {
+                        BatchGeneratorCommand::CommitNotification(block_timestamp, batches) => {
                             trace!(
                                 "QS: got clean request from execution, block timestamp {}",
                                 block_timestamp
@@ -431,10 +431,21 @@ impl BatchGenerator {
                             );
                             self.latest_block_timestamp = block_timestamp;
 
+                            for batch_id in batches.iter().map(|b| b.batch_id()) {
+                                if self.remove_batch_in_progress(&batch_id) {
+                                    counters::BATCH_IN_PROGRESS_COMMITTED.inc();
+                                    debug!(
+                                        LogSchema::new(LogEvent::BatchCommitNotification),
+                                        batch_id = batch_id,
+                                    );
+                                }
+                            }
+
                             // Cleans up all batches that expire in timestamp <= block_timestamp. This is
                             // safe since clean request must occur only after execution result is certified.
                             for batch_id in self.batch_expirations.expire(block_timestamp) {
                                 if self.remove_batch_in_progress(&batch_id) {
+                                    counters::BATCH_IN_PROGRESS_EXPIRED.inc();
                                     debug!(
                                         "QS: logical time based expiration batch w. id {} from batches_in_progress, new size {}",
                                         batch_id,
@@ -445,6 +456,7 @@ impl BatchGenerator {
                         },
                         BatchGeneratorCommand::ProofExpiration(batch_ids) => {
                             for batch_id in batch_ids {
+                                counters::BATCH_IN_PROGRESS_TIMEOUT.inc();
                                 debug!(
                                     "QS: received timeout for proof of store, batch id = {}",
                                     batch_id
