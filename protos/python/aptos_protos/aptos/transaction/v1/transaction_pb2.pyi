@@ -89,6 +89,7 @@ class Transaction(_message.Message):
         "genesis",
         "state_checkpoint",
         "user",
+        "validator",
     ]
 
     class TransactionType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
@@ -98,11 +99,13 @@ class Transaction(_message.Message):
         TRANSACTION_TYPE_BLOCK_METADATA: _ClassVar[Transaction.TransactionType]
         TRANSACTION_TYPE_STATE_CHECKPOINT: _ClassVar[Transaction.TransactionType]
         TRANSACTION_TYPE_USER: _ClassVar[Transaction.TransactionType]
+        TRANSACTION_TYPE_VALIDATOR: _ClassVar[Transaction.TransactionType]
     TRANSACTION_TYPE_UNSPECIFIED: Transaction.TransactionType
     TRANSACTION_TYPE_GENESIS: Transaction.TransactionType
     TRANSACTION_TYPE_BLOCK_METADATA: Transaction.TransactionType
     TRANSACTION_TYPE_STATE_CHECKPOINT: Transaction.TransactionType
     TRANSACTION_TYPE_USER: Transaction.TransactionType
+    TRANSACTION_TYPE_VALIDATOR: Transaction.TransactionType
     TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
     VERSION_FIELD_NUMBER: _ClassVar[int]
     INFO_FIELD_NUMBER: _ClassVar[int]
@@ -113,6 +116,7 @@ class Transaction(_message.Message):
     GENESIS_FIELD_NUMBER: _ClassVar[int]
     STATE_CHECKPOINT_FIELD_NUMBER: _ClassVar[int]
     USER_FIELD_NUMBER: _ClassVar[int]
+    VALIDATOR_FIELD_NUMBER: _ClassVar[int]
     timestamp: _timestamp_pb2.Timestamp
     version: int
     info: TransactionInfo
@@ -123,6 +127,7 @@ class Transaction(_message.Message):
     genesis: GenesisTransaction
     state_checkpoint: StateCheckpointTransaction
     user: UserTransaction
+    validator: ValidatorTransaction
     def __init__(
         self,
         timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...,
@@ -135,6 +140,7 @@ class Transaction(_message.Message):
         genesis: _Optional[_Union[GenesisTransaction, _Mapping]] = ...,
         state_checkpoint: _Optional[_Union[StateCheckpointTransaction, _Mapping]] = ...,
         user: _Optional[_Union[UserTransaction, _Mapping]] = ...,
+        validator: _Optional[_Union[ValidatorTransaction, _Mapping]] = ...,
     ) -> None: ...
 
 class BlockMetadataTransaction(_message.Message):
@@ -181,6 +187,10 @@ class GenesisTransaction(_message.Message):
     ) -> None: ...
 
 class StateCheckpointTransaction(_message.Message):
+    __slots__ = []
+    def __init__(self) -> None: ...
+
+class ValidatorTransaction(_message.Message):
     __slots__ = []
     def __init__(self) -> None: ...
 
@@ -1019,9 +1029,11 @@ class AnyPublicKey(_message.Message):
         TYPE_UNSPECIFIED: _ClassVar[AnyPublicKey.Type]
         TYPE_ED25519: _ClassVar[AnyPublicKey.Type]
         TYPE_SECP256K1_ECDSA: _ClassVar[AnyPublicKey.Type]
+        TYPE_SECP256R1_ECDSA: _ClassVar[AnyPublicKey.Type]
     TYPE_UNSPECIFIED: AnyPublicKey.Type
     TYPE_ED25519: AnyPublicKey.Type
     TYPE_SECP256K1_ECDSA: AnyPublicKey.Type
+    TYPE_SECP256R1_ECDSA: AnyPublicKey.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
     PUBLIC_KEY_FIELD_NUMBER: _ClassVar[int]
     type: AnyPublicKey.Type
@@ -1033,25 +1045,51 @@ class AnyPublicKey(_message.Message):
     ) -> None: ...
 
 class AnySignature(_message.Message):
-    __slots__ = ["type", "signature"]
+    __slots__ = ["type", "ed25519", "secp256k1_ecdsa", "webauthn"]
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = []
         TYPE_UNSPECIFIED: _ClassVar[AnySignature.Type]
         TYPE_ED25519: _ClassVar[AnySignature.Type]
         TYPE_SECP256K1_ECDSA: _ClassVar[AnySignature.Type]
+        TYPE_WEBAUTHN: _ClassVar[AnySignature.Type]
     TYPE_UNSPECIFIED: AnySignature.Type
     TYPE_ED25519: AnySignature.Type
     TYPE_SECP256K1_ECDSA: AnySignature.Type
+    TYPE_WEBAUTHN: AnySignature.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
-    SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    ED25519_FIELD_NUMBER: _ClassVar[int]
+    SECP256K1_ECDSA_FIELD_NUMBER: _ClassVar[int]
+    WEBAUTHN_FIELD_NUMBER: _ClassVar[int]
     type: AnySignature.Type
-    signature: bytes
+    ed25519: Ed25519
+    secp256k1_ecdsa: Secp256k1Ecdsa
+    webauthn: WebAuthn
     def __init__(
         self,
         type: _Optional[_Union[AnySignature.Type, str]] = ...,
-        signature: _Optional[bytes] = ...,
+        ed25519: _Optional[_Union[Ed25519, _Mapping]] = ...,
+        secp256k1_ecdsa: _Optional[_Union[Secp256k1Ecdsa, _Mapping]] = ...,
+        webauthn: _Optional[_Union[WebAuthn, _Mapping]] = ...,
     ) -> None: ...
+
+class Ed25519(_message.Message):
+    __slots__ = ["signature"]
+    SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    signature: bytes
+    def __init__(self, signature: _Optional[bytes] = ...) -> None: ...
+
+class Secp256k1Ecdsa(_message.Message):
+    __slots__ = ["signature"]
+    SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    signature: bytes
+    def __init__(self, signature: _Optional[bytes] = ...) -> None: ...
+
+class WebAuthn(_message.Message):
+    __slots__ = ["signature"]
+    SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    signature: bytes
+    def __init__(self, signature: _Optional[bytes] = ...) -> None: ...
 
 class SingleKeySignature(_message.Message):
     __slots__ = ["public_key", "signature"]

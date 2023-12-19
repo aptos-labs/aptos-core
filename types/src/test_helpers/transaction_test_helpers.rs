@@ -15,7 +15,7 @@ use crate::{
         TransactionPayload,
     },
 };
-use aptos_crypto::{ed25519::*, traits::*, HashValue};
+use aptos_crypto::{ed25519::*, traits::*};
 
 const MAX_GAS_AMOUNT: u64 = 1_000_000;
 const TEST_GAS_PRICE: u64 = 100;
@@ -248,12 +248,27 @@ pub fn get_test_txn_with_chain_id(
     SignedTransaction::new(raw_txn, public_key, signature)
 }
 
-pub fn block(
-    mut user_txns: Vec<Transaction>,
-    block_executor_onchain_config: BlockExecutorConfigFromOnchain,
-) -> Vec<SignatureVerifiedTransaction> {
-    if !block_executor_onchain_config.has_any_block_gas_limit() {
-        user_txns.push(Transaction::StateCheckpoint(HashValue::random()));
-    }
+pub fn block(user_txns: Vec<Transaction>) -> Vec<SignatureVerifiedTransaction> {
     into_signature_verified_block(user_txns)
+}
+
+pub fn get_test_raw_transaction(
+    sender: AccountAddress,
+    sequence_number: u64,
+    payload: Option<TransactionPayload>,
+    expiration_timestamp_secs: Option<u64>,
+    gas_unit_price: Option<u64>,
+    max_gas_amount: Option<u64>,
+) -> RawTransaction {
+    RawTransaction::new(
+        sender,
+        sequence_number,
+        payload.unwrap_or_else(|| {
+            TransactionPayload::Script(Script::new(EMPTY_SCRIPT.to_vec(), vec![], vec![]))
+        }),
+        max_gas_amount.unwrap_or(MAX_GAS_AMOUNT),
+        gas_unit_price.unwrap_or(TEST_GAS_PRICE),
+        expiration_timestamp_secs.unwrap_or(expiration_time(10)),
+        ChainId::test(),
+    )
 }

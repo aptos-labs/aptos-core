@@ -313,17 +313,17 @@ fun m::foo(): u64 {
  68: $t10 := copy($t37)
      # live vars: $t6, $t9, $t10, $t12, $t25
  69: goto 72
-     # live vars: $t6
+     # live vars: $t6, $t25
  70: label L11
-     # live vars: $t6
+     # live vars: $t6, $t25
  71: goto 74
      # live vars: $t6, $t9, $t10, $t12, $t25
  72: label L12
      # live vars: $t6, $t9, $t10, $t12, $t25
  73: goto 45
-     # live vars: $t6
+     # live vars: $t6, $t25
  74: label L9
-     # live vars: $t6
+     # live vars: $t6, $t25
  75: $t8 := copy($t25)
      # live vars: $t6
  76: $t40 := freeze_ref($t6)

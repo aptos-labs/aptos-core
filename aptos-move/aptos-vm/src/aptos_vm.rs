@@ -27,7 +27,6 @@ use aptos_gas_schedule::{AptosGasParameters, VMGasParameters};
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_metrics_core::TimerHelper;
-use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
     account_config::new_block_event_key,
@@ -42,9 +41,11 @@ use aptos_types::{
         new_epoch_event_key, ConfigurationResource, FeatureFlag, Features, OnChainConfig,
         TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,
     },
+    state_store::{StateView, StateViewId},
     transaction::{
+        authenticator::{AccountAuthenticator, AnySignature, TransactionAuthenticator},
         signature_verified_transaction::SignatureVerifiedTransaction,
-        EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
+        BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
         MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
         Transaction::{
             BlockMetadata as BlockMetadataTransaction, GenesisTransaction, StateCheckpoint,
@@ -313,7 +314,7 @@ impl AptosVM {
     /// Returns the internal gas schedule if it has been loaded, or an error if it hasn't.
     #[cfg(any(test, feature = "testing"))]
     pub fn gas_params(&self) -> Result<&AptosGasParameters, VMStatus> {
-        let log_context = AdapterLogSchema::new(aptos_state_view::StateViewId::Miscellaneous, 0);
+        let log_context = AdapterLogSchema::new(StateViewId::Miscellaneous, 0);
         get_or_vm_startup_failure(&self.gas_params, &log_context)
     }
 
@@ -418,25 +419,6 @@ impl AptosVM {
                 .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
         ) {
             TransactionStatus::Keep(status) => {
-                // Inject abort info if available.
-                let status = match status {
-                    ExecutionStatus::MoveAbort {
-                        location: AbortLocation::Module(module),
-                        code,
-                        ..
-                    } => {
-                        let info = self
-                            .extract_module_metadata(&module)
-                            .and_then(|m| m.extract_abort_info(code));
-                        ExecutionStatus::MoveAbort {
-                            location: AbortLocation::Module(module),
-                            code,
-                            info,
-                        }
-                    },
-                    _ => status,
-                };
-
                 // The transaction should be kept. Run the appropriate post transaction workflows
                 // including epilogue. This runs a new session that ignores any side effects that
                 // might abort the execution (e.g., spending additional funds needed to pay for
@@ -447,10 +429,11 @@ impl AptosVM {
                     gas_meter,
                     txn_data,
                     resolver,
+                    status,
                     log_context,
                     change_set_configs,
                 ) {
-                    Ok((change_set, fee_statement)) => {
+                    Ok((change_set, fee_statement, status)) => {
                         VMOutput::new(change_set, fee_statement, TransactionStatus::Keep(status))
                     },
                     Err(err) => discarded_output(err.status_code()),
@@ -465,19 +448,41 @@ impl AptosVM {
         }
     }
 
+    fn inject_abort_info_if_available(&self, status: ExecutionStatus) -> ExecutionStatus {
+        match status {
+            ExecutionStatus::MoveAbort {
+                location: AbortLocation::Module(module),
+                code,
+                ..
+            } => {
+                let info = self
+                    .extract_module_metadata(&module)
+                    .and_then(|m| m.extract_abort_info(code));
+                ExecutionStatus::MoveAbort {
+                    location: AbortLocation::Module(module),
+                    code,
+                    info,
+                }
+            },
+            _ => status,
+        }
+    }
+
     fn finish_aborted_transaction(
         &self,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         resolver: &impl AptosMoveResolver,
+        status: ExecutionStatus,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
-    ) -> Result<(VMChangeSet, FeeStatement), VMStatus> {
+    ) -> Result<(VMChangeSet, FeeStatement, ExecutionStatus), VMStatus> {
         // Storage refund is zero since no slots are deleted in aborted transactions.
         const ZERO_STORAGE_REFUND: u64 = 0;
 
         if is_account_init_for_sponsored_transaction(txn_data, &self.features) {
             let mut session = self.new_session(resolver, SessionId::run_on_abort(txn_data));
+            let status = self.inject_abort_info_if_available(status);
 
             create_account_if_does_not_exist(&mut session, gas_meter, txn_data.sender())
                 // if this fails, it is likely due to out of gas, so we try again without metering
@@ -553,9 +558,10 @@ impl AptosVM {
             })?;
             respawned_session
                 .finish(change_set_configs)
-                .map(|set| (set, fee_statement))
+                .map(|set| (set, fee_statement, status))
         } else {
             let mut session = self.new_session(resolver, SessionId::epilogue_meta(txn_data));
+            let status = self.inject_abort_info_if_available(status);
 
             let fee_statement =
                 AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
@@ -569,7 +575,7 @@ impl AptosVM {
             )?;
             session
                 .finish(change_set_configs)
-                .map(|set| (set, fee_statement))
+                .map(|set| (set, fee_statement, status))
                 .map_err(|e| e.into())
         }
     }
@@ -2023,7 +2029,7 @@ impl VMExecutor for AptosVM {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         fail_point!("move_adapter::execute_block", |_| {
             Err(VMStatus::error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -2088,6 +2094,40 @@ impl VMExecutor for AptosVM {
     }
 }
 
+/// Check if account authenticator matches WebAuthn `AccountAuthenticator`
+fn matches_webauthn_authenticator(account_authenticator: &AccountAuthenticator) -> bool {
+    // exhaustive check AccountAuthenticator in case variants are added later
+    match account_authenticator {
+        AccountAuthenticator::Ed25519 { .. } | AccountAuthenticator::MultiEd25519 { .. } => {},
+        AccountAuthenticator::SingleKey { authenticator } => {
+            let signature = authenticator.signature();
+            if matches!(signature, AnySignature::WebAuthn { .. }) {
+                return true;
+            }
+        },
+        AccountAuthenticator::MultiKey { authenticator } => {
+            let signatures = authenticator.signatures();
+            for (.., signature) in signatures {
+                if matches!(signature, AnySignature::WebAuthn { .. }) {
+                    return true;
+                }
+            }
+        },
+    }
+    false
+}
+
+/// Check if account authenticators includes one or more WebAuthn AccountAuthenticator
+fn includes_webauthn_authenticator(account_authenticators: &Vec<AccountAuthenticator>) -> bool {
+    for account_authenticator in account_authenticators {
+        // immediately return if true
+        if matches_webauthn_authenticator(account_authenticator) {
+            return true;
+        }
+    }
+    false
+}
+
 // VMValidator external API
 impl VMValidator for AptosVM {
     /// Determine if a transaction is valid. Will return `None` if the transaction is accepted,
@@ -2115,6 +2155,44 @@ impl VMValidator for AptosVM {
         {
             if let aptos_types::transaction::authenticator::TransactionAuthenticator::SingleSender{ .. } = transaction.authenticator_ref() {
                 return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+            }
+        }
+
+        if !self.features.is_enabled(FeatureFlag::WEBAUTHN_SIGNATURE) {
+            // exhaustive check TransactionAuthenticator in case variants are added later
+            match transaction.authenticator_ref() {
+                TransactionAuthenticator::Ed25519 { .. }
+                | TransactionAuthenticator::MultiEd25519 { .. } => {},
+                TransactionAuthenticator::MultiAgent {
+                    sender,
+                    secondary_signers,
+                    ..
+                } => {
+                    let is_webauthn = matches_webauthn_authenticator(sender)
+                        || includes_webauthn_authenticator(secondary_signers);
+                    if is_webauthn {
+                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+                    }
+                },
+                TransactionAuthenticator::FeePayer {
+                    sender,
+                    secondary_signers,
+                    fee_payer_signer,
+                    ..
+                } => {
+                    let is_webauthn = matches_webauthn_authenticator(sender)
+                        || includes_webauthn_authenticator(secondary_signers)
+                        || matches_webauthn_authenticator(fee_payer_signer);
+                    if is_webauthn {
+                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+                    }
+                },
+                TransactionAuthenticator::SingleSender { sender } => {
+                    let is_webauthn = matches_webauthn_authenticator(sender);
+                    if is_webauthn {
+                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+                    }
+                },
             }
         }
 

@@ -27,7 +27,6 @@ use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGE
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
-use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView,
     state_delta::StateDelta, DbReaderWriter, ExecutedTrees,
@@ -36,6 +35,7 @@ use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain,
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
+    state_store::StateViewId,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction, TransactionInfo,
         TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
@@ -754,7 +754,6 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
                     .map(|txn_info| txn_info.state_checkpoint_hash())
                     .collect(),
             ),
-            None,
         )?;
         ensure_no_discard(to_discard)?;
         ensure_no_retry(to_retry)?;

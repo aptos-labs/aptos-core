@@ -68,6 +68,7 @@ members = [
     "crates/aptos-id-generator",
     "crates/aptos-infallible",
     "crates/aptos-inspection-service",
+    "crates/aptos-jwk-consensus",
     "crates/aptos-keygen",
     "crates/aptos-ledger",
     "crates/aptos-log-derive",
@@ -105,13 +106,13 @@ members = [
     "crates/transaction-emitter",
     "crates/transaction-emitter-lib",
     "crates/transaction-generator-lib",
+    "crates/validator-transaction-pool",
     "ecosystem/indexer-grpc/indexer-grpc-cache-worker",
     "ecosystem/indexer-grpc/indexer-grpc-data-access",
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
     "ecosystem/indexer-grpc/indexer-grpc-file-store",
     "ecosystem/indexer-grpc/indexer-grpc-fullnode",
     "ecosystem/indexer-grpc/indexer-grpc-integration-tests",
-    "ecosystem/indexer-grpc/indexer-grpc-post-processor",
     "ecosystem/indexer-grpc/indexer-grpc-server-framework",
     "ecosystem/indexer-grpc/indexer-grpc-table-info",
     "ecosystem/indexer-grpc/indexer-grpc-utils",
@@ -162,7 +163,6 @@ members = [
     "storage/rocksdb-options",
     "storage/schemadb",
     "storage/scratchpad",
-    "storage/state-view",
     "storage/storage-interface",
     "testsuite/aptos-fuzzer",
     "testsuite/aptos-fuzzer/fuzz",
@@ -302,6 +302,7 @@ aptos-db = { path = "storage/aptosdb" }
 aptos-db-indexer = { path = "storage/indexer" }
 aptos-db-tool = { path = "storage/db-tool" }
 aptos-debugger = { path = "crates/aptos-debugger" }
+aptos-dkg-runtime = { path = "dkg" }
 aptos-drop-helper = { path = "crates/aptos-drop-helper" }
 aptos-event-notifications = { path = "state-sync/inter-component/event-notifications" }
 aptos-executable-store = { path = "storage/executable-store" }
@@ -338,7 +339,6 @@ aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-
 aptos-indexer-grpc-data-service = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service" }
 aptos-indexer-grpc-data-access = { path = "ecosystem/indexer-grpc/indexer-grpc-data-access" }
 aptos-indexer-grpc-file-store = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store" }
-aptos-indexer-grpc-post-processor = { path = "ecosystem/indexer-grpc/indexer-grpc-post-processor" }
 aptos-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-fullnode" }
 aptos-indexer-grpc-table-info = { path = "ecosystem/indexer-grpc/indexer-grpc-table-info" }
 aptos-indexer-grpc-utils = { path = "ecosystem/indexer-grpc/indexer-grpc-utils" }
@@ -346,6 +346,7 @@ aptos-indexer-grpc-server-framework = { path = "ecosystem/indexer-grpc/indexer-g
 aptos-infallible = { path = "crates/aptos-infallible" }
 aptos-inspection-service = { path = "crates/aptos-inspection-service" }
 aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
+aptos-jwk-consensus = { path = "crates/aptos-jwk-consensus" }
 aptos-keygen = { path = "crates/aptos-keygen" }
 aptos-language-e2e-tests = { path = "aptos-move/e2e-tests" }
 aptos-ledger = { path = "crates/aptos-ledger" }
@@ -402,7 +403,6 @@ aptos-secure-storage = { path = "secure/storage" }
 aptos-short-hex-str = { path = "crates/short-hex-str" }
 aptos-speculative-state-helper = { path = "crates/aptos-speculative-state-helper" }
 aptos-state-sync-driver = { path = "state-sync/state-sync-driver" }
-aptos-state-view = { path = "storage/state-view" }
 aptos-storage-interface = { path = "storage/storage-interface" }
 aptos-storage-service-client = { path = "state-sync/storage-service/client" }
 aptos-storage-service-notifications = { path = "state-sync/inter-component/storage-service-notifications" }
@@ -420,6 +420,7 @@ aptos-transaction-generator-lib = { path = "crates/transaction-generator-lib" }
 aptos-types = { path = "types" }
 aptos-utils = { path = "aptos-utils" }
 aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }
+aptos-validator-transaction-pool = { path = "crates/validator-transaction-pool" }
 aptos-vault-client = { path = "secure/storage/vault" }
 aptos-vm = { path = "aptos-move/aptos-vm" }
 aptos-vm-logging = { path = "aptos-move/aptos-vm-logging" }
@@ -470,6 +471,7 @@ bytes = { version = "1.4.0", features = ["serde"] }
 chrono = { version = "0.4.19", features = ["clock", "serde"] }
 cfg_block = "0.1.1"
 cfg-if = "1.0.0"
+ciborium = "0.2"
 claims = "0.7"
 clap = { version = "4.3.9", features = ["derive", "unstable-styles"] }
 clap_complete = "4.4.1"
@@ -479,6 +481,7 @@ concurrent-queue = "2.2.0"
 console-subscriber = "0.1.8"
 const_format = "0.2.26"
 core_affinity = "0.8.1"
+coset = "0.3"
 criterion = "0.3.5"
 criterion-cpu-time = "0.1.0"
 crossbeam = "0.8.1"
@@ -507,19 +510,18 @@ event-listener = "2.5.3"
 fail = "0.5.0"
 field_count = "0.1.1"
 flate2 = "1.0.24"
-futures = "0.3.24"
-futures-channel = "0.3.24"
-futures-core = "0.3.25"
-futures-util = "0.3.21"
+futures = "0.3.29"
+futures-channel = "0.3.29"
+futures-core = "0.3.29"
+futures-util = "0.3.29"
 gcp-bigquery-client = "0.13.0"
 get_if_addrs = "0.5.3"
 git2 = "0.16.1"
 glob = "0.3.0"
 goldenfile = "1.5.2"
-google-cloud-pubsub = "0.18.0"
 google-cloud-storage = "0.13.0"
 handlebars = "4.2.2"
-heck = "0.3.2"
+heck = "0.4.1"
 hex = "0.4.3"
 hkdf = "0.10.0"
 hostname = "0.3.1"
@@ -572,6 +574,9 @@ signature = "2.1.0"
 sec1 = "0.7.0"
 parking_lot = "0.12.0"
 paste = "1.0.7"
+passkey-authenticator = { version = "0.2.0", features = ["testable"] }
+passkey-client = { version = "0.2.0" }
+passkey-types = { version = "0.2.0" }
 pbjson = "0.5.1"
 percent-encoding = "2.1.0"
 pin-project = "1.0.10"
@@ -613,6 +618,7 @@ rocksdb = { version = "0.21.0", features = ["lz4"] }
 rstack-self =  { version = "0.3.0", features = ["dw"], default_features = false }
 rstest = "0.15.0"
 rusty-fork = "0.3.0"
+rustversion = "1.0.14"
 scopeguard = "1.2.0"
 sha-1 = "0.10.0"
 sha2 = "0.9.3"

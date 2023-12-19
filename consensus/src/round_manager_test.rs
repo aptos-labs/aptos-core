@@ -2006,7 +2006,7 @@ fn no_vote_on_proposal_ext_when_feature_disabled() {
     let genesis_qc = certificate_for_genesis();
 
     let invalid_block = Block::new_proposal_ext(
-        vec![ValidatorTransaction::dummy(vec![0xFF]); 5],
+        vec![ValidatorTransaction::dummy1(vec![0xFF]); 5],
         Payload::empty(false),
         1,
         1,
@@ -2073,7 +2073,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     let genesis_qc = certificate_for_genesis();
 
     let block_too_many_txns = Block::new_proposal_ext(
-        vec![ValidatorTransaction::dummy(vec![0xFF; 20]); 11],
+        vec![ValidatorTransaction::dummy1(vec![0xFF; 20]); 11],
         Payload::empty(false),
         1,
         1,
@@ -2084,7 +2084,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     .unwrap();
 
     let block_too_large = Block::new_proposal_ext(
-        vec![ValidatorTransaction::dummy(vec![0xFF; 30]); 10],
+        vec![ValidatorTransaction::dummy1(vec![0xFF; 30]); 10],
         Payload::empty(false),
         1,
         1,
@@ -2095,7 +2095,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     .unwrap();
 
     let valid_block = Block::new_proposal_ext(
-        vec![ValidatorTransaction::dummy(vec![0xFF; 25]); 10], // 64 bytes in total
+        vec![ValidatorTransaction::dummy1(vec![0xFF; 16]); 10], // small enough txns
         Payload::empty(false),
         1,
         1,

@@ -1,7 +1,7 @@
 lockfileVersion: '6.0'
 
 settings:
-  autoInstallPeers: false
+  autoInstallPeers: true
   excludeLinksFromLockfile: false
 
 dependencies:
@@ -99,7 +99,7 @@ devDependencies:
     version: 6.3.1
   ts-jest:
     specifier: 29.1.1
-    version: 29.1.1(jest@29.7.0)(typescript@5.3.3)
+    version: 29.1.1(@babel/core@7.23.6)(esbuild@0.19.9)(jest@29.7.0)(typescript@5.3.3)
   ts-loader:
     specifier: 9.5.1
     version: 9.5.1(typescript@5.3.3)(webpack@5.89.0)
@@ -117,7 +117,7 @@ devDependencies:
     version: 5.3.3
   webpack:
     specifier: ^5.89.0
-    version: 5.89.0
+    version: 5.89.0(esbuild@0.19.9)
 
 packages:
 
@@ -7143,7 +7143,7 @@ packages:
     engines: {node: '>=6'}
     dev: true
 
-  /terser-webpack-plugin@5.3.9(webpack@5.89.0):
+  /terser-webpack-plugin@5.3.9(esbuild@0.19.9)(webpack@5.89.0):
     resolution: {integrity: sha512-ZuXsqE07EcggTWQjXUj+Aot/OMcD0bMKGgF63f7UxYcu5/AJF53aIpK1YoP5xR9l6s/Hy2b+t1AM0bLNPRuhwA==}
     engines: {node: '>= 10.13.0'}
     peerDependencies:
@@ -7160,11 +7160,12 @@ packages:
         optional: true
     dependencies:
       '@jridgewell/trace-mapping': 0.3.20
+      esbuild: 0.19.9
       jest-worker: 27.5.1
       schema-utils: 3.3.0
       serialize-javascript: 6.0.1
       terser: 5.26.0
-      webpack: 5.89.0
+      webpack: 5.89.0(esbuild@0.19.9)
     dev: true
 
   /terser@5.26.0:
@@ -7265,7 +7266,7 @@ packages:
     resolution: {integrity: sha512-Y/arvbn+rrz3JCKl9C4kVNfTfSm2/mEp5FSz5EsZSANGPSlQrpRI5M4PKF+mJnE52jOO90PnPSc3Ur3bTQw0gA==}
     dev: true
 
-  /ts-jest@29.1.1(jest@29.7.0)(typescript@5.3.3):
+  /ts-jest@29.1.1(@babel/core@7.23.6)(esbuild@0.19.9)(jest@29.7.0)(typescript@5.3.3):
     resolution: {integrity: sha512-D6xjnnbP17cC85nliwGiL+tpoKN0StpgE0TeOjXQTU6MVCfsB4v7aW05CgQ/1OywGb0x/oy9hHFnN+sczTiRaA==}
     engines: {node: ^14.15.0 || ^16.10.0 || >=18.0.0}
     hasBin: true
@@ -7286,7 +7287,9 @@ packages:
       esbuild:
         optional: true
     dependencies:
+      '@babel/core': 7.23.6
       bs-logger: 0.2.6
+      esbuild: 0.19.9
       fast-json-stable-stringify: 2.1.0
       jest: 29.7.0(@types/node@20.10.4)(ts-node@10.9.2)
       jest-util: 29.7.0
@@ -7311,7 +7314,7 @@ packages:
       semver: 7.5.4
       source-map: 0.7.4
       typescript: 5.3.3
-      webpack: 5.89.0
+      webpack: 5.89.0(esbuild@0.19.9)
     dev: true
 
   /ts-log@2.2.5:
@@ -7649,7 +7652,7 @@ packages:
     engines: {node: '>=10.13.0'}
     dev: true
 
-  /webpack@5.89.0:
+  /webpack@5.89.0(esbuild@0.19.9):
     resolution: {integrity: sha512-qyfIC10pOr70V+jkmud8tMfajraGCZMBWJtrmuBymQKCrLTRejBI8STDp1MCyZu/QTdZSeacCQYpYNQVOzX5kw==}
     engines: {node: '>=10.13.0'}
     hasBin: true
@@ -7680,7 +7683,7 @@ packages:
       neo-async: 2.6.2
       schema-utils: 3.3.0
       tapable: 2.2.1
-      terser-webpack-plugin: 5.3.9(webpack@5.89.0)
+      terser-webpack-plugin: 5.3.9(esbuild@0.19.9)(webpack@5.89.0)
       watchpack: 2.4.0
       webpack-sources: 3.2.3
     transitivePeerDependencies:
@@ -7876,7 +7879,7 @@ packages:
     dev: true
 
   '@github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.24.0-p1/openapi-typescript-codegen-v0.24.0-p1.tgz':
-    resolution: {tarball: https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.24.0-p1/openapi-typescript-codegen-v0.24.0-p1.tgz}
+    resolution: {registry: https://registry.npmjs.org/, tarball: https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.24.0-p1/openapi-typescript-codegen-v0.24.0-p1.tgz}
     name: openapi-typescript-codegen
     version: 0.24.0
     hasBin: true

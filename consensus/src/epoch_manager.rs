@@ -33,12 +33,13 @@ use crate::{
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::{
-        mixed::MixedPayloadClient, user::quorum_store_client::QuorumStoreClient, PayloadClient,
+        mixed::MixedPayloadClient, user::quorum_store_client::QuorumStoreClient,
+        validator::ValidatorTxnPayloadClient, PayloadClient,
     },
     payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
     pipeline::{
-        buffer_manager::{OrderedBlocks, ResetRequest},
+        buffer_manager::{OrderedBlocks, ResetRequest, ResetSignal},
         decoupled_execution_utils::prepare_phases_and_buffer_manager,
         ordering_state_computer::{DagStateSyncComputer, OrderingStateComputer},
         signing_phase::CommitSignerProvider,
@@ -84,8 +85,8 @@ use aptos_types::{
         OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
     },
     validator_signer::ValidatorSigner,
-    validator_txn::pool::ValidatorTransactionPoolClient,
 };
+use aptos_validator_transaction_pool as vtxn_pool;
 use fail::fail_point;
 use futures::{
     channel::{
@@ -134,7 +135,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     commit_state_computer: Arc<dyn StateComputer>,
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
-    validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
+    validator_txn_pool_client: Arc<dyn ValidatorTxnPayloadClient>,
     reconfig_events: ReconfigNotificationListener<P>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingCommitRequest>>,
@@ -178,7 +179,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         reconfig_events: ReconfigNotificationListener<P>,
         bounded_executor: BoundedExecutor,
         aptos_time_service: aptos_time_service::TimeService,
-        validator_txn_pool_client: Arc<dyn ValidatorTransactionPoolClient>,
+        validator_txn_pool_client: vtxn_pool::ReadClient,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -200,7 +201,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             commit_state_computer,
             storage,
             safety_rules_manager,
-            validator_txn_pool_client,
+            validator_txn_pool_client: Arc::new(validator_txn_pool_client),
             reconfig_events,
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
@@ -601,14 +602,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             block_rx,
             reset_rx,
             epoch_state,
+            self.bounded_executor.clone(),
         );
-        let bounded_executor = self.bounded_executor.clone();
 
         tokio::spawn(execution_schedule_phase.start());
         tokio::spawn(execution_wait_phase.start());
         tokio::spawn(signing_phase.start());
         tokio::spawn(persisting_phase.start());
-        tokio::spawn(buffer_manager.start(bounded_executor));
+        tokio::spawn(buffer_manager.start());
 
         (block_tx, reset_tx)
     }
@@ -644,7 +645,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let (ack_tx, ack_rx) = oneshot::channel();
             tx.send(ResetRequest {
                 tx: ack_tx,
-                stop: true,
+                signal: ResetSignal::Stop,
             })
             .await
             .expect("[EpochManager] Fail to drop buffer manager");
@@ -1130,6 +1131,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             block_tx,
             onchain_consensus_config.quorum_store_enabled(),
             onchain_consensus_config.validator_txn_enabled(),
+            self.bounded_executor.clone(),
         );
 
         let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);

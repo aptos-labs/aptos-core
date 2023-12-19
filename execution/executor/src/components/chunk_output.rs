@@ -28,7 +28,7 @@ use aptos_types::{
     epoch_state::EpochState,
     transaction::{
         signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
-        ExecutionStatus, Transaction, TransactionOutput, TransactionOutputProvider,
+        BlockOutput, ExecutionStatus, Transaction, TransactionOutput, TransactionOutputProvider,
         TransactionStatus,
     },
 };
@@ -69,9 +69,10 @@ impl ChunkOutput {
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Self> {
-        let transaction_outputs =
-            Self::execute_block::<V>(&transactions, &state_view, onchain_config)?;
+        let block_output = Self::execute_block::<V>(&transactions, &state_view, onchain_config)?;
 
+        let transaction_outputs = block_output.into_inner();
+        // TODO add block_limit_info to ChunkOutput, to add it to StateCheckpoint
         Ok(Self {
             transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
             transaction_outputs,
@@ -135,23 +136,17 @@ impl ChunkOutput {
         self,
         base_view: &ExecutedTrees,
         known_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
-        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
         fail_point!("executor::apply_to_ledger", |_| {
             Err(anyhow::anyhow!("Injected error in apply_to_ledger."))
         });
-        ApplyChunkOutput::apply_chunk(
-            self,
-            base_view,
-            known_state_checkpoint_hashes,
-            append_state_checkpoint_to_block,
-        )
+        ApplyChunkOutput::apply_chunk(self, base_view, known_state_checkpoint_hashes)
     }
 
     pub fn into_state_checkpoint_output(
         self,
         parent_state: &StateDelta,
-        append_state_checkpoint_to_block: Option<HashValue>,
+        block_id: HashValue,
     ) -> Result<(StateDelta, Option<EpochState>, StateCheckpointOutput)> {
         fail_point!("executor::into_state_checkpoint_output", |_| {
             Err(anyhow::anyhow!(
@@ -164,7 +159,7 @@ impl ChunkOutput {
         ApplyChunkOutput::calculate_state_checkpoint(
             self,
             parent_state,
-            append_state_checkpoint_to_block,
+            Some(block_id),
             None,
             /*is_block=*/ true,
         )
@@ -199,7 +194,7 @@ impl ChunkOutput {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<Vec<TransactionOutput>> {
+    ) -> Result<BlockOutput<TransactionOutput>> {
         Ok(V::execute_block(transactions, state_view, onchain_config)?)
     }
 
@@ -212,26 +207,31 @@ impl ChunkOutput {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<Vec<TransactionOutput>> {
-        use aptos_state_view::{StateViewId, TStateView};
-        use aptos_types::write_set::WriteSet;
+    ) -> Result<BlockOutput<TransactionOutput>> {
+        use aptos_types::{
+            state_store::{StateViewId, TStateView},
+            write_set::WriteSet,
+        };
 
         let transaction_outputs = match state_view.id() {
             // this state view ID implies a genesis block in non-test cases.
             StateViewId::Miscellaneous => {
                 V::execute_block(transactions, state_view, onchain_config)?
             },
-            _ => transactions
-                .iter()
-                .map(|_| {
-                    TransactionOutput::new(
-                        WriteSet::default(),
-                        Vec::new(),
-                        0, // Keep gas zero to match with StateCheckpoint txn output
-                        TransactionStatus::Keep(ExecutionStatus::Success),
-                    )
-                })
-                .collect::<Vec<_>>(),
+            _ => BlockOutput::new(
+                transactions
+                    .iter()
+                    .map(|_| {
+                        TransactionOutput::new(
+                            WriteSet::default(),
+                            Vec::new(),
+                            0, // Keep gas zero to match with StateCheckpoint txn output
+                            TransactionStatus::Keep(ExecutionStatus::Success),
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+                None,
+            ),
         };
         Ok(transaction_outputs)
     }

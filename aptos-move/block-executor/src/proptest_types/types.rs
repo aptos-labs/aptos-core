@@ -13,7 +13,6 @@ use aptos_aggregator::{
     types::DelayedFieldID,
 };
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -23,7 +22,8 @@ use aptos_types::{
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{
         state_storage_usage::StateStorageUsage,
-        state_value::{StateValue, StateValueMetadata, StateValueMetadataKind},
+        state_value::{StateValue, StateValueMetadata},
+        StateViewId, TStateView,
     },
     transaction::BlockExecutableTransaction as Transaction,
     write_set::{TransactionWrite, WriteOp, WriteOpKind},
@@ -174,7 +174,7 @@ impl<K: Hash + Clone + Debug + Eq + PartialOrd + Ord> ModulePath for KeyType<K> 
 pub(crate) struct ValueType {
     /// Wrapping the types used for testing to add TransactionWrite trait implementation (below).
     bytes: Option<Bytes>,
-    metadata: StateValueMetadataKind,
+    metadata: StateValueMetadata,
     write_op_kind: ExplicitSyncWrapper<WriteOpKind>,
 }
 
@@ -206,7 +206,7 @@ impl Arbitrary for ValueType {
 impl ValueType {
     pub(crate) fn new(
         bytes: Option<Bytes>,
-        metadata: StateValueMetadataKind,
+        metadata: StateValueMetadata,
         kind: WriteOpKind,
     ) -> Self {
         Self {
@@ -229,7 +229,7 @@ impl ValueType {
                 v.resize(16, 1);
                 v.into()
             }),
-            metadata: None,
+            metadata: StateValueMetadata::none(),
             write_op_kind: ExplicitSyncWrapper::new(
                 if !use_value {
                     WriteOpKind::Deletion
@@ -241,7 +241,7 @@ impl ValueType {
     }
 
     /// If len = 0, treated as Deletion for testing.
-    pub(crate) fn with_len_and_metadata(len: usize, metadata: StateValueMetadataKind) -> Self {
+    pub(crate) fn with_len_and_metadata(len: usize, metadata: StateValueMetadata) -> Self {
         Self {
             bytes: (len > 0).then_some(vec![100_u8; len].into()),
             metadata,
@@ -263,9 +263,9 @@ impl TransactionWrite for ValueType {
 
     fn from_state_value(maybe_state_value: Option<StateValue>) -> Self {
         let (maybe_metadata, maybe_bytes) =
-            match maybe_state_value.map(|state_value| state_value.into()) {
+            match maybe_state_value.map(|state_value| state_value.unpack()) {
                 Some((maybe_metadata, bytes)) => (maybe_metadata, Some(bytes)),
-                None => (None, None),
+                None => (StateValueMetadata::none(), None),
             };
 
         let empty = maybe_bytes.is_none();
@@ -288,10 +288,8 @@ impl TransactionWrite for ValueType {
     }
 
     fn as_state_value(&self) -> Option<StateValue> {
-        self.extract_raw_bytes().map(|bytes| match &self.metadata {
-            Some(metadata) => StateValue::new_with_metadata(bytes, metadata.clone()),
-            None => StateValue::new_legacy(bytes),
-        })
+        self.extract_raw_bytes()
+            .map(|bytes| StateValue::new_with_metadata(bytes, self.metadata.clone()))
     }
 
     fn set_bytes(&mut self, bytes: Bytes) {
@@ -932,7 +930,11 @@ where
                             } else {
                                 new_inner_ops.insert(
                                     *tag,
-                                    ValueType::new(None, None, WriteOpKind::Deletion),
+                                    ValueType::new(
+                                        None,
+                                        StateValueMetadata::none(),
+                                        WriteOpKind::Deletion,
+                                    ),
                                 );
                             }
                         }
@@ -974,10 +976,8 @@ where
     }
 }
 
-pub(crate) fn raw_metadata(v: u64) -> StateValueMetadataKind {
-    Some(StateValueMetadata::new(v, &CurrentTimeMicroseconds {
-        microseconds: v,
-    }))
+pub(crate) fn raw_metadata(v: u64) -> StateValueMetadata {
+    StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })
 }
 
 #[derive(Debug)]

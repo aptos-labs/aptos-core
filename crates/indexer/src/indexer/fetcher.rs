@@ -283,6 +283,10 @@ async fn fetch_nexts(
                         sct.info.block_height = Some(block_height_bcs);
                         sct.info.epoch = Some(epoch_bcs);
                     },
+                    Transaction::ValidatorTransaction(ref mut st) => {
+                        st.info.block_height = Some(block_height_bcs);
+                        st.info.epoch = Some(epoch_bcs);
+                    },
                 };
                 txn
             }) {

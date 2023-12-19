@@ -62,5 +62,5 @@ def scale_all_execution(nominator: int, denominator: int):
 def id(entry):
     return entry
 
-modify_all_execution(id)
-#scale_all_execution(5, 4)
+# modify_all_execution(id)
+scale_all_execution(209, 1000)

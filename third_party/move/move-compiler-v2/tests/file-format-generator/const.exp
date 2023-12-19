@@ -86,39 +86,39 @@ fun constant::test_constans() {
      var $t24: vector<u8>
      # live vars:
   0: $t1 := true
-     # live vars:
+     # live vars: $t1
   1: $t0 := copy($t1)
      # live vars:
   2: $t3 := false
-     # live vars:
+     # live vars: $t3
   3: $t2 := copy($t3)
      # live vars:
   4: $t5 := 1
-     # live vars:
+     # live vars: $t5
   5: $t4 := copy($t5)
      # live vars:
   6: $t7 := 7086
-     # live vars:
+     # live vars: $t7
   7: $t6 := copy($t7)
      # live vars:
   8: $t9 := 14593408
-     # live vars:
+     # live vars: $t9
   9: $t8 := copy($t9)
      # live vars:
  10: $t11 := 51966
-     # live vars:
+     # live vars: $t11
  11: $t10 := copy($t11)
      # live vars:
  12: $t13 := 3735928559
-     # live vars:
+     # live vars: $t13
  13: $t12 := copy($t13)
      # live vars:
  14: $t15 := 301490978409967
-     # live vars:
+     # live vars: $t15
  15: $t14 := copy($t15)
      # live vars:
  16: $t17 := 0x42
-     # live vars:
+     # live vars: $t17
  17: $t16 := copy($t17)
      # live vars:
  18: $t20 := 1
@@ -128,11 +128,11 @@ fun constant::test_constans() {
  20: $t22 := 3
      # live vars: $t20, $t21, $t22
  21: $t19 := vector($t20, $t21, $t22)
-     # live vars:
+     # live vars: $t19
  22: $t18 := copy($t19)
      # live vars:
  23: $t24 := [72, 101, 108, 108, 111, 33, 10]
-     # live vars:
+     # live vars: $t24
  24: $t23 := copy($t24)
      # live vars:
  25: return ()

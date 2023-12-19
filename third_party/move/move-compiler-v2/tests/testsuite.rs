@@ -9,6 +9,7 @@ use move_compiler::compiled_unit::CompiledUnit;
 use move_compiler_v2::{
     inliner,
     pipeline::{
+        ability_checker::AbilityChecker, explicit_drop::ExplicitDrop,
         livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety_processor::ReferenceSafetyProcessor,
         visibility_checker::VisibilityChecker,
@@ -166,6 +167,29 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: verbose,
+            }
+        } else if path.contains("/explicit-drop/") {
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+            pipeline.add_processor(Box::new(ExplicitDrop {}));
+            Self {
+                type_check_only: false,
+                dump_ast: verbose,
+                pipeline,
+                generate_file_format: false,
+                dump_annotated_targets: true,
+            }
+        } else if path.contains("/ability-checker/") {
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+            pipeline.add_processor(Box::new(ExplicitDrop {}));
+            pipeline.add_processor(Box::new(AbilityChecker {}));
+            Self {
+                type_check_only: false,
+                dump_ast: false,
+                pipeline,
+                generate_file_format: false,
+                dump_annotated_targets: true,
             }
         } else {
             panic!(

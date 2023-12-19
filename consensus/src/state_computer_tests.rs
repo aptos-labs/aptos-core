@@ -64,7 +64,6 @@ impl TxnNotifier for DummyTxnNotifier {
         &self,
         _txns: Vec<SignedTransaction>,
         _compute_results: &StateComputeResult,
-        _block_gas_limit_enabled: bool,
     ) -> anyhow::Result<(), MempoolError> {
         Ok(())
     }
@@ -144,8 +143,8 @@ async fn schedule_compute_should_discover_validator_txns() {
         TransactionFilter::new(Filter::empty()),
     );
 
-    let validator_txn_0 = ValidatorTransaction::dummy(vec![0xFF; 99]);
-    let validator_txn_1 = ValidatorTransaction::dummy(vec![0xFF; 999]);
+    let validator_txn_0 = ValidatorTransaction::dummy1(vec![0xFF; 99]);
+    let validator_txn_1 = ValidatorTransaction::dummy1(vec![0xFF; 999]);
 
     let block = Block::new_for_testing(
         HashValue::zero(),
@@ -196,8 +195,8 @@ async fn commit_should_discover_validator_txns() {
         TransactionFilter::new(Filter::empty()),
     );
 
-    let validator_txn_0 = ValidatorTransaction::dummy(vec![0xFF; 99]);
-    let validator_txn_1 = ValidatorTransaction::dummy(vec![0xFF; 999]);
+    let validator_txn_0 = ValidatorTransaction::dummy1(vec![0xFF; 99]);
+    let validator_txn_1 = ValidatorTransaction::dummy1(vec![0xFF; 999]);
 
     let block = Block::new_for_testing(
         HashValue::zero(),
@@ -208,12 +207,12 @@ async fn commit_should_discover_validator_txns() {
         None,
     );
 
-    // Eventually 4 txns: block metadata, validator txn 0, validator txn 1, state checkpoint.
+    // Eventually 3 txns: block metadata, validator txn 0, validator txn 1.
     let state_compute_result = StateComputeResult::new_dummy_with_compute_status(vec![
             TransactionStatus::Keep(
                 ExecutionStatus::Success
             );
-            4
+            3
         ]);
 
     let blocks = vec![Arc::new(ExecutedBlock::new(

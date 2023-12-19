@@ -9,6 +9,7 @@ use aptos_metrics_core::{
 };
 
 // Useful metric constants and labels
+pub const BLOCK_TIMESTAMP_LAG_LABEL: &str = "block_timestamp_lag";
 pub const PRIORITIZED_PEER: &str = "prioritized_peer";
 pub const PROPOSE_TO_SEEN_LATENCY_LABEL: &str = "propose_to_seen_latency";
 pub const PROPOSE_TO_SYNC_LATENCY_LABEL: &str = "propose_to_sync_latency";
@@ -145,7 +146,7 @@ pub static OPTIMAL_CHUNK_SIZES: Lazy<IntGaugeVec> = Lazy::new(|| {
 const SYNC_LATENCY_BUCKETS_SECS: &[f64] = &[
     0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8,
     1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 3.0, 5.0, 10.0, 15.0, 20.0, 30.0, 40.0, 60.0, 120.0, 180.0,
-    240.0, 300.0, 360.0, 420.0, 480.0, 540.0, 600.0, 1200.0, 1800.0,
+    240.0, 300.0, 360.0, 420.0, 480.0, 540.0, 600.0, 1200.0, 1800.0, 3600.0, 7200.0, 14400.0,
 ];
 
 /// Counter for tracking various sync latencies
