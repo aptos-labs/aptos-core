@@ -29,6 +29,7 @@ pub struct Processor {
     file_store_operator: Box<dyn FileStoreOperator>,
     cache_chain_id: u64,
     enable_expensive_logging: bool,
+    _chain_id: u64,
 }
 
 impl Processor {
@@ -54,7 +55,6 @@ impl Processor {
                     redis_main_instance_address.0
                 )
             })?;
-
         let mut cache_operator = CacheOperator::new(conn);
 
         let mut file_store_operator: Box<dyn FileStoreOperator> = match &file_store_config {
@@ -71,8 +71,9 @@ impl Processor {
             ),
         };
         file_store_operator.verify_storage_bucket_existence().await;
-
-        let file_store_metadata = file_store_operator.get_file_store_metadata().await;
+        let file_store_metadata: Option<
+            aptos_indexer_grpc_utils::file_store_operator::FileStoreMetadata,
+        > = file_store_operator.get_file_store_metadata().await;
         if file_store_metadata.is_none() {
             file_store_operator
                 .update_file_store_metadata_internal(chain_id, 0)
@@ -96,12 +97,12 @@ impl Processor {
         cache_operator
             .update_file_store_latest_version(batch_start_version)
             .await?;
-
         Ok(Self {
             cache_operator,
             file_store_operator,
             cache_chain_id: chain_id,
             enable_expensive_logging,
+            _chain_id: chain_id,
         })
     }
 
@@ -120,6 +121,24 @@ impl Processor {
                 anyhow::ensure!(metadata.chain_id == cache_chain_id, "Chain ID mismatch.");
                 metadata.version
             } else {
+                // If metadata doesn't exist, create and upload it and init file store latest version in cache.
+                while self
+                    .file_store_operator
+                    .update_file_store_metadata_with_timeout(cache_chain_id, 0)
+                    .await
+                    .is_err()
+                {
+                    tracing::error!(
+                        batch_start_version = 0,
+                        service_type = SERVICE_TYPE,
+                        "[File worker] Failed to update file store metadata. Retrying."
+                    );
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                    METADATA_UPLOAD_FAILURE_COUNT.inc();
+                }
+                self.cache_operator
+                    .update_file_store_latest_version(0)
+                    .await?;
                 0
             };
 
@@ -156,15 +175,43 @@ impl Processor {
                 let mut cache_operator_clone = self.cache_operator.clone();
                 let mut file_store_operator_clone = self.file_store_operator.clone_box();
                 let task = tokio::spawn(async move {
+                    let fetch_start_time = std::time::Instant::now();
                     let transactions = cache_operator_clone
                         .batch_get_encoded_proto_data_x(start_version, BLOB_STORAGE_SIZE as u64)
                         .await
                         .unwrap();
                     let last_transaction = transactions.last().unwrap().0.clone();
+                    log_grpc_step(
+                        SERVICE_TYPE,
+                        IndexerGrpcStep::FilestoreFetchTxns,
+                        Some(start_version as i64),
+                        Some((start_version + BLOB_STORAGE_SIZE as u64 - 1) as i64),
+                        None,
+                        None,
+                        Some(fetch_start_time.elapsed().as_secs_f64()),
+                        None,
+                        Some(BLOB_STORAGE_SIZE as i64),
+                        None,
+                    );
+
+                    let upload_start_time = std::time::Instant::now();
                     let (start, end) = file_store_operator_clone
                         .upload_transaction_batch(cache_chain_id, transactions)
                         .await
                         .unwrap();
+                    log_grpc_step(
+                        SERVICE_TYPE,
+                        IndexerGrpcStep::FilestoreUploadTxns,
+                        Some(start_version as i64),
+                        Some((start_version + BLOB_STORAGE_SIZE as u64 - 1) as i64),
+                        None,
+                        None,
+                        Some(upload_start_time.elapsed().as_secs_f64()),
+                        None,
+                        Some(BLOB_STORAGE_SIZE as i64),
+                        None,
+                    );
+
                     (start, end, last_transaction)
                 });
                 tasks.push(task);
@@ -274,7 +321,7 @@ impl Processor {
             let full_loop_duration = latest_loop_time.elapsed().as_secs_f64();
             log_grpc_step(
                 SERVICE_TYPE,
-                IndexerGrpcStep::FilestoreUploadTxns,
+                IndexerGrpcStep::FilestoreProcessedBatch,
                 Some(first_version as i64),
                 Some(last_version as i64),
                 start_version_timestamp.as_ref(),

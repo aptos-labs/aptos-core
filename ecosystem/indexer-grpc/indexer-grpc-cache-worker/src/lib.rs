@@ -43,7 +43,11 @@ impl RunnableConfig for IndexerGrpcCacheWorkerConfig {
         )
         .await
         .context("Failed to create cache worker")?;
-        worker.run().await?;
+        worker
+            .run()
+            .await
+            .context("Failed to run cache worker")
+            .expect("Cache worker failed");
         Ok(())
     }
 
