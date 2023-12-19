@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    register_gauge_vec, register_histogram_vec, register_int_counter, register_int_counter_vec,
-    register_int_gauge_vec, GaugeVec, HistogramVec, IntCounter, IntCounterVec, IntGaugeVec,
+    register_gauge_vec, register_histogram_vec, register_int_counter_vec, register_int_gauge_vec,
+    GaugeVec, HistogramVec, IntCounterVec, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -68,10 +68,11 @@ pub static PROCESSED_BATCH_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 /// Count of connections that data service has established.
-pub static CONNECTION_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "indexer_grpc_data_service_connection_count",
+pub static CONNECTION_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_grpc_data_service_connection_count_v2",
         "Count of connections that data service has established",
+        &["request_token", "email", "processor"],
     )
     .unwrap()
 });

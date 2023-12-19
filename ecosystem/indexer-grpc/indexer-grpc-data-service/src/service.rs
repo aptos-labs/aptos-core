@@ -119,7 +119,13 @@ impl RawData for RawDataServerWrapper {
             Ok(request_metadata) => request_metadata,
             _ => return Result::Err(Status::aborted("Invalid request token")),
         };
-        CONNECTION_COUNT.inc();
+        CONNECTION_COUNT
+            .with_label_values(&[
+                request_metadata.request_api_key_name.as_str(),
+                request_metadata.request_email.as_str(),
+                request_metadata.processor_name.as_str(),
+            ])
+            .inc();
         let request = req.into_inner();
 
         let transactions_count = request.transactions_count;
@@ -175,13 +181,6 @@ impl RawData for RawDataServerWrapper {
                         ERROR_COUNT
                             .with_label_values(&["redis_connection_failed"])
                             .inc();
-                        SHORT_CONNECTION_COUNT
-                            .with_label_values(&[
-                                request_metadata.request_api_key_name.as_str(),
-                                request_metadata.request_email.as_str(),
-                                request_metadata.processor_name.as_str(),
-                            ])
-                            .inc();
                         // Connection will be dropped anyway, so we ignore the error here.
                         let _result = tx
                             .send_timeout(
@@ -207,13 +206,6 @@ impl RawData for RawDataServerWrapper {
                     Err(e) => {
                         ERROR_COUNT
                             .with_label_values(&["redis_get_chain_id_failed"])
-                            .inc();
-                        SHORT_CONNECTION_COUNT
-                            .with_label_values(&[
-                                request_metadata.request_api_key_name.as_str(),
-                                request_metadata.request_email.as_str(),
-                                request_metadata.processor_name.as_str(),
-                            ])
                             .inc();
                         // Connection will be dropped anyway, so we ignore the error here.
                         let _result = tx
