@@ -69,7 +69,8 @@ pub fn consensus_network_configuration(node_config: &NodeConfig) -> NetworkAppli
 }
 
 pub fn dkg_network_configuration(node_config: &NodeConfig) -> NetworkApplicationConfig {
-    let direct_send_protocols: Vec<ProtocolId> = aptos_dkg_runtime::network_interface::DIRECT_SEND.into();
+    let direct_send_protocols: Vec<ProtocolId> =
+        aptos_dkg_runtime::network_interface::DIRECT_SEND.into();
     let rpc_protocols: Vec<ProtocolId> = aptos_dkg_runtime::network_interface::RPC.into();
 
     let network_client_config =
@@ -85,7 +86,8 @@ pub fn dkg_network_configuration(node_config: &NodeConfig) -> NetworkApplication
 }
 
 pub fn jwk_consensus_network_configuration(node_config: &NodeConfig) -> NetworkApplicationConfig {
-    let direct_send_protocols: Vec<ProtocolId> = aptos_jwk_consensus::network_interface::DIRECT_SEND.into();
+    let direct_send_protocols: Vec<ProtocolId> =
+        aptos_jwk_consensus::network_interface::DIRECT_SEND.into();
     let rpc_protocols: Vec<ProtocolId> = aptos_jwk_consensus::network_interface::RPC.into();
 
     let network_client_config =

@@ -28,7 +28,6 @@ use std::{
     ops::{BitAnd, BitOr},
 };
 use thiserror::Error;
-use crate::protocols::wire::handshake::v1::ProtocolId::{JWKConsensusDirectSendBcs, JWKConsensusDirectSendCompressed};
 
 #[cfg(test)]
 mod test;
@@ -158,9 +157,8 @@ impl ProtocolId {
             ProtocolId::DKGDirectSendCompressed | ProtocolId::DKGRpcCompressed => {
                 Encoding::CompressedBcs(RECURSION_LIMIT)
             },
-            ProtocolId::JWKConsensusDirectSendCompressed | ProtocolId::JWKConsensusRpcCompressed => {
-                Encoding::CompressedBcs(RECURSION_LIMIT)
-            },
+            ProtocolId::JWKConsensusDirectSendCompressed
+            | ProtocolId::JWKConsensusRpcCompressed => Encoding::CompressedBcs(RECURSION_LIMIT),
             ProtocolId::MempoolDirectSend => Encoding::CompressedBcs(USER_INPUT_RECURSION_LIMIT),
             ProtocolId::MempoolRpc => Encoding::Bcs(USER_INPUT_RECURSION_LIMIT),
             _ => Encoding::Bcs(RECURSION_LIMIT),
@@ -175,11 +173,10 @@ impl ProtocolId {
             },
             ProtocolId::MempoolDirectSend => CompressionClient::Mempool,
             ProtocolId::DKGDirectSendCompressed | ProtocolId::DKGRpcCompressed => {
-                CompressionClient::DKG,
-            }
-            ProtocolId::JWKConsensusDirectSendCompressed | ProtocolId::JWKConsensusRpcCompressed => {
-                CompressionClient::JWKConsensus,
-            }
+                CompressionClient::DKG
+            },
+            ProtocolId::JWKConsensusDirectSendCompressed
+            | ProtocolId::JWKConsensusRpcCompressed => CompressionClient::JWKConsensus,
             protocol_id => unreachable!(
                 "The given protocol ({:?}) should not be using compression!",
                 protocol_id
