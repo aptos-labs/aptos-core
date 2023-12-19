@@ -110,6 +110,8 @@ const RANKING_SCORE_BUCKETS: &[f64] = &[
     10000.0, 14678.0, 21544.0, 31623.0, 46416.0, 68129.0, 100000.0, 146780.0, 215443.0,
 ];
 
+const CONSENSUS_PULLED_BUCKETS: &[f64] = &[1.0, 2.0, 3.0, 4.0, 5.0, 10.0, 25.0, 50.0, 100.0];
+
 static TRANSACTION_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
     exponential_buckets(
         /*start=*/ 1.5, /*factor=*/ 1.5, /*count=*/ 20,
@@ -263,6 +265,15 @@ pub static CORE_MEMPOOL_GC_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
         "aptos_core_mempool_gc_latency",
         "How long a transaction stayed in core mempool before garbage-collected",
         &["type", "status"]
+    )
+    .unwrap()
+});
+
+pub static CORE_MEMPOOL_CONSENSUS_PULLED_COUNT: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_core_mempool_consensus_pulled_count",
+        "Number of times a txn was pulled from core mempool by consensus",
+        CONSENSUS_PULLED_BUCKETS.to_vec()
     )
     .unwrap()
 });

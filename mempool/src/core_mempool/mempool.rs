@@ -26,6 +26,7 @@ use aptos_types::{
 };
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
+    sync::atomic::Ordering,
     time::{Duration, Instant, SystemTime},
 };
 
@@ -84,7 +85,7 @@ impl Mempool {
             is_rejected = true,
             label = reason_label,
         );
-        self.log_latency(*sender, sequence_number, reason_label);
+        self.log_commit_rejected_latency(*sender, sequence_number, reason_label);
         if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
             counters::core_mempool_txn_ranking_score(
                 counters::REMOVE_LABEL,
@@ -119,7 +120,7 @@ impl Mempool {
     }
 
     pub(crate) fn log_txn_latency(
-        insertion_info: InsertionInfo,
+        insertion_info: &InsertionInfo,
         bucket: &str,
         stage: &'static str,
     ) {
@@ -133,8 +134,26 @@ impl Mempool {
         }
     }
 
-    fn log_latency(&self, account: AccountAddress, sequence_number: u64, stage: &'static str) {
-        if let Some((&insertion_info, bucket)) = self
+    fn log_consensus_pulled_latency(&self, account: AccountAddress, sequence_number: u64) {
+        if let Some((insertion_info, bucket)) = self
+            .transactions
+            .get_insertion_info_and_bucket(&account, sequence_number)
+        {
+            let prev_count = insertion_info
+                .consensus_pulled_counter
+                .fetch_add(1, Ordering::Relaxed);
+            Self::log_txn_latency(insertion_info, bucket, counters::CONSENSUS_PULLED_LABEL);
+            counters::CORE_MEMPOOL_CONSENSUS_PULLED_COUNT.observe((prev_count + 1) as f64);
+        }
+    }
+
+    fn log_commit_rejected_latency(
+        &self,
+        account: AccountAddress,
+        sequence_number: u64,
+        stage: &'static str,
+    ) {
+        if let Some((insertion_info, bucket)) = self
             .transactions
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
@@ -148,7 +167,7 @@ impl Mempool {
         sequence_number: u64,
         block_timestamp: Duration,
     ) {
-        if let Some((&insertion_info, bucket)) = self
+        if let Some((insertion_info, bucket)) = self
             .transactions
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
@@ -393,11 +412,7 @@ impl Mempool {
         counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, block.len());
         counters::MEMPOOL_SERVICE_BYTES_GET_BLOCK.observe(total_bytes as f64);
         for transaction in &block {
-            self.log_latency(
-                transaction.sender(),
-                transaction.sequence_number(),
-                counters::CONSENSUS_PULLED_LABEL,
-            );
+            self.log_consensus_pulled_latency(transaction.sender(), transaction.sequence_number());
         }
         block
     }
