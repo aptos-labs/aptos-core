@@ -1,4 +1,4 @@
-//# publish --print-bytecode
+//# publish
 module 0x42::Test {
     inline fun foo(g: |u64, u64| u64, x: u64, _y: u64): u64 {
         g(x, _y)
