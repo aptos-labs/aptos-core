@@ -7,7 +7,7 @@ use crate::{
     network::MempoolSyncMsg,
 };
 use anyhow::{format_err, Result};
-use aptos_compression::metrics::CompressionClient;
+use aptos_compression::client::CompressionClient;
 use aptos_config::config::{NodeConfig, MAX_APPLICATION_MESSAGE_SIZE};
 use aptos_consensus_types::common::{TransactionInProgress, TransactionSummary};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};

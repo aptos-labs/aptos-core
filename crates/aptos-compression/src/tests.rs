@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::CompressionClient;
+use crate::{CompressedData, CompressionClient, Error};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, hash::HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_types::{
     account_address::AccountAddress,
@@ -16,66 +16,83 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
+use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 
-const MAX_COMPRESSION_SIZE: usize = 64 * 1024 * 1024;
+// Useful test constants
+const MAX_COMPRESSION_SIZE: usize = 64 * 1024 * 1024; // 64 MiBi
+const MIB: usize = 1024 * 1024;
 
 #[test]
 fn test_basic_compression() {
-    // Test epoch ending ledger infos
-    let epoch_ending_ledger_infos = create_epoch_ending_ledger_infos(0, 999);
-    test_compress_and_decompress(epoch_ending_ledger_infos);
+    // Test both regular and variable compression
+    for variable_compression in [true, false] {
+        // Test compress random bytes
+        let raw_bytes: Vec<_> = (0..MIB).map(|_| rand::thread_rng().gen::<u8>()).collect();
+        test_compress_and_decompress(raw_bytes, variable_compression);
 
-    // Test transaction outputs with proof
-    let outputs_with_proof = create_output_list_with_proof(13434, 17000, 19000);
-    test_compress_and_decompress(outputs_with_proof);
+        // Test compress epoch ending ledger infos
+        let epoch_ending_ledger_infos = create_epoch_ending_ledger_infos(0, 999);
+        test_compress_and_decompress(epoch_ending_ledger_infos, variable_compression);
 
-    // Test transactions with proof
-    let transactions_with_proof = create_transaction_list_with_proof(1000, 1999, 1999, true);
-    test_compress_and_decompress(transactions_with_proof);
+        // Test compress transaction outputs with proof
+        let outputs_with_proof = create_output_list_with_proof(13434, 17000, 19000);
+        test_compress_and_decompress(outputs_with_proof, variable_compression);
+
+        // Test compress transactions with proof
+        let transactions_with_proof = create_transaction_list_with_proof(1000, 1999, 1999, true);
+        test_compress_and_decompress(transactions_with_proof, variable_compression);
+    }
 }
 
 #[test]
 fn test_compression_limits() {
-    let too_small_bytes = 1;
+    // Create test data
+    let too_small_bytes = 10;
     let transactions_with_proof = create_transaction_list_with_proof(1000, 1999, 1999, true);
 
-    // Test compression limit
-    let bcs_encoded_bytes = bcs::to_bytes(&transactions_with_proof).unwrap();
-    let maybe_compressed_bytes = crate::compress(
-        bcs_encoded_bytes,
-        CompressionClient::StateSync,
-        too_small_bytes,
-    );
-    assert!(maybe_compressed_bytes.is_err());
+    // Test both regular and variable compression
+    for variable_compression in [true, false] {
+        // Test the compression limit
+        let maybe_compressed_bytes = test_compress(
+            transactions_with_proof.clone(),
+            variable_compression,
+            too_small_bytes,
+        );
+        assert!(maybe_compressed_bytes.is_err());
 
-    // Test decompression limit
-    let bcs_encoded_bytes = bcs::to_bytes(&transactions_with_proof).unwrap();
-    let compressed_bytes = crate::compress(
-        bcs_encoded_bytes,
-        CompressionClient::StateSync,
-        MAX_COMPRESSION_SIZE,
-    )
-    .unwrap();
-    let maybe_decompressed_bytes = crate::decompress(
-        &compressed_bytes,
-        CompressionClient::StateSync,
-        too_small_bytes,
-    );
-    assert!(maybe_decompressed_bytes.is_err());
+        // Test the decompression limit
+        let compressed_bytes = test_compress(
+            transactions_with_proof.clone(),
+            variable_compression,
+            MAX_COMPRESSION_SIZE,
+        )
+        .unwrap();
+        let maybe_decompressed_bytes = crate::decompress(
+            &compressed_bytes,
+            CompressionClient::StateSync,
+            too_small_bytes,
+        );
+        assert!(maybe_decompressed_bytes.is_err());
+    }
 }
 
-/// Ensures that the given object can be compressed and decompressed successfully
-/// when BCS encoded.
-fn test_compress_and_decompress<T: Debug + DeserializeOwned + PartialEq + Serialize>(object: T) {
-    let bcs_encoded_bytes = bcs::to_bytes(&object).unwrap();
-    let compressed_bytes = crate::compress(
-        bcs_encoded_bytes,
-        CompressionClient::StateSync,
+/// Ensures that the given object can be compressed and
+/// decompressed successfully when BCS encoded.
+fn test_compress_and_decompress<T: Clone + Debug + DeserializeOwned + PartialEq + Serialize>(
+    object: T,
+    use_variable_compression: bool,
+) {
+    // Compress the object
+    let compressed_bytes = test_compress(
+        object.clone(),
+        use_variable_compression,
         MAX_COMPRESSION_SIZE,
     )
     .unwrap();
+
+    // Decompress the bytes and then BCS decode the object
     let decompressed_bytes = crate::decompress(
         &compressed_bytes,
         CompressionClient::StateSync,
@@ -84,7 +101,29 @@ fn test_compress_and_decompress<T: Debug + DeserializeOwned + PartialEq + Serial
     .unwrap();
     let decoded_object = bcs::from_bytes::<T>(&decompressed_bytes).unwrap();
 
+    // Verify that the objects are equal
     assert_eq!(object, decoded_object);
+}
+
+/// Compresses the given object depending on if variable compression is enabled
+fn test_compress<T: Debug + DeserializeOwned + PartialEq + Serialize>(
+    object: T,
+    use_variable_compression: bool,
+    max_bytes: usize,
+) -> Result<CompressedData, Error> {
+    // BCS encode the object
+    let bcs_encoded_bytes = bcs::to_bytes(&object).unwrap();
+
+    // Compress the bytes
+    if use_variable_compression {
+        crate::compress_with_variable_compression(
+            bcs_encoded_bytes,
+            CompressionClient::StateSync,
+            max_bytes,
+        )
+    } else {
+        crate::compress(bcs_encoded_bytes, CompressionClient::StateSync, max_bytes)
+    }
 }
 
 /// Creates a test epoch change proof

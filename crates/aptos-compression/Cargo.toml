@@ -23,4 +23,10 @@ thiserror = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
+criterion = { workspace = true, features = ["html_reports"] }
+rand = { workspace = true }
 serde = { workspace = true }
+
+[[bench]]
+name = "compression"
+harness = false

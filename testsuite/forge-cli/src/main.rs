@@ -595,11 +595,11 @@ fn k8s_test_suite() -> ForgeConfig {
 fn get_land_blocking_test(
     test_name: &str,
     duration: Duration,
-    test_cmd: &TestCommand,
+    _test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" => land_blocking_test_suite(duration), // TODO: remove land_blocking, superseded by below
-        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
+        "realistic_env_max_load" => realistic_network_tuned_for_throughput_test(), // realistic_env_max_load_test(duration, test_cmd, 7, 5),
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         _ => return None, // The test name does not match a land-blocking test
@@ -1853,8 +1853,8 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             mempool_backlog: 500_000,
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
-            increase_state_sync_chunk_sizes(config);
+            // Optimize the state sync configs for throughput
+            optimize_state_sync_for_throughput(config);
 
             // consensus and quorum store configs copied from the consensus-only suite
             optimize_for_maximum_throughput(config);
@@ -1900,8 +1900,8 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         forge_config = forge_config
             .with_initial_fullnode_count(VALIDATOR_COUNT)
             .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
-                // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
-                increase_state_sync_chunk_sizes(config);
+                // Optimize the state sync configs for throughput
+                optimize_state_sync_for_throughput(config);
 
                 // Experimental storage optimizations
                 config.storage.rocksdb_configs.enable_storage_sharding = true;
@@ -1953,9 +1953,10 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     forge_config
 }
 
-/// Increases the state sync chunk sizes for a given node config
-fn increase_state_sync_chunk_sizes(node_config: &mut NodeConfig) {
-    let max_chunk_size = 10_000; // This allows > 10k TPS
+/// Optimizes the state sync configs for throughput
+fn optimize_state_sync_for_throughput(node_config: &mut NodeConfig) {
+    let max_chunk_size = 15_000; // This allows state sync to match consensus block sizes
+    let max_chunk_bytes = 40 * 1024 * 1024; // 10x the current limit (to prevent execution fallback)
 
     // Update the chunk sizes for the data client
     let data_client_config = &mut node_config.state_sync.aptos_data_client;
@@ -1966,6 +1967,9 @@ fn increase_state_sync_chunk_sizes(node_config: &mut NodeConfig) {
     let storage_service_config = &mut node_config.state_sync.storage_service;
     storage_service_config.max_transaction_chunk_size = max_chunk_size;
     storage_service_config.max_transaction_output_chunk_size = max_chunk_size;
+
+    // Update the chunk bytes for the storage service
+    storage_service_config.max_network_chunk_bytes = max_chunk_bytes;
 }
 
 fn pre_release_suite() -> ForgeConfig {
