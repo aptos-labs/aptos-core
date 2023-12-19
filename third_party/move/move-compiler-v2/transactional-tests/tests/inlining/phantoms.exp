@@ -1,3 +1,22 @@
-processed 2 tasks
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
++ task 0 'publish'. lines 1-16:
++ Error: compilation errors:
++  error: cannot copy
++   ┌─ TEMPFILE:9:12
++   │
++ 9 │        let _s = S<T>{ addr: @0x12 };
++   │            ^^
++ 
++ 
++ 
++ task 1 'run'. lines 18-18:
++ Error: Function execution failed with VMError: {
++     major_status: LINKER_ERROR,
++     sub_status: None,
++     location: undefined,
++     indices: redacted,
++     offsets: redacted,
++ }
++ 

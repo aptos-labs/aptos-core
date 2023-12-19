@@ -1,6 +1,41 @@
-processed 3 tasks
-
-task 2 'run'. lines 27-27:
-return values: 2
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 3 tasks
+= 
++ task 1 'publish'. lines 15-25:
++ Error: compilation errors:
++  error: cannot copy
++    ┌─ /Users/zw/aptos-core/third_party/move/move-stdlib/sources/vector.move:55:13
++    │
++ 55 │         let v = empty();
++    │             ^
++ 
++ error: cannot drop
++    ┌─ /Users/zw/aptos-core/third_party/move/move-stdlib/sources/vector.move:55:13
++    │
++ 55 │         let v = empty();
++    │             ^
++ 
++ error: cannot copy
++    ┌─ /Users/zw/aptos-core/third_party/move/move-stdlib/sources/vector.move:57:9
++    │
++ 57 │         v
++    │         ^
++ 
++ error: cannot drop
++    ┌─ /Users/zw/aptos-core/third_party/move/move-stdlib/sources/vector.move:57:9
++    │
++ 57 │         v
++    │         ^
++ 
++ 
++ 
+= task 2 'run'. lines 27-27:
+- return values: 2
++ Error: Function execution failed with VMError: {
++     major_status: LINKER_ERROR,
++     sub_status: None,
++     location: undefined,
++     indices: redacted,
++     offsets: redacted,
++ }
+= 

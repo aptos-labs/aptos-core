@@ -1,3 +1,81 @@
-processed 3 tasks
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 3 tasks
+= 
++ task 1 'publish'. lines 76-101:
++ Error: compilation errors:
++  error: cannot copy
++    ┌─ /var/folders/zs/2tcxd6rs43q9kg97b2xmtcq40000gn/T/.tmpNvpgWT:39:5
++    │  
++ 39 │ ╭     public inline fun create<T: key>(signer: &signer, _ref: &OwnerRef, val: T) {
++ 40 │ │         // In reality, we should get the signer via the ref
++ 41 │ │         move_to<T>(signer, val)
++ 42 │ │     }
++    │ ╰─────^
++    │  
++    ┌─ TEMPFILE:81:9
++    │
++ 81 │         obj::create(signer, owner, Token{val})
++    │         -------------------------------------- in a call inlined at this callsite
++ 
++ error: cannot drop
++    ┌─ /var/folders/zs/2tcxd6rs43q9kg97b2xmtcq40000gn/T/.tmpNvpgWT:39:5
++    │  
++ 39 │ ╭     public inline fun create<T: key>(signer: &signer, _ref: &OwnerRef, val: T) {
++ 40 │ │         // In reality, we should get the signer via the ref
++ 41 │ │         move_to<T>(signer, val)
++ 42 │ │     }
++    │ ╰─────^
++    │  
++    ┌─ TEMPFILE:81:9
++    │
++ 81 │         obj::create(signer, owner, Token{val})
++    │         -------------------------------------- in a call inlined at this callsite
++ 
++ 
++ 
++ task 2 'run'. lines 103-115:
++ Error: compilation errors:
++  error: unbound module
++     ┌─ TEMPFILE:105:9
++     │
++ 105 │     use 0x42::token;
++     │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '0x42::token'
++ 
++ error: unbound module
++     ┌─ TEMPFILE:108:9
++     │
++ 108 │         token::create(&s, &or, 22);
++     │         ^^^^^ Unbound module alias 'token'
++ 
++ error: unbound module
++     ┌─ TEMPFILE:109:18
++     │
++ 109 │         let rr = token::reader_ref(&or);
++     │                  ^^^^^ Unbound module alias 'token'
++ 
++ error: unbound module
++     ┌─ TEMPFILE:110:18
++     │
++ 110 │         let wr = token::writer_ref(&or);
++     │                  ^^^^^ Unbound module alias 'token'
++ 
++ error: unbound module
++     ┌─ TEMPFILE:111:17
++     │
++ 111 │         assert!(token::get_value(&rr) == 22, 0);
++     │                 ^^^^^ Unbound module alias 'token'
++ 
++ error: unbound module
++     ┌─ TEMPFILE:112:9
++     │
++ 112 │         token::set_value(&wr, 23);
++     │         ^^^^^ Unbound module alias 'token'
++ 
++ error: unbound module
++     ┌─ TEMPFILE:113:17
++     │
++ 113 │         assert!(token::get_value(&rr) == 23, 1)
++     │                 ^^^^^ Unbound module alias 'token'
++ 
++ 
++ 

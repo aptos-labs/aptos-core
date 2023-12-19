@@ -1,57 +1,169 @@
-processed 7 tasks
-
-task 1 'run'. lines 57-64:
-Error: Script execution failed with VMError: {
-    major_status: ARITHMETIC_ERROR,
-    sub_status: None,
-    location: 0x42::M,
-    indices: redacted,
-    offsets: redacted,
-}
-
-task 2 'run'. lines 66-73:
-Error: Script execution failed with VMError: {
-    major_status: ARITHMETIC_ERROR,
-    sub_status: None,
-    location: 0x42::M,
-    indices: redacted,
-    offsets: redacted,
-}
-
-task 3 'run'. lines 75-82:
-Error: Script execution failed with VMError: {
-    major_status: ARITHMETIC_ERROR,
-    sub_status: None,
-    location: 0x42::M,
-    indices: redacted,
-    offsets: redacted,
-}
-
-task 4 'run'. lines 84-91:
-Error: Script execution failed with VMError: {
-    major_status: ARITHMETIC_ERROR,
-    sub_status: None,
-    location: 0x42::M,
-    indices: redacted,
-    offsets: redacted,
-}
-
-task 5 'run'. lines 93-110:
-Error: Script execution failed with VMError: {
-    major_status: ARITHMETIC_ERROR,
-    sub_status: None,
-    location: 0x42::M,
-    indices: redacted,
-    offsets: redacted,
-}
-
-task 6 'run'. lines 112-119:
-Error: Script execution failed with VMError: {
-    major_status: RESOURCE_ALREADY_EXISTS,
-    sub_status: None,
-    location: 0x42::M,
-    indices: redacted,
-    offsets: redacted,
-}
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 7 tasks
+= 
++ task 0 'publish'. lines 3-55:
++ Error: compilation errors:
++  error: cannot copy
++    ┌─ TEMPFILE:42:35
++    │
++ 42 │         move_to(account, Cup { b: R{}, a: 0 });
++    │                                   ^^^
++ 
++ error: cannot drop
++    ┌─ TEMPFILE:42:35
++    │
++ 42 │         move_to(account, Cup { b: R{}, a: 0 });
++    │                                   ^^^
++ 
++ error: cannot copy
++    ┌─ TEMPFILE:35:35
++    │
++ 35 │         move_to(account, Cup { b: R{}, a: 0 });
++    │                                   ^^^
++ 
++ error: cannot drop
++    ┌─ TEMPFILE:35:35
++    │
++ 35 │         move_to(account, Cup { b: R{}, a: 0 });
++    │                                   ^^^
++ 
++ 
++ 
+= task 1 'run'. lines 57-64:
+- Error: Script execution failed with VMError: {
+-     major_status: ARITHMETIC_ERROR,
+-     sub_status: None,
+-     location: 0x42::M,
+-     indices: redacted,
+-     offsets: redacted,
+- }
++ Error: compilation errors:
++  error: unbound module
++    ┌─ TEMPFILE:59:5
++    │
++ 59 │ use 0x42::M;
++    │     ^^^^^^^ Invalid 'use'. Unbound module: '0x42::M'
+= 
++ error: unbound module
++    ┌─ TEMPFILE:62:3
++    │
++ 62 │   M::t0()
++    │   ^ Unbound module alias 'M'
++ 
++ 
++ 
+= task 2 'run'. lines 66-73:
+- Error: Script execution failed with VMError: {
+-     major_status: ARITHMETIC_ERROR,
+-     sub_status: None,
+-     location: 0x42::M,
+-     indices: redacted,
+-     offsets: redacted,
+- }
++ Error: compilation errors:
++  error: unbound module
++    ┌─ TEMPFILE:68:5
++    │
++ 68 │ use 0x42::M;
++    │     ^^^^^^^ Invalid 'use'. Unbound module: '0x42::M'
+= 
++ error: unbound module
++    ┌─ TEMPFILE:71:3
++    │
++ 71 │   M::t1()
++    │   ^ Unbound module alias 'M'
++ 
++ 
++ 
+= task 3 'run'. lines 75-82:
+- Error: Script execution failed with VMError: {
+-     major_status: ARITHMETIC_ERROR,
+-     sub_status: None,
+-     location: 0x42::M,
+-     indices: redacted,
+-     offsets: redacted,
+- }
++ Error: compilation errors:
++  error: unbound module
++    ┌─ TEMPFILE:77:5
++    │
++ 77 │ use 0x42::M;
++    │     ^^^^^^^ Invalid 'use'. Unbound module: '0x42::M'
+= 
++ error: unbound module
++    ┌─ TEMPFILE:80:3
++    │
++ 80 │   M::t2()
++    │   ^ Unbound module alias 'M'
++ 
++ 
++ 
+= task 4 'run'. lines 84-91:
+- Error: Script execution failed with VMError: {
+-     major_status: ARITHMETIC_ERROR,
+-     sub_status: None,
+-     location: 0x42::M,
+-     indices: redacted,
+-     offsets: redacted,
+- }
++ Error: compilation errors:
++  error: unbound module
++    ┌─ TEMPFILE:86:5
++    │
++ 86 │ use 0x42::M;
++    │     ^^^^^^^ Invalid 'use'. Unbound module: '0x42::M'
+= 
++ error: unbound module
++    ┌─ TEMPFILE:89:3
++    │
++ 89 │   M::t3()
++    │   ^ Unbound module alias 'M'
++ 
++ 
++ 
+= task 5 'run'. lines 93-110:
+- Error: Script execution failed with VMError: {
+-     major_status: ARITHMETIC_ERROR,
+-     sub_status: None,
+-     location: 0x42::M,
+-     indices: redacted,
+-     offsets: redacted,
+- }
++ Error: compilation errors:
++  error: unbound module
++    ┌─ TEMPFILE:95:5
++    │
++ 95 │ use 0x42::M;
++    │     ^^^^^^^ Invalid 'use'. Unbound module: '0x42::M'
+= 
++ error: unbound module
++    ┌─ TEMPFILE:98:3
++    │
++ 98 │   M::t4()
++    │   ^ Unbound module alias 'M'
++ 
++ 
++ 
+= task 6 'run'. lines 112-119:
+- Error: Script execution failed with VMError: {
+-     major_status: RESOURCE_ALREADY_EXISTS,
+-     sub_status: None,
+-     location: 0x42::M,
+-     indices: redacted,
+-     offsets: redacted,
+- }
++ Error: compilation errors:
++  error: unbound module
++     ┌─ TEMPFILE:114:5
++     │
++ 114 │ use 0x42::M;
++     │     ^^^^^^^ Invalid 'use'. Unbound module: '0x42::M'
+= 
++ error: unbound module
++     ┌─ TEMPFILE:117:3
++     │
++ 117 │   M::t6(&account)
++     │   ^ Unbound module alias 'M'
++ 
++ 
++ 

@@ -1,3 +1,19 @@
-processed 3 tasks
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 3 tasks
+= 
++ task 2 'publish'. lines 17-29:
++ Error: compilation errors:
++  error: cannot copy
++    ┌─ TEMPFILE:25:18
++    │
++ 25 │             t_c: 0x42::C::foo(),
++    │                  ^^^^^^^^^^^^^^
++ 
++ error: cannot drop
++    ┌─ TEMPFILE:25:18
++    │
++ 25 │             t_c: 0x42::C::foo(),
++    │                  ^^^^^^^^^^^^^^
++ 
++ 
++ 

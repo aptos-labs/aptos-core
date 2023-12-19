@@ -1,3 +1,13 @@
-processed 2 tasks
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
++ task 1 'run'. lines 21-35:
++ Error: compilation errors:
++  error: cannot copy
++    ┌─ TEMPFILE:25:9
++    │
++ 25 │     let x = Test::new();
++    │         ^
++ 
++ 
++ 
