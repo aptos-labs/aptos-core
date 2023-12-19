@@ -1,7 +1,139 @@
 comparison between v1 and v2 failed:
-= processed 2 tasks
+= processed 3 tasks
 = 
-+ task 0 'publish'. lines 1-11:
+= task 0 'print-bytecode'. lines 1-11:
+- // Move bytecode v6
++ // Move bytecode v7
+= module cafe.vectors {
+= 
+= 
+= test_for_each_mut() {
+- L0:	loc0: &mut u64
++ L0:	loc0: vector<u64>
+= L1:	loc1: u64
+- L2:	loc2: u64
+- L3:	loc3: vector<u64>
++ L2:	loc2: &mut vector<u64>
++ L3:	loc3: u64
+= L4:	loc4: &mut vector<u64>
++ L5:	loc5: u64
++ L6:	loc6: &mut vector<u64>
++ L7:	loc7: &mut u64
++ L8:	loc8: u64
++ L9:	loc9: u64
++ L10:	loc10: vector<u64>
+= B0:
+- 	0: LdConst[0](Vector(U64): [3, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0])
+- 	1: StLoc[3](loc3: vector<u64>)
+- 	2: LdU64(2)
+- 	3: StLoc[2](loc2: u64)
+- 	4: MutBorrowLoc[3](loc3: vector<u64>)
+- 	5: StLoc[4](loc4: &mut vector<u64>)
+- 	6: LdU64(0)
+- 	7: StLoc[1](loc1: u64)
++ 	0: LdU64(1)
++ 	1: LdU64(2)
++ 	2: LdU64(3)
++ 	3: VecPack(1, 3)
++ 	4: StLoc[0](loc0: vector<u64>)
++ 	5: LdU64(2)
++ 	6: StLoc[1](loc1: u64)
++ 	7: MutBorrowLoc[0](loc0: vector<u64>)
++ 	8: StLoc[2](loc2: &mut vector<u64>)
++ 	9: LdU64(0)
++ 	10: StLoc[3](loc3: u64)
+= B1:
+- 	8: CopyLoc[1](loc1: u64)
+- 	9: CopyLoc[4](loc4: &mut vector<u64>)
+- 	10: FreezeRef
+- 	11: VecLen(2)
+- 	12: Lt
+- 	13: BrFalse(31)
++ 	11: CopyLoc[2](loc2: &mut vector<u64>)
++ 	12: StLoc[4](loc4: &mut vector<u64>)
++ 	13: MoveLoc[4](loc4: &mut vector<u64>)
++ 	14: FreezeRef
++ 	15: VecLen(1)
++ 	16: StLoc[5](loc5: u64)
++ 	17: CopyLoc[3](loc3: u64)
++ 	18: MoveLoc[5](loc5: u64)
++ 	19: Lt
++ 	20: BrFalse(43)
+= B2:
+- 	14: Branch(15)
++ 	21: CopyLoc[2](loc2: &mut vector<u64>)
++ 	22: StLoc[6](loc6: &mut vector<u64>)
++ 	23: MoveLoc[6](loc6: &mut vector<u64>)
++ 	24: CopyLoc[3](loc3: u64)
++ 	25: VecMutBorrow(1)
++ 	26: StLoc[7](loc7: &mut u64)
++ 	27: CopyLoc[1](loc1: u64)
++ 	28: MoveLoc[7](loc7: &mut u64)
++ 	29: WriteRef
++ 	30: LdU64(1)
++ 	31: StLoc[8](loc8: u64)
++ 	32: MoveLoc[1](loc1: u64)
++ 	33: MoveLoc[8](loc8: u64)
++ 	34: Add
++ 	35: StLoc[1](loc1: u64)
++ 	36: LdU64(1)
++ 	37: StLoc[9](loc9: u64)
++ 	38: MoveLoc[3](loc3: u64)
++ 	39: MoveLoc[9](loc9: u64)
++ 	40: Add
++ 	41: StLoc[3](loc3: u64)
++ 	42: Branch(44)
+= B3:
+- 	15: CopyLoc[4](loc4: &mut vector<u64>)
+- 	16: CopyLoc[1](loc1: u64)
+- 	17: VecMutBorrow(2)
+- 	18: StLoc[0](loc0: &mut u64)
+- 	19: CopyLoc[2](loc2: u64)
+- 	20: MoveLoc[0](loc0: &mut u64)
+- 	21: WriteRef
+- 	22: MoveLoc[2](loc2: u64)
+- 	23: LdU64(1)
+- 	24: Add
+- 	25: StLoc[2](loc2: u64)
+- 	26: MoveLoc[1](loc1: u64)
+- 	27: LdU64(1)
+- 	28: Add
+- 	29: StLoc[1](loc1: u64)
+- 	30: Branch(8)
++ 	43: Branch(45)
+= B4:
+- 	31: MoveLoc[4](loc4: &mut vector<u64>)
+- 	32: Pop
+- 	33: MoveLoc[3](loc3: vector<u64>)
+- 	34: LdConst[1](Vector(U64): [3, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0])
+- 	35: Eq
+- 	36: BrFalse(38)
++ 	44: Branch(11)
+= B5:
+- 	37: Branch(40)
++ 	45: LdU64(2)
++ 	46: LdU64(3)
++ 	47: LdU64(4)
++ 	48: VecPack(1, 3)
++ 	49: StLoc[10](loc10: vector<u64>)
++ 	50: MoveLoc[0](loc0: vector<u64>)
++ 	51: MoveLoc[10](loc10: vector<u64>)
++ 	52: Eq
++ 	53: BrFalse(55)
+= B6:
+- 	38: LdU64(0)
+- 	39: Abort
++ 	54: Branch(57)
+= B7:
+- 	40: Ret
++ 	55: LdU64(0)
++ 	56: Abort
++ B8:
++ 	57: Ret
+= }
+= }
+= 
++ task 1 'publish'. lines 13-23:
 + Error: Unable to publish module '000000000000000000000000000000000000000000000000000000000000cafe::vectors'. Got VMError: {
 +     major_status: MOVELOC_EXISTS_BORROW_ERROR,
 +     sub_status: None,
@@ -10,7 +142,7 @@ comparison between v1 and v2 failed:
 +     offsets: redacted,
 + }
 + 
-+ task 1 'run'. lines 13-13:
++ task 2 'run'. lines 25-25:
 + Error: Function execution failed with VMError: {
 +     major_status: LINKER_ERROR,
 +     sub_status: None,
