@@ -8,6 +8,8 @@ use crate::{should_forward_to_subscription_service, ChunkCommitNotification, Led
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_storage_interface::{state_delta::StateDelta, ExecutedTrees};
 #[cfg(test)]
+use aptos_types::account_config::NewEpochEvent;
+#[cfg(test)]
 use aptos_types::contract_event::ContractEvent;
 use aptos_types::{
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
@@ -85,7 +87,7 @@ impl ExecutedChunk {
 
         let mut committed_transactions =
             Vec::with_capacity(self.ledger_update_output.to_commit.len());
-        let mut committed_events =
+        let mut subscribable_events =
             Vec::with_capacity(self.ledger_update_output.to_commit.len() * 2);
         let mut to_drop = Vec::with_capacity(self.ledger_update_output.to_commit.len());
         for txn_to_commit in self.ledger_update_output.to_commit {
@@ -97,7 +99,7 @@ impl ExecutedChunk {
                 ..
             } = txn_to_commit;
             committed_transactions.push(transaction);
-            committed_events.extend(
+            subscribable_events.extend(
                 events
                     .into_iter()
                     .filter(should_forward_to_subscription_service),
@@ -108,7 +110,7 @@ impl ExecutedChunk {
 
         ChunkCommitNotification {
             committed_transactions,
-            committed_events,
+            subscribable_events,
             reconfiguration_occurred,
         }
     }
@@ -126,8 +128,6 @@ impl ExecutedChunk {
 
 #[test]
 fn into_chunk_commit_notification_should_apply_event_filters() {
-    let event_0 =
-        ContractEvent::new_v2_with_type_tag_str("0x1::dkg::DKGStartEvent", b"dkg_data_0".to_vec());
     let event_1 = ContractEvent::new_v2_with_type_tag_str(
         "0x2345::random_module::RandomEvent",
         b"random_data_x".to_vec(),
@@ -138,12 +138,13 @@ fn into_chunk_commit_notification_should_apply_event_filters() {
         "0x6789::random_module::RandomEvent",
         b"random_data_y".to_vec(),
     );
+    let event_4 = ContractEvent::from((1, NewEpochEvent::dummy()));
 
     let ledger_update_output = LedgerUpdateOutput {
         to_commit: vec![
-            TransactionToCommit::dummy_with_events(vec![event_0.clone()]),
-            TransactionToCommit::dummy_with_events(vec![event_1.clone(), event_2.clone()]),
-            TransactionToCommit::dummy_with_events(vec![event_3.clone()]),
+            TransactionToCommit::dummy_with_events(vec![event_1.clone()]),
+            TransactionToCommit::dummy_with_events(vec![event_2.clone(), event_3.clone()]),
+            TransactionToCommit::dummy_with_events(vec![event_4.clone()]),
         ],
         ..Default::default()
     };
@@ -155,5 +156,5 @@ fn into_chunk_commit_notification_should_apply_event_filters() {
 
     let notification = chunk.into_chunk_commit_notification();
 
-    assert_eq!(vec![event_0, event_2], notification.committed_events);
+    assert_eq!(vec![event_2, event_4], notification.subscribable_events);
 }

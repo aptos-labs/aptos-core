@@ -282,6 +282,17 @@ impl TryFrom<&ContractEvent> for NewBlockEvent {
     }
 }
 
+impl From<(u64, NewEpochEvent)> for ContractEvent {
+    fn from((seq_num, event): (u64, NewEpochEvent)) -> Self {
+        Self::new_v1(
+            new_epoch_event_key(),
+            seq_num,
+            TypeTag::from(NewEpochEvent::struct_tag()),
+            bcs::to_bytes(&event).unwrap(),
+        )
+    }
+}
+
 impl TryFrom<&ContractEvent> for NewEpochEvent {
     type Error = Error;
 
