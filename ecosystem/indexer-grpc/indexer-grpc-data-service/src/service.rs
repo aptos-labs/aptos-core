@@ -292,10 +292,8 @@ impl RawData for RawDataServerWrapper {
                     // 2. Push the data to the response channel, i.e. stream the data to the client.
                     let current_batch_size = transaction_data.as_slice().len();
                     let end_of_batch_version = transaction_data.as_slice().last().unwrap().version;
-                    let resp_items = get_transactions_responses_builder(
-                        transaction_data,
-                        chain_id as u32,
-                    );
+                    let resp_items =
+                        get_transactions_responses_builder(transaction_data, chain_id as u32);
                     let data_latency_in_secs = resp_items
                         .last()
                         .unwrap()
@@ -411,14 +409,13 @@ fn get_transactions_responses_builder(
     chain_id: u32,
 ) -> Vec<TransactionsResponse> {
     let chunks = chunk_transactions(transactions, MESSAGE_SIZE_LIMIT);
-    let resp_items = chunks
+    chunks
         .into_iter()
         .map(|chunk| TransactionsResponse {
             chain_id: Some(chain_id as u64),
             transactions: chunk,
         })
-        .collect::<Vec<TransactionsResponse>>();
-    resp_items
+        .collect()
 }
 
 /// Fetches data from cache or the file store. It returns the data if it is ready in the cache or file store.

@@ -9,7 +9,7 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_protos::{indexer::v1::TransactionsInStorage, transaction::v1::Transaction};
+use aptos_protos::transaction::v1::Transaction;
 use cloud_storage::{Bucket, Object};
 use std::env;
 

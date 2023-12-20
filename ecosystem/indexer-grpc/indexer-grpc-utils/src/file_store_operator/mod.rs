@@ -1,9 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::storage_format::{FileStoreMetadata, StorageFormat, FileEntry, FILE_ENTRY_TRANSACTION_COUNT};
+use crate::storage_format::{
+    FileEntry, FileStoreMetadata, StorageFormat, FILE_ENTRY_TRANSACTION_COUNT,
+};
 use anyhow::Result;
-use aptos_protos::{transaction::v1::Transaction, indexer::v1::TransactionsInStorage};
+use aptos_protos::{indexer::v1::TransactionsInStorage, transaction::v1::Transaction};
 
 pub mod gcs;
 pub use gcs::*;
@@ -19,7 +21,7 @@ pub trait FileStoreOperator: Send + Sync {
     async fn verify_storage_bucket_existence(&self);
 
     fn storage_format(&self) -> StorageFormat;
-    
+
     /// Gets the transactions files from the file store. version has to be a multiple of BLOB_STORAGE_SIZE.
     async fn get_transactions(&self, version: u64) -> Result<Vec<Transaction>> {
         let (transactions, _, _) = self.get_transactions_with_durations(version).await?;
@@ -28,23 +30,26 @@ pub trait FileStoreOperator: Send + Sync {
 
     async fn get_transactions_bytes(&self, version: u64) -> Result<Vec<u8>>;
 
-    async fn get_transactions_with_durations(&self, version: u64) -> Result<(Vec<Transaction>, f64, f64)> {
+    async fn get_transactions_with_durations(
+        &self,
+        version: u64,
+    ) -> Result<(Vec<Transaction>, f64, f64)> {
         let io_start_time = std::time::Instant::now();
         let bytes = self.get_transactions_bytes(version).await?;
         let io_duration = io_start_time.elapsed().as_secs_f64();
         let decoding_start_time = std::time::Instant::now();
         let transactions_in_storage: TransactionsInStorage =
-            FileEntry::from_bytes(bytes, self.storage_format())
-                .try_into()?;
+            FileEntry::from_bytes(bytes, self.storage_format()).try_into()?;
         let decoding_duration = decoding_start_time.elapsed().as_secs_f64();
-        Ok((transactions_in_storage
-            .transactions
-            .into_iter()
-            .skip((version % FILE_ENTRY_TRANSACTION_COUNT) as usize)
-            .collect(),
+        Ok((
+            transactions_in_storage
+                .transactions
+                .into_iter()
+                .skip((version % FILE_ENTRY_TRANSACTION_COUNT) as usize)
+                .collect(),
             io_duration,
-            decoding_duration)
-        )
+            decoding_duration,
+        ))
     }
     /// Gets the metadata from the file store. Operator will panic if error happens when accessing the metadata file(except not found).
     async fn get_file_store_metadata(&self) -> Option<FileStoreMetadata>;
