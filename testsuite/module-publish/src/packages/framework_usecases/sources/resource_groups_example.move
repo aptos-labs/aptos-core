@@ -264,16 +264,10 @@ module 0xABCD::resource_groups_example {
         set_and_read(owner, set_index, read_index, name);
     }
 
-    #[test(owner = @0x123)]
-    entry fun test_set(owner: &signer) acquires Collection {
-        set(owner, owner, 0, string::utf8(b"a"));
-        set(owner, owner, 0, string::utf8(b"b"));
-        set(owner, owner, 1, string::utf8(b"c"));
-    }
-
     #[test(creator = @0x123, owner = @0x456)]
     entry fun test_set(creator: &signer, owner: &signer) acquires Collection {
         set(creator, owner, 0, string::utf8(b"a"));
+        set(creator, owner, 0, string::utf8(b"aa"));
         set(creator, owner, 1, string::utf8(b"b"));
         set(creator, owner, 2, string::utf8(b"c"));
         set(creator, owner, 3, string::utf8(b"d"));

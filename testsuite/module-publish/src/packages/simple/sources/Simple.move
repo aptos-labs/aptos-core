@@ -13,7 +13,6 @@ module 0xABCD::simple {
     use std::signer;
     use std::string::{Self, String, utf8};
     use std::vector;
-    use aptos_framework::aggregator_v2::{Self, Aggregator};
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::account;
     use aptos_std::table::{Self, Table};
@@ -26,9 +25,6 @@ module 0xABCD::simple {
 
     // Resource being modified doesn't exist
     const ECOUNTER_RESOURCE_NOT_PRESENT: u64 = 1;
-
-    // Incrementing a counter failed
-    const ECOUNTER_INCREMENT_FAIL: u64 = 2;
 
     // Load and return a value from the constant `RANDOM`.
     // No data read or write.
@@ -128,28 +124,12 @@ module 0xABCD::simple {
         count: u64,
     }
 
-    struct CounterAggV2 has key {
-        count: Aggregator<u64>,
-    }
-
-    struct BoundedAggV2 has key {
-        count: Aggregator<u64>,
-    }
-
     // Create the global `Counter`.
     // Stored under the module publisher address.
     fun init_module(publisher: &signer) {
         move_to<Counter>(
             publisher,
             Counter { count: 0 }
-        );
-        move_to<CounterAggV2>(
-            publisher,
-            CounterAggV2 { count: aggregator_v2::create_unbounded_aggregator() }
-        );
-        move_to<BoundedAggV2>(
-            publisher,
-            BoundedAggV2 { count: aggregator_v2::create_aggregator(100) }
         );
     }
 
@@ -158,36 +138,18 @@ module 0xABCD::simple {
     // The idea is that `COUNTER_STEP` is one of the few values (if not the only
     // one) that changes across versions.
     public entry fun step_signer(s: &signer) acquires Counter {
-        let counter = borrow_global_mut<Counter>(signer::address_of(s));
+        let addr = signer::address_of(s);
+        assert!(exists<Counter>(addr), error::invalid_argument(ECOUNTER_RESOURCE_NOT_PRESENT));
+        let counter = borrow_global_mut<Counter>(addr);
         *(&mut counter.count) = counter.count + COUNTER_STEP;
     }
 
     // Get the value behind `Counter`.
     public entry fun get_counter(s: &signer) acquires Counter {
-        let counter = borrow_global<Counter>(signer::address_of(s));
+        let addr = signer::address_of(s);
+        assert!(exists<Counter>(addr), error::invalid_argument(ECOUNTER_RESOURCE_NOT_PRESENT));
+        let counter = borrow_global<Counter>(addr);
         counter.count;
-    }
-
-    public entry fun step_destination(_owner: &signer, destination: address) acquires Counter {
-        assert!(exists<Counter>(destination), error::invalid_argument(ECOUNTER_RESOURCE_NOT_PRESENT));
-        let counter = borrow_global_mut<Counter>(destination);
-        *(&mut counter.count) = counter.count + COUNTER_STEP;
-    }
-
-    public entry fun step_destination_agg_v2(_owner: &signer, destination: address) acquires CounterAggV2 {
-        assert!(exists<CounterAggV2>(destination), error::invalid_argument(ECOUNTER_RESOURCE_NOT_PRESENT));
-        let counter = borrow_global_mut<CounterAggV2>(destination);
-        assert!(aggregator_v2::try_add(&mut counter.count, COUNTER_STEP), ECOUNTER_INCREMENT_FAIL);
-    }
-
-    public entry fun modify_destination_bounded_agg_v2(_owner: &signer, destination: address, increment: bool, delta: u64) acquires BoundedAggV2 {
-        assert!(exists<BoundedAggV2>(destination), error::invalid_argument(ECOUNTER_RESOURCE_NOT_PRESENT));
-        let bounded = borrow_global_mut<BoundedAggV2>(destination);
-        if (increment) {
-            aggregator_v2::try_add(&mut bounded.count, delta);
-        } else {
-            aggregator_v2::try_sub(&mut bounded.count, delta);
-        }
     }
 
     //

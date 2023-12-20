@@ -31,6 +31,7 @@ class Flow(Flag):
     # Test resource groups
     RESOURCE_GROUPS = auto()
 
+
 # Tests that are run on LAND_BLOCKING and continuously on main
 LAND_BLOCKING_AND_C = Flow.LAND_BLOCKING | Flow.CONTINUOUS
 

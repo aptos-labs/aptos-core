@@ -123,23 +123,23 @@ impl TransactionTypeArg {
                 use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::ModifyGlobalResource => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::StepDst,
+                entry_point: EntryPoints::IncGlobal,
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::ModifyGlobalResourceAggV2 => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::StepDstAggV2,
+                entry_point: EntryPoints::IncGlobalAggV2,
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::ModifyGlobalFlagAggV2 => TransactionType::CallCustomModules {
                 // 100 is max, so equivalent to flag
-                entry_point: EntryPoints::ModifyBoundedAggV2 { step: 100 },
+                entry_point: EntryPoints::ModifyGlobalBoundedAggV2 { step: 100 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::ModifyGlobalBoundedAggV2 => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::ModifyBoundedAggV2 { step: 10 },
+                entry_point: EntryPoints::ModifyGlobalBoundedAggV2 { step: 10 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },

@@ -159,12 +159,12 @@ pub enum EntryPoints {
         max_offset: u64,
         max_count: u64,
     },
-    /// Increment destination resource - COUNTER_STEP
-    StepDst,
-    /// Increment destination AggregatorV2 resource - COUNTER_STEP
-    StepDstAggV2,
+    /// Increment global (publisher) resource - COUNTER_STEP
+    IncGlobal,
+    /// Increment global (publisher) AggregatorV2 resource - COUNTER_STEP
+    IncGlobalAggV2,
     /// Modify (try_add(step) or try_sub(step)) AggregatorV2 bounded counter (counter with max_value=100)
-    ModifyBoundedAggV2 {
+    ModifyGlobalBoundedAggV2 {
         step: u64,
     },
 
@@ -246,11 +246,11 @@ impl EntryPoints {
             | EntryPoints::BytesMakeOrChange { .. }
             | EntryPoints::EmitEvents { .. }
             | EntryPoints::MakeOrChangeTable { .. }
-            | EntryPoints::MakeOrChangeTableRandom { .. }
-            | EntryPoints::StepDst
-            | EntryPoints::StepDstAggV2
-            | EntryPoints::ModifyBoundedAggV2 { .. } => "simple",
-            EntryPoints::CreateObjects { .. }
+            | EntryPoints::MakeOrChangeTableRandom { .. } => "simple",
+            EntryPoints::IncGlobal
+            | EntryPoints::IncGlobalAggV2
+            | EntryPoints::ModifyGlobalBoundedAggV2 { .. }
+            | EntryPoints::CreateObjects { .. }
             | EntryPoints::CreateObjectsConflict { .. }
             | EntryPoints::TokenV1InitializeCollection
             | EntryPoints::TokenV1MintAndStoreNFTParallel
@@ -292,10 +292,10 @@ impl EntryPoints {
             | EntryPoints::BytesMakeOrChange { .. }
             | EntryPoints::EmitEvents { .. }
             | EntryPoints::MakeOrChangeTable { .. }
-            | EntryPoints::MakeOrChangeTableRandom { .. }
-            | EntryPoints::StepDst
-            | EntryPoints::StepDstAggV2
-            | EntryPoints::ModifyBoundedAggV2 { .. } => "simple",
+            | EntryPoints::MakeOrChangeTableRandom { .. } => "simple",
+            EntryPoints::IncGlobal
+            | EntryPoints::IncGlobalAggV2
+            | EntryPoints::ModifyGlobalBoundedAggV2 { .. } => "aggregator_example",
             EntryPoints::CreateObjects { .. } | EntryPoints::CreateObjectsConflict { .. } => {
                 "objects"
             },
@@ -420,16 +420,11 @@ impl EntryPoints {
                     ],
                 )
             },
-            EntryPoints::StepDst => step_dst(module_id, other.expect("Must provide other")),
-            EntryPoints::StepDstAggV2 => {
-                step_dst_agg_v2(module_id, other.expect("Must provide other"))
+            EntryPoints::IncGlobal => inc_global(module_id),
+            EntryPoints::IncGlobalAggV2 => inc_global_agg_v2(module_id),
+            EntryPoints::ModifyGlobalBoundedAggV2 { step } => {
+                modify_bounded_agg_v2(module_id, rng.expect("Must provide RNG"), *step)
             },
-            EntryPoints::ModifyBoundedAggV2 { step } => modify_bounded_agg_v2(
-                module_id,
-                other.expect("Must provide other"),
-                rng.expect("Must provide RNG"),
-                *step,
-            ),
             EntryPoints::CreateObjects {
                 num_objects,
                 object_payload_size,
@@ -706,31 +701,19 @@ fn minimize(module_id: ModuleId, other: &AccountAddress) -> TransactionPayload {
     ])
 }
 
-fn step_dst(module_id: ModuleId, dst: &AccountAddress) -> TransactionPayload {
-    get_payload(module_id, ident_str!("step_destination").to_owned(), vec![
-        bcs::to_bytes(dst).unwrap(),
-    ])
+fn inc_global(module_id: ModuleId) -> TransactionPayload {
+    get_payload(module_id, ident_str!("increment").to_owned(), vec![])
 }
 
-fn step_dst_agg_v2(module_id: ModuleId, dst: &AccountAddress) -> TransactionPayload {
-    get_payload(
-        module_id,
-        ident_str!("step_destination_agg_v2").to_owned(),
-        vec![bcs::to_bytes(dst).unwrap()],
-    )
+fn inc_global_agg_v2(module_id: ModuleId) -> TransactionPayload {
+    get_payload(module_id, ident_str!("increment_agg_v2").to_owned(), vec![])
 }
 
-fn modify_bounded_agg_v2(
-    module_id: ModuleId,
-    dst: &AccountAddress,
-    rng: &mut StdRng,
-    step: u64,
-) -> TransactionPayload {
+fn modify_bounded_agg_v2(module_id: ModuleId, rng: &mut StdRng, step: u64) -> TransactionPayload {
     get_payload(
         module_id,
-        ident_str!("modify_destination_bounded_agg_v2").to_owned(),
+        ident_str!("modify_bounded_agg_v2").to_owned(),
         vec![
-            bcs::to_bytes(dst).unwrap(),
             bcs::to_bytes(&rng.gen::<bool>()).unwrap(),
             bcs::to_bytes(&step).unwrap(),
         ],
