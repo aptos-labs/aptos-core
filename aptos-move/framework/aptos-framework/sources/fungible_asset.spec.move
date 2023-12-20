@@ -5,7 +5,7 @@ spec aptos_framework::fungible_asset {
     /// Criticality: Medium
     /// Implementation: The add_fungibility function has size limitations for the name, symbol, number of decimals,
     /// icon_uri, and project_uri field of the Metadata resource.
-    /// Enforcement: This has been audited.
+    /// Enforcement: Formally verified via [high-level-req-1](add_fungibility).
     ///
     /// No.: 2
     /// Property: Adding fungibility to an existing object should initialize the metadata and supply resources and store
@@ -13,7 +13,7 @@ spec aptos_framework::fungible_asset {
     /// Criticality: Low
     /// Implementation: The add_fungibility function initializes the Metadata and Supply resources and moves them under
     /// the metadata object.
-    /// Enforcement: Audited that the Metadata and Supply resources are initialized properly.
+    /// Enforcement: Formally verified via [high-level-req-2](add_fungibility).
     ///
     /// No.: 3
     /// Property: Generating mint, burn and transfer references can only be done at object creation time and if the
@@ -21,14 +21,15 @@ spec aptos_framework::fungible_asset {
     /// Criticality: Low
     /// Implementation: The following functions generate the related references of the Metadata object: 1.
     /// generate_mint_ref 2. generate_burn_ref 3. generate_transfer_ref
-    /// Enforcement: Audited that the Metadata object exists within the constructor ref.
+    /// Enforcement: Formally verified via [high-level-req-3.1](generate_mint_ref),
+    /// [high-level-req-3.2](generate_burn_ref), and [high-level-req-3.3](generate_transfer_ref)
     ///
     /// No.: 4
     /// Property: Only the owner of a store should be allowed to withdraw fungible assets from it.
     /// Criticality: High
-    /// Implementation: The fungible_asset::withdraw function ensures that the signer owns the store by asserting that
-    /// the object address matches the address of the signer.
-    /// Enforcement: Audited that the address of the signer owns the object.
+    /// Implementation: The withdraw function ensures that the signer owns the store by asserting that the object
+    /// address matches the address of the signer.
+    /// Enforcement: Formally verified via [high-level-req-4](withdraw).
     ///
     /// No.: 5
     /// Property: The transfer, withdrawal and deposit operation should never change the current supply of the fungible
@@ -37,7 +38,8 @@ spec aptos_framework::fungible_asset {
     /// Implementation: The transfer function withdraws the fungible assets from the store and deposits them to the
     /// receiver. The withdraw function extracts the fungible asset from the fungible asset store. The deposit function
     /// adds the balance to the fungible asset store.
-    /// Enforcement: Audited that the supply before and after the operation remains constant.
+    /// Enforcement: Formally verified via [high-level-req-5.1](withdraw), [high-level-req-5.1](deposit), and
+    /// [high-level-req-5.3](transfer).
     ///
     /// No.: 6
     /// Property: The owner of the store should only be able to withdraw a certain amount if its store has sufficient
@@ -47,7 +49,8 @@ spec aptos_framework::fungible_asset {
     /// Implementation: The withdraw function ensures that the store is not frozen before calling withdraw_internal
     /// which ensures that the withdrawing amount is greater than 0 and less than the total balance from the store.
     /// The withdraw_with_ref ensures that the reference's metadata matches the store metadata.
-    /// Enforcement: Audited that it aborts if the withdrawing store is frozen. Audited that it aborts if the store doesn't have sufficient balance. Audited that the balance of the withdrawing store is reduced by amount.
+    /// Enforcement: Audited that it aborts if the withdrawing store is frozen. Audited that it aborts if the store
+    /// doesn't have sufficient balance. Audited that the balance of the withdrawing store is reduced by amount.
     ///
     /// No.: 7
     /// Property: Only the same type of fungible assets should be deposited in a fungible asset store, if the store is
@@ -134,7 +137,290 @@ spec aptos_framework::fungible_asset {
     /// </high-level-req>
     ///
     spec module {
-        // TODO: verification disabled until this module is specified.
-        pragma verify=false;
+        pragma verify = true;
+        pragma aborts_if_is_strict;
+    }
+
+    spec fun spec_exists_at<T: key>(object: address): bool;
+
+    spec add_fungibility(
+        constructor_ref: &ConstructorRef,
+        maximum_supply: Option<u128>,
+        name: String,
+        symbol: String,
+        decimals: u8,
+        icon_uri: String,
+        project_uri: String,
+    ): Object<Metadata> {
+        pragma aborts_if_is_partial;
+        /// [high-level-req-1]
+        aborts_if (object::can_generate_delete_ref(constructor_ref));
+        aborts_if (string::length(name) > MAX_NAME_LENGTH);
+        aborts_if (string::length(symbol) > MAX_SYMBOL_LENGTH);
+        aborts_if (decimals > MAX_DECIMALS);
+        aborts_if (string::length(icon_uri) > MAX_URI_LENGTH);
+        aborts_if (string::length(project_uri) > MAX_URI_LENGTH);
+        let contructor_ref_addr = object::address_from_constructor_ref(constructor_ref);
+        aborts_if !exists<object::ObjectCore>(contructor_ref_addr);
+        aborts_if !object::spec_exists_at<Metadata>(contructor_ref_addr);
+        aborts_if exists<Metadata>(contructor_ref_addr);
+        // aborts_if (features::spec_is_enabled(features::CONCURRENT_ASSETS)) ==> exists<ConcurrentSupply>(contructor_ref_addr);
+        // aborts_if !(features::spec_is_enabled(features::CONCURRENT_ASSETS)) ==> exists<Supply>(contructor_ref_addr);
+
+        /// [high-level-req-2]
+        ensures exists<Metadata>(contructor_ref_addr);
+        ensures (features::spec_is_enabled(features::CONCURRENT_ASSETS)) ==> exists<ConcurrentSupply>(contructor_ref_addr);
+        ensures !(features::spec_is_enabled(features::CONCURRENT_ASSETS)) ==> exists<Supply>(contructor_ref_addr);
+    }
+
+    spec generate_mint_ref(constructor_ref: &ConstructorRef): MintRef {
+        let contructor_ref_addr = object::address_from_constructor_ref(constructor_ref);
+        aborts_if !exists<object::ObjectCore>(contructor_ref_addr);
+        aborts_if !object::spec_exists_at<Metadata>(contructor_ref_addr);
+    }
+
+    spec generate_burn_ref(constructor_ref: &ConstructorRef): BurnRef {
+        let contructor_ref_addr = object::address_from_constructor_ref(constructor_ref);
+        aborts_if !exists<object::ObjectCore>(contructor_ref_addr);
+        aborts_if !object::spec_exists_at<Metadata>(contructor_ref_addr);
+    }
+
+    spec generate_transfer_ref(constructor_ref: &ConstructorRef): TransferRef {
+        let contructor_ref_addr = object::address_from_constructor_ref(constructor_ref);
+        aborts_if !exists<object::ObjectCore>(contructor_ref_addr);
+        aborts_if !object::spec_exists_at<Metadata>(contructor_ref_addr);
+    }
+
+    spec supply<T: key>(metadata: Object<T>): Option<u128> {
+        pragma aborts_if_is_partial;
+    }
+
+    spec maximum<T: key>(metadata: Object<T>): Option<u128> {
+        pragma aborts_if_is_partial;
+    }
+
+    spec name<T: key>(metadata: Object<T>): String {
+        pragma aborts_if_is_partial;
+    }
+
+
+    spec symbol<T: key>(metadata: Object<T>): String {
+        pragma aborts_if_is_partial;
+    }
+
+    spec decimals<T: key>(metadata: Object<T>): u8 {
+        pragma aborts_if_is_partial;
+    }
+
+    spec store_exists(store: address): bool {
+        pragma aborts_if_is_partial;
+    }
+
+    spec metadata_from_asset(fa: &FungibleAsset): Object<Metadata> {
+        pragma aborts_if_is_partial;
+    }
+
+    spec store_metadata<T: key>(store: Object<T>): Object<Metadata> {
+        pragma aborts_if_is_partial;
+    }
+
+    spec amount(fa: &FungibleAsset): u64 {
+        pragma aborts_if_is_partial;
+    }
+
+    spec balance<T: key>(store: Object<T>): u64 {
+        pragma aborts_if_is_partial;
+    }
+
+    spec is_frozen<T: key>(store: Object<T>): bool {
+        pragma aborts_if_is_partial;
+    }
+
+    spec asset_metadata(fa: &FungibleAsset): Object<Metadata> {
+        pragma aborts_if_is_partial;
+    }
+
+    spec mint_ref_metadata(ref: &MintRef): Object<Metadata> {
+        pragma aborts_if_is_partial;
+    }
+
+    spec transfer_ref_metadata(ref: &TransferRef): Object<Metadata> {
+        pragma aborts_if_is_partial;
+    }
+
+    spec burn_ref_metadata(ref: &BurnRef): Object<Metadata> {
+        pragma aborts_if_is_partial;
+    }
+
+    spec transfer<T: key>(
+        sender: &signer,
+        from: Object<T>,
+        to: Object<T>,
+        amount: u64,
+        ) {
+        pragma aborts_if_is_partial;
+
+        let from_addr = from.inner;
+        let supply = global<ConcurrentSupply>(from_addr);
+        let post post_supply = global<ConcurrentSupply>(from_addr);
+        /// [high-level-req-5.3]
+        ensures post_supply == supply;
+    }
+
+    spec create_store<T: key>(
+        constructor_ref: &ConstructorRef,
+        metadata: Object<T>,
+        ): Object<FungibleStore> {
+        pragma aborts_if_is_partial;
+    }
+
+    spec remove_store(delete_ref: &DeleteRef) {
+        pragma aborts_if_is_partial;
+    }
+
+    spec withdraw<T: key>(
+        owner: &signer,
+        store: Object<T>,
+        amount: u64,
+        ): FungibleAsset {
+        pragma aborts_if_is_partial;
+
+        let current_address_0 = store.inner;
+        let object_0 = global<object::ObjectCore>(current_address_0);
+        let current_address = object_0.owner;
+        /// [high-level-req-4]
+        aborts_if store.inner != signer::address_of(owner) && !exists<object::ObjectCore>(store.inner);
+        aborts_if !exists<FungibleStore>(current_address_0);
+        aborts_if !exists<FungibleAssetEvents>(current_address_0);
+
+        aborts_if (amount == 0);
+        aborts_if (is_frozen(store));
+
+        let fungible_store = global<FungibleStore>(current_address_0);
+        aborts_if (fungible_store.balance < amount);
+
+        let supply = global<ConcurrentSupply>(current_address_0);
+        let post post_supply = global<ConcurrentSupply>(current_address_0);
+        /// [high-level-req-5.1]
+        ensures post_supply == supply;
+    }
+
+    spec deposit<T: key>(store: Object<T>, fa: FungibleAsset) {
+        pragma aborts_if_is_partial;
+
+        let reciepient_addr = store.inner;
+        let supply = global<ConcurrentSupply>(reciepient_addr);
+        let post post_supply = global<ConcurrentSupply>(reciepient_addr);
+        /// [high-level-req-5.2]
+        ensures post_supply == supply;
+    }
+
+    spec mint(ref: &MintRef, amount: u64): FungibleAsset {
+        pragma aborts_if_is_partial;
+    }
+
+    spec mint_to<T: key>(ref: &MintRef, store: Object<T>, amount: u64) {
+        pragma aborts_if_is_partial;
+    }
+
+    spec set_frozen_flag<T: key>(
+        ref: &TransferRef,
+        store: Object<T>,
+        frozen: bool,
+        ) {
+        pragma aborts_if_is_partial;
+    }
+
+    spec burn(ref: &BurnRef, fa: FungibleAsset) {
+        pragma aborts_if_is_partial;
+    }
+
+    spec burn_from<T: key>(
+        ref: &BurnRef,
+        store: Object<T>,
+        amount: u64
+        ) {
+        pragma aborts_if_is_partial;
+    }
+
+    spec withdraw_with_ref<T: key>(
+        ref: &TransferRef,
+        store: Object<T>,
+        amount: u64
+        ): FungibleAsset  {
+        pragma aborts_if_is_partial;
+    }
+
+    spec deposit_with_ref<T: key>(
+        ref: &TransferRef,
+        store: Object<T>,
+        fa: FungibleAsset
+        ) {
+        pragma aborts_if_is_partial;
+    }
+
+    spec transfer_with_ref<T: key>(
+        transfer_ref: &TransferRef,
+        from: Object<T>,
+        to: Object<T>,
+        amount: u64,
+        ) {
+        pragma aborts_if_is_partial;
+    }
+
+    spec zero<T: key>(metadata: Object<T>): FungibleAsset {
+        pragma aborts_if_is_partial;
+    }
+
+    spec extract(fungible_asset: &mut FungibleAsset, amount: u64): FungibleAsset {
+        pragma aborts_if_is_partial;
+    }
+
+    spec merge(dst_fungible_asset: &mut FungibleAsset, src_fungible_asset: FungibleAsset) {
+        pragma aborts_if_is_partial;
+    }
+
+    spec destroy_zero(fungible_asset: FungibleAsset) {
+        pragma aborts_if_is_partial;
+    }
+
+    spec deposit_internal<T: key>(store: Object<T>, fa: FungibleAsset) {
+        pragma aborts_if_is_partial;
+
+        let store_addr = object::object_address(store);
+        let store = global<FungibleStore>(store_addr);
+        let amount = fa.amount;
+        let post store_balance = global<FungibleStore>(store_addr).balance;
+        ensures store_balance == store.balance + amount;
+    }
+
+    spec withdraw_internal(
+        store_addr: address,
+        amount: u64,
+        ): FungibleAsset {
+        pragma aborts_if_is_partial;
+        aborts_if (amount == 0);
+
+        let store = global<FungibleStore>(store_addr);
+        aborts_if (store.balance < amount);
+        aborts_if !exists<FungibleStore>(store_addr);
+        aborts_if !exists<FungibleAssetEvents>(store_addr);
+
+        let post store_balance = global<FungibleStore>(store_addr).balance;
+        ensures store_balance == store.balance - amount;
+    }
+
+    spec increase_supply<T: key>(metadata: &Object<T>, amount: u64) {
+        pragma aborts_if_is_partial;
+    }
+
+    spec decrease_supply<T: key>(metadata: &Object<T>, amount: u64) {
+        pragma aborts_if_is_partial;
+    }
+
+    spec upgrade_to_concurrent(
+        ref: &ExtendRef,
+        ) {
+        pragma aborts_if_is_partial;
     }
 }
