@@ -2,7 +2,7 @@
 /// test_point2: merge itmes
 
 module BlockLine {
-use aptos_framework::{natives::code::PackageMetadata, unzip_metadata_str, BuildOptions, BuiltPackage, APTOS_PACKAGES,};
+use aptos_framework::account::{Self, SignerCapability, Account, create_signer_with_capability, new_event_handle};
 use aptos_framework::coin::{Self, BurnCapability};
 use aptos_framework::coin::MintCapability;
 }

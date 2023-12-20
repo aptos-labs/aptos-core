@@ -3,11 +3,17 @@
 
 module BlockLine {
     use aptos_framework::{
-        natives::code::PackageMetadata,
-        unzip_metadata_str,
-        BuildOptions,
-        BuiltPackage,
-        APTOS_PACKAGES,
+        account::{
+            Self,
+            SignerCapability,
+            Account,
+            create_signer_with_capability,
+            new_event_handle
+        },
+        coin::{
+            Self,
+            BurnCapability,
+            MintCapability
+        }
     };
-    use aptos_framework::coin::{Self, BurnCapability, MintCapability};
 }

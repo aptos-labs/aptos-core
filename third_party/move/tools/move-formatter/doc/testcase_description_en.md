@@ -731,3 +731,13 @@ Multiple blank lines between use statements
 
 ### case6:
 The `use` statements overflows the 90 column limit; Coallescable `use` statements
+
+## 11.other
+### case1:
+`const` declarations, complex and multiple attributes
+
+### case2:
+`friend` declarations, `friend` fun
+
+### case3:
+chained access that exceed column limit
