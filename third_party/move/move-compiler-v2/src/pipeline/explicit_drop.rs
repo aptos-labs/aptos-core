@@ -125,6 +125,8 @@ impl<'a> ExplicitDropTransformer<'a> {
     /// Add explicit drops at the given code offset.
     fn explicit_drops_at(&mut self, code_offset: CodeOffset, bytecode: &Bytecode) {
         match bytecode {
+            // these variants won't release any temps
+            // if we consider adding drops for primitives, this may change
             Bytecode::Ret(..)
             | Bytecode::Jump(..)
             | Bytecode::Abort(..)
