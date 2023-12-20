@@ -143,7 +143,7 @@ impl Mempool {
                 .consensus_pulled_counter
                 .fetch_add(1, Ordering::Relaxed);
             Self::log_txn_latency(insertion_info, bucket, counters::CONSENSUS_PULLED_LABEL);
-            counters::CORE_MEMPOOL_CONSENSUS_PULLED_COUNT.observe((prev_count + 1) as f64);
+            counters::CORE_MEMPOOL_TXN_CONSENSUS_PULLED.observe((prev_count + 1) as f64);
         }
     }
 
