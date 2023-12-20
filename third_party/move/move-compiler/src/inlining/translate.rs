@@ -232,6 +232,15 @@ impl<'l> Inliner<'l> {
             (*visitor)(self, name.as_str(), &mut sdef.function)
         }
     }
+
+    /// Create a symbol uniquely based on the provided `var_sym` string to
+    /// avoid conflicts, while remaining somewhat recognizable for debugging
+    /// purposes (or if it leaks to the user somehow).
+    fn rename_symbol(&mut self, var_sym: &str) -> Symbol {
+        let new_name = Symbol::from(format!("{}#{}", var_sym, self.rename_counter));
+        self.rename_counter += 1;
+        new_name
+    }
 }
 
 #[derive(PartialEq)]
@@ -406,9 +415,10 @@ impl<'l, 'r> SubstitutionVisitor<'l, 'r> {
                 match repl.exp.value {
                     UnannotatedExp_::Lambda(decls, mut body) => {
                         let loc = args.exp.loc;
+                        let params_from_decls = get_params_from_decls(self.inliner, &decls);
                         let (decls_for_let, bindings) = self.inliner.process_parameters(
                             loc,
-                            get_params_from_decls(&decls)
+                            params_from_decls
                                 .into_iter()
                                 .zip(get_args_from_exp(args))
                                 .map(|(s, e)| ((Var(Name::new(e.exp.loc, s)), e.ty.clone()), e)),
@@ -598,8 +608,7 @@ impl<'l, 'r> Visitor for RenamingVisitor<'l, 'r> {
     }
 
     fn var_decl(&mut self, _ty: &mut Type, var: &mut Var) {
-        let new_name = Symbol::from(format!("{}#{}", var.0.value, self.inliner.rename_counter));
-        self.inliner.rename_counter += 1;
+        let new_name = self.inliner.rename_symbol(&var.0.value);
         self.renamings
             .front_mut()
             .unwrap()
@@ -1094,16 +1103,23 @@ fn get_args_from_exp(args: &Exp) -> Vec<Exp> {
     }
 }
 
-fn get_params_from_decls(decls: &LValueList) -> Vec<Symbol> {
+fn get_params_from_decls(inliner: &mut Inliner, decls: &LValueList) -> Vec<Symbol> {
     decls
         .value
         .iter()
         .flat_map(|lv| match &lv.value {
-            LValue_::Var(v, _) => vec![v.0.value],
-            LValue_::Ignore => vec![],
+            LValue_::Var(v, _) => vec![Some(v.0.value)],
+            LValue_::Ignore => vec![None], // placeholder for "_"
             LValue_::Unpack(_, _, _, fields) | LValue_::BorrowUnpack(_, _, _, _, fields) => {
-                fields.iter().map(|(_, x, _)| *x).collect()
+                fields.iter().map(|(_, x, _)| Some(*x)).collect()
             },
+        })
+        .map(|opt_sym| {
+            if let Some(sym) = opt_sym {
+                sym
+            } else {
+                inliner.rename_symbol("_")
+            }
         })
         .collect()
 }

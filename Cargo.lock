@@ -1226,10 +1226,12 @@ name = "aptos-dkg-runtime"
 version = "0.1.0"
 dependencies = [
  "aptos-config",
+ "aptos-event-notifications",
  "aptos-network",
  "aptos-runtimes",
  "aptos-types",
  "aptos-validator-transaction-pool",
+ "futures-util",
  "serde",
  "tokio",
 ]
@@ -2419,10 +2421,12 @@ name = "aptos-jwk-consensus"
 version = "0.1.0"
 dependencies = [
  "aptos-config",
+ "aptos-event-notifications",
  "aptos-network",
  "aptos-runtimes",
  "aptos-types",
  "aptos-validator-transaction-pool",
+ "futures-util",
  "serde",
  "tokio",
 ]
