@@ -306,7 +306,7 @@ impl ProofCoordinator {
                                                 LogSchema::new(LogEvent::ProofOfStoreReady),
                                                 digest = digest,
                                                 batch_id = batch_id.id,
-                                            )
+                                            );
                                             proofs.push(proof);
                                         }
                                     },
