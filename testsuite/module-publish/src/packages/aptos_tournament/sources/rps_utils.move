@@ -157,4 +157,20 @@ module tournament::rps_utils {
         let hash_addition = b"random uuid";
         player_commit(player, game_address, action, hash_addition);
     }
+
+    #[test]
+    fun test_full_game_play() {
+        use aptos_framework::account;
+        let admin = account::create_account(@0xABC);
+        setup_tournament(&admin);
+        let player1 = account::create_account(@0xABCE);
+        let player2 = account::create_account(@0xABCF);
+        let fee_payer = account::create_account(@0xABC0);
+        let admin_address = signer::address_of(&admin);
+        setup_player(&player1, admin_address);
+        setup_player(&player2, admin_address);
+        start_new_round(&fee_payer, &admin, vector[signer::address_of(&player1), signer::address_of(&player2)]);
+        game_play(&player1, admin_address);
+        game_play(&player2, admin_address);
+    }
 }

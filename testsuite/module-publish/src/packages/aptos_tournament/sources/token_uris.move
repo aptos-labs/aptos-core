@@ -4,8 +4,7 @@ module tournament::token_uris {
     use tournament::misc_utils;
 
     friend tournament::token_manager;
-    #[test_only] friend tournament::rps_unit_tests;
-    #[test_only] friend tournament::test_utils;
+    #[test_only] friend tournament::rps_utils;
 
     const NUM_TOKEN_URIS: u64 = 250;
 

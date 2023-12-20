@@ -14,9 +14,6 @@ module tournament::trivia {
 
     friend tournament::aptos_tournament;
 
-    #[test_only] friend tournament::trivia_unit_tests;
-    #[test_only] friend tournament::main_unit_test;
-
     /// You are not the owner of the object.
     const E_NOT_OWNER: u64 = 0;
     /// The sha3_256(answer + challenge) you submitted don't match the original hashed answer.

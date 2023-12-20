@@ -15,7 +15,7 @@ module tournament::admin {
     const ENOT_AUTHORIZED: u64 = 0;
 
     #[test_only]
-    friend tournament::rps_unit_tests;
+    friend tournament::rps_utils;
 
     struct AdminStore has key, drop {
         signer_cap: SignerCapability,

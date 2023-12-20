@@ -14,11 +14,7 @@ module tournament::object_refs {
     friend tournament::round;
 
     #[test_only]
-    friend tournament::rps_unit_tests;
-    #[test_only]
-    friend tournament::main_unit_test;
-    #[test_only]
-    friend tournament::test_utils;
+    friend tournament::rps_utils;
 
     /// That object doesn't have valid Refs (capabilities) on it.
     const EOBJECT_HAS_NO_REFS: u64 = 0;
