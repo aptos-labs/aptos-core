@@ -19,7 +19,9 @@ use crate::{
     metrics::{increment_counter, increment_counter_multiple_labels, start_timer},
     stream_engine::{DataStreamEngine, StreamEngine},
     streaming_client::{NotificationFeedback, StreamRequest},
+    streaming_service::StreamUpdateNotification,
 };
+use aptos_channels::aptos_channel;
 use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
 use aptos_data_client::{
     global_summary::{AdvertisedData, GlobalDataSummary},
@@ -77,6 +79,10 @@ pub struct DataStream<T> {
     // The engine for this data stream
     stream_engine: StreamEngine,
 
+    // The stream update notifier (to notify the streaming service
+    // that the stream has been updated).
+    stream_update_notifier: aptos_channel::Sender<(), StreamUpdateNotification>,
+
     // The current queue of data client requests and pending responses. When the
     // request at the head of the queue completes (i.e., we receive a response),
     // a data notification can be created and sent along the stream.
@@ -121,6 +127,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         data_stream_config: DataStreamingServiceConfig,
         data_stream_id: DataStreamId,
         stream_request: &StreamRequest,
+        stream_update_notifier: aptos_channel::Sender<(), StreamUpdateNotification>,
         aptos_data_client: T,
         notification_id_generator: Arc<U64IdGenerator>,
         advertised_data: &AdvertisedData,
@@ -141,6 +148,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
             data_stream_id,
             aptos_data_client,
             stream_engine,
+            stream_update_notifier,
             sent_data_requests: None,
             spawned_tasks: vec![],
             notifications_to_responses: BTreeMap::new(),
@@ -374,10 +382,12 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
 
         // Send the request to the network
         let join_handle = spawn_request_task(
+            self.data_stream_id,
             data_client_request,
             self.aptos_data_client.clone(),
             pending_client_response.clone(),
             request_timeout_ms,
+            self.stream_update_notifier.clone(),
         );
         self.spawned_tasks.push(join_handle);
 
@@ -1386,10 +1396,12 @@ fn extract_response_error(
 }
 
 fn spawn_request_task<T: AptosDataClientInterface + Send + Clone + 'static>(
+    data_stream_id: DataStreamId,
     data_client_request: DataClientRequest,
     aptos_data_client: T,
     pending_response: PendingClientResponse,
     request_timeout_ms: u64,
+    stream_update_notifier: aptos_channel::Sender<(), StreamUpdateNotification>,
 ) -> JoinHandle<()> {
     // Update the requests sent counter
     increment_counter(
@@ -1488,6 +1500,10 @@ fn spawn_request_task<T: AptosDataClientInterface + Send + Clone + 'static>(
 
         // Save the response
         pending_response.lock().client_response = Some(client_response);
+
+        // Send a notification via the stream update notifier
+        let stream_update_notification = StreamUpdateNotification::new(data_stream_id);
+        let _ = stream_update_notifier.push((), stream_update_notification);
     })
 }
 
