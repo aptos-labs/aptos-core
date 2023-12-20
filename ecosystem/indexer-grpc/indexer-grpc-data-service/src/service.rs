@@ -436,6 +436,7 @@ async fn data_fetch(
         // Data is not ready yet in the cache.
         Ok(CacheBatchGetStatus::NotReady) => Ok(TransactionsDataStatus::AheadOfCache),
         Ok(CacheBatchGetStatus::Ok(transactions)) => {
+            let decoding_start_time = std::time::Instant::now();
             let size_in_bytes = transactions
                 .iter()
                 .map(|transaction| transaction.len())
@@ -464,20 +465,31 @@ async fn data_fetch(
                 Some(num_of_transactions as i64),
                 Some(request_metadata.clone()),
             );
+            log_grpc_step(
+                SERVICE_TYPE,
+                IndexerGrpcStep::DataServiceTxnsDecoded,
+                Some(starting_version as i64),
+                Some(starting_version as i64 + num_of_transactions as i64 - 1),
+                start_version_timestamp,
+                end_version_timestamp,
+                Some(decoding_start_time.elapsed().as_secs_f64()),
+                Some(size_in_bytes),
+                Some(num_of_transactions as i64),
+                Some(request_metadata.clone()),
+            );
 
             Ok(TransactionsDataStatus::Success(transactions))
         },
         Ok(CacheBatchGetStatus::EvictedFromCache) => {
             // Data is evicted from the cache. Fetch from file store.
-            let transactions = file_store_operator
-                .get_transactions(starting_version)
+            let (transactions, io_duration, decoding_duration) = file_store_operator
+                .get_transactions_with_durations(starting_version)
                 .await?;
             let size_in_bytes = transactions
                 .iter()
                 .map(|transaction| transaction.encoded_len())
                 .sum::<usize>();
             let num_of_transactions = transactions.len();
-            let duration_in_secs = current_batch_start_time.elapsed().as_secs_f64();
             let start_version_timestamp = transactions.first().unwrap().timestamp.as_ref();
             let end_version_timestamp = transactions.last().unwrap().timestamp.as_ref();
             log_grpc_step(
@@ -487,7 +499,19 @@ async fn data_fetch(
                 Some(starting_version as i64 + num_of_transactions as i64 - 1),
                 start_version_timestamp,
                 end_version_timestamp,
-                Some(duration_in_secs),
+                Some(io_duration),
+                Some(size_in_bytes),
+                Some(num_of_transactions as i64),
+                Some(request_metadata.clone()),
+            );
+            log_grpc_step(
+                SERVICE_TYPE,
+                IndexerGrpcStep::DataServiceTxnsDecoded,
+                Some(starting_version as i64),
+                Some(starting_version as i64 + num_of_transactions as i64 - 1),
+                start_version_timestamp,
+                end_version_timestamp,
+                Some(decoding_duration),
                 Some(size_in_bytes),
                 Some(num_of_transactions as i64),
                 Some(request_metadata.clone()),

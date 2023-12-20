@@ -325,11 +325,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         match cache_coverage_status {
             Ok(CacheCoverageStatus::CacheHit(v)) => {
                 let versions = (start_version..start_version + v)
-                    .map(|e| 
-                    {
-                        let key = CacheEntryKey::new(e, self.storage_format).to_string();
-                        key
-                    })
+                    .map(|e| CacheEntryKey::new(e, self.storage_format).to_string())
                     .collect::<Vec<String>>();
                 let encoded_transactions: Vec<Vec<u8>> = self.conn.mget(versions).await?;
                 Ok(CacheBatchGetStatus::Ok(encoded_transactions))

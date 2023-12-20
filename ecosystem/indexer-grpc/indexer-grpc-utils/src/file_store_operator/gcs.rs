@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    counters::{log_grpc_step, IndexerGrpcStep},
     file_store_operator::{FileStoreOperator, METADATA_FILE_NAME},
     storage_format::{
         FileEntry, FileEntryBuilder, FileEntryKey, FileStoreMetadata, StorageFormat,
@@ -200,11 +201,23 @@ impl FileStoreOperator for GcsFileStoreOperator {
             batch_size % FILE_ENTRY_TRANSACTION_COUNT as usize == 0,
             "The number of transactions to upload has to be multiplier of BLOB_STORAGE_SIZE."
         );
-
+        let start_time = std::time::Instant::now();
         let bucket_name = self.bucket_name.clone();
         let file_entry: FileEntry =
             FileEntryBuilder::new(transactions, self.storage_format).try_into()?;
         let file_entry_key = FileEntryKey::new(start_version, self.storage_format).to_string();
+        log_grpc_step(
+            "file_worker",
+            IndexerGrpcStep::FilestoreUploadTxns,
+            Some(start_version as i64),
+            Some((start_version + FILE_ENTRY_TRANSACTION_COUNT - 1) as i64),
+            None,
+            None,
+            Some(start_time.elapsed().as_secs_f64()),
+            None,
+            Some(FILE_ENTRY_TRANSACTION_COUNT as i64),
+            None,
+        );
         Object::create(
             bucket_name.clone().as_str(),
             file_entry.into_inner(),
