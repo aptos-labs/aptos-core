@@ -1,6 +1,25 @@
+use crate::report::{Mutation, Range};
 use move_command_line_common::files::FileHash;
 use move_compiler::parser::ast::{BinOp, BinOp_, UnaryOp};
 use std::fmt;
+
+/// Mutation result that contains the mutated source code and the modification that was applied.
+pub struct MutantInfo {
+    /// The mutated source code.
+    pub mutated_source: String,
+    /// The modification that was applied.
+    pub mutation: Mutation,
+}
+
+impl MutantInfo {
+    /// Creates a new mutation result.
+    pub fn new(mutated_source: String, mutation: Mutation) -> Self {
+        Self {
+            mutated_source,
+            mutation,
+        }
+    }
+}
 
 /// The mutation operator to apply.
 #[derive(Debug, Copy, Clone)]
@@ -12,12 +31,12 @@ pub enum MutationOperator {
 impl MutationOperator {
     /// Applies the mutation operator to the given source code.
     /// Returns differently mutated source code listings in a vector.
-    pub fn apply(&self, source: &str) -> Vec<String> {
+    pub fn apply(&self, source: &str) -> Vec<MutantInfo> {
         match self {
             MutationOperator::BinaryOperator(bin_op) => {
                 let start = bin_op.loc.start() as usize;
                 let end = bin_op.loc.end() as usize;
-                let op = &source[start..end];
+                let cur_op = &source[start..end];
 
                 // Group of exchangeable binary operators - we only want to replace the operator with a different one
                 // within the same group.
@@ -35,17 +54,26 @@ impl MutationOperator {
                 };
 
                 ops.into_iter()
-                    .filter(|v| op != *v)
+                    .filter(|v| cur_op != *v)
                     .map(|op| {
                         let mut mutated_source = source.to_string();
                         mutated_source.replace_range(start..end, op);
-                        mutated_source
+                        MutantInfo::new(
+                            mutated_source,
+                            Mutation::new(
+                                Range::new(start, end),
+                                "binary_operator_replacement".to_string(),
+                                cur_op.to_string(),
+                                op.to_string(),
+                            ),
+                        )
                     })
                     .collect()
             },
             MutationOperator::UnaryOperator(unary_op) => {
                 let start = unary_op.loc.start() as usize;
                 let end = unary_op.loc.end() as usize;
+                let cur_op = &source[start..end];
 
                 // For unary operator mutations, we only need to replace the operator with a space (to ensure the same file length)
                 vec![" "]
@@ -53,7 +81,15 @@ impl MutationOperator {
                     .map(|op| {
                         let mut mutated_source = source.to_string();
                         mutated_source.replace_range(start..end, op);
-                        mutated_source
+                        MutantInfo::new(
+                            mutated_source,
+                            Mutation::new(
+                                Range::new(start, end),
+                                "unary_operator_replacement".to_string(),
+                                cur_op.to_string(),
+                                op.to_string(),
+                            ),
+                        )
                     })
                     .collect()
             },
@@ -109,7 +145,11 @@ mod tests {
         let operator = MutationOperator::BinaryOperator(bin_op);
         let source = "*";
         let expected = vec!["+", "-", "/", "%"];
-        assert_eq!(operator.apply(source), expected);
+        let result = operator.apply(source);
+        assert_eq!(result.len(), expected.len());
+        for (i, r) in result.iter().enumerate() {
+            assert_eq!(r.mutated_source, expected[i]);
+        }
     }
 
     #[test]
@@ -122,7 +162,11 @@ mod tests {
         let operator = MutationOperator::UnaryOperator(unary_op);
         let source = "!";
         let expected = vec![" "];
-        assert_eq!(operator.apply(source), expected);
+        let result = operator.apply(source);
+        assert_eq!(result.len(), expected.len());
+        for (i, r) in result.iter().enumerate() {
+            assert_eq!(r.mutated_source, expected[i]);
+        }
     }
 
     #[test]

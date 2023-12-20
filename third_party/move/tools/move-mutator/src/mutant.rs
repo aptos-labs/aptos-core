@@ -1,4 +1,4 @@
-use crate::operator::MutationOperator;
+use crate::operator::{MutantInfo, MutationOperator};
 use move_command_line_common::files::FileHash;
 use std::fmt;
 
@@ -22,7 +22,7 @@ impl Mutant {
 
     /// Applies the mutation operator to the given source code, by calling the mutation operator's apply method.
     /// Returns differently mutated source code listings in a vector.
-    pub fn apply(&self, source: &str) -> Vec<String> {
+    pub fn apply(&self, source: &str) -> Vec<MutantInfo> {
         self.operator.apply(source)
     }
 }
@@ -72,6 +72,10 @@ mod tests {
         let mutant = Mutant::new(operator);
         let source = "+";
         let expected = vec!["-", "*", "/", "%"];
-        assert_eq!(mutant.apply(source), expected);
+        let result = mutant.apply(source);
+        assert_eq!(result.len(), expected.len());
+        for (i, r) in result.iter().enumerate() {
+            assert_eq!(r.mutated_source, expected[i]);
+        }
     }
 }
