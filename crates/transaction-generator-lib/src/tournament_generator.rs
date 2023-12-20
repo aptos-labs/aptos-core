@@ -91,7 +91,7 @@ impl UserModuleTransactionGenerator for TournamentStartNewRoundTransactionGenera
                 return None;
             }
             let addresses: Vec<_> = batch.iter().map(|a| a.address()).collect();
-            println!("Tournament Generator: submitting transaction: start_new_round: {:?}", addresses);
+            // println!("Tournament Generator: submitting transaction: start_new_round: {:?}", addresses);
             let builder = txn_factory.payload(start_new_round(package.get_module_id("rps_utils")));
             done.add_to_pool(batch);
             Some(account.sign_multi_agent_with_transaction_builder(vec![publisher], builder))
@@ -148,7 +148,7 @@ impl UserModuleTransactionGenerator for TournamentMovePlayersToRoundTransactionG
                 return None;
             }
             let addresses = batch.iter().map(|a| a.address()).collect();
-            println!("Tournament Generator: submitting transaction: move_players_to_round: {:?}", addresses);
+            // println!("Tournament Generator: submitting transaction: move_players_to_round: {:?}", addresses);
             let builder = txn_factory.payload(move_players_to_round(package.get_module_id("rps_utils"), addresses));
             joined.add_to_pool(batch);
             Some(account.sign_multi_agent_with_transaction_builder(vec![publisher], builder))

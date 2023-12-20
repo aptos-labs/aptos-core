@@ -5,14 +5,15 @@ module tournament::trivia {
     use std::vector;
     use aptos_framework::object::{Self, Object};
 
-    use aptos_token_objects::token::Token;
-
     use tournament::admin;
     use tournament::round;
-    use tournament::token_manager;
+    use tournament::token_manager::{Self, TournamentPlayerToken};
     use tournament::tournament_manager;
 
     friend tournament::aptos_tournament;
+
+    #[test_only] friend tournament::trivia_unit_tests;
+    #[test_only] friend tournament::main_unit_test;
 
     /// You are not the owner of the object.
     const E_NOT_OWNER: u64 = 0;
@@ -28,7 +29,6 @@ module tournament::trivia {
     const E_ROOM_IS_LIMITED: u64 = 5;
 
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct TriviaGame has key {}
 
     // // Updated by the admin- this contains the questions and answers for the game.
@@ -65,7 +65,7 @@ module tournament::trivia {
 
     public(friend) fun add_players_returning(
         tournament_address: address,
-        players: vector<Object<Token>>
+        players: vector<Object<TournamentPlayerToken>>
     ): vector<address> {
         let admin_signer = admin::get_admin_signer();
         let tournament_signer = tournament_manager::get_tournament_signer(&admin_signer, tournament_address);
@@ -114,7 +114,7 @@ module tournament::trivia {
         // the user
         user: &signer,
         // the user's player object (presumably, we verify it is)
-        player_obj: Object<Token>,
+        player_obj: Object<TournamentPlayerToken>,
         submitted_answer_index: u8
     ) acquires TriviaAnswer {
         let player_address = signer::address_of(user);
@@ -123,7 +123,7 @@ module tournament::trivia {
         let player_obj_addr = object::object_address(&player_obj);
         assert!(exists<TriviaAnswer>(player_obj_addr), E_NOT_A_TRIVIA_PLAYER);
 
-        let player_obj = object::convert<Token, TriviaAnswer>(player_obj);
+        let player_obj = object::convert<TournamentPlayerToken, TriviaAnswer>(player_obj);
         let user_addr = signer::address_of(user);
         assert!(object::is_owner(player_obj, user_addr), E_NOT_OWNER);
 
@@ -133,10 +133,10 @@ module tournament::trivia {
         answer.answer_index = submitted_answer_index;
     }
 
-    public fun handle_players_game_end(
+    public entry fun handle_players_game_end(
         admin: &signer,
         tournament_address: address,
-        players: vector<Object<Token>>,
+        players: vector<Object<TournamentPlayerToken>>,
     ) acquires TriviaAnswer, TriviaQuestion {
         let tournament_signer = admin::get_tournament_owner_signer_as_admin(admin, tournament_address);
 
@@ -153,7 +153,7 @@ module tournament::trivia {
 
     inline fun handle_player_game_end(
         tournament_signer: &signer,
-        player: &Object<Token>,
+        player: &Object<TournamentPlayerToken>,
         expected_answer: u8,
     ) acquires TriviaAnswer {
         let token_address = object::object_address(player);
@@ -193,11 +193,16 @@ module tournament::trivia {
 
     public fun destroy_and_cleanup_round(admin_signer: &signer, round_address: address) acquires TriviaQuestion {
         let admin = admin::get_admin_signer_as_admin(admin_signer);
-        move_from<TriviaQuestion>(round_address);
+        if (exists<TriviaQuestion>(round_address)) {
+            move_from<TriviaQuestion>(round_address);
+        };
         round::destroy_and_cleanup_round<TriviaGame>(&admin, round_address);
     }
 
-    public fun destroy_and_cleanup_current_round(admin_signer: &signer, tournament_address: address) acquires TriviaQuestion {
+    public fun destroy_and_cleanup_current_round(
+        admin_signer: &signer,
+        tournament_address: address
+    ) acquires TriviaQuestion {
         let round_address = tournament_manager::get_round_address(tournament_address);
         destroy_and_cleanup_round(admin_signer, round_address);
     }

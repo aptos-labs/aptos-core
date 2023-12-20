@@ -1,5 +1,6 @@
 module tournament::misc_utils {
     use std::bcs;
+    use std::signer;
     use std::string::{Self, String};
     use std::vector;
     use aptos_std::string_utils;
@@ -33,6 +34,10 @@ module tournament::misc_utils {
         string::append(&mut s, any_value_as_string);
 
         s
+    }
+
+    public inline fun signers_to_addresses(signers: &vector<signer>): vector<address> {
+        vector::map_ref(signers, |signer| { signer::address_of(signer) })
     }
 
     public inline fun split_fully_qualified_struct(struct_path: String): (String, String, String) {

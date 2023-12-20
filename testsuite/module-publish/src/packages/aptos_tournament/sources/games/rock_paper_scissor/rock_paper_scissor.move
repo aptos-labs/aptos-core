@@ -4,17 +4,14 @@ module tournament::rock_paper_scissor {
     use std::option::{Self, Option};
     use std::signer;
     use std::string::{String, utf8};
-    use std::vector;
     use std::table::{Self, Table};
+    use std::vector;
     use aptos_framework::object::Self;
 
-    use aptos_token_objects::token::Token;
-
     use tournament::admin;
-    use tournament::admin::get_tournament_owner_signer_from_object_owner;
     use tournament::room;
     use tournament::round;
-    use tournament::token_manager;
+    use tournament::token_manager::{Self, TournamentPlayerToken};
     use tournament::tournament_manager;
 
     friend tournament::aptos_tournament;
@@ -44,7 +41,6 @@ module tournament::rock_paper_scissor {
         token_address: address,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct RockPaperScissorsGame has key {}
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -69,22 +65,6 @@ module tournament::rock_paper_scissor {
         my_address.inner
     }
 
-    public fun get_player_to_game_mapping(
-        game_addresses: &vector<address>
-    ): Table<address, MyAddress> acquires RockPaperScissor {
-        let player_to_game_mapping = table::new();
-        // let player_to_game_mapping = vector::empty<(address, address)>();
-        vector::for_each_ref(game_addresses, |game_address| {
-            let game = borrow_global<RockPaperScissor>(*game_address);
-            // vector::push_back(&mut player_to_game_mapping, (game.player1.address, *game_address));
-            // vector::push_back(&mut player_to_game_mapping, (game.player2.address, *game_address));
-            table::upsert(&mut player_to_game_mapping, game.player2.address, MyAddress {
-                inner: *game_address
-            });
-        });
-        player_to_game_mapping
-    }
-
     public fun update_player_to_game_mapping(
         game_addresses: &vector<address>,
         player_to_game_mapping: &mut Table<address, MyAddress>,
@@ -92,17 +72,19 @@ module tournament::rock_paper_scissor {
         // let player_to_game_mapping = vector::empty<(address, address)>();
         vector::for_each_ref(game_addresses, |game_address| {
             let game = borrow_global<RockPaperScissor>(*game_address);
-            // vector::push_back(&mut player_to_game_mapping, (game.player1.address, *game_address));
-            // vector::push_back(&mut player_to_game_mapping, (game.player2.address, *game_address));
+            table::upsert(player_to_game_mapping, game.player1.address, MyAddress {
+                inner: *game_address
+            });
             table::upsert(player_to_game_mapping, game.player2.address, MyAddress {
                 inner: *game_address
             });
         });
     }
 
+    /// Returns room addresses
     public(friend) fun add_players_returning(
         tournament_address: address,
-        players: vector<Object<Token>>
+        players: vector<Object<TournamentPlayerToken>>
     ): vector<address> {
         let tournament_signer = admin::get_tournament_owner_signer(tournament_address);
         let round_address = tournament_manager::get_round_address(tournament_address);
@@ -110,7 +92,12 @@ module tournament::rock_paper_scissor {
         let room_signers = round::add_players<RockPaperScissorsGame>(&tournament_signer, round_address, players);
         assert!(option::is_some(&room_signers), EROOM_NOT_LIMITED);
         let room_signers = option::extract(&mut room_signers);
-        vector::for_each_ref(&room_signers, |room_signer| {
+        add_players_to_rooms_returning(&room_signers)
+    }
+
+    /// Returns room addresses
+    public(friend) fun add_players_to_rooms_returning(room_signers: &vector<signer>): vector<address> {
+        vector::for_each_ref(room_signers, |room_signer| {
             let room_address = signer::address_of(room_signer);
             let players = room::get_players<RockPaperScissorsGame>(room_address);
             let players = option::extract(&mut players);
@@ -125,10 +112,10 @@ module tournament::rock_paper_scissor {
 
             move_to<RockPaperScissor>(room_signer, game);
         });
-        vector::map_ref(&room_signers, |room_signer|{ signer::address_of(room_signer) })
+        tournament::misc_utils::signers_to_addresses(room_signers)
     }
 
-    fun token_to_new_player(token: Object<Token>): Player {
+    fun token_to_new_player(token: Object<TournamentPlayerToken>): Player {
         let token_address = object::object_address(&token);
         Player {
             committed_action: option::none(),
@@ -189,7 +176,7 @@ module tournament::rock_paper_scissor {
         };
 
         if (is_game_complete(game_address)) {
-            let owner = get_tournament_owner_signer_from_object_owner(game_address);
+            let owner = admin::get_admin_signer();
             let (winners, losers) = force_close_game(&owner, game_address);
             return (true, winners, losers)
         };
@@ -228,11 +215,11 @@ module tournament::rock_paper_scissor {
 
         // Convert token addresses to user addresses
         let winners = vector::map<address, address>(winners, |winner| {
-            let token_obj = object::address_to_object<Token>(winner);
+            let token_obj = object::address_to_object<TournamentPlayerToken>(winner);
             object::owner(token_obj)
         });
         let losers = vector::map<address, address>(losers, |loser| {
-            let token_obj = object::address_to_object<Token>(loser);
+            let token_obj = object::address_to_object<TournamentPlayerToken>(loser);
             let loser_user = object::owner(token_obj);
             // Delete the tokens while we go
             token_manager::mark_token_loss(owner, loser);
@@ -335,11 +322,11 @@ module tournament::rock_paper_scissor {
     ): (vector<address>, vector<address>) acquires RockPaperScissor {
         let (winner_tokens, loser_tokens) = get_results(game_address);
         let winner_players = vector::map(winner_tokens, |token| {
-            let token_obj = object::address_to_object<Token>(token);
+            let token_obj = object::address_to_object<TournamentPlayerToken>(token);
             object::owner(token_obj)
         });
         let loser_players = vector::map(loser_tokens, |token| {
-            let token_obj = object::address_to_object<Token>(token);
+            let token_obj = object::address_to_object<TournamentPlayerToken>(token);
             object::owner(token_obj)
         });
         (winner_players, loser_players)
@@ -381,19 +368,6 @@ module tournament::rock_paper_scissor {
         let rock = b"Rock";
         let paper = b"Paper";
         let scissor = b"Scissor";
-
-        // TODO: Remove after debugging
-        // std::debug::print(&std::string::utf8(b"------------------------------------"));
-        // let player_1_and_action = std::string_utils::to_string<address>(&player1);
-        // // player_1_and_action = std::string::sub_string(&player_1_and_action, 1, 7);
-        // std::string::append_utf8(&mut player_1_and_action, b": ");
-        // std::string::append_utf8(&mut player_1_and_action, action1);
-        // let player_2_and_action = std::string_utils::to_string<address>(&player2);
-        // // player_2_and_action = std::string::sub_string(&player_2_and_action, 1, 7);
-        // std::string::append_utf8(&mut player_2_and_action, b": ");
-        // std::string::append_utf8(&mut player_2_and_action, action2);
-        // std::debug::print(&player_1_and_action);
-        // std::debug::print(&player_2_and_action);
 
         if (action1 == rock && action2 == paper) {
             vector::push_back(&mut winners, player2);

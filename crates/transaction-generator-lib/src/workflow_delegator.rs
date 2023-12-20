@@ -101,7 +101,7 @@ impl TransactionGenerator for WorkflowTxnGenerator {
         }
 
         sample!(
-            SampleRate::Duration(Duration::from_millis(500)),
+            SampleRate::Duration(Duration::from_millis(2000)),
             info!("Cur stage: {}, pool sizes: {:?}", stage, self.pool_per_stage.iter().map(|p| p.len()).collect::<Vec<_>>());
         );
 
