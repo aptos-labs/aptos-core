@@ -443,6 +443,8 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::BN254_STRUCTURES,
         FeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL,
         FeatureFlag::WEBAUTHN_SIGNATURE,
+        FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
+        FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM,
     ]
 }
 

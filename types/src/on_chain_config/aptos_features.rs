@@ -76,6 +76,10 @@ impl Default for Features {
         features.enable(SIGNATURE_CHECKER_V2_SCRIPT_FIX);
         features.enable(AGGREGATOR_V2_API);
         features.enable(BN254_STRUCTURES);
+        features.enable(AGGREGATOR_V2_DELAYED_FIELDS);
+        features.enable(RESOURCE_GROUPS);
+        features.enable(RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM);
+        features.enable(CONCURRENT_ASSETS);
         features
     }
 }
