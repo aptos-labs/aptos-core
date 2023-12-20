@@ -230,6 +230,7 @@ impl RawData for RawDataServerWrapper {
                         current_version,
                         &mut cache_operator,
                         file_store_operator.as_ref(),
+                        request_metadata.clone(),
                     )
                     .await
                     {
@@ -294,7 +295,6 @@ impl RawData for RawDataServerWrapper {
                     let resp_items = get_transactions_responses_builder(
                         transaction_data,
                         chain_id as u32,
-                        request_metadata.clone(),
                     );
                     let data_latency_in_secs = resp_items
                         .last()
@@ -409,9 +409,7 @@ impl RawData for RawDataServerWrapper {
 fn get_transactions_responses_builder(
     transactions: Vec<Transaction>,
     chain_id: u32,
-    request_metadata: IndexerGrpcRequestMetadata,
 ) -> Vec<TransactionsResponse> {
-    let decode_start_time = Instant::now();
     let chunks = chunk_transactions(transactions, MESSAGE_SIZE_LIMIT);
     let resp_items = chunks
         .into_iter()
@@ -420,29 +418,6 @@ fn get_transactions_responses_builder(
             transactions: chunk,
         })
         .collect::<Vec<TransactionsResponse>>();
-
-    let overall_size_in_bytes = resp_items
-        .iter()
-        .map(|resp_item| resp_item.encoded_len())
-        .sum::<usize>();
-    let overall_start_txn = resp_items.first().unwrap().transactions.first().unwrap();
-    let overall_end_txn = resp_items.last().unwrap().transactions.last().unwrap();
-    let overall_start_version = overall_start_txn.version;
-    let overall_end_version = overall_end_txn.version;
-    let overall_start_txn_timestamp = overall_start_txn.clone().timestamp;
-    let overall_end_txn_timestamp = overall_end_txn.clone().timestamp;
-    log_grpc_step(
-        SERVICE_TYPE,
-        IndexerGrpcStep::DataServiceTxnsDecoded,
-        Some(overall_start_version as i64),
-        Some(overall_end_version as i64),
-        overall_start_txn_timestamp.as_ref(),
-        overall_end_txn_timestamp.as_ref(),
-        Some(decode_start_time.elapsed().as_secs_f64()),
-        Some(overall_size_in_bytes),
-        Some((overall_end_version - overall_start_version + 1) as i64),
-        Some(request_metadata.clone()),
-    );
     resp_items
 }
 
@@ -452,6 +427,7 @@ async fn data_fetch(
     starting_version: u64,
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
     file_store_operator: &dyn FileStoreOperator,
+    request_metadata: IndexerGrpcRequestMetadata,
 ) -> anyhow::Result<TransactionsDataStatus> {
     // At this point, no starting and ending versions are considered as fatal errors.
     let (cache_starting_version, cache_ending_version) = cache_operator
@@ -462,14 +438,40 @@ async fn data_fetch(
         )?;
 
     if starting_version < cache_starting_version {
-        // Data is not ready yet in the cache.
-        let transactions = file_store_operator
-            .get_transactions(starting_version)
+        // Data in file store.
+        let (transactions, io_duration, decoding_duration) = file_store_operator
+            .get_transactions_with_durations(starting_version)
             .await
             .context(format!(
                 "Fetching data failed from GCS, version {}",
                 starting_version
             ))?;
+        let transactions_count = transactions.len() as u64;
+        let size_in_bytes = transactions.iter().map(|t| t.encoded_len()).sum::<usize>();
+        log_grpc_step(
+            SERVICE_TYPE,
+            IndexerGrpcStep::DataServiceDataFetchedFilestore,
+            Some(starting_version as i64),
+            Some((starting_version + 1 - transactions_count) as i64),
+            transactions.first().unwrap().timestamp.as_ref(),
+            transactions.last().unwrap().timestamp.as_ref(),
+            Some(io_duration),
+            Some(size_in_bytes),
+            Some(transactions_count as i64),
+            Some(request_metadata.clone()),
+        );
+        log_grpc_step(
+            SERVICE_TYPE,
+            IndexerGrpcStep::DataServiceTxnsDecoded,
+            Some(starting_version as i64),
+            Some((starting_version + 1 - transactions_count) as i64),
+            transactions.first().unwrap().timestamp.as_ref(),
+            transactions.last().unwrap().timestamp.as_ref(),
+            Some(decoding_duration),
+            Some(size_in_bytes),
+            Some(transactions_count as i64),
+            Some(request_metadata),
+        );
         Ok(TransactionsDataStatus::Success(transactions))
     } else {
         let transactions_count = std::cmp::min(
@@ -480,12 +482,37 @@ async fn data_fetch(
             // Data is not ready yet in the cache.
             return Ok(TransactionsDataStatus::AheadOfCache);
         }
-        Ok(TransactionsDataStatus::Success(
-            cache_operator
-                .get_transactions(starting_version, transactions_count)
-                .await
-                .context("[Data Service] Failed to get transactions from cache.")?,
-        ))
+        let (transactions, io_duration, decoding_duration) = cache_operator
+            .get_transactions_with_durations(starting_version, transactions_count)
+            .await
+            .context("[Data Service] Failed to get transactions from cache.")?;
+        let size_in_bytes = transactions.iter().map(|t| t.encoded_len()).sum::<usize>();
+        log_grpc_step(
+            SERVICE_TYPE,
+            IndexerGrpcStep::DataServiceDataFetchedCache,
+            Some(starting_version as i64),
+            Some((starting_version + 1 - transactions_count) as i64),
+            transactions.first().unwrap().timestamp.as_ref(),
+            transactions.last().unwrap().timestamp.as_ref(),
+            Some(io_duration),
+            Some(size_in_bytes),
+            Some(transactions_count as i64),
+            Some(request_metadata.clone()),
+        );
+        log_grpc_step(
+            SERVICE_TYPE,
+            IndexerGrpcStep::DataServiceTxnsDecoded,
+            Some(starting_version as i64),
+            Some((starting_version + 1 - transactions_count) as i64),
+            transactions.first().unwrap().timestamp.as_ref(),
+            transactions.last().unwrap().timestamp.as_ref(),
+            Some(decoding_duration),
+            Some(size_in_bytes),
+            Some(transactions_count as i64),
+            Some(request_metadata),
+        );
+
+        Ok(TransactionsDataStatus::Success(transactions))
     }
 }
 

@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::storage_format::{CacheEntry, CacheEntryBuilder, CacheEntryKey, StorageFormat};
+use crate::{
+    counters::{log_grpc_step, IndexerGrpcStep},
+    storage_format::{CacheEntry, CacheEntryBuilder, CacheEntryKey, StorageFormat},
+};
 use anyhow::{ensure, Context};
 use aptos_protos::transaction::v1::Transaction;
 use redis::{AsyncCommands, RedisResult};
@@ -156,7 +159,14 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         &mut self,
         transactions: Vec<Transaction>,
     ) -> anyhow::Result<()> {
+        let start_version = transactions.first().unwrap().version;
+        let end_version = transactions.last().unwrap().version;
+        let num_transactions = transactions.len();
+        let start_txn_timestamp = transactions.first().unwrap().timestamp.clone();
+        let end_txn_timestamp = transactions.last().unwrap().timestamp.clone();
+        let mut size_in_bytes = 0;
         let mut redis_pipeline = redis::pipe();
+        let start_time = std::time::Instant::now();
         for transaction in transactions {
             let version = transaction.version;
             let cache_key = CacheEntryKey::new(version, self.storage_format).to_string();
@@ -166,10 +176,12 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
                 .map_or(0, |t| t.seconds as u64);
             let cache_entry_builder = CacheEntryBuilder::new(transaction, self.storage_format);
             let cache_entry: CacheEntry = cache_entry_builder.try_into()?;
+            let bytes = cache_entry.into_inner();
+            size_in_bytes += bytes.len();
             redis_pipeline
                 .cmd("SET")
                 .arg(cache_key)
-                .arg(cache_entry.into_inner())
+                .arg(bytes)
                 .arg("EX")
                 .arg(get_ttl_in_seconds(timestamp_in_seconds))
                 .ignore();
@@ -183,6 +195,20 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
                     .ignore();
             }
         }
+        // Note: this method is and should be only used by `cache_worker`.
+        let service_type = "cache_worker";
+        log_grpc_step(
+            service_type,
+            IndexerGrpcStep::CacheWorkerTxnEncoded,
+            Some(start_version as i64),
+            Some(end_version as i64),
+            start_txn_timestamp.as_ref(),
+            end_txn_timestamp.as_ref(),
+            Some(start_time.elapsed().as_secs_f64()),
+            Some(size_in_bytes),
+            Some(num_transactions as i64),
+            None,
+        );
 
         let redis_result: RedisResult<()> =
             redis_pipeline.query_async::<_, _>(&mut self.conn).await;
@@ -221,12 +247,12 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         }
     }
 
-    /// Fail if not all transactions requested are returned
-    pub async fn get_transactions(
+    pub async fn get_transactions_with_durations(
         &mut self,
         start_version: u64,
         transaction_count: u64,
-    ) -> anyhow::Result<Vec<Transaction>> {
+    ) -> anyhow::Result<(Vec<Transaction>, f64, f64)> {
+        let start_time = std::time::Instant::now();
         let versions = (start_version..start_version + transaction_count)
             .map(|e| CacheEntryKey::new(e, self.storage_format).to_string())
             .collect::<Vec<String>>();
@@ -235,7 +261,8 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
             .mget(versions)
             .await
             .context("Failed to mget from Redis")?;
-
+        let io_duration = start_time.elapsed().as_secs_f64();
+        let start_time = std::time::Instant::now();
         let mut transactions = vec![];
         for encoded_transaction in encoded_transactions {
             let cache_entry: CacheEntry =
@@ -249,6 +276,19 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
             transactions.len() == transaction_count as usize,
             "Failed to get all transactions from cache."
         );
+        let decoding_duration = start_time.elapsed().as_secs_f64();
+        Ok((transactions, io_duration, decoding_duration))
+    }
+
+    /// Fail if not all transactions requested are returned
+    pub async fn get_transactions(
+        &mut self,
+        start_version: u64,
+        transaction_count: u64,
+    ) -> anyhow::Result<Vec<Transaction>> {
+        let (transactions, _, _) = self
+            .get_transactions_with_durations(start_version, transaction_count)
+            .await?;
         Ok(transactions)
     }
 }

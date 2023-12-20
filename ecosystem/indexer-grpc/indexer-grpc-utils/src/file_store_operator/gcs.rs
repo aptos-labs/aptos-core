@@ -59,20 +59,14 @@ impl FileStoreOperator for GcsFileStoreOperator {
             .expect("Failed to read bucket.");
     }
 
-    /// Gets the transactions files from the file store. version has to be a multiple of BLOB_STORAGE_SIZE.
-    async fn get_transactions(&self, version: u64) -> anyhow::Result<Vec<Transaction>> {
+    fn storage_format(&self) -> StorageFormat {
+        self.storage_format
+    }
+
+    async fn get_transactions_bytes(&self, version: u64) -> anyhow::Result<Vec<u8>> {
         let file_entry_key = FileEntryKey::new(version, self.storage_format).to_string();
         match Object::download(&self.bucket_name, file_entry_key.as_str()).await {
-            Ok(file) => {
-                let transactions_in_storage: TransactionsInStorage =
-                    FileEntry::from_bytes(file, StorageFormat::JsonBase64UncompressedProto)
-                        .try_into()?;
-                Ok(transactions_in_storage
-                    .transactions
-                    .into_iter()
-                    .skip((version % FILE_ENTRY_TRANSACTION_COUNT) as usize)
-                    .collect())
-            },
+            Ok(file) => Ok(file),
             Err(cloud_storage::Error::Other(err)) => {
                 if err.contains("No such object: ") {
                     anyhow::bail!("[Indexer File] Transactions file not found. Gap might happen between cache and file store. {}", err)
@@ -91,6 +85,32 @@ impl FileStoreOperator for GcsFileStoreOperator {
             },
         }
     }
+
+    // /// Gets the transactions files from the file store. version has to be a multiple of BLOB_STORAGE_SIZE.
+    // async fn get_transactions(&self, version: u64) -> anyhow::Result<Vec<Transaction>> {
+    //     let file_entry_key = FileEntryKey::new(version, self.storage_format).to_string();
+    //     match Object::download(&self.bucket_name, file_entry_key.as_str()).await {
+    //         Ok(file) => {
+
+    //         },
+    //         Err(cloud_storage::Error::Other(err)) => {
+    //             if err.contains("No such object: ") {
+    //                 anyhow::bail!("[Indexer File] Transactions file not found. Gap might happen between cache and file store. {}", err)
+    //             } else {
+    //                 anyhow::bail!(
+    //                     "[Indexer File] Error happens when transaction file. {}",
+    //                     err
+    //                 );
+    //             }
+    //         },
+    //         Err(err) => {
+    //             anyhow::bail!(
+    //                 "[Indexer File] Error happens when transaction file. {}",
+    //                 err
+    //             );
+    //         },
+    //     }
+    // }
 
     /// Gets the metadata from the file store. Operator will panic if error happens when accessing the metadata file(except not found).
     async fn get_file_store_metadata(&self) -> Option<FileStoreMetadata> {

@@ -50,21 +50,16 @@ impl FileStoreOperator for LocalFileStoreOperator {
         }
     }
 
-    async fn get_transactions(&self, version: u64) -> anyhow::Result<Vec<Transaction>> {
+    fn storage_format(&self) -> StorageFormat {
+        self.storage_format
+    }
+
+    async fn get_transactions_bytes(&self, version: u64) -> anyhow::Result<Vec<u8>> {
         let file_entry_key =
             FileEntryKey::new(version, StorageFormat::JsonBase64UncompressedProto).to_string();
         let file_path = self.path.join(file_entry_key);
         match tokio::fs::read(file_path).await {
-            Ok(file) => {
-                let transactions_in_storage: TransactionsInStorage =
-                    FileEntry::from_bytes(file, StorageFormat::JsonBase64UncompressedProto)
-                        .try_into()?;
-                Ok(transactions_in_storage
-                    .transactions
-                    .into_iter()
-                    .skip((version % FILE_ENTRY_TRANSACTION_COUNT) as usize)
-                    .collect())
-            },
+            Ok(file) => Ok(file),
             Err(err) => {
                 if err.kind() == std::io::ErrorKind::NotFound {
                     anyhow::bail!("[Indexer File] Transactions file not found. Gap might happen between cache and file store. {}", err)
@@ -172,13 +167,6 @@ impl FileStoreOperator for LocalFileStoreOperator {
         );
         let mut tasks = vec![];
 
-        // FIX THIS.
-        // let files_dir = self.path.join(FILE_FOLDER_NAME);
-        // if !files_dir.exists() {
-        //     tracing::info!("Creating files directory {:?}", files_dir.clone());
-        //     tokio::fs::create_dir(files_dir.clone()).await?;
-        // }
-
         // Split the transactions into batches of BLOB_STORAGE_SIZE.
         for i in transactions.chunks(FILE_ENTRY_TRANSACTION_COUNT as usize) {
             let current_batch = i.iter().cloned().collect_vec();
@@ -188,6 +176,9 @@ impl FileStoreOperator for LocalFileStoreOperator {
             let file_entry_key =
                 FileEntryKey::new(starting_version, self.storage_format).to_string();
             let txns_path = self.path.join(file_entry_key.as_str());
+            if !txns_path.exists() {
+                tokio::fs::create_dir_all(txns_path.clone()).await?;
+            }
 
             tracing::debug!(
                 "Uploading transactions to {:?}",
