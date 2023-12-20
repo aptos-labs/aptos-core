@@ -216,7 +216,7 @@ fun m::foo(): u64 {
      # live vars: $t6, $t9, $t10, $t12, $t20
  20: $t19 := vector::borrow<u64>($t20, $t10)
      # live vars: $t6, $t9, $t10, $t12, $t19
- 21: $t18 := copy($t19)
+ 21: $t18 := move($t19)
      # live vars: $t6, $t9, $t10, $t12, $t18
  22: $t21 := read_ref($t18)
      # live vars: $t6, $t9, $t10, $t12, $t21
@@ -278,7 +278,7 @@ fun m::foo(): u64 {
      # live vars: $t6, $t9, $t10, $t12, $t25, $t32
  51: $t31 := vector::borrow<u64>($t32, $t10)
      # live vars: $t6, $t9, $t10, $t12, $t25, $t31
- 52: $t30 := copy($t31)
+ 52: $t30 := move($t31)
      # live vars: $t6, $t9, $t10, $t12, $t25, $t30
  53: $t33 := read_ref($t30)
      # live vars: $t6, $t9, $t10, $t12, $t25, $t33

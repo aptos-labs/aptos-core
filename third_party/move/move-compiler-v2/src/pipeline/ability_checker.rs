@@ -1,3 +1,7 @@
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 //! Checks for ability violations.
 //! prerequisite:
 //! - liveness analysis and lifetime analysis have been performed
@@ -23,7 +27,7 @@ fn type_abilities(func_target: &FunctionTarget, ty: &Type) -> AbilitySet {
 }
 
 /// Determines if the given type has the given ability
-fn has_ability(target: &FunctionTarget, ty: &Type, ability: Ability) -> bool {
+pub fn has_ability(target: &FunctionTarget, ty: &Type, ability: Ability) -> bool {
     type_abilities(target, ty).has_ability(ability)
 }
 

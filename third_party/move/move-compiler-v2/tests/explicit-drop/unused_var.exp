@@ -41,7 +41,7 @@ fun explicate_drop::unused_var() {
 fun explicate_drop::id<#0>($t0: #0): #0 {
      var $t1: #0
      # live vars: $t0
-  0: $t1 := copy($t0)
+  0: $t1 := move($t0)
      # live vars: $t1
   1: return $t1
 }
@@ -91,12 +91,14 @@ fun explicate_drop::id<#0>($t0: #0): #0 {
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {}
      #
-  0: $t1 := copy($t0)
+  0: $t1 := move($t0)
      # live vars: $t1
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {$t0}
      #
   1: return $t1
 }
@@ -108,6 +110,7 @@ fun explicate_drop::unused_arg<#0>($t0: #0) {
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {}
      #
   0: return ()
 }
@@ -122,24 +125,28 @@ fun explicate_drop::unused_call_assign() {
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {}
      #
   0: $t2 := 42
      # live vars: $t2
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {}
      #
   1: $t1 := explicate_drop::id<u64>($t2)
      # live vars: $t1
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {$t2}
      #
   2: $t0 := copy($t1)
      # live vars:
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {$t2}
      #
   3: return ()
 }
@@ -153,18 +160,21 @@ fun explicate_drop::unused_var() {
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {}
      #
   0: $t1 := 42
      # live vars: $t1
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {}
      #
   1: $t0 := copy($t1)
      # live vars:
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {}
      #
   2: return ()
 }
@@ -174,9 +184,8 @@ fun explicate_drop::unused_var() {
 [variant baseline]
 fun explicate_drop::id<#0>($t0: #0): #0 {
      var $t1: #0
-  0: $t1 := copy($t0)
-  1: destroy($t0)
-  2: return $t1
+  0: $t1 := move($t0)
+  1: return $t1
 }
 
 

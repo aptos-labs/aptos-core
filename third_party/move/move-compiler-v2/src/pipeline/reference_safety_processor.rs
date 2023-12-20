@@ -185,6 +185,8 @@ pub struct LifetimeState {
     local_to_label_map: BTreeMap<TempIndex, LifetimeLabel>,
     /// A map from globals to labels. Represents root states of the active graph.
     global_to_label_map: BTreeMap<QualifiedInstId<StructId>, LifetimeLabel>,
+    /// Contains the set of variables whose values have been moved to somewhere else.
+    moved: SetDomain<TempIndex>,
 }
 
 impl AbstractDomain for LifetimeNode {
@@ -215,6 +217,8 @@ impl AbstractDomain for LifetimeState {
         ));
         self.local_to_label_map = new_local_to_label_map;
         self.global_to_label_map = new_global_to_label_map;
+
+        change = change.combine(self.moved.join(&other.moved));
         change
     }
 }
@@ -762,6 +766,11 @@ impl<'env> LifeTimeAnalysis<'env> {
                 ),
             );
         }
+        // Track whether the variable content is moved
+        if kind == AssignKind::Move {
+            state.moved.insert(src);
+        }
+        state.moved.remove(&dest);
     }
 
     /// Check validness of reading a local. The read is not allowed if the local is borrowed,
@@ -915,7 +924,8 @@ impl<'env> LifeTimeAnalysis<'env> {
             &label,
             BorrowEdge::new(BorrowEdgeKind::BorrowLocal, is_mut, Some(loc), child),
             alive,
-        )
+        );
+        state.moved.remove(&dest);
     }
 
     /// Process a borrow global instruction. This checks whether the borrow is allowed and
@@ -938,7 +948,8 @@ impl<'env> LifeTimeAnalysis<'env> {
             &label,
             BorrowEdge::new(BorrowEdgeKind::BorrowGlobal, is_mut, Some(loc), child),
             alive,
-        )
+        );
+        state.moved.remove(&dest);
     }
 
     /// Process a borrow field instruction. This checks whether the borrow is allowed and
@@ -973,7 +984,8 @@ impl<'env> LifeTimeAnalysis<'env> {
                 child,
             ),
             alive,
-        )
+        );
+        state.moved.remove(&dest);
     }
 
     /// Process a function call. For now we implement standard Move semantics, where every
@@ -1043,12 +1055,17 @@ impl<'env> LifeTimeAnalysis<'env> {
                 }
             }
         }
+        // All sources are moved into a call
+        state.moved.extend(srcs.iter().cloned());
+        for dest in dests {
+            state.moved.remove(dest);
+        }
     }
 
     /// Process a MoveFrom instruction.
     fn move_from(
         &self,
-        state: &LifetimeState,
+        state: &mut LifetimeState,
         id: AttrId,
         dest: TempIndex,
         resource: &QualifiedInstId<StructId>,
@@ -1068,12 +1085,13 @@ impl<'env> LifeTimeAnalysis<'env> {
                 self.borrow_info(state, &label, false, alive).into_iter(),
             )
         }
+        state.moved.remove(&dest);
     }
 
     /// Process a return instruction.
     fn return_(
         &self,
-        state: &LifetimeState,
+        state: &mut LifetimeState,
         id: AttrId,
         srcs: &[TempIndex],
         alive: &LiveVarInfoAtCodeOffset,
@@ -1113,13 +1131,14 @@ impl<'env> LifeTimeAnalysis<'env> {
                 }
             }
         }
+        state.moved.extend(srcs.iter().cloned())
     }
 
     /// Process a ReadRef instruction. In contrast to `self.check_read_local`, this needs
     /// to check the value behind the reference.
     fn read_ref(
         &self,
-        state: &LifetimeState,
+        state: &mut LifetimeState,
         id: AttrId,
         dest: TempIndex,
         src: TempIndex,
@@ -1139,13 +1158,15 @@ impl<'env> LifeTimeAnalysis<'env> {
                 )
             }
         }
+        state.moved.insert(src);
+        state.moved.remove(&dest);
     }
 
     /// Process a WriteRef instruction. In contrast to `self.check_write_local`, this needs
     /// to check the value behind the reference.
     fn write_ref(
         &self,
-        state: &LifetimeState,
+        state: &mut LifetimeState,
         id: AttrId,
         dest: TempIndex,
         src: TempIndex,
@@ -1163,6 +1184,9 @@ impl<'env> LifeTimeAnalysis<'env> {
                 self.borrow_info(state, label, false, alive).into_iter(),
             )
         }
+        state.moved.insert(src);
+        // The destination variable is not overridden, only what it is pointing to, so
+        // no removal from moved
     }
 
     /// Get the location associated with bytecode attribute.
@@ -1202,6 +1226,9 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
             }
         }
         match instr {
+            Load(_, dest, _) => {
+                state.moved.remove(dest);
+            },
             Assign(id, dest, src, kind) => {
                 self.assign(state, code_offset, *id, *dest, *src, *kind, alive);
             },
@@ -1288,7 +1315,7 @@ impl LifetimeAnnotation {
 }
 
 /// Annotation present at each code offset
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct LifetimeInfoAtCodeOffset {
     pub before: LifetimeState,
     pub after: LifetimeState,
@@ -1305,6 +1332,11 @@ impl LifetimeInfoAtCodeOffset {
             .keys()
             .filter(|t| !self.after.local_to_label_map.contains_key(t))
             .cloned()
+    }
+
+    /// Returns true if the value in the variable has been moved at this program point.
+    pub fn is_moved(&self, temp: TempIndex) -> bool {
+        self.after.moved.contains(&temp)
     }
 }
 
@@ -1328,10 +1360,11 @@ impl FunctionTargetProcessor for ReferenceSafetyProcessor {
             target: &target,
             live_var_annotation,
         };
-        let cfg = StacklessControlFlowGraph::new_forward(target.get_bytecode());
+        let code = target.get_bytecode();
+        let cfg = StacklessControlFlowGraph::new_forward(code);
         let state_map =
             analyzer.analyze_function(LifetimeState::default(), target.get_bytecode(), &cfg);
-        let annotation = LifetimeAnnotation(analyzer.state_per_instruction(
+        let mut state_map_per_instr = analyzer.state_per_instruction(
             state_map,
             target.get_bytecode(),
             &cfg,
@@ -1339,7 +1372,15 @@ impl FunctionTargetProcessor for ReferenceSafetyProcessor {
                 before: before.clone(),
                 after: after.clone(),
             },
-        ));
+        );
+        // For dead code, there may be wholes in the map. Identify those and populate with default so
+        // that each code offset actually has an annotation.
+        for offset in 0..code.len() {
+            state_map_per_instr
+                .entry(offset as CodeOffset)
+                .or_insert_with(LifetimeInfoAtCodeOffset::default);
+        }
+        let annotation = LifetimeAnnotation(state_map_per_instr);
         data.annotations.set(annotation, true);
         data
     }
@@ -1449,7 +1490,9 @@ impl<'a> Display for LifetimeDomainDisplay<'a> {
             graph,
             local_to_label_map,
             global_to_label_map,
+            moved,
         } = &self.1;
+        let pool = self.0.global_env().symbol_pool();
         writeln!(
             f,
             "graph: {}",
@@ -1462,9 +1505,7 @@ impl<'a> Display for LifetimeDomainDisplay<'a> {
                 .iter()
                 .map(|(temp, label)| format!(
                     "{}={}",
-                    self.0
-                        .get_local_raw_name(*temp)
-                        .display(self.0.global_env().symbol_pool()),
+                    self.0.get_local_raw_name(*temp).display(pool),
                     label
                 ))
                 .join(",")
@@ -1475,6 +1516,14 @@ impl<'a> Display for LifetimeDomainDisplay<'a> {
             global_to_label_map
                 .iter()
                 .map(|(str, label)| format!("{}={}", self.0.global_env().display(str), label))
+                .join(",")
+        )?;
+        writeln!(
+            f,
+            "moved: {{{}}}",
+            moved
+                .iter()
+                .map(|t| self.0.get_local_raw_name(*t).display(pool).to_string())
                 .join(",")
         )
     }

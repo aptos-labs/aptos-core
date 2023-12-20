@@ -22,6 +22,6 @@ pub struct Experiment();
 
 impl Experiment {
     /// A flag which allows to turn off safety checks, like reference safety.
-    /// Rentention: permanent.
+    /// Retention: permanent.
     pub const NO_SAFETY: &'static str = "no-safety";
 }

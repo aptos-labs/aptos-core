@@ -1,13 +1,5 @@
 
 Diagnostics:
-error: cannot copy mutable reference in local `x`
-   ┌─ tests/reference-safety/v1-tests/dereference_full_invalid.move:12:17
-   │
-12 │         let y = copy x; // error in v2
-   │                 ^^^^^^ copied here
-
-
-Diagnostics:
 error: cannot dereference local `x` which is still mutable borrowed
    ┌─ tests/reference-safety/v1-tests/dereference_full_invalid.move:18:9
    │
