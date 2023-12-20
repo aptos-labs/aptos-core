@@ -235,65 +235,15 @@ fun ability::invalid_copy() {
      var $t2: bool
      var $t3: ability::Impotent
      var $t4: ability::Impotent
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   0: $t2 := false
-     # live vars: $t2
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   1: $t1 := pack ability::Impotent($t2)
-     # live vars: $t1
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   2: $t0 := copy($t1)
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   3: destroy($t1)
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   4: $t3 := copy($t0)
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   5: destroy($t3)
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   6: $t4 := copy($t0)
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   7: destroy($t0)
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   8: destroy($t4)
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   9: return ()
 }
 
@@ -302,29 +252,9 @@ fun ability::invalid_copy() {
 fun ability::invalid_move_to($t0: &signer) {
      var $t1: ability::Impotent
      var $t2: bool
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   0: $t2 := false
-     # live vars: $t0, $t2
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   1: $t1 := pack ability::Impotent($t2)
-     # live vars: $t0, $t1
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   2: move_to<ability::Impotent>($t0, $t1)
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   3: return ()
 }
 
@@ -336,65 +266,15 @@ fun ability::no_key($t0: address) {
      var $t3: &mut ability::Impotent
      var $t4: &ability::Impotent
      var $t5: bool
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   0: $t1 := move_from<ability::Impotent>($t0)
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   1: destroy($t1)
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   2: $t2 := move_from<ability::S<ability::Impotent>>($t0)
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   3: destroy($t2)
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   4: $t3 := borrow_global<ability::Impotent>($t0)
-     # live vars: $t0
-     # graph: {L1024=global<ability::Impotent>[borrow_global(true) -> L1025],L1025=local($t3)[]}
-     # local_to_label: {$t3=L1025}
-     # global_to_label: {ability::Impotent=L1024}
-     #
   5: $t4 := borrow_global<ability::Impotent>($t0)
-     # live vars: $t0
-     # graph: {L1280=global<ability::Impotent>[borrow_global(false) -> L1281],L1281=local($t4)[]}
-     # local_to_label: {$t4=L1281}
-     # global_to_label: {ability::Impotent=L1280}
-     #
   6: destroy($t3)
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   7: $t5 := exists<ability::Impotent>($t0)
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   8: destroy($t4)
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   9: return ()
 }
 
@@ -493,65 +373,15 @@ fun ability::invalid_copy() {
      var $t2: bool
      var $t3: ability::Impotent
      var $t4: ability::Impotent
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   0: $t2 := false
-     # live vars: $t2
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   1: $t1 := pack ability::Impotent($t2)
-     # live vars: $t1
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   2: $t0 := copy($t1)
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   3: destroy($t1)
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   4: $t3 := copy($t0)
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   5: destroy($t3)
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   6: $t4 := copy($t0)
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   7: destroy($t0)
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   8: destroy($t4)
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   9: return ()
 }
 
@@ -560,29 +390,9 @@ fun ability::invalid_copy() {
 fun ability::invalid_move_to($t0: &signer) {
      var $t1: ability::Impotent
      var $t2: bool
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   0: $t2 := false
-     # live vars: $t0, $t2
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   1: $t1 := pack ability::Impotent($t2)
-     # live vars: $t0, $t1
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   2: move_to<ability::Impotent>($t0, $t1)
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   3: return ()
 }
 
@@ -594,64 +404,14 @@ fun ability::no_key($t0: address) {
      var $t3: &mut ability::Impotent
      var $t4: &ability::Impotent
      var $t5: bool
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   0: $t1 := move_from<ability::Impotent>($t0)
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   1: destroy($t1)
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   2: $t2 := move_from<ability::S<ability::Impotent>>($t0)
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   3: destroy($t2)
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   4: $t3 := borrow_global<ability::Impotent>($t0)
-     # live vars: $t0
-     # graph: {L1024=global<ability::Impotent>[borrow_global(true) -> L1025],L1025=local($t3)[]}
-     # local_to_label: {$t3=L1025}
-     # global_to_label: {ability::Impotent=L1024}
-     #
   5: $t4 := borrow_global<ability::Impotent>($t0)
-     # live vars: $t0
-     # graph: {L1280=global<ability::Impotent>[borrow_global(false) -> L1281],L1281=local($t4)[]}
-     # local_to_label: {$t4=L1281}
-     # global_to_label: {ability::Impotent=L1280}
-     #
   6: destroy($t3)
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   7: $t5 := exists<ability::Impotent>($t0)
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   8: destroy($t4)
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   9: return ()
 }

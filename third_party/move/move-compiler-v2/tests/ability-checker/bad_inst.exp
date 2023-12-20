@@ -81,35 +81,10 @@ fun test::test(): test::U<test::S<test::T>> {
      var $t1: test::S<test::T>
      var $t2: test::T
      var $t3: bool
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   0: $t3 := false
-     # live vars: $t3
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   1: $t2 := pack test::T($t3)
-     # live vars: $t2
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   2: $t1 := pack test::S<test::T>($t2)
-     # live vars: $t1
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   3: $t0 := pack test::U<test::S<test::T>>($t1)
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   4: return $t0
 }
 
@@ -135,34 +110,9 @@ fun test::test(): test::U<test::S<test::T>> {
      var $t1: test::S<test::T>
      var $t2: test::T
      var $t3: bool
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   0: $t3 := false
-     # live vars: $t3
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   1: $t2 := pack test::T($t3)
-     # live vars: $t2
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   2: $t1 := pack test::S<test::T>($t2)
-     # live vars: $t1
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   3: $t0 := pack test::U<test::S<test::T>>($t1)
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   4: return $t0
 }

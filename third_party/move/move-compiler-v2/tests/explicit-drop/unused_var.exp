@@ -174,40 +174,15 @@ fun explicate_drop::unused_var() {
 [variant baseline]
 fun explicate_drop::id<#0>($t0: #0): #0 {
      var $t1: #0
-     # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   0: $t1 := copy($t0)
-     # live vars: $t1
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   1: destroy($t0)
-     # live vars: $t1
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   2: return $t1
 }
 
 
 [variant baseline]
 fun explicate_drop::unused_arg<#0>($t0: #0) {
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   0: destroy($t0)
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   1: return ()
 }
 
@@ -217,29 +192,9 @@ fun explicate_drop::unused_call_assign() {
      var $t0: u64
      var $t1: u64
      var $t2: u64
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   0: $t2 := 42
-     # live vars: $t2
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   1: $t1 := explicate_drop::id<u64>($t2)
-     # live vars: $t1
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   2: $t0 := copy($t1)
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   3: return ()
 }
 
@@ -248,22 +203,7 @@ fun explicate_drop::unused_call_assign() {
 fun explicate_drop::unused_var() {
      var $t0: u64
      var $t1: u64
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   0: $t1 := 42
-     # live vars: $t1
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   1: $t0 := copy($t1)
-     # live vars:
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
-     #
   2: return ()
 }
