@@ -3,8 +3,6 @@
 
 use serde::{Deserialize, Serialize};
 
-// The maximum number of transactions that can be stored in a blob.
-pub const BLOB_STORAGE_SIZE: usize = 1_000;
 // Maximum number of threads for the file store
 pub const MAXIMUM_NUMBER_FILESTORE_THREADS: usize = 10;
 // GRPC request metadata key for the token ID.

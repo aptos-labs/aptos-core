@@ -1,13 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{constants::BLOB_STORAGE_SIZE, EncodedTransactionWithVersion};
-use anyhow::Context;
-use redis::{AsyncCommands, RedisError, RedisResult};
+use crate::storage_format::{CacheEntry, CacheEntryBuilder, CacheEntryKey, StorageFormat};
+use anyhow::{ensure, Context};
+use aptos_protos::transaction::v1::Transaction;
+use redis::{AsyncCommands, RedisResult};
 
 // Configurations for cache.
 // Cache entries that are present.
 const CACHE_SIZE_ESTIMATION: u64 = 250_000_u64;
+
+pub const MAX_CACHE_FETCH_SIZE: u64 = 500_u64;
 
 // Hard limit for cache lower bound. Only used for active eviction.
 // Cache worker actively evicts the cache entries if the cache entry version is
@@ -50,37 +53,6 @@ const CACHE_SCRIPT_UPDATE_LATEST_VERSION: &str = r#"
     end
 "#;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CacheBatchGetStatus {
-    /// OK with batch of encoded transactions.
-    Ok(Vec<String>),
-    /// Requested version is already evicted from cache. Visit file store instead.
-    EvictedFromCache,
-    /// Not ready yet. Wait and retry.
-    NotReady,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CacheUpdateStatus {
-    /// 0 - Cache is updated from version x to x + 1. New key `x+1` with corresponding encoded data is added.
-    Ok,
-    /// 1 - Cache is not updated because current version is ahead of the latest version.
-    AheadOfLatestVersion,
-    /// 2 - Cache is not updated but verified. This is the case when the cache is updated by other workers from an old version.
-    VerifiedWithoutUpdate,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum CacheCoverageStatus {
-    /// Requested version is not processed by cache worker yet.
-    DataNotReady,
-    /// Requested version is cached.
-    /// Transactions are available in cache: [requested_version, requested_version + value).
-    CacheHit(u64),
-    /// Requested version is evicted from cache.
-    CacheEvicted,
-}
-
 /// Get the TTL in seconds for a given timestamp.
 pub fn get_ttl_in_seconds(timestamp_in_seconds: u64) -> u64 {
     let current_time = std::time::SystemTime::now()
@@ -94,11 +66,15 @@ pub fn get_ttl_in_seconds(timestamp_in_seconds: u64) -> u64 {
 #[derive(Clone)]
 pub struct CacheOperator<T: redis::aio::ConnectionLike + Send> {
     conn: T,
+    storage_format: StorageFormat,
 }
 
 impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
-    pub fn new(conn: T) -> Self {
-        Self { conn }
+    pub fn new(conn: T, storage_format: StorageFormat) -> Self {
+        Self {
+            conn,
+            storage_format,
+        }
     }
 
     // Set up the cache if needed.
@@ -135,6 +111,20 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         self.get_config_by_key(CACHE_KEY_LATEST_VERSION).await
     }
 
+    /// Returns starting version and ending version.
+    pub async fn get_latest_starting_and_ending_verisons(
+        &mut self,
+    ) -> anyhow::Result<Option<(u64, u64)>> {
+        let latest_version = self.get_latest_version().await?;
+        match latest_version {
+            Some(version) => Ok(Some((
+                version.saturating_sub(CACHE_SIZE_ESTIMATION),
+                version,
+            ))),
+            None => Ok(None),
+        }
+    }
+
     pub async fn get_file_store_latest_version(&mut self) -> anyhow::Result<Option<u64>> {
         self.get_config_by_key(FILE_STORE_LATEST_VERSION).await
     }
@@ -162,45 +152,24 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         Ok(())
     }
 
-    // Internal function to get the latest version from cache.
-    pub(crate) async fn check_cache_coverage_status(
-        &mut self,
-        requested_version: u64,
-    ) -> anyhow::Result<CacheCoverageStatus> {
-        let latest_version: u64 = match self
-            .conn
-            .get::<&str, String>(CACHE_KEY_LATEST_VERSION)
-            .await
-        {
-            Ok(v) => v
-                .parse::<u64>()
-                .expect("Redis latest_version is not a number."),
-            Err(err) => return Err(err.into()),
-        };
-
-        if requested_version >= latest_version {
-            Ok(CacheCoverageStatus::DataNotReady)
-        } else if requested_version + CACHE_SIZE_ESTIMATION < latest_version {
-            Ok(CacheCoverageStatus::CacheEvicted)
-        } else {
-            // TODO: rewrite this logic to surface this max fetch size better
-            Ok(CacheCoverageStatus::CacheHit(std::cmp::min(
-                latest_version - requested_version,
-                BLOB_STORAGE_SIZE as u64,
-            )))
-        }
-    }
-
     pub async fn update_cache_transactions(
         &mut self,
-        transactions: Vec<(u64, String, u64)>,
+        transactions: Vec<Transaction>,
     ) -> anyhow::Result<()> {
         let mut redis_pipeline = redis::pipe();
-        for (version, encoded_proto_data, timestamp_in_seconds) in transactions {
+        for transaction in transactions {
+            let version = transaction.version;
+            let cache_key = CacheEntryKey::new(version, self.storage_format).to_string();
+            let timestamp_in_seconds = transaction
+                .timestamp
+                .clone()
+                .map_or(0, |t| t.seconds as u64);
+            let cache_entry_builder = CacheEntryBuilder::new(transaction, self.storage_format);
+            let cache_entry: CacheEntry = cache_entry_builder.try_into()?;
             redis_pipeline
                 .cmd("SET")
-                .arg(version)
-                .arg(encoded_proto_data)
+                .arg(cache_key)
+                .arg(cache_entry.into_inner())
                 .arg("EX")
                 .arg(get_ttl_in_seconds(timestamp_in_seconds))
                 .ignore();
@@ -252,54 +221,43 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         }
     }
 
-    // TODO: Remove this
-    pub async fn batch_get_encoded_proto_data(
-        &mut self,
-        start_version: u64,
-    ) -> anyhow::Result<CacheBatchGetStatus> {
-        let cache_coverage_status = self.check_cache_coverage_status(start_version).await;
-        match cache_coverage_status {
-            Ok(CacheCoverageStatus::CacheHit(v)) => {
-                let versions = (start_version..start_version + v)
-                    .map(|e| e.to_string())
-                    .collect::<Vec<String>>();
-                let encoded_transactions: Result<Vec<String>, RedisError> =
-                    self.conn.mget(versions).await;
-                match encoded_transactions {
-                    Ok(v) => Ok(CacheBatchGetStatus::Ok(v)),
-                    Err(err) => Err(err.into()),
-                }
-            },
-            Ok(CacheCoverageStatus::CacheEvicted) => Ok(CacheBatchGetStatus::EvictedFromCache),
-            Ok(CacheCoverageStatus::DataNotReady) => Ok(CacheBatchGetStatus::NotReady),
-            Err(err) => Err(err),
-        }
-    }
-
     /// Fail if not all transactions requested are returned
-    pub async fn batch_get_encoded_proto_data_x(
+    pub async fn get_transactions(
         &mut self,
         start_version: u64,
         transaction_count: u64,
-    ) -> anyhow::Result<Vec<EncodedTransactionWithVersion>> {
+    ) -> anyhow::Result<Vec<Transaction>> {
         let versions = (start_version..start_version + transaction_count)
-            .map(|e| e.to_string())
+            .map(|e| CacheEntryKey::new(e, self.storage_format).to_string())
             .collect::<Vec<String>>();
-        let encoded_transactions: Result<Vec<String>, RedisError> = self.conn.mget(versions).await;
-        match encoded_transactions {
-            Ok(txns) => Ok(txns
-                .into_iter()
-                .enumerate()
-                .map(|(i, txn)| (txn, start_version + i as u64))
-                .collect()),
-            Err(err) => Err(err.into()),
+        let encoded_transactions: Vec<Vec<u8>> = self
+            .conn
+            .mget(versions)
+            .await
+            .context("Failed to mget from Redis")?;
+
+        let mut transactions = vec![];
+        for encoded_transaction in encoded_transactions {
+            let cache_entry: CacheEntry =
+                CacheEntry::from_bytes(encoded_transaction, self.storage_format);
+            let transaction: Transaction = cache_entry
+                .try_into()
+                .context("Failed to decode cache entry")?;
+            transactions.push(transaction);
         }
+        ensure!(
+            transactions.len() == transaction_count as usize,
+            "Failed to get all transactions from cache."
+        );
+        Ok(transactions)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aptos_protos::util::timestamp::Timestamp;
+    use prost::Message;
     use redis_test::{MockCmd, MockRedisConnection};
 
     #[tokio::test]
@@ -314,7 +272,7 @@ mod tests {
         )];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
+            CacheOperator::new(mock_connection, StorageFormat::Base64UncompressedProto);
 
         assert!(cache_operator.cache_setup_if_needed().await.unwrap());
     }
@@ -330,7 +288,7 @@ mod tests {
         )];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
+            CacheOperator::new(mock_connection, StorageFormat::Base64UncompressedProto);
 
         assert!(!cache_operator.cache_setup_if_needed().await.unwrap());
     }
@@ -343,164 +301,10 @@ mod tests {
         )];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
+            CacheOperator::new(mock_connection, StorageFormat::Base64UncompressedProto);
 
-        assert_eq!(
-            cache_operator
-                .check_cache_coverage_status(123)
-                .await
-                .unwrap(),
-            CacheCoverageStatus::DataNotReady
-        );
+        assert_eq!(cache_operator.get_latest_version().await.unwrap(), Some(12));
     }
-
-    #[tokio::test]
-    async fn cache_coverage_status_is_evicted() {
-        let cmds = vec![MockCmd::new(
-            redis::cmd("GET").arg(CACHE_KEY_LATEST_VERSION),
-            Ok("120000000"),
-        )];
-        let mock_connection = MockRedisConnection::new(cmds);
-        let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
-
-        assert_eq!(
-            cache_operator.check_cache_coverage_status(1).await.unwrap(),
-            CacheCoverageStatus::CacheEvicted
-        );
-    }
-
-    #[tokio::test]
-    async fn cache_coverage_status_cache_hit() {
-        let cmds = vec![MockCmd::new(
-            redis::cmd("GET").arg(CACHE_KEY_LATEST_VERSION),
-            Ok("123"),
-        )];
-        let mock_connection = MockRedisConnection::new(cmds);
-        let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
-
-        // Transactions are 100..123, thus 23 transactions are cached.
-        assert_eq!(
-            cache_operator
-                .check_cache_coverage_status(100)
-                .await
-                .unwrap(),
-            CacheCoverageStatus::CacheHit(23)
-        );
-    }
-
-    #[tokio::test]
-    async fn cache_coverage_status_cache_hit_with_full_batch() {
-        let cmds = vec![MockCmd::new(
-            redis::cmd("GET").arg(CACHE_KEY_LATEST_VERSION),
-            Ok("12300"),
-        )];
-        let mock_connection = MockRedisConnection::new(cmds);
-        let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
-
-        assert_eq!(
-            cache_operator
-                .check_cache_coverage_status(1000)
-                .await
-                .unwrap(),
-            CacheCoverageStatus::CacheHit(1000)
-        );
-    }
-
-    // Cache batch get status tests.
-    #[tokio::test]
-    async fn cache_batch_get_status_hit_the_head() {
-        let bulck_value = redis::Value::Bulk(vec![
-            redis::Value::Data("t0".as_bytes().to_vec()),
-            redis::Value::Data("t1".as_bytes().to_vec()),
-            redis::Value::Data("t2".as_bytes().to_vec()),
-        ]);
-        let cmds = vec![
-            MockCmd::new(redis::cmd("GET").arg(CACHE_KEY_LATEST_VERSION), Ok("3")),
-            MockCmd::new(
-                redis::cmd("MGET").arg("0").arg("1").arg("2"),
-                Ok(bulck_value),
-            ),
-        ];
-        let mock_connection = MockRedisConnection::new(cmds);
-        let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
-
-        assert_eq!(
-            cache_operator
-                .batch_get_encoded_proto_data(0)
-                .await
-                .unwrap(),
-            CacheBatchGetStatus::Ok(vec!["t0".to_string(), "t1".to_string(), "t2".to_string()])
-        );
-    }
-
-    #[tokio::test]
-    async fn cache_batch_get_status_ok() {
-        let bulck_value = redis::Value::Bulk(
-            (1..1001)
-                .map(|e| redis::Value::Data(format!("t{}", e).as_bytes().to_vec()))
-                .collect(),
-        );
-        let keys = (1..1001).map(|e| e.to_string()).collect::<Vec<String>>();
-        let cmds = vec![
-            MockCmd::new(redis::cmd("GET").arg(CACHE_KEY_LATEST_VERSION), Ok("1003")),
-            MockCmd::new(redis::cmd("MGET").arg(keys), Ok(bulck_value)),
-        ];
-        let mock_connection = MockRedisConnection::new(cmds);
-        let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
-
-        assert_eq!(
-            cache_operator
-                .batch_get_encoded_proto_data(1)
-                .await
-                .unwrap(),
-            CacheBatchGetStatus::Ok((1..1001).map(|e| format!("t{}", e)).collect())
-        );
-    }
-
-    #[tokio::test]
-    async fn cache_batch_get_status_cache_evicted() {
-        let cmds = vec![MockCmd::new(
-            redis::cmd("GET").arg(CACHE_KEY_LATEST_VERSION),
-            Ok("100000000"),
-        )];
-        let mock_connection = MockRedisConnection::new(cmds);
-        let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
-
-        assert_eq!(
-            cache_operator
-                .batch_get_encoded_proto_data(1)
-                .await
-                .unwrap(),
-            CacheBatchGetStatus::EvictedFromCache
-        );
-    }
-
-    #[tokio::test]
-    async fn cache_batch_get_status_cache_not_ready() {
-        let cmds = vec![MockCmd::new(
-            redis::cmd("GET").arg(CACHE_KEY_LATEST_VERSION),
-            Ok("1"),
-        )];
-        let mock_connection = MockRedisConnection::new(cmds);
-        let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
-
-        assert_eq!(
-            cache_operator
-                .batch_get_encoded_proto_data(100_000_000)
-                .await
-                .unwrap(),
-            CacheBatchGetStatus::NotReady
-        );
-    }
-
-    // TODO:Cache update tests.
 
     // Cache chain id tests.
     #[tokio::test]
@@ -511,7 +315,7 @@ mod tests {
         )];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
+            CacheOperator::new(mock_connection, StorageFormat::Base64UncompressedProto);
 
         assert_eq!(cache_operator.get_chain_id().await.unwrap(), Some(123));
     }
@@ -526,7 +330,7 @@ mod tests {
         )];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
+            CacheOperator::new(mock_connection, StorageFormat::Base64UncompressedProto);
 
         assert_eq!(
             cache_operator.get_latest_version().await.unwrap(),
@@ -537,22 +341,29 @@ mod tests {
     // Cache update cache transactions tests.
     #[tokio::test]
     async fn cache_update_cache_transactions_ok() {
-        let mut transactions = vec![];
-        let version = 123_u64;
-        let encoded_proto_data = String::from("123");
-        let timestamp_in_seconds = 12_u64;
-        transactions.push((version, encoded_proto_data.clone(), timestamp_in_seconds));
+        let transactions = vec![Transaction {
+            version: 1,
+            timestamp: Some(Timestamp {
+                seconds: 1,
+                nanos: 0,
+            }),
+            ..Default::default()
+        }];
+        let mut buf = vec![];
+        let key = "1";
+        transactions[0].encode(&mut buf).unwrap();
+        let encoded_proto_data = base64::encode(&buf);
         let cmds = vec![MockCmd::new(
             redis::cmd("SET")
-                .arg(version)
+                .arg(key)
                 .arg(encoded_proto_data.clone())
                 .arg("EX")
-                .arg(get_ttl_in_seconds(timestamp_in_seconds)),
+                .arg(get_ttl_in_seconds(1)),
             Ok("ok"),
         )];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
+            CacheOperator::new(mock_connection, StorageFormat::Base64UncompressedProto);
         assert!(cache_operator
             .update_cache_transactions(transactions)
             .await
@@ -561,28 +372,34 @@ mod tests {
 
     #[tokio::test]
     async fn cache_update_cache_transactions_with_large_version_ok() {
-        let mut transactions = vec![];
         let version = CACHE_SIZE_EVICTION_LOWER_BOUND + 100;
-        let encoded_proto_data = String::from("123");
-        let timestamp_in_seconds = 12_u64;
-        transactions.push((version, encoded_proto_data.clone(), timestamp_in_seconds));
+        let transactions = vec![Transaction {
+            version,
+            timestamp: Some(Timestamp {
+                seconds: 1,
+                nanos: 0,
+            }),
+            ..Default::default()
+        }];
+        let mut buf = vec![];
+        transactions[0].encode(&mut buf).unwrap();
+        let encoded_proto_data = base64::encode(&buf);
         let mut redis_pipeline = redis::pipe();
         redis_pipeline
             .cmd("SET")
-            .arg(version)
-            .arg(encoded_proto_data.clone())
+            .arg(version.to_string())
+            .arg(encoded_proto_data)
             .arg("EX")
-            .arg(get_ttl_in_seconds(timestamp_in_seconds));
+            .arg(get_ttl_in_seconds(1));
         redis_pipeline
             .cmd("DEL")
             .arg(version - CACHE_SIZE_EVICTION_LOWER_BOUND);
         let cmds = vec![MockCmd::new(redis_pipeline, Ok("ok"))];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
-        assert!(cache_operator
-            .update_cache_transactions(transactions)
-            .await
-            .is_ok());
+            CacheOperator::new(mock_connection, StorageFormat::Base64UncompressedProto);
+        let res = cache_operator.update_cache_transactions(transactions).await;
+        println!("{:?}", res);
+        assert!(res.is_ok());
     }
 }

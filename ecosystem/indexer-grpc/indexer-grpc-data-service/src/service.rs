@@ -9,8 +9,7 @@ use crate::metrics::{
 };
 use anyhow::Context;
 use aptos_indexer_grpc_utils::{
-    build_protobuf_encoded_transaction_wrappers,
-    cache_operator::{CacheBatchGetStatus, CacheOperator},
+    cache_operator::{CacheOperator, MAX_CACHE_FETCH_SIZE},
     chunk_transactions,
     config::IndexerGrpcFileStoreConfig,
     constants::{
@@ -18,10 +17,10 @@ use aptos_indexer_grpc_utils::{
         MESSAGE_SIZE_LIMIT,
     },
     counters::{log_grpc_step, IndexerGrpcStep},
-    file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
+    file_store_operator::FileStoreOperator,
+    storage_format::StorageFormat,
     time_diff_since_pb_timestamp_in_secs,
     types::RedisUrl,
-    EncodedTransactionWithVersion,
 };
 use aptos_moving_average::MovingAverage;
 use aptos_protos::{
@@ -67,6 +66,7 @@ pub struct RawDataServerWrapper {
     pub redis_client: Arc<redis::Client>,
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub data_service_response_channel_size: usize,
+    pub cache_storage_format: StorageFormat,
 }
 
 impl RawDataServerWrapper {
@@ -74,6 +74,7 @@ impl RawDataServerWrapper {
         redis_address: RedisUrl,
         file_store_config: IndexerGrpcFileStoreConfig,
         data_service_response_channel_size: usize,
+        cache_storage_format: StorageFormat,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             redis_client: Arc::new(
@@ -83,6 +84,7 @@ impl RawDataServerWrapper {
             ),
             file_store_config,
             data_service_response_channel_size,
+            cache_storage_format,
         })
     }
 }
@@ -90,11 +92,9 @@ impl RawDataServerWrapper {
 /// Enum to represent the status of the data fetching overall.
 enum TransactionsDataStatus {
     // Data fetching is successful.
-    Success(Vec<EncodedTransactionWithVersion>),
+    Success(Vec<Transaction>),
     // Ahead of current head of cache.
     AheadOfCache,
-    // Fatal error when gap detected between cache and file store.
-    DataGap,
 }
 
 /// RawDataServerWrapper handles the get transactions requests from cache and file store.
@@ -133,19 +133,7 @@ impl RawData for RawDataServerWrapper {
             },
         };
 
-        let file_store_operator: Box<dyn FileStoreOperator> = match &self.file_store_config {
-            IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => {
-                Box::new(GcsFileStoreOperator::new(
-                    gcs_file_store.gcs_file_store_bucket_name.clone(),
-                    gcs_file_store
-                        .gcs_file_store_service_account_key_path
-                        .clone(),
-                ))
-            },
-            IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => Box::new(
-                LocalFileStoreOperator::new(local_file_store.local_file_store_path.clone()),
-            ),
-        };
+        let file_store_operator: Box<dyn FileStoreOperator> = self.file_store_config.create();
 
         // Adds tracing context for the request.
         log_grpc_step(
@@ -162,6 +150,7 @@ impl RawData for RawDataServerWrapper {
         );
 
         let redis_client = self.redis_client.clone();
+        let cache_storage_format = self.cache_storage_format;
         tokio::spawn({
             let request_metadata = request_metadata.clone();
             async move {
@@ -198,7 +187,7 @@ impl RawData for RawDataServerWrapper {
                         return;
                     },
                 };
-                let mut cache_operator = CacheOperator::new(conn);
+                let mut cache_operator = CacheOperator::new(conn, cache_storage_format);
                 file_store_operator.verify_storage_bucket_existence().await;
 
                 // Validate redis chain id. Must be present by the time it gets here
@@ -241,7 +230,6 @@ impl RawData for RawDataServerWrapper {
                         current_version,
                         &mut cache_operator,
                         file_store_operator.as_ref(),
-                        request_metadata.clone(),
                     )
                     .await
                     {
@@ -264,11 +252,6 @@ impl RawData for RawDataServerWrapper {
                             ahead_of_cache_data_handling().await;
                             // Retry after a short sleep.
                             continue;
-                        },
-                        Ok(TransactionsDataStatus::DataGap) => {
-                            data_gap_handling(current_version);
-                            // End the data stream.
-                            break;
                         },
                         Err(e) => {
                             ERROR_COUNT.with_label_values(&["data_fetch_failed"]).inc();
@@ -293,12 +276,10 @@ impl RawData for RawDataServerWrapper {
                             transactions_count = Some(count - transaction_data.len() as u64);
                         }
                     };
-                    // Note: this is not the actual bytes transferred to the client.
-                    // This is the bytes consumed internally by the server
-                    // and ready to be transferred to the client.
+                    // Note: this is the protobuf encoded transaction size.
                     let bytes_ready_to_transfer = transaction_data
                         .iter()
-                        .map(|(encoded, _)| encoded.len())
+                        .map(|t| t.encoded_len())
                         .sum::<usize>();
                     BYTES_READY_TO_TRANSFER_FROM_SERVER
                         .with_label_values(&[
@@ -309,7 +290,7 @@ impl RawData for RawDataServerWrapper {
                         .inc_by(bytes_ready_to_transfer as u64);
                     // 2. Push the data to the response channel, i.e. stream the data to the client.
                     let current_batch_size = transaction_data.as_slice().len();
-                    let end_of_batch_version = transaction_data.as_slice().last().unwrap().1;
+                    let end_of_batch_version = transaction_data.as_slice().last().unwrap().version;
                     let resp_items = get_transactions_responses_builder(
                         transaction_data,
                         chain_id as u32,
@@ -426,19 +407,11 @@ impl RawData for RawDataServerWrapper {
 
 /// Builds the response for the get transactions request. Partial batch is ok, i.e., a batch with transactions < 1000.
 fn get_transactions_responses_builder(
-    data: Vec<EncodedTransactionWithVersion>,
+    transactions: Vec<Transaction>,
     chain_id: u32,
     request_metadata: IndexerGrpcRequestMetadata,
 ) -> Vec<TransactionsResponse> {
     let decode_start_time = Instant::now();
-    let transactions: Vec<Transaction> = data
-        .into_iter()
-        .map(|(encoded, _)| {
-            let decoded_transaction = base64::decode(encoded).unwrap();
-            let transaction = Transaction::decode(&*decoded_transaction);
-            transaction.unwrap()
-        })
-        .collect();
     let chunks = chunk_transactions(transactions, MESSAGE_SIZE_LIMIT);
     let resp_items = chunks
         .into_iter()
@@ -479,108 +452,40 @@ async fn data_fetch(
     starting_version: u64,
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
     file_store_operator: &dyn FileStoreOperator,
-    request_metadata: IndexerGrpcRequestMetadata,
 ) -> anyhow::Result<TransactionsDataStatus> {
-    let cache_fetch_start_time = Instant::now();
-    let batch_get_result = cache_operator
-        .batch_get_encoded_proto_data(starting_version)
-        .await;
+    // At this point, no starting and ending versions are considered as fatal errors.
+    let (cache_starting_version, cache_ending_version) = cache_operator
+        .get_latest_starting_and_ending_verisons()
+        .await?
+        .context(
+            "[Data Service] Failed to get the latest starting and ending versions from cache.",
+        )?;
 
-    match batch_get_result {
+    if starting_version < cache_starting_version {
         // Data is not ready yet in the cache.
-        Ok(CacheBatchGetStatus::NotReady) => Ok(TransactionsDataStatus::AheadOfCache),
-        Ok(CacheBatchGetStatus::Ok(transactions)) => {
-            let size_in_bytes = transactions
-                .iter()
-                .map(|transaction| transaction.len())
-                .sum::<usize>();
-            let num_of_transactions = transactions.len();
-            let start_version_timestamp = {
-                let decoded_transaction = base64::decode(transactions.first().unwrap())
-                    .expect("Failed to decode base64.");
-                let transaction =
-                    Transaction::decode(&*decoded_transaction).expect("Failed to decode protobuf.");
-                transaction.timestamp
-            };
-            let end_version_timestamp = {
-                let decoded_transaction =
-                    base64::decode(transactions.last().unwrap()).expect("Failed to decode base64.");
-                let transaction =
-                    Transaction::decode(&*decoded_transaction).expect("Failed to decode protobuf.");
-                transaction.timestamp
-            };
-
-            log_grpc_step(
-                SERVICE_TYPE,
-                IndexerGrpcStep::DataServiceDataFetchedCache,
-                Some(starting_version as i64),
-                Some(starting_version as i64 + num_of_transactions as i64 - 1),
-                start_version_timestamp.as_ref(),
-                end_version_timestamp.as_ref(),
-                Some(cache_fetch_start_time.elapsed().as_secs_f64()),
-                Some(size_in_bytes),
-                Some(num_of_transactions as i64),
-                Some(request_metadata.clone()),
-            );
-
-            Ok(TransactionsDataStatus::Success(
-                build_protobuf_encoded_transaction_wrappers(transactions, starting_version),
-            ))
-        },
-        Ok(CacheBatchGetStatus::EvictedFromCache) => {
-            // Data is evicted from the cache. Fetch from file store.
-            let file_store_fetch_start_time = Instant::now();
-            let file_store_batch_get_result =
-                file_store_operator.get_transactions(starting_version).await;
-            match file_store_batch_get_result {
-                Ok(transactions) => {
-                    let size_in_bytes = transactions
-                        .iter()
-                        .map(|transaction| transaction.len())
-                        .sum::<usize>();
-                    let num_of_transactions = transactions.len();
-                    let start_version_timestamp = {
-                        let decoded_transaction = base64::decode(transactions.first().unwrap())
-                            .expect("Failed to decode base64.");
-                        let transaction = Transaction::decode(&*decoded_transaction)
-                            .expect("Failed to decode protobuf.");
-                        transaction.timestamp
-                    };
-                    let end_version_timestamp = {
-                        let decoded_transaction = base64::decode(transactions.last().unwrap())
-                            .expect("Failed to decode base64.");
-                        let transaction = Transaction::decode(&*decoded_transaction)
-                            .expect("Failed to decode protobuf.");
-                        transaction.timestamp
-                    };
-
-                    log_grpc_step(
-                        SERVICE_TYPE,
-                        IndexerGrpcStep::DataServiceDataFetchedFilestore,
-                        Some(starting_version as i64),
-                        Some(starting_version as i64 + num_of_transactions as i64 - 1),
-                        start_version_timestamp.as_ref(),
-                        end_version_timestamp.as_ref(),
-                        Some(file_store_fetch_start_time.elapsed().as_secs_f64()),
-                        Some(size_in_bytes),
-                        Some(num_of_transactions as i64),
-                        Some(request_metadata.clone()),
-                    );
-
-                    Ok(TransactionsDataStatus::Success(
-                        build_protobuf_encoded_transaction_wrappers(transactions, starting_version),
-                    ))
-                },
-                Err(e) => {
-                    if e.to_string().contains("Transactions file not found") {
-                        Ok(TransactionsDataStatus::DataGap)
-                    } else {
-                        Err(e)
-                    }
-                },
-            }
-        },
-        Err(e) => Err(e),
+        let transactions = file_store_operator
+            .get_transactions(starting_version)
+            .await
+            .context(format!(
+                "Fetching data failed from GCS, version {}",
+                starting_version
+            ))?;
+        Ok(TransactionsDataStatus::Success(transactions))
+    } else {
+        let transactions_count = std::cmp::min(
+            cache_ending_version + 1 - starting_version,
+            MAX_CACHE_FETCH_SIZE,
+        );
+        if transactions_count == 0 {
+            // Data is not ready yet in the cache.
+            return Ok(TransactionsDataStatus::AheadOfCache);
+        }
+        Ok(TransactionsDataStatus::Success(
+            cache_operator
+                .get_transactions(starting_version, transactions_count)
+                .await
+                .context("[Data Service] Failed to get transactions from cache.")?,
+        ))
     }
 }
 
@@ -591,16 +496,6 @@ async fn ahead_of_cache_data_handling() {
         AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS,
     ))
     .await;
-}
-
-/// Handles data gap errors, i.e., the data is not present in the cache or file store.
-fn data_gap_handling(version: u64) {
-    // TODO(larry): add metrics/alerts to track the gap.
-    // Do not crash the server when gap detected since other clients may still be able to get data.
-    error!(
-        current_version = version,
-        "[Data Service] Data gap detected. Please check the logs for more details."
-    );
 }
 
 /// Handles data fetch errors, including cache and file store related errors.

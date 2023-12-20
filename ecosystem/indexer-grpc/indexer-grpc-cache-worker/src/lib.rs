@@ -17,6 +17,7 @@ pub struct IndexerGrpcCacheWorkerConfig {
     pub fullnode_grpc_address: Url,
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub redis_main_instance_address: RedisUrl,
+    pub enable_cache_compression: bool,
 }
 
 impl IndexerGrpcCacheWorkerConfig {
@@ -24,11 +25,13 @@ impl IndexerGrpcCacheWorkerConfig {
         fullnode_grpc_address: Url,
         file_store_config: IndexerGrpcFileStoreConfig,
         redis_main_instance_address: RedisUrl,
+        enable_cache_compression: bool,
     ) -> Self {
         Self {
             fullnode_grpc_address,
             file_store_config,
             redis_main_instance_address,
+            enable_cache_compression,
         }
     }
 }
@@ -40,6 +43,7 @@ impl RunnableConfig for IndexerGrpcCacheWorkerConfig {
             self.fullnode_grpc_address.clone(),
             self.redis_main_instance_address.clone(),
             self.file_store_config.clone(),
+            self.enable_cache_compression,
         )
         .await
         .context("Failed to create cache worker")?;
