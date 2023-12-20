@@ -14,7 +14,7 @@ use aptos_types::{
     state_store::combine_or_add_sharded_state_updates, transaction::TransactionToCommit,
 };
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ExecutedChunk {
     pub result_state: StateDelta,
     pub ledger_info: Option<LedgerInfoWithSignatures>,
@@ -112,6 +112,16 @@ impl ExecutedChunk {
             reconfiguration_occurred,
         }
     }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy() -> Self {
+        Self {
+            result_state: Default::default(),
+            ledger_info: None,
+            next_epoch_state: None,
+            ledger_update_output: Default::default(),
+        }
+    }
 }
 
 #[test]
@@ -140,7 +150,7 @@ fn into_chunk_commit_notification_should_apply_event_filters() {
 
     let chunk = ExecutedChunk {
         ledger_update_output,
-        ..Default::default()
+        ..ExecutedChunk::dummy()
     };
 
     let notification = chunk.into_chunk_commit_notification();

@@ -352,20 +352,6 @@ impl StateComputeResult {
         }
     }
 
-    pub fn dummy() -> Self {
-        Self {
-            root_hash: HashValue::zero(),
-            frozen_subtree_roots: vec![],
-            num_leaves: 0,
-            parent_frozen_subtree_roots: vec![],
-            parent_num_leaves: 0,
-            epoch_state: None,
-            compute_status_for_input_txns: vec![],
-            transaction_info_hashes: vec![],
-            subscribable_events: vec![],
-        }
-    }
-
     /// generate a new dummy state compute result with a given root hash.
     /// this function is used in RandomComputeResultStateComputer to assert that the compute
     /// function is really called.

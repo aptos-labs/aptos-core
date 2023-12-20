@@ -1895,6 +1895,7 @@ impl Transaction {
         }
     }
 
+    #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy() -> Self {
         Transaction::StateCheckpoint(HashValue::zero())
     }
