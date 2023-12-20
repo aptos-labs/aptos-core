@@ -58,11 +58,6 @@ pub fn check_for_function_typed_parameters(env: &mut GlobalEnv) {
 ///   - non-inline functions are handled in the VisibilityChecker pass, but
 ///     inline functions will be either gone or inlined by then.
 pub fn check_access_and_use(env: &mut GlobalEnv) {
-    let options = env
-        .get_extension::<Options>()
-        .expect("Options is available");
-    let warn_about_unused = options.warn_unused;
-
     // For each function seen, we record whether it has an accessible caller.
     let mut functions_with_callers: BTreeSet<QualifiedFunId> = BTreeSet::new();
     // For each function seen, we record whether it has an inaccessible caller.
@@ -209,18 +204,21 @@ pub fn check_access_and_use(env: &mut GlobalEnv) {
     }
 
     // Check for Unused functions: private (or friendless public(friend)) funs with no callers.
-    for callee in private_funcs {
-        if !functions_with_callers.contains(&callee) {
-            // We saw no uses of private/friendless function `callee`.
-            let callee_env = env.get_function(callee);
-            let callee_loc = callee_env.get_loc();
-            let callee_is_script = callee_env.module_env.get_name().is_script();
+    let options = env
+        .get_extension::<Options>()
+        .expect("Options is available");
+    if options.warn_unused {
+        for callee in private_funcs {
+            if !functions_with_callers.contains(&callee) {
+                // We saw no uses of private/friendless function `callee`.
+                let callee_env = env.get_function(callee);
+                let callee_loc = callee_env.get_loc();
+                let callee_is_script = callee_env.module_env.get_name().is_script();
 
-            // Entry functions in a script don't need any uses.
-            // Check others which are private.
-            if !callee_is_script {
-                let is_private = matches!(callee_env.visibility(), Visibility::Private);
-                if warn_about_unused {
+                // Entry functions in a script don't need any uses.
+                // Check others which are private.
+                if !callee_is_script {
+                    let is_private = matches!(callee_env.visibility(), Visibility::Private);
                     if functions_with_inaccessible_callers.contains(&callee) {
                         let msg = format!(
                             "Function `{}` may be unused: it has callers, but none with access.",
