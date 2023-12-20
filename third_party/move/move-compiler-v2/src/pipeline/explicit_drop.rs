@@ -1,4 +1,6 @@
 //! Adds explicit destroy instructions for non-primitive types.
+//! Removes livevar/lifetime annotation unless experiment flags "need-livevar"/"need-lifetime" is set,
+//! in which case the annotation is recomputed
 
 use super::{
     livevar_analysis_processor::{
@@ -8,6 +10,7 @@ use super::{
         LifetimeAnnotation, LifetimeInfoAtCodeOffset, ReferenceSafetyProcessor,
     },
 };
+use crate::{Experiment, Options};
 use move_binary_format::file_format::CodeOffset;
 use move_model::{ast::TempIndex, model::FunctionEnv, ty::Type};
 use move_stackless_bytecode::{
@@ -34,7 +37,22 @@ impl FunctionTargetProcessor for ExplicitDrop {
         let mut transformer = ExplicitDropTransformer::new(target);
         transformer.transform();
         data.code = transformer.transformed;
-        self.recompute_invalidated_analyses(targets, fun_env, data, scc_opt)
+        let options = fun_env
+            .module_env
+            .env
+            .get_extension::<Options>()
+            .expect("options");
+        if options.experiment_on(Experiment::NEED_LIVEVAR) {
+            data = recompute_livevar_annotation(targets, fun_env, data, scc_opt);
+        } else {
+            data.annotations.remove::<LiveVarAnnotation>();
+        }
+        if options.experiment_on(Experiment::NEED_LIFETIME) {
+            data = recompute_lifetime_annotation(targets, fun_env, data, scc_opt);
+        } else {
+            data.annotations.remove::<LifetimeAnnotation>();
+        }
+        data
     }
 
     fn name(&self) -> String {
@@ -42,24 +60,30 @@ impl FunctionTargetProcessor for ExplicitDrop {
     }
 }
 
-impl ExplicitDrop {
-    /// Recomputes livevar analyais and lifetime analysis
-    fn recompute_invalidated_analyses(
-        &self,
-        targets: &mut FunctionTargetsHolder,
-        fun_env: &FunctionEnv,
-        mut data: FunctionData,
-        scc_opt: Option<&[FunctionEnv]>,
-    ) -> FunctionData {
-        // don't run the processor directly to avoid doing copy transformation again
-        let livevar_analysis_processor = LiveVarAnalysisProcessor();
-        let target = FunctionTarget::new(fun_env, &data);
-        let offset_to_live_refs =
-            LiveVarAnnotation::new(livevar_analysis_processor.analyze(&target));
-        data.annotations.set(offset_to_live_refs, true);
-        let reference_safety_processor = ReferenceSafetyProcessor {};
-        reference_safety_processor.process(targets, fun_env, data, scc_opt)
-    }
+/// Recomputes livevar annotations
+fn recompute_livevar_annotation(
+    _targets: &mut FunctionTargetsHolder,
+    fun_env: &FunctionEnv,
+    mut data: FunctionData,
+    _scc_opt: Option<&[FunctionEnv]>,
+) -> FunctionData {
+    // don't run the processor directly to avoid doing copy transformation again
+    let livevar_analysis_processor = LiveVarAnalysisProcessor();
+    let target = FunctionTarget::new(fun_env, &data);
+    let offset_to_live_refs = LiveVarAnnotation::new(livevar_analysis_processor.analyze(&target));
+    data.annotations.set(offset_to_live_refs, true);
+    data
+}
+
+/// Recomputes lifetime annotations
+fn recompute_lifetime_annotation(
+    targets: &mut FunctionTargetsHolder,
+    fun_env: &FunctionEnv,
+    data: FunctionData,
+    scc_opt: Option<&[FunctionEnv]>,
+) -> FunctionData {
+    let reference_safety_processor = ReferenceSafetyProcessor {};
+    reference_safety_processor.process(targets, fun_env, data, scc_opt)
 }
 
 struct ExplicitDropTransformer<'a> {

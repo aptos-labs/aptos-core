@@ -21,6 +21,12 @@
 pub struct Experiment();
 
 impl Experiment {
+    /// Ensure that lifetime annotation exists
+    /// Rentention: permanent
+    pub const NEED_LIFETIME: &'static str = "need-lifetime";
+    /// Ensure that livevar annotation exists
+    /// Rentention: permanent
+    pub const NEED_LIVEVAR: &'static str = "need-livevar";
     /// A flag which allows to turn off safety checks, like reference safety.
     /// Rentention: permanent.
     pub const NO_SAFETY: &'static str = "no-safety";
