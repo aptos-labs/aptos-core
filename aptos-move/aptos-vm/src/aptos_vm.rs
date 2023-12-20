@@ -27,6 +27,10 @@ use aptos_gas_schedule::{AptosGasParameters, VMGasParameters};
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_metrics_core::TimerHelper;
+#[cfg(any(test, feature = "testing"))]
+use aptos_types::state_store::StateViewId;
+#[cfg(any(test, feature = "fuzzing"))]
+use aptos_types::validator_txn::ValidatorTransaction;
 use aptos_types::{
     account_config,
     account_config::new_block_event_key,
@@ -56,13 +60,6 @@ use aptos_types::{
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
-
-#[cfg(any(test, feature = "fuzzing"))]
-use aptos_types::validator_txn::ValidatorTransaction;
-
-#[cfg(any(test, feature = "testing"))]
-use aptos_types::state_store::StateViewId;
-
 use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
 use aptos_vm_types::{
