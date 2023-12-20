@@ -43,7 +43,7 @@ use aptos_types::{
     },
     state_store::{StateView, StateViewId},
     transaction::{
-        authenticator::{AccountAuthenticator, AnySignature, TransactionAuthenticator},
+        authenticator::AnySignature,
         signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
         MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
@@ -2125,14 +2125,20 @@ impl VMValidator for AptosVM {
         }
 
         if !self.features.is_enabled(FeatureFlag::WEBAUTHN_SIGNATURE) {
-            let sk_authenticators = transaction.authenticator_ref().to_single_key_authenticators()?;
-            for authenticator in sk_authenticators {
-                match (authenticator.signature()) {
-                    (AnySignature::WebAuthn { .. }) =>
-                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING),
-                    _ => {},
-                }
-            }
+            match transaction.authenticator_ref().to_single_key_authenticators() {
+                Ok(sk_authenticators) => {
+                    for authenticator in sk_authenticators {
+                        match authenticator.signature() {
+                            AnySignature::WebAuthn { .. } =>
+                                return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING),
+                            _ => {},
+                        }
+                    }
+                },
+                _ => {
+                    return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
+                },
+            };
         }
 
         let txn = match transaction.check_signature() {
