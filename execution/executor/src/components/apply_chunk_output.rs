@@ -15,6 +15,7 @@ use anyhow::{ensure, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_executor_types::{
     parsed_transaction_output::TransactionsWithParsedOutput,
+    should_forward_to_subscription_service,
     state_checkpoint_output::{StateCheckpointOutput, TransactionsByStatus},
     ExecutedChunk, LedgerUpdateOutput, ParsedTransactionOutput,
 };
@@ -139,7 +140,7 @@ impl ApplyChunkOutput {
             .with_label_values(&["assemble_ledger_diff_for_block"])
             .start_timer();
 
-        let (txns_to_commit, transaction_info_hashes, events) =
+        let (txns_to_commit, transaction_info_hashes, subscribable_events) =
             Self::assemble_ledger_diff(to_commit, state_updates_vec, state_checkpoint_hashes);
         let transaction_accumulator =
             Arc::new(base_txn_accumulator.append(&transaction_info_hashes));
@@ -147,7 +148,7 @@ impl ApplyChunkOutput {
             LedgerUpdateOutput {
                 statuses_for_input_txns,
                 to_commit: txns_to_commit,
-                events,
+                subscribable_events,
                 transaction_info_hashes,
                 state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
                 sharded_state_cache,
@@ -285,7 +286,7 @@ impl ApplyChunkOutput {
         ))
     }
 
-    fn assemble_ledger_diff(
+    pub fn assemble_ledger_diff(
         to_commit_from_execution: TransactionsWithParsedOutput,
         state_updates_vec: Vec<ShardedStateUpdates>,
         state_checkpoint_hashes: Vec<Option<HashValue>>,
@@ -312,7 +313,7 @@ impl ApplyChunkOutput {
             })
             .collect();
 
-        let mut all_events = Vec::new();
+        let mut all_subscribable_events = Vec::new();
         let (to_commit_txns, to_commit_outputs) = to_commit_from_execution.into_inner();
         for (
             txn,
@@ -330,6 +331,11 @@ impl ApplyChunkOutput {
             let (write_set, events, per_txn_reconfig_events, gas_used, status) =
                 txn_output.unpack();
 
+            let subscribable_events: Vec<ContractEvent> = events
+                .iter()
+                .filter(|evt| should_forward_to_subscription_service(*evt))
+                .cloned()
+                .collect();
             let txn_info = match &status {
                 TransactionStatus::Keep(status) => TransactionInfo::new(
                     txn.hash(),
@@ -348,13 +354,13 @@ impl ApplyChunkOutput {
                 txn_info,
                 state_updates,
                 write_set,
-                events.clone(),
+                events,
                 !per_txn_reconfig_events.is_empty(),
             );
-            all_events.extend(events.clone());
+            all_subscribable_events.extend(subscribable_events);
             to_commit.push(txn_to_commit);
         }
-        (to_commit, txn_info_hashes, all_events)
+        (to_commit, txn_info_hashes, all_subscribable_events)
     }
 
     fn calculate_events_and_writeset_hashes(
@@ -392,4 +398,42 @@ pub fn ensure_no_retry(to_retry: Vec<Transaction>) -> Result<()> {
         "Seeing retries when syncing, did it crosses epoch boundary?",
     );
     Ok(())
+}
+
+#[test]
+fn test_x() {
+    let event_0 =
+        ContractEvent::new_v2_with_type_tag_str("0x1::dkg::StartDKGEvent", b"dkg_1".to_vec());
+    let event_1 = ContractEvent::new_v2_with_type_tag_str(
+        "0x2345::random_module::RandomEvent",
+        b"random_x".to_vec(),
+    );
+    let event_2 =
+        ContractEvent::new_v2_with_type_tag_str("0x1::dkg::StartDKGEvent", b"dkg_2".to_vec());
+    let txns_n_outputs =
+        TransactionsWithParsedOutput::new(vec![Transaction::dummy(), Transaction::dummy()], vec![
+            ParsedTransactionOutput::from(TransactionOutput::new(
+                WriteSet::default(),
+                vec![event_0.clone()],
+                0,
+                TransactionStatus::Keep(ExecutionStatus::Success),
+            )),
+            ParsedTransactionOutput::from(TransactionOutput::new(
+                WriteSet::default(),
+                vec![event_1.clone(), event_2.clone()],
+                0,
+                TransactionStatus::Keep(ExecutionStatus::Success),
+            )),
+        ]);
+    let state_updates_vec = vec![
+        ShardedStateUpdates::default(),
+        ShardedStateUpdates::default(),
+    ];
+    let state_checkpoint_hashes = vec![Some(HashValue::zero()), Some(HashValue::zero())];
+    let (_, _, subscribable_events) = ApplyChunkOutput::assemble_ledger_diff(
+        txns_n_outputs,
+        state_updates_vec,
+        state_checkpoint_hashes,
+    );
+    assert_eq!(vec![event_0, event_2], subscribable_events);
 }

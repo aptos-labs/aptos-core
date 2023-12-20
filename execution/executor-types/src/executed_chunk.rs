@@ -7,12 +7,11 @@
 use crate::{should_forward_to_subscription_service, ChunkCommitNotification, LedgerUpdateOutput};
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_storage_interface::{state_delta::StateDelta, ExecutedTrees};
+#[cfg(test)]
+use aptos_types::contract_event::ContractEvent;
 use aptos_types::{
-    contract_event::ContractEvent,
-    epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
-    state_store::combine_or_add_sharded_state_updates,
-    transaction::TransactionToCommit,
+    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
+    state_store::combine_or_add_sharded_state_updates, transaction::TransactionToCommit,
 };
 
 #[derive(Debug, Default)]

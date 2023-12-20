@@ -20,9 +20,7 @@ use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
-use aptos_executor_types::{
-    should_forward_to_subscription_service, BlockExecutorTrait, ExecutorResult, StateComputeResult,
-};
+use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResult};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -230,12 +228,7 @@ impl StateComputer for ExecutionProxy {
                 block.validator_txns().cloned().unwrap_or_default(),
                 input_txns,
             ));
-            subscribable_txn_events.extend(
-                block
-                    .events()
-                    .into_iter()
-                    .filter(should_forward_to_subscription_service),
-            );
+            subscribable_txn_events.extend(block.subscribable_events());
         }
 
         let executor = self.executor.clone();

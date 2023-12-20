@@ -1890,10 +1890,8 @@ impl Transaction {
             Transaction::ValidatorTransaction(_) => "validator_transaction",
         }
     }
-}
 
-impl Default for Transaction {
-    fn default() -> Self {
+    pub fn dummy() -> Self {
         Transaction::StateCheckpoint(HashValue::zero())
     }
 }

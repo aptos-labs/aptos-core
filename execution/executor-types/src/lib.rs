@@ -296,35 +296,35 @@ pub struct ChunkCommitNotification {
 #[derive(Debug, Default, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct StateComputeResult {
     /// transaction accumulator root hash is identified as `state_id` in Consensus.
-    pub root_hash: HashValue,
+    root_hash: HashValue,
     /// Represents the roots of all the full subtrees from left to right in this accumulator
     /// after the execution. For details, please see [`InMemoryAccumulator`](aptos_types::proof::accumulator::InMemoryAccumulator).
-    pub frozen_subtree_roots: Vec<HashValue>,
+    frozen_subtree_roots: Vec<HashValue>,
 
     /// The frozen subtrees roots of the parent block,
-    pub parent_frozen_subtree_roots: Vec<HashValue>,
+    parent_frozen_subtree_roots: Vec<HashValue>,
 
     /// The number of leaves of the transaction accumulator after executing a proposed block.
     /// This state must be persisted to ensure that on restart that the version is calculated correctly.
-    pub num_leaves: u64,
+    num_leaves: u64,
 
     /// The number of leaves after executing the parent block,
-    pub parent_num_leaves: u64,
+    parent_num_leaves: u64,
 
     /// If set, this is the new epoch info that should be changed to if this block is committed.
-    pub epoch_state: Option<EpochState>,
+    epoch_state: Option<EpochState>,
     /// The compute status (success/failure) of the given payload. The specific details are opaque
     /// for StateMachineReplication, which is merely passing it between StateComputer and
     /// PayloadClient.
     ///
     /// Here, only input transactions statuses are kept, and in their order.
     /// Input includes BlockMetadata, but doesn't include StateCheckpoint/BlockEpilogue
-    pub compute_status_for_input_txns: Vec<TransactionStatus>,
+    compute_status_for_input_txns: Vec<TransactionStatus>,
 
     /// The transaction info hashes of all success txns.
-    pub transaction_info_hashes: Vec<HashValue>,
+    transaction_info_hashes: Vec<HashValue>,
 
-    pub events: Vec<ContractEvent>,
+    subscribable_events: Vec<ContractEvent>,
 }
 
 impl StateComputeResult {
@@ -337,7 +337,7 @@ impl StateComputeResult {
         epoch_state: Option<EpochState>,
         compute_status_for_input_txns: Vec<TransactionStatus>,
         transaction_info_hashes: Vec<HashValue>,
-        events: Vec<ContractEvent>,
+        subscribable_events: Vec<ContractEvent>,
     ) -> Self {
         Self {
             root_hash,
@@ -348,7 +348,7 @@ impl StateComputeResult {
             epoch_state,
             compute_status_for_input_txns,
             transaction_info_hashes,
-            events,
+            subscribable_events,
         }
     }
 
@@ -362,7 +362,7 @@ impl StateComputeResult {
             epoch_state: None,
             compute_status_for_input_txns: vec![],
             transaction_info_hashes: vec![],
-            events: vec![],
+            subscribable_events: vec![],
         }
     }
 
@@ -379,7 +379,7 @@ impl StateComputeResult {
             epoch_state: None,
             compute_status_for_input_txns: vec![],
             transaction_info_hashes: vec![],
-            events: vec![],
+            subscribable_events: vec![],
         }
     }
 
@@ -396,7 +396,7 @@ impl StateComputeResult {
                 num_txns
             ],
             transaction_info_hashes: vec![],
-            events: vec![],
+            subscribable_events: vec![],
         }
     }
 
@@ -513,8 +513,8 @@ impl StateComputeResult {
         self.epoch_state.is_some()
     }
 
-    pub fn events(&self) -> &[ContractEvent] {
-        &self.events
+    pub fn subscribable_events(&self) -> &[ContractEvent] {
+        &self.subscribable_events
     }
 }
 
