@@ -3,19 +3,21 @@ module tournament::admin {
     use std::option::{Self, Option};
     use std::signer;
     use aptos_framework::account::{Self, SignerCapability};
-    use aptos_framework::object::{Self, ObjectCore};
 
     use tournament::tournament_manager;
 
     friend tournament::rock_paper_scissor;
     friend tournament::trivia;
+    friend tournament::roulette;
     friend tournament::aptos_tournament;
 
     /// You are not authorized to do that
     const ENOT_AUTHORIZED: u64 = 0;
 
     #[test_only]
-    friend tournament::rps_utils;
+    friend tournament::rps_unit_tests;
+    #[test_only]
+    friend tournament::roulette_unit_tests;
 
     struct AdminStore has key, drop {
         signer_cap: SignerCapability,
@@ -77,12 +79,4 @@ module tournament::admin {
         tournament_manager::get_tournament_signer(&admin_signer, tournament_address)
     }
 
-    // Assumes the tournament_address is `object::owner(Object<ObjectCore>@object_address)`
-    public(friend) fun get_tournament_owner_signer_from_object_owner(
-        object_address: address
-    ): signer acquires AdminStore {
-        get_tournament_owner_signer(
-            object::owner(object::address_to_object<ObjectCore>(object_address))
-        )
-    }
 }

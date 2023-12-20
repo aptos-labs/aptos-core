@@ -4,11 +4,9 @@ module tournament::tournament_manager {
     use aptos_std::type_info::type_name;
     use aptos_framework::object::{Self, Object};
 
-    use aptos_token_objects::token::Token;
-
     use tournament::object_refs;
     use tournament::round;
-    use tournament::token_manager;
+    use tournament::token_manager::{Self, TournamentPlayerToken};
 
     /// The account is not authorized to perform that action.
     const ENOT_AUTHORIZED: u64 = 1;
@@ -153,7 +151,7 @@ module tournament::tournament_manager {
         player: &signer,
         tournament_address: address,
         player_name: String,
-    ): Object<Token> acquires TournamentState, TournamentDirector {
+    ): Object<TournamentPlayerToken> acquires TournamentState, TournamentDirector {
         assert_tournament_not_ended(tournament_address);
         assert_tournament_is_joinable(tournament_address);
         let td = borrow_global_mut<TournamentDirector>(tournament_address);
@@ -207,18 +205,20 @@ module tournament::tournament_manager {
 
         let tournament_signer = get_tournament_signer(caller, tournament_address);
 
+        let new_round_number = current_round.number + 1;
+
         cleanup_current_round<GameType>(&tournament_signer, current_round);
 
         let (round_signer, _, _) = round::create_round<GameType>(
             &tournament_signer,
-            current_round.number,
+            new_round_number,
             min_players_per_room,
             max_players_per_room,
         );
         let round_address = signer::address_of(&round_signer);
 
         current_round.game_module = type_name<GameType>();
-        current_round.number = current_round.number + 1;
+        current_round.number = new_round_number;
         current_round.round_address = round_address;
 
         // Only allow joining at the start!
@@ -287,9 +287,12 @@ module tournament::tournament_manager {
     //                                    Assertion helpers                                   //
     // -------------------------------------------------------------------------------------- //
 
+    public fun tournament_has_ended(tournament_address: address): bool acquires TournamentState {
+        borrow_global<TournamentState>(tournament_address).has_ended
+    }
+
     inline fun assert_tournament_not_ended(tournament_address: address) {
-        let has_ended = borrow_global<TournamentState>(tournament_address).has_ended;
-        assert!(!has_ended, ETOURNAMENT_HAS_ENDED);
+        assert!(!tournament_has_ended(tournament_address), ETOURNAMENT_HAS_ENDED);
     }
 
     inline fun assert_tournament_is_joinable(tournament_address: address) {

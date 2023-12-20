@@ -5,10 +5,10 @@ module tournament::round {
     use aptos_framework::object;
     use aptos_framework::object::Object;
 
-    use aptos_token_objects::token::Token;
 
     use tournament::matchmaker;
     use tournament::object_refs;
+    use tournament::token_manager::TournamentPlayerToken;
 
     /// The signer is not the owner of the Round
     const ENOT_ROUND_OWNER: u64 = 0;
@@ -79,6 +79,12 @@ module tournament::round {
         object::owner(round)
     }
 
+    #[view]
+    public fun get_<GameType>(round_address: address): address {
+        let round = object::address_to_object<Round<GameType>>(round_address);
+        object::owner(round)
+    }
+
     // Returns the round_signer, matchmaker_signer, and Option<unlimited_room_signer>
     // The unlimited room signer is only returned if max_players_per_room is 0: i.e we want all players in one room
     public fun create_round<GameType>(
@@ -110,10 +116,11 @@ module tournament::round {
         (round_signer, matchmaker_signer, unlimited_room_signer)
     }
 
+    /// Returns room signers
     public fun add_players<GameType>(
         owner: &signer,
         round_address: address,
-        players: vector<Object<Token>>,
+        players: vector<Object<TournamentPlayerToken>>,
     ): Option<vector<signer>> acquires Round {
         assert_round_owner<GameType>(owner, round_address);
 
@@ -127,11 +134,19 @@ module tournament::round {
         owner: &signer,
         round_address: address,
     ) acquires Round {
+        end_matchmaking_returning<GameType>(owner, round_address);
+    }
+
+    /// Returns (option<vec<room signer>>, vec<Object<player token>>)
+    public fun end_matchmaking_returning<GameType>(
+        owner: &signer,
+        round_address: address,
+    ): (Option<vector<signer>>, vector<Object<TournamentPlayerToken>>) acquires Round {
         assert_round_owner<GameType>(owner, round_address);
 
         let round = borrow_global_mut<Round<GameType>>(round_address);
         round.matchmaking_ended = true;
-        matchmaker::finish_matchmaking<GameType>(owner, round.matchmaker_address);
+        matchmaker::finish_matchmaking<GameType>(owner, round.matchmaker_address)
     }
 
     public entry fun start_play<GameType>(
@@ -161,18 +176,20 @@ module tournament::round {
         owner: &signer,
         round_address: address,
     ) acquires Round {
-        assert_round_owner<GameType>(owner, round_address);
+        if (exists<Round<GameType>>(round_address)) {
+            assert_round_owner<GameType>(owner, round_address);
 
-        let Round<GameType> {
-            number: _,
-            matchmaking_ended: _,
-            play_started: _,
-            play_ended: _,
-            paused: _,
-            matchmaker_address,
-        } = move_from<Round<GameType>>(round_address);
-        object_refs::destroy_object(round_address);
-        matchmaker::destroy_matchmaker<GameType>(matchmaker_address);
+            let Round<GameType> {
+                number: _,
+                matchmaking_ended: _,
+                play_started: _,
+                play_ended: _,
+                paused: _,
+                matchmaker_address,
+            } = move_from<Round<GameType>>(round_address);
+            object_refs::destroy_object(round_address);
+            matchmaker::destroy_matchmaker<GameType>(matchmaker_address);
+        }
     }
 
     public fun get_round_signer<GameType>(owner: &signer, round_address: address): signer {

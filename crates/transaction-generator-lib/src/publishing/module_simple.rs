@@ -603,7 +603,10 @@ impl EntryPoints {
                 get_payload(
                     module_id,
                     ident_str!("game_play").to_owned(),
-                    vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
+                    vec![
+                        bcs::to_bytes(other.expect("Must provide other")).unwrap(),
+                        bcs::to_bytes(&false).unwrap()
+                    ],
                 )
             }
         }

@@ -1,17 +1,22 @@
 module tournament::matchmaker {
+    use std::bcs;
     use std::option::{Self, Option};
     use std::signer;
     use std::vector;
     use aptos_std::table_with_length::{Self, TableWithLength};
     use aptos_framework::object::{Self, Object};
+    use aptos_framework::timestamp;
     use aptos_framework::transaction_context;
-
-    use aptos_token_objects::token::Token;
 
     use tournament::object_refs;
     use tournament::room;
+    use tournament::token_manager::TournamentPlayerToken;
 
     friend tournament::round;
+
+    #[test_only]
+    friend tournament::main_unit_test;
+
 
     /// Attempted to matchmake for a tournament that the signer does not own
     const ENOT_MATCHMAKER_OWNER: u64 = 0;
@@ -29,7 +34,7 @@ module tournament::matchmaker {
         joining_allowed: bool,
         // Only one of the two below will be Some
         unlimited_room_address: Option<address>,
-        user_buckets: Option<TableWithLength<u8, vector<Object<Token>>>>
+        user_buckets: Option<TableWithLength<u8, vector<Object<TournamentPlayerToken>>>>
     }
 
     public(friend) fun create_unlimited_matchmaker<GameType>(
@@ -64,7 +69,7 @@ module tournament::matchmaker {
 
         let i: u8 = 0;
         while (i < NUM_BUCKETS) {
-            table_with_length::add(&mut user_buckets, i, vector::empty<Object<Token>>());
+            table_with_length::add(&mut user_buckets, i, vector::empty<Object<TournamentPlayerToken>>());
             i = i + 1;
         };
 
@@ -99,6 +104,9 @@ module tournament::matchmaker {
     public(friend) fun destroy_matchmaker<GameType>(
         matchmaker_address: address,
     ) acquires MatchMaker {
+        if(!exists<MatchMaker<GameType>>(matchmaker_address)) {
+            return
+        };
         let matchmaker = object::address_to_object<MatchMaker<GameType>>(matchmaker_address);
 
         let matchmaker_addr = object::object_address(&matchmaker);
@@ -143,7 +151,9 @@ module tournament::matchmaker {
 
     // Uses the current transaction hash to get the bucket number
     public(friend) fun get_bucket_num(): u8 {
-        let hash = transaction_context::get_transaction_hash();
+        let to_hash = transaction_context::get_transaction_hash();
+        vector::append(&mut to_hash, bcs::to_bytes(&timestamp::now_seconds()));
+        let hash = std::hash::sha3_256(to_hash);
         let last_u8 = vector::pop_back(&mut hash);
         last_u8 % NUM_BUCKETS
     }
@@ -151,7 +161,7 @@ module tournament::matchmaker {
     public(friend) fun add_players<GameType>(
         owner: &signer,
         matchmaker_address: address,
-        players: vector<Object<Token>>,
+        players: vector<Object<TournamentPlayerToken>>,
     ): Option<vector<signer>> acquires MatchMaker {
         let matchmaker = object::address_to_object<MatchMaker<GameType>>(matchmaker_address);
 
@@ -168,11 +178,13 @@ module tournament::matchmaker {
             let bucket_num = get_bucket_num();
             let bucket = table_with_length::borrow_mut(table, bucket_num);
             vector::append(bucket, players);
-            if (vector::length(bucket) >= matchmaker.max_players_per_room) {
+            room_signers = if (vector::length(bucket) >= matchmaker.max_players_per_room) {
                 // Time to create some new rooms!
-                room_signers = option::some(
+                option::some(
                     create_rooms_for_players<GameType>(owner, bucket, matchmaker.max_players_per_room)
-                );
+                )
+            } else {
+                option::some(vector[])
             }
         } else {
             let room_addr = option::borrow(&matchmaker.unlimited_room_address);
@@ -184,7 +196,7 @@ module tournament::matchmaker {
 
     inline fun create_rooms_for_players<GameType>(
         owner: &signer,
-        bucket: &mut vector<Object<Token>>,
+        bucket: &mut vector<Object<TournamentPlayerToken>>,
         players_per_room: u64,
     ): vector<signer> {
         let room_signers = vector::empty<signer>();
@@ -199,10 +211,11 @@ module tournament::matchmaker {
         room_signers
     }
 
+    // Returns room_signers, all_players
     public(friend) fun finish_matchmaking<GameType>(
         owner: &signer,
         matchmaker_address: address,
-    ): (Option<vector<signer>>, vector<Object<Token>>) acquires MatchMaker {
+    ): (Option<vector<signer>>, vector<Object<TournamentPlayerToken>>) acquires MatchMaker {
         let matchmaker = borrow_global_mut<MatchMaker<GameType>>(matchmaker_address);
         matchmaker.joining_allowed = false;
         // Iterate through all buckets, if we need to, and kick them into rooms
@@ -211,7 +224,7 @@ module tournament::matchmaker {
             let user_buckets = option::borrow_mut(&mut matchmaker.user_buckets);
             let i = 0;
             let room_signers = vector::empty<signer>();
-            let all_players = vector::empty<Object<Token>>();
+            let all_players = vector::empty<Object<TournamentPlayerToken>>();
             let table_length = table_with_length::length(user_buckets);
             while (i < table_length) {
                 let bucket = table_with_length::borrow_mut(user_buckets, (i as u8));
@@ -234,7 +247,6 @@ module tournament::matchmaker {
             return (option::some(room_signers), all_players)
         };
 
-        (option::none(), vector::empty<Object<Token>>())
+        (option::none(), vector::empty<Object<TournamentPlayerToken>>())
     }
-
 }

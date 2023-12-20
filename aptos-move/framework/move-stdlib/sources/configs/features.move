@@ -96,8 +96,9 @@ module std::features {
     /// Lifetime: transient
     const BLAKE2B_256_NATIVE: u64 = 8;
     public fun get_blake2b_256_feature(): u64 { BLAKE2B_256_NATIVE }
-    public fun blake2b_256_enabled(): bool acquires Features {
-        is_enabled(BLAKE2B_256_NATIVE)
+    public fun blake2b_256_enabled(): bool {
+        true
+        // is_enabled(BLAKE2B_256_NATIVE)
     }
 
     /// Whether resource groups are enabled.

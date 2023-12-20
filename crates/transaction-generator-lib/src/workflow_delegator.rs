@@ -226,7 +226,6 @@ impl WorkflowTxnGeneratorCreator {
                 let tournament_setup_round_worker =  CustomModulesDelegationGeneratorCreator::create_worker(init_txn_factory.clone(), root_account, txn_executor, &mut packages, &mut TournamentStartNewRoundTransactionGenerator::new(
                     player_setup_pool.clone(),
                     round_created_pool.clone(),
-                    join_batch,
                 )).await;
                 let tournament_move_players_to_round_worker =  CustomModulesDelegationGeneratorCreator::create_worker(init_txn_factory.clone(), root_account, txn_executor, &mut packages, &mut TournamentMovePlayersToRoundTransactionGenerator::new(
                     round_created_pool.clone(),
