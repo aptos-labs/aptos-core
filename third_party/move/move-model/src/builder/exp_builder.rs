@@ -1246,7 +1246,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let body = self.translate_exp(body, &Type::unit());
                 // See the Move book for below treatment: if the loop has no exit, the type
                 // is arbitrary, otherwise `()`.
-                let loop_type = if body.has_exit() {
+                let loop_type = if body.has_loop_exit() {
                     self.check_type(&loc, &Type::unit(), expected_type, "")
                 } else {
                     expected_type.clone()

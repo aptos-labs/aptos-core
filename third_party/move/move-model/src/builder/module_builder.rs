@@ -1447,7 +1447,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             return self.spec_funs[spec_fun_idx].is_native && no_mut_ref_param;
         };
         let mut is_pure = true;
-        body.visit(&mut |e: &ExpData| {
+        body.visit_pre_order(&mut |e: &ExpData| {
             if let ExpData::Call(_, Operation::SpecFunction(mid, fid, _), _) = e {
                 if mid.to_usize() < self.module_id.to_usize() {
                     // This is calling a function from another module we already have
@@ -1460,7 +1460,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     // arbitrary call graphs, including cyclic.
                     if !self.propagate_function_impurity(visited, *fid) {
                         is_pure = false;
-                        false // Short-curcuit the visit; this function is not pure
+                        false // Short-circuit the visit; this function is not pure
                     } else {
                         true
                     }
@@ -2078,7 +2078,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 }
                 true // continue visit, note all problematic subexprs
             };
-            cond.exp.visit(&mut visitor);
+            cond.exp.visit_post_order(&mut visitor);
         } else if let FunctionCode(name, _) | FunctionCodeV2(name, _) = context {
             // Restrict accesses to function arguments only for `old(..)` in in-spec block
             let entry = self.parent.fun_table.get(name).expect("function defined");
@@ -2110,7 +2110,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 }
                 true // continue visit, note all problematic subexprs
             };
-            cond.exp.visit(&mut visitor);
+            cond.exp.visit_post_order(&mut visitor);
         }
         ok
     }
@@ -3491,7 +3491,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     ) {
         let mut used_memory = BTreeSet::new();
         let mut callees = BTreeSet::new();
-        exp.visit(&mut |e: &ExpData| {
+        exp.visit_post_order(&mut |e: &ExpData| {
             match e {
                 ExpData::Call(id, Operation::SpecFunction(mid, fid, _), _) => {
                     callees.insert(mid.qualified(*fid));

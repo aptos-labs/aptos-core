@@ -561,7 +561,9 @@ impl From<Exp> for ExpData {
 
 /// Rewrite result
 pub enum RewriteResult {
+    // A new expression
     Rewritten(Exp),
+    // The original expression
     Unchanged(Exp),
 }
 
@@ -620,7 +622,7 @@ impl ExpData {
 
     pub fn node_ids(&self) -> Vec<NodeId> {
         let mut ids = vec![];
-        self.visit(&mut |e| {
+        self.visit_post_order(&mut |e| {
             ids.push(e.node_id());
             true // keep going
         });
@@ -643,9 +645,9 @@ impl ExpData {
     /// Returns the bound local variables with node id in this expression
     pub fn bound_local_vars_with_node_id(&self) -> BTreeMap<Symbol, NodeId> {
         let mut vars = BTreeMap::new();
-        let mut visitor = |up: bool, e: &ExpData| {
+        let mut visitor = |post: bool, e: &ExpData| {
             use ExpData::*;
-            if up {
+            if post {
                 if let LocalVar(id, sym) = e {
                     if !vars.iter().any(|(s, _)| s == sym) {
                         vars.insert(*sym, *id);
@@ -664,7 +666,7 @@ impl ExpData {
         F: FnMut(&NodeId, &Symbol),
     {
         let mut shadowed: BTreeMap<Symbol, usize> = BTreeMap::new();
-        let mut visitor = |up: bool, e: &ExpData| {
+        let mut visitor = |post: bool, e: &ExpData| {
             use ExpData::*;
             let decls = match e {
                 Lambda(_, pat, _) | Block(_, pat, _, _) => {
@@ -676,7 +678,7 @@ impl ExpData {
                     .collect_vec(),
                 _ => vec![],
             };
-            if !up {
+            if !post {
                 // Visit the Assigned pat on the way down, before visiting the RHS expression
                 if let Assign(_, pat, _) = e {
                     for (id, sym) in pat.vars().iter() {
@@ -693,7 +695,7 @@ impl ExpData {
                     }
                 }
             }
-            if up {
+            if post {
                 if let LocalVar(id, sym) = e {
                     if shadowed.get(sym).cloned().unwrap_or(0) == 0 {
                         node_symbol_visitor(id, sym);
@@ -751,7 +753,7 @@ impl ExpData {
             }
             true // keep going
         };
-        self.visit(&mut visitor);
+        self.visit_post_order(&mut visitor);
         result
     }
 
@@ -766,7 +768,7 @@ impl ExpData {
             }
             true // keep going
         };
-        self.visit(&mut visitor);
+        self.visit_post_order(&mut visitor);
         temps
     }
 
@@ -779,7 +781,7 @@ impl ExpData {
             }
             true // keep going
         };
-        self.visit(&mut visitor);
+        self.visit_post_order(&mut visitor);
         called
     }
 
@@ -795,16 +797,20 @@ impl ExpData {
             }
             true // keep going
         };
-        self.visit(&mut visitor);
+        self.visit_post_order(&mut visitor);
         called
     }
 
-    pub fn has_exit(&self) -> bool {
+    /// Given that this expression is (part of) a loop body, returns `true` if
+    /// there is an early exit from the body of the nearest enclosing loop,
+    /// i.e., the expression contains a `continue` or `break` statement outside
+    /// of any nested loop.
+    pub fn has_loop_exit(&self) -> bool {
         let mut loop_count = 0; // Count internal nested loops.
         let mut has_exit = false;
-        let mut visitor = |up: bool, e: &ExpData| {
+        let mut visitor = |post: bool, e: &ExpData| {
             match e {
-                ExpData::Loop(_, _) => loop_count += if up { -1 } else { 1 },
+                ExpData::Loop(_, _) => loop_count += if post { -1 } else { 1 },
                 ExpData::LoopCont(_, _) if loop_count == 0 => {
                     has_exit = true;
                     return false; // found an exit, exit visit early
@@ -848,18 +854,18 @@ impl ExpData {
             }
             true // Always keep going, to add all problematic subexpressions to reasons.
         };
-        self.visit_top_down(&mut visitor);
+        self.visit_pre_order(&mut visitor);
         valid
     }
 
     /// Visits expression, calling visitor on each sub-expression, depth first.
     /// `visitor` returns false to indicate that visit should stop early.
-    pub fn visit<F>(&self, visitor: &mut F)
+    pub fn visit_post_order<F>(&self, visitor: &mut F)
     where
         F: FnMut(&ExpData) -> bool,
     {
-        self.visit_pre_post(&mut |up, e| {
-            if up {
+        self.visit_pre_post(&mut |post, e| {
+            if post {
                 visitor(e)
             } else {
                 true // keep going
@@ -869,12 +875,12 @@ impl ExpData {
 
     /// Visits expression, calling visitor parent expression, then subexpressions, depth first.
     /// `visitor` returns false to indicate that visit should stop early.
-    pub fn visit_top_down<F>(&self, visitor: &mut F)
+    pub fn visit_pre_order<F>(&self, visitor: &mut F)
     where
         F: FnMut(&ExpData) -> bool,
     {
-        self.visit_pre_post(&mut |up, e| {
-            if !up {
+        self.visit_pre_post(&mut |post, e| {
+            if !post {
                 visitor(e)
             } else {
                 true // keep going
@@ -887,7 +893,7 @@ impl ExpData {
         P: FnMut(&ExpData) -> bool,
     {
         let mut found = false;
-        self.visit(&mut |e| {
+        self.visit_pre_order(&mut |e| {
             if predicate(e) {
                 found = true;
                 false // stop visiting; we're done
@@ -910,7 +916,7 @@ impl ExpData {
         let _ = self.visit_pre_post_impl(&mut |x, e| if visitor(x, e) { Some(()) } else { None });
     }
 
-    /// Visitor implementation uses `Options<()>` to implement short-cutting without verbosity.
+    /// Visitor implementation uses `Option<()>` to implement short-cutting without verbosity.
     /// - `visitor` returns `None` to indicate that visit should stop early, and `Some(())` to continue.
     /// - `visit_pre_post` returns `None` if visitor returned `None`.
     fn visit_pre_post_impl<F>(&self, visitor: &mut F) -> Option<()>
@@ -1119,7 +1125,7 @@ impl ExpData {
 
     /// Returns the set of module ids used by this expression.
     pub fn module_usage(&self, usage: &mut BTreeSet<ModuleId>) {
-        self.visit(&mut |e| {
+        self.visit_post_order(&mut |e| {
             if let ExpData::Call(_, oper, _) = e {
                 use Operation::*;
                 match oper {
@@ -1132,7 +1138,7 @@ impl ExpData {
                     _ => {},
                 }
             }
-            true // keepy going
+            true // keep going
         });
     }
 
@@ -1164,7 +1170,7 @@ impl ExpData {
 
     /// Collect struct-related operations
     pub fn struct_usage(&self, usage: &mut BTreeSet<QualifiedId<StructId>>) {
-        self.visit(&mut |e| {
+        self.visit_post_order(&mut |e| {
             if let ExpData::Call(_, oper, _) = e {
                 use Operation::*;
                 match oper {
@@ -1180,7 +1186,7 @@ impl ExpData {
 
     /// Collect field-related operations
     pub fn field_usage(&self, usage: &mut BTreeSet<(QualifiedId<StructId>, FieldId)>) {
-        self.visit(&mut |e| {
+        self.visit_post_order(&mut |e| {
             if let ExpData::Call(_, oper, _) = e {
                 use Operation::*;
                 match oper {
@@ -1196,7 +1202,7 @@ impl ExpData {
 
     /// Collect vector-related operations
     pub fn vector_usage(&self, usage: &mut HashSet<Operation>) {
-        self.visit(&mut |e| {
+        self.visit_post_order(&mut |e| {
             if let ExpData::Call(_, oper, _) = e {
                 use Operation::*;
                 match oper {
@@ -1520,7 +1526,7 @@ impl ExpData {
     {
         use ExpData::*;
         let mut no_use = true;
-        self.visit(&mut |exp: &ExpData| {
+        self.visit_pre_order(&mut |exp: &ExpData| {
             if let Call(_, oper, _) = exp {
                 if !oper.uses_no_memory(check_pure) {
                     no_use = false;
@@ -1567,7 +1573,7 @@ impl ExpData {
             }
             true // keep going
         };
-        self.visit(&mut visitor);
+        self.visit_pre_order(&mut visitor);
         is_pure
     }
 }
