@@ -1031,7 +1031,7 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
                 transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
                 num_modules: 1,
                 unique_senders: true,
-                mempool_backlog: 10000,
+                mempool_backlog: 30000,
             },
             // transactions get rejected, to fix.
             // TransactionWorkload {
@@ -1043,17 +1043,24 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         ]),
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
-            (3700, 0.35, 0.5, 0.8, 0.65),
-            (2800, 0.35, 0.5, 1.2, 1.3),
-            (1800, 0.35, 2.0, 1.5, 3.0),
-            (950, 0.35, 0.65, 1.5, 2.9),
+            (5500, 100, 0.3, 0.3, 0.8, 0.65),
+            (4500, 100, 0.3, 0.4, 1.0, 1.5),
+            (2000, 300, 0.3, 0.3, 0.8, 1.0),
+            (600, 500, 0.3, 0.3, 0.8, 1.0),
             // (150, 0.5, 1.0, 1.5, 0.65),
         ]
         .into_iter()
         .map(
-            |(min_tps, batch_to_pos, pos_to_proposal, proposal_to_ordered, ordered_to_commit)| {
+            |(
+                min_tps,
+                max_expired,
+                batch_to_pos,
+                pos_to_proposal,
+                proposal_to_ordered,
+                ordered_to_commit,
+            )| {
                 SuccessCriteria::new(min_tps)
-                    .add_max_expired_tps(200)
+                    .add_max_expired_tps(max_expired)
                     .add_max_failed_submission_tps(200)
                     .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
                         (LatencyBreakdownSlice::QsBatchToPos, batch_to_pos),
