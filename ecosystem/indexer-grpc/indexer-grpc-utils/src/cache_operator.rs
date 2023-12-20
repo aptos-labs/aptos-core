@@ -122,7 +122,8 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         match latest_version {
             Some(version) => Ok(Some((
                 version.saturating_sub(CACHE_SIZE_ESTIMATION),
-                version,
+                // Fix this: current latest version is exclusive.
+                version.saturating_sub(1),
             ))),
             None => Ok(None),
         }
