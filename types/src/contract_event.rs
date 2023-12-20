@@ -19,7 +19,7 @@ use once_cell::sync::Lazy;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::convert::TryFrom;
+use std::{convert::TryFrom, str::FromStr};
 
 pub static FEE_STATEMENT_EVENT_TYPE: Lazy<TypeTag> = Lazy::new(|| {
     TypeTag::Struct(Box::new(StructTag {
@@ -77,6 +77,13 @@ impl ContractEvent {
 
     pub fn new_v2(type_tag: TypeTag, event_data: Vec<u8>) -> Self {
         ContractEvent::V2(ContractEventV2::new(type_tag, event_data))
+    }
+
+    pub fn new_v2_with_type_tag_str(type_tag_str: &str, event_data: Vec<u8>) -> Self {
+        ContractEvent::V2(ContractEventV2::new(
+            TypeTag::from_str(type_tag_str).unwrap(),
+            event_data,
+        ))
     }
 
     pub fn event_key(&self) -> Option<&EventKey> {

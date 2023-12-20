@@ -53,8 +53,8 @@ pub mod webauthn;
 
 use crate::{
     contract_event::TransactionEvent, executable::ModulePath, fee_statement::FeeStatement,
-    proof::accumulator::InMemoryEventAccumulator, validator_txn::ValidatorTransaction,
-    write_set::TransactionWrite,
+    proof::accumulator::InMemoryEventAccumulator, state_store::create_empty_sharded_state_updates,
+    validator_txn::ValidatorTransaction, write_set::TransactionWrite,
 };
 pub use block_output::BlockOutput;
 pub use change_set::ChangeSet;
@@ -1297,6 +1297,17 @@ impl TransactionInfo {
             status,
         )
     }
+
+    fn dummy() -> Self {
+        Self::new(
+            HashValue::default(),
+            HashValue::default(),
+            HashValue::default(),
+            None,
+            0,
+            ExecutionStatus::Success,
+        )
+    }
 }
 
 impl Deref for TransactionInfo {
@@ -1429,6 +1440,17 @@ impl TransactionToCommit {
             write_set,
             events,
             is_reconfig,
+        }
+    }
+
+    pub fn dummy_with_events(events: Vec<ContractEvent>) -> Self {
+        Self {
+            transaction: Transaction::StateCheckpoint(HashValue::zero()),
+            transaction_info: TransactionInfo::dummy(),
+            state_updates: create_empty_sharded_state_updates(),
+            write_set: Default::default(),
+            events,
+            is_reconfig: false,
         }
     }
 
@@ -1867,6 +1889,12 @@ impl Transaction {
             Transaction::StateCheckpoint(_) => "state_checkpoint",
             Transaction::ValidatorTransaction(_) => "validator_transaction",
         }
+    }
+}
+
+impl Default for Transaction {
+    fn default() -> Self {
+        Transaction::StateCheckpoint(HashValue::zero())
     }
 }
 

@@ -8,11 +8,14 @@ use crate::{should_forward_to_subscription_service, ChunkCommitNotification, Led
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_storage_interface::{state_delta::StateDelta, ExecutedTrees};
 use aptos_types::{
-    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
-    state_store::combine_or_add_sharded_state_updates, transaction::TransactionToCommit,
+    contract_event::ContractEvent,
+    epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
+    state_store::combine_or_add_sharded_state_updates,
+    transaction::TransactionToCommit,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ExecutedChunk {
     pub result_state: StateDelta,
     pub ledger_info: Option<LedgerInfoWithSignatures>,
@@ -110,4 +113,38 @@ impl ExecutedChunk {
             reconfiguration_occurred,
         }
     }
+}
+
+#[test]
+fn into_chunk_commit_notification_should_apply_event_filters() {
+    let event_0 =
+        ContractEvent::new_v2_with_type_tag_str("0x1::dkg::StartDKGEvent", b"dkg_data_0".to_vec());
+    let event_1 = ContractEvent::new_v2_with_type_tag_str(
+        "0x2345::random_module::RandomEvent",
+        b"random_data_x".to_vec(),
+    );
+    let event_2 =
+        ContractEvent::new_v2_with_type_tag_str("0x1::dkg::StartDKGEvent", b"dkg_data_2".to_vec());
+    let event_3 = ContractEvent::new_v2_with_type_tag_str(
+        "0x6789::random_module::RandomEvent",
+        b"random_data_y".to_vec(),
+    );
+
+    let ledger_update_output = LedgerUpdateOutput {
+        to_commit: vec![
+            TransactionToCommit::dummy_with_events(vec![event_0.clone()]),
+            TransactionToCommit::dummy_with_events(vec![event_1.clone(), event_2.clone()]),
+            TransactionToCommit::dummy_with_events(vec![event_3.clone()]),
+        ],
+        ..Default::default()
+    };
+
+    let chunk = ExecutedChunk {
+        ledger_update_output,
+        ..Default::default()
+    };
+
+    let notification = chunk.into_chunk_commit_notification();
+
+    assert_eq!(vec![event_0, event_2], notification.committed_events);
 }
