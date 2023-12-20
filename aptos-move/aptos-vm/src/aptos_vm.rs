@@ -2094,40 +2094,6 @@ impl VMExecutor for AptosVM {
     }
 }
 
-/// Check if account authenticator matches WebAuthn `AccountAuthenticator`
-fn matches_webauthn_authenticator(account_authenticator: &AccountAuthenticator) -> bool {
-    // exhaustive check AccountAuthenticator in case variants are added later
-    match account_authenticator {
-        AccountAuthenticator::Ed25519 { .. } | AccountAuthenticator::MultiEd25519 { .. } => {},
-        AccountAuthenticator::SingleKey { authenticator } => {
-            let signature = authenticator.signature();
-            if matches!(signature, AnySignature::WebAuthn { .. }) {
-                return true;
-            }
-        },
-        AccountAuthenticator::MultiKey { authenticator } => {
-            let signatures = authenticator.signatures();
-            for (.., signature) in signatures {
-                if matches!(signature, AnySignature::WebAuthn { .. }) {
-                    return true;
-                }
-            }
-        },
-    }
-    false
-}
-
-/// Check if account authenticators includes one or more WebAuthn AccountAuthenticator
-fn includes_webauthn_authenticator(account_authenticators: &Vec<AccountAuthenticator>) -> bool {
-    for account_authenticator in account_authenticators {
-        // immediately return if true
-        if matches_webauthn_authenticator(account_authenticator) {
-            return true;
-        }
-    }
-    false
-}
-
 // VMValidator external API
 impl VMValidator for AptosVM {
     /// Determine if a transaction is valid. Will return `None` if the transaction is accepted,
@@ -2159,40 +2125,13 @@ impl VMValidator for AptosVM {
         }
 
         if !self.features.is_enabled(FeatureFlag::WEBAUTHN_SIGNATURE) {
-            // exhaustive check TransactionAuthenticator in case variants are added later
-            match transaction.authenticator_ref() {
-                TransactionAuthenticator::Ed25519 { .. }
-                | TransactionAuthenticator::MultiEd25519 { .. } => {},
-                TransactionAuthenticator::MultiAgent {
-                    sender,
-                    secondary_signers,
-                    ..
-                } => {
-                    let is_webauthn = matches_webauthn_authenticator(sender)
-                        || includes_webauthn_authenticator(secondary_signers);
-                    if is_webauthn {
-                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
-                    }
-                },
-                TransactionAuthenticator::FeePayer {
-                    sender,
-                    secondary_signers,
-                    fee_payer_signer,
-                    ..
-                } => {
-                    let is_webauthn = matches_webauthn_authenticator(sender)
-                        || includes_webauthn_authenticator(secondary_signers)
-                        || matches_webauthn_authenticator(fee_payer_signer);
-                    if is_webauthn {
-                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
-                    }
-                },
-                TransactionAuthenticator::SingleSender { sender } => {
-                    let is_webauthn = matches_webauthn_authenticator(sender);
-                    if is_webauthn {
-                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
-                    }
-                },
+            let sk_authenticators = transaction.authenticator_ref().to_single_key_authenticators()?;
+            for authenticator in sk_authenticators {
+                match (authenticator.signature()) {
+                    (AnySignature::WebAuthn { .. }) =>
+                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING),
+                    _ => {},
+                }
             }
         }
 
