@@ -434,10 +434,6 @@ impl BatchGenerator {
                             for batch_id in batches.iter().map(|b| b.batch_id()) {
                                 if self.remove_batch_in_progress(&batch_id) {
                                     counters::BATCH_IN_PROGRESS_COMMITTED.inc();
-                                    debug!(
-                                        LogSchema::new(LogEvent::BatchCommitNotification),
-                                        batch_id = batch_id,
-                                    );
                                 }
                             }
 
