@@ -1,4 +1,4 @@
-//# publish --print-bytecode
+//# publish
 module 0x42::M {
 
     struct R has key { f: u64 }

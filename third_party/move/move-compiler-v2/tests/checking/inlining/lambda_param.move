@@ -15,7 +15,12 @@ module 0x42::LambdaParam {
 	b
     }
 
-    fun test_lambda_symbol_param() {
+    fun test_lambda_symbol_param1() {
+	let a = inline_apply2(|x| x, 3);
+	assert!(a == 3, 0);
+    }
+
+    fun test_lambda_symbol_param2() {
 	let a = inline_apply2(|x| x, 3);
 	assert!(a == 3, 0);
 	let b = inline_apply(|x| x, 3);
