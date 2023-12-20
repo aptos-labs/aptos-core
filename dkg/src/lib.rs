@@ -13,6 +13,7 @@ use aptos_validator_transaction_pool as vtxn_pool;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::runtime::Runtime;
+use futures_util::StreamExt;
 
 #[allow(clippy::let_and_return)]
 pub fn start_dkg_runtime(
@@ -20,10 +21,18 @@ pub fn start_dkg_runtime(
     _network_service_events: NetworkServiceEvents<DKGMsg>,
     _vtxn_pool_writer: vtxn_pool::SingleTopicWriteClient,
     _vtxn_pulled_rx: vtxn_pool::PullNotificationReceiver,
-    _reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
-    _start_dkg_events: EventNotificationListener,
+    mut reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
+    mut start_dkg_events: EventNotificationListener,
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("dkg".into(), Some(4));
+    runtime.spawn(async move {
+        loop {
+            tokio::select! {
+                _ = reconfig_events.select_next_some() => {},
+                _ = start_dkg_events.select_next_some() => {},
+            }
+        }
+    });
     runtime
 }
 

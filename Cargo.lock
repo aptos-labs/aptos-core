@@ -1231,6 +1231,7 @@ dependencies = [
  "aptos-runtimes",
  "aptos-types",
  "aptos-validator-transaction-pool",
+ "futures-util",
  "serde",
  "tokio",
 ]
@@ -2425,6 +2426,7 @@ dependencies = [
  "aptos-runtimes",
  "aptos-types",
  "aptos-validator-transaction-pool",
+ "futures-util",
  "serde",
  "tokio",
 ]
