@@ -7,7 +7,7 @@ use crate::metrics::{
     PROCESSED_LATENCY_IN_SECS, PROCESSED_LATENCY_IN_SECS_ALL, PROCESSED_VERSIONS_COUNT,
     SHORT_CONNECTION_COUNT,
 };
-use anyhow::Context;
+use anyhow::{bail, ensure, Context, Result};
 use aptos_indexer_grpc_utils::{
     build_protobuf_encoded_transaction_wrappers,
     cache_operator::{CacheBatchGetStatus, CacheOperator},
@@ -50,6 +50,9 @@ const AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS: u64 = 50;
 // When error happens when fetching data from cache and file store, the server will retry after this duration.
 // TODO(larry): fix all errors treated as transient errors.
 const TRANSIENT_DATA_ERROR_RETRY_SLEEP_DURATION_MS: u64 = 1000;
+// This is the time we wait for the file store to be ready. It should only be
+// kicked off when there's no metadata in the file store.
+const FILE_STORE_METADATA_WAIT_MS: u64 = 2000;
 
 // The server will retry to send the response to the client and give up after RESPONSE_CHANNEL_SEND_TIMEOUT.
 // This is to prevent the server from being occupied by a slow client.
@@ -201,6 +204,22 @@ impl RawData for RawDataServerWrapper {
                 let mut cache_operator = CacheOperator::new(conn);
                 file_store_operator.verify_storage_bucket_existence().await;
 
+                // Validate chain id
+                let mut metadata = file_store_operator.get_file_store_metadata().await;
+                while metadata.is_none() {
+                    metadata = file_store_operator.get_file_store_metadata().await;
+                    tracing::warn!(
+                        "[File worker] File store metadata not found. Waiting for {} ms.",
+                        FILE_STORE_METADATA_WAIT_MS
+                    );
+                    tokio::time::sleep(std::time::Duration::from_millis(
+                        FILE_STORE_METADATA_WAIT_MS,
+                    ))
+                    .await;
+                }
+
+                let metadata_chain_id = metadata.unwrap().chain_id;
+
                 // Validate redis chain id. Must be present by the time it gets here
                 let chain_id = match cache_operator.get_chain_id().await {
                     Ok(chain_id) => chain_id.unwrap(),
@@ -217,13 +236,13 @@ impl RawData for RawDataServerWrapper {
                             .inc();
                         // Connection will be dropped anyway, so we ignore the error here.
                         let _result = tx
-                            .send_timeout(
-                                Err(Status::unavailable(
-                                    "[Data Service] Cannot get the chain id from redis; please retry.",
-                                )),
-                                RESPONSE_CHANNEL_SEND_TIMEOUT,
-                            )
-                            .await;
+                                            .send_timeout(
+                                                Err(Status::unavailable(
+                                                    "[Data Service] Cannot get the chain id from redis; please retry.",
+                                                )),
+                                                RESPONSE_CHANNEL_SEND_TIMEOUT,
+                                            )
+                                            .await;
                         error!(
                             error = e.to_string(),
                             "[Data Service] Failed to get chain id from redis."
@@ -231,6 +250,18 @@ impl RawData for RawDataServerWrapper {
                         return;
                     },
                 };
+
+                if metadata_chain_id != chain_id {
+                    let _result = tx
+                        .send_timeout(
+                            Err(Status::unavailable("[Data Service] Chain ID mismatch.")),
+                            RESPONSE_CHANNEL_SEND_TIMEOUT,
+                        )
+                        .await;
+                    error!("[Data Service] Chain ID mismatch.",);
+                    return;
+                }
+
                 // Data service metrics.
                 let mut tps_calculator = MovingAverage::new(MOVING_AVERAGE_WINDOW_SIZE);
 
