@@ -3,7 +3,9 @@
 
 use crate::{
     counters::{log_grpc_step, IndexerGrpcStep},
-    storage_format::{CacheEntry, CacheEntryBuilder, CacheEntryKey, StorageFormat},
+    storage_format::{
+        CacheEntry, CacheEntryBuilder, CacheEntryKey, StorageFormat, FILE_ENTRY_TRANSACTION_COUNT,
+    },
 };
 use anyhow::{ensure, Context};
 use aptos_protos::transaction::v1::Transaction;
@@ -55,6 +57,37 @@ const CACHE_SCRIPT_UPDATE_LATEST_VERSION: &str = r#"
         return 0
     end
 "#;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CacheBatchGetStatus {
+    /// OK with batch of encoded transactions.
+    Ok(Vec<Vec<u8>>),
+    /// Requested version is already evicted from cache. Visit file store instead.
+    EvictedFromCache,
+    /// Not ready yet. Wait and retry.
+    NotReady,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CacheUpdateStatus {
+    /// 0 - Cache is updated from version x to x + 1. New key `x+1` with corresponding encoded data is added.
+    Ok,
+    /// 1 - Cache is not updated because current version is ahead of the latest version.
+    AheadOfLatestVersion,
+    /// 2 - Cache is not updated but verified. This is the case when the cache is updated by other workers from an old version.
+    VerifiedWithoutUpdate,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CacheCoverageStatus {
+    /// Requested version is not processed by cache worker yet.
+    DataNotReady,
+    /// Requested version is cached.
+    /// Transactions are available in cache: [requested_version, requested_version + value).
+    CacheHit(u64),
+    /// Requested version is evicted from cache.
+    CacheEvicted,
+}
 
 /// Get the TTL in seconds for a given timestamp.
 pub fn get_ttl_in_seconds(timestamp_in_seconds: u64) -> u64 {
@@ -156,6 +189,69 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         Ok(())
     }
 
+    // Internal function to get the latest version from cache.
+    pub(crate) async fn check_cache_coverage_status(
+        &mut self,
+        requested_version: u64,
+    ) -> anyhow::Result<CacheCoverageStatus> {
+        let latest_version: u64 = match self
+            .conn
+            .get::<&str, String>(CACHE_KEY_LATEST_VERSION)
+            .await
+        {
+            Ok(v) => v
+                .parse::<u64>()
+                .expect("Redis latest_version is not a number."),
+            Err(err) => return Err(err.into()),
+        };
+
+        if requested_version >= latest_version {
+            Ok(CacheCoverageStatus::DataNotReady)
+        } else if requested_version + CACHE_SIZE_ESTIMATION < latest_version {
+            Ok(CacheCoverageStatus::CacheEvicted)
+        } else {
+            // TODO: rewrite this logic to surface this max fetch size better
+            Ok(CacheCoverageStatus::CacheHit(std::cmp::min(
+                latest_version - requested_version,
+                FILE_ENTRY_TRANSACTION_COUNT,
+            )))
+        }
+    }
+
+    /// Fail if not all transactions requested are returned
+    pub async fn batch_get_encoded_proto_data_x(
+        &mut self,
+        start_version: u64,
+        transaction_count: u64,
+    ) -> anyhow::Result<(Vec<Transaction>, f64, f64)> {
+        let start_time = std::time::Instant::now();
+        let versions = (start_version..start_version + transaction_count)
+            .map(|e| CacheEntryKey::new(e, self.storage_format).to_string())
+            .collect::<Vec<String>>();
+        let encoded_transactions: Vec<Vec<u8>> = self
+            .conn
+            .mget(versions)
+            .await
+            .context("Failed to mget from Redis")?;
+        let io_duration = start_time.elapsed().as_secs_f64();
+        let start_time = std::time::Instant::now();
+        let mut transactions = vec![];
+        for encoded_transaction in encoded_transactions {
+            let cache_entry: CacheEntry =
+                CacheEntry::from_bytes(encoded_transaction, self.storage_format);
+            let transaction: Transaction = cache_entry
+                .try_into()
+                .context("Failed to decode cache entry")?;
+            transactions.push(transaction);
+        }
+        ensure!(
+            transactions.len() == transaction_count as usize,
+            "Failed to get all transactions from cache."
+        );
+        let decoding_duration = start_time.elapsed().as_secs_f64();
+        Ok((transactions, io_duration, decoding_duration))
+    }
+
     pub async fn update_cache_transactions(
         &mut self,
         transactions: Vec<Transaction>,
@@ -217,6 +313,26 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         match redis_result {
             Ok(_) => Ok(()),
             Err(err) => Err(err.into()),
+        }
+    }
+
+    // TODO: Remove this
+    pub async fn batch_get_encoded_proto_data(
+        &mut self,
+        start_version: u64,
+    ) -> anyhow::Result<CacheBatchGetStatus> {
+        let cache_coverage_status = self.check_cache_coverage_status(start_version).await;
+        match cache_coverage_status {
+            Ok(CacheCoverageStatus::CacheHit(v)) => {
+                let versions = (start_version..start_version + v)
+                    .map(|e| e.to_string())
+                    .collect::<Vec<String>>();
+                let encoded_transactions: Vec<Vec<u8>> = self.conn.mget(versions).await?;
+                Ok(CacheBatchGetStatus::Ok(encoded_transactions))
+            },
+            Ok(CacheCoverageStatus::CacheEvicted) => Ok(CacheBatchGetStatus::EvictedFromCache),
+            Ok(CacheCoverageStatus::DataNotReady) => Ok(CacheBatchGetStatus::NotReady),
+            Err(err) => Err(err),
         }
     }
 
