@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    logging::{LogEvent, LogSchema},
     monitor,
     network::QuorumStoreSender,
     quorum_store::{
@@ -57,6 +58,11 @@ impl IncrementalProofState {
         validator_verifier: &ValidatorVerifier,
     ) -> Result<(), SignedBatchInfoError> {
         if signed_batch_info.batch_info() != &self.info {
+            warn!(
+                LogSchema::new(LogEvent::ProofOfStoreWrongBatchInfo),
+                batch_info_left = signed_batch_info.batch_info(),
+                batch_info_right = self.info
+            );
             return Err(SignedBatchInfoError::WrongInfo);
         }
 
@@ -186,6 +192,13 @@ impl ProofCoordinator {
         self.digest_to_time
             .entry(*signed_batch_info.digest())
             .or_insert(chrono::Utc::now().naive_utc().timestamp_micros() as u64);
+
+        info!(
+            LogSchema::new(LogEvent::ProofOfStoreInit),
+            digest = signed_batch_info.digest(),
+            batch_id = signed_batch_info.batch_id(),
+        );
+
         Ok(())
     }
 
@@ -274,10 +287,11 @@ impl ProofCoordinator {
                             for signed_batch_info in signed_batch_infos.take().into_iter() {
                                 let peer_id = signed_batch_info.signer();
                                 let digest = *signed_batch_info.digest();
+                                let batch_id = signed_batch_info.batch_id();
                                 match self.add_signature(signed_batch_info, &validator_verifier) {
                                     Ok(result) => {
                                         if let Some(proof) = result {
-                                            debug!("QS: received quorum of signatures, digest {}", digest);
+                                            debug!(LogSchema::new(LogEvent::ProofOfStoreReady), digest = digest, batch_id = batch_id);
                                             proofs.push(proof);
                                         }
                                     },
@@ -285,7 +299,7 @@ impl ProofCoordinator {
                                         // TODO: better error messages
                                         // Can happen if we already garbage collected
                                         if peer_id == self.peer_id {
-                                            debug!("QS: could not add signature from self, err = {:?}", e);
+                                            warn!("QS: could not add signature from self, digest {} batch_id {} err = {:?}", digest, batch_id, e);
                                         }
                                     },
                                 }

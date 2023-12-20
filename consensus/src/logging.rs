@@ -42,6 +42,9 @@ pub enum LogEvent {
     BatchCommitNotification,
     PayloadCommitNotification,
     PulledProof,
+    ProofOfStoreInit,
+    ProofOfStoreWrongBatchInfo,
+    ProofOfStoreReady,
 }
 
 impl LogSchema {
