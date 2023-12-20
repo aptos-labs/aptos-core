@@ -70,6 +70,6 @@ rand_core = { workspace = true }
 
 [features]
 default = []
-fuzzing = ["move-core-types/fuzzing", "move-binary-format/fuzzing", "move-vm-types/fuzzing", "aptos-framework/fuzzing"]
+fuzzing = ["move-core-types/fuzzing", "move-binary-format/fuzzing", "move-vm-types/fuzzing", "aptos-framework/fuzzing", "aptos-types/fuzzing"]
 failpoints = ["fail/failpoints", "move-vm-runtime/failpoints"]
 testing = ["move-unit-test", "aptos-framework/testing"]

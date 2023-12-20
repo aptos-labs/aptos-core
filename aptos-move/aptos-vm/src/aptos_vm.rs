@@ -41,7 +41,7 @@ use aptos_types::{
         new_epoch_event_key, ConfigurationResource, FeatureFlag, Features, OnChainConfig,
         TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,
     },
-    state_store::{StateView, StateViewId},
+    state_store::StateView,
     transaction::{
         authenticator::{AccountAuthenticator, AnySignature, TransactionAuthenticator},
         signature_verified_transaction::SignatureVerifiedTransaction,
@@ -54,9 +54,15 @@ use aptos_types::{
         TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
         WriteSetPayload,
     },
-    validator_txn::ValidatorTransaction,
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
+
+#[cfg(any(test, feature = "fuzzing"))]
+use aptos_types::validator_txn::ValidatorTransaction;
+
+#[cfg(any(test, feature = "testing"))]
+use aptos_types::state_store::StateViewId;
+
 use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
 use aptos_vm_types::{
@@ -1429,6 +1435,7 @@ impl AptosVM {
         }
     }
 
+    #[cfg(any(test, feature = "fuzzing"))]
     fn process_validator_transaction(
         &self,
         _resolver: &impl AptosMoveResolver,
@@ -2008,11 +2015,23 @@ impl AptosVM {
                 let output = VMOutput::empty_with_status(status);
                 (VMStatus::Executed, output, Some("state_checkpoint".into()))
             },
-            Transaction::ValidatorTransaction(txn) => {
+            Transaction::ValidatorTransaction(_txn) => {
                 fail_point!("aptos_vm::execution::validator_transaction");
-                let (vm_status, output) =
-                    self.process_validator_transaction(resolver, txn.clone(), log_context);
-                (vm_status, output, Some("validator_transaction".to_string()))
+                #[cfg(any(test, feature = "fuzzing"))]
+                {
+                    #![allow(unreachable_code)]
+                    let (_vm_status, _output) =
+                        self.process_validator_transaction(resolver, _txn.clone(), log_context);
+                    (
+                        _vm_status,
+                        _output,
+                        Some("validator_transaction".to_string()),
+                    )
+                }
+                #[cfg(not(any(test, feature = "fuzzing")))]
+                {
+                    unreachable!()
+                }
             },
         })
     }
