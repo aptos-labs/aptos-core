@@ -333,7 +333,7 @@ impl ApplyChunkOutput {
 
             let subscribable_events: Vec<ContractEvent> = events
                 .iter()
-                .filter(|evt| should_forward_to_subscription_service(*evt))
+                .filter(|evt| should_forward_to_subscription_service(evt))
                 .cloned()
                 .collect();
             let txn_info = match &status {
@@ -401,7 +401,7 @@ pub fn ensure_no_retry(to_retry: Vec<Transaction>) -> Result<()> {
 }
 
 #[test]
-fn test_x() {
+fn assemble_ledger_diff_should_filter_subscribable_events() {
     let event_0 =
         ContractEvent::new_v2_with_type_tag_str("0x1::dkg::StartDKGEvent", b"dkg_1".to_vec());
     let event_1 = ContractEvent::new_v2_with_type_tag_str(

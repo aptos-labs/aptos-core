@@ -51,10 +51,12 @@ mod script;
 pub mod signature_verified_transaction;
 pub mod webauthn;
 
+#[cfg(any(test, feature = "fuzzing"))]
+use crate::state_store::create_empty_sharded_state_updates;
 use crate::{
     contract_event::TransactionEvent, executable::ModulePath, fee_statement::FeeStatement,
-    proof::accumulator::InMemoryEventAccumulator, state_store::create_empty_sharded_state_updates,
-    validator_txn::ValidatorTransaction, write_set::TransactionWrite,
+    proof::accumulator::InMemoryEventAccumulator, validator_txn::ValidatorTransaction,
+    write_set::TransactionWrite,
 };
 pub use block_output::BlockOutput;
 pub use change_set::ChangeSet;
@@ -1298,6 +1300,7 @@ impl TransactionInfo {
         )
     }
 
+    #[cfg(any(test, feature = "fuzzing"))]
     fn dummy() -> Self {
         Self::new(
             HashValue::default(),
@@ -1443,6 +1446,7 @@ impl TransactionToCommit {
         }
     }
 
+    #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy_with_events(events: Vec<ContractEvent>) -> Self {
         Self {
             transaction: Transaction::StateCheckpoint(HashValue::zero()),
