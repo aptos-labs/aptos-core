@@ -127,13 +127,13 @@ impl ExecutedChunk {
 #[test]
 fn into_chunk_commit_notification_should_apply_event_filters() {
     let event_0 =
-        ContractEvent::new_v2_with_type_tag_str("0x1::dkg::StartDKGEvent", b"dkg_data_0".to_vec());
+        ContractEvent::new_v2_with_type_tag_str("0x1::dkg::DKGStartEvent", b"dkg_data_0".to_vec());
     let event_1 = ContractEvent::new_v2_with_type_tag_str(
         "0x2345::random_module::RandomEvent",
         b"random_data_x".to_vec(),
     );
     let event_2 =
-        ContractEvent::new_v2_with_type_tag_str("0x1::dkg::StartDKGEvent", b"dkg_data_2".to_vec());
+        ContractEvent::new_v2_with_type_tag_str("0x1::dkg::DKGStartEvent", b"dkg_data_2".to_vec());
     let event_3 = ContractEvent::new_v2_with_type_tag_str(
         "0x6789::random_module::RandomEvent",
         b"random_data_y".to_vec(),

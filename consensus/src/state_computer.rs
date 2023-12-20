@@ -61,7 +61,7 @@ impl PipelineExecutionResult {
 type NotificationType = (
     Box<dyn FnOnce() + Send + Sync>,
     Vec<Transaction>,
-    Vec<ContractEvent>, // Subscribable events, e.g. NewEpochEvent, StartDKGEvent
+    Vec<ContractEvent>, // Subscribable events, e.g. NewEpochEvent, DKGStartEvent
 );
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Hash)]

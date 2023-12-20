@@ -403,13 +403,13 @@ pub fn ensure_no_retry(to_retry: Vec<Transaction>) -> Result<()> {
 #[test]
 fn assemble_ledger_diff_should_filter_subscribable_events() {
     let event_0 =
-        ContractEvent::new_v2_with_type_tag_str("0x1::dkg::StartDKGEvent", b"dkg_1".to_vec());
+        ContractEvent::new_v2_with_type_tag_str("0x1::dkg::DKGStartEvent", b"dkg_1".to_vec());
     let event_1 = ContractEvent::new_v2_with_type_tag_str(
         "0x2345::random_module::RandomEvent",
         b"random_x".to_vec(),
     );
     let event_2 =
-        ContractEvent::new_v2_with_type_tag_str("0x1::dkg::StartDKGEvent", b"dkg_2".to_vec());
+        ContractEvent::new_v2_with_type_tag_str("0x1::dkg::DKGStartEvent", b"dkg_2".to_vec());
     let txns_n_outputs =
         TransactionsWithParsedOutput::new(vec![Transaction::dummy(), Transaction::dummy()], vec![
             ParsedTransactionOutput::from(TransactionOutput::new(

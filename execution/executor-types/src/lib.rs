@@ -529,7 +529,7 @@ pub fn should_forward_to_subscription_service(event: &ContractEvent) -> bool {
     matches!(
         event.type_tag().to_string().as_str(),
         "0x1::reconfiguration::NewEpochEvent"
-            | "0x1::dkg::StartDKGEvent"
+            | "0x1::dkg::DKGStartEvent"
             | "0x1::jwks::OnChainJWKMapUpdated"
     )
 }

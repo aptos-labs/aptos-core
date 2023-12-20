@@ -49,7 +49,7 @@ pub fn create_event_subscription_service(
     Option<(
         ReconfigNotificationListener<DbBackedOnChainConfig>,
         EventNotificationListener,
-    )>, // (reconfig_events, start_dkg_events) for DKG
+    )>, // (reconfig_events, dkg_start_events) for DKG
     Option<(
         ReconfigNotificationListener<DbBackedOnChainConfig>,
         EventNotificationListener,
@@ -79,10 +79,10 @@ pub fn create_event_subscription_service(
         let reconfig_events = event_subscription_service
             .subscribe_to_reconfigurations()
             .expect("DKG must subscribe to reconfigurations");
-        let start_dkg_events = event_subscription_service
-            .subscribe_to_events(vec![], vec!["0x1::dkg::StartDKGEvent".to_string()])
+        let dkg_start_events = event_subscription_service
+            .subscribe_to_events(vec![], vec!["0x1::dkg::DKGStartEvent".to_string()])
             .expect("Consensus must subscribe to DKG events");
-        Some((reconfig_events, start_dkg_events))
+        Some((reconfig_events, dkg_start_events))
     } else {
         None
     };
@@ -91,10 +91,10 @@ pub fn create_event_subscription_service(
         let reconfig_events = event_subscription_service
             .subscribe_to_reconfigurations()
             .expect("JWK consensus must subscribe to reconfigurations");
-        let start_dkg_events = event_subscription_service
+        let jwk_updated_events = event_subscription_service
             .subscribe_to_events(vec![], vec!["0x1::jwks::OnChainJWKMapUpdated".to_string()])
             .expect("JWK consensus must subscribe to DKG events");
-        Some((reconfig_events, start_dkg_events))
+        Some((reconfig_events, jwk_updated_events))
     } else {
         None
     };

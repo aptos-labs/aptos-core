@@ -22,14 +22,14 @@ pub fn start_dkg_runtime(
     _vtxn_pool_writer: vtxn_pool::SingleTopicWriteClient,
     _vtxn_pulled_rx: vtxn_pool::PullNotificationReceiver,
     mut reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
-    mut start_dkg_events: EventNotificationListener,
+    mut dkg_start_events: EventNotificationListener,
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("dkg".into(), Some(4));
     runtime.spawn(async move {
         loop {
             tokio::select! {
                 _ = reconfig_events.select_next_some() => {},
-                _ = start_dkg_events.select_next_some() => {},
+                _ = dkg_start_events.select_next_some() => {},
             }
         }
     });
