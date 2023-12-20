@@ -208,7 +208,7 @@ impl StateComputer for ExecutionProxy {
         let mut latest_logical_time = self.write_mutex.lock().await;
         let mut block_ids = Vec::new();
         let mut txns = Vec::new();
-        let mut txn_events_for_state_sync = Vec::new();
+        let mut subscribable_txn_events = Vec::new();
         let mut payloads = Vec::new();
         let logical_time = LogicalTime::new(
             finality_proof.ledger_info().epoch(),
@@ -230,7 +230,7 @@ impl StateComputer for ExecutionProxy {
                 block.validator_txns().cloned().unwrap_or_default(),
                 input_txns,
             ));
-            txn_events_for_state_sync.extend(
+            subscribable_txn_events.extend(
                 block
                     .events()
                     .into_iter()
@@ -257,7 +257,7 @@ impl StateComputer for ExecutionProxy {
         };
         self.async_state_sync_notifier
             .clone()
-            .send((Box::new(wrapped_callback), txns, txn_events_for_state_sync))
+            .send((Box::new(wrapped_callback), txns, subscribable_txn_events))
             .await
             .expect("Failed to send async state sync notification");
 
