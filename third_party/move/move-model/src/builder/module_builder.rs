@@ -1355,11 +1355,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 }
                 let loc = et.to_loc(&body.loc);
                 for (pos, TypeParameter(name, _, loc)) in type_params.iter().enumerate() {
-                    et.define_type_param(&loc, *name, Type::new_param(pos), false);
+                    et.define_type_param(loc, *name, Type::new_param(pos), false);
                 }
                 et.enter_scope();
                 for (idx, Parameter(n, ty, loc)) in params.iter().enumerate() {
-                    et.define_local(&loc, *n, ty.clone(), None, Some(idx));
+                    et.define_local(loc, *n, ty.clone(), None, Some(idx));
                 }
                 let access_specifiers = if !as_spec_fun {
                     // Translate access specifiers
