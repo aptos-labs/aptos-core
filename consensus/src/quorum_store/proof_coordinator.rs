@@ -18,7 +18,7 @@ use aptos_types::{
     aggregate_signature::PartialSignatures, validator_verifier::ValidatorVerifier, PeerId,
 };
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{hash_map::Entry, BTreeMap, HashMap},
     sync::Arc,
     time::Duration,
 };
@@ -30,6 +30,7 @@ use tokio::{
 #[derive(Debug)]
 pub(crate) enum ProofCoordinatorCommand {
     AppendSignature(SignedBatchInfoMsg),
+    CommitNotification(Vec<BatchInfo>),
     Shutdown(TokioOneshot::Sender<()>),
 }
 
@@ -129,6 +130,10 @@ impl IncrementalProofState {
             Ok(sig) => ProofOfStore::new(self.info.clone(), sig),
             Err(e) => unreachable!("Cannot aggregate signatures on digest err = {:?}", e),
         }
+    }
+
+    fn batch_info(&self) -> &BatchInfo {
+        &self.info
     }
 }
 
@@ -281,6 +286,16 @@ impl ProofCoordinator {
                                 .send(())
                                 .expect("Failed to send shutdown ack to QuorumStore");
                             break;
+                        },
+                        ProofCoordinatorCommand::CommitNotification(batches) => {
+                            for batch in batches {
+                                let digest = batch.digest();
+                                if let Entry::Occupied(existing_proof) = self.digest_to_proof.entry(*digest) {
+                                    if batch == *existing_proof.get().batch_info() {
+                                        existing_proof.remove();
+                                    }
+                                }
+                            }
                         },
                         ProofCoordinatorCommand::AppendSignature(signed_batch_infos) => {
                             let mut proofs = vec![];
