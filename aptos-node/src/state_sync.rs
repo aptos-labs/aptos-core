@@ -10,7 +10,8 @@ use aptos_data_streaming_service::{
     streaming_service::DataStreamingService,
 };
 use aptos_event_notifications::{
-    DbBackedOnChainConfig, EventSubscriptionService, ReconfigNotificationListener,
+    DbBackedOnChainConfig, EventNotificationListener, EventSubscriptionService,
+    ReconfigNotificationListener,
 };
 use aptos_executor::chunk_executor::ChunkExecutor;
 use aptos_infallible::RwLock;
@@ -45,6 +46,14 @@ pub fn create_event_subscription_service(
     EventSubscriptionService,
     ReconfigNotificationListener<DbBackedOnChainConfig>,
     Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
+    Option<(
+        ReconfigNotificationListener<DbBackedOnChainConfig>,
+        EventNotificationListener,
+    )>, // (reconfig_events, start_dkg_events) for DKG
+    Option<(
+        ReconfigNotificationListener<DbBackedOnChainConfig>,
+        EventNotificationListener,
+    )>, // (reconfig_events, jwk_map_updated_events) for JWK consensus
 ) {
     // Create the event subscription service
     let mut event_subscription_service =
@@ -66,10 +75,36 @@ pub fn create_event_subscription_service(
         None
     };
 
+    let dkg_subscriptions = if node_config.base.role.is_validator() {
+        let reconfig_events = event_subscription_service
+            .subscribe_to_reconfigurations()
+            .expect("DKG must subscribe to reconfigurations");
+        let start_dkg_events = event_subscription_service
+            .subscribe_to_events(vec![], vec!["0x1::dkg::StartDKGEvent".to_string()])
+            .expect("Consensus must subscribe to DKG events");
+        Some((reconfig_events, start_dkg_events))
+    } else {
+        None
+    };
+
+    let jwk_consensus_subscriptions = if node_config.base.role.is_validator() {
+        let reconfig_events = event_subscription_service
+            .subscribe_to_reconfigurations()
+            .expect("JWK consensus must subscribe to reconfigurations");
+        let onchain_jwk_updated_events = event_subscription_service
+            .subscribe_to_events(vec![], vec!["0x1::jwks::OnChainJWKMapUpdated".to_string()])
+            .expect("JWK consensus must subscribe to DKG events");
+        Some((reconfig_events, onchain_jwk_updated_events))
+    } else {
+        None
+    };
+
     (
         event_subscription_service,
         mempool_reconfig_subscription,
         consensus_reconfig_subscription,
+        dkg_subscriptions,
+        jwk_consensus_subscriptions,
     )
 }
 

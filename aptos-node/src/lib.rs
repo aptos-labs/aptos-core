@@ -593,6 +593,8 @@ pub fn setup_environment_and_start_node(
         mut event_subscription_service,
         mempool_reconfig_subscription,
         consensus_reconfig_subscription,
+        dkg_subscriptions,
+        jwk_consensus_subscriptions,
     ) = state_sync::create_event_subscription_service(&node_config, &db_rw);
 
     // Set up the networks and gather the application network handles
@@ -669,11 +671,15 @@ pub fn setup_environment_and_start_node(
             network_client,
             network_service_events,
         } = obj;
+        let (reconfig_events, start_dkg_events) = dkg_subscriptions
+            .expect("DKG needs to listen to NewEpochEvents events and StartDKGEvents");
         let dkg_runtime = start_dkg_runtime(
             network_client,
             network_service_events,
             vtxn_pool_writer_for_dkg,
             dkg_txn_pulled_rx,
+            reconfig_events,
+            start_dkg_events,
         );
         Some(dkg_runtime)
     } else {
@@ -685,10 +691,15 @@ pub fn setup_environment_and_start_node(
             network_client,
             network_service_events,
         } = obj;
+        let (reconfig_events, onchain_jwk_updated_events) = jwk_consensus_subscriptions.expect(
+            "JWK consensus needs to listen to NewEpochEvents and OnChainJWKMapUpdated events.",
+        );
         let jwk_consensus_runtime = start_jwk_consensus_runtime(
             network_client,
             network_service_events,
             vtxn_pool_writer_for_jwk,
+            reconfig_events,
+            onchain_jwk_updated_events,
         );
         Some(jwk_consensus_runtime)
     } else {
