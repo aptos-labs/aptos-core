@@ -163,13 +163,13 @@ CODE_PERF_VERSION = "v4"
 
 # default to using production number of execution threads for assertions
 NUMBER_OF_EXECUTION_THREADS = int(
-    os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=8)
+    os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=32)
 )
 
 if os.environ.get("DETAILED"):
     EXECUTION_ONLY_NUMBER_OF_THREADS = [1, 2, 4, 8, 16, 32, 60]
 else:
-    EXECUTION_ONLY_NUMBER_OF_THREADS = [1, 2, 4, 8, 16, 32, 60]
+    EXECUTION_ONLY_NUMBER_OF_THREADS = []
 
 if os.environ.get("RELEASE_BUILD"):
     BUILD_FLAG = "--release"
