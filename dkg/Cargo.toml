@@ -14,10 +14,12 @@ rust-version = { workspace = true }
 
 [dependencies]
 aptos-config = { workspace = true }
+aptos-event-notifications = { workspace = true }
 aptos-network = { workspace = true }
 aptos-runtimes = { workspace = true }
 aptos-types = { workspace = true }
 aptos-validator-transaction-pool = { workspace = true }
+futures-util = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 
