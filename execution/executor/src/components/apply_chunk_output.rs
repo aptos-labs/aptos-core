@@ -286,7 +286,7 @@ impl ApplyChunkOutput {
         ))
     }
 
-    pub fn assemble_ledger_diff(
+    fn assemble_ledger_diff(
         to_commit_from_execution: TransactionsWithParsedOutput,
         state_updates_vec: Vec<ShardedStateUpdates>,
         state_checkpoint_hashes: Vec<Option<HashValue>>,
