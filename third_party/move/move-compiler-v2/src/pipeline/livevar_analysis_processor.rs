@@ -35,6 +35,7 @@ use std::{
 pub struct LiveVarAnnotation(BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset>);
 
 impl LiveVarAnnotation {
+    /// Wraps a map from code offsets to livevar info
     pub fn new(annot: BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset>) -> Self {
         Self(annot)
     }
