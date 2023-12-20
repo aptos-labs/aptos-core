@@ -844,7 +844,7 @@ pub struct MultiKey {
 
 impl From<MultiEd25519PublicKey> for MultiKey {
     fn from(multi_ed25519_public_key: MultiEd25519PublicKey) -> Self {
-        let public_keys: Vec<AnyPublicKey> = multi_ed25519_public_key.public_keys().into_iter().map(|key| AnyPublicKey::ed25519(key.clone())).collect();
+        let public_keys: Vec<AnyPublicKey> = multi_ed25519_public_key.public_keys().iter().map(|key| AnyPublicKey::ed25519(key.clone())).collect();
         let signatures_required = *multi_ed25519_public_key.threshold();
         MultiKey{public_keys, signatures_required}
     }
