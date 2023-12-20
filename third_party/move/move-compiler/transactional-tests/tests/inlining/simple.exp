@@ -1,23 +1,4 @@
 processed 2 tasks
 
-task 0 'publish'. lines 1-11:
-
-
-
 task 1 'run'. lines 13-13:
 return values: 3
-
->>> V1 Compiler {
-== BEGIN Bytecode ==
-// Move bytecode v6
-module 42.Test {
-
-
-public test(): u64 {
-B0:
-	0: LdU64(3)
-	1: Ret
-}
-}
-== END Bytecode ==
-}

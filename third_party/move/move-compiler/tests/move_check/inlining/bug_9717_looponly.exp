@@ -1,10 +1,10 @@
 error[E07006]: ambiguous usage of variable
-   ┌─ tests/move_check/inlining/bug_9717_looponly.move:72:20
+   ┌─ tests/move_check/inlining/bug_9717_looponly.move:20:20
    │
-60 │         let flipsref5 = &flips;
+ 8 │         let flipsref5 = &flips;
    │                         ------ It is still being borrowed by this reference
    ·
-72 │         let _v2 =  flips;
+20 │         let _v2 =  flips;
    │                    ^^^^^
    │                    │
    │                    Ambiguous usage of variable 'flips'
