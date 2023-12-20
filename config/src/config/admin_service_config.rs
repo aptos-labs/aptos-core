@@ -23,6 +23,7 @@ pub struct AdminServiceConfig {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum AuthenticationConfig {
     // This will allow authentication through query parameter.
     // e.g. `/profilez?passcode=abc`.
