@@ -771,13 +771,6 @@ impl MultiKeyAuthenticator {
             self.signatures.len(),
             self.public_keys.signatures_required(),
         );
-        let last_set_bit = self.signatures_bitmap.last_set_bit().unwrap_or(0) as usize;
-        ensure!(
-            last_set_bit < self.public_keys.len(),
-            "Mismatch in the highest set signature and the available public keys, {} >= {}",
-            last_set_bit,
-            self.public_keys.len(),
-        );
         for (idx, signature) in
             std::iter::zip(self.signatures_bitmap.iter_ones(), self.signatures.iter())
         {

@@ -70,7 +70,7 @@ target "debian-base" {
   dockerfile = "docker/builder/debian-base.Dockerfile"
   contexts = {
     # Run `docker buildx imagetools inspect debian:bullseye` to find the latest multi-platform hash
-    debian = "docker-image://debian:bullseye@sha256:ab2b95aa8d7d6d54866b92c322cf0693933c1ae8038652f24ddfda1d1763a45a"
+    debian = "docker-image://debian:bullseye@sha256:71f0e09d55a4042ddee1f114a0838d99266e185bf33e71f15c15bf6b9545a9a0"
   }
 }
 
@@ -79,8 +79,8 @@ target "builder-base" {
   target     = "builder-base"
   context    = "."
   contexts = {
-    # Run `docker buildx imagetools inspect rust:1.72.1-bullseye` to find the latest multi-platform hash
-    rust = "docker-image://rust:1.72.1-bullseye@sha256:9e3b35bd7a1f8f534acc033f02170f68e1dfc18ecdb9cfd3c1e2e148bdd6e039"
+    # Run `docker buildx imagetools inspect rust:1.74.1-bullseye` to find the latest multi-platform hash
+    rust = "docker-image://rust:1.74.1-bullseye@sha256:a9271d7222f7de1867f72c1e8fdc590d908fc68756c3b49ef48b1cdac2f6b495"
   }
   args = {
     PROFILE            = "${PROFILE}"

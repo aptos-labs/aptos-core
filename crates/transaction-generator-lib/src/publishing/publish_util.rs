@@ -13,7 +13,7 @@ use aptos_sdk::{
         LocalAccount,
     },
 };
-use move_binary_format::{access::ModuleAccess, CompiledModule};
+use move_binary_format::{access::ModuleAccess, file_format::SignatureToken, CompiledModule};
 use rand::{rngs::StdRng, Rng};
 
 // Information used to track a publisher and what allows to identify and
@@ -221,10 +221,19 @@ fn update(
             .get(module.self_handle_idx().0 as usize)
             .expect("ModuleId for self must exists");
         let original_address_idx = module_handle.address.0;
+        let original_address = new_module.address_identifiers[original_address_idx as usize];
         let _ = std::mem::replace(
             &mut new_module.address_identifiers[original_address_idx as usize],
             publisher,
         );
+
+        for constant in new_module.constant_pool.iter_mut() {
+            if constant.type_ == SignatureToken::Address
+                && original_address == AccountAddress::from_bytes(constant.data.clone()).unwrap()
+            {
+                constant.data.swap_with_slice(&mut publisher.to_vec());
+            }
+        }
 
         if suffix > 0 {
             for module_handle in &new_module.module_handles {
