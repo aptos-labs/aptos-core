@@ -286,9 +286,13 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
             // eviction policy, which is probabilistic-based and may evict the
             // cache that is still needed.
             if version >= CACHE_SIZE_EVICTION_LOWER_BOUND {
+                let key = CacheEntryKey::new(
+                    version - CACHE_SIZE_EVICTION_LOWER_BOUND,
+                    self.storage_format,
+                ).to_string();
                 redis_pipeline
                     .cmd("DEL")
-                    .arg(version - CACHE_SIZE_EVICTION_LOWER_BOUND)
+                    .arg(key)
                     .ignore();
             }
         }
