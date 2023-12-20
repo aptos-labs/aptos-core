@@ -2128,10 +2128,8 @@ impl VMValidator for AptosVM {
             match transaction.authenticator_ref().to_single_key_authenticators() {
                 Ok(sk_authenticators) => {
                     for authenticator in sk_authenticators {
-                        match authenticator.signature() {
-                            AnySignature::WebAuthn { .. } =>
-                                return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING),
-                            _ => {},
+                        if let AnySignature::WebAuthn { .. } = authenticator.signature() {
+                            return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING)
                         }
                     }
                 },
