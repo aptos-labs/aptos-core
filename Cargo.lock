@@ -4035,7 +4035,6 @@ dependencies = [
  "aptos-framework",
  "aptos-gas-schedule",
  "aptos-language-e2e-tests",
- "aptos-state-view",
  "aptos-storage-interface",
  "aptos-types",
  "aptos-vm",

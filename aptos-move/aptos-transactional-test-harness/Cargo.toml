@@ -20,7 +20,6 @@ aptos-crypto = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-language-e2e-tests = { workspace = true }
-aptos-state-view = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true, features = [ "fuzzing" ] }
 aptos-vm = { workspace = true }
