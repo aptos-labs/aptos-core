@@ -178,7 +178,7 @@ impl ExecutedBlock {
             .transactions_to_commit(input_txns, self.id())
     }
 
-    pub fn reconfig_event(&self) -> Vec<ContractEvent> {
+    pub fn events(&self) -> Vec<ContractEvent> {
         // reconfiguration suffix don't count, the state compute result is carried over from parents
         if self.is_reconfiguration_suffix() {
             return vec![];

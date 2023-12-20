@@ -6,7 +6,7 @@
 use crate::state_checkpoint_output::StateCheckpointOutput;
 use anyhow::Result;
 use aptos_crypto::{
-    hash::{TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
+    hash::{ACCUMULATOR_PLACEHOLDER_HASH, TransactionAccumulatorHasher},
     HashValue,
 };
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
@@ -33,8 +33,8 @@ use std::{
     collections::{BTreeSet, HashMap},
     fmt::Debug,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
@@ -337,7 +337,7 @@ impl StateComputeResult {
         epoch_state: Option<EpochState>,
         compute_status_for_input_txns: Vec<TransactionStatus>,
         transaction_info_hashes: Vec<HashValue>,
-        reconfig_events: Vec<ContractEvent>,
+        events: Vec<ContractEvent>,
     ) -> Self {
         Self {
             root_hash,
@@ -348,7 +348,7 @@ impl StateComputeResult {
             epoch_state,
             compute_status_for_input_txns,
             transaction_info_hashes,
-            reconfig_events,
+            reconfig_events: events,
         }
     }
 
@@ -522,4 +522,10 @@ impl ProofRead for ProofReader {
     fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt> {
         self.proofs.get(&key)
     }
+}
+
+pub fn is_event_subscribable(event: &ContractEvent) -> bool {
+    let type_tag_str = event.type_tag().to_string();
+    println!("is_event_subscribable, type_tag_str={type_tag_str}");
+    matches!(type_tag_str.as_str(), "0x1::reconfiguration::NewEpochEvent")
 }

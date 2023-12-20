@@ -4,9 +4,9 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{ChunkCommitNotification, LedgerUpdateOutput};
+use crate::{ChunkCommitNotification, is_event_subscribable, LedgerUpdateOutput};
 use aptos_drop_helper::DEFAULT_DROPPER;
-use aptos_storage_interface::{state_delta::StateDelta, ExecutedTrees};
+use aptos_storage_interface::{ExecutedTrees, state_delta::StateDelta};
 use aptos_types::{
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
     state_store::combine_or_add_sharded_state_updates, transaction::TransactionToCommit,
@@ -95,7 +95,7 @@ impl ExecutedChunk {
                 ..
             } = txn_to_commit;
             committed_transactions.push(transaction);
-            committed_events.extend(events);
+            committed_events.extend(events.into_iter().filter(is_event_subscribable));
             to_drop.push((state_updates, write_set));
         }
         DEFAULT_DROPPER.schedule_drop(to_drop);

@@ -20,7 +20,7 @@ use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
-use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResult};
+use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, is_event_subscribable, StateComputeResult};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -207,7 +207,7 @@ impl StateComputer for ExecutionProxy {
 
         let mut block_ids = Vec::new();
         let mut txns = Vec::new();
-        let mut reconfig_events = Vec::new();
+        let mut subscribable_events = Vec::new();
         let mut payloads = Vec::new();
         let logical_time = LogicalTime::new(
             finality_proof.ledger_info().epoch(),
@@ -229,7 +229,7 @@ impl StateComputer for ExecutionProxy {
                 block.validator_txns().cloned().unwrap_or_default(),
                 input_txns,
             ));
-            reconfig_events.extend(block.reconfig_event());
+            subscribable_events.extend(block.events().into_iter().filter(is_event_subscribable));
         }
 
         let executor = self.executor.clone();
@@ -251,7 +251,7 @@ impl StateComputer for ExecutionProxy {
         };
         self.async_state_sync_notifier
             .clone()
-            .send((Box::new(wrapped_callback), txns, reconfig_events))
+            .send((Box::new(wrapped_callback), txns, subscribable_events))
             .await
             .expect("Failed to send async state sync notification");
 

@@ -139,7 +139,7 @@ impl ApplyChunkOutput {
             .with_label_values(&["assemble_ledger_diff_for_block"])
             .start_timer();
 
-        let (txns_to_commit, transaction_info_hashes, reconfig_events) =
+        let (txns_to_commit, transaction_info_hashes, events) =
             Self::assemble_ledger_diff(to_commit, state_updates_vec, state_checkpoint_hashes);
         let transaction_accumulator =
             Arc::new(base_txn_accumulator.append(&transaction_info_hashes));
@@ -147,7 +147,7 @@ impl ApplyChunkOutput {
             LedgerUpdateOutput {
                 statuses_for_input_txns,
                 to_commit: txns_to_commit,
-                reconfig_events,
+                events,
                 transaction_info_hashes,
                 state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
                 sharded_state_cache,
@@ -312,7 +312,7 @@ impl ApplyChunkOutput {
             })
             .collect();
 
-        let mut all_reconfig_events = Vec::new();
+        let mut all_events = Vec::new();
         let (to_commit_txns, to_commit_outputs) = to_commit_from_execution.into_inner();
         for (
             txn,
@@ -348,13 +348,13 @@ impl ApplyChunkOutput {
                 txn_info,
                 state_updates,
                 write_set,
-                events,
+                events.clone(),
                 !per_txn_reconfig_events.is_empty(),
             );
-            all_reconfig_events.extend(per_txn_reconfig_events);
+            all_events.extend(events);
             to_commit.push(txn_to_commit);
         }
-        (to_commit, txn_info_hashes, all_reconfig_events)
+        (to_commit, txn_info_hashes, all_events)
     }
 
     fn calculate_events_and_writeset_hashes(
