@@ -1,0 +1,947 @@
+warning: unused import: `StateViewId`
+  --> aptos-move/aptos-vm/src/aptos_vm.rs:44:30
+   |
+44 |     state_store::{StateView, StateViewId},
+   |                              ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: `aptos-vm` (lib) generated 1 warning (run `cargo fix --lib -p aptos-vm` to apply 1 suggestion)
+   Compiling aptos-build-info v0.1.0 (/Users/igorkabiljo/code/work/aptos-core-2nd-checkout/crates/aptos-build-info)
+warning: unused import: `Itertools`
+  --> execution/executor-types/src/state_checkpoint_output.rs:11:25
+   |
+11 | use itertools::{zip_eq, Itertools};
+   |                         ^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: `aptos-executor-types` (lib) generated 1 warning
+   Compiling aptos-transaction-generator-lib v0.0.0 (/Users/igorkabiljo/code/work/aptos-core-2nd-checkout/crates/transaction-generator-lib)
+warning: unused variable: `batch_size`
+  --> crates/transaction-generator-lib/src/tournament_generator.rs:84:13
+   |
+84 |         let batch_size = self.batch_size;
+   |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_batch_size`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: `aptos-transaction-generator-lib` (lib) generated 1 warning (run `cargo fix --lib -p aptos-transaction-generator-lib` to apply 1 suggestion)
+   Compiling aptos-node-resource-metrics v0.1.0 (/Users/igorkabiljo/code/work/aptos-core-2nd-checkout/crates/node-resource-metrics)
+   Compiling aptos-executor-service v0.1.0 (/Users/igorkabiljo/code/work/aptos-core-2nd-checkout/execution/executor-service)
+   Compiling aptos-executor v0.1.0 (/Users/igorkabiljo/code/work/aptos-core-2nd-checkout/execution/executor)
+   Compiling aptos-db v0.1.0 (/Users/igorkabiljo/code/work/aptos-core-2nd-checkout/storage/aptosdb)
+   Compiling aptos-experimental-ptx-executor v0.1.0 (/Users/igorkabiljo/code/work/aptos-core-2nd-checkout/experimental/execution/ptx-executor)
+   Compiling aptos-genesis v0.1.0 (/Users/igorkabiljo/code/work/aptos-core-2nd-checkout/crates/aptos-genesis)
+   Compiling aptos-executor-benchmark v0.1.0 (/Users/igorkabiljo/code/work/aptos-core-2nd-checkout/execution/executor-benchmark)
+    Finished test [unoptimized + debuginfo] target(s) in 11.27s
+     Running unittests src/lib.rs (target/debug/deps/aptos_executor_benchmark-21c63e1470cb194e)
+
+running 1 test
+db_generator::create_db_with_accounts
+Initializing...
+2023-12-20T20:40:24.066496Z [tests::test_benchmark_transaction] INFO crates/aptos-genesis/src/builder.rs:513 Building genesis with 1 validators. Directory of output: "/private/var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/9bf0fee541b73eab1679305f25a34213"
+2023-12-20T20:40:25.141741Z [tests::test_benchmark_transaction] INFO storage/schemadb/src/lib.rs:173 Opened RocksDB. {"rocksdb_name":"ledger_db"}
+2023-12-20T20:40:25.141896Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:308 Opened ledger_db at "/var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/7428420be041988c49edbc1336b30356/ledger_db"!
+2023-12-20T20:40:25.141978Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:95 Opened ledger metadata db! {"ledger_metadata_db_path":"/var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/7428420be041988c49edbc1336b30356/ledger_db","sharding":false}
+2023-12-20T20:40:25.141988Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:102 Individual ledger dbs are not enabled!
+2023-12-20T20:40:25.142013Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_kv_db.rs:44 State K/V DB is not enabled!
+2023-12-20T20:40:25.143022Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_merkle_db.rs:86 Sharded state merkle DB is not enabled!
+2023-12-20T20:40:25.169813Z [tests::test_benchmark_transaction] INFO storage/schemadb/src/lib.rs:173 Opened RocksDB. {"rocksdb_name":"state_merkle_db"}
+2023-12-20T20:40:25.170374Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_store/mod.rs:425 No overall commit progress was found!
+2023-12-20T20:40:25.170801Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_store/mod.rs:479 Initializing BufferedState. {"latest_snapshot_version":null,"num_transactions":0}
+2023-12-20T20:40:25.171214Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_store/mod.rs:571 StateStore initialization finished. {"latest_in_memory_root_hash":"5350415253455f4d45524b4c455f504c414345484f4c4445525f484153480000","latest_in_memory_version":null,"latest_snapshot_root_hash":"5350415253455f4d45524b4c455f504c414345484f4c4445525f484153480000","latest_snapshot_version":null}
+2023-12-20T20:40:25.171953Z [tests::test_benchmark_transaction] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 1 {"name":"miscellaneous","txn_idx":0}
+2023-12-20T20:40:25.179647Z [tests::test_benchmark_transaction] INFO aptos-move/aptos-vm-logging/src/lib.rs:54 Reconfiguration occurred: restart required {"name":"miscellaneous","txn_idx":0}
+2023-12-20T20:40:25.180429Z [tests::test_benchmark_transaction] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Sequential execution completed. 1 out of 1 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":0}
+2023-12-20T20:40:25.224813Z [tests::test_benchmark_transaction] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(0), result_state: Some(0) HashValue(d0236dc148357b7f4c505aa8e4b4cb97c2a3b3c6ec8863f0dd0a421e86a06634) Tracked { items: 153, bytes: 674185 } 0 HashValue(d0236dc148357b7f4c505aa8e4b4cb97c2a3b3c6ec8863f0dd0a421e86a06634) Tracked { items: 153, bytes: 674185 }
+2023-12-20T20:40:25.386714Z [tests::test_benchmark_transaction] INFO execution/executor/src/db_bootstrapper.rs:208 Genesis calculated: ledger_info_with_sigs Some(V0(LedgerInfoWithV0 { ledger_info: LedgerInfo { commit_info: BlockInfo { epoch: 0, round: 0, id: HashValue(0000000000000000000000000000000000000000000000000000000000000000), executed_state_id: HashValue(d49cfb13398d30abacc774081caf50025007acf98c9ec028e084a27b003b05fa), version: 0, timestamp_usecs: 0, next_epoch_state: Some(EpochState [epoch: 1, validator: ValidatorSet: [66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef: 10, ]]) }, consensus_data_hash: HashValue(0000000000000000000000000000000000000000000000000000000000000000) }, signatures: AggregateSignature { validator_bitmask: BitVec { inner: [] }, sig: None } })), waypoint Waypoint { version: 0, value: HashValue(398e6f406eb8fdb96bac0f90900c8d4a25a12c0c98cb261d1a97d7f9e24be2cf) }
+2023-12-20T20:40:25.387314Z INFO storage/schemadb/src/lib.rs:324 Dropped RocksDB. {"rocksdb_name":"state_merkle_db"}
+2023-12-20T20:40:25.390158Z INFO storage/schemadb/src/lib.rs:324 Dropped RocksDB. {"rocksdb_name":"ledger_db"}
+2023-12-20T20:40:25.582319Z [tests::test_benchmark_transaction] INFO storage/schemadb/src/lib.rs:173 Opened RocksDB. {"rocksdb_name":"ledger_db"}
+2023-12-20T20:40:25.582367Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:308 Opened ledger_db at "/var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/5c5eb1c3a9d07bc0f10934452de0f2aa/ledger_db"!
+2023-12-20T20:40:25.582378Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:95 Opened ledger metadata db! {"ledger_metadata_db_path":"/var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/5c5eb1c3a9d07bc0f10934452de0f2aa/ledger_db","sharding":false}
+2023-12-20T20:40:25.582386Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:102 Individual ledger dbs are not enabled!
+2023-12-20T20:40:25.582391Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_kv_db.rs:44 State K/V DB is not enabled!
+2023-12-20T20:40:25.583345Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_merkle_db.rs:86 Sharded state merkle DB is not enabled!
+2023-12-20T20:40:25.610263Z [tests::test_benchmark_transaction] INFO storage/schemadb/src/lib.rs:173 Opened RocksDB. {"rocksdb_name":"state_merkle_db"}
+2023-12-20T20:40:25.610382Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_store/mod.rs:425 No overall commit progress was found!
+2023-12-20T20:40:25.610445Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_store/mod.rs:479 Initializing BufferedState. {"latest_snapshot_version":null,"num_transactions":0}
+2023-12-20T20:40:25.610536Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_store/mod.rs:571 StateStore initialization finished. {"latest_in_memory_root_hash":"5350415253455f4d45524b4c455f504c414345484f4c4445525f484153480000","latest_in_memory_version":null,"latest_snapshot_root_hash":"5350415253455f4d45524b4c455f504c414345484f4c4445525f484153480000","latest_snapshot_version":null}
+2023-12-20T20:40:25.610799Z [tests::test_benchmark_transaction] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 1 {"name":"miscellaneous","txn_idx":0}
+2023-12-20T20:40:25.616619Z [tests::test_benchmark_transaction] INFO aptos-move/aptos-vm-logging/src/lib.rs:54 Reconfiguration occurred: restart required {"name":"miscellaneous","txn_idx":0}
+2023-12-20T20:40:25.617124Z [tests::test_benchmark_transaction] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Sequential execution completed. 1 out of 1 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":0}
+2023-12-20T20:40:25.661070Z [tests::test_benchmark_transaction] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(0), result_state: Some(0) HashValue(d0236dc148357b7f4c505aa8e4b4cb97c2a3b3c6ec8863f0dd0a421e86a06634) Tracked { items: 153, bytes: 674185 } 0 HashValue(d0236dc148357b7f4c505aa8e4b4cb97c2a3b3c6ec8863f0dd0a421e86a06634) Tracked { items: 153, bytes: 674185 }
+2023-12-20T20:40:25.819824Z [tests::test_benchmark_transaction] INFO execution/executor/src/db_bootstrapper.rs:208 Genesis calculated: ledger_info_with_sigs Some(V0(LedgerInfoWithV0 { ledger_info: LedgerInfo { commit_info: BlockInfo { epoch: 0, round: 0, id: HashValue(0000000000000000000000000000000000000000000000000000000000000000), executed_state_id: HashValue(d49cfb13398d30abacc774081caf50025007acf98c9ec028e084a27b003b05fa), version: 0, timestamp_usecs: 0, next_epoch_state: Some(EpochState [epoch: 1, validator: ValidatorSet: [66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef: 10, ]]) }, consensus_data_hash: HashValue(0000000000000000000000000000000000000000000000000000000000000000) }, signatures: AggregateSignature { validator_bitmask: BitVec { inner: [] }, sig: None } })), waypoint Waypoint { version: 0, value: HashValue(398e6f406eb8fdb96bac0f90900c8d4a25a12c0c98cb261d1a97d7f9e24be2cf) }
+2023-12-20T20:40:25.820282Z [tests::test_benchmark_transaction] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 1 {"name":"miscellaneous","txn_idx":0}
+2023-12-20T20:40:25.825981Z [tests::test_benchmark_transaction] INFO aptos-move/aptos-vm-logging/src/lib.rs:54 Reconfiguration occurred: restart required {"name":"miscellaneous","txn_idx":0}
+2023-12-20T20:40:25.826483Z [tests::test_benchmark_transaction] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Sequential execution completed. 1 out of 1 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":0}
+2023-12-20T20:40:25.868256Z [tests::test_benchmark_transaction] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(0), result_state: Some(0) HashValue(d0236dc148357b7f4c505aa8e4b4cb97c2a3b3c6ec8863f0dd0a421e86a06634) Tracked { items: 153, bytes: 674185 } 0 HashValue(d0236dc148357b7f4c505aa8e4b4cb97c2a3b3c6ec8863f0dd0a421e86a06634) Tracked { items: 153, bytes: 674185 }
+2023-12-20T20:40:26.030675Z [tests::test_benchmark_transaction] INFO execution/executor/src/db_bootstrapper.rs:208 Genesis calculated: ledger_info_with_sigs Some(V0(LedgerInfoWithV0 { ledger_info: LedgerInfo { commit_info: BlockInfo { epoch: 0, round: 0, id: HashValue(0000000000000000000000000000000000000000000000000000000000000000), executed_state_id: HashValue(d49cfb13398d30abacc774081caf50025007acf98c9ec028e084a27b003b05fa), version: 0, timestamp_usecs: 0, next_epoch_state: Some(EpochState [epoch: 1, validator: ValidatorSet: [66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef: 10, ]]) }, consensus_data_hash: HashValue(0000000000000000000000000000000000000000000000000000000000000000) }, signatures: AggregateSignature { validator_bitmask: BitVec { inner: [] }, sig: None } })), waypoint Waypoint { version: 0, value: HashValue(398e6f406eb8fdb96bac0f90900c8d4a25a12c0c98cb261d1a97d7f9e24be2cf) }
+2023-12-20T20:40:26.030887Z [tests::test_benchmark_transaction] WARN storage/aptosdb/src/db/include/aptosdb_internal.rs:266 AptosDB API returned error. {"api_name":"get_latest_version","error":"No progress in db."}
+2023-12-20T20:40:26.031987Z [non_exe-1] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 0, Tracked { items: 153, bytes: 674185 }, skip_usage: false.
+2023-12-20T20:40:26.162417Z [state_batch_committer] INFO storage/aptosdb/src/state_merkle_db.rs:225 Committing StateMerkleDb. {"version":0}
+2023-12-20T20:40:26.162614Z [state_batch_committer] INFO storage/aptosdb/src/state_store/state_merkle_batch_committer.rs:82 State snapshot committed. {"base_version":null,"root_hash":"d0236dc148357b7f4c505aa8e4b4cb97c2a3b3c6ec8863f0dd0a421e86a06634","version":0}
+2023-12-20T20:40:26.162951Z [tests::test_benchmark_transaction] INFO execution/executor/src/db_bootstrapper.rs:121 Genesis commited.
+2023-12-20T20:40:26.163412Z INFO storage/schemadb/src/lib.rs:324 Dropped RocksDB. {"rocksdb_name":"state_merkle_db"}
+2023-12-20T20:40:26.166587Z INFO storage/schemadb/src/lib.rs:324 Dropped RocksDB. {"rocksdb_name":"ledger_db"}
+Finished empty DB creation, DB dir: /var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/5c5eb1c3a9d07bc0f10934452de0f2aa. Creating accounts now...
+2023-12-20T20:40:26.168196Z [tests::test_benchmark_transaction] INFO crates/aptos-genesis/src/builder.rs:513 Building genesis with 1 validators. Directory of output: "/private/var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/66b7261d0a05d93d1ba69b871e8bedcd"
+2023-12-20T20:40:26.948851Z [tests::test_benchmark_transaction] INFO storage/schemadb/src/lib.rs:173 Opened RocksDB. {"rocksdb_name":"ledger_db"}
+2023-12-20T20:40:26.948898Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:308 Opened ledger_db at "/var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/48c7a2ee20ff2b6d93ebbac25d94a706/ledger_db"!
+2023-12-20T20:40:26.948910Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:95 Opened ledger metadata db! {"ledger_metadata_db_path":"/var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/48c7a2ee20ff2b6d93ebbac25d94a706/ledger_db","sharding":false}
+2023-12-20T20:40:26.948919Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:102 Individual ledger dbs are not enabled!
+2023-12-20T20:40:26.948924Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_kv_db.rs:44 State K/V DB is not enabled!
+2023-12-20T20:40:26.949823Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_merkle_db.rs:86 Sharded state merkle DB is not enabled!
+2023-12-20T20:40:26.979859Z [tests::test_benchmark_transaction] INFO storage/schemadb/src/lib.rs:173 Opened RocksDB. {"rocksdb_name":"state_merkle_db"}
+2023-12-20T20:40:26.979991Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_store/mod.rs:425 No overall commit progress was found!
+2023-12-20T20:40:26.980058Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_store/mod.rs:479 Initializing BufferedState. {"latest_snapshot_version":null,"num_transactions":0}
+2023-12-20T20:40:26.980153Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_store/mod.rs:571 StateStore initialization finished. {"latest_in_memory_root_hash":"5350415253455f4d45524b4c455f504c414345484f4c4445525f484153480000","latest_in_memory_version":null,"latest_snapshot_root_hash":"5350415253455f4d45524b4c455f504c414345484f4c4445525f484153480000","latest_snapshot_version":null}
+2023-12-20T20:40:26.980421Z [tests::test_benchmark_transaction] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 1 {"name":"miscellaneous","txn_idx":0}
+2023-12-20T20:40:26.986368Z [tests::test_benchmark_transaction] INFO aptos-move/aptos-vm-logging/src/lib.rs:54 Reconfiguration occurred: restart required {"name":"miscellaneous","txn_idx":0}
+2023-12-20T20:40:26.986877Z [tests::test_benchmark_transaction] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Sequential execution completed. 1 out of 1 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":0}
+2023-12-20T20:40:27.030203Z [tests::test_benchmark_transaction] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(0), result_state: Some(0) HashValue(dd432fa758c66629b2da359d8e35a13efa4de2981532c9aa4f88c2ba6714ac3d) Tracked { items: 153, bytes: 674185 } 0 HashValue(dd432fa758c66629b2da359d8e35a13efa4de2981532c9aa4f88c2ba6714ac3d) Tracked { items: 153, bytes: 674185 }
+2023-12-20T20:40:27.194247Z [tests::test_benchmark_transaction] INFO execution/executor/src/db_bootstrapper.rs:208 Genesis calculated: ledger_info_with_sigs Some(V0(LedgerInfoWithV0 { ledger_info: LedgerInfo { commit_info: BlockInfo { epoch: 0, round: 0, id: HashValue(0000000000000000000000000000000000000000000000000000000000000000), executed_state_id: HashValue(be03ee7769e22f28f661162f8fced1f39dff95f79010ef92dd36b2423dc8d437), version: 0, timestamp_usecs: 0, next_epoch_state: Some(EpochState [epoch: 1, validator: ValidatorSet: [66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef: 10, ]]) }, consensus_data_hash: HashValue(0000000000000000000000000000000000000000000000000000000000000000) }, signatures: AggregateSignature { validator_bitmask: BitVec { inner: [] }, sig: None } })), waypoint Waypoint { version: 0, value: HashValue(2f57d3d5626093385964d6c62b31bd2a36e38fca566be3ad1a955051a21e1425) }
+2023-12-20T20:40:27.194743Z INFO storage/schemadb/src/lib.rs:324 Dropped RocksDB. {"rocksdb_name":"state_merkle_db"}
+2023-12-20T20:40:27.197041Z INFO storage/schemadb/src/lib.rs:324 Dropped RocksDB. {"rocksdb_name":"ledger_db"}
+2023-12-20T20:40:27.263697Z [tests::test_benchmark_transaction] INFO storage/schemadb/src/lib.rs:173 Opened RocksDB. {"rocksdb_name":"ledger_db"}
+2023-12-20T20:40:27.263773Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:308 Opened ledger_db at "/var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/5c5eb1c3a9d07bc0f10934452de0f2aa/ledger_db"!
+2023-12-20T20:40:27.263809Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:95 Opened ledger metadata db! {"ledger_metadata_db_path":"/var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/5c5eb1c3a9d07bc0f10934452de0f2aa/ledger_db","sharding":false}
+2023-12-20T20:40:27.263829Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:102 Individual ledger dbs are not enabled!
+2023-12-20T20:40:27.263834Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_kv_db.rs:44 State K/V DB is not enabled!
+2023-12-20T20:40:27.264697Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_merkle_db.rs:86 Sharded state merkle DB is not enabled!
+2023-12-20T20:40:27.278462Z [tests::test_benchmark_transaction] INFO storage/schemadb/src/lib.rs:173 Opened RocksDB. {"rocksdb_name":"state_merkle_db"}
+2023-12-20T20:40:27.278673Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_store/mod.rs:375 Start syncing databases... {"overall_commit_progress":0}
+2023-12-20T20:40:27.278705Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_store/mod.rs:396 Attempt ledger truncation... {"ledger_commit_progress":0}
+2023-12-20T20:40:27.286823Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_store/mod.rs:479 Initializing BufferedState. {"latest_snapshot_version":0,"num_transactions":1}
+2023-12-20T20:40:27.287282Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_store/mod.rs:571 StateStore initialization finished. {"latest_in_memory_root_hash":"d0236dc148357b7f4c505aa8e4b4cb97c2a3b3c6ec8863f0dd0a421e86a06634","latest_in_memory_version":0,"latest_snapshot_root_hash":"d0236dc148357b7f4c505aa8e4b4cb97c2a3b3c6ec8863f0dd0a421e86a06634","latest_snapshot_version":0}
+2023-12-20T20:40:27.288201Z [txn_committer] INFO execution/executor-benchmark/src/pipeline.rs:244 Starting commit thread
+2023-12-20T20:40:27.288213Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:74 Start with version: 0
+[12-20 12:40:27] Generating cache of 1 seed accounts.
+[12-20 12:40:27] Generating 1 seed account creation txns, with 1000000000000000 coins.
+[12-20 12:40:27] done.
+[12-20 12:40:27] Generating 100 account creation txns.
+2023-12-20T20:40:27.289901Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 0, received 1 transactions.
+Skipped first 0 existing accounts.
+2023-12-20T20:40:27.290550Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 1 to execute
+2023-12-20T20:40:27.290583Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 0, received block bd23cd31.
+2023-12-20T20:40:27.290644Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"bd23cd310a60ae78f7643ae03433ba078a4409a57901a0cfdbec30ab2f6c3232","name":"block_executor"}
+2023-12-20T20:40:27.290673Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 1
+2023-12-20T20:40:27.291248Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 1 {"block_id":"bd23cd310a60ae78f7643ae03433ba078a4409a57901a0cfdbec30ab2f6c3232","name":"execution","txn_idx":0}
+2023-12-20T20:40:27.292346Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 1, received 5 transactions.
+2023-12-20T20:40:27.294396Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 2, received 5 transactions.
+2023-12-20T20:40:27.296294Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 3, received 5 transactions.
+2023-12-20T20:40:27.298601Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 4, received 5 transactions.
+2023-12-20T20:40:27.690861Z [par_exec-2] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 1 out of 1 txns committed {"approx_output_size":1685,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":10}
+2023-12-20T20:40:27.692722Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(1), result_state: Some(2) HashValue(7bfd9aff5980783d4b73a6a81bd7be8d32586f04d2e76638d434ea9845ec4b04) Tracked { items: 155, bytes: 674655 } 2 HashValue(7bfd9aff5980783d4b73a6a81bd7be8d32586f04d2e76638d434ea9845ec4b04) Tracked { items: 155, bytes: 674655 }
+2023-12-20T20:40:27.692884Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:27.692900Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 5 to execute
+2023-12-20T20:40:27.692906Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 1, received block 01187577.
+2023-12-20T20:40:27.692929Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 5, received 5 transactions.
+2023-12-20T20:40:27.692925Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"01187577c669108776c27a46021772df73b4cc13f2d0e5f118eeb9946b958c4d","name":"block_executor"}
+2023-12-20T20:40:27.692945Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 3
+2023-12-20T20:40:27.692947Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"bd23cd310a60ae78f7643ae03433ba078a4409a57901a0cfdbec30ab2f6c3232","name":"block_executor"}
+2023-12-20T20:40:27.693452Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 5 {"block_id":"01187577c669108776c27a46021772df73b4cc13f2d0e5f118eeb9946b958c4d","name":"execution","txn_idx":0}
+2023-12-20T20:40:27.693974Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"bd23cd310a60ae78f7643ae03433ba078a4409a57901a0cfdbec30ab2f6c3232","name":"block_executor"}
+2023-12-20T20:40:27.696720Z [non_exe-4] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 2, Tracked { items: 155, bytes: 674655 }, skip_usage: false.
+2023-12-20T20:40:27.700723Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"bd23cd310a60ae78f7643ae03433ba078a4409a57901a0cfdbec30ab2f6c3232"}
+2023-12-20T20:40:27.700777Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 2. latency: 410 ms, partition time: 0 ms, execute time: 402 ms. commit time: 6 ms. TPS: 5 (partition: 3132, execution: 5, commit: 293). Accumulative TPS: 5
+2023-12-20T20:40:27.700789Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 0 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:27.700797Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 200237271 ns, executor time: 841021 ns, commit time: 3402084 ns, DB commit time: 69425146 ns
+2023-12-20T20:40:27.753788Z [par_exec-3] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 5 out of 5 txns committed {"approx_output_size":8425,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":150}
+2023-12-20T20:40:27.755493Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(5), result_state: Some(8) HashValue(2de75c82dc0fbca9a4c5dc955fb06386e5e838ee1e721b7ff3e6bae5432d7c51) Tracked { items: 165, bytes: 677005 } 8 HashValue(2de75c82dc0fbca9a4c5dc955fb06386e5e838ee1e721b7ff3e6bae5432d7c51) Tracked { items: 165, bytes: 677005 }
+2023-12-20T20:40:27.755869Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:27.755885Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 5 to execute
+2023-12-20T20:40:27.755890Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 2, received block e9420923.
+2023-12-20T20:40:27.755902Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 6, received 5 transactions.
+2023-12-20T20:40:27.755903Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"e94209231ea89dbbbb224e7e0b3dcaf74587909fec18000c67ad9a128e088252","name":"block_executor"}
+2023-12-20T20:40:27.755902Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"01187577c669108776c27a46021772df73b4cc13f2d0e5f118eeb9946b958c4d","name":"block_executor"}
+2023-12-20T20:40:27.755916Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 9
+2023-12-20T20:40:27.756433Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 5 {"block_id":"e94209231ea89dbbbb224e7e0b3dcaf74587909fec18000c67ad9a128e088252","name":"execution","txn_idx":0}
+2023-12-20T20:40:27.758822Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"01187577c669108776c27a46021772df73b4cc13f2d0e5f118eeb9946b958c4d","name":"block_executor"}
+2023-12-20T20:40:27.763479Z [non_exe-4] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 8, Tracked { items: 165, bytes: 677005 }, skip_usage: false.
+2023-12-20T20:40:27.770086Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"01187577c669108776c27a46021772df73b4cc13f2d0e5f118eeb9946b958c4d"}
+2023-12-20T20:40:27.770127Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 8. latency: 477 ms, partition time: 2 ms, execute time: 62 ms. commit time: 11 ms. TPS: 95 (partition: 2928, execution: 95, commit: 530). Accumulative TPS: 17
+2023-12-20T20:40:27.770139Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 0 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:27.770146Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 57641766 ns, executor time: 457026 ns, commit time: 2264292 ns, DB commit time: 18756239 ns
+2023-12-20T20:40:27.819389Z [par_exec-5] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 5 out of 5 txns committed {"approx_output_size":8425,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":150}
+2023-12-20T20:40:27.821071Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(5), result_state: Some(14) HashValue(81be4de444c5dcc985695e582db66e4154e1c1f73ca318a51d8d9d7b0a307166) Tracked { items: 175, bytes: 679355 } 14 HashValue(81be4de444c5dcc985695e582db66e4154e1c1f73ca318a51d8d9d7b0a307166) Tracked { items: 175, bytes: 679355 }
+2023-12-20T20:40:27.821471Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:27.821488Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 5 to execute
+2023-12-20T20:40:27.821494Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 3, received block 8c4c06d8.
+2023-12-20T20:40:27.821509Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 7, received 5 transactions.
+2023-12-20T20:40:27.821513Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"8c4c06d89b9f2a5ab290e3a36ecb2392914176b911051b7220a91c7f3ab6dae0","name":"block_executor"}
+2023-12-20T20:40:27.821540Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 15
+2023-12-20T20:40:27.821513Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"e94209231ea89dbbbb224e7e0b3dcaf74587909fec18000c67ad9a128e088252","name":"block_executor"}
+2023-12-20T20:40:27.822073Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 5 {"block_id":"8c4c06d89b9f2a5ab290e3a36ecb2392914176b911051b7220a91c7f3ab6dae0","name":"execution","txn_idx":0}
+2023-12-20T20:40:27.825394Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"e94209231ea89dbbbb224e7e0b3dcaf74587909fec18000c67ad9a128e088252","name":"block_executor"}
+2023-12-20T20:40:27.829184Z [non_exe-4] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 14, Tracked { items: 175, bytes: 679355 }, skip_usage: false.
+2023-12-20T20:40:27.834463Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"e94209231ea89dbbbb224e7e0b3dcaf74587909fec18000c67ad9a128e088252"}
+2023-12-20T20:40:27.834508Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 14. latency: 540 ms, partition time: 1 ms, execute time: 65 ms. commit time: 9 ms. TPS: 92 (partition: 3163, execution: 92, commit: 656). Accumulative TPS: 26
+2023-12-20T20:40:27.834518Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 1 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:27.834525Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 37464357 ns, executor time: 394122 ns, commit time: 1946908 ns, DB commit time: 11338598 ns
+2023-12-20T20:40:27.883301Z [par_exec-2] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 5 out of 5 txns committed {"approx_output_size":8425,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":150}
+2023-12-20T20:40:27.885361Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(5), result_state: Some(20) HashValue(003065f38b2dbafe3e2340db73c90fa09c68aa5d1ac22a5b7987ff5ca7f40505) Tracked { items: 185, bytes: 681705 } 20 HashValue(003065f38b2dbafe3e2340db73c90fa09c68aa5d1ac22a5b7987ff5ca7f40505) Tracked { items: 185, bytes: 681705 }
+2023-12-20T20:40:27.885742Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:27.885759Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 5 to execute
+2023-12-20T20:40:27.885765Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 4, received block f34915f0.
+2023-12-20T20:40:27.885769Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 8, received 5 transactions.
+2023-12-20T20:40:27.885776Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"f34915f0df17ad83501712bac14e9b871c9b786c117603fe5c297b25c3c27429","name":"block_executor"}
+2023-12-20T20:40:27.885792Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 21
+2023-12-20T20:40:27.885774Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"8c4c06d89b9f2a5ab290e3a36ecb2392914176b911051b7220a91c7f3ab6dae0","name":"block_executor"}
+2023-12-20T20:40:27.886307Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 5 {"block_id":"f34915f0df17ad83501712bac14e9b871c9b786c117603fe5c297b25c3c27429","name":"execution","txn_idx":0}
+2023-12-20T20:40:27.888699Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"8c4c06d89b9f2a5ab290e3a36ecb2392914176b911051b7220a91c7f3ab6dae0","name":"block_executor"}
+2023-12-20T20:40:27.894556Z [non_exe-8] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 20, Tracked { items: 185, bytes: 681705 }, skip_usage: false.
+2023-12-20T20:40:27.902465Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"8c4c06d89b9f2a5ab290e3a36ecb2392914176b911051b7220a91c7f3ab6dae0"}
+2023-12-20T20:40:27.902571Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 20. latency: 606 ms, partition time: 1 ms, execute time: 64 ms. commit time: 13 ms. TPS: 93 (partition: 3598, execution: 93, commit: 432). Accumulative TPS: 33
+2023-12-20T20:40:27.902589Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 1 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:27.902600Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 29304746 ns, executor time: 391383 ns, commit time: 2056552 ns, DB commit time: 8621510 ns
+2023-12-20T20:40:27.946589Z [par_exec-3] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 5 out of 5 txns committed {"approx_output_size":8425,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":150}
+2023-12-20T20:40:27.948143Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(5), result_state: Some(26) HashValue(4060e347d9987d02d9195991358f9efd9cac16c8362b43be594406fa176c7c8a) Tracked { items: 195, bytes: 684055 } 26 HashValue(4060e347d9987d02d9195991358f9efd9cac16c8362b43be594406fa176c7c8a) Tracked { items: 195, bytes: 684055 }
+2023-12-20T20:40:27.948541Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:27.948555Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 5 to execute
+2023-12-20T20:40:27.948561Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 5, received block 515cae05.
+2023-12-20T20:40:27.948569Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"f34915f0df17ad83501712bac14e9b871c9b786c117603fe5c297b25c3c27429","name":"block_executor"}
+2023-12-20T20:40:27.948572Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"515cae059298d13d5ce4c6b1403a0be9b4a23628baabc4f0adfacc2970f3f9e0","name":"block_executor"}
+2023-12-20T20:40:27.948583Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 27
+2023-12-20T20:40:27.948584Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 9, received 5 transactions.
+2023-12-20T20:40:27.949061Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 5 {"block_id":"515cae059298d13d5ce4c6b1403a0be9b4a23628baabc4f0adfacc2970f3f9e0","name":"execution","txn_idx":0}
+2023-12-20T20:40:27.951495Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"f34915f0df17ad83501712bac14e9b871c9b786c117603fe5c297b25c3c27429","name":"block_executor"}
+2023-12-20T20:40:27.956086Z [non_exe-4] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 26, Tracked { items: 195, bytes: 684055 }, skip_usage: false.
+2023-12-20T20:40:27.963177Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"f34915f0df17ad83501712bac14e9b871c9b786c117603fe5c297b25c3c27429"}
+2023-12-20T20:40:27.963227Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 26. latency: 664 ms, partition time: 1 ms, execute time: 62 ms. commit time: 11 ms. TPS: 96 (partition: 4058, execution: 96, commit: 511). Accumulative TPS: 39
+2023-12-20T20:40:27.963239Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 1 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:27.963247Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 24873726 ns, executor time: 370425 ns, commit time: 2033423 ns, DB commit time: 7078356 ns
+2023-12-20T20:40:28.008747Z [par_exec-3] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 5 out of 5 txns committed {"approx_output_size":8425,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":150}
+2023-12-20T20:40:28.010836Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(5), result_state: Some(32) HashValue(1a313b641af6ef4672265a638d408654ce47aee2af1fa658e6aca0bf08775e93) Tracked { items: 205, bytes: 686405 } 32 HashValue(1a313b641af6ef4672265a638d408654ce47aee2af1fa658e6aca0bf08775e93) Tracked { items: 205, bytes: 686405 }
+2023-12-20T20:40:28.011217Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:28.011233Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 5 to execute
+2023-12-20T20:40:28.011239Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 6, received block 09dec788.
+2023-12-20T20:40:28.011250Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"09dec788b85b11061df910c3faa75c0acdecf39d289518f98902f4212579b2cb","name":"block_executor"}
+2023-12-20T20:40:28.011265Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 33
+2023-12-20T20:40:28.011247Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"515cae059298d13d5ce4c6b1403a0be9b4a23628baabc4f0adfacc2970f3f9e0","name":"block_executor"}
+2023-12-20T20:40:28.011262Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 10, received 5 transactions.
+[12-20 12:40:28] done.
+2023-12-20T20:40:28.011784Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 5 {"block_id":"09dec788b85b11061df910c3faa75c0acdecf39d289518f98902f4212579b2cb","name":"execution","txn_idx":0}
+2023-12-20T20:40:28.014146Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"515cae059298d13d5ce4c6b1403a0be9b4a23628baabc4f0adfacc2970f3f9e0","name":"block_executor"}
+2023-12-20T20:40:28.017706Z [non_exe-4] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 32, Tracked { items: 205, bytes: 686405 }, skip_usage: false.
+2023-12-20T20:40:28.022686Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"515cae059298d13d5ce4c6b1403a0be9b4a23628baabc4f0adfacc2970f3f9e0"}
+2023-12-20T20:40:28.022735Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 32. latency: 329 ms, partition time: 1 ms, execute time: 62 ms. commit time: 8 ms. TPS: 96 (partition: 3881, execution: 96, commit: 698). Accumulative TPS: 44
+2023-12-20T20:40:28.022746Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 1 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:28.022752Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 22086789 ns, executor time: 371423 ns, commit time: 1920691 ns, DB commit time: 6015965 ns
+2023-12-20T20:40:28.071597Z [par_exec-2] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 5 out of 5 txns committed {"approx_output_size":8425,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":150}
+2023-12-20T20:40:28.073385Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(5), result_state: Some(38) HashValue(969a57c30892d0857633dda2045b64aad40b79c927e42026878506ab6586f39d) Tracked { items: 215, bytes: 688755 } 38 HashValue(969a57c30892d0857633dda2045b64aad40b79c927e42026878506ab6586f39d) Tracked { items: 215, bytes: 688755 }
+2023-12-20T20:40:28.073762Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:28.073776Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 5 to execute
+2023-12-20T20:40:28.073781Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 7, received block 79c215c3.
+2023-12-20T20:40:28.073789Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"09dec788b85b11061df910c3faa75c0acdecf39d289518f98902f4212579b2cb","name":"block_executor"}
+2023-12-20T20:40:28.073795Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"79c215c3b4eb7e5c337bfb7b59ef1f1a3ee95c28fc9640ad516cb7f823d6c352","name":"block_executor"}
+2023-12-20T20:40:28.073820Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 39
+2023-12-20T20:40:28.073808Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 11, received 5 transactions.
+2023-12-20T20:40:28.074394Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 5 {"block_id":"79c215c3b4eb7e5c337bfb7b59ef1f1a3ee95c28fc9640ad516cb7f823d6c352","name":"execution","txn_idx":0}
+2023-12-20T20:40:28.076668Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"09dec788b85b11061df910c3faa75c0acdecf39d289518f98902f4212579b2cb","name":"block_executor"}
+2023-12-20T20:40:28.082491Z [non_exe-4] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 38, Tracked { items: 215, bytes: 688755 }, skip_usage: false.
+2023-12-20T20:40:28.086551Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"09dec788b85b11061df910c3faa75c0acdecf39d289518f98902f4212579b2cb"}
+2023-12-20T20:40:28.086595Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 38. latency: 330 ms, partition time: 1 ms, execute time: 62 ms. commit time: 9 ms. TPS: 96 (partition: 4042, execution: 96, commit: 604). Accumulative TPS: 48
+2023-12-20T20:40:28.086605Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 1 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:28.086611Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 20183052 ns, executor time: 365647 ns, commit time: 1878675 ns, DB commit time: 5324634 ns
+2023-12-20T20:40:28.134468Z [par_exec-0] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 5 out of 5 txns committed {"approx_output_size":8425,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":150}
+2023-12-20T20:40:28.136061Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(5), result_state: Some(44) HashValue(17919755708f6fab363709d0fd58d7f707ad6ffc43aa8a5e9f20dc8f0ea57b8d) Tracked { items: 225, bytes: 691105 } 44 HashValue(17919755708f6fab363709d0fd58d7f707ad6ffc43aa8a5e9f20dc8f0ea57b8d) Tracked { items: 225, bytes: 691105 }
+2023-12-20T20:40:28.136456Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:28.136472Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 5 to execute
+2023-12-20T20:40:28.136478Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 8, received block e381a4f7.
+2023-12-20T20:40:28.136486Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 12, received 5 transactions.
+2023-12-20T20:40:28.136497Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"e381a4f704f597dd433da2b7cbc7a816d696429a4cf0afcb44ed9d88b1cc17a7","name":"block_executor"}
+2023-12-20T20:40:28.136497Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"79c215c3b4eb7e5c337bfb7b59ef1f1a3ee95c28fc9640ad516cb7f823d6c352","name":"block_executor"}
+2023-12-20T20:40:28.136515Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 45
+2023-12-20T20:40:28.137057Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 5 {"block_id":"e381a4f704f597dd433da2b7cbc7a816d696429a4cf0afcb44ed9d88b1cc17a7","name":"execution","txn_idx":0}
+2023-12-20T20:40:28.140059Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"79c215c3b4eb7e5c337bfb7b59ef1f1a3ee95c28fc9640ad516cb7f823d6c352","name":"block_executor"}
+2023-12-20T20:40:28.142135Z [non_exe-4] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 44, Tracked { items: 225, bytes: 691105 }, skip_usage: false.
+2023-12-20T20:40:28.148046Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"79c215c3b4eb7e5c337bfb7b59ef1f1a3ee95c28fc9640ad516cb7f823d6c352"}
+2023-12-20T20:40:28.148088Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 44. latency: 326 ms, partition time: 2 ms, execute time: 62 ms. commit time: 8 ms. TPS: 96 (partition: 2822, execution: 96, commit: 743). Accumulative TPS: 51
+2023-12-20T20:40:28.148098Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 1 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:28.148105Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 18804045 ns, executor time: 359010 ns, commit time: 1805775 ns, DB commit time: 4777411 ns
+2023-12-20T20:40:28.197193Z [par_exec-0] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 5 out of 5 txns committed {"approx_output_size":8425,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":150}
+2023-12-20T20:40:28.199145Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(5), result_state: Some(50) HashValue(28492ed0a74efeb9fb84a338c281bf024e9fd5a4a0d5ec879fea82f74b191310) Tracked { items: 235, bytes: 693455 } 50 HashValue(28492ed0a74efeb9fb84a338c281bf024e9fd5a4a0d5ec879fea82f74b191310) Tracked { items: 235, bytes: 693455 }
+2023-12-20T20:40:28.199506Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:28.199520Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 5 to execute
+2023-12-20T20:40:28.199526Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 9, received block fb1e2110.
+2023-12-20T20:40:28.199535Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"e381a4f704f597dd433da2b7cbc7a816d696429a4cf0afcb44ed9d88b1cc17a7","name":"block_executor"}
+2023-12-20T20:40:28.199545Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 13, received 5 transactions.
+2023-12-20T20:40:28.199537Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"fb1e2110b8877e1f3a68494e89ce66993fdbe3e8290541454c3c155984ff0396","name":"block_executor"}
+2023-12-20T20:40:28.199561Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 51
+2023-12-20T20:40:28.200064Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 5 {"block_id":"fb1e2110b8877e1f3a68494e89ce66993fdbe3e8290541454c3c155984ff0396","name":"execution","txn_idx":0}
+2023-12-20T20:40:28.202682Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"e381a4f704f597dd433da2b7cbc7a816d696429a4cf0afcb44ed9d88b1cc17a7","name":"block_executor"}
+2023-12-20T20:40:28.206324Z [non_exe-4] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 50, Tracked { items: 235, bytes: 693455 }, skip_usage: false.
+2023-12-20T20:40:28.212698Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"e381a4f704f597dd433da2b7cbc7a816d696429a4cf0afcb44ed9d88b1cc17a7"}
+2023-12-20T20:40:28.212749Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 50. latency: 326 ms, partition time: 1 ms, execute time: 63 ms. commit time: 10 ms. TPS: 95 (partition: 3877, execution: 95, commit: 595). Accumulative TPS: 54
+2023-12-20T20:40:28.212765Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 1 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:28.212774Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 17758393 ns, executor time: 359023 ns, commit time: 1790645 ns, DB commit time: 4402868 ns
+2023-12-20T20:40:28.259578Z [par_exec-3] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 5 out of 5 txns committed {"approx_output_size":8425,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":150}
+2023-12-20T20:40:28.261209Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(5), result_state: Some(56) HashValue(9f0c3e3589a55487cf7dc6758fe5ba4bf75979ef4a5b9ac1fd09581aabe5e40b) Tracked { items: 245, bytes: 695805 } 56 HashValue(9f0c3e3589a55487cf7dc6758fe5ba4bf75979ef4a5b9ac1fd09581aabe5e40b) Tracked { items: 245, bytes: 695805 }
+2023-12-20T20:40:28.261569Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:28.261582Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 5 to execute
+2023-12-20T20:40:28.261588Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 10, received block 7bd7c9c4.
+2023-12-20T20:40:28.261600Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"7bd7c9c4b3e9c3bfca9a20f5e96bf64a06943b2b866693ff4f861085dc1ae16d","name":"block_executor"}
+2023-12-20T20:40:28.261622Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 57
+2023-12-20T20:40:28.261600Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"fb1e2110b8877e1f3a68494e89ce66993fdbe3e8290541454c3c155984ff0396","name":"block_executor"}
+2023-12-20T20:40:28.261609Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 14, received 5 transactions.
+2023-12-20T20:40:28.262119Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 5 {"block_id":"7bd7c9c4b3e9c3bfca9a20f5e96bf64a06943b2b866693ff4f861085dc1ae16d","name":"execution","txn_idx":0}
+2023-12-20T20:40:28.265203Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"fb1e2110b8877e1f3a68494e89ce66993fdbe3e8290541454c3c155984ff0396","name":"block_executor"}
+2023-12-20T20:40:28.268387Z [non_exe-4] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 56, Tracked { items: 245, bytes: 695805 }, skip_usage: false.
+2023-12-20T20:40:28.273550Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"fb1e2110b8877e1f3a68494e89ce66993fdbe3e8290541454c3c155984ff0396"}
+2023-12-20T20:40:28.273593Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 56. latency: 325 ms, partition time: 1 ms, execute time: 62 ms. commit time: 8 ms. TPS: 97 (partition: 4025, execution: 97, commit: 714). Accumulative TPS: 57
+2023-12-20T20:40:28.273602Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 1 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:28.273608Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 16924569 ns, executor time: 353801 ns, commit time: 1748722 ns, DB commit time: 4079028 ns
+2023-12-20T20:40:28.321260Z [par_exec-1] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 5 out of 5 txns committed {"approx_output_size":8425,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":150}
+2023-12-20T20:40:28.322900Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(5), result_state: Some(62) HashValue(3e19b8fe44910846a97d4859ceb3a3c9ee5d59041785a1002631a7b5cf6414c4) Tracked { items: 255, bytes: 698155 } 62 HashValue(3e19b8fe44910846a97d4859ceb3a3c9ee5d59041785a1002631a7b5cf6414c4) Tracked { items: 255, bytes: 698155 }
+2023-12-20T20:40:28.323284Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:28.323311Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 5 to execute
+2023-12-20T20:40:28.323317Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 11, received block 9e42968e.
+2023-12-20T20:40:28.323320Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 15, received 5 transactions.
+2023-12-20T20:40:28.323310Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"7bd7c9c4b3e9c3bfca9a20f5e96bf64a06943b2b866693ff4f861085dc1ae16d","name":"block_executor"}
+2023-12-20T20:40:28.323339Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"9e42968eb19f5e24a7dc8521b86c84afd41d3418224283a3aebc6a4a287a15c6","name":"block_executor"}
+2023-12-20T20:40:28.323354Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 63
+2023-12-20T20:40:28.323877Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 5 {"block_id":"9e42968eb19f5e24a7dc8521b86c84afd41d3418224283a3aebc6a4a287a15c6","name":"execution","txn_idx":0}
+2023-12-20T20:40:28.326253Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"7bd7c9c4b3e9c3bfca9a20f5e96bf64a06943b2b866693ff4f861085dc1ae16d","name":"block_executor"}
+2023-12-20T20:40:28.330273Z [non_exe-4] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 62, Tracked { items: 255, bytes: 698155 }, skip_usage: false.
+2023-12-20T20:40:28.335706Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"7bd7c9c4b3e9c3bfca9a20f5e96bf64a06943b2b866693ff4f861085dc1ae16d"}
+2023-12-20T20:40:28.335747Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 62. latency: 324 ms, partition time: 1 ms, execute time: 61 ms. commit time: 9 ms. TPS: 97 (partition: 3979, execution: 97, commit: 631). Accumulative TPS: 59
+2023-12-20T20:40:28.335758Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 1 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:28.335764Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 16246749 ns, executor time: 349086 ns, commit time: 1732674 ns, DB commit time: 3835689 ns
+2023-12-20T20:40:28.384227Z [par_exec-4] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 5 out of 5 txns committed {"approx_output_size":8425,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":150}
+2023-12-20T20:40:28.385982Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(5), result_state: Some(68) HashValue(9b07530d224a9725ad8f83cb0e489d661f0f12ec24e5b84679b72efe8fb5d97d) Tracked { items: 265, bytes: 700505 } 68 HashValue(9b07530d224a9725ad8f83cb0e489d661f0f12ec24e5b84679b72efe8fb5d97d) Tracked { items: 265, bytes: 700505 }
+2023-12-20T20:40:28.386346Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:28.386359Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 5 to execute
+2023-12-20T20:40:28.386365Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 12, received block 11c6bfd3.
+2023-12-20T20:40:28.386377Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"11c6bfd379a2b581227c867e55ab9a5a5b1d6b3b692a604a077dd042070827ba","name":"block_executor"}
+2023-12-20T20:40:28.386377Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"9e42968eb19f5e24a7dc8521b86c84afd41d3418224283a3aebc6a4a287a15c6","name":"block_executor"}
+2023-12-20T20:40:28.386384Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 16, received 5 transactions.
+2023-12-20T20:40:28.386388Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 69
+2023-12-20T20:40:28.386895Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 5 {"block_id":"11c6bfd379a2b581227c867e55ab9a5a5b1d6b3b692a604a077dd042070827ba","name":"execution","txn_idx":0}
+2023-12-20T20:40:28.389386Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"9e42968eb19f5e24a7dc8521b86c84afd41d3418224283a3aebc6a4a287a15c6","name":"block_executor"}
+2023-12-20T20:40:28.392877Z [non_exe-4] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 68, Tracked { items: 265, bytes: 700505 }, skip_usage: false.
+2023-12-20T20:40:28.397204Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"9e42968eb19f5e24a7dc8521b86c84afd41d3418224283a3aebc6a4a287a15c6"}
+2023-12-20T20:40:28.397254Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 68. latency: 323 ms, partition time: 1 ms, execute time: 63 ms. commit time: 7 ms. TPS: 95 (partition: 3932, execution: 95, commit: 761). Accumulative TPS: 61
+2023-12-20T20:40:28.397266Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 1 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:28.397272Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 15706627 ns, executor time: 346863 ns, commit time: 1695683 ns, DB commit time: 3611090 ns
+2023-12-20T20:40:28.446648Z [par_exec-2] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 5 out of 5 txns committed {"approx_output_size":8425,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":150}
+2023-12-20T20:40:28.448474Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(5), result_state: Some(74) HashValue(0250275032b4eb56bb816c61e356b4495bff3e7ed4294b8181968162ef459796) Tracked { items: 275, bytes: 702855 } 74 HashValue(0250275032b4eb56bb816c61e356b4495bff3e7ed4294b8181968162ef459796) Tracked { items: 275, bytes: 702855 }
+2023-12-20T20:40:28.448834Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:28.448848Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 5 to execute
+2023-12-20T20:40:28.448854Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 13, received block 5eae40c0.
+2023-12-20T20:40:28.448862Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"11c6bfd379a2b581227c867e55ab9a5a5b1d6b3b692a604a077dd042070827ba","name":"block_executor"}
+2023-12-20T20:40:28.448873Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 17, received 5 transactions.
+2023-12-20T20:40:28.448865Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"5eae40c0c54e20dea83f6a4af50eac6c0bf4415ff865061a82e093c4ec130ff2","name":"block_executor"}
+2023-12-20T20:40:28.448894Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 75
+2023-12-20T20:40:28.449417Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 5 {"block_id":"5eae40c0c54e20dea83f6a4af50eac6c0bf4415ff865061a82e093c4ec130ff2","name":"execution","txn_idx":0}
+2023-12-20T20:40:28.452022Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"11c6bfd379a2b581227c867e55ab9a5a5b1d6b3b692a604a077dd042070827ba","name":"block_executor"}
+2023-12-20T20:40:28.455880Z [non_exe-4] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 74, Tracked { items: 275, bytes: 702855 }, skip_usage: false.
+2023-12-20T20:40:28.462532Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"11c6bfd379a2b581227c867e55ab9a5a5b1d6b3b692a604a077dd042070827ba"}
+2023-12-20T20:40:28.462582Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 74. latency: 326 ms, partition time: 1 ms, execute time: 62 ms. commit time: 10 ms. TPS: 96 (partition: 3962, execution: 96, commit: 568). Accumulative TPS: 63
+2023-12-20T20:40:28.462593Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 1 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:28.462599Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 15246070 ns, executor time: 345541 ns, commit time: 1700891 ns, DB commit time: 3459430 ns
+2023-12-20T20:40:28.509101Z [par_exec-6] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 5 out of 5 txns committed {"approx_output_size":8425,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":150}
+2023-12-20T20:40:28.511043Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(5), result_state: Some(80) HashValue(eb4506c8fa01677ff45ee737e1eafec9f9414c425b35a72076fab1b34106c13f) Tracked { items: 285, bytes: 705205 } 80 HashValue(eb4506c8fa01677ff45ee737e1eafec9f9414c425b35a72076fab1b34106c13f) Tracked { items: 285, bytes: 705205 }
+2023-12-20T20:40:28.511416Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:28.511432Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 5 to execute
+2023-12-20T20:40:28.511438Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 14, received block b5def4a4.
+2023-12-20T20:40:28.511445Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"5eae40c0c54e20dea83f6a4af50eac6c0bf4415ff865061a82e093c4ec130ff2","name":"block_executor"}
+2023-12-20T20:40:28.511449Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"b5def4a461a4fa2c90d3ec0133f9ee021b568b696a2725cc8395aff7af8f1053","name":"block_executor"}
+2023-12-20T20:40:28.511454Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 18, received 5 transactions.
+2023-12-20T20:40:28.511459Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 81
+2023-12-20T20:40:28.511970Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 5 {"block_id":"b5def4a461a4fa2c90d3ec0133f9ee021b568b696a2725cc8395aff7af8f1053","name":"execution","txn_idx":0}
+2023-12-20T20:40:28.514386Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"5eae40c0c54e20dea83f6a4af50eac6c0bf4415ff865061a82e093c4ec130ff2","name":"block_executor"}
+2023-12-20T20:40:28.519185Z [non_exe-4] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 80, Tracked { items: 285, bytes: 705205 }, skip_usage: false.
+2023-12-20T20:40:28.527300Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"5eae40c0c54e20dea83f6a4af50eac6c0bf4415ff865061a82e093c4ec130ff2"}
+2023-12-20T20:40:28.527351Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 80. latency: 327 ms, partition time: 1 ms, execute time: 62 ms. commit time: 12 ms. TPS: 96 (partition: 4046, execution: 96, commit: 463). Accumulative TPS: 65
+2023-12-20T20:40:28.527363Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 1 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:28.527369Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 14852978 ns, executor time: 347051 ns, commit time: 1735401 ns, DB commit time: 3360545 ns
+2023-12-20T20:40:28.571578Z [par_exec-0] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 5 out of 5 txns committed {"approx_output_size":8425,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":150}
+2023-12-20T20:40:28.573415Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(5), result_state: Some(86) HashValue(681bed722254855310b09a1b838ef7e55bb627cc8e459d1237ac82d6669f06fc) Tracked { items: 295, bytes: 707555 } 86 HashValue(681bed722254855310b09a1b838ef7e55bb627cc8e459d1237ac82d6669f06fc) Tracked { items: 295, bytes: 707555 }
+2023-12-20T20:40:28.573795Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:28.573813Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 5 to execute
+2023-12-20T20:40:28.573819Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 15, received block 522a9b54.
+2023-12-20T20:40:28.573830Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 19, received 5 transactions.
+2023-12-20T20:40:28.573835Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"522a9b54a8ef5dcb5361b2f93a65aa6135ecc794045b71cd628e914641517fda","name":"block_executor"}
+2023-12-20T20:40:28.573835Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"b5def4a461a4fa2c90d3ec0133f9ee021b568b696a2725cc8395aff7af8f1053","name":"block_executor"}
+2023-12-20T20:40:28.573855Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 87
+2023-12-20T20:40:28.574380Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 5 {"block_id":"522a9b54a8ef5dcb5361b2f93a65aa6135ecc794045b71cd628e914641517fda","name":"execution","txn_idx":0}
+2023-12-20T20:40:28.577123Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"b5def4a461a4fa2c90d3ec0133f9ee021b568b696a2725cc8395aff7af8f1053","name":"block_executor"}
+2023-12-20T20:40:28.581128Z [non_exe-4] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 86, Tracked { items: 295, bytes: 707555 }, skip_usage: false.
+2023-12-20T20:40:28.585691Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"b5def4a461a4fa2c90d3ec0133f9ee021b568b696a2725cc8395aff7af8f1053"}
+2023-12-20T20:40:28.585739Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 86. latency: 324 ms, partition time: 1 ms, execute time: 62 ms. commit time: 8 ms. TPS: 96 (partition: 3977, execution: 96, commit: 693). Accumulative TPS: 66
+2023-12-20T20:40:28.585751Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 1 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:28.585764Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 14513704 ns, executor time: 347009 ns, commit time: 1714906 ns, DB commit time: 3223428 ns
+2023-12-20T20:40:28.635785Z [par_exec-1] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 5 out of 5 txns committed {"approx_output_size":8425,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":150}
+2023-12-20T20:40:28.637387Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(5), result_state: Some(92) HashValue(f20179f57a07f23bf20d047e043ac9eef3a8d2ee7f5a843a5acd6ba113e641b2) Tracked { items: 305, bytes: 709905 } 92 HashValue(f20179f57a07f23bf20d047e043ac9eef3a8d2ee7f5a843a5acd6ba113e641b2) Tracked { items: 305, bytes: 709905 }
+2023-12-20T20:40:28.637776Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:28.637795Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 5 to execute
+2023-12-20T20:40:28.637801Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 16, received block fda298dc.
+2023-12-20T20:40:28.637800Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"522a9b54a8ef5dcb5361b2f93a65aa6135ecc794045b71cd628e914641517fda","name":"block_executor"}
+2023-12-20T20:40:28.637811Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 20, received 5 transactions.
+2023-12-20T20:40:28.637812Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"fda298dcc8a4b0fbc28cb1d450b59c8ec5f9c0b9d415e17714521cab0da09c1a","name":"block_executor"}
+2023-12-20T20:40:28.637850Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 93
+2023-12-20T20:40:28.638332Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 5 {"block_id":"fda298dcc8a4b0fbc28cb1d450b59c8ec5f9c0b9d415e17714521cab0da09c1a","name":"execution","txn_idx":0}
+2023-12-20T20:40:28.641951Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"522a9b54a8ef5dcb5361b2f93a65aa6135ecc794045b71cd628e914641517fda","name":"block_executor"}
+2023-12-20T20:40:28.646495Z [non_exe-9] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 92, Tracked { items: 305, bytes: 709905 }, skip_usage: false.
+2023-12-20T20:40:28.663079Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"522a9b54a8ef5dcb5361b2f93a65aa6135ecc794045b71cd628e914641517fda"}
+2023-12-20T20:40:28.663149Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 92. latency: 339 ms, partition time: 1 ms, execute time: 63 ms. commit time: 21 ms. TPS: 94 (partition: 3930, execution: 94, commit: 283). Accumulative TPS: 67
+2023-12-20T20:40:28.663159Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 1 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:28.663166Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 14239107 ns, executor time: 343888 ns, commit time: 1833789 ns, DB commit time: 3240779 ns
+2023-12-20T20:40:28.699482Z [par_exec-0] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 5 out of 5 txns committed {"approx_output_size":8425,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":150}
+2023-12-20T20:40:28.701316Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(5), result_state: Some(98) HashValue(5748ee61a406890657963163d5ef29cd9c8f8f37b95ef8bb749c4a03187ce0ef) Tracked { items: 315, bytes: 712255 } 98 HashValue(5748ee61a406890657963163d5ef29cd9c8f8f37b95ef8bb749c4a03187ce0ef) Tracked { items: 315, bytes: 712255 }
+2023-12-20T20:40:28.701706Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:28.701722Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 5 to execute
+2023-12-20T20:40:28.701727Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 17, received block caaf1dc0.
+2023-12-20T20:40:28.701747Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"caaf1dc0432a56871616ca4d4fd31e132af3b48f9a81e6609eee12a2424e9331","name":"block_executor"}
+2023-12-20T20:40:28.701768Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 99
+2023-12-20T20:40:28.701747Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"fda298dcc8a4b0fbc28cb1d450b59c8ec5f9c0b9d415e17714521cab0da09c1a","name":"block_executor"}
+2023-12-20T20:40:28.702348Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 5 {"block_id":"caaf1dc0432a56871616ca4d4fd31e132af3b48f9a81e6609eee12a2424e9331","name":"execution","txn_idx":0}
+2023-12-20T20:40:28.704836Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"fda298dcc8a4b0fbc28cb1d450b59c8ec5f9c0b9d415e17714521cab0da09c1a","name":"block_executor"}
+2023-12-20T20:40:28.707482Z [non_exe-4] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 98, Tracked { items: 315, bytes: 712255 }, skip_usage: false.
+2023-12-20T20:40:28.718336Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"fda298dcc8a4b0fbc28cb1d450b59c8ec5f9c0b9d415e17714521cab0da09c1a"}
+2023-12-20T20:40:28.718401Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 98. latency: 332 ms, partition time: 1 ms, execute time: 63 ms. commit time: 13 ms. TPS: 94 (partition: 4002, execution: 94, commit: 442). Accumulative TPS: 69
+2023-12-20T20:40:28.718412Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 1 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:28.718419Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 13995308 ns, executor time: 343466 ns, commit time: 1860034 ns, DB commit time: 3179149 ns
+2023-12-20T20:40:28.763557Z [par_exec-3] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 5 out of 5 txns committed {"approx_output_size":8425,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":150}
+2023-12-20T20:40:28.765135Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(5), result_state: Some(104) HashValue(19fb1159c02a6f85a5639c103f938c0f216d4a379c791de486e1258c78b64045) Tracked { items: 325, bytes: 714605 } 104 HashValue(19fb1159c02a6f85a5639c103f938c0f216d4a379c791de486e1258c78b64045) Tracked { items: 325, bytes: 714605 }
+2023-12-20T20:40:28.765502Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:28.765514Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 5 to execute
+2023-12-20T20:40:28.765520Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 18, received block 502f5976.
+2023-12-20T20:40:28.765532Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"502f59768e80273194de76eb898c2083d5dcf933d1e79cb540b3ac985da1da79","name":"block_executor"}
+2023-12-20T20:40:28.765532Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"caaf1dc0432a56871616ca4d4fd31e132af3b48f9a81e6609eee12a2424e9331","name":"block_executor"}
+2023-12-20T20:40:28.765546Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 105
+2023-12-20T20:40:28.766115Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 5 {"block_id":"502f59768e80273194de76eb898c2083d5dcf933d1e79cb540b3ac985da1da79","name":"execution","txn_idx":0}
+2023-12-20T20:40:28.768807Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"caaf1dc0432a56871616ca4d4fd31e132af3b48f9a81e6609eee12a2424e9331","name":"block_executor"}
+2023-12-20T20:40:28.774415Z [non_exe-5] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 104, Tracked { items: 325, bytes: 714605 }, skip_usage: false.
+2023-12-20T20:40:28.780076Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"caaf1dc0432a56871616ca4d4fd31e132af3b48f9a81e6609eee12a2424e9331"}
+2023-12-20T20:40:28.780151Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 104. latency: 331 ms, partition time: 1 ms, execute time: 63 ms. commit time: 11 ms. TPS: 94 (partition: 3959, execution: 94, commit: 527). Accumulative TPS: 70
+2023-12-20T20:40:28.780161Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 1 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:28.780168Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 13779992 ns, executor time: 341595 ns, commit time: 1862021 ns, DB commit time: 3102032 ns
+2023-12-20T20:40:28.827691Z [par_exec-2] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 5 out of 5 txns committed {"approx_output_size":8425,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":150}
+2023-12-20T20:40:28.829922Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(5), result_state: Some(110) HashValue(664a2e8b103c75002b5ef3a20c481e6f68d4ffab4c917c13cb75084fd00cfda3) Tracked { items: 335, bytes: 716955 } 110 HashValue(664a2e8b103c75002b5ef3a20c481e6f68d4ffab4c917c13cb75084fd00cfda3) Tracked { items: 335, bytes: 716955 }
+2023-12-20T20:40:28.830300Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:28.830313Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 5 to execute
+2023-12-20T20:40:28.830318Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 19, received block 4c52f41e.
+2023-12-20T20:40:28.830331Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"4c52f41e76182ba67a6c4378742685d44c8751ff1dff96c39bf064ae50d010c2","name":"block_executor"}
+2023-12-20T20:40:28.830347Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 111
+2023-12-20T20:40:28.830331Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"502f59768e80273194de76eb898c2083d5dcf933d1e79cb540b3ac985da1da79","name":"block_executor"}
+2023-12-20T20:40:28.830857Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 5 {"block_id":"4c52f41e76182ba67a6c4378742685d44c8751ff1dff96c39bf064ae50d010c2","name":"execution","txn_idx":0}
+2023-12-20T20:40:28.833966Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"502f59768e80273194de76eb898c2083d5dcf933d1e79cb540b3ac985da1da79","name":"block_executor"}
+2023-12-20T20:40:28.838844Z [non_exe-2] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 110, Tracked { items: 335, bytes: 716955 }, skip_usage: false.
+2023-12-20T20:40:28.845907Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"502f59768e80273194de76eb898c2083d5dcf933d1e79cb540b3ac985da1da79"}
+2023-12-20T20:40:28.845975Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 110. latency: 334 ms, partition time: 1 ms, execute time: 64 ms. commit time: 12 ms. TPS: 93 (partition: 4035, execution: 93, commit: 499). Accumulative TPS: 71
+2023-12-20T20:40:28.845986Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 1 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:28.845992Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 13592572 ns, executor time: 344591 ns, commit time: 1869679 ns, DB commit time: 3040566 ns
+2023-12-20T20:40:28.892149Z [par_exec-2] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 5 out of 5 txns committed {"approx_output_size":8425,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":150}
+2023-12-20T20:40:28.894402Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(5), result_state: Some(116) HashValue(2d4c9228efa5b075bb4a706ce96e2b26651fc6a917877d028e6fcfd656766670) Tracked { items: 345, bytes: 719305 } 116 HashValue(2d4c9228efa5b075bb4a706ce96e2b26651fc6a917877d028e6fcfd656766670) Tracked { items: 345, bytes: 719305 }
+2023-12-20T20:40:28.894787Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:28.894803Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 5 to execute
+2023-12-20T20:40:28.894808Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 20, received block 416f05c3.
+2023-12-20T20:40:28.894820Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"416f05c3a82cf66e202c7f58698054e3779abcbb074bf2aa1c58b3f995da53f0","name":"block_executor"}
+2023-12-20T20:40:28.894834Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 117
+2023-12-20T20:40:28.894818Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"4c52f41e76182ba67a6c4378742685d44c8751ff1dff96c39bf064ae50d010c2","name":"block_executor"}
+2023-12-20T20:40:28.895388Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 5 {"block_id":"416f05c3a82cf66e202c7f58698054e3779abcbb074bf2aa1c58b3f995da53f0","name":"execution","txn_idx":0}
+2023-12-20T20:40:28.897870Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"4c52f41e76182ba67a6c4378742685d44c8751ff1dff96c39bf064ae50d010c2","name":"block_executor"}
+2023-12-20T20:40:28.899447Z [non_exe-4] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 116, Tracked { items: 345, bytes: 719305 }, skip_usage: false.
+2023-12-20T20:40:28.904677Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"4c52f41e76182ba67a6c4378742685d44c8751ff1dff96c39bf064ae50d010c2"}
+2023-12-20T20:40:28.904720Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 116. latency: 330 ms, partition time: 1 ms, execute time: 64 ms. commit time: 6 ms. TPS: 93 (partition: 3992, execution: 93, commit: 874). Accumulative TPS: 72
+2023-12-20T20:40:28.904730Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 2 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:28.904738Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 13421594 ns, executor time: 347470 ns, commit time: 1832119 ns, DB commit time: 2941344 ns
+2023-12-20T20:40:28.955250Z [par_exec-5] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 5 out of 5 txns committed {"approx_output_size":8425,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":150}
+2023-12-20T20:40:28.956855Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(5), result_state: Some(122) HashValue(ca303f19f2288c2a62d0fdd31725e5477a387607902ad2796fbe7ed91fc7e683) Tracked { items: 355, bytes: 721655 } 122 HashValue(ca303f19f2288c2a62d0fdd31725e5477a387607902ad2796fbe7ed91fc7e683) Tracked { items: 355, bytes: 721655 }
+2023-12-20T20:40:28.957341Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:28.957366Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"416f05c3a82cf66e202c7f58698054e3779abcbb074bf2aa1c58b3f995da53f0","name":"block_executor"}
+2023-12-20T20:40:28.957391Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:178 Overall execution TPS: 60.506364887677194 txn/s (over 101 txns, in 1.669245875 s)
+2023-12-20T20:40:28.957406Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:184 Overall execution GPS: 605.0636488767719 gas/s (over 101 txns)
+2023-12-20T20:40:28.957411Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:189 Overall execution effectiveGPS: 1803.2094882367164 gas/s (over 101 txns)
+2023-12-20T20:40:28.957415Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:194 Overall execution ioGPS: 181.51909466303158 gas/s (over 101 txns)
+2023-12-20T20:40:28.957419Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:199 Overall execution executionGPS: 423.54455421374035 gas/s (over 101 txns)
+2023-12-20T20:40:28.957424Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:204 Overall execution GPT: 10 gas/txn (over 101 txns)
+2023-12-20T20:40:28.957428Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:209 Overall execution approx_output: 101953.22483573607 bytes/s
+2023-12-20T20:40:28.957432Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:213 Overall execution output: 92843.12294616274 bytes/s
+2023-12-20T20:40:28.960274Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"416f05c3a82cf66e202c7f58698054e3779abcbb074bf2aa1c58b3f995da53f0","name":"block_executor"}
+2023-12-20T20:40:28.962123Z [non_exe-4] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 122, Tracked { items: 355, bytes: 721655 }, skip_usage: false.
+2023-12-20T20:40:28.964286Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"416f05c3a82cf66e202c7f58698054e3779abcbb074bf2aa1c58b3f995da53f0"}
+2023-12-20T20:40:28.964329Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 122. latency: 326 ms, partition time: 1 ms, execute time: 62 ms. commit time: 4 ms. TPS: 96 (partition: 3910, execution: 96, commit: 1474). Accumulative TPS: 73
+2023-12-20T20:40:28.964342Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 2 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:28.964349Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 13255218 ns, executor time: 345643 ns, commit time: 1775352 ns, DB commit time: 2829000 ns
+2023-12-20T20:40:28.964438Z [tests::test_benchmark_transaction] INFO execution/executor-benchmark/src/lib.rs:487 Overall TPS: create_db: account creation: 72.80815 txn/s
+Verifying sequence numbers...
+Cannot verify account sequence numbers.
+Created 100 new accounts. Now at version 122, total # of accounts 100.
+2023-12-20T20:40:28.964541Z [tests::test_benchmark_transaction] INFO execution/executor-benchmark/src/lib.rs:681 total supply is Some(18446744073699350625) octas
+Total written internal nodes value size: 7433 bytes
+Total written leaf nodes value size: 24200 bytes
+2023-12-20T20:40:28.975527Z [state_batch_committer] INFO storage/aptosdb/src/state_merkle_db.rs:225 Committing StateMerkleDb. {"version":122}
+2023-12-20T20:40:28.975755Z [state_batch_committer] INFO storage/aptosdb/src/state_store/state_merkle_batch_committer.rs:82 State snapshot committed. {"base_version":0,"root_hash":"ca303f19f2288c2a62d0fdd31725e5477a387607902ad2796fbe7ed91fc7e683","version":122}
+2023-12-20T20:40:28.976529Z INFO storage/schemadb/src/lib.rs:324 Dropped RocksDB. {"rocksdb_name":"state_merkle_db"}
+2023-12-20T20:40:28.982541Z INFO storage/schemadb/src/lib.rs:324 Dropped RocksDB. {"rocksdb_name":"ledger_db"}
+run_benchmark
+2023-12-20T20:40:28.984081Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/db/mod.rs:208 Creating checkpoint for AptosDB. {"sharding":false}
+2023-12-20T20:40:29.036816Z [tests::test_benchmark_transaction] INFO storage/schemadb/src/lib.rs:173 Opened RocksDB. {"rocksdb_name":"ledger_db"}
+2023-12-20T20:40:29.036864Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:308 Opened ledger_db at "/var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/5c5eb1c3a9d07bc0f10934452de0f2aa/ledger_db"!
+2023-12-20T20:40:29.036876Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:95 Opened ledger metadata db! {"ledger_metadata_db_path":"/var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/5c5eb1c3a9d07bc0f10934452de0f2aa/ledger_db","sharding":false}
+2023-12-20T20:40:29.036885Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:102 Individual ledger dbs are not enabled!
+2023-12-20T20:40:29.036892Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:174 Creating ledger_db checkpoint at: "/var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/bb1f56cc808b8cc7c71691247afa11f5/ledger_db" {"sharding":false}
+2023-12-20T20:40:29.044788Z [tests::test_benchmark_transaction] INFO storage/schemadb/src/lib.rs:324 Dropped RocksDB. {"rocksdb_name":"ledger_db"}
+2023-12-20T20:40:29.046008Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_merkle_db.rs:86 Sharded state merkle DB is not enabled!
+2023-12-20T20:40:29.060641Z [tests::test_benchmark_transaction] INFO storage/schemadb/src/lib.rs:173 Opened RocksDB. {"rocksdb_name":"state_merkle_db"}
+2023-12-20T20:40:29.060689Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_merkle_db.rs:178 Creating state_merkle_db checkpoint at: "/var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/bb1f56cc808b8cc7c71691247afa11f5/state_merkle_db"
+2023-12-20T20:40:29.062784Z [tests::test_benchmark_transaction] INFO storage/schemadb/src/lib.rs:324 Dropped RocksDB. {"rocksdb_name":"state_merkle_db"}
+2023-12-20T20:40:29.063443Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/db/mod.rs:216 Made AptosDB checkpoint. {"cp_path":"/var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/bb1f56cc808b8cc7c71691247afa11f5","db_path":"/var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/5c5eb1c3a9d07bc0f10934452de0f2aa","time_ms":"79"}
+2023-12-20T20:40:29.063678Z [tests::test_benchmark_transaction] INFO crates/aptos-genesis/src/builder.rs:513 Building genesis with 1 validators. Directory of output: "/private/var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/93bfcd7c6175ecc332bfafae5f203967"
+2023-12-20T20:40:29.802830Z [tests::test_benchmark_transaction] INFO storage/schemadb/src/lib.rs:173 Opened RocksDB. {"rocksdb_name":"ledger_db"}
+2023-12-20T20:40:29.802874Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:308 Opened ledger_db at "/var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/5929e6edcac044b5b746ba51804ff233/ledger_db"!
+2023-12-20T20:40:29.802885Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:95 Opened ledger metadata db! {"ledger_metadata_db_path":"/var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/5929e6edcac044b5b746ba51804ff233/ledger_db","sharding":false}
+2023-12-20T20:40:29.802893Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:102 Individual ledger dbs are not enabled!
+2023-12-20T20:40:29.802898Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_kv_db.rs:44 State K/V DB is not enabled!
+2023-12-20T20:40:29.803924Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_merkle_db.rs:86 Sharded state merkle DB is not enabled!
+2023-12-20T20:40:29.829996Z [tests::test_benchmark_transaction] INFO storage/schemadb/src/lib.rs:173 Opened RocksDB. {"rocksdb_name":"state_merkle_db"}
+2023-12-20T20:40:29.830117Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_store/mod.rs:425 No overall commit progress was found!
+2023-12-20T20:40:29.830179Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_store/mod.rs:479 Initializing BufferedState. {"latest_snapshot_version":null,"num_transactions":0}
+2023-12-20T20:40:29.830261Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_store/mod.rs:571 StateStore initialization finished. {"latest_in_memory_root_hash":"5350415253455f4d45524b4c455f504c414345484f4c4445525f484153480000","latest_in_memory_version":null,"latest_snapshot_root_hash":"5350415253455f4d45524b4c455f504c414345484f4c4445525f484153480000","latest_snapshot_version":null}
+2023-12-20T20:40:29.830518Z [tests::test_benchmark_transaction] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 1 {"name":"miscellaneous","txn_idx":0}
+2023-12-20T20:40:29.836168Z [tests::test_benchmark_transaction] INFO aptos-move/aptos-vm-logging/src/lib.rs:54 Reconfiguration occurred: restart required {"name":"miscellaneous","txn_idx":0}
+2023-12-20T20:40:29.836679Z [tests::test_benchmark_transaction] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Sequential execution completed. 1 out of 1 txns committed {"approx_output_size":0,"block_gas_limit":0,"block_gas_limit_exceeded":false,"block_output_limit":0,"block_output_limit_exceeded":false,"effective_block_gas":0}
+2023-12-20T20:40:29.877836Z [tests::test_benchmark_transaction] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(0), result_state: Some(0) HashValue(8bf687bedf78204716fe037a791e9ad86d490750bbc7baa2c1a1e4caa8f54a50) Tracked { items: 153, bytes: 674185 } 0 HashValue(8bf687bedf78204716fe037a791e9ad86d490750bbc7baa2c1a1e4caa8f54a50) Tracked { items: 153, bytes: 674185 }
+2023-12-20T20:40:30.037769Z [tests::test_benchmark_transaction] INFO execution/executor/src/db_bootstrapper.rs:208 Genesis calculated: ledger_info_with_sigs Some(V0(LedgerInfoWithV0 { ledger_info: LedgerInfo { commit_info: BlockInfo { epoch: 0, round: 0, id: HashValue(0000000000000000000000000000000000000000000000000000000000000000), executed_state_id: HashValue(1d307a0af65e6e60786dcf32005d534d6de879eeb33d564a94ec5e215c458298), version: 0, timestamp_usecs: 0, next_epoch_state: Some(EpochState [epoch: 1, validator: ValidatorSet: [66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef: 10, ]]) }, consensus_data_hash: HashValue(0000000000000000000000000000000000000000000000000000000000000000) }, signatures: AggregateSignature { validator_bitmask: BitVec { inner: [] }, sig: None } })), waypoint Waypoint { version: 0, value: HashValue(e426ccac6d6dff1de5ae560a005a761a799db22ccb299c1ab22c850a69986204) }
+2023-12-20T20:40:30.038296Z INFO storage/schemadb/src/lib.rs:324 Dropped RocksDB. {"rocksdb_name":"state_merkle_db"}
+2023-12-20T20:40:30.041737Z INFO storage/schemadb/src/lib.rs:324 Dropped RocksDB. {"rocksdb_name":"ledger_db"}
+2023-12-20T20:40:30.077100Z [tests::test_benchmark_transaction] INFO storage/schemadb/src/lib.rs:173 Opened RocksDB. {"rocksdb_name":"ledger_db"}
+2023-12-20T20:40:30.077145Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:308 Opened ledger_db at "/var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/bb1f56cc808b8cc7c71691247afa11f5/ledger_db"!
+2023-12-20T20:40:30.077157Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:95 Opened ledger metadata db! {"ledger_metadata_db_path":"/var/folders/22/tzgdb9n16jngrf8wy1mgbnjr0000gn/T/bb1f56cc808b8cc7c71691247afa11f5/ledger_db","sharding":false}
+2023-12-20T20:40:30.077165Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/ledger_db.rs:102 Individual ledger dbs are not enabled!
+2023-12-20T20:40:30.077170Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_kv_db.rs:44 State K/V DB is not enabled!
+2023-12-20T20:40:30.078021Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_merkle_db.rs:86 Sharded state merkle DB is not enabled!
+2023-12-20T20:40:30.088421Z [tests::test_benchmark_transaction] INFO storage/schemadb/src/lib.rs:173 Opened RocksDB. {"rocksdb_name":"state_merkle_db"}
+2023-12-20T20:40:30.088838Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_store/mod.rs:375 Start syncing databases... {"overall_commit_progress":122}
+2023-12-20T20:40:30.088869Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_store/mod.rs:396 Attempt ledger truncation... {"ledger_commit_progress":122}
+2023-12-20T20:40:30.093699Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_store/mod.rs:479 Initializing BufferedState. {"latest_snapshot_version":122,"num_transactions":123}
+2023-12-20T20:40:30.094145Z [tests::test_benchmark_transaction] INFO storage/aptosdb/src/state_store/mod.rs:571 StateStore initialization finished. {"latest_in_memory_root_hash":"ca303f19f2288c2a62d0fdd31725e5477a387607902ad2796fbe7ed91fc7e683","latest_in_memory_version":122,"latest_snapshot_root_hash":"ca303f19f2288c2a62d0fdd31725e5477a387607902ad2796fbe7ed91fc7e683","latest_snapshot_version":122}
+[12-20 12:40:30] Generating cache of 55 user accounts.
+2023-12-20T20:40:30.106328Z [txn_committer] INFO execution/executor-benchmark/src/pipeline.rs:244 Starting commit thread
+2023-12-20T20:40:30.106345Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:74 Start with version: 122
+2023-12-20T20:40:30.114114Z [tests::test_benchmark_transaction] INFO crates/transaction-generator-lib/src/call_custom_modules.rs:231 Creating 1 publisher accounts
+2023-12-20T20:40:30.114185Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 0, received 1 transactions.
+2023-12-20T20:40:30.114582Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 1 to execute
+2023-12-20T20:40:30.114597Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 0, received block e06044ad.
+2023-12-20T20:40:30.114627Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"e06044adc3974ff0a2aae80361ad22b3783ede144eef5fdc4bec48d5db5772ed","name":"block_executor"}
+2023-12-20T20:40:30.114645Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 123
+2023-12-20T20:40:30.115141Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 1 {"block_id":"e06044adc3974ff0a2aae80361ad22b3783ede144eef5fdc4bec48d5db5772ed","name":"execution","txn_idx":0}
+2023-12-20T20:40:30.165268Z [par_exec-2] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 1 out of 1 txns committed {"approx_output_size":1685,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":10}
+2023-12-20T20:40:30.167042Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(1), result_state: Some(124) HashValue(fa4775a330f3d65a942b1f389d07d77375129c8bd91ada9bc4a084f6ff6c513d) Tracked { items: 357, bytes: 722125 } 124 HashValue(fa4775a330f3d65a942b1f389d07d77375129c8bd91ada9bc4a084f6ff6c513d) Tracked { items: 357, bytes: 722125 }
+2023-12-20T20:40:30.167175Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:30.167215Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"e06044adc3974ff0a2aae80361ad22b3783ede144eef5fdc4bec48d5db5772ed","name":"block_executor"}
+2023-12-20T20:40:30.168104Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"e06044adc3974ff0a2aae80361ad22b3783ede144eef5fdc4bec48d5db5772ed","name":"block_executor"}
+2023-12-20T20:40:30.170496Z [non_exe-4] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 124, Tracked { items: 357, bytes: 722125 }, skip_usage: false.
+2023-12-20T20:40:30.172684Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"e06044adc3974ff0a2aae80361ad22b3783ede144eef5fdc4bec48d5db5772ed"}
+2023-12-20T20:40:30.172721Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 124. latency: 58 ms, partition time: 0 ms, execute time: 52 ms. commit time: 4 ms. TPS: 38 (partition: 5138, execution: 38, commit: 432). Accumulative TPS: 34
+2023-12-20T20:40:30.172730Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 2 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:30.172739Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 834073086 ns, executor time: 21816540 ns, commit time: 110606896 ns, DB commit time: 174834896 ns
+2023-12-20T20:40:30.174520Z [tests::test_benchmark_transaction] INFO crates/transaction-generator-lib/src/call_custom_modules.rs:237 Publishing 1 packages
+2023-12-20T20:40:30.174555Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 1, received 1 transactions.
+2023-12-20T20:40:30.175556Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 1 to execute
+2023-12-20T20:40:30.175567Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 1, received block 48ec05dd.
+2023-12-20T20:40:30.175586Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"48ec05ddb502bea5c02b4ce006f7605cd61658945b3f068cb423c2027698151c","name":"block_executor"}
+2023-12-20T20:40:30.175600Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 125
+2023-12-20T20:40:30.176100Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 1 {"block_id":"48ec05ddb502bea5c02b4ce006f7605cd61658945b3f068cb423c2027698151c","name":"execution","txn_idx":0}
+2023-12-20T20:40:30.629276Z [txn_executor] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Sequential execution completed. 1 out of 1 txns committed {"approx_output_size":64159,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":177}
+2023-12-20T20:40:30.633183Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(1), result_state: Some(126) HashValue(fa087dd747ef9deee75a352209994b960795705d3c6d74b57d6fbc54b77e2d57) Tracked { items: 377, bytes: 755204 } 126 HashValue(fa087dd747ef9deee75a352209994b960795705d3c6d74b57d6fbc54b77e2d57) Tracked { items: 377, bytes: 755204 }
+2023-12-20T20:40:30.633492Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:30.633528Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"48ec05ddb502bea5c02b4ce006f7605cd61658945b3f068cb423c2027698151c","name":"block_executor"}
+2023-12-20T20:40:30.642063Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"48ec05ddb502bea5c02b4ce006f7605cd61658945b3f068cb423c2027698151c","name":"block_executor"}
+2023-12-20T20:40:30.643485Z [non_exe-1] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 126, Tracked { items: 377, bytes: 755204 }, skip_usage: false.
+2023-12-20T20:40:30.647646Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"48ec05ddb502bea5c02b4ce006f7605cd61658945b3f068cb423c2027698151c"}
+2023-12-20T20:40:30.647700Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 126. latency: 473 ms, partition time: 0 ms, execute time: 457 ms. commit time: 5 ms. TPS: 4 (partition: 2027, execution: 4, commit: 353). Accumulative TPS: 7
+2023-12-20T20:40:30.647711Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 2 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:30.647722Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 530605637 ns, executor time: 11753291 ns, commit time: 56719177 ns, DB commit time: 88785260 ns
+2023-12-20T20:40:30.656982Z [tests::test_benchmark_transaction] INFO crates/transaction-generator-lib/src/call_custom_modules.rs:243 Done publishing 1 packages
+2023-12-20T20:40:30.657515Z [tests::test_benchmark_transaction] INFO crates/transaction-generator-lib/src/call_custom_modules.rs:180 Initializing workload with 1 transactions
+2023-12-20T20:40:30.657562Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 2, received 1 transactions.
+2023-12-20T20:40:30.657972Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 1 to execute
+2023-12-20T20:40:30.657982Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 2, received block d9511db1.
+2023-12-20T20:40:30.658017Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"d9511db1616e9833a34faf3dac0079c90e8482d51230768483d81108799afdc2","name":"block_executor"}
+2023-12-20T20:40:30.658041Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 127
+2023-12-20T20:40:30.658569Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 1 {"block_id":"d9511db1616e9833a34faf3dac0079c90e8482d51230768483d81108799afdc2","name":"execution","txn_idx":0}
+2023-12-20T20:40:30.814318Z [par_exec-5] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 1 out of 1 txns committed {"approx_output_size":1867,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":11}
+2023-12-20T20:40:30.816424Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(1), result_state: Some(128) HashValue(cf7f06bd639049627662a0c2f6c2911b47c56179d1a39a24937841b1c93737b4) Tracked { items: 380, bytes: 756156 } 128 HashValue(cf7f06bd639049627662a0c2f6c2911b47c56179d1a39a24937841b1c93737b4) Tracked { items: 380, bytes: 756156 }
+2023-12-20T20:40:30.816604Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:30.816618Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"d9511db1616e9833a34faf3dac0079c90e8482d51230768483d81108799afdc2","name":"block_executor"}
+2023-12-20T20:40:30.817567Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"d9511db1616e9833a34faf3dac0079c90e8482d51230768483d81108799afdc2","name":"block_executor"}
+2023-12-20T20:40:30.821530Z [non_exe-4] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 128, Tracked { items: 380, bytes: 756156 }, skip_usage: false.
+2023-12-20T20:40:30.824691Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"d9511db1616e9833a34faf3dac0079c90e8482d51230768483d81108799afdc2"}
+2023-12-20T20:40:30.824762Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 128. latency: 167 ms, partition time: 0 ms, execute time: 158 ms. commit time: 7 ms. TPS: 13 (partition: 5055, execution: 13, commit: 278). Accumulative TPS: 8
+2023-12-20T20:40:30.824773Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 2 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:30.824780Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 379841251 ns, executor time: 8144888 ns, commit time: 39012604 ns, DB commit time: 60362854 ns
+2023-12-20T20:40:30.827401Z [tests::test_benchmark_transaction] INFO crates/transaction-generator-lib/src/call_custom_modules.rs:190 Done preparing workload for 1 packages
+2023-12-20T20:40:30.827433Z [tests::test_benchmark_transaction] INFO crates/transaction-generator-lib/src/call_custom_modules.rs:190 Done preparing workload for 1 packages
+2023-12-20T20:40:30.827440Z [tests::test_benchmark_transaction] INFO crates/transaction-generator-lib/src/call_custom_modules.rs:190 Done preparing workload for 1 packages
+2023-12-20T20:40:30.827446Z [tests::test_benchmark_transaction] INFO crates/transaction-generator-lib/src/call_custom_modules.rs:190 Done preparing workload for 1 packages
+2023-12-20T20:40:30.827502Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:178 Overall execution TPS: 4.159557145815875 txn/s (over 3 txns, in 0.721230625 s)
+2023-12-20T20:40:30.827512Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:184 Overall execution GPS: 274.5307716238478 gas/s (over 3 txns)
+2023-12-20T20:40:30.827517Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:189 Overall execution effectiveGPS: 274.5307716238478 gas/s (over 3 txns)
+2023-12-20T20:40:30.827521Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:194 Overall execution ioGPS: 77.64506672189634 gas/s (over 3 txns)
+2023-12-20T20:40:30.827525Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:199 Overall execution executionGPS: 196.88570490195144 gas/s (over 3 txns)
+2023-12-20T20:40:30.827529Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:204 Overall execution GPT: 66 gas/txn (over 3 txns)
+2023-12-20T20:40:30.827533Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:209 Overall execution approx_output: 93882.59130011291 bytes/s
+2023-12-20T20:40:30.827536Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:213 Overall execution output: 52295.33895624579 bytes/s
+2023-12-20T20:40:30.828375Z [txn_committer] INFO execution/executor-benchmark/src/pipeline.rs:244 Starting commit thread
+2023-12-20T20:40:30.828383Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:74 Start with version: 128
+[12-20 12:40:30] Generating cache of 25 user accounts.
+TransactionGenerator Workflow: Stage 0: prev: 1, num_to_create: 1
+2023-12-20T20:40:30.834433Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 0, pool sizes: [0, 0, 0]
+TransactionGenerator Workflow: Stage 0: prev: 0, num_to_create: 1
+TransactionGenerator Workflow: Stage 0: prev: 2, num_to_create: 1
+2023-12-20T20:40:30.834451Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 0, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.834461Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 0, pool sizes: [0, 0, 0]
+TransactionGenerator Workflow: Stage 0: prev: 3, num_to_create: 1
+2023-12-20T20:40:30.834498Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 0, pool sizes: [0, 0, 0]
+EntryPoint: submitting transaction: 9eccd4bfa6d5cceff0812bdf81fc63ce246f7bbb2896ecdeb77d7d401eb703de for TournamentSetupPlayer
+EntryPoint: submitting transaction: b42c5b9736e2a1c21a158c65b2e99c4539abcd4a017e82a647a16273e355768e for TournamentSetupPlayer
+EntryPoint: submitting transaction: 0bead8b0ab75fa7b91d3ffc133dbff91c40fae81c785478cba025c7467e0d86f for TournamentSetupPlayer
+EntryPoint: submitting transaction: 946271409afbda177f5f67416bb5fbae41efd5dc5a539d597d8b211b56b25bff for TournamentSetupPlayer
+2023-12-20T20:40:30.834829Z INFO crates/transaction-generator-lib/src/lib.rs:385 Pool working set increased to 1
+TransactionGenerator Workflow: Stage 0: prev: 4, num_to_create: 1
+TransactionGenerator Workflow: Stage 0: prev: 5, num_to_create: 1
+2023-12-20T20:40:30.834860Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 0, pool sizes: [3, 0, 0]
+2023-12-20T20:40:30.834870Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 0, pool sizes: [3, 0, 0]
+TransactionGenerator Workflow: Stage 0: prev: 6, num_to_create: 1
+EntryPoint: submitting transaction: dcc6edd6afb04cb035dddb56fd2a2a57a87a41c0aa89c02b3109a01e03fd408a for TournamentSetupPlayer
+2023-12-20T20:40:30.834889Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 0, pool sizes: [4, 0, 0]
+TransactionGenerator Workflow: Stage 0: prev: 7, num_to_create: 1
+EntryPoint: submitting transaction: d21817228379d10b0945cabce8ba3ae627dbf3b446964b87cb1228929ef60f45 for TournamentSetupPlayer
+2023-12-20T20:40:30.834903Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 0, pool sizes: [4, 0, 0]
+EntryPoint: submitting transaction: a52a9543dc9d69d092c060a94c6796f80ee8b82735b45096f5e0047a97af9ccc for TournamentSetupPlayer
+EntryPoint: submitting transaction: 0e47459501848b32308e568b6b23d99d20448b6e494bf7b1d9ee10a8d6bcb4db for TournamentSetupPlayer
+TransactionGenerator Workflow: Stage 0: prev: 8, num_to_create: 1
+2023-12-20T20:40:30.835181Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 0, pool sizes: [7, 0, 0]
+EntryPoint: submitting transaction: 21215a18d821036f16baa9ab7abc1afdfdbf60c3c8db494bfc06ddc58756be00 for TournamentSetupPlayer
+TransactionGenerator Workflow: Stage 0: prev: 9, num_to_create: 1
+2023-12-20T20:40:30.835452Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 0, pool sizes: [9, 0, 0]
+EntryPoint: submitting transaction: 6f03a3db1733e9f774ba17a24a554085583e9c19584c7f7dc7f4970fc9bbbd80 for TournamentSetupPlayer
+2023-12-20T20:40:30.835791Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 0, received 10 transactions.
+TransactionGenerator Workflow: Stage 0: prev: 10, num_to_create: 0
+TransactionGenerator Workflow: Stage 0: prev: 11, num_to_create: 0
+TransactionGenerator Workflow: Stage 0: prev: 12, num_to_create: 0
+TransactionGenerator Workflow: Stage 0: prev: 14, num_to_create: 0
+TransactionGenerator Workflow: Stage 0: prev: 15, num_to_create: 0
+TransactionGenerator Workflow: Stage 0: prev: 16, num_to_create: 0
+TransactionGenerator Workflow: Stage 0: prev: 13, num_to_create: 0
+TransactionGenerator Workflow: Stage 0: prev: 17, num_to_create: 0
+TransactionGenerator Workflow: Stage 0: prev: 18, num_to_create: 0
+TransactionGenerator Workflow: Stage 0: prev: 19, num_to_create: 0
+No transactions generated in phase 0, moving to next phase
+2023-12-20T20:40:30.835939Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 1, pool sizes: [10, 0, 0]
+2023-12-20T20:40:30.835942Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 1, pool sizes: [10, 0, 0]
+Tournament Generator: submitting transaction: start_new_round: [9eccd4bfa6d5cceff0812bdf81fc63ce246f7bbb2896ecdeb77d7d401eb703de, b42c5b9736e2a1c21a158c65b2e99c4539abcd4a017e82a647a16273e355768e, 0bead8b0ab75fa7b91d3ffc133dbff91c40fae81c785478cba025c7467e0d86f, 946271409afbda177f5f67416bb5fbae41efd5dc5a539d597d8b211b56b25bff, dcc6edd6afb04cb035dddb56fd2a2a57a87a41c0aa89c02b3109a01e03fd408a, a52a9543dc9d69d092c060a94c6796f80ee8b82735b45096f5e0047a97af9ccc, 0e47459501848b32308e568b6b23d99d20448b6e494bf7b1d9ee10a8d6bcb4db, d21817228379d10b0945cabce8ba3ae627dbf3b446964b87cb1228929ef60f45, 21215a18d821036f16baa9ab7abc1afdfdbf60c3c8db494bfc06ddc58756be00, 6f03a3db1733e9f774ba17a24a554085583e9c19584c7f7dc7f4970fc9bbbd80]
+2023-12-20T20:40:30.835994Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 1, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.836010Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 1, pool sizes: [0, 10, 0]
+2023-12-20T20:40:30.836016Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 1, pool sizes: [0, 10, 0]
+2023-12-20T20:40:30.836023Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 1, pool sizes: [0, 10, 0]
+2023-12-20T20:40:30.836028Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 1, pool sizes: [0, 10, 0]
+2023-12-20T20:40:30.836034Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 1, pool sizes: [0, 10, 0]
+2023-12-20T20:40:30.836041Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 1, pool sizes: [0, 10, 0]
+2023-12-20T20:40:30.836773Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 1, pool sizes: [0, 10, 0]
+2023-12-20T20:40:30.836859Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 1, pool sizes: [0, 10, 0]
+2023-12-20T20:40:30.836860Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 1, pool sizes: [0, 10, 0]
+2023-12-20T20:40:30.836860Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 1, pool sizes: [0, 10, 0]
+2023-12-20T20:40:30.836872Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 1, pool sizes: [0, 10, 0]
+2023-12-20T20:40:30.836877Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 1, pool sizes: [0, 10, 0]
+2023-12-20T20:40:30.836907Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 1, pool sizes: [0, 10, 0]
+2023-12-20T20:40:30.836916Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 1, pool sizes: [0, 10, 0]
+2023-12-20T20:40:30.836921Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 1, pool sizes: [0, 10, 0]
+2023-12-20T20:40:30.836927Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 1, pool sizes: [0, 10, 0]
+2023-12-20T20:40:30.836959Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 1, pool sizes: [0, 10, 0]
+No transactions generated in phase 1, moving to next phase
+2023-12-20T20:40:30.837008Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 2, pool sizes: [0, 10, 0]
+2023-12-20T20:40:30.837011Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 2, pool sizes: [0, 10, 0]
+2023-12-20T20:40:30.837011Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 2, pool sizes: [0, 10, 0]
+2023-12-20T20:40:30.837011Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 2, pool sizes: [0, 10, 0]
+Tournament Generator: submitting transaction: move_players_to_round: [946271409afbda177f5f67416bb5fbae41efd5dc5a539d597d8b211b56b25bff, dcc6edd6afb04cb035dddb56fd2a2a57a87a41c0aa89c02b3109a01e03fd408a, a52a9543dc9d69d092c060a94c6796f80ee8b82735b45096f5e0047a97af9ccc]
+Tournament Generator: submitting transaction: move_players_to_round: [9eccd4bfa6d5cceff0812bdf81fc63ce246f7bbb2896ecdeb77d7d401eb703de, b42c5b9736e2a1c21a158c65b2e99c4539abcd4a017e82a647a16273e355768e, 0bead8b0ab75fa7b91d3ffc133dbff91c40fae81c785478cba025c7467e0d86f]
+Tournament Generator: submitting transaction: move_players_to_round: [6f03a3db1733e9f774ba17a24a554085583e9c19584c7f7dc7f4970fc9bbbd80, 0e47459501848b32308e568b6b23d99d20448b6e494bf7b1d9ee10a8d6bcb4db, d21817228379d10b0945cabce8ba3ae627dbf3b446964b87cb1228929ef60f45]
+Tournament Generator: submitting transaction: move_players_to_round: [21215a18d821036f16baa9ab7abc1afdfdbf60c3c8db494bfc06ddc58756be00]
+2023-12-20T20:40:30.837816Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 2, pool sizes: [0, 0, 10]
+2023-12-20T20:40:30.837820Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 2, pool sizes: [0, 0, 10]
+2023-12-20T20:40:30.837817Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 2, pool sizes: [0, 0, 10]
+2023-12-20T20:40:30.837834Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 2, pool sizes: [0, 0, 10]
+2023-12-20T20:40:30.837854Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 2, pool sizes: [0, 0, 10]
+2023-12-20T20:40:30.837859Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 2, pool sizes: [0, 0, 10]
+2023-12-20T20:40:30.837941Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 2, pool sizes: [0, 0, 10]
+2023-12-20T20:40:30.837942Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 2, pool sizes: [0, 0, 10]
+2023-12-20T20:40:30.837952Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 2, pool sizes: [0, 0, 10]
+2023-12-20T20:40:30.837956Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 2, pool sizes: [0, 0, 10]
+2023-12-20T20:40:30.837972Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 2, pool sizes: [0, 0, 10]
+2023-12-20T20:40:30.837973Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 2, pool sizes: [0, 0, 10]
+2023-12-20T20:40:30.837984Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 2, pool sizes: [0, 0, 10]
+2023-12-20T20:40:30.837987Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 2, pool sizes: [0, 0, 10]
+2023-12-20T20:40:30.838023Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 2, pool sizes: [0, 0, 10]
+2023-12-20T20:40:30.838032Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 2, pool sizes: [0, 0, 10]
+No transactions generated in phase 2, moving to next phase
+2023-12-20T20:40:30.838085Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 3, pool sizes: [0, 0, 10]
+2023-12-20T20:40:30.838086Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 3, pool sizes: [0, 0, 10]
+2023-12-20T20:40:30.838088Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 3, pool sizes: [0, 0, 10]
+EntryPoint: submitting transaction: 0e47459501848b32308e568b6b23d99d20448b6e494bf7b1d9ee10a8d6bcb4db for TournamentGamePlay
+EntryPoint: submitting transaction: b42c5b9736e2a1c21a158c65b2e99c4539abcd4a017e82a647a16273e355768e for TournamentGamePlay
+EntryPoint: submitting transaction: 946271409afbda177f5f67416bb5fbae41efd5dc5a539d597d8b211b56b25bff for TournamentGamePlay
+2023-12-20T20:40:30.838436Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 3, pool sizes: [0, 0, 7]
+EntryPoint: submitting transaction: d21817228379d10b0945cabce8ba3ae627dbf3b446964b87cb1228929ef60f45 for TournamentGamePlay
+2023-12-20T20:40:30.838471Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 3, pool sizes: [0, 0, 6]
+EntryPoint: submitting transaction: dcc6edd6afb04cb035dddb56fd2a2a57a87a41c0aa89c02b3109a01e03fd408a for TournamentGamePlay
+2023-12-20T20:40:30.838516Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 3, pool sizes: [0, 0, 5]
+EntryPoint: submitting transaction: a52a9543dc9d69d092c060a94c6796f80ee8b82735b45096f5e0047a97af9ccc for TournamentGamePlay
+2023-12-20T20:40:30.838656Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 1, received 0 transactions.
+2023-12-20T20:40:30.838666Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 10 to execute
+2023-12-20T20:40:30.838677Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 0, received block fe9b6a80.
+2023-12-20T20:40:30.838709Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 3, pool sizes: [0, 0, 4]
+EntryPoint: submitting transaction: 21215a18d821036f16baa9ab7abc1afdfdbf60c3c8db494bfc06ddc58756be00 for TournamentGamePlay
+2023-12-20T20:40:30.838718Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"fe9b6a805f6b6d7caabcab4bc18a8f062bf851d4af7dcbee66cf77eda6536118","name":"block_executor"}
+2023-12-20T20:40:30.838738Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 129
+2023-12-20T20:40:30.838760Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 2, received 1 transactions.
+2023-12-20T20:40:30.838805Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 3, pool sizes: [0, 0, 3]
+EntryPoint: submitting transaction: 9eccd4bfa6d5cceff0812bdf81fc63ce246f7bbb2896ecdeb77d7d401eb703de for TournamentGamePlay
+2023-12-20T20:40:30.838980Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 3, pool sizes: [0, 0, 2]
+EntryPoint: submitting transaction: 0bead8b0ab75fa7b91d3ffc133dbff91c40fae81c785478cba025c7467e0d86f for TournamentGamePlay
+2023-12-20T20:40:30.839093Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 3, pool sizes: [0, 0, 1]
+EntryPoint: submitting transaction: 6f03a3db1733e9f774ba17a24a554085583e9c19584c7f7dc7f4970fc9bbbd80 for TournamentGamePlay
+2023-12-20T20:40:30.839336Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 10 {"block_id":"fe9b6a805f6b6d7caabcab4bc18a8f062bf851d4af7dcbee66cf77eda6536118","name":"execution","txn_idx":0}
+2023-12-20T20:40:30.839477Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 3, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839490Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 3, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839490Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 3, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839497Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 3, received 0 transactions.
+2023-12-20T20:40:30.839503Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 3, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839509Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 3, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839514Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 3, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839499Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 3, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839525Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 3, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839562Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 3, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839570Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 3, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839607Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 4, received 4 transactions.
+No transactions generated in phase 3, moving to next phase
+2023-12-20T20:40:30.839730Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 4, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839740Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 4, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839746Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 4, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839751Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 4, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839758Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 4, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839766Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 4, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839772Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 4, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839778Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 4, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839783Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 4, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839788Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 4, pool sizes: [0, 0, 0]
+No transactions generated in phase 4, moving to next phase
+2023-12-20T20:40:30.839857Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 5, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839866Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 5, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839872Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 5, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839877Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 5, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839881Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 5, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839886Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 5, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839892Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 5, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839896Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 5, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839928Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 5, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.839933Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 5, pool sizes: [0, 0, 0]
+No transactions generated in phase 5, moving to next phase
+2023-12-20T20:40:30.840201Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 6, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.840207Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 6, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.840212Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 6, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.840216Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 6, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.840222Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 6, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.840227Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 6, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.840227Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 6, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.840234Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 6, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.840239Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 6, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.840243Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 6, pool sizes: [0, 0, 0]
+No transactions generated in phase 6, moving to next phase
+2023-12-20T20:40:30.840699Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 7, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.840737Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 7, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.840743Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 7, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.840748Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 7, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.840752Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 7, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.840756Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 7, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.840762Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 7, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.840766Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 7, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.840771Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 7, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.840775Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 7, pool sizes: [0, 0, 0]
+No transactions generated in phase 7, moving to next phase
+2023-12-20T20:40:30.841075Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 8, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841081Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 8, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841085Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 8, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841090Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 8, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841094Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 8, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841098Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 8, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841103Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 8, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841135Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 8, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841141Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 8, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841145Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 8, pool sizes: [0, 0, 0]
+No transactions generated in phase 8, moving to next phase
+2023-12-20T20:40:30.841286Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 9, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841293Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 9, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841297Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 9, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841301Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 9, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841334Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 9, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841339Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 9, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841344Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 9, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841348Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 9, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841354Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 9, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841359Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 9, pool sizes: [0, 0, 0]
+No transactions generated in phase 9, moving to next phase
+2023-12-20T20:40:30.841493Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 10, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841499Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 10, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841505Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 10, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841509Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 10, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841514Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 10, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841518Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 10, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841522Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 10, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841526Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 10, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841531Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 10, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841535Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 10, pool sizes: [0, 0, 0]
+No transactions generated in phase 10, moving to next phase
+2023-12-20T20:40:30.841624Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 11, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841629Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 11, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841634Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 11, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841639Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 11, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841644Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 11, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841650Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 11, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841654Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 11, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841659Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 11, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841663Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 11, pool sizes: [0, 0, 0]
+2023-12-20T20:40:30.841667Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 11, pool sizes: [0, 0, 0]
+No transactions generated in phase 11, moving to next phase
+2023-12-20T20:40:31.042726Z [par_exec-3] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 10 out of 10 txns committed {"approx_output_size":39267,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":1352}
+2023-12-20T20:40:31.048978Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(10), result_state: Some(139) HashValue(456353dcc42aaee4896f7e91d530e9ae944f7cd7cb78f175f23f4f8306d3a490) Tracked { items: 410, bytes: 769483 } 139 HashValue(456353dcc42aaee4896f7e91d530e9ae944f7cd7cb78f175f23f4f8306d3a490) Tracked { items: 410, bytes: 769483 }
+PlayerConfig: StateKey { inner: AccessPath { address: 0x9eccd4bfa6d5cceff0812bdf81fc63ce246f7bbb2896ecdeb77d7d401eb703de, path: "Resource(0x368dd15a4ea4ea4520f2125248ebb110f7b1e22d2a6b1dff2cb74d1596b5ab2a::rps_utils::PlayerConfig)" }, hash: OnceCell(HashValue(cf6831fa94d3db944f447c67a5f7b29e6eac3032f97ceacdeb8963132f6b445c)) } -> Creation(a6e08a9094c5e5e8440cd07b78c174de729ae1d811a17ae01325f76d7c83cfef, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 50000, bytes_deposit: 0, creation_time_usecs: 0 }) })
+PlayerConfig: StateKey { inner: AccessPath { address: 0xdcc6edd6afb04cb035dddb56fd2a2a57a87a41c0aa89c02b3109a01e03fd408a, path: "Resource(0x368dd15a4ea4ea4520f2125248ebb110f7b1e22d2a6b1dff2cb74d1596b5ab2a::rps_utils::PlayerConfig)" }, hash: OnceCell(HashValue(58e47a6c40f518276b755896eb6268cc3631e2d00b06f41ae7c6124cce8c8a8b)) } -> Creation(2f36e6ce00c66c6d9655027de729e7a0b7184c032dcaebf6017fb576ed770ce9, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 50000, bytes_deposit: 0, creation_time_usecs: 0 }) })
+PlayerConfig: StateKey { inner: AccessPath { address: 0x946271409afbda177f5f67416bb5fbae41efd5dc5a539d597d8b211b56b25bff, path: "Resource(0x368dd15a4ea4ea4520f2125248ebb110f7b1e22d2a6b1dff2cb74d1596b5ab2a::rps_utils::PlayerConfig)" }, hash: OnceCell(HashValue(88360404876cbc859217d97e90024f3e40db19dca20066d64f59867184e28cc2)) } -> Creation(196d1173378a3dbfbad9b2513831089e9fd2e3fe631cad24f0514b1b2e25facb, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 50000, bytes_deposit: 0, creation_time_usecs: 0 }) })
+PlayerConfig: StateKey { inner: AccessPath { address: 0xe47459501848b32308e568b6b23d99d20448b6e494bf7b1d9ee10a8d6bcb4db, path: "Resource(0x368dd15a4ea4ea4520f2125248ebb110f7b1e22d2a6b1dff2cb74d1596b5ab2a::rps_utils::PlayerConfig)" }, hash: OnceCell(HashValue(2f01b5439cad938ab29cc61079a457a38be281b68c539f9da6bcf17907c6235d)) } -> Creation(6a151e42838b9febffcf251a0255d2192cf881a5e5c2823f2551c2409b1c0062, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 50000, bytes_deposit: 0, creation_time_usecs: 0 }) })
+PlayerConfig: StateKey { inner: AccessPath { address: 0xb42c5b9736e2a1c21a158c65b2e99c4539abcd4a017e82a647a16273e355768e, path: "Resource(0x368dd15a4ea4ea4520f2125248ebb110f7b1e22d2a6b1dff2cb74d1596b5ab2a::rps_utils::PlayerConfig)" }, hash: OnceCell(HashValue(fdc2023d7bcb9a9106cdc9c557d35e458b86dedcb4b782fdce2032428d460249)) } -> Creation(7e01fcca4cfd964ab5d104e741cfe9f6f88831680d1277088a201d1328c9d906, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 50000, bytes_deposit: 0, creation_time_usecs: 0 }) })
+PlayerConfig: StateKey { inner: AccessPath { address: 0xd21817228379d10b0945cabce8ba3ae627dbf3b446964b87cb1228929ef60f45, path: "Resource(0x368dd15a4ea4ea4520f2125248ebb110f7b1e22d2a6b1dff2cb74d1596b5ab2a::rps_utils::PlayerConfig)" }, hash: OnceCell(HashValue(d47feec206ae87935f6f901669a2396ed203d545c66082b5c9306d9f36cf7a58)) } -> Creation(a617895c742bb5c09a0d1438dbce1399093c15bbfef6951193775ffeabf4b967, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 50000, bytes_deposit: 0, creation_time_usecs: 0 }) })
+PlayerConfig: StateKey { inner: AccessPath { address: 0x21215a18d821036f16baa9ab7abc1afdfdbf60c3c8db494bfc06ddc58756be00, path: "Resource(0x368dd15a4ea4ea4520f2125248ebb110f7b1e22d2a6b1dff2cb74d1596b5ab2a::rps_utils::PlayerConfig)" }, hash: OnceCell(HashValue(6667a4b72adb33c2be65645ceddc0fe33cff22fbc162cad6c7a74257a6cd543b)) } -> Creation(ea265c4b1cdb779e581a65a0db8dca4293cc7b2c2d86b67c47712a32f1a95a4c, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 50000, bytes_deposit: 0, creation_time_usecs: 0 }) })
+PlayerConfig: StateKey { inner: AccessPath { address: 0x6f03a3db1733e9f774ba17a24a554085583e9c19584c7f7dc7f4970fc9bbbd80, path: "Resource(0x368dd15a4ea4ea4520f2125248ebb110f7b1e22d2a6b1dff2cb74d1596b5ab2a::rps_utils::PlayerConfig)" }, hash: OnceCell(HashValue(435257a0a16362cc040635eb1eec030bf5bae514e89053e25d9531704f8b27a3)) } -> Creation(da2b42ed81eab46eeda7c765ad35124d8dbb4f68974a55ba18b1a5f48df0ae00, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 50000, bytes_deposit: 0, creation_time_usecs: 0 }) })
+PlayerConfig: StateKey { inner: AccessPath { address: 0xbead8b0ab75fa7b91d3ffc133dbff91c40fae81c785478cba025c7467e0d86f, path: "Resource(0x368dd15a4ea4ea4520f2125248ebb110f7b1e22d2a6b1dff2cb74d1596b5ab2a::rps_utils::PlayerConfig)" }, hash: OnceCell(HashValue(f9189311f365ca60385d0011b5c0d81a3bf1cf1f325e3a206e8cac36f1e0df99)) } -> Creation(119cbce6e3f876be656a873be48763ffc740f297144a1df004fbee92f7d543a7, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 50000, bytes_deposit: 0, creation_time_usecs: 0 }) })
+PlayerConfig: StateKey { inner: AccessPath { address: 0xa52a9543dc9d69d092c060a94c6796f80ee8b82735b45096f5e0047a97af9ccc, path: "Resource(0x368dd15a4ea4ea4520f2125248ebb110f7b1e22d2a6b1dff2cb74d1596b5ab2a::rps_utils::PlayerConfig)" }, hash: OnceCell(HashValue(d0b782e14d874ce3b76207eb673ffbd53033e3f226cd03f1316bec8be93e3ab8)) } -> Creation(d2e8a9d5210d50f8b5b5cfbd99a45f31d79ddeb310a91fb99f697d5c7da53479, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 50000, bytes_deposit: 0, creation_time_usecs: 0 }) })
+2023-12-20T20:40:31.050042Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:31.050058Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 0 to execute
+2023-12-20T20:40:31.050066Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 1, received block 9fed5d3e.
+2023-12-20T20:40:31.050079Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"9fed5d3e5004d3631b3e5c5f626f2c7e1131e19230bd6decfc94da0d664f9990","name":"block_executor"}
+2023-12-20T20:40:31.050089Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 5, received 0 transactions.
+2023-12-20T20:40:31.050097Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 140
+2023-12-20T20:40:31.050079Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"fe9b6a805f6b6d7caabcab4bc18a8f062bf851d4af7dcbee66cf77eda6536118","name":"block_executor"}
+2023-12-20T20:40:31.050177Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 12, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.050190Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 12, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.050178Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 12, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.050208Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 12, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.050212Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 12, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.050222Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 12, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.050228Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 12, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.050233Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 12, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.050249Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 12, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.050263Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 12, pool sizes: [0, 0, 0]
+No transactions generated in phase 12, moving to next phase
+2023-12-20T20:40:31.050641Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 0 {"block_id":"9fed5d3e5004d3631b3e5c5f626f2c7e1131e19230bd6decfc94da0d664f9990","name":"execution","txn_idx":0}
+2023-12-20T20:40:31.050979Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(0), result_state: Some(140) HashValue(456353dcc42aaee4896f7e91d530e9ae944f7cd7cb78f175f23f4f8306d3a490) Tracked { items: 410, bytes: 769483 } 140 HashValue(456353dcc42aaee4896f7e91d530e9ae944f7cd7cb78f175f23f4f8306d3a490) Tracked { items: 410, bytes: 769483 }
+2023-12-20T20:40:31.051011Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:31.051023Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 1 to execute
+2023-12-20T20:40:31.051028Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 2, received block c1716aa0.
+2023-12-20T20:40:31.051039Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"c1716aa011ba31341f3dc62107438b56cb03ccc511f7f3e60f21dc9a3d96f072","name":"block_executor"}
+2023-12-20T20:40:31.051041Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 6, received 10 transactions.
+2023-12-20T20:40:31.051051Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 141
+2023-12-20T20:40:31.051138Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 13, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.051139Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 13, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.051150Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 13, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.051140Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 13, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.051178Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 13, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.051182Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 13, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.051185Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 13, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.051191Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 13, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.051195Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 13, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.051200Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 13, pool sizes: [0, 0, 0]
+No transactions generated in phase 13, moving to next phase
+2023-12-20T20:40:31.051499Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 1 {"block_id":"c1716aa011ba31341f3dc62107438b56cb03ccc511f7f3e60f21dc9a3d96f072","name":"execution","txn_idx":0}
+2023-12-20T20:40:31.058735Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"9fed5d3e5004d3631b3e5c5f626f2c7e1131e19230bd6decfc94da0d664f9990","name":"block_executor"}
+2023-12-20T20:40:31.058753Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"fe9b6a805f6b6d7caabcab4bc18a8f062bf851d4af7dcbee66cf77eda6536118","name":"block_executor"}
+2023-12-20T20:40:31.063924Z [non_exe-1] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 139, Tracked { items: 410, bytes: 769483 }, skip_usage: false.
+2023-12-20T20:40:31.068301Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"fe9b6a805f6b6d7caabcab4bc18a8f062bf851d4af7dcbee66cf77eda6536118"}
+2023-12-20T20:40:31.068348Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 139. latency: 232 ms, partition time: 2 ms, execute time: 211 ms. commit time: 9 ms. TPS: 52 (partition: 3846, execution: 52, commit: 1143). Accumulative TPS: 47
+2023-12-20T20:40:31.068358Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 2 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:31.068364Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 225985936 ns, executor time: 4849735 ns, commit time: 22153958 ns, DB commit time: 33783826 ns
+2023-12-20T20:40:31.068382Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"9fed5d3e5004d3631b3e5c5f626f2c7e1131e19230bd6decfc94da0d664f9990","name":"block_executor"}
+2023-12-20T20:40:31.070563Z [non_exe-7] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 140, Tracked { items: 410, bytes: 769483 }, skip_usage: false.
+2023-12-20T20:40:31.072338Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"9fed5d3e5004d3631b3e5c5f626f2c7e1131e19230bd6decfc94da0d664f9990"}
+2023-12-20T20:40:31.072369Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 140. latency: 233 ms, partition time: 0 ms, execute time: 0 ms. commit time: 3 ms. TPS: 251 (partition: 13905, execution: 1060, commit: 251). Accumulative TPS: 51
+2023-12-20T20:40:31.072377Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 2 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:31.072383Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 207153775 ns, executor time: 4445590 ns, commit time: 20640177 ns, DB commit time: 31295649 ns
+2023-12-20T20:40:31.214577Z [par_exec-4] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 1 out of 1 txns committed {"approx_output_size":3156,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":25}
+2023-12-20T20:40:31.218870Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(1), result_state: Some(142) HashValue(044a1531a4103f6e61862f795d7690e3ef656c446824ad1d44ae4aaff7998df8) Tracked { items: 422, bytes: 771040 } 142 HashValue(044a1531a4103f6e61862f795d7690e3ef656c446824ad1d44ae4aaff7998df8) Tracked { items: 422, bytes: 771040 }
+2023-12-20T20:40:31.219090Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:31.219117Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 0 to execute
+2023-12-20T20:40:31.219124Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 3, received block 5ce6444e.
+2023-12-20T20:40:31.219134Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 7, received 0 transactions.
+2023-12-20T20:40:31.219140Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"5ce6444eb2c2098944b7f7f4b892f9d3bee5d2e3de9a227b9c55b8b7862c2a87","name":"block_executor"}
+2023-12-20T20:40:31.219140Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"c1716aa011ba31341f3dc62107438b56cb03ccc511f7f3e60f21dc9a3d96f072","name":"block_executor"}
+2023-12-20T20:40:31.219155Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 143
+2023-12-20T20:40:31.219236Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 14, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.219245Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 14, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.219236Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 14, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.219257Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 14, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.219267Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 14, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.219257Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 14, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.219276Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 14, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.219283Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 14, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.219288Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 14, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.219292Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 14, pool sizes: [0, 0, 0]
+No transactions generated in phase 14, moving to next phase
+2023-12-20T20:40:31.219706Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 0 {"block_id":"5ce6444eb2c2098944b7f7f4b892f9d3bee5d2e3de9a227b9c55b8b7862c2a87","name":"execution","txn_idx":0}
+2023-12-20T20:40:31.220152Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(0), result_state: Some(143) HashValue(044a1531a4103f6e61862f795d7690e3ef656c446824ad1d44ae4aaff7998df8) Tracked { items: 422, bytes: 771040 } 143 HashValue(044a1531a4103f6e61862f795d7690e3ef656c446824ad1d44ae4aaff7998df8) Tracked { items: 422, bytes: 771040 }
+2023-12-20T20:40:31.220192Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:170 Finished executing block
+2023-12-20T20:40:31.220208Z [txn_executor] INFO execution/executor-benchmark/src/pipeline.rs:167 Received block of size 4 to execute
+2023-12-20T20:40:31.220213Z [txn_executor] INFO execution/executor-benchmark/src/transaction_executor.rs:67 In iteration 4, received block 1fff9f60.
+2023-12-20T20:40:31.220217Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"c1716aa011ba31341f3dc62107438b56cb03ccc511f7f3e60f21dc9a3d96f072","name":"block_executor"}
+2023-12-20T20:40:31.220216Z [ledger_update] INFO execution/executor/src/block_executor.rs:274 ledger_update {"block_id":"5ce6444eb2c2098944b7f7f4b892f9d3bee5d2e3de9a227b9c55b8b7862c2a87","name":"block_executor"}
+2023-12-20T20:40:31.220219Z [block_partitioning] INFO execution/executor-benchmark/src/block_preparation.rs:50 In iteration 8, received 0 transactions.
+2023-12-20T20:40:31.220225Z [txn_executor] INFO execution/executor/src/block_executor.rs:209 execute_block {"block_id":"1fff9f6029f71a8a6d362ca9b849bbd70cc00676509a51a0288ecb70fc51bc7e","name":"block_executor"}
+2023-12-20T20:40:31.220260Z [txn_executor] INFO execution/executor/src/block_executor.rs:230 next_version: 144
+2023-12-20T20:40:31.220315Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 15, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.220323Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 15, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.220328Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 15, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.220333Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 15, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.220375Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 15, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.220380Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 15, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.220449Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 15, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.220493Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 15, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.220609Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 15, pool sizes: [0, 0, 0]
+2023-12-20T20:40:31.220625Z INFO crates/transaction-generator-lib/src/workflow_delegator.rs:105 Cur stage: 15, pool sizes: [0, 0, 0]
+No transactions generated in phase 15, moving to next phase
+2023-12-20T20:40:31.220727Z [txn_executor] INFO aptos-move/aptos-vm/src/aptos_vm.rs:2040 Executing block, transaction count: 4 {"block_id":"1fff9f6029f71a8a6d362ca9b849bbd70cc00676509a51a0288ecb70fc51bc7e","name":"execution","txn_idx":0}
+2023-12-20T20:40:31.228608Z [non_exe-7] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 142, Tracked { items: 422, bytes: 771040 }, skip_usage: false.
+2023-12-20T20:40:31.234501Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"c1716aa011ba31341f3dc62107438b56cb03ccc511f7f3e60f21dc9a3d96f072"}
+2023-12-20T20:40:31.234557Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 142. latency: 395 ms, partition time: 0 ms, execute time: 168 ms. commit time: 14 ms. TPS: 12 (partition: 2674, execution: 12, commit: 139). Accumulative TPS: 35
+2023-12-20T20:40:31.234566Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 3 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:31.234572Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 189381816 ns, executor time: 4057226 ns, commit time: 18715961 ns, DB commit time: 27839551 ns
+2023-12-20T20:40:31.234593Z [txn_committer] INFO execution/executor/src/block_executor.rs:355 commit_block {"block_id":"5ce6444eb2c2098944b7f7f4b892f9d3bee5d2e3de9a227b9c55b8b7862c2a87","name":"block_executor"}
+2023-12-20T20:40:31.238082Z [non_exe-6] INFO storage/aptosdb/src/state_store/mod.rs:926 Write usage at version 143, Tracked { items: 422, bytes: 771040 }, skip_usage: false.
+2023-12-20T20:40:31.241904Z [txn_committer] INFO execution/executor/src/components/block_tree/mod.rs:267 Updated with a new root block {"name":"speculation_cache","root_block_id":"5ce6444eb2c2098944b7f7f4b892f9d3bee5d2e3de9a227b9c55b8b7862c2a87"}
+2023-12-20T20:40:31.241967Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:122 Version: 143. latency: 402 ms, partition time: 0 ms, execute time: 1 ms. commit time: 7 ms. TPS: 136 (partition: 9153, execution: 938, commit: 136). Accumulative TPS: 37
+2023-12-20T20:40:31.241977Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:135 Accumulative total: VM time: 3 secs, executor time: 0 secs, commit time: 0 secs, DB commit time: 0 secs
+2023-12-20T20:40:31.241983Z [txn_committer] INFO execution/executor-benchmark/src/transaction_committer.rs:143 Accumulative per transaction: VM time: 176756361 ns, executor time: 3786744 ns, commit time: 17959700 ns, DB commit time: 26466761 ns
+2023-12-20T20:40:31.375350Z [par_exec-4] INFO aptos-move/block-executor/src/limit_processor.rs:178 [BlockSTM]: Parallel execution completed. 4 out of 4 txns committed {"approx_output_size":7434,"block_gas_limit":1000000000,"block_gas_limit_exceeded":false,"block_output_limit":1000000000000,"block_output_limit_exceeded":false,"effective_block_gas":100}
+2023-12-20T20:40:31.381726Z [exe-0] INFO execution/executor/src/components/in_memory_state_calculator_v2.rs:248 last_checkpoint_index Some(4), result_state: Some(148) HashValue(62b27e92974b92742da72e4a5c3d830ed9271908369536423b8b082a1c43b6b0) Tracked { items: 419, bytes: 772852 } 148 HashValue(62b27e92974b92742da72e4a5c3d830ed9271908369536423b8b082a1c43b6b0) Tracked { items: 419, bytes: 772852 }
+Some transactions were not successful: 1 aborts, 0 discards and 0 retries out of 4, examples: aborts: ["UserTransaction(SignedTransaction { \n { raw_txn: RawTransaction {\n    sender: 889a3bbcf1556f01f50648d5b03ce1333db3ad7a5635749777274a3216ae5f4a,\n    sequence_number: 0,\n    payload: EntryFunction(\n        EntryFunction {\n            module: ModuleId {\n                address: 368dd15a4ea4ea4520f2125248ebb110f7b1e22d2a6b1dff2cb74d1596b5ab2a,\n                name: Identifier(\n                    \"rps_utils\",\n                ),\n            },\n            function: Identifier(\n                \"move_players_to_round\",\n            ),\n            ty_args: [],\n            args: [\n                [\n                    1,\n                    33,\n                    33,\n                    90,\n                    24,\n                    216,\n                    33,\n                    3,\n                    111,\n                    22,\n                    186,\n                    169,\n                    171,\n                    122,\n                    188,\n                    26,\n                    253,\n                    253,\n                    191,\n                    96,\n                    195,\n                    200,\n                    219,\n                    73,\n                    75,\n                    252,\n                    6,\n                    221,\n                    197,\n                    135,\n                    86,\n                    190,\n                    0,\n                ],\n            ],\n        },\n    ),\n    max_gas_amount: 2000000,\n    gas_unit_price: 100,\n    expiration_timestamp_secs: 1703105130,\n    chain_id: testing,\n}, \n authenticator: MultiAgent {\n    sender: Ed25519 {\n        public_key: Ed25519PublicKey(a0dd5909b66dbf370290bb0617e3dae4ea231b6eab88beb3c257d48d49e3a3d6),\n        signature: Ed25519Signature(950d87daed0dd1474a68c7cd5190c2fd4a970eca6bf89a057a6e01824819b3cc319d542cd8dbc47e0c136ed961fa1723c2e321a9efc95de373957bd66489fc0f),\n    },\n    secondary_signer_addresses: [\n        368dd15a4ea4ea4520f2125248ebb110f7b1e22d2a6b1dff2cb74d1596b5ab2a,\n    ],\n    secondary_signers: [\n        Ed25519 {\n            public_key: Ed25519PublicKey(39e69c0bdda706395b9df4d8956f1d38f82bbf9dc4b3b0cbea099559fc398eb1),\n            signature: Ed25519Signature(43c933f6493db2ad94e4f4f39caee1fc72018bfad7105521af983e96d8a00ce86ad6b0acd6f8836f141cf9314401c4408b89903b163d0b6150de9f9eb8d32c00),\n        },\n    ],\n}, \n } \n }): Keep(MoveAbort { location: 368dd15a4ea4ea4520f2125248ebb110f7b1e22d2a6b1dff2cb74d1596b5ab2a::rock_paper_scissor, code: 5, info: Some(AbortInfo { reason_name: \"EROOM_NOT_LIMITED\", description: \"The room must be a limited room\" }) })"], discards: [], retries: []
+thread 'txn_executor' panicked at 'No aborts allowed, 1, examples: ["UserTransaction(SignedTransaction { \n { raw_txn: RawTransaction {\n    sender: 889a3bbcf1556f01f50648d5b03ce1333db3ad7a5635749777274a3216ae5f4a,\n    sequence_number: 0,\n    payload: EntryFunction(\n        EntryFunction {\n            module: ModuleId {\n                address: 368dd15a4ea4ea4520f2125248ebb110f7b1e22d2a6b1dff2cb74d1596b5ab2a,\n                name: Identifier(\n                    \"rps_utils\",\n                ),\n            },\n            function: Identifier(\n                \"move_players_to_round\",\n            ),\n            ty_args: [],\n            args: [\n                [\n                    1,\n                    33,\n                    33,\n                    90,\n                    24,\n                    216,\n                    33,\n                    3,\n                    111,\n                    22,\n                    186,\n                    169,\n                    171,\n                    122,\n                    188,\n                    26,\n                    253,\n                    253,\n                    191,\n                    96,\n                    195,\n                    200,\n                    219,\n                    73,\n                    75,\n                    252,\n                    6,\n                    221,\n                    197,\n                    135,\n                    86,\n                    190,\n                    0,\n                ],\n            ],\n        },\n    ),\n    max_gas_amount: 2000000,\n    gas_unit_price: 100,\n    expiration_timestamp_secs: 1703105130,\n    chain_id: testing,\n}, \n authenticator: MultiAgent {\n    sender: Ed25519 {\n        public_key: Ed25519PublicKey(a0dd5909b66dbf370290bb0617e3dae4ea231b6eab88beb3c257d48d49e3a3d6),\n        signature: Ed25519Signature(950d87daed0dd1474a68c7cd5190c2fd4a970eca6bf89a057a6e01824819b3cc319d542cd8dbc47e0c136ed961fa1723c2e321a9efc95de373957bd66489fc0f),\n    },\n    secondary_signer_addresses: [\n        368dd15a4ea4ea4520f2125248ebb110f7b1e22d2a6b1dff2cb74d1596b5ab2a,\n    ],\n    secondary_signers: [\n        Ed25519 {\n            public_key: Ed25519PublicKey(39e69c0bdda706395b9df4d8956f1d38f82bbf9dc4b3b0cbea099559fc398eb1),\n            signature: Ed25519Signature(43c933f6493db2ad94e4f4f39caee1fc72018bfad7105521af983e96d8a00ce86ad6b0acd6f8836f141cf9314401c4408b89903b163d0b6150de9f9eb8d32c00),\n        },\n    ],\n}, \n } \n }): Keep(MoveAbort { location: 368dd15a4ea4ea4520f2125248ebb110f7b1e22d2a6b1dff2cb74d1596b5ab2a::rock_paper_scissor, code: 5, info: Some(AbortInfo { reason_name: \"EROOM_NOT_LIMITED\", description: \"The room must be a limited room\" }) })"]', execution/executor-types/src/state_checkpoint_output.rs:179:9
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+thread 'block_partitioning' panicked at 'called `Result::unwrap()` on an `Err` value: SendError { .. }', execution/executor-benchmark/src/pipeline.rs:143:65
+thread 'tests::test_benchmark_transaction' panicked at 'called `Result::unwrap()` on an `Err` value: SendError { .. }', execution/executor-benchmark/src/transaction_generator.rs:688:39
+2023-12-20T20:40:31.393438Z [state_batch_committer] INFO storage/aptosdb/src/state_merkle_db.rs:225 Committing StateMerkleDb. {"version":143}
+2023-12-20T20:40:31.393748Z [state_batch_committer] INFO storage/aptosdb/src/state_store/state_merkle_batch_committer.rs:82 State snapshot committed. {"base_version":122,"root_hash":"044a1531a4103f6e61862f795d7690e3ef656c446824ad1d44ae4aaff7998df8","version":143}
+2023-12-20T20:40:31.394151Z INFO storage/schemadb/src/lib.rs:324 Dropped RocksDB. {"rocksdb_name":"state_merkle_db"}
+2023-12-20T20:40:31.401073Z INFO storage/schemadb/src/lib.rs:324 Dropped RocksDB. {"rocksdb_name":"ledger_db"}
+test tests::test_benchmark_transaction ... FAILED
+
+failures:
+
+failures:
+    tests::test_benchmark_transaction
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 7.35s
+
+error: test failed, to rerun pass `-p aptos-executor-benchmark --lib`

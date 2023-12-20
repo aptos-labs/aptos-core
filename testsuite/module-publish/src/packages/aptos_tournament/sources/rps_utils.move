@@ -12,18 +12,18 @@ module tournament::rps_utils {
     use tournament::admin;
     use tournament::aptos_tournament;
     use tournament::rock_paper_scissor::{Self, MyAddress, RockPaperScissorsGame};
-    use tournament::token_manager;
     use tournament::tournament_manager;
 
     const ETOURNAMENT_DOES_NOT_EXIST_1: u64 = 1;
-    const ETOURNAMENT_DOES_NOT_EXIST_2: u64 = 1;
-    const EPLAYER_DOES_NOT_EXIST: u64 = 2;
-    const EMAPPING_ALREADY_EXISTS: u64 = 3;
-    const EMAPPING_DOESNT_EXIST: u64 = 4;
+    const ETOURNAMENT_DOES_NOT_EXIST_2: u64 = 2;
+    const EPLAYER_DOES_NOT_EXIST: u64 = 3;
+    const EMAPPING_ALREADY_EXISTS: u64 = 4;
+    const EMAPPING_DOESNT_EXIST: u64 = 5;
+    const EPLAYER_MISSING_PLAY_TOKEN: u64 = 6;
 
     struct TournamentConfig has key {
         tournament_address: address,
-        round_address: Option<address>,
+        // round_address: Option<address>,
     }
 
     // Stores a map of player address to the game address.
@@ -37,6 +37,11 @@ module tournament::rps_utils {
         player_tokens: Table<address, Object<Token>>,
     }
 
+    // struct MissingPlayerConfig has key {
+    //     // Configuration of the player for each tournament.
+    //     missing: vector<address>,
+    // }
+
     public entry fun setup_tournament(
         admin: &signer
     ) {
@@ -49,7 +54,10 @@ module tournament::rps_utils {
 
         move_to(admin, TournamentConfig {
             tournament_address,
-            round_address: option::none(),
+            // round_address: option::none(),
+        });
+        move_to(admin, PlayerToGameMapping {
+            mapping: table::new(),
         });
     }
 
@@ -72,27 +80,52 @@ module tournament::rps_utils {
                 player_tokens: table::new(),
             })
         };
+        assert!(exists<PlayerConfig>(user_address), EPLAYER_DOES_NOT_EXIST);
+
         // TODO: Can a resource be inserted and modified in the same transaction?
         let player_config = borrow_global_mut<PlayerConfig>(user_address);
         table::upsert(&mut player_config.player_tokens, tournament_address, player_token);
     }
 
-    public entry fun start_new_round(_fee_payer: &signer, admin: &signer, player_addresses: vector<address>) acquires PlayerConfig, TournamentConfig, PlayerToGameMapping {
+    // public entry fun start_new_round_check(_fee_payer: &signer, admin: &signer, player_addresses: vector<address>) acquires MissingPlayerConfig {
+    //     let admin_address = signer::address_of(admin);
+    //     if (!exists<MissingPlayerConfig>(admin_address)) {
+    //         move_to<MissingPlayerConfig>(admin, MissingPlayerConfig {
+    //             missing: vector::empty(),
+    //         });
+    //     };
+
+    //     let missing_players = borrow_global_mut<MissingPlayerConfig>(admin_address);
+
+    //     let _ = vector::map_ref(&player_addresses, |player_address| {
+    //         assert!(exists<PlayerConfig>(*player_address), EPLAYER_DOES_NOT_EXIST);
+    //         1
+    //     });
+    // }
+
+    public entry fun start_new_round(_fee_payer: &signer, admin: &signer) acquires TournamentConfig {
         let admin_address = signer::address_of(admin);
-        if (exists<PlayerToGameMapping>(admin_address)) {
-           move_to<PlayerToGameMapping>(admin, PlayerToGameMapping {
-                mapping: table::new(),
-            });
-        };
 
         assert!(exists<TournamentConfig>(admin_address), ETOURNAMENT_DOES_NOT_EXIST_2);
         let tournament_address = borrow_global<TournamentConfig>(admin_address).tournament_address;
         aptos_tournament::start_new_round<RockPaperScissorsGame>(admin, tournament_address);
 
+        // let round_address = tournament_manager::get_round_address(tournament_address);
+        // let tournament_config = borrow_global_mut<TournamentConfig>(admin_address);
+        // tournament_config.round_address = option::some(round_address);
+    }
+
+    public entry fun move_players_to_round(_fee_payer: &signer, admin: &signer, player_addresses: vector<address>) acquires PlayerConfig, TournamentConfig, PlayerToGameMapping {
+        let admin_address = signer::address_of(admin);
+        assert!(exists<TournamentConfig>(admin_address), ETOURNAMENT_DOES_NOT_EXIST_2);
+        let tournament_address = borrow_global<TournamentConfig>(admin_address).tournament_address;
+
         let player_tokens: vector<Object<Token>> = vector::map_ref(&player_addresses, |player_address| {
             assert!(exists<PlayerConfig>(*player_address), EPLAYER_DOES_NOT_EXIST);
             let player_config = borrow_global_mut<PlayerConfig>(*player_address);
-            table::remove(&mut player_config.player_tokens, admin_address)
+
+            assert!(table::contains(&player_config.player_tokens, tournament_address), EPLAYER_MISSING_PLAY_TOKEN);
+            table::remove(&mut player_config.player_tokens, tournament_address)
         });
         // TODO: Should this be done every round, or only once in the beginning?
         let game_addresses = aptos_tournament::add_players_to_game_returning(
@@ -104,10 +137,6 @@ module tournament::rps_utils {
         let player_to_game_mapping = &mut borrow_global_mut<PlayerToGameMapping>(admin_address).mapping;
 
         rock_paper_scissor::update_player_to_game_mapping(&game_addresses, player_to_game_mapping);
-
-        let round_address = tournament_manager::get_round_address(tournament_address);
-        let tournament_config = borrow_global_mut<TournamentConfig>(admin_address);
-        tournament_config.round_address = option::some(round_address);
     }
 
     fun player_commit(player: &signer, game_address: address, action: vector<u8>, hash_addition: vector<u8>) {
@@ -116,7 +145,7 @@ module tournament::rps_utils {
         rock_paper_scissor::commit_action(player, game_address, hash::sha3_256(combo));
     }
 
-    fun game_play(
+    public entry fun game_play(
         player: &signer,
         admin_address: address,
     ) acquires PlayerToGameMapping {

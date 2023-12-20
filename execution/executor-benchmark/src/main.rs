@@ -103,9 +103,11 @@ pub struct PipelineOpt {
     #[clap(long)]
     skip_commit: bool,
     #[clap(long)]
+    allow_aborts: bool,
+    #[clap(long)]
     allow_discards: bool,
     #[clap(long)]
-    allow_aborts: bool,
+    allow_retries: bool,
     #[clap(long, default_value = "4")]
     num_generator_workers: usize,
     #[clap(flatten)]
@@ -118,8 +120,9 @@ impl PipelineOpt {
             delay_execution_start: self.generate_then_execute,
             split_stages: self.split_stages,
             skip_commit: self.skip_commit,
-            allow_discards: self.allow_discards,
             allow_aborts: self.allow_aborts,
+            allow_discards: self.allow_discards,
+            allow_retries: self.allow_retries,
             num_executor_shards: self.sharding_opt.num_executor_shards,
             use_global_executor: self.sharding_opt.use_global_executor,
             num_generator_workers: self.num_generator_workers,
@@ -310,6 +313,9 @@ enum Command {
         #[clap(long, default_value_t = 1)]
         module_working_set_size: usize,
 
+        #[clap(long)]
+        use_sender_account_pool: bool,
+
         #[clap(long, value_parser)]
         data_dir: PathBuf,
 
@@ -359,6 +365,7 @@ where
             transaction_type,
             transaction_weights,
             module_working_set_size,
+            use_sender_account_pool,
             data_dir,
             checkpoint_dir,
         } => {
@@ -370,7 +377,7 @@ where
                     &transaction_weights,
                     &[],
                     module_working_set_size,
-                    false,
+                    use_sender_account_pool,
                 );
                 assert!(mix_per_phase.len() == 1);
                 Some(mix_per_phase[0].clone())

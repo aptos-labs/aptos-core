@@ -24,6 +24,9 @@ pub struct TransactionExecutor<V> {
     parent_block_id: HashValue,
     maybe_first_block_start_time: Option<Instant>,
     ledger_update_sender: mpsc::SyncSender<LedgerUpdateMessage>,
+    allow_aborts: bool,
+    allow_discards: bool,
+    allow_retries: bool,
 }
 
 impl<V> TransactionExecutor<V>
@@ -34,6 +37,9 @@ where
         executor: Arc<BlockExecutor<V>>,
         parent_block_id: HashValue,
         ledger_update_sender: mpsc::SyncSender<LedgerUpdateMessage>,
+        allow_aborts: bool,
+        allow_discards: bool,
+        allow_retries: bool,
     ) -> Self {
         Self {
             num_blocks_processed: 0,
@@ -41,6 +47,9 @@ where
             parent_block_id,
             maybe_first_block_start_time: None,
             ledger_update_sender,
+            allow_aborts,
+            allow_discards,
+            allow_retries,
         }
     }
 
@@ -70,7 +79,14 @@ where
             .unwrap();
 
         assert_eq!(output.input_txns_len(), num_txns);
-        assert_eq!(output.txns_to_commit_len(), num_txns + 1);
+        output.check_aborts_discards_retries(
+            self.allow_aborts,
+            self.allow_discards,
+            self.allow_retries,
+        );
+        if !self.allow_retries {
+            assert_eq!(output.txns_to_commit_len(), num_txns + 1);
+        }
 
         let msg = LedgerUpdateMessage {
             current_block_start_time,

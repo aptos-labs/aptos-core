@@ -325,22 +325,26 @@ impl TransactionTypeArg {
             TransactionTypeArg::Tournament10 => TransactionType::Workflow{
                 workflow_kind: WorkflowKind::Tournament { num_players: 10, join_batch: 3 },
                 num_modules: module_working_set_size,
-                move_stages_by_phase: false,
+                move_stages_by_phase: true,
+                use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::Tournament10kBy1k => TransactionType::Workflow{
                 workflow_kind: WorkflowKind::Tournament { num_players: 10000, join_batch: 1000 },
                 num_modules: module_working_set_size,
-                move_stages_by_phase: false,
+                move_stages_by_phase: true,
+                use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::Tournament100kBy1k => TransactionType::Workflow{
                 workflow_kind: WorkflowKind::Tournament { num_players: 100000, join_batch: 1000 },
                 num_modules: module_working_set_size,
-                move_stages_by_phase: false,
+                move_stages_by_phase: true,
+                use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::Tournament1mBy10k => TransactionType::Workflow{
                 workflow_kind: WorkflowKind::Tournament { num_players: 1000000, join_batch: 10000 },
                 num_modules: module_working_set_size,
-                move_stages_by_phase: false,
+                move_stages_by_phase: true,
+                use_account_pool: sender_use_account_pool,
             },
         }
     }

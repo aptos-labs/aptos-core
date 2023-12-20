@@ -150,7 +150,7 @@ pub fn run_benchmark<V>(
         let (main_signer_accounts, burner_accounts) =
             accounts_cache.split(num_main_signer_accounts);
 
-        let transaction_generator_creator = init_workload::<V>(
+        let (transaction_generator_creator, phase) = init_workload::<V>(
             transaction_mix,
             &mut root_account,
             main_signer_accounts,
@@ -161,7 +161,7 @@ pub fn run_benchmark<V>(
             &PipelineConfig::default(),
         );
         // need to initialize all workers and finish with all transactions before we start the timer:
-        (0..pipeline_config.num_generator_workers).map(|_| transaction_generator_creator.create_transaction_generator()).collect::<Vec<_>>()
+        ((0..pipeline_config.num_generator_workers).map(|_| transaction_generator_creator.create_transaction_generator()).collect::<Vec<_>>(), phase)
     });
 
     let version = db.reader.get_latest_version().unwrap();
@@ -227,11 +227,12 @@ pub fn run_benchmark<V>(
     let start_commit_total = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum();
 
     let start_vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
-    if let Some(transaction_generators) = transaction_generators {
+    if let Some((transaction_generators, phase)) = transaction_generators {
         generator.run_workload(
             block_size,
             num_blocks,
             transaction_generators,
+            phase,
             transactions_per_sender,
         );
     } else {
@@ -358,7 +359,7 @@ fn init_workload<V>(
     burner_accounts: Vec<LocalAccount>,
     db: DbReaderWriter,
     pipeline_config: &PipelineConfig,
-) -> Box<dyn TransactionGeneratorCreator>
+) -> (Box<dyn TransactionGeneratorCreator>, Arc<AtomicUsize>)
 where
     V: TransactionBlockExecutor + 'static,
 {
@@ -372,8 +373,9 @@ where
 
     let runtime = Runtime::new().unwrap();
     let transaction_factory = TransactionGenerator::create_transaction_factory();
+    let phase = Arc::new(AtomicUsize::new(0));
+    let phase_clone = phase.clone();
     let (txn_generator_creator, _address_pool, _account_pool) = runtime.block_on(async {
-        let phase = Arc::new(AtomicUsize::new(0));
 
         let db_gen_init_transaction_executor = DbReliableTransactionSubmitter {
             db: db.clone(),
@@ -388,14 +390,14 @@ where
             &db_gen_init_transaction_executor,
             &transaction_factory,
             &transaction_factory,
-            phase,
+            phase_clone,
         )
         .await
     });
 
     pipeline.join();
 
-    txn_generator_creator
+    (txn_generator_creator, phase)
 }
 
 pub fn add_accounts<V>(
@@ -638,7 +640,7 @@ mod tests {
         super::run_benchmark::<E>(
             10, /* block_size */
             30, /* num_blocks */
-            transaction_type.map(|t| vec![(t.materialize(2, false), 1)]),
+            transaction_type.map(|t| vec![(t.materialize(1, true), 1)]),
             2,     /* transactions per sender */
             0,     /* connected txn groups in a block */
             false, /* shuffle the connected txns in a block */
