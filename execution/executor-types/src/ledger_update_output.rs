@@ -180,7 +180,7 @@ impl LedgerUpdateOutput {
         let Self {
             statuses_for_input_txns,
             to_commit,
-            events: reconfig_events,
+            events,
             transaction_info_hashes,
             state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
             sharded_state_cache,
@@ -196,7 +196,7 @@ impl LedgerUpdateOutput {
 
         self.statuses_for_input_txns.extend(statuses_for_input_txns);
         self.to_commit.extend(to_commit);
-        self.events.extend(reconfig_events);
+        self.events.extend(events);
         self.transaction_info_hashes.extend(transaction_info_hashes);
         self.sharded_state_cache.combine(sharded_state_cache);
         self.transaction_accumulator = transaction_accumulator;
