@@ -1,4 +1,4 @@
-//#publish --print-bytecode
+//#publish
 module 0xcafe::vectors {
     use std::vector;
 
