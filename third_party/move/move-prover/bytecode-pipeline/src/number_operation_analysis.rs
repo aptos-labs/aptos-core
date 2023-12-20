@@ -352,13 +352,9 @@ impl<'a> NumberOperationAnalysis<'a> {
                                                 if let Some(oper) = oper_opt {
                                                     // Still need to check compatibility
                                                     if !allow_merge && oper.conflict(&para_vec[i]) {
-                                                        self.func_target.global_env().error(
-                                                            loc,
-                                                            // &self
-                                                            // .func_target
-                                                            // .get_bytecode_loc(attr_id),
-                                                            CONFLICT_ERROR_MSG,
-                                                        );
+                                                        self.func_target
+                                                            .global_env()
+                                                            .error(loc, CONFLICT_ERROR_MSG);
                                                     } else {
                                                         let merged = oper.merge(&para_vec[i]);
                                                         para_vec[i] = merged;

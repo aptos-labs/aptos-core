@@ -372,7 +372,7 @@ impl ModuleGenerator {
         let type_parameters = fun_env
             .get_type_parameters()
             .into_iter()
-            .map(|TypeParameter(_, TypeParameterKind { abilities, .. }, _loc)| abilities)
+            .map(|TypeParameter(_, TypeParameterKind { abilities, .. }, _)| abilities)
             .collect::<Vec<_>>();
         let parameters = self.signature(
             ctx,
@@ -380,7 +380,7 @@ impl ModuleGenerator {
             fun_env
                 .get_parameters()
                 .iter()
-                .map(|Parameter(_, ty, _loc)| ty.to_owned())
+                .map(|Parameter(_, ty, _)| ty.to_owned())
                 .collect(),
         );
         let return_ = self.signature(
@@ -462,7 +462,7 @@ impl ModuleGenerator {
                     let param_index = fun_env
                         .get_parameters()
                         .iter()
-                        .position(|Parameter(n, _ty, _loc)| n == name)
+                        .position(|Parameter(n, _ty, _)| n == name)
                         .expect("parameter defined") as u8;
                     FF::AddressSpecifier::Parameter(param_index, None)
                 },
@@ -470,7 +470,7 @@ impl ModuleGenerator {
                     let param_index = fun_env
                         .get_parameters()
                         .iter()
-                        .position(|Parameter(n, _ty, _loc)| n == name)
+                        .position(|Parameter(n, _ty, _)| n == name)
                         .expect("parameter defined") as u8;
                     let fun_index = self.function_instantiation_index(
                         ctx,

@@ -1442,7 +1442,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let no_mut_ref_param = self.spec_funs[spec_fun_idx]
                 .params
                 .iter()
-                .map(|Parameter(_, ty, _loc)| !ty.is_mutable_reference())
+                .map(|Parameter(_, ty, _)| !ty.is_mutable_reference())
                 .all(|b| b); // `no_mut_ref_param` if none of the types are mut refs.
             return self.spec_funs[spec_fun_idx].is_native && no_mut_ref_param;
         };
@@ -2127,7 +2127,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 .conditions
                 .iter()
                 .filter_map(|c| match &c.kind {
-                    LetPost(name, _loc) | LetPre(name, _loc) => Some(*name),
+                    LetPost(name, _) | LetPre(name, _) => Some(*name),
                     _ => None,
                 })
                 .collect()
@@ -3118,7 +3118,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                                 labels.push((
                                     loc.clone(),
                                     format!(
-                                        "Variable {} defined here",
+                                        "...variable {} defined here",
                                         name.display(self.symbol_pool())
                                     )
                                     .to_owned(),
@@ -3133,7 +3133,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     self.parent.env.error_with_labels(
                         &exp_loc,
                         &format!(
-                            "A specification variable in the schema {} conflicts with",
+                            "A specification variable in the schema {} conflicts with...",
                             schema_name.display(self.parent.env)
                         ),
                         labels,
@@ -3142,7 +3142,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             }
 
             match kind {
-                ConditionKind::LetPost(name, _loc) | ConditionKind::LetPre(name, _loc) => {
+                ConditionKind::LetPost(name, _) | ConditionKind::LetPre(name, _) => {
                     // If a let name is introduced by this condition, remove it from argument_map
                     // as it shadows schema arguments.
                     argument_map.remove(name);

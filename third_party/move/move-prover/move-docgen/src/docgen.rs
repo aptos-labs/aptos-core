@@ -1280,7 +1280,7 @@ impl<'env> Docgen<'env> {
         let params = func_env
             .get_parameters()
             .iter()
-            .map(|Parameter(name, ty, _loc)| {
+            .map(|Parameter(name, ty, _)| {
                 format!("{}: {}", self.name_string(*name), ty.display(tctx))
             })
             .join(", ");
@@ -1579,7 +1579,7 @@ impl<'env> Docgen<'env> {
         let type_param_names = func_env
             .get_type_parameters()
             .iter()
-            .map(|TypeParameter(name, _, _loc)| *name)
+            .map(|TypeParameter(name, _, _)| *name)
             .collect_vec();
         TypeDisplayContext::new_with_params(self.env, type_param_names)
     }
@@ -1592,7 +1592,7 @@ impl<'env> Docgen<'env> {
         let type_param_names = struct_env
             .get_type_parameters()
             .iter()
-            .map(|TypeParameter(name, _, _loc)| *name)
+            .map(|TypeParameter(name, _, _)| *name)
             .collect_vec();
         TypeDisplayContext::new_with_params(self.env, type_param_names)
     }

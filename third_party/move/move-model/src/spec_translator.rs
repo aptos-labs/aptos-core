@@ -467,8 +467,8 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
     fn translate_lets(&mut self, post_state: bool, spec: &Spec) {
         for cond in &spec.conditions {
             let sym = match &cond.kind {
-                ConditionKind::LetPost(sym, _loc) if post_state => sym,
-                ConditionKind::LetPre(sym, _loc) if !post_state => sym,
+                ConditionKind::LetPost(sym, _) if post_state => sym,
+                ConditionKind::LetPre(sym, _) if !post_state => sym,
                 _ => continue,
             };
             let exp = self.translate_exp(&self.auto_trace(&cond.loc, &cond.exp), false);

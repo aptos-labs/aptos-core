@@ -456,7 +456,7 @@ impl<'a> Analyzer<'a> {
     fn analyze_spec_fun(&mut self, fun: QualifiedId<SpecFunId>) {
         let module_env = self.env.get_module(fun.module_id);
         let decl = module_env.get_spec_fun(fun.id);
-        for Parameter(_, ty, _loc) in &decl.params {
+        for Parameter(_, ty, _) in &decl.params {
             self.add_type_root(ty)
         }
         self.add_type_root(&decl.result_type);
