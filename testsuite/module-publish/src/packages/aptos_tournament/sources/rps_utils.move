@@ -4,7 +4,7 @@ module tournament::rps_utils {
     use std::string;
     use std::vector;
     use std::table::{Self, Table};
-    use std::option::{Self, Option};
+    // use std::option::{Self, Option};
     use std::string_utils::{to_string};
     use aptos_framework::object::Object;
     use aptos_token_objects::token::Token;
@@ -158,19 +158,14 @@ module tournament::rps_utils {
         player_commit(player, game_address, action, hash_addition);
     }
 
-    #[test]
-    fun test_full_game_play() {
-        use aptos_framework::account;
-        let admin = account::create_account(@0xABC);
-        setup_tournament(&admin);
-        let player1 = account::create_account(@0xABCE);
-        let player2 = account::create_account(@0xABCF);
-        let fee_payer = account::create_account(@0xABC0);
-        let admin_address = signer::address_of(&admin);
-        setup_player(&player1, admin_address);
-        setup_player(&player2, admin_address);
-        start_new_round(&fee_payer, &admin, vector[signer::address_of(&player1), signer::address_of(&player2)]);
-        game_play(&player1, admin_address);
-        game_play(&player2, admin_address);
+    #[test(admin = @0xCAFE, player1 = @0xABC1, player2 = @0xABC2, fee_payer = @0xABC3)]
+    fun test_full_game_play(admin: &signer, player1: &signer, player2: &signer, fee_payer: &signer) acquires PlayerConfig, TournamentConfig, PlayerToGameMapping {
+        setup_tournament(admin);
+        let admin_address = signer::address_of(admin);
+        setup_player(player1, admin_address);
+        setup_player(player2, admin_address);
+        start_new_round(fee_payer, admin);
+        game_play(player1, admin_address);
+        game_play(player2, admin_address);
     }
 }
