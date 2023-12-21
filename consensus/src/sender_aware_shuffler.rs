@@ -116,7 +116,7 @@ impl PendingTransactions {
         self.ordered_txns.push_back(txn.clone());
         self.txns_by_senders
             .entry(txn.sender())
-            .or_insert_with(VecDeque::new)
+            .or_default()
             .push_back(txn);
     }
 

@@ -1,0 +1,7 @@
+processed 3 tasks
+
+task 1 'publish'. lines 4-35:
+Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(Some(CALL_TYPE_MISMATCH_ERROR))
+
+task 2 'run'. lines 37-37:
+Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(Some(LINKER_ERROR))

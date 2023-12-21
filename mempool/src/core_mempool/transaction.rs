@@ -8,6 +8,7 @@ use aptos_types::{account_address::AccountAddress, transaction::SignedTransactio
 use serde::{Deserialize, Serialize};
 use std::{
     mem::size_of,
+    sync::{atomic::AtomicU8, Arc},
     time::{Duration, SystemTime},
 };
 
@@ -107,10 +108,11 @@ pub enum SubmittedBy {
     PeerValidator,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone)]
 pub struct InsertionInfo {
     pub insertion_time: SystemTime,
     pub submitted_by: SubmittedBy,
+    pub consensus_pulled_counter: Arc<AtomicU8>,
 }
 
 impl InsertionInfo {
@@ -129,6 +131,7 @@ impl InsertionInfo {
         Self {
             insertion_time,
             submitted_by,
+            consensus_pulled_counter: Arc::new(AtomicU8::new(0)),
         }
     }
 

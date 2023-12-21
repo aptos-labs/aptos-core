@@ -108,7 +108,7 @@ async fn main() -> Result<()> {
         for node_result in node_results {
             nhc_responses
                 .entry(account_address)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(node_result);
         }
     }

@@ -1,6 +1,9 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::unwrap_or_default)]
+#![allow(clippy::non_canonical_partial_ord_impl)]
+
 //! This module is responsible for building symbolication information on top of compiler's typed
 //! AST, in particular identifier definitions to be used for implementing go-to-def and
 //! go-to-references language server commands.

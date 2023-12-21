@@ -197,7 +197,7 @@ pub fn verify_partitioner_output(
             old_txn_idxs_seen.insert(old_txn_idx);
             old_txn_idxs_by_sender
                 .entry(sender)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(old_txn_idx);
             let new_txn_idx = start_txn_idx + pos_in_sub_block;
             for loc in txn_with_dep.txn.write_hints().iter() {

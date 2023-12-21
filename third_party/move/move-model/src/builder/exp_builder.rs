@@ -5,7 +5,7 @@
 use crate::{
     ast::{
         AccessSpecifier, Address, AddressSpecifier, Exp, ExpData, ModuleName, Operation, Pattern,
-        QualifiedSymbol, QuantKind, ResourceSpecifier, Spec, TempIndex, Value,
+        QualifiedSymbol, QuantKind, ResourceSpecifier, RewriteResult, Spec, TempIndex, Value,
     },
     builder::{
         model_builder::{AnyFunEntry, ConstEntry, EntryVisibility, LocalVarEntry, StructEntry},
@@ -43,7 +43,7 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     /// A symbol table for type parameters.
     pub type_params_table: BTreeMap<Symbol, Type>,
     /// Type parameters in sequence they have been added.
-    pub type_params: Vec<(Symbol, Type)>,
+    pub type_params: Vec<(Symbol, Type, Loc)>,
     /// Function pointer table
     pub fun_ptrs_table: BTreeMap<Symbol, (Symbol, Vec<Symbol>)>,
     /// A scoped symbol table for local names. The first element in the list contains the most
@@ -226,7 +226,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 
     /// Get type parameters with names from this translator (old style)
-    pub fn get_type_params_with_name(&self) -> Vec<(Symbol, Type)> {
+    pub fn get_type_params_with_name(&self) -> Vec<(Symbol, Type, Loc)> {
         self.type_params.clone()
     }
 
@@ -234,7 +234,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     pub fn get_type_params(&self) -> Vec<TypeParameter> {
         self.type_params
             .iter()
-            .map(|(n, _)| TypeParameter::new_named(n))
+            .map(|(n, _, loc)| TypeParameter::new_named(n, loc))
             .collect()
     }
 
@@ -261,10 +261,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
     }
 
-    /// Shortcut for a diagnosis note.
-    pub fn note(&mut self, loc: &Loc, msg: &str) {
+    /// Shortcut for reporting an error.
+    pub fn error_with_labels(&mut self, loc: &Loc, msg: &str, labels: Vec<(Loc, String)>) {
+        self.had_errors = true;
         if self.mode != ExpTranslationMode::TryImplAsSpec {
-            self.parent.parent.env.diag(Severity::Note, loc, msg)
+            self.parent.parent.env.error_with_labels(loc, msg, labels);
         }
     }
 
@@ -424,7 +425,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     fn type_display_context(&self) -> TypeDisplayContext<'_> {
         TypeDisplayContext {
             env: self.parent.parent.env,
-            type_param_names: Some(self.type_params.iter().map(|(s, _)| *s).collect()),
+            type_param_names: Some(self.type_params.iter().map(|(s, _, _)| *s).collect()),
             subs_opt: Some(&self.subs),
             builder_struct_table: Some(&self.parent.parent.reverse_struct_table),
         }
@@ -478,7 +479,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 );
                 return;
             }
-            self.type_params.push((name, ty));
+            self.type_params.push((name, ty, loc.clone()));
         } else if report_errors {
             let param_name = name.display(self.symbol_pool());
             let context = TypeDisplayContext::new(self.parent.parent.env);
@@ -494,8 +495,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 
     /// Defines a vector of formal type parameters.
-    pub fn define_type_params(&mut self, loc: &Loc, params: &[TypeParameter], report_errors: bool) {
-        for (pos, TypeParameter(name, _)) in params.iter().enumerate() {
+    pub fn define_type_params(
+        &mut self,
+        _loc: &Loc,
+        params: &[TypeParameter],
+        report_errors: bool,
+    ) {
+        for (pos, TypeParameter(name, _, loc)) in params.iter().enumerate() {
             self.define_type_param(loc, *name, Type::new_param(pos), report_errors)
         }
     }
@@ -549,8 +555,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             .insert(name, entry)
         {
             let display = name.display(self.symbol_pool()).to_string();
-            self.error(loc, &format!("duplicate declaration of `{}`", display));
-            self.note(&old.loc, &format!("previous declaration of `{}`", display));
+            self.error_with_labels(
+                loc,
+                &format!("duplicate declaration of `{}`", display),
+                vec![(
+                    old.loc.clone(),
+                    format!("previous declaration of `{}`", display),
+                )],
+            );
             // Put the old entry back
             self.local_table.front_mut().unwrap().insert(name, old);
         }
@@ -586,7 +598,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let ty = Type::new_param(i);
                 let sym = self.symbol_pool().make(n.value.as_str());
                 let abilities = self.parent.translate_abilities(a);
-                self.define_type_param(&self.to_loc(&n.loc), sym, ty, true /*report_errors*/);
+                let loc = self.to_loc(&n.loc);
+                self.define_type_param(&loc, sym, ty, true /*report_errors*/);
                 TypeParameter(
                     sym,
                     if is_phantom {
@@ -594,6 +607,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     } else {
                         TypeParameterKind::new(abilities)
                     },
+                    loc,
                 )
             })
             .collect_vec()
@@ -612,8 +626,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             .map(|(idx, (v, ty))| {
                 let ty = self.translate_type(ty);
                 let sym = self.symbol_pool().make(v.0.value.as_str());
+                let loc = self.to_loc(&v.loc());
                 self.define_local(
-                    &self.to_loc(&v.0.loc),
+                    &loc,
                     sym,
                     ty.clone(),
                     None,
@@ -622,7 +637,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     // a `LocalVar`.
                     if for_move_fun { Some(idx) } else { None },
                 );
-                Parameter(sym, ty)
+                Parameter(sym, ty, loc)
             })
             .collect_vec()
     }
@@ -1231,7 +1246,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let body = self.translate_exp(body, &Type::unit());
                 // See the Move book for below treatment: if the loop has no exit, the type
                 // is arbitrary, otherwise `()`.
-                let loop_type = if body.has_exit() {
+                let loop_type = if body.has_loop_exit() {
                     self.check_type(&loc, &Type::unit(), expected_type, "")
                 } else {
                     expected_type.clone()
@@ -1467,7 +1482,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             &mut |e| {
                 if self.placeholder_map.is_empty() {
                     // Shortcut case of no placeholders
-                    return Err(e);
+                    return RewriteResult::Unchanged(e);
                 }
                 let exp_data: ExpData = e.into();
                 if let ExpData::Call(id, Operation::NoOp, args) = exp_data {
@@ -1494,7 +1509,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                     self.bug(&loc, "unresolved spec anchor");
                                     Spec::default()
                                 };
-                                Ok(ExpData::SpecBlock(id, spec).into_exp())
+                                RewriteResult::Rewritten(ExpData::SpecBlock(id, spec).into_exp())
                             },
                             ExpPlaceholder::FieldSelectInfo {
                                 struct_ty,
@@ -1506,23 +1521,31 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                     .specialize_with_defaults(struct_ty)
                                     .skip_reference()
                                 {
-                                    Ok(ExpData::Call(
-                                        id,
-                                        Operation::Select(*mid, *sid, FieldId::new(*field_name)),
-                                        args,
+                                    RewriteResult::Rewritten(
+                                        ExpData::Call(
+                                            id,
+                                            Operation::Select(
+                                                *mid,
+                                                *sid,
+                                                FieldId::new(*field_name),
+                                            ),
+                                            args,
+                                        )
+                                        .into_exp(),
                                     )
-                                    .into_exp())
                                 } else {
-                                    Ok(self.new_error_exp().into_exp())
+                                    RewriteResult::Rewritten(self.new_error_exp().into_exp())
                                 }
                             },
                         }
                     } else {
                         // Reconstruct expression and return for traversal
-                        Err(ExpData::Call(id, Operation::NoOp, args).into_exp())
+                        RewriteResult::Unchanged(
+                            ExpData::Call(id, Operation::NoOp, args).into_exp(),
+                        )
                     }
                 } else {
-                    Err(exp_data.into_exp())
+                    RewriteResult::Unchanged(exp_data.into_exp())
                 }
             },
             &mut |pat, _entering_scope| match pat {

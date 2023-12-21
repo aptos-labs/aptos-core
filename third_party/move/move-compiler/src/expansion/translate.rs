@@ -248,7 +248,7 @@ pub fn program(
         for s in scripts {
             collected
                 .entry(s.function_name.value())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(s)
         }
         let mut keyed: BTreeMap<Symbol, E::Script> = BTreeMap::new();
@@ -523,7 +523,6 @@ fn module_(
             .add_diag(diag!(Declarations::InvalidName, (name.loc(), msg)));
     }
 
-    let name = name;
     let name_loc = name.0.loc;
     let current_module = sp(name_loc, ModuleIdent_::new(*context.cur_address(), name));
     if context
