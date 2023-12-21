@@ -13,7 +13,7 @@ use crate::{
     responses::Error::DegenerateRangeError,
     Epoch, StorageServiceRequest, COMPRESSION_SUFFIX_LABEL,
 };
-use aptos_compression::{client::CompressionClient, CompressedData, CompressionError};
+use aptos_compression::{client::CompressionClient, CompressedData};
 use aptos_config::config::{
     AptosDataClientConfig, StorageServiceConfig, MAX_APPLICATION_MESSAGE_SIZE,
 };
@@ -47,8 +47,8 @@ pub enum Error {
     UnexpectedResponseError(String),
 }
 
-impl From<CompressionError> for Error {
-    fn from(error: CompressionError) -> Self {
+impl From<aptos_compression::Error> for Error {
+    fn from(error: aptos_compression::Error) -> Self {
         Error::UnexpectedErrorEncountered(error.to_string())
     }
 }
