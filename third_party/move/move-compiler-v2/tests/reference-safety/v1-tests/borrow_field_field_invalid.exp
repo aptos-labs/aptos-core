@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: cannot immutable borrow local `inner` since other mutable references exist
+error: cannot immutably borrow local `inner` since other mutable references exist
    ┌─ tests/reference-safety/v1-tests/borrow_field_field_invalid.move:14:18
    │
 13 │         let c = &mut inner.f1;
@@ -8,7 +8,7 @@ error: cannot immutable borrow local `inner` since other mutable references exis
 14 │         let f1 = &inner.f1;
    │                  ^^^^^^^^^ immutable borrow attempted here
 
-error: cannot immutable borrow local `inner` since other mutable references exist
+error: cannot immutably borrow local `inner` since other mutable references exist
    ┌─ tests/reference-safety/v1-tests/borrow_field_field_invalid.move:21:18
    │
 20 │         let c = id_mut(&mut inner.f1);

@@ -36,8 +36,10 @@
 //! applying independently for such sub-locations. Thus one can have `&s.f` and `&mut s.g` at the
 //! same time.
 
-use crate::pipeline::livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset};
-use crate::{Experiment, Options};
+use crate::{
+    pipeline::livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
+    Experiment, Options,
+};
 use codespan_reporting::diagnostic::Severity;
 use im::ordmap::Entry;
 use itertools::Itertools;
@@ -271,14 +273,11 @@ impl LifetimeState {
 impl LifetimeState {
     /// Creates a new node with the given label and location information.
     fn new_node(&mut self, assigned_label: LifetimeLabel, location: MemoryLocation) {
-        self.graph.insert(
-            assigned_label,
-            LifetimeNode {
-                location,
-                children: Default::default(),
-                parents: Default::default(),
-            },
-        );
+        self.graph.insert(assigned_label, LifetimeNode {
+            location,
+            children: Default::default(),
+            parents: Default::default(),
+        });
     }
 
     /// Returns reference to node.
@@ -721,18 +720,13 @@ impl<'env> LifeTimeAnalysis<'env> {
                 let mut_prefix = if e.is_mut { "mutable " } else { "" };
                 return Some((
                     loc.clone(),
-                    format!(
-                        "{}{}{}",
-                        prefix,
-                        mut_prefix,
-                        match &e.kind {
-                            BorrowLocal => "local borrow",
-                            BorrowGlobal => "global borrow",
-                            BorrowField(..) => "field borrow",
-                            Call(..) => "call result",
-                            Skip => return None,
-                        },
-                    ),
+                    format!("{}{}{}", prefix, mut_prefix, match &e.kind {
+                        BorrowLocal => "local borrow",
+                        BorrowGlobal => "global borrow",
+                        BorrowField(..) => "field borrow",
+                        Call(..) => "call result",
+                        Skip => return None,
+                    },),
                 ));
             }
         }
