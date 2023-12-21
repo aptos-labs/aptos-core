@@ -34,6 +34,8 @@ const CACHE_WORKER_WAIT_FOR_FILE_STORE_MS: u64 = 100;
 // kicked off when there's no metadata in the file store.
 const FILE_STORE_METADATA_WAIT_MS: u64 = 2000;
 
+const CACHE_CHANNEL_SIZE: usize = 1000;
+
 const SERVICE_TYPE: &str = "cache_worker";
 
 pub struct Worker {
@@ -306,7 +308,7 @@ async fn process_streaming_response(
     let current_version = starting_version;
     let batch_start_time = std::time::Instant::now();
 
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<CacheTaskItem>(1000);
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<CacheTaskItem>(CACHE_CHANNEL_SIZE);
 
     // process the cache items.
     tokio::spawn({
@@ -438,7 +440,7 @@ async fn process_streaming_response(
                 .await
                 .expect("task send failure");
                 // Channel size.
-                info!("[Cache worker] Channel size: {}", 100 - tx.capacity());
+                info!("[Cache worker] Channel size: {}", CACHE_CHANNEL_SIZE - tx.capacity());
             },
         }
 
