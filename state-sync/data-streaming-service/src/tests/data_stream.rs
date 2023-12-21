@@ -20,6 +20,7 @@ use crate::{
         GetAllTransactionsOrOutputsRequest, GetAllTransactionsRequest, NotificationFeedback,
         StreamRequest,
     },
+    streaming_service::StreamUpdateNotification,
     tests::utils::{
         create_data_client_response, create_ledger_info, create_output_list_with_proof,
         create_random_u64, create_transaction_list_with_proof, get_data_notification,
@@ -29,6 +30,7 @@ use crate::{
         MIN_ADVERTISED_TRANSACTION, MIN_ADVERTISED_TRANSACTION_OUTPUT,
     },
 };
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
 use aptos_data_client::{
     global_summary::{AdvertisedData, GlobalDataSummary, OptimalChunkSizes},
@@ -2063,6 +2065,7 @@ fn create_data_stream(
         streaming_service_config,
         create_random_u64(10000),
         &stream_request,
+        create_stream_update_notifier(),
         aptos_data_client,
         notification_generator,
         &advertised_data,
@@ -2113,6 +2116,12 @@ fn create_optimal_chunk_sizes(chunk_sizes: u64) -> OptimalChunkSizes {
         transaction_chunk_size: chunk_sizes,
         transaction_output_chunk_size: chunk_sizes,
     }
+}
+
+/// Creates a returns a new stream update notifier (dropping the listener)
+fn create_stream_update_notifier() -> aptos_channel::Sender<(), StreamUpdateNotification> {
+    let (stream_update_notifier, _) = aptos_channel::new(QueueStyle::LIFO, 1, None);
+    stream_update_notifier
 }
 
 /// A utility function that creates and returns all types of

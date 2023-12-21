@@ -132,7 +132,7 @@ impl Default for StateSyncDriverConfig {
             continuous_syncing_mode: ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs,
             enable_auto_bootstrapping: false,
             fallback_to_output_syncing_secs: 180, // 3 minutes
-            progress_check_interval_ms: 50,
+            progress_check_interval_ms: 100,
             max_connection_deadline_secs: 10,
             max_consecutive_stream_notifications: 10,
             max_num_stream_timeouts: 12,
