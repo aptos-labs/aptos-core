@@ -8,10 +8,9 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::bls12381::Signature;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_infallible::RwLock;
 use aptos_types::{aggregate_signature::AggregateSignature, validator_verifier::ValidatorVerifier};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug, sync::Arc};
+use std::{collections::HashMap, fmt::Debug};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub(super) struct MockShare;
@@ -317,7 +316,6 @@ pub struct RandConfig {
     author: Author,
     threshold: u64,
     weights: HashMap<Author, u64>,
-    certified_data: Arc<RwLock<HashMap<Author, Vec<u8>>>>,
 }
 
 impl RandConfig {
@@ -328,7 +326,6 @@ impl RandConfig {
             author,
             weights,
             threshold: sum * 2 / 3 + 1,
-            certified_data: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -349,9 +346,5 @@ impl RandConfig {
 
     pub fn threshold_weight(&self) -> u64 {
         self.threshold
-    }
-
-    pub fn add_certified_data(&self, author: Author, data: Vec<u8>) {
-        self.certified_data.write().insert(author, data);
     }
 }
