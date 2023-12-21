@@ -169,15 +169,16 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
         with_copy_inference: true,
     }));
+    pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+    pipeline.add_processor(Box::new(ExplicitDrop {}));
     if safety_on {
-        pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
-        pipeline.add_processor(Box::new(ExplicitDrop {}));
+        // Ability checker is functionally not relevant so can be completely skipped if safety is off
         pipeline.add_processor(Box::new(AbilityChecker {}));
-        // Run live var again because it is invalidated but needed by file format generator
-        pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
-            with_copy_inference: false,
-        }));
     }
+    // Run live var again because it is invalidated by ExplicitDrop but needed by file format generator
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+        with_copy_inference: false,
+    }));
     pipeline
 }
 
