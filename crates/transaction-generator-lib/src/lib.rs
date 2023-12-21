@@ -80,6 +80,7 @@ pub enum TransactionType {
     Workflow {
         workflow_kind: WorkflowKind,
         num_modules: usize,
+        use_account_pool: bool,
         move_stages_by_phase: bool,
     },
 }
@@ -315,6 +316,7 @@ pub async fn create_txn_generator_creator(
                 },
                 TransactionType::Workflow {
                     num_modules,
+                    use_account_pool,
                     workflow_kind,
                     move_stages_by_phase,
                 } => Box::new(
@@ -325,6 +327,7 @@ pub async fn create_txn_generator_creator(
                         root_account,
                         txn_executor,
                         *num_modules,
+                        use_account_pool.then(|| accounts_pool.clone()),
                         move_stages_by_phase.then(|| cur_phase.clone()),
                     )
                     .await,

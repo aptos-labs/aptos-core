@@ -34,7 +34,7 @@ use std::{
     fs::File,
     io::{Read, Write},
     path::Path,
-    sync::{mpsc, Arc, Mutex},
+    sync::{mpsc, Arc, Mutex, atomic::{AtomicUsize, Ordering}},
 };
 use thread_local::ThreadLocal;
 
@@ -296,6 +296,7 @@ impl TransactionGenerator {
         block_size: usize,
         num_blocks: usize,
         transaction_generators: Vec<Box<dyn aptos_transaction_generator_lib::TransactionGenerator>>,
+        phase: Arc<AtomicUsize>,
         transactions_per_sender: usize,
     ) {
         let transaction_generators = Mutex::new(transaction_generators);
@@ -316,6 +317,7 @@ impl TransactionGenerator {
             self.generate_and_send_block(
                 self.main_signer_accounts.as_ref().unwrap(),
                 sender_indices,
+                phase.clone(),
                 |sender_idx, _| {
                     let sender = &self.main_signer_accounts.as_ref().unwrap().accounts[sender_idx];
                     let mut transaction_generator = transaction_generator
@@ -415,6 +417,7 @@ impl TransactionGenerator {
             self.generate_and_send_block(
                 self.seed_accounts_cache.as_ref().unwrap(),
                 input,
+                Arc::new(AtomicUsize::new(0)),
                 |(sender_idx, new_account), account_cache| {
                     let sender = &account_cache.accounts[sender_idx];
                     let txn = sender.sign_with_transaction_builder(
@@ -614,6 +617,7 @@ impl TransactionGenerator {
         self.generate_and_send_block(
             account_cache,
             transfer_indices,
+            Arc::new(AtomicUsize::new(0)),
             |(sender_idx, receiver_idx), account_cache| {
                 let txn = account_cache.accounts[sender_idx].sign_with_transaction_builder(
                     self.transaction_factory
@@ -629,6 +633,7 @@ impl TransactionGenerator {
         &self,
         account_cache: &AccountCache,
         inputs: Vec<T>,
+        phase: Arc<AtomicUsize>,
         func: F,
         sender_func: S,
     ) where
@@ -668,6 +673,11 @@ impl TransactionGenerator {
             if let Some(txn) = transactions_by_index.get(&i) {
                 transactions.push(txn.clone());
             }
+        }
+
+        if transactions.is_empty() {
+            let val = phase.fetch_add(1, Ordering::Relaxed);
+            println!("No transactions generated in phase {}, moving to next phase", val)
         }
 
         NUM_TXNS

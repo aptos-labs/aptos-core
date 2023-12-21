@@ -17,7 +17,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
-    time::Duration,
+    time::Duration, cmp,
 };
 
 /// Wrapper that allows inner transaction generator to have unique accounts
@@ -30,6 +30,7 @@ struct WorkflowTxnGenerator {
     generators: Vec<Box<dyn TransactionGenerator>>,
     pool_per_stage: Vec<Arc<ObjectPool<LocalAccount>>>,
     num_for_first_stage: usize,
+    completed_for_first_stage: Arc<AtomicUsize>,
 }
 
 impl WorkflowTxnGenerator {
@@ -38,12 +39,14 @@ impl WorkflowTxnGenerator {
         generators: Vec<Box<dyn TransactionGenerator>>,
         pool_per_stage: Vec<Arc<ObjectPool<LocalAccount>>>,
         num_for_first_stage: usize,
+        completed_for_first_stage: Arc<AtomicUsize>,
     ) -> Self {
         Self {
             stage,
             generators,
             pool_per_stage,
             num_for_first_stage,
+            completed_for_first_stage,
         }
     }
 }
@@ -52,30 +55,49 @@ impl TransactionGenerator for WorkflowTxnGenerator {
     fn generate_transactions(
         &mut self,
         account: &LocalAccount,
-        num_to_create: usize,
+        mut num_to_create: usize,
     ) -> Vec<SignedTransaction> {
-        if let StageTracking::WhenDone(stage_counter) = &self.stage {
-            let stage = stage_counter.load(Ordering::Relaxed);
-            if stage == 0 {
-                if self.pool_per_stage.get(0).unwrap().len() >= self.num_for_first_stage {
-                    info!("TransactionGenerator Workflow: Stage 0 is full with {} accounts, moving to stage 1", self.pool_per_stage.get(0).unwrap().len());
-                    let _ =
-                        stage_counter.compare_exchange(0, 1, Ordering::Relaxed, Ordering::Relaxed);
-                }
-            } else if stage < self.pool_per_stage.len()
-                && self.pool_per_stage.get(stage - 1).unwrap().len() == 0
-            {
-                info!("TransactionGenerator Workflow: Stage {} has consumed all accounts, moving to stage {}", stage, stage + 1);
-                let _ = stage_counter.compare_exchange(
-                    stage,
-                    stage + 1,
-                    Ordering::Relaxed,
-                    Ordering::Relaxed,
-                );
-            }
-        }
+        assert_ne!(num_to_create, 0);
+        let mut stage = self.stage.load_current_stage();
 
-        let stage = self.stage.load_current_stage();
+        match &self.stage {
+            StageTracking::WhenDone(stage_counter) => {
+                if stage == 0 {
+                    let prev = self.completed_for_first_stage.fetch_add(num_to_create, Ordering::Relaxed);
+                    num_to_create = cmp::min(num_to_create, self.num_for_first_stage.saturating_sub(prev));
+
+                    println!("TransactionGenerator Workflow: Stage 0: prev: {prev}, num_to_create: {num_to_create}");
+                    if num_to_create == 0 {
+                        info!("TransactionGenerator Workflow: Stage 0 is full with {} accounts, moving to stage 1", self.pool_per_stage.get(0).unwrap().len());
+                        let _ =
+                            stage_counter.compare_exchange(0, 1, Ordering::Relaxed, Ordering::Relaxed);
+                        stage = 1;
+                    }
+                } else if stage < self.pool_per_stage.len()
+                    && self.pool_per_stage.get(stage - 1).unwrap().len() == 0
+                {
+                    info!("TransactionGenerator Workflow: Stage {} has consumed all accounts, moving to stage {}", stage, stage + 1);
+                    let _ = stage_counter.compare_exchange(
+                        stage,
+                        stage + 1,
+                        Ordering::Relaxed,
+                        Ordering::Relaxed,
+                    );
+                    stage = stage + 1;
+                }
+            },
+            StageTracking::ExternallySet(_) => {
+                if stage == 0 {
+                    let prev = self.completed_for_first_stage.fetch_add(num_to_create, Ordering::Relaxed);
+                    num_to_create = cmp::min(num_to_create, self.num_for_first_stage.saturating_sub(prev));
+
+                    println!("TransactionGenerator Workflow: Stage 0: prev: {prev}, num_to_create: {num_to_create}");
+                    if num_to_create == 0 {
+                        return Vec::new();
+                    }
+                }
+            },
+        }
 
         sample!(
             SampleRate::Duration(Duration::from_millis(500)),
@@ -97,6 +119,7 @@ pub struct WorkflowTxnGeneratorCreator {
     creators: Vec<Box<dyn TransactionGeneratorCreator>>,
     pool_per_stage: Vec<Arc<ObjectPool<LocalAccount>>>,
     num_for_first_stage: usize,
+    completed_for_first_stage: Arc<AtomicUsize>,
 }
 
 impl WorkflowTxnGeneratorCreator {
@@ -111,6 +134,7 @@ impl WorkflowTxnGeneratorCreator {
             creators,
             pool_per_stage,
             num_for_first_stage,
+            completed_for_first_stage: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -121,6 +145,7 @@ impl WorkflowTxnGeneratorCreator {
         root_account: &mut LocalAccount,
         txn_executor: &dyn ReliableTransactionSubmitter,
         num_modules: usize,
+        initial_account_pool: Option<Arc<ObjectPool<LocalAccount>>>,
         cur_phase: Option<Arc<AtomicUsize>>,
     ) -> Self {
         let stage_tracking = cur_phase.map_or_else(
@@ -182,6 +207,7 @@ impl TransactionGeneratorCreator for WorkflowTxnGeneratorCreator {
                 .collect(),
             self.pool_per_stage.clone(),
             self.num_for_first_stage,
+            self.completed_for_first_stage.clone(),
         ))
     }
 }
