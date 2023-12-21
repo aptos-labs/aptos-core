@@ -193,38 +193,8 @@ pub fn run_benchmark<V>(
         pipeline_config.num_generator_workers,
     );
 
-    let mut start_time = Instant::now();
-    let start_gas_measurement = GasMeasuring::start();
-    let start_output_size = APTOS_PROCESSED_TXNS_OUTPUT_SIZE.get_sample_sum();
-    let start_partitioning_total = BLOCK_PARTITIONING_SECONDS.get_sample_sum();
-    let start_execution_total = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum();
-    let start_vm_only = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
-    let other_labels = vec![
-        ("1.", true, "verified_state_view"),
-        ("2.", true, "state_checkpoint"),
-        ("2.1.", false, "sort_transactions"),
-        ("2.2.", false, "calculate_for_transaction_block"),
-        ("2.2.1.", false, "get_sharded_state_updates"),
-        ("2.2.2.", false, "calculate_block_state_updates"),
-        ("2.2.3.", false, "calculate_usage"),
-        ("2.2.4.", false, "make_checkpoint"),
-    ];
+    let mut overall_measuring = OverallMeasuring::start();
 
-    let start_by_other = other_labels
-        .iter()
-        .map(|(_prefix, _top_level, other_label)| {
-            (
-                other_label.to_string(),
-                APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-                    .with_label_values(&[other_label])
-                    .get_sample_sum(),
-            )
-        })
-        .collect::<HashMap<_, _>>();
-    let start_ledger_update_total = APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS.get_sample_sum();
-    let start_commit_total = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum();
-
-    let start_vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
     if let Some(transaction_generators) = transaction_generators {
         generator.run_workload(
             block_size,
@@ -243,24 +213,12 @@ pub fn run_benchmark<V>(
         );
     }
     if pipeline_config.delay_execution_start {
-        start_time = Instant::now();
+        overall_measuring.start_time = Instant::now();
     }
     pipeline.start_execution();
     generator.drop_sender();
     pipeline.join();
 
-    let elapsed = start_time.elapsed().as_secs_f64();
-    let delta_v = (db.reader.get_latest_version().unwrap() - version - num_blocks as u64) as f64;
-    let delta_gas = start_gas_measurement.end();
-    let delta_output_size = APTOS_PROCESSED_TXNS_OUTPUT_SIZE.get_sample_sum() - start_output_size;
-
-    let delta_vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum() - start_vm_time;
-    info!(
-        "VM execution TPS {} txn/s; ({} / {})",
-        (delta_v / delta_vm_time) as usize,
-        delta_v,
-        delta_vm_time
-    );
     info!(
         "Executed workload {}",
         if let Some(mix) = transaction_mix {
@@ -269,79 +227,9 @@ pub fn run_benchmark<V>(
             "raw transfer".to_string()
         }
     );
-    info!("Overall TPS: {} txn/s", delta_v / elapsed);
-    info!("Overall GPS: {} gas/s", delta_gas.gas / elapsed);
-    info!(
-        "Overall effectiveGPS: {} gas/s",
-        delta_gas.effective_block_gas / elapsed
-    );
-    info!("Overall ioGPS: {} gas/s", delta_gas.io_gas / elapsed);
-    info!(
-        "Overall executionGPS: {} gas/s",
-        delta_gas.execution_gas / elapsed
-    );
-    info!(
-        "Overall GPT: {} gas/txn",
-        delta_gas.gas / (delta_gas.gas_count as f64).max(1.0)
-    );
-    info!(
-        "Overall approx_output: {} bytes/s",
-        delta_gas.approx_block_output / elapsed
-    );
-    info!("Overall output: {} bytes/s", delta_output_size / elapsed);
 
-    let time_in_partitioning =
-        BLOCK_PARTITIONING_SECONDS.get_sample_sum() - start_partitioning_total;
-
-    info!(
-        "Overall fraction of total: {:.3} in partitioning (component TPS: {})",
-        time_in_partitioning / elapsed,
-        delta_v / time_in_partitioning
-    );
-
-    let time_in_execution =
-        APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum() - start_execution_total;
-    info!(
-        "Overall fraction of total: {:.3} in execution (component TPS: {})",
-        time_in_execution / elapsed,
-        delta_v / time_in_execution
-    );
-    let time_in_vm = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum() - start_vm_only;
-    info!(
-        "Overall fraction of execution {:.3} in VM (component TPS: {})",
-        time_in_vm / time_in_execution,
-        delta_v / time_in_vm
-    );
-    for (prefix, top_level, other_label) in other_labels {
-        let time_in_label = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-            .with_label_values(&[other_label])
-            .get_sample_sum()
-            - start_by_other.get(other_label).unwrap();
-        if top_level || time_in_label / time_in_execution > 0.01 {
-            info!(
-                "Overall fraction of execution {:.3} in {} {} (component TPS: {})",
-                time_in_label / time_in_execution,
-                prefix,
-                other_label,
-                delta_v / time_in_label
-            );
-        }
-    }
-
-    let time_in_ledger_update =
-        APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS.get_sample_sum() - start_ledger_update_total;
-    info!(
-        "Overall fraction of total: {:.3} in ledger update (component TPS: {})",
-        time_in_ledger_update / elapsed,
-        delta_v / time_in_ledger_update
-    );
-
-    let time_in_commit = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum() - start_commit_total;
-    info!(
-        "Overall fraction of total: {:.4} in commit (component TPS: {})",
-        time_in_commit / elapsed,
-        delta_v / time_in_commit
-    );
+    let num_txns = db.reader.get_latest_version().unwrap() - version - num_blocks as u64;
+    overall_measuring.print_end("Overall", num_txns);
 
     if verify_sequence_numbers {
         generator.verify_sequence_numbers(db.reader.clone());
@@ -512,6 +400,7 @@ fn add_accounts_impl<V>(
     );
 }
 
+#[derive(Debug, Clone)]
 struct GasMeasurement {
     pub gas: f64,
     pub effective_block_gas: f64,
@@ -569,30 +458,212 @@ impl GasMeasurement {
             gas_count,
         }
     }
-}
 
-struct GasMeasuring {
-    start: GasMeasurement,
-}
+    pub fn elapsed_delta(self) -> Self {
+        let end = Self::now();
 
-impl GasMeasuring {
-    pub fn start() -> Self {
         Self {
-            start: GasMeasurement::now(),
+            gas: end.gas - self.gas,
+            effective_block_gas: end.effective_block_gas - self.effective_block_gas,
+            io_gas: end.io_gas - self.io_gas,
+            execution_gas: end.execution_gas - self.execution_gas,
+            approx_block_output: end.approx_block_output - self.approx_block_output,
+            gas_count: end.gas_count - self.gas_count,
+        }
+    }
+}
+
+static OTHER_LABELS: &[(&str, bool, &str)] = &[
+    ("1.", true, "verified_state_view"),
+    ("2.", true, "state_checkpoint"),
+    ("2.1.", false, "sort_transactions"),
+    ("2.2.", false, "calculate_for_transaction_block"),
+    ("2.2.1.", false, "get_sharded_state_updates"),
+    ("2.2.2.", false, "calculate_block_state_updates"),
+    ("2.2.3.", false, "calculate_usage"),
+    ("2.2.4.", false, "make_checkpoint"),
+];
+
+#[derive(Debug, Clone)]
+struct ExecutionTimeMeasurement {
+    output_size: f64,
+
+    partitioning_total: f64,
+    execution_total: f64,
+    vm_only: f64,
+    by_other: HashMap<&'static str, f64>,
+    ledger_update_total: f64,
+    commit_total: f64,
+
+    vm_time: f64,
+}
+
+impl ExecutionTimeMeasurement {
+    pub fn now() -> Self {
+        let output_size = APTOS_PROCESSED_TXNS_OUTPUT_SIZE.get_sample_sum();
+
+        let partitioning_total = BLOCK_PARTITIONING_SECONDS.get_sample_sum();
+        let execution_total = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum();
+        let vm_only = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
+
+        let by_other = OTHER_LABELS
+            .iter()
+            .map(|(_prefix, _top_level, other_label)| {
+                (
+                    *other_label,
+                    APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                        .with_label_values(&[other_label])
+                        .get_sample_sum(),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+        let ledger_update_total = APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS.get_sample_sum();
+        let commit_total = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum();
+
+        let vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
+
+        Self {
+            output_size,
+            partitioning_total,
+            execution_total,
+            vm_only,
+            by_other,
+            ledger_update_total,
+            commit_total,
+            vm_time,
         }
     }
 
-    pub fn end(self) -> GasMeasurement {
-        let end = GasMeasurement::now();
+    pub fn elapsed_delta(self) -> Self {
+        let end = Self::now();
 
-        GasMeasurement {
-            gas: end.gas - self.start.gas,
-            effective_block_gas: end.effective_block_gas - self.start.effective_block_gas,
-            io_gas: end.io_gas - self.start.io_gas,
-            execution_gas: end.execution_gas - self.start.execution_gas,
-            approx_block_output: end.approx_block_output - self.start.approx_block_output,
-            gas_count: end.gas_count - self.start.gas_count,
+        Self {
+            output_size: end.output_size - self.output_size,
+            partitioning_total: end.partitioning_total - self.partitioning_total,
+            execution_total: end.execution_total - self.execution_total,
+            vm_only: end.vm_only - self.vm_only,
+            by_other: end
+                .by_other
+                .into_iter()
+                .map(|(k, v)| (k, v - self.by_other.get(&k).unwrap()))
+                .collect::<HashMap<_, _>>(),
+            ledger_update_total: end.ledger_update_total - self.ledger_update_total,
+            commit_total: end.commit_total - self.commit_total,
+            vm_time: end.vm_time - self.vm_time,
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct OverallMeasuring {
+    start_time: Instant,
+    start_execution: ExecutionTimeMeasurement,
+    start_gas: GasMeasurement,
+}
+
+impl OverallMeasuring {
+    pub fn start() -> Self {
+        Self {
+            start_time: Instant::now(),
+            start_execution: ExecutionTimeMeasurement::now(),
+            start_gas: GasMeasurement::now(),
+        }
+    }
+
+    pub fn print_end(self, prefix: &str, num_txns: u64) {
+        let elapsed = self.start_time.elapsed().as_secs_f64();
+        let num_txns = num_txns as f64;
+        let delta_execution = self.start_execution.elapsed_delta();
+        let delta_gas = self.start_gas.elapsed_delta();
+
+        info!(
+            "{} TPS: {} txn/s (over {} txns, in {} s)",
+            prefix,
+            num_txns / elapsed,
+            num_txns,
+            elapsed
+        );
+        info!(
+            "{} VM execution TPS {} txn/s; ({} / {})",
+            prefix,
+            (num_txns / delta_execution.vm_time) as usize,
+            num_txns,
+            delta_execution.vm_time
+        );
+        info!("{} GPS: {} gas/s", prefix, delta_gas.gas / elapsed);
+        info!(
+            "{} effectiveGPS: {} gas/s",
+            prefix,
+            delta_gas.effective_block_gas / elapsed
+        );
+        info!("{} ioGPS: {} gas/s", prefix, delta_gas.io_gas / elapsed);
+        info!(
+            "{} executionGPS: {} gas/s",
+            prefix,
+            delta_gas.execution_gas / elapsed
+        );
+        info!(
+            "{} GPT: {} gas/txn",
+            prefix,
+            delta_gas.gas / (delta_gas.gas_count as f64).max(1.0)
+        );
+        info!(
+            "{} approx_output: {} bytes/s",
+            prefix,
+            delta_gas.approx_block_output / elapsed
+        );
+        info!(
+            "{} output: {} bytes/s",
+            prefix,
+            delta_execution.output_size / elapsed
+        );
+
+        info!(
+            "{} fraction of total: {:.3} in partitioning (component TPS: {})",
+            prefix,
+            delta_execution.partitioning_total / elapsed,
+            num_txns / delta_execution.partitioning_total
+        );
+
+        info!(
+            "{} fraction of total: {:.3} in execution (component TPS: {})",
+            prefix,
+            delta_execution.execution_total / elapsed,
+            num_txns / delta_execution.execution_total
+        );
+        info!(
+            "{} fraction of execution {:.3} in VM (component TPS: {})",
+            prefix,
+            delta_execution.vm_only / delta_execution.execution_total,
+            num_txns / delta_execution.vm_only
+        );
+        for (prefix, top_level, other_label) in OTHER_LABELS {
+            let time_in_label = delta_execution.by_other.get(other_label).unwrap();
+            if *top_level || time_in_label / delta_execution.execution_total > 0.01 {
+                info!(
+                    "{} fraction of execution {:.3} in {} {} (component TPS: {})",
+                    prefix,
+                    time_in_label / delta_execution.execution_total,
+                    prefix,
+                    other_label,
+                    num_txns / time_in_label
+                );
+            }
+        }
+
+        info!(
+            "{} fraction of total: {:.3} in ledger update (component TPS: {})",
+            prefix,
+            delta_execution.ledger_update_total / elapsed,
+            num_txns / delta_execution.ledger_update_total
+        );
+
+        info!(
+            "{} fraction of total: {:.4} in commit (component TPS: {})",
+            prefix,
+            delta_execution.commit_total / elapsed,
+            num_txns / delta_execution.commit_total
+        );
     }
 }
 
