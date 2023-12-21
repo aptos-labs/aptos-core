@@ -13,7 +13,7 @@ use crate::{
             AugDataCertBuilder, CertifiedAugDataAckState, ShareAggregateState,
         },
         storage::interface::{AugDataStorage, RandStorage},
-        types::{AugmentedData, Proof, RandConfig, RequestShare, Share},
+        types::{AugmentedData, CertifiedAugData, Proof, RandConfig, RequestShare, Share},
     },
 };
 use aptos_bounded_executor::BoundedExecutor;
@@ -213,23 +213,38 @@ impl<
         DropGuard::new(abort_handle)
     }
 
-    fn broadcast_aug_data(&self) -> DropGuard {
-        let data = D::generate(&self.config);
+    async fn broadcast_aug_data(&mut self) -> CertifiedAugData<D> {
+        if let Some(certified_data) = self.aug_data_store.get_my_certified_aug_data() {
+            info!("[RandManager] Already have certified aug data");
+            return certified_data;
+        }
+        let data = self
+            .aug_data_store
+            .get_my_aug_data()
+            .unwrap_or_else(|| D::generate(&self.config));
+        // Add it synchronously to avoid race that it sends to others but panics before it persists locally.
+        self.aug_data_store
+            .add_aug_data(data.clone())
+            .expect("Add self aug data should succeed");
         let aug_ack = AugDataCertBuilder::new(data.clone(), self.epoch_state.clone());
         let rb = self.reliable_broadcast.clone();
-        let rb2 = self.reliable_broadcast.clone();
-        let first_phase = async move {
-            info!("[RandManager] Start broadcasting aug data");
-            let data = rb.broadcast(data, aug_ack).await;
-            info!("[RandManager] Finish broadcasting aug data");
-            data
-        };
+        info!("[RandManager] Start broadcasting aug data");
+        let certified_data = rb.broadcast(data, aug_ack).await;
+        info!("[RandManager] Finish broadcasting aug data");
+        certified_data
+    }
+
+    fn broadcast_certified_aug_data(&mut self, certified_data: CertifiedAugData<D>) -> DropGuard {
+        let rb = self.reliable_broadcast.clone();
         let validators = self.epoch_state.verifier.get_ordered_account_addresses();
+        // Add it synchronously to be able to sign without a race that we get to sign before the broadcast reaches aug store.
+        self.aug_data_store
+            .add_certified_aug_data(certified_data.clone())
+            .expect("Add self aug data should succeed");
         let task = async move {
-            let cert = first_phase.await;
             let ack_state = Arc::new(CertifiedAugDataAckState::new(validators.into_iter()));
             info!("[RandManager] Start broadcasting certified aug data");
-            rb2.broadcast(cert, ack_state).await;
+            rb.broadcast(certified_data, ack_state).await;
             info!("[RandManager] Finish broadcasting certified aug data");
         };
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
@@ -259,7 +274,8 @@ impl<
             )
         );
 
-        let _guard = self.broadcast_aug_data();
+        let certified_data = self.broadcast_aug_data().await;
+        let _guard = self.broadcast_certified_aug_data(certified_data);
 
         while !self.stop {
             tokio::select! {

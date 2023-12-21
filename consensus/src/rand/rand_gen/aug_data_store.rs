@@ -78,8 +78,16 @@ impl<D: AugmentedData, Storage: AugDataStorage<D>> AugDataStore<D, Storage> {
         }
     }
 
+    pub fn get_my_aug_data(&self) -> Option<AugData<D>> {
+        self.data.get(self.config.author()).cloned()
+    }
+
+    pub fn get_my_certified_aug_data(&self) -> Option<CertifiedAugData<D>> {
+        self.certified_data.get(self.config.author()).cloned()
+    }
+
     pub fn add_aug_data(&mut self, data: AugData<D>) -> anyhow::Result<AugDataSignature> {
-        if let Some(existing_data) = self.data.get(&data.author()) {
+        if let Some(existing_data) = self.data.get(data.author()) {
             ensure!(
                 existing_data == &data,
                 "[AugDataStore] equivocate data from {}",
@@ -89,19 +97,23 @@ impl<D: AugmentedData, Storage: AugDataStorage<D>> AugDataStore<D, Storage> {
             self.db.save_aug_data(&data)?;
         }
         let sig = AugDataSignature::new(self.epoch, self.signer.sign(&data)?);
-        self.data.insert(data.author(), data);
+        self.data.insert(*data.author(), data);
         Ok(sig)
     }
 
     pub fn add_certified_aug_data(
         &mut self,
-        data: CertifiedAugData<D>,
+        certified_data: CertifiedAugData<D>,
     ) -> anyhow::Result<CertifiedAugDataAck> {
-        if self.certified_data.contains_key(&data.author()) {
+        if self.certified_data.contains_key(certified_data.author()) {
             return Ok(CertifiedAugDataAck::new(self.epoch));
         }
-        self.db.save_certified_aug_data(&data)?;
-        self.certified_data.insert(data.author(), data);
+        self.db.save_certified_aug_data(&certified_data)?;
+        certified_data
+            .data()
+            .augment(&self.config, certified_data.author());
+        self.certified_data
+            .insert(*certified_data.author(), certified_data);
         Ok(CertifiedAugDataAck::new(self.epoch))
     }
 }
