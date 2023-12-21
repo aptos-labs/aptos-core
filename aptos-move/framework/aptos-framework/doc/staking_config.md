@@ -24,6 +24,8 @@ Provides the configuration for staking and rewards
 -  [Function `update_rewards_rate`](#0x1_staking_config_update_rewards_rate)
 -  [Function `update_rewards_config`](#0x1_staking_config_update_rewards_config)
 -  [Function `update_voting_power_increase_limit`](#0x1_staking_config_update_voting_power_increase_limit)
+-  [Function `lock`](#0x1_staking_config_lock)
+-  [Function `unlock`](#0x1_staking_config_unlock)
 -  [Function `validate_required_stake`](#0x1_staking_config_validate_required_stake)
 -  [Function `validate_rewards_config`](#0x1_staking_config_validate_rewards_config)
 -  [Specification](#@Specification_1)
@@ -882,6 +884,56 @@ Can only be called as part of the Aptos governance proposal process established 
 
     <b>let</b> <a href="staking_config.md#0x1_staking_config">staking_config</a> = <b>borrow_global_mut</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
     <a href="staking_config.md#0x1_staking_config">staking_config</a>.voting_power_increase_limit = new_voting_power_increase_limit;
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_staking_config_lock"></a>
+
+## Function `lock`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="staking_config.md#0x1_staking_config_lock">lock</a>()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="staking_config.md#0x1_staking_config_lock">lock</a>() <b>acquires</b> <a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a> {
+    <b>let</b> config = <b>borrow_global_mut</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
+    config.allow_validator_set_change = <b>false</b>;
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_staking_config_unlock"></a>
+
+## Function `unlock`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="staking_config.md#0x1_staking_config_unlock">unlock</a>()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="staking_config.md#0x1_staking_config_unlock">unlock</a>() <b>acquires</b> <a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a> {
+    <b>let</b> config = <b>borrow_global_mut</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
+    config.allow_validator_set_change = <b>true</b>;
 }
 </code></pre>
 

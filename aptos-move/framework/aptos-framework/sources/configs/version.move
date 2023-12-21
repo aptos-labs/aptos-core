@@ -1,5 +1,6 @@
 /// Maintains the version number for the blockchain.
 module aptos_framework::version {
+    use std::config_for_next_epoch;
     use std::error;
     use std::signer;
 
@@ -7,8 +8,9 @@ module aptos_framework::version {
     use aptos_framework::system_addresses;
 
     friend aptos_framework::genesis;
+    friend aptos_framework::reconfiguration_with_dkg;
 
-    struct Version has key {
+    struct Version has drop, key, store {
         major: u64,
     }
 
@@ -18,6 +20,7 @@ module aptos_framework::version {
     const EINVALID_MAJOR_VERSION_NUMBER: u64 = 1;
     /// Account is not authorized to make this change.
     const ENOT_AUTHORIZED: u64 = 2;
+    const EAPI_DISABLED: u64 = 3;
 
     /// Only called during genesis.
     /// Publishes the Version config.
@@ -33,6 +36,7 @@ module aptos_framework::version {
     /// Updates the major version to a larger version.
     /// This can be called by on chain governance.
     public entry fun set_version(account: &signer, major: u64) acquires Version {
+        assert!(!std::features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
         assert!(exists<SetVersionCapability>(signer::address_of(account)), error::permission_denied(ENOT_AUTHORIZED));
 
         let old_major = borrow_global<Version>(@aptos_framework).major;
@@ -43,6 +47,23 @@ module aptos_framework::version {
 
         // Need to trigger reconfiguration so validator nodes can sync on the updated version.
         reconfiguration::reconfigure();
+    }
+
+    /// Updates the major version to a larger version.
+    /// This can be called by on chain governance.
+    public entry fun set_for_next_epoch(account: &signer, major: u64) acquires Version {
+        assert!(std::features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
+        assert!(exists<SetVersionCapability>(signer::address_of(account)), error::permission_denied(ENOT_AUTHORIZED));
+        let old_major = borrow_global<Version>(@aptos_framework).major;
+        assert!(old_major < major, error::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER));
+        config_for_next_epoch::upsert(account, Version {major});
+    }
+
+    public(friend) fun on_new_epoch(account: &signer) acquires Version {
+        assert!(std::features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
+        if (config_for_next_epoch::does_exist<Version>()) {
+            *borrow_global_mut<Version>(@aptos_framework) = config_for_next_epoch::extract<Version>(account);
+        }
     }
 
     /// Only called in tests and testnets. This allows the core resources account, which only exists in tests/testnets,

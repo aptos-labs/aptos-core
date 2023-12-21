@@ -935,6 +935,16 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 ## Constants
 
 
+<a id="0x1_vesting_EPERMISSION_DENIED"></a>
+
+Account is not admin or does not have the required role to take this action.
+
+
+<pre><code><b>const</b> <a href="vesting.md#0x1_vesting_EPERMISSION_DENIED">EPERMISSION_DENIED</a>: u64 = 15;
+</code></pre>
+
+
+
 <a id="0x1_vesting_EEMPTY_VESTING_SCHEDULE"></a>
 
 Vesting schedule cannot be empty.
@@ -981,16 +991,6 @@ Cannot terminate the vesting contract with pending active stake. Need to wait un
 
 
 <pre><code><b>const</b> <a href="vesting.md#0x1_vesting_EPENDING_STAKE_FOUND">EPENDING_STAKE_FOUND</a>: u64 = 11;
-</code></pre>
-
-
-
-<a id="0x1_vesting_EPERMISSION_DENIED"></a>
-
-Account is not admin or does not have the required role to take this action.
-
-
-<pre><code><b>const</b> <a href="vesting.md#0x1_vesting_EPERMISSION_DENIED">EPERMISSION_DENIED</a>: u64 = 15;
 </code></pre>
 
 

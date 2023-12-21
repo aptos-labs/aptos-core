@@ -11,6 +11,7 @@ module aptos_framework::staking_config {
 
     friend aptos_framework::genesis;
     friend aptos_framework::stake;
+    friend aptos_framework::block;
 
     /// Stake lockup duration cannot be zero.
     const EZERO_LOCKUP_DURATION: u64 = 1;
@@ -350,6 +351,16 @@ module aptos_framework::staking_config {
 
         let staking_config = borrow_global_mut<StakingConfig>(@aptos_framework);
         staking_config.voting_power_increase_limit = new_voting_power_increase_limit;
+    }
+
+    public(friend) fun lock() acquires StakingConfig {
+        let config = borrow_global_mut<StakingConfig>(@aptos_framework);
+        config.allow_validator_set_change = false;
+    }
+
+    public(friend) fun unlock() acquires StakingConfig {
+        let config = borrow_global_mut<StakingConfig>(@aptos_framework);
+        config.allow_validator_set_change = true;
     }
 
     fun validate_required_stake(minimum_stake: u64, maximum_stake: u64) {

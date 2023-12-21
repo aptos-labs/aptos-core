@@ -1,6 +1,7 @@
 /// Maintains the consensus config for the blockchain. The config is stored in a
 /// Reconfiguration, and may be updated by root.
 module aptos_framework::consensus_config {
+    use std::config_for_next_epoch;
     use std::error;
     use std::vector;
 
@@ -8,13 +9,15 @@ module aptos_framework::consensus_config {
     use aptos_framework::system_addresses;
 
     friend aptos_framework::genesis;
+    friend aptos_framework::reconfiguration_with_dkg;
 
-    struct ConsensusConfig has key {
+    struct ConsensusConfig has drop, key, store {
         config: vector<u8>,
     }
 
     /// The provided on chain config bytes are empty or invalid
     const EINVALID_CONFIG: u64 = 1;
+    const EAPI_DISABLED: u64 = 2;
 
     /// Publishes the ConsensusConfig config.
     public(friend) fun initialize(aptos_framework: &signer, config: vector<u8>) {
@@ -25,6 +28,7 @@ module aptos_framework::consensus_config {
 
     /// This can be called by on-chain governance to update on-chain consensus configs.
     public fun set(account: &signer, config: vector<u8>) acquires ConsensusConfig {
+        assert!(!std::features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
         system_addresses::assert_aptos_framework(account);
         assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
 
@@ -33,5 +37,19 @@ module aptos_framework::consensus_config {
 
         // Need to trigger reconfiguration so validator nodes can sync on the updated configs.
         reconfiguration::reconfigure();
+    }
+
+    public fun set_for_next_epoch(account: &signer, config: vector<u8>) {
+        assert!(std::features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
+        system_addresses::assert_aptos_framework(account);
+        assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
+        std::config_for_next_epoch::upsert<ConsensusConfig>(account, ConsensusConfig {config});
+    }
+
+    public(friend) fun on_new_epoch(account: &signer) acquires ConsensusConfig {
+        assert!(std::features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
+        if (config_for_next_epoch::does_exist<ConsensusConfig>()) {
+            *borrow_global_mut<ConsensusConfig>(@aptos_framework) = std::config_for_next_epoch::extract(account);
+        }
     }
 }

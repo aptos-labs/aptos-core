@@ -23,6 +23,7 @@
 /// is a public function. However, once the feature flag is disabled, those functions can constantly
 /// return true.
 module std::features {
+    use std::config_for_next_epoch;
     use std::error;
     use std::signer;
     use std::vector;
@@ -332,6 +333,17 @@ module std::features {
         is_enabled(BN254_STRUCTURES)
     }
 
+    /// If enabled:
+    /// - Buffer on-chain config changes.
+    /// - At the end of every epoch, lock on-chain configs, perform a DKG, unlock on-chain configs, and enter the new epoch.
+    ///
+    /// Lifetime: transient
+    const RECONFIGURE_WITH_DKG: u64 = 45;
+    public fun get_reconfigure_with_dkg_feature(): u64 { RECONFIGURE_WITH_DKG }
+    public fun reconfigure_with_dkg_enabled(): bool acquires Features {
+        is_enabled(RECONFIGURE_WITH_DKG)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
@@ -339,7 +351,7 @@ module std::features {
     const EFRAMEWORK_SIGNER_NEEDED: u64 = 1;
 
     /// The enabled features, represented by a bitset stored on chain.
-    struct Features has key {
+    struct Features has copy, drop, key, store {
         features: vector<u8>,
     }
 
@@ -350,13 +362,33 @@ module std::features {
         if (!exists<Features>(@std)) {
             move_to<Features>(framework, Features { features: vector[] })
         };
-        let features = &mut borrow_global_mut<Features>(@std).features;
-        vector::for_each_ref(&enable, |feature| {
-            set(features, *feature, true);
-        });
-        vector::for_each_ref(&disable, |feature| {
-            set(features, *feature, false);
-        });
+        apply_diff(borrow_global_mut<Features>(@std), enable, disable);
+    }
+
+    /// Function to enable and disable features. Can only be called by a signer of @std.
+    public fun change_feature_flags_for_next_epoch(framework: &signer, enable: vector<u64>, disable: vector<u64>)
+    acquires Features {
+        assert!(signer::address_of(framework) == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
+        let features = if (config_for_next_epoch::does_exist<Features>()) {
+            config_for_next_epoch::extract<Features>(framework)
+        } else if (exists<Features>(@std)) {
+            *borrow_global<Features>(@std)
+        } else {
+            Features { features: vector[] }
+        };
+        apply_diff(&mut features, enable, disable);
+        config_for_next_epoch::upsert(framework, features);
+    }
+
+    /// Apply all the pending feature flag changes. Should only be used at the end of a reconfiguration with DKG.
+    ///
+    /// While the scope is public, it can only be usd in system transactions like `block_prologue` and governance proposals,
+    /// who have permission to set the flag that's checked in `extract()`.
+    public fun on_new_epoch(account: &signer) acquires Features {
+        if (config_for_next_epoch::does_exist<Features>()) {
+            let features = config_for_next_epoch::extract<Features>(account);
+            *borrow_global_mut<Features>(@std) = features;
+        }
     }
 
     #[view]
@@ -385,6 +417,15 @@ module std::features {
         let byte_index = feature / 8;
         let bit_mask = 1 << ((feature % 8) as u8);
         byte_index < vector::length(features) && (*vector::borrow(features, byte_index) & bit_mask) != 0
+    }
+
+    fun apply_diff(features: &mut Features, enable: vector<u64>, disable: vector<u64>) {
+        vector::for_each_ref(&enable, |feature| {
+            set(&mut features.features, *feature, true);
+        });
+        vector::for_each_ref(&disable, |feature| {
+            set(&mut features.features, *feature, false);
+        });
     }
 
     #[test]

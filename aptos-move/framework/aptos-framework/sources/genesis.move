@@ -130,6 +130,8 @@ module aptos_framework::genesis {
         block::initialize(&aptos_framework_account, epoch_interval_microsecs);
         state_storage::initialize(&aptos_framework_account);
         timestamp::set_time_has_started(&aptos_framework_account);
+        dkg::initialize(&aptos_framework_account);
+        debug::print(&std::string::utf8(b"genesis::initialization() finished."));
     }
 
     /// Genesis step 2: Initialize Aptos coin.
@@ -365,7 +367,7 @@ module aptos_framework::genesis {
             validator.consensus_pubkey,
             validator.proof_of_possession,
         );
-        stake::update_network_and_fullnode_addresses(
+        stake::force_update_network_and_fullnode_addresses(
             operator,
             pool_address,
             validator.network_addresses,
@@ -381,6 +383,8 @@ module aptos_framework::genesis {
 
     #[verify_only]
     use std::features;
+    use aptos_std::debug;
+    use aptos_framework::dkg;
 
     #[verify_only]
     fun initialize_for_verification(

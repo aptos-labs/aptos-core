@@ -31,6 +31,7 @@ module aptos_framework::aptos_governance {
     use aptos_framework::staking_config;
     use aptos_framework::system_addresses;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
+    use aptos_framework::reconfiguration_with_dkg;
     use aptos_framework::timestamp;
     use aptos_framework::voting;
 
@@ -60,6 +61,7 @@ module aptos_framework::aptos_governance {
     const EPARTIAL_VOTING_NOT_INITIALIZED: u64 = 13;
     /// The proposal in the argument is not a partial voting proposal.
     const ENOT_PARTIAL_VOTING_PROPOSAL: u64 = 14;
+    const EAPI_DISABLED: u64 = 15;
 
     /// This matches the same enum const in voting. We have to duplicate it as Move doesn't have support for enums yet.
     const PROPOSAL_STATE_SUCCEEDED: u64 = 1;
@@ -538,8 +540,28 @@ module aptos_framework::aptos_governance {
 
     /// Force reconfigure. To be called at the end of a proposal that alters on-chain configs.
     public fun reconfigure(aptos_framework: &signer) {
+        assert!(!features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
         system_addresses::assert_aptos_framework(aptos_framework);
         reconfiguration::reconfigure();
+    }
+
+    /// Manully start a reconfiguration with DKG.
+    /// Can be called at the end of a series of proposals that alters on-chain configs.
+    ///
+    public fun trigger_reconfiguration_with_dkg(aptos_framework: &signer) {
+        assert!(features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
+        system_addresses::assert_aptos_framework(aptos_framework);
+        reconfiguration_with_dkg::start(aptos_framework);
+    }
+
+    /// Apply all the pending config changes and start a new epoch, regardless of DKG status.
+    /// Can be used in emergency (e.g., when DKG is stuck).
+    ///
+    /// NOTE: there will be no randomness in the new epoch.
+    public fun force_finish_reconfiguration_with_dkg(aptos_framework: &signer) {
+        assert!(features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
+        system_addresses::assert_aptos_framework(aptos_framework);
+        reconfiguration_with_dkg::finish(aptos_framework);
     }
 
     /// Update feature flags and also trigger reconfiguration.

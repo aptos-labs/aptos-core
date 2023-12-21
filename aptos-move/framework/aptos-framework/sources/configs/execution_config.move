@@ -1,6 +1,7 @@
 /// Maintains the execution config for the blockchain. The config is stored in a
 /// Reconfiguration, and may be updated by root.
 module aptos_framework::execution_config {
+    use std::config_for_next_epoch;
     use std::error;
     use std::vector;
 
@@ -8,16 +9,19 @@ module aptos_framework::execution_config {
     use aptos_framework::system_addresses;
 
     friend aptos_framework::genesis;
+    friend aptos_framework::reconfiguration_with_dkg;
 
-    struct ExecutionConfig has key {
+    struct ExecutionConfig has drop, key, store {
         config: vector<u8>,
     }
 
     /// The provided on chain config bytes are empty or invalid
     const EINVALID_CONFIG: u64 = 1;
+    const EAPI_DISABLED: u64 = 2;
 
     /// This can be called by on-chain governance to update on-chain execution configs.
     public fun set(account: &signer, config: vector<u8>) acquires ExecutionConfig {
+        assert!(!std::features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
         system_addresses::assert_aptos_framework(account);
         assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
 
@@ -29,5 +33,22 @@ module aptos_framework::execution_config {
         };
         // Need to trigger reconfiguration so validator nodes can sync on the updated configs.
         reconfiguration::reconfigure();
+    }
+
+    /// This can be called by on-chain governance to update on-chain execution configs.
+    public fun set_for_next_epoch(account: &signer, config: vector<u8>) {
+        assert!(std::features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
+        system_addresses::assert_aptos_framework(account);
+        assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
+        config_for_next_epoch::upsert(account, ExecutionConfig { config });
+    }
+
+    /// Only used in reconfiguration with DKG.
+    public(friend) fun on_new_epoch(account: &signer) acquires ExecutionConfig {
+        assert!(std::features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
+        if (config_for_next_epoch::does_exist<ExecutionConfig>()) {
+            let config = config_for_next_epoch::extract<ExecutionConfig>(account);
+            *borrow_global_mut<ExecutionConfig>(@aptos_framework) = config;
+        }
     }
 }
