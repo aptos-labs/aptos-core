@@ -148,7 +148,7 @@ impl DagDriver {
                         highest_strong_links_round,
                         &self.epoch_state.verifier,
                     )
-                    .unwrap_or(vec![]),
+                    .unwrap_or_default(),
             )
         };
         self.round_state

@@ -811,14 +811,8 @@ fn test_get_conflicting_grps_transfer_indices() {
             for (sender_idx, receiver_idx) in transfer_indices {
                 assert!(sender_idx < num_signer_accounts);
                 assert!(receiver_idx < num_signer_accounts);
-                adj_list
-                    .entry(sender_idx)
-                    .or_insert(HashSet::new())
-                    .insert(receiver_idx);
-                adj_list
-                    .entry(receiver_idx)
-                    .or_insert(HashSet::new())
-                    .insert(sender_idx);
+                adj_list.entry(sender_idx).or_default().insert(receiver_idx);
+                adj_list.entry(receiver_idx).or_default().insert(sender_idx);
             }
 
             assert_eq!(get_num_connected_components(&adj_list), connected_txn_grps);

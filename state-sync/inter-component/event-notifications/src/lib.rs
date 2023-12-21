@@ -14,7 +14,6 @@ use aptos_types::{
     contract_event::ContractEvent,
     event::EventKey,
     move_resource::MoveStorage,
-    on_chain_config,
     on_chain_config::{OnChainConfig, OnChainConfigPayload, OnChainConfigProvider},
     state_store::account_with_state_view::AsAccountWithStateView,
     transaction::Version,
@@ -203,13 +202,6 @@ impl EventSubscriptionService {
         self.subscription_id_generator.next()
     }
 
-    fn is_new_epoch_event(&self, event: &ContractEvent) -> bool {
-        match event {
-            ContractEvent::V1(evt) => *evt.key() == on_chain_config::new_epoch_event_key(),
-            ContractEvent::V2(_) => false,
-        }
-    }
-
     /// This notifies all the event subscribers of the new events found at the
     /// specified version. If a reconfiguration event (i.e., new epoch) is found,
     /// this method will return true.
@@ -248,7 +240,7 @@ impl EventSubscriptionService {
             }
 
             // Take note if a reconfiguration (new epoch) has occurred
-            if self.is_new_epoch_event(event) {
+            if event.is_new_epoch_event() {
                 reconfig_event_found = true;
             }
         }

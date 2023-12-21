@@ -9,5 +9,8 @@ use clap::Parser;
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = ServerArgs::parse();
-    args.run::<IndexerGrpcFileStoreWorkerConfig>().await
+    args.run::<IndexerGrpcFileStoreWorkerConfig>()
+        .await
+        .expect("Failed to run server");
+    Ok(())
 }

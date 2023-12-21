@@ -61,7 +61,7 @@ impl PipelineExecutionResult {
 type NotificationType = (
     Box<dyn FnOnce() + Send + Sync>,
     Vec<Transaction>,
-    Vec<ContractEvent>,
+    Vec<ContractEvent>, // Subscribable events, e.g. NewEpochEvent, DKGStartEvent
 );
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Hash)]
@@ -105,10 +105,10 @@ impl ExecutionProxy {
             aptos_channels::new::<NotificationType>(10, &counters::PENDING_STATE_SYNC_NOTIFICATION);
         let notifier = state_sync_notifier.clone();
         handle.spawn(async move {
-            while let Some((callback, txns, reconfig_events)) = rx.next().await {
+            while let Some((callback, txns, subscribable_events)) = rx.next().await {
                 if let Err(e) = monitor!(
                     "notify_state_sync",
-                    notifier.notify_new_commit(txns, reconfig_events).await
+                    notifier.notify_new_commit(txns, subscribable_events).await
                 ) {
                     error!(error = ?e, "Failed to notify state synchronizer");
                 }
@@ -204,10 +204,9 @@ impl StateComputer for ExecutionProxy {
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
         let mut latest_logical_time = self.write_mutex.lock().await;
-
         let mut block_ids = Vec::new();
         let mut txns = Vec::new();
-        let mut reconfig_events = Vec::new();
+        let mut subscribable_txn_events = Vec::new();
         let mut payloads = Vec::new();
         let logical_time = LogicalTime::new(
             finality_proof.ledger_info().epoch(),
@@ -229,7 +228,7 @@ impl StateComputer for ExecutionProxy {
                 block.validator_txns().cloned().unwrap_or_default(),
                 input_txns,
             ));
-            reconfig_events.extend(block.reconfig_event());
+            subscribable_txn_events.extend(block.subscribable_events());
         }
 
         let executor = self.executor.clone();
@@ -251,7 +250,7 @@ impl StateComputer for ExecutionProxy {
         };
         self.async_state_sync_notifier
             .clone()
-            .send((Box::new(wrapped_callback), txns, reconfig_events))
+            .send((Box::new(wrapped_callback), txns, subscribable_txn_events))
             .await
             .expect("Failed to send async state sync notification");
 
@@ -430,7 +429,7 @@ async fn test_commit_sync_race() {
         async fn notify_new_commit(
             &self,
             _transactions: Vec<Transaction>,
-            _reconfiguration_events: Vec<ContractEvent>,
+            _subscribable_events: Vec<ContractEvent>,
         ) -> std::result::Result<(), Error> {
             Ok(())
         }
@@ -471,6 +470,7 @@ async fn test_commit_sync_race() {
         &tokio::runtime::Handle::current(),
         TransactionFilter::new(Filter::empty()),
     );
+
     executor.new_epoch(
         &EpochState::empty(),
         Arc::new(PayloadManager::DirectMempool),

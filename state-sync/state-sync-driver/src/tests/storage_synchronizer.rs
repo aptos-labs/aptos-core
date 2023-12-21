@@ -57,7 +57,7 @@ async fn test_apply_transaction_outputs() {
         .returning(|_, _, _| Ok(()));
     chunk_executor.expect_update_ledger().returning(|| Ok(()));
     let expected_commit_return = Ok(ChunkCommitNotification {
-        committed_events: vec![event_to_commit.clone()],
+        subscribable_events: vec![event_to_commit.clone()],
         committed_transactions: vec![transaction_to_commit.clone()],
         reconfiguration_occurred: false,
     });
@@ -360,7 +360,7 @@ async fn test_execute_transactions() {
         .with(always(), always(), always())
         .returning(|_, _, _| Ok(()));
     let expected_commit_return = Ok(ChunkCommitNotification {
-        committed_events: vec![event_to_commit.clone()],
+        subscribable_events: vec![event_to_commit.clone()],
         committed_transactions: vec![transaction_to_commit.clone()],
         reconfiguration_occurred: false,
     });

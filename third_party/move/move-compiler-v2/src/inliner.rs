@@ -668,10 +668,8 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         for arg_exp in non_lambda_function_args {
             env.error(
                 &env.get_node_loc(arg_exp.as_ref().node_id()),
-                concat!(
-                    "Currently, a function-typed parameter to an inline function",
-                    " must be a literal lambda expression",
-                ),
+                "Currently, a function-typed parameter to an inline function \
+                 must be a literal lambda expression",
             );
         }
 
@@ -757,37 +755,36 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
     /// Also check for Break or Continue inside a lambda and not inside a loop.
     fn check_for_return_break_continue_in_lambda(env: &GlobalEnv, lambda_body: &Exp) {
         let mut in_loop = 0;
-        lambda_body.visit_pre_post(&mut |up, e| match e {
-            ExpData::Loop(..) if !up => {
-                in_loop += 1;
-            },
-            ExpData::Loop(..) if up => {
-                in_loop -= 1;
-            },
-            ExpData::Return(node_id, _) if !up => {
-                let node_loc = env.get_node_loc(*node_id);
-                env.error(
-                    &node_loc,
-                    concat!(
-                        "Return not currently supported in function-typed arguments",
-                        " (lambda expressions)"
-                    ),
-                )
-            },
-            ExpData::LoopCont(node_id, is_continue) if !up && in_loop == 0 => {
-                let node_loc = env.get_node_loc(*node_id);
-                env.error(
-                    &node_loc,
-                    &format!(
-                        concat!(
-                            "{} outside of a loop not supported in function-typed arguments",
-                            " (lambda expressions)"
+        lambda_body.visit_pre_post(&mut |post, e| {
+            match e {
+                ExpData::Loop(..) if !post => {
+                    in_loop += 1;
+                },
+                ExpData::Loop(..) if post => {
+                    in_loop -= 1;
+                },
+                ExpData::Return(node_id, _) if !post => {
+                    let node_loc = env.get_node_loc(*node_id);
+                    env.error(
+                        &node_loc,
+                        "Return not currently supported in function-typed arguments \
+                         (lambda expressions)",
+                    )
+                },
+                ExpData::LoopCont(node_id, is_continue) if !post && in_loop == 0 => {
+                    let node_loc = env.get_node_loc(*node_id);
+                    env.error(
+                        &node_loc,
+                        &format!(
+                            "{} outside of a loop not supported in function-typed arguments \
+                             (lambda expressions)",
+                            if *is_continue { "Continue" } else { "Break" }
                         ),
-                        if *is_continue { "Continue" } else { "Break" }
-                    ),
-                )
-            },
-            _ => {},
+                    )
+                },
+                _ => {},
+            }
+            true // keep going
         });
     }
 
@@ -805,14 +802,8 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         let tuple_args: Vec<Pattern> = parameters
             .iter()
             .map(|param| {
-                let Parameter(sym, ty) = *param;
-                // TODO(10731): ideally, each Parameter has its own loc.  For now, we use the
-                // function location.  body should have types rewritten, other inlining complete,
-                // lambdas inlined, etc.
-                let id = env.new_node(
-                    function_loc.clone().inlined_from(call_site_loc),
-                    ty.instantiate(self.type_args),
-                );
+                let Parameter(sym, ty, loc) = *param;
+                let id = env.new_node(loc.clone(), ty.instantiate(self.type_args));
                 if let Some(new_sym) = self.shadow_stack.get_shadow_symbol(*sym, true) {
                     Pattern::Var(id, new_sym)
                 } else {
@@ -987,12 +978,14 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         }
     }
 
-    /// Convert a single-variable pattern into a `Pattern::Tuple` if needed.
+    /// Convert any non-`Tuple` pattern `pat` into a a singleton `Pattern::Tuple` if needed,
+    /// for convenience in matching it to a `Tuple` of expressions.
     fn make_lambda_pattern_a_tuple(&mut self, pat: &Pattern) -> Pattern {
-        if let Pattern::Var(id, _) = pat {
+        if !matches!(pat, Pattern::Tuple(..)) {
+            let id = pat.node_id();
             let new_id = self.env.new_node(
-                self.env.get_node_loc(*id),
-                Type::Tuple(vec![self.env.get_node_type(*id)]),
+                self.env.get_node_loc(id),
+                Type::Tuple(vec![self.env.get_node_type(id)]),
             );
             Pattern::Tuple(new_id, vec![pat.clone()])
         } else {
@@ -1012,7 +1005,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
                 let node_loc = self.env.get_node_loc(*node_id);
                 self.env.error(
                     &node_loc,
-                    concat!("Return not currently supported in inline functions"),
+                    "Return not currently supported in inline functions",
                 );
                 false
             },
@@ -1082,7 +1075,8 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
             let param = &self.inlined_formal_params[idx];
             let sym = param.0;
             let param_type = &param.1;
-            let new_node_id = self.env.new_node(loc, param_type.clone());
+            let instantiated_param_type = param_type.instantiate(self.type_args);
+            let new_node_id = self.env.new_node(loc, instantiated_param_type);
             if let Some(new_sym) = self.shadow_stack.get_shadow_symbol(sym, false) {
                 Some(ExpData::LocalVar(new_node_id, new_sym).into())
             } else {
@@ -1093,10 +1087,8 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
                 Severity::Bug,
                 &loc,
                 &format!(
-                    concat!(
-                        "Temporary with invalid index `{}` during inlining",
-                        " of function with `{}` parameters"
-                    ),
+                    "Temporary with invalid index `{}` during inlining \
+                     of function with `{}` parameters",
                     idx,
                     self.inlined_formal_params.len()
                 ),

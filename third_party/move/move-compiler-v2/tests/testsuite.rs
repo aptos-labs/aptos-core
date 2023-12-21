@@ -82,7 +82,7 @@ impl TestConfig {
         let path = path.to_string_lossy();
         let verbose = cfg!(feature = "verbose-debug-print");
         let mut pipeline = FunctionTargetPipeline::default();
-        if path.contains("/inlining/bug_") {
+        if path.contains("/inlining/bug_11112") || path.contains("/inlining/bug_9717_looponly") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
             pipeline.add_processor(Box::new(VisibilityChecker {}));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
@@ -97,6 +97,19 @@ impl TestConfig {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
             pipeline.add_processor(Box::new(VisibilityChecker {}));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+            Self {
+                type_check_only: false,
+                dump_ast: true,
+                pipeline,
+                generate_file_format: false,
+                dump_annotated_targets: verbose,
+            }
+        } else if path.contains("/inlining/") {
+            pipeline.add_processor(Box::new(VisibilityChecker {}));
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+            pipeline.add_processor(Box::new(ExplicitDrop {}));
+            pipeline.add_processor(Box::new(AbilityChecker {}));
             Self {
                 type_check_only: false,
                 dump_ast: true,
