@@ -1,5 +1,4 @@
-/// Reconfiguration with DKG.
-/// Different from the default reconfiguration which is an instant state transition.
+/// Reconfiguration with DKG helper functions.
 module aptos_framework::reconfiguration_with_dkg {
     use std::config_for_next_epoch;
     use std::features;

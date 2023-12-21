@@ -217,15 +217,6 @@ Event emitted when a proposal is created.
 
 
 
-<a id="0x1_block_EAPI_DISABLED"></a>
-
-
-
-<pre><code><b>const</b> <a href="block.md#0x1_block_EAPI_DISABLED">EAPI_DISABLED</a>: u64 = 4;
-</code></pre>
-
-
-
 <a id="0x1_block_EINVALID_PROPOSER"></a>
 
 An invalid proposer was provided. Expected the proposer to be the VM or an active validator.
@@ -476,7 +467,8 @@ The runtime always runs this before executing the transactions in a block.
 ## Function `block_prologue_ext`
 
 <code><a href="block.md#0x1_block_block_prologue">block_prologue</a>()</code> but do reconfiguration with DKG after epoch timed out.
-It will also run as account <code>0x1</code> to make on-chain config locking easier.
+
+Also, it will run as account <code>0x1</code> to make on-chain config locking easier.
 
 
 <pre><code><b>fun</b> <a href="block.md#0x1_block_block_prologue_ext">block_prologue_ext</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: <b>address</b>, epoch: u64, round: u64, proposer: <b>address</b>, failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64, randomness_available: bool, <a href="randomness.md#0x1_randomness">randomness</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
@@ -500,14 +492,18 @@ It will also run as account <code>0x1</code> to make on-chain config locking eas
     randomness_available: bool,
     <a href="randomness.md#0x1_randomness">randomness</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ) <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a> {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_reconfigure_with_dkg_enabled">features::reconfigure_with_dkg_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="block.md#0x1_block_EAPI_DISABLED">EAPI_DISABLED</a>));
-
     <b>let</b> epoch_interval = <a href="block.md#0x1_block_block_prologue_common">block_prologue_common</a>(&<a href="account.md#0x1_account">account</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>, epoch, round, proposer, failed_proposer_indices, previous_block_votes_bitvec, <a href="timestamp.md#0x1_timestamp">timestamp</a>);
     <a href="randomness.md#0x1_randomness_on_new_block">randomness::on_new_block</a>(&<a href="account.md#0x1_account">account</a>, randomness_available, <a href="randomness.md#0x1_randomness">randomness</a>);
 
-    <b>if</b> (!<a href="dkg.md#0x1_dkg_in_progress">dkg::in_progress</a>() && <a href="timestamp.md#0x1_timestamp">timestamp</a> - <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>() &gt;= epoch_interval) {
+    <b>if</b> (<a href="dkg.md#0x1_dkg_in_progress">dkg::in_progress</a>()) {
+        <b>let</b> dkg_timed_out = <a href="dkg.md#0x1_dkg_update">dkg::update</a>(<b>false</b>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[]);
+        <b>if</b> (dkg_timed_out) {
+            // Proceed <b>to</b> the next epoch without <a href="randomness.md#0x1_randomness">randomness</a>.
+            <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_finish">reconfiguration_with_dkg::finish</a>(&<a href="account.md#0x1_account">account</a>);
+        }
+    } <b>else</b> <b>if</b> (<a href="timestamp.md#0x1_timestamp">timestamp</a> - <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>() &gt;= epoch_interval) {
         <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_start">reconfiguration_with_dkg::start</a>(&<a href="account.md#0x1_account">account</a>);
-    };
+    }
 }
 </code></pre>
 

@@ -58,7 +58,6 @@ module aptos_framework::block {
     const EINVALID_PROPOSER: u64 = 2;
     /// Epoch interval cannot be 0.
     const EZERO_EPOCH_INTERVAL: u64 = 3;
-    const EAPI_DISABLED: u64 = 4;
 
     /// This can only be called during Genesis.
     public(friend) fun initialize(aptos_framework: &signer, epoch_interval_microsecs: u64) {
@@ -176,7 +175,8 @@ module aptos_framework::block {
     }
 
     /// `block_prologue()` but do reconfiguration with DKG after epoch timed out.
-    /// It will also run as account `0x1` to make on-chain config locking easier.
+    ///
+    /// Also, it will run as account `0x1` to make on-chain config locking easier.
     fun block_prologue_ext(
         account: signer,
         hash: address,
@@ -189,14 +189,18 @@ module aptos_framework::block {
         randomness_available: bool,
         randomness: vector<u8>,
     ) acquires BlockResource {
-        assert!(features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
-
         let epoch_interval = block_prologue_common(&account, hash, epoch, round, proposer, failed_proposer_indices, previous_block_votes_bitvec, timestamp);
         randomness::on_new_block(&account, randomness_available, randomness);
 
-        if (!dkg::in_progress() && timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
+        if (dkg::in_progress()) {
+            let dkg_timed_out = dkg::update(false, vector[]);
+            if (dkg_timed_out) {
+                // Proceed to the next epoch without randomness.
+                reconfiguration_with_dkg::finish(&account);
+            }
+        } else if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
             reconfiguration_with_dkg::start(&account);
-        };
+        }
     }
 
     #[view]

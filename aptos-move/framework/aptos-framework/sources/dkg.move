@@ -48,6 +48,7 @@ module aptos_framework::dkg {
         );
     }
 
+    /// Mark on-chain DKG state as in-progress. Notify validators to start DKG.
     public(friend) fun start(
         dealer_epoch: u64,
         dealer_validator_set: ValidatorSet,
@@ -61,7 +62,7 @@ module aptos_framework::dkg {
             dealer_validator_set,
             target_epoch,
             target_validator_set,
-            deadline_microseconds: timestamp::now_microseconds() + 999999999, // Expect DKG to finish.
+            deadline_microseconds: timestamp::now_microseconds() + 9999999999,
             result: vector[],
         });
 
@@ -72,9 +73,12 @@ module aptos_framework::dkg {
         emit(event);
     }
 
-    /// Update the current DKG state with a potential result.
-    /// Return true if the current DKG becomes inactive and we should start a new epoch.
-    /// Abort if no DKG is in progress.
+    /// Update the current DKG state at the beginning of every block in `block_prologue_ext()`,
+    /// or when DKG result is available.
+    ///
+    /// Return true if and only if this update completes/aborts the DKG and we should proceed to the next epoch.
+    ///
+    /// Abort if DKG is not in progress.
     public(friend) fun update(dkg_result_available: bool, dkg_result: vector<u8>): bool acquires DKGState {
         let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
         assert!(option::is_some(&dkg_state.in_progress), error::invalid_state(EDKG_NOT_IN_PROGRESS));
@@ -84,7 +88,8 @@ module aptos_framework::dkg {
             session.result = dkg_result;
             dkg_completed = true;
         };
-        if (timestamp::now_microseconds() >= session.deadline_microseconds || dkg_completed) {
+        let dkg_timed_out = timestamp::now_microseconds() >= session.deadline_microseconds;
+        if (dkg_timed_out || dkg_completed) {
             dkg_state.last_complete = option::some(session);
             dkg_state.in_progress = option::none();
             true
@@ -94,12 +99,8 @@ module aptos_framework::dkg {
         }
     }
 
+    /// Return whether a DKG is in progress.
     public(friend) fun in_progress(): bool acquires DKGState {
         option::is_some(&borrow_global<DKGState>(@aptos_framework).in_progress)
-    }
-
-    public(friend) fun current_deadline(): u64 acquires DKGState {
-        let in_progress_session = option::borrow(&borrow_global<DKGState>(@aptos_framework).in_progress);
-        in_progress_session.deadline_microseconds
     }
 }

@@ -3,8 +3,7 @@
 
 # Module `0x1::reconfiguration_with_dkg`
 
-Reconfiguration with DKG.
-Different from the default reconfiguration which is an instant state transition.
+Reconfiguration with DKG helper functions.
 
 
 -  [Function `start`](#0x1_reconfiguration_with_dkg_start)

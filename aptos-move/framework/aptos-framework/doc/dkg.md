@@ -13,7 +13,6 @@
 -  [Function `start`](#0x1_dkg_start)
 -  [Function `update`](#0x1_dkg_update)
 -  [Function `in_progress`](#0x1_dkg_in_progress)
--  [Function `current_deadline`](#0x1_dkg_current_deadline)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -220,6 +219,7 @@ The complete and ongoing DKG sessions.
 
 ## Function `start`
 
+Mark on-chain DKG state as in-progress. Notify validators to start DKG.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_start">start</a>(dealer_epoch: u64, dealer_validator_set: <a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>, target_epoch: u64, target_validator_set: <a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>)
@@ -244,7 +244,7 @@ The complete and ongoing DKG sessions.
         dealer_validator_set,
         target_epoch,
         target_validator_set,
-        deadline_microseconds: <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() + 999999999, // Expect DKG <b>to</b> finish.
+        deadline_microseconds: <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() + 9999999999,
         result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
     });
 
@@ -264,9 +264,12 @@ The complete and ongoing DKG sessions.
 
 ## Function `update`
 
-Update the current DKG state with a potential result.
-Return true if the current DKG becomes inactive and we should start a new epoch.
-Abort if no DKG is in progress.
+Update the current DKG state at the beginning of every block in <code>block_prologue_ext()</code>,
+or when DKG result is available.
+
+Return true if and only if this update completes/aborts the DKG and we should proceed to the next epoch.
+
+Abort if DKG is not in progress.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <b>update</b>(dkg_result_available: bool, dkg_result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
@@ -287,7 +290,8 @@ Abort if no DKG is in progress.
         session.result = dkg_result;
         dkg_completed = <b>true</b>;
     };
-    <b>if</b> (<a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() &gt;= session.deadline_microseconds || dkg_completed) {
+    <b>let</b> dkg_timed_out = <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() &gt;= session.deadline_microseconds;
+    <b>if</b> (dkg_timed_out || dkg_completed) {
         dkg_state.last_complete = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(session);
         dkg_state.in_progress = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
         <b>true</b>
@@ -306,6 +310,7 @@ Abort if no DKG is in progress.
 
 ## Function `in_progress`
 
+Return whether a DKG is in progress.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_in_progress">in_progress</a>(): bool
@@ -319,31 +324,6 @@ Abort if no DKG is in progress.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_in_progress">in_progress</a>(): bool <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<b>borrow_global</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework).in_progress)
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_dkg_current_deadline"></a>
-
-## Function `current_deadline`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_current_deadline">current_deadline</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_current_deadline">current_deadline</a>(): u64 <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
-    <b>let</b> in_progress_session = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&<b>borrow_global</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework).in_progress);
-    in_progress_session.deadline_microseconds
 }
 </code></pre>
 
