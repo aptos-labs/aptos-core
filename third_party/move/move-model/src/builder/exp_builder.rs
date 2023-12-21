@@ -5,7 +5,7 @@
 use crate::{
     ast::{
         AccessSpecifier, Address, AddressSpecifier, Exp, ExpData, ModuleName, Operation, Pattern,
-        QualifiedSymbol, QuantKind, ResourceSpecifier, Spec, TempIndex, Value,
+        QualifiedSymbol, QuantKind, ResourceSpecifier, RewriteResult, Spec, TempIndex, Value,
     },
     builder::{
         model_builder::{AnyFunEntry, ConstEntry, EntryVisibility, LocalVarEntry, StructEntry},
@@ -1246,7 +1246,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let body = self.translate_exp(body, &Type::unit());
                 // See the Move book for below treatment: if the loop has no exit, the type
                 // is arbitrary, otherwise `()`.
-                let loop_type = if body.has_exit() {
+                let loop_type = if body.has_loop_exit() {
                     self.check_type(&loc, &Type::unit(), expected_type, "")
                 } else {
                     expected_type.clone()
@@ -1482,7 +1482,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             &mut |e| {
                 if self.placeholder_map.is_empty() {
                     // Shortcut case of no placeholders
-                    return Err(e);
+                    return RewriteResult::Unchanged(e);
                 }
                 let exp_data: ExpData = e.into();
                 if let ExpData::Call(id, Operation::NoOp, args) = exp_data {
@@ -1509,7 +1509,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                     self.bug(&loc, "unresolved spec anchor");
                                     Spec::default()
                                 };
-                                Ok(ExpData::SpecBlock(id, spec).into_exp())
+                                RewriteResult::Rewritten(ExpData::SpecBlock(id, spec).into_exp())
                             },
                             ExpPlaceholder::FieldSelectInfo {
                                 struct_ty,
@@ -1521,23 +1521,31 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                     .specialize_with_defaults(struct_ty)
                                     .skip_reference()
                                 {
-                                    Ok(ExpData::Call(
-                                        id,
-                                        Operation::Select(*mid, *sid, FieldId::new(*field_name)),
-                                        args,
+                                    RewriteResult::Rewritten(
+                                        ExpData::Call(
+                                            id,
+                                            Operation::Select(
+                                                *mid,
+                                                *sid,
+                                                FieldId::new(*field_name),
+                                            ),
+                                            args,
+                                        )
+                                        .into_exp(),
                                     )
-                                    .into_exp())
                                 } else {
-                                    Ok(self.new_error_exp().into_exp())
+                                    RewriteResult::Rewritten(self.new_error_exp().into_exp())
                                 }
                             },
                         }
                     } else {
                         // Reconstruct expression and return for traversal
-                        Err(ExpData::Call(id, Operation::NoOp, args).into_exp())
+                        RewriteResult::Unchanged(
+                            ExpData::Call(id, Operation::NoOp, args).into_exp(),
+                        )
                     }
                 } else {
-                    Err(exp_data.into_exp())
+                    RewriteResult::Unchanged(exp_data.into_exp())
                 }
             },
             &mut |pat, _entering_scope| match pat {

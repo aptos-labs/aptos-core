@@ -1854,7 +1854,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
-            increase_state_sync_chunk_sizes(config);
+            optimize_state_sync_for_throughput(config);
 
             // consensus and quorum store configs copied from the consensus-only suite
             optimize_for_maximum_throughput(config);
@@ -1901,7 +1901,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             .with_initial_fullnode_count(VALIDATOR_COUNT)
             .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
                 // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
-                increase_state_sync_chunk_sizes(config);
+                optimize_state_sync_for_throughput(config);
 
                 // Experimental storage optimizations
                 config.storage.rocksdb_configs.enable_storage_sharding = true;
@@ -1953,19 +1953,22 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     forge_config
 }
 
-/// Increases the state sync chunk sizes for a given node config
-fn increase_state_sync_chunk_sizes(node_config: &mut NodeConfig) {
-    let max_chunk_size = 10_000; // This allows > 10k TPS
+/// Optimizes the state sync configs for throughput
+fn optimize_state_sync_for_throughput(node_config: &mut NodeConfig) {
+    let max_chunk_size = 15_000; // This allows state sync to match consensus block sizes
+    let max_chunk_bytes = 40 * 1024 * 1024; // 10x the current limit (to prevent execution fallback)
 
     // Update the chunk sizes for the data client
     let data_client_config = &mut node_config.state_sync.aptos_data_client;
     data_client_config.max_transaction_chunk_size = max_chunk_size;
     data_client_config.max_transaction_output_chunk_size = max_chunk_size;
-
     // Update the chunk sizes for the storage service
     let storage_service_config = &mut node_config.state_sync.storage_service;
     storage_service_config.max_transaction_chunk_size = max_chunk_size;
     storage_service_config.max_transaction_output_chunk_size = max_chunk_size;
+
+    // Update the chunk bytes for the storage service
+    storage_service_config.max_network_chunk_bytes = max_chunk_bytes;
 }
 
 fn pre_release_suite() -> ForgeConfig {

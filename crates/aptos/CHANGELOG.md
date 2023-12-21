@@ -4,6 +4,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 - Hide the V2 compiler from input options until the V2 compiler is ready for release
+- Updated CLI source compilation to use rust toolchain version 1.74.1 (from 1.72.1).
 
 ## [2.3.2] - 2023/11/28
 - Services in the local testnet now bind to 127.0.0.1 by default (unless the CLI is running inside a container, which most users should not do) rather than 0.0.0.0. You can override this behavior with the `--bind-to` flag. This fixes an issue preventing the local testnet from working on Windows.

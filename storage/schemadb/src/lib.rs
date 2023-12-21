@@ -77,7 +77,7 @@ impl SchemaBatch {
         self.rows
             .lock()
             .entry(S::COLUMN_FAMILY_NAME)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(WriteOp::Value { key, value });
 
         Ok(())
@@ -89,7 +89,7 @@ impl SchemaBatch {
         self.rows
             .lock()
             .entry(S::COLUMN_FAMILY_NAME)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(WriteOp::Deletion { key });
 
         Ok(())

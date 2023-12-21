@@ -157,8 +157,8 @@ pub(crate) fn get_required_helper_types(abis: &[EntryABI]) -> BTreeSet<&TypeTag>
 
 pub(crate) fn filter_transaction_scripts(abis: &[EntryABI]) -> Vec<EntryABI> {
     abis.iter()
-        .cloned()
         .filter(|abi| abi.is_transaction_script_abi())
+        .cloned()
         .collect()
 }
 

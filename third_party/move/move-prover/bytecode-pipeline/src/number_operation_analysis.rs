@@ -474,8 +474,9 @@ impl<'a> NumberOperationAnalysis<'a> {
                 },
                 _ => {},
             }
+            true // keep going
         };
-        e.visit(visitor);
+        e.visit_post_order(visitor);
     }
 
     /// Check whether operations in s conflicting

@@ -1447,20 +1447,26 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             return self.spec_funs[spec_fun_idx].is_native && no_mut_ref_param;
         };
         let mut is_pure = true;
-        body.visit(&mut |e: &ExpData| {
+        body.visit_pre_order(&mut |e: &ExpData| {
             if let ExpData::Call(_, Operation::SpecFunction(mid, fid, _), _) = e {
                 if mid.to_usize() < self.module_id.to_usize() {
                     // This is calling a function from another module we already have
                     // translated. In this case, the impurity has already been propagated
                     // in translate_call.
+                    true
                 } else {
                     // This is calling a function from the module we are currently translating.
                     // Need to recursively ensure we have propagated impurity because of
                     // arbitrary call graphs, including cyclic.
                     if !self.propagate_function_impurity(visited, *fid) {
                         is_pure = false;
+                        false // Short-circuit the visit; this function is not pure
+                    } else {
+                        true
                     }
                 }
+            } else {
+                true
             }
         });
         if is_pure {
@@ -1756,18 +1762,14 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     {
         use SpecBlockContext::*;
         match context {
-            Function(name) => update(
-                self.fun_specs
-                    .entry(name.symbol)
-                    .or_insert_with(Spec::default),
-            ),
+            Function(name) => update(self.fun_specs.entry(name.symbol).or_default()),
             FunctionCode(name, spec_info) => update(
                 self.fun_specs
                     .entry(name.symbol)
-                    .or_insert_with(Spec::default)
+                    .or_default()
                     .on_impl
                     .entry(spec_info.offset)
-                    .or_insert_with(Spec::default),
+                    .or_default(),
             ),
             FunctionCodeV2(..) => update(
                 // For v2 compilation only: direct to builder which will be flushed at end
@@ -1783,11 +1785,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .expect("schema defined")
                     .spec,
             ),
-            Struct(name) => update(
-                self.struct_specs
-                    .entry(name.symbol)
-                    .or_insert_with(Spec::default),
-            ),
+            Struct(name) => update(self.struct_specs.entry(name.symbol).or_default()),
             Module => update(&mut self.module_spec),
         }
     }
@@ -2070,8 +2068,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     );
                     ok = false;
                 }
+                true // continue visit, note all problematic subexprs
             };
-            cond.exp.visit(&mut visitor);
+            cond.exp.visit_post_order(&mut visitor);
         } else if let FunctionCode(name, _) | FunctionCodeV2(name, _) = context {
             // Restrict accesses to function arguments only for `old(..)` in in-spec block
             let entry = self.parent.fun_table.get(name).expect("function defined");
@@ -2101,8 +2100,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         },
                     };
                 }
+                true // continue visit, note all problematic subexprs
             };
-            cond.exp.visit(&mut visitor);
+            cond.exp.visit_post_order(&mut visitor);
         }
         ok
     }
@@ -3411,7 +3411,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         }
         // Check for purity requirements. All data invariants must be pure expressions and
         // not depend on global state.
-        let check_uses_memory = |mid: ModuleId, fid: SpecFunId| {
+        let check_uses_no_memory = |mid: ModuleId, fid: SpecFunId| {
             if mid.to_usize() < self.parent.env.get_module_count() {
                 // This is calling a function from another module we already have
                 // translated.
@@ -3428,7 +3428,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         for struct_spec in self.struct_specs.values() {
             for cond in &struct_spec.conditions {
                 if matches!(cond.kind, ConditionKind::StructInvariant)
-                    && !cond.exp.uses_memory(&check_uses_memory)
+                    && !cond.exp.uses_no_memory(&check_uses_no_memory)
                 {
                     self.parent.error(
                         &cond.loc,
@@ -3483,7 +3483,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     ) {
         let mut used_memory = BTreeSet::new();
         let mut callees = BTreeSet::new();
-        exp.visit(&mut |e: &ExpData| {
+        exp.visit_post_order(&mut |e: &ExpData| {
             match e {
                 ExpData::Call(id, Operation::SpecFunction(mid, fid, _), _) => {
                     callees.insert(mid.qualified(*fid));
@@ -3529,6 +3529,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 },
                 _ => {},
             }
+            true // continue visit, note all problematic subexprs
         });
         (used_memory, callees)
     }

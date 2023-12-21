@@ -213,7 +213,7 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
             None => {
                 self.pending_on
                     .entry(handle)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(bytes.clone());
             },
         }

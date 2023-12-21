@@ -43,7 +43,6 @@ pub fn output(
     // generator. Disable those functiosn for now.
     let abis_vec = abis
         .iter()
-        .cloned()
         .filter(|abi| {
             if let EntryABI::EntryFunction(sf) = abi {
                 sf.module_name().name().as_str() != "code"
@@ -56,6 +55,7 @@ pub fn output(
                 true
             }
         })
+        .cloned()
         .collect::<Vec<_>>();
 
     let abis = abis_vec.as_slice();

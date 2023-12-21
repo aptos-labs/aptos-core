@@ -389,7 +389,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .saturating_sub(use_history_from_previous_epoch_max_count as u64),
         );
         // If we are considering beyond the current epoch, we need to fetch validators for those epochs
-        let epoch_to_proposers = if epoch_state.epoch > first_epoch_to_consider {
+        if epoch_state.epoch > first_epoch_to_consider {
             self.storage
                 .aptos_db()
                 .get_epoch_ending_ledger_infos(first_epoch_to_consider - 1, epoch_state.epoch)
@@ -409,8 +409,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 })
         } else {
             HashMap::from([(epoch_state.epoch, proposers)])
-        };
-        epoch_to_proposers
+        }
     }
 
     fn process_epoch_retrieval(

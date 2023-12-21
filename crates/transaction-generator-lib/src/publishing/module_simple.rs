@@ -159,9 +159,36 @@ pub enum EntryPoints {
         max_offset: u64,
         max_count: u64,
     },
-    /// Increment destination resource - COUNTER_STEP
-    StepDst,
+    /// Increment global (publisher) resource - COUNTER_STEP
+    IncGlobal,
+    /// Increment global (publisher) AggregatorV2 resource - COUNTER_STEP
+    IncGlobalAggV2,
+    /// Modify (try_add(step) or try_sub(step)) AggregatorV2 bounded counter (counter with max_value=100)
+    ModifyGlobalBoundedAggV2 {
+        step: u64,
+    },
 
+    /// Modifying a single random tag in a resource group (which contains 8 tags),
+    /// from a global resource (at module publishers' address)
+    ResourceGroupsGlobalWriteTag {
+        string_length: usize,
+    },
+    /// Modifying a single random tag, and reading another random tag,
+    /// in a resource group (which contains 8 tags),
+    /// from a global resource (at module publishers' address)
+    ResourceGroupsGlobalWriteAndReadTag {
+        string_length: usize,
+    },
+    /// Modifying a single random tag in a resource group (which contains 8 tags)
+    /// from a user's resource (i.e. each user modifies their own resource)
+    ResourceGroupsSenderWriteTag {
+        string_length: usize,
+    },
+    /// Modifying 3 out of 8 random tags in a resource group
+    /// from a user's resource (i.e. each user modifies their own resource)
+    ResourceGroupsSenderMultiChange {
+        string_length: usize,
+    },
     CreateObjects {
         num_objects: u64,
         object_payload_size: u64,
@@ -219,9 +246,11 @@ impl EntryPoints {
             | EntryPoints::BytesMakeOrChange { .. }
             | EntryPoints::EmitEvents { .. }
             | EntryPoints::MakeOrChangeTable { .. }
-            | EntryPoints::MakeOrChangeTableRandom { .. }
-            | EntryPoints::StepDst => "simple",
-            EntryPoints::CreateObjects { .. }
+            | EntryPoints::MakeOrChangeTableRandom { .. } => "simple",
+            EntryPoints::IncGlobal
+            | EntryPoints::IncGlobalAggV2
+            | EntryPoints::ModifyGlobalBoundedAggV2 { .. }
+            | EntryPoints::CreateObjects { .. }
             | EntryPoints::CreateObjectsConflict { .. }
             | EntryPoints::TokenV1InitializeCollection
             | EntryPoints::TokenV1MintAndStoreNFTParallel
@@ -229,7 +258,11 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndTransferNFTParallel
             | EntryPoints::TokenV1MintAndTransferNFTSequential
             | EntryPoints::TokenV1MintAndStoreFT
-            | EntryPoints::TokenV1MintAndTransferFT => "framework_usecases",
+            | EntryPoints::TokenV1MintAndTransferFT
+            | EntryPoints::ResourceGroupsGlobalWriteTag { .. }
+            | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. }
+            | EntryPoints::ResourceGroupsSenderWriteTag { .. }
+            | EntryPoints::ResourceGroupsSenderMultiChange { .. } => "framework_usecases",
             EntryPoints::TokenV2AmbassadorMint => "ambassador_token",
             EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
@@ -259,8 +292,10 @@ impl EntryPoints {
             | EntryPoints::BytesMakeOrChange { .. }
             | EntryPoints::EmitEvents { .. }
             | EntryPoints::MakeOrChangeTable { .. }
-            | EntryPoints::MakeOrChangeTableRandom { .. }
-            | EntryPoints::StepDst => "simple",
+            | EntryPoints::MakeOrChangeTableRandom { .. } => "simple",
+            EntryPoints::IncGlobal
+            | EntryPoints::IncGlobalAggV2
+            | EntryPoints::ModifyGlobalBoundedAggV2 { .. } => "aggregator_example",
             EntryPoints::CreateObjects { .. } | EntryPoints::CreateObjectsConflict { .. } => {
                 "objects"
             },
@@ -271,6 +306,10 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndTransferNFTSequential
             | EntryPoints::TokenV1MintAndStoreFT
             | EntryPoints::TokenV1MintAndTransferFT => "token_v1",
+            EntryPoints::ResourceGroupsGlobalWriteTag { .. }
+            | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. }
+            | EntryPoints::ResourceGroupsSenderWriteTag { .. }
+            | EntryPoints::ResourceGroupsSenderMultiChange { .. } => "resource_groups_example",
             EntryPoints::TokenV2AmbassadorMint => "ambassador",
             EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
@@ -381,7 +420,11 @@ impl EntryPoints {
                     ],
                 )
             },
-            EntryPoints::StepDst => step_dst(module_id, other.expect("Must provide other")),
+            EntryPoints::IncGlobal => inc_global(module_id),
+            EntryPoints::IncGlobalAggV2 => inc_global_agg_v2(module_id),
+            EntryPoints::ModifyGlobalBoundedAggV2 { step } => {
+                modify_bounded_agg_v2(module_id, rng.expect("Must provide RNG"), *step)
+            },
             EntryPoints::CreateObjects {
                 num_objects,
                 object_payload_size,
@@ -436,6 +479,48 @@ impl EntryPoints {
                 ident_str!("token_v1_mint_and_transfer_ft").to_owned(),
                 vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
             ),
+            EntryPoints::ResourceGroupsGlobalWriteTag { string_length }
+            | EntryPoints::ResourceGroupsSenderWriteTag { string_length } => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let index: u64 = rng.gen_range(0, 8);
+                get_payload(
+                    module_id,
+                    ident_str!(
+                        if let EntryPoints::ResourceGroupsGlobalWriteTag { .. } = self {
+                            "set_p"
+                        } else {
+                            "set"
+                        }
+                    )
+                    .to_owned(),
+                    vec![
+                        bcs::to_bytes(&index).unwrap(),
+                        bcs::to_bytes(&rand_string(rng, *string_length)).unwrap(), // name
+                    ],
+                )
+            },
+            EntryPoints::ResourceGroupsGlobalWriteAndReadTag { string_length } => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let index1: u64 = rng.gen_range(0, 8);
+                let index2: u64 = rng.gen_range(0, 8);
+                get_payload(module_id, ident_str!("set_and_read_p").to_owned(), vec![
+                    bcs::to_bytes(&index1).unwrap(),
+                    bcs::to_bytes(&index2).unwrap(),
+                    bcs::to_bytes(&rand_string(rng, *string_length)).unwrap(), // name
+                ])
+            },
+            EntryPoints::ResourceGroupsSenderMultiChange { string_length } => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let index1: u64 = rng.gen_range(0, 8);
+                let index2: u64 = rng.gen_range(0, 8);
+                let index3: u64 = rng.gen_range(0, 8);
+                get_payload(module_id, ident_str!("set_3").to_owned(), vec![
+                    bcs::to_bytes(&index1).unwrap(),
+                    bcs::to_bytes(&index2).unwrap(),
+                    bcs::to_bytes(&index3).unwrap(),
+                    bcs::to_bytes(&rand_string(rng, *string_length)).unwrap(), // name
+                ])
+            },
             EntryPoints::TokenV2AmbassadorMint => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 get_payload(
@@ -520,6 +605,8 @@ impl EntryPoints {
         match self {
             EntryPoints::Nop2Signers => MultiSigConfig::Random(1),
             EntryPoints::Nop5Signers => MultiSigConfig::Random(4),
+            EntryPoints::ResourceGroupsGlobalWriteTag { .. }
+            | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. } => MultiSigConfig::Publisher,
             EntryPoints::TokenV2AmbassadorMint => MultiSigConfig::Publisher,
             _ => MultiSigConfig::None,
         }
@@ -614,10 +701,23 @@ fn minimize(module_id: ModuleId, other: &AccountAddress) -> TransactionPayload {
     ])
 }
 
-fn step_dst(module_id: ModuleId, dst: &AccountAddress) -> TransactionPayload {
-    get_payload(module_id, ident_str!("step_destination").to_owned(), vec![
-        bcs::to_bytes(dst).unwrap(),
-    ])
+fn inc_global(module_id: ModuleId) -> TransactionPayload {
+    get_payload(module_id, ident_str!("increment").to_owned(), vec![])
+}
+
+fn inc_global_agg_v2(module_id: ModuleId) -> TransactionPayload {
+    get_payload(module_id, ident_str!("increment_agg_v2").to_owned(), vec![])
+}
+
+fn modify_bounded_agg_v2(module_id: ModuleId, rng: &mut StdRng, step: u64) -> TransactionPayload {
+    get_payload(
+        module_id,
+        ident_str!("modify_bounded_agg_v2").to_owned(),
+        vec![
+            bcs::to_bytes(&rng.gen::<bool>()).unwrap(),
+            bcs::to_bytes(&step).unwrap(),
+        ],
+    )
 }
 
 fn mint_new_token(module_id: ModuleId, other: AccountAddress) -> TransactionPayload {
