@@ -15,11 +15,11 @@ module example {
 
     fun returns_3_values(): (u64, bool, address) {
         // comment
-        (0, /*comment*/ false /*comment*/ , @0x42) // comment
+        (0, /*comment*/ false /*comment*/, @0x42) // comment
     }
 
     fun returns_4_values(x: &u64): (&u64, u8, u128, vector<u8>) {
-        (x /*comment*/ , 0 /*comment*/ , /*comment*/ 1 /*comment*/ , /*comment*/ b"foobar" /*comment*/ )
+        (x /*comment*/, 0 /*comment*/, /*comment*/ 1 /*comment*/, /*comment*/ b"foobar" /*comment*/)
     }
 }
 }

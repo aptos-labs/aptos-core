@@ -11,7 +11,7 @@ module std::ascii {
     /// be printable. To determine if a `String` contains only "printable"
     /// characters you should use the `all_characters_printable` predicate
     /// defined in this module.
-    struct String has /*comment*/ copy, drop /*comment*/ , store /*comment*/ {
+    struct String has /*comment*/ copy, drop /*comment*/, store /*comment*/ {
         // comment
         bytes: vector<u8>, // comment
 

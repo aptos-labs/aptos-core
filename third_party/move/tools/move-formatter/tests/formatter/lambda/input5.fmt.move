@@ -26,7 +26,7 @@ module 0x42::LambdaTest2 {
     }
 
     // Public inline function with comments for each parameter and the return value
-    public inline fun inline_apply3( /* lambda function g */ g: |u64| u64, /* value c */ c: u64) /* returns u64 */ : u64 {
+    public inline fun inline_apply3(/* lambda function g */ g: |u64| u64, /* value c */ c: u64) /* returns u64 */ : u64 {
         // Apply the lambda function g to the result of applying another lambda function to c, multiply the result by 3, and add 4 to the result
         LambdaTest1::inline_apply1(
             g,
