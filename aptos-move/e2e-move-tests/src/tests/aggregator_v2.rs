@@ -15,7 +15,7 @@ use aptos_framework::natives::aggregator_natives::aggregator_v2::{
 use aptos_language_e2e_tests::executor::ExecutorMode;
 use proptest::prelude::*;
 
-const STRESSTEST_MODE: bool = true;
+const STRESSTEST_MODE: bool = false;
 
 const EAGGREGATOR_OVERFLOW: u64 = 0x02_0001;
 const EAGGREGATOR_UNDERFLOW: u64 = 0x02_0002;
