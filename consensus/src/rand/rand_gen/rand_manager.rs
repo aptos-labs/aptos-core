@@ -12,8 +12,8 @@ use crate::{
         reliable_broadcast_state::{
             AugDataCertBuilder, CertifiedAugDataAckState, ShareAggregateState,
         },
-        storage::interface::{AugDataStorage, RandStorage},
-        types::{AugmentedData, CertifiedAugData, Proof, RandConfig, RequestShare, Share},
+        storage::interface::AugDataStorage,
+        types::{AugmentedData, CertifiedAugData, RandConfig, RequestShare, Share},
     },
 };
 use aptos_bounded_executor::BoundedExecutor;
@@ -34,7 +34,7 @@ use tokio_retry::strategy::ExponentialBackoff;
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
 
-pub struct RandManager<S: Share, P: Proof<Share = S>, D: AugmentedData, Storage> {
+pub struct RandManager<S: Share, D: AugmentedData, Storage> {
     author: Author,
     epoch_state: Arc<EpochState>,
     stop: bool,
@@ -45,17 +45,11 @@ pub struct RandManager<S: Share, P: Proof<Share = S>, D: AugmentedData, Storage>
     // downstream channels
     outgoing_blocks: Sender<OrderedBlocks>,
     // local state
-    rand_store: Arc<Mutex<RandStore<S, P, Storage>>>,
+    rand_store: Arc<Mutex<RandStore<S>>>,
     aug_data_store: AugDataStore<D, Storage>,
 }
 
-impl<
-        S: Share,
-        P: Proof<Share = S>,
-        D: AugmentedData,
-        Storage: RandStorage<S, P> + AugDataStorage<D>,
-    > RandManager<S, P, D, Storage>
-{
+impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, Storage> {
     pub fn new(
         author: Author,
         epoch_state: Arc<EpochState>,
@@ -81,7 +75,6 @@ impl<
             epoch_state.epoch,
             author,
             config.clone(),
-            db.clone(),
         )));
         let aug_data_store = AugDataStore::new(epoch_state.epoch, signer, config.clone(), db);
 

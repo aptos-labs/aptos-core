@@ -17,9 +17,6 @@ use std::{collections::HashMap, fmt::Debug, sync::Arc};
 pub(super) struct MockShare;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub(super) struct MockProof;
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub(super) struct MockAugData;
 
 impl Share for MockShare {
@@ -38,17 +35,16 @@ impl Share for MockShare {
     {
         RandShare::new(*rand_config.author(), rand_metadata, Self)
     }
-}
-
-impl Proof for MockProof {
-    type Share = MockShare;
 
     fn aggregate<'a>(
-        _shares: impl Iterator<Item = &'a RandShare<Self::Share>>,
+        _shares: impl Iterator<Item = &'a RandShare<Self>>,
         _rand_config: &RandConfig,
         rand_metadata: RandMetadata,
-    ) -> RandDecision<Self> {
-        RandDecision::new(Randomness::new(rand_metadata, vec![0u8; 32]), Self)
+    ) -> Randomness
+    where
+        Self: Sized,
+    {
+        Randomness::new(rand_metadata, vec![])
     }
 }
 
@@ -80,18 +76,12 @@ pub trait Share:
     fn generate(rand_config: &RandConfig, rand_metadata: RandMetadata) -> RandShare<Self>
     where
         Self: Sized;
-}
-
-pub trait Proof:
-    Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned + 'static
-{
-    type Share: Share;
 
     fn aggregate<'a>(
-        shares: impl Iterator<Item = &'a RandShare<Self::Share>>,
+        shares: impl Iterator<Item = &'a RandShare<Self>>,
         rand_config: &RandConfig,
         rand_metadata: RandMetadata,
-    ) -> RandDecision<Self>
+    ) -> Randomness
     where
         Self: Sized;
 }
@@ -157,26 +147,6 @@ impl<S: Share> RandShare<S> {
             round: self.round(),
             author: self.author,
         }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct RandDecision<P> {
-    randomness: Randomness,
-    proof: P,
-}
-
-impl<P: Proof> RandDecision<P> {
-    pub fn new(randomness: Randomness, proof: P) -> Self {
-        Self { randomness, proof }
-    }
-
-    pub fn randomness(&self) -> &Randomness {
-        &self.randomness
-    }
-
-    pub fn rand_metadata(&self) -> &RandMetadata {
-        self.randomness.metadata()
     }
 }
 
