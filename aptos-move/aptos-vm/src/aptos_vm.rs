@@ -27,9 +27,11 @@ use aptos_gas_schedule::{AptosGasParameters, VMGasParameters};
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_metrics_core::TimerHelper;
+#[cfg(any(test, feature = "testing"))]
+use aptos_types::state_store::StateViewId;
 use aptos_types::{
     account_config,
-    account_config::new_block_event_key,
+    account_config::{new_block_event_key, AccountResource},
     block_executor::{
         config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
         partitioner::PartitionedTransactions,
@@ -41,7 +43,7 @@ use aptos_types::{
         new_epoch_event_key, ConfigurationResource, FeatureFlag, Features, OnChainConfig,
         TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,
     },
-    state_store::{StateView, StateViewId},
+    state_store::StateView,
     transaction::{
         authenticator::{AccountAuthenticator, AnySignature, TransactionAuthenticator},
         signature_verified_transaction::SignatureVerifiedTransaction,
@@ -81,6 +83,7 @@ use move_core_types::{
     ident_str,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
+    move_resource::MoveStructType,
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
     vm_status::StatusType,
@@ -480,7 +483,10 @@ impl AptosVM {
         // Storage refund is zero since no slots are deleted in aborted transactions.
         const ZERO_STORAGE_REFUND: u64 = 0;
 
-        if is_account_init_for_sponsored_transaction(txn_data, &self.features) {
+        let is_account_init_for_sponsored_transaction =
+            is_account_init_for_sponsored_transaction(txn_data, &self.features, resolver)?;
+
+        if is_account_init_for_sponsored_transaction {
             let mut session = self.new_session(resolver, SessionId::run_on_abort(txn_data));
             let status = self.inject_abort_info_if_available(status);
 
@@ -1470,7 +1476,17 @@ impl AptosVM {
             session = self.new_session(resolver, SessionId::txn_meta(&txn_data));
         }
 
-        if is_account_init_for_sponsored_transaction(&txn_data, &self.features) {
+        let is_account_init_for_sponsored_transaction =
+            match is_account_init_for_sponsored_transaction(&txn_data, &self.features, resolver) {
+                Ok(result) => result,
+                Err(err) => {
+                    let vm_status = err.into_vm_status();
+                    let discarded_output = discarded_output(vm_status.status_code());
+                    return (vm_status, discarded_output);
+                },
+            };
+
+        if is_account_init_for_sponsored_transaction {
             if let Err(err) =
                 create_account_if_does_not_exist(&mut session, gas_meter, txn.sender())
             {
@@ -2284,13 +2300,30 @@ fn create_account_if_does_not_exist(
         .map(|_return_vals| ())
 }
 
+/// Signals that the transaction should trigger the flow for creating an account as part of a
+/// sponsored transaction. This occurs when:
+/// * The feature gate is enabled SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION
+/// * There is fee payer
+/// * The sequence number is 0
+/// * There is no account resource for the account
 pub(crate) fn is_account_init_for_sponsored_transaction(
     txn_data: &TransactionMetadata,
     features: &Features,
-) -> bool {
-    txn_data.fee_payer.is_some()
-        && txn_data.sequence_number == 0
-        && features.is_enabled(FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION)
+    resolver: &impl AptosMoveResolver,
+) -> Result<bool, VMError> {
+    Ok(
+        features.is_enabled(FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION)
+            && txn_data.fee_payer.is_some()
+            && txn_data.sequence_number == 0
+            && resolver
+                .get_resource(&txn_data.sender(), &AccountResource::struct_tag())
+                .map(|data| data.is_none())
+                .map_err(|e| {
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!("{}", e))
+                        .finish(Location::Undefined)
+                })?,
+    )
 }
 
 #[test]
