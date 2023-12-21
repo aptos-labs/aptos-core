@@ -16,13 +16,20 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
+use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 
-const MAX_COMPRESSION_SIZE: usize = 64 * 1024 * 1024;
+// Useful test constants
+const MAX_COMPRESSION_SIZE: usize = 64 * 1024 * 1024; // 64 MiBi
+const MIB: usize = 1024 * 1024;
 
 #[test]
 fn test_basic_compression() {
+    // Test compress random bytes
+    let raw_bytes: Vec<_> = (0..MIB).map(|_| rand::thread_rng().gen::<u8>()).collect();
+    test_compress_and_decompress(raw_bytes);
+
     // Test epoch ending ledger infos
     let epoch_ending_ledger_infos = create_epoch_ending_ledger_infos(0, 999);
     test_compress_and_decompress(epoch_ending_ledger_infos);
@@ -38,6 +45,7 @@ fn test_basic_compression() {
 
 #[test]
 fn test_compression_limits() {
+    // Create test data
     let too_small_bytes = 1;
     let transactions_with_proof = create_transaction_list_with_proof(1000, 1999, 1999, true);
 
