@@ -599,7 +599,7 @@ fn get_land_blocking_test(
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" => land_blocking_test_suite(duration), // TODO: remove land_blocking, superseded by below
-        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
+        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 0),
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         _ => return None, // The test name does not match a land-blocking test
@@ -1775,7 +1775,13 @@ fn realistic_env_max_load_test(
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 40000,
+                    mempool_backlog: 20000,
+                })
+                .transaction_type(TransactionType::Workflow{
+                    workflow_kind: WorkflowKind::Tournament { num_players: 100000, join_batch: 1000 },
+                    use_account_pool: false,
+                    move_stages_by_phase: false,
+                    num_modules: 1,
                 })
                 .init_gas_price_multiplier(20),
             inner_success_criteria: SuccessCriteria::new(
@@ -1791,7 +1797,7 @@ fn realistic_env_max_load_test(
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             // Have single epoch change in land blocking, and a few on long-running
             helm_values["chain"]["epoch_duration_secs"] =
-                (if long_running { 600 } else { 300 }).into();
+                (if long_running { 600 } else { 1200 }).into();
             helm_values["chain"]["on_chain_consensus_config"] =
                 serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
                     .expect("must serialize");

@@ -78,7 +78,9 @@ async fn test_txn_emmitter() {
             // ],
             vec![
                 (TransactionType::Workflow{
-                    workflow_kind: WorkflowKind::Tournament { num_players: 20, join_batch: 5 },
+                    workflow_kind: WorkflowKind::Tournament { num_players: 100000, join_batch: 1000 },
+                    use_account_pool: false,
+                    move_stages_by_phase: false,
                     num_modules: 1,
                 }, 1)
                 // (TransactionTypeArg::NoOp.materialize(100, false), 20),
