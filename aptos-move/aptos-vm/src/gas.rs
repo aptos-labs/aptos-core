@@ -243,7 +243,8 @@ pub(crate) fn check_gas(
     // gas to cover storage, execution, and IO costs.
     // TODO: This isn't the cleaning code, thus we localize it just here and will remove it
     // once accountv2 is available and we no longer need to create accounts.
-    if crate::aptos_vm::is_account_init_for_sponsored_transaction(txn_metadata, features) {
+    if crate::aptos_vm::is_account_init_for_sponsored_transaction(txn_metadata, features, resolver)?
+    {
         let gas_unit_price: u64 = txn_metadata.gas_unit_price().into();
         let max_gas_amount: u64 = txn_metadata.max_gas_amount().into();
         let storage_fee_per_state_slot_create: u64 =
