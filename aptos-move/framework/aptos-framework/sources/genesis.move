@@ -131,7 +131,6 @@ module aptos_framework::genesis {
         state_storage::initialize(&aptos_framework_account);
         timestamp::set_time_has_started(&aptos_framework_account);
         dkg::initialize(&aptos_framework_account);
-        debug::print(&std::string::utf8(b"genesis::initialization() finished."));
     }
 
     /// Genesis step 2: Initialize Aptos coin.
@@ -383,7 +382,6 @@ module aptos_framework::genesis {
 
     #[verify_only]
     use std::features;
-    use aptos_std::debug;
     use aptos_framework::dkg;
 
     #[verify_only]

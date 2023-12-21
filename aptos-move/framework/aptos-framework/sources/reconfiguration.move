@@ -4,7 +4,6 @@ module aptos_framework::reconfiguration {
     use std::error;
     use std::features;
     use std::signer;
-    use aptos_std::debug;
 
     use aptos_framework::account;
     use aptos_framework::event;
@@ -96,10 +95,8 @@ module aptos_framework::reconfiguration {
 
     /// Signal validators to start using new configuration. Must be called from friend config modules.
     public(friend) fun reconfigure() acquires Configuration {
-        debug::print(&std::string::utf8(b"reconfiguration::reconfigure() started."));
         // Do not do anything if genesis has not finished.
         if (chain_status::is_genesis() || timestamp::now_microseconds() == 0 || !reconfiguration_enabled()) {
-            debug::print(&std::string::utf8(b"reconfiguration::reconfigure() returned: genesis not finished."));
             return
         };
 
@@ -119,7 +116,6 @@ module aptos_framework::reconfiguration {
         // one reconfiguration event.
         //
         if (current_time == config_ref.last_reconfiguration_time) {
-            debug::print(&std::string::utf8(b"reconfiguration::reconfigure() returned: already emitted."));
             return
         };
 
@@ -156,7 +152,6 @@ module aptos_framework::reconfiguration {
                 epoch: config_ref.epoch,
             },
         );
-        debug::print(&std::string::utf8(b"reconfiguration::reconfigure() returned: did a lot of real work."));
     }
 
     public fun last_reconfiguration_time(): u64 acquires Configuration {
