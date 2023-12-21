@@ -988,17 +988,17 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000]),
         criteria: [
-            (9, 1.5, 3., 4., 0),
-            (95, 1.5, 3., 4., 0),
-            (950, 2., 3., 4., 0),
-            (2750, 2.5, 3.5, 4.5, 0),
-            (4600, 3., 4., 5., 10), // Allow some expired transactions (high-load)
+            (9, 1.5, 3., 4.),
+            (95, 1.5, 3., 4.),
+            (950, 2., 3., 4.),
+            (2750, 2.5, 3.5, 4.5),
+            (4600, 3., 4., 5.), // Allow some expired transactions (high-load)
         ]
         .into_iter()
         .map(
-            |(min_tps, max_lat_p50, max_lat_p90, max_lat_p99, max_expired_tps)| {
+            |(min_tps, max_lat_p50, max_lat_p90, max_lat_p99)| {
                 SuccessCriteria::new(min_tps)
-                    .add_max_expired_tps(max_expired_tps)
+                    .add_max_expired_tps(0)
                     .add_max_failed_submission_tps(0)
                     .add_latency_threshold(max_lat_p50, LatencyType::P50)
                     .add_latency_threshold(max_lat_p90, LatencyType::P90)
@@ -1028,14 +1028,14 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
             TransactionWorkload {
                 transaction_type: TransactionTypeArg::ModifyGlobalResource,
                 num_modules: 1,
-                unique_senders: true,
+                unique_senders: false,
                 mempool_backlog: 20000,
             },
             TransactionWorkload {
                 transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
                 num_modules: 1,
                 unique_senders: true,
-                mempool_backlog: 30000,
+                mempool_backlog: 10000,
             },
             // transactions get rejected, to fix.
             // TransactionWorkload {
@@ -1048,9 +1048,9 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
             (5500, 100, 0.3, 0.3, 0.8, 0.65),
-            (4500, 100, 0.3, 0.4, 1.0, 1.5),
-            (2000, 300, 0.3, 0.3, 0.8, 1.0),
-            (600, 500, 0.3, 0.3, 0.8, 1.0),
+            (4500, 100, 0.3, 0.3, 1.0, 1.6),
+            (2800, 100, 0.3, 0.3, 1.0, 1.6),
+            (1000, 500, 0.3, 0.3, 1.0, 1.6),
             // (150, 0.5, 1.0, 1.5, 0.65),
         ]
         .into_iter()
