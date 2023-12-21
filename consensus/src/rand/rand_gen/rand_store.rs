@@ -14,7 +14,7 @@ use aptos_consensus_types::{
     common::{Author, Round},
     randomness::{RandMetadata, Randomness},
 };
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 const FUTURE_ROUNDS_TO_ACCEPT: u64 = 200;
 
@@ -178,6 +178,18 @@ impl<S: Share> RandItem<S> {
         let _ = std::mem::replace(self, new_item);
     }
 
+    fn get_all_shares_authors(&self) -> Option<HashSet<Author>> {
+        match self {
+            RandItem::PendingDecision {
+                share_aggregator, ..
+            } => Some(share_aggregator.shares.keys().cloned().collect()),
+            RandItem::Decided { .. } => None,
+            RandItem::PendingMetadata(_) => {
+                unreachable!("Should only be called after block is added")
+            },
+        }
+    }
+
     fn get_self_share(&self) -> Option<RandShare<S>> {
         match self {
             RandItem::PendingMetadata(aggr) => aggr.get_self_share(),
@@ -267,6 +279,14 @@ impl<S: Share> RandStore<S> {
         rand_item.add_share(share, &self.rand_config)?;
         Self::try_aggregate(&self.rand_config, rand_item, &mut self.block_queue);
         Ok(rand_item.decision().is_some())
+    }
+
+    /// This should only be called after the block is added, returns None if already decided
+    /// Otherwise returns existing shares' authors
+    pub fn get_all_shares_authors(&self, metadata: &RandMetadata) -> Option<HashSet<Author>> {
+        self.rand_map
+            .get(&metadata.round())
+            .and_then(|item| item.get_all_shares_authors())
     }
 
     pub fn get_self_share(
