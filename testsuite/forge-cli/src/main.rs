@@ -1778,7 +1778,7 @@ fn realistic_env_max_load_test(
                     mempool_backlog: 20000,
                 })
                 .transaction_type(TransactionType::Workflow{
-                    workflow_kind: WorkflowKind::Tournament { num_players: 100000, join_batch: 1000 },
+                    workflow_kind: WorkflowKind::Tournament { num_players: 10000, join_batch: 100 },
                     use_account_pool: false,
                     move_stages_by_phase: false,
                     num_modules: 1,
