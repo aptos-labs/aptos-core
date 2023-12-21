@@ -206,7 +206,7 @@ impl<'a> FunctionGenerator<'a> {
 
     /// Compute the set of temporaries which are referenced in borrow instructions.
     /// TODO: right now we also pin locals which are parameter of the destroy instruction.
-    ///   This is neeeded since we cannot determine whether the local has been already moved on
+    ///   This is needed since we cannot determine whether the local has been already moved on
     ///   the stack and is not longer available in the associated local. This needs to be reworked
     ///   to avoid this.
     fn pinned_temps(ctx: &FunctionContext) -> BTreeSet<TempIndex> {

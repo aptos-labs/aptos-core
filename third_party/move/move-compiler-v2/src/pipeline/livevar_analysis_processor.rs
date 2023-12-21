@@ -300,7 +300,7 @@ impl<'a> CopyTransformation<'a> {
                 new_srcs.insert(0, srcs[0]);
                 self.data
                     .code
-                    .push(Call(id, dsts, Operation::WriteRef, srcs, ai))
+                    .push(Call(id, dsts, Operation::WriteRef, new_srcs, ai))
             },
             Call(id, dsts, oper, srcs, ai) => {
                 let srcs = self.copy_arg_if_needed(alive, id, srcs);
