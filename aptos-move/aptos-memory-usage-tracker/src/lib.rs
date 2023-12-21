@@ -160,6 +160,8 @@ where
         fn charge_vec_swap(&mut self, ty: impl TypeView) -> PartialVMResult<()>;
 
         fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()>;
+
+        fn charge_dependency(&mut self, module_id: &ModuleId, size: NumBytes) -> PartialVMResult<()>;
     }
 
     #[inline]

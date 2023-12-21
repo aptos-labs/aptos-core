@@ -22,7 +22,7 @@ use anyhow::anyhow;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::{natives::code::PublishRequest, RuntimeModuleMetadataV1};
-use aptos_gas_algebra::{Gas, GasQuantity, Octa};
+use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{AptosGasParameters, VMGasParameters};
 use aptos_logger::{enabled, prelude::*, Level};
@@ -652,7 +652,15 @@ impl AptosVM {
         senders: Vec<AccountAddress>,
         script: &Script,
     ) -> Result<SerializedReturnValues, VMStatus> {
+        // Note: Feature gating is needed here because the traversal of the dependencies could
+        //       result in shallow-loading of the modules and therefore subtle changes in
+        //       the error semantics.
+        if self.gas_feature_version >= 14 {
+            session.check_script_dependencies_and_check_gas(gas_meter, script.code())?;
+        }
+
         let loaded_func = session.load_script(script.code(), script.ty_args().to_vec())?;
+
         // TODO(Gerardo): consolidate the extended validation to verifier.
         verifier::event_validation::verify_no_event_emission_in_script(
             script.code(),
@@ -677,6 +685,13 @@ impl AptosVM {
         senders: Vec<AccountAddress>,
         entry_fn: &EntryFunction,
     ) -> Result<SerializedReturnValues, VMStatus> {
+        // Note: Feature gating is needed here because the traversal of the dependencies could
+        //       result in shallow-loading of the modules and therefore subtle changes in
+        //       the error semantics.
+        if self.gas_feature_version >= 14 {
+            session.check_dependencies_and_charge_gas(gas_meter, [entry_fn.module().clone()])?;
+        }
+
         let function =
             session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
@@ -993,6 +1008,13 @@ impl AptosVM {
         payload: &EntryFunction,
         new_published_modules_loaded: &mut bool,
     ) -> Result<(), VMStatus> {
+        // Note: Feature gating is needed here because the traversal of the dependencies could
+        //       result in shallow-loading of the modules and therefore subtle changes in
+        //       the error semantics.
+        if self.gas_feature_version >= 14 {
+            session.check_dependencies_and_charge_gas(gas_meter, [payload.module().clone()])?;
+        }
+
         // If txn args are not valid, we'd still consider the transaction as executed but
         // failed. This is primarily because it's unrecoverable at this point.
         self.validate_and_execute_entry_function(
@@ -1165,6 +1187,45 @@ impl AptosVM {
             // the deserialization again. Consider adding an API to MoveVM which allows to
             // directly pass CompiledModule.
             let modules = self.deserialize_module_bundle(&bundle)?;
+
+            // Note: Feature gating is needed here because the traversal of the dependencies could
+            //       result in shallow-loading of the modules and therefore subtle changes in
+            //       the error semantics.
+            if self.gas_feature_version >= 14 {
+                // Charge all modules in the bundle that is about to be published.
+                for (module, blob) in modules.iter().zip(bundle.iter()) {
+                    gas_meter
+                        .charge_dependency(
+                            &module.self_id(),
+                            NumBytes::new(blob.code().len() as u64),
+                        )
+                        .map_err(|err| err.finish(Location::Undefined))?;
+                }
+
+                // Charge all dependencies.
+                //
+                // Must exclude the ones that are in the current bundle because they have not
+                // been published yet.
+                let module_ids_in_bundle = modules
+                    .iter()
+                    .map(|module| module.self_id())
+                    .collect::<BTreeSet<_>>();
+
+                session.check_dependencies_and_charge_gas(
+                    gas_meter,
+                    modules
+                        .iter()
+                        .flat_map(|module| {
+                            module
+                                .immediate_dependencies()
+                                .into_iter()
+                                .chain(module.immediate_friends())
+                        })
+                        .filter(|module_id| !module_ids_in_bundle.contains(module_id)),
+                )?;
+
+                // TODO: Revisit the order of traversal. Consider switching to alphabetical order.
+            }
 
             // Validate the module bundle
             self.validate_publish_request(session, &modules, expected_modules, allowed_deps)?;

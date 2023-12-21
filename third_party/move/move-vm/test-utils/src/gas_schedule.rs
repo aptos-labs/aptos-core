@@ -509,6 +509,10 @@ impl<'b> GasMeter for GasStatus<'b> {
     fn charge_create_ty(&mut self, _num_nodes: NumTypeNodes) -> PartialVMResult<()> {
         Ok(())
     }
+
+    fn charge_dependency(&mut self, _module_id: &ModuleId, _size: NumBytes) -> PartialVMResult<()> {
+        Ok(())
+    }
 }
 
 pub fn new_from_instructions(mut instrs: Vec<(Bytecode, GasCost)>) -> CostTable {

@@ -93,14 +93,15 @@ impl ModuleStorageAdapter {
         &self,
         natives: &NativeFunctions,
         id: ModuleId,
-        module: CompiledModule,
+        module_size: usize,
+        module: Arc<CompiledModule>,
         name_cache: &StructNameCache,
     ) -> VMResult<Arc<Module>> {
         if let Some(cached) = self.module_at(&id) {
             return Ok(cached);
         }
 
-        match Module::new(natives, module, self, name_cache) {
+        match Module::new(natives, module_size, module, self, name_cache) {
             Ok(module) => Ok(self.modules.store_module(&id, module)),
             Err((err, _)) => Err(err.finish(Location::Undefined)),
         }
@@ -180,6 +181,10 @@ impl ModuleStorageAdapter {
 pub struct Module {
     #[allow(dead_code)]
     id: ModuleId,
+
+    // size in bytes
+    pub(crate) size: usize,
+
     // primitive pools
     pub(crate) module: Arc<CompiledModule>,
 
@@ -252,10 +257,11 @@ pub(crate) struct FieldInstantiation {
 impl Module {
     pub(crate) fn new(
         natives: &NativeFunctions,
-        module: CompiledModule,
+        size: usize,
+        module: Arc<CompiledModule>,
         cache: &ModuleStorageAdapter,
         name_cache: &StructNameCache,
-    ) -> Result<Self, (PartialVMError, CompiledModule)> {
+    ) -> Result<Self, (PartialVMError, Arc<CompiledModule>)> {
         let id = module.self_id();
 
         let mut structs = vec![];
@@ -440,7 +446,8 @@ impl Module {
         match create() {
             Ok(_) => Ok(Self {
                 id,
-                module: Arc::new(module),
+                size,
+                module,
                 structs,
                 struct_instantiations,
                 function_refs,

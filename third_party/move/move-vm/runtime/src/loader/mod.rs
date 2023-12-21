@@ -21,7 +21,7 @@ use move_binary_format::{
 use move_bytecode_verifier::{self, cyclic_dependencies, dependencies};
 use move_core_types::{
     account_address::AccountAddress,
-    gas_algebra::NumTypeNodes,
+    gas_algebra::{NumBytes, NumTypeNodes},
     ident_str,
     identifier::IdentStr,
     language_storage::{ModuleId, StructTag, TypeTag},
@@ -243,6 +243,30 @@ impl Loader {
     // Script verification and loading
     //
 
+    pub(crate) fn check_script_dependencies_and_check_gas(
+        &self,
+        module_store: &ModuleStorageAdapter,
+        data_store: &mut TransactionDataCache,
+        gas_meter: &mut impl GasMeter,
+        script_blob: &[u8],
+    ) -> VMResult<()> {
+        let mut sha3_256 = Sha3_256::new();
+        sha3_256.update(script_blob);
+        let hash_value: [u8; 32] = sha3_256.finalize().into();
+
+        let script = data_store.load_compiled_script_to_cache(script_blob, hash_value)?;
+
+        // TODO(Gas): the script it self?
+        self.check_dependencies_and_charge_gas(
+            module_store,
+            data_store,
+            gas_meter,
+            script.immediate_dependencies(),
+        )?;
+
+        Ok(())
+    }
+
     // Scripts are verified and dependencies are loaded.
     // Effectively that means modules are cached from leaf to root in the dependency DAG.
     // If a dependency error is found, loading stops and the error is returned.
@@ -255,7 +279,7 @@ impl Loader {
         &self,
         script_blob: &[u8],
         ty_args: &[TypeTag],
-        data_store: &TransactionDataCache,
+        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<(Arc<Function>, LoadedFunctionInstantiation)> {
         // retrieve or load the script
@@ -267,8 +291,12 @@ impl Loader {
         let (main, parameters, return_) = match scripts.get(&hash_value) {
             Some(cached) => cached,
             None => {
-                let ver_script =
-                    self.deserialize_and_verify_script(script_blob, data_store, module_store)?;
+                let ver_script = self.deserialize_and_verify_script(
+                    script_blob,
+                    hash_value,
+                    data_store,
+                    module_store,
+                )?;
                 let script = Script::new(ver_script, &hash_value, module_store, &self.name_cache)?;
                 scripts.insert(hash_value, script)
             },
@@ -309,21 +337,11 @@ impl Loader {
     fn deserialize_and_verify_script(
         &self,
         script: &[u8],
-        data_store: &TransactionDataCache,
+        hash_value: [u8; 32],
+        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
-    ) -> VMResult<CompiledScript> {
-        let script = match CompiledScript::deserialize_with_config(
-            script,
-            &self.vm_config.deserializer_config,
-        ) {
-            Ok(script) => script,
-            Err(err) => {
-                let msg = format!("[VM] deserializer for script returned error: {:?}", err);
-                return Err(PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
-                    .with_message(msg)
-                    .finish(Location::Script));
-            },
-        };
+    ) -> VMResult<Arc<CompiledScript>> {
+        let script = data_store.load_compiled_script_to_cache(script, hash_value)?;
 
         match self.verify_script(&script) {
             Ok(_) => {
@@ -369,7 +387,7 @@ impl Loader {
         &self,
         module_id: &ModuleId,
         function_name: &IdentStr,
-        data_store: &TransactionDataCache,
+        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<(Arc<Module>, Arc<Function>, Vec<Type>, Vec<Type>)> {
         let module = self.load_module(module_id, data_store, module_store)?;
@@ -476,7 +494,7 @@ impl Loader {
         module_id: &ModuleId,
         function_name: &IdentStr,
         expected_return_type: &Type,
-        data_store: &TransactionDataCache,
+        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<(LoadedFunction, LoadedFunctionInstantiation)> {
         let (module, func, parameters, return_vec) = self.load_function_without_type_args(
@@ -543,7 +561,7 @@ impl Loader {
         module_id: &ModuleId,
         function_name: &IdentStr,
         ty_args: &[TypeTag],
-        data_store: &TransactionDataCache,
+        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<(Arc<Module>, Arc<Function>, LoadedFunctionInstantiation)> {
         let (module, func, parameters, return_) = self.load_function_without_type_args(
@@ -623,7 +641,7 @@ impl Loader {
         module: &CompiledModule,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         bundle_unverified: &BTreeSet<ModuleId>,
-        data_store: &TransactionDataCache,
+        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<()> {
         // Performs all verification steps to load the module without loading it, i.e., the new
@@ -743,7 +761,7 @@ impl Loader {
     pub(crate) fn load_type(
         &self,
         type_tag: &TypeTag,
-        data_store: &TransactionDataCache,
+        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<Type> {
         Ok(match type_tag {
@@ -793,12 +811,73 @@ impl Loader {
         })
     }
 
+    /// Traverses the whole transitive closure of dependencies, starting from the specified
+    /// modules and perform gas metering.
+    ///
+    /// The traversal follows a depth-first order, with the module itself being visited first,
+    /// followed by its dependencies, and finally its friends.
+    /// Changing this order without a valid reason may affect the gas semantics and must be
+    /// avoided.
+    ///
+    /// This will result in the shallow-loading of the modules -- they will be read from the
+    /// storage as bytes and then deserialized, but NOT converted into the runtime representation.
+    ///
+    /// TODO: Revisit the order of traversal. Consider switching to alphabetical order.
+    pub(crate) fn check_dependencies_and_charge_gas<I>(
+        &self,
+        module_store: &ModuleStorageAdapter,
+        data_store: &mut TransactionDataCache,
+        gas_meter: &mut impl GasMeter,
+        ids: I,
+    ) -> VMResult<()>
+    where
+        I: IntoIterator<Item = ModuleId>,
+        I::IntoIter: DoubleEndedIterator,
+    {
+        let mut visited = BTreeSet::new();
+        let mut stack = ids
+            .into_iter()
+            .rev()
+            .map(|id| (id, true))
+            .collect::<Vec<_>>();
+
+        while let Some((id, allow_loading_failure)) = stack.pop() {
+            if !visited.insert(id.clone()) {
+                continue;
+            }
+
+            let (module, size) = match module_store.module_at(&id) {
+                Some(module) => (module.module.clone(), module.size),
+                None => {
+                    let (module, size, _) = data_store
+                        .load_compiled_module_to_cache(id.clone(), allow_loading_failure)?;
+                    (module, size)
+                },
+            };
+
+            gas_meter
+                .charge_dependency(&id, NumBytes::new(size as u64))
+                .map_err(|err| err.finish(Location::Module(id.clone())))?;
+
+            stack.extend(
+                module
+                    .immediate_dependencies()
+                    .into_iter()
+                    .chain(module.immediate_friends())
+                    .map(|id| (id, false))
+                    .rev(),
+            );
+        }
+
+        Ok(())
+    }
+
     // The interface for module loading. Aligned with `load_type` and `load_function`, this function
     // verifies that the module is OK instead of expect it.
     pub(crate) fn load_module(
         &self,
         id: &ModuleId,
-        data_store: &TransactionDataCache,
+        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<Arc<Module>> {
         self.load_module_internal(id, data_store, module_store)
@@ -809,7 +888,7 @@ impl Loader {
     fn load_module_internal(
         &self,
         id: &ModuleId,
-        data_store: &TransactionDataCache,
+        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<Arc<Module>> {
         // if the module is already in the code cache, load the cached version
@@ -844,34 +923,13 @@ impl Loader {
     fn load_and_verify_module(
         &self,
         id: &ModuleId,
-        data_store: &TransactionDataCache,
+        data_store: &mut TransactionDataCache,
         allow_loading_failure: bool,
-    ) -> VMResult<CompiledModule> {
-        // bytes fetching, allow loading to fail if the flag is set
-        let bytes = match data_store
-            .load_module(id)
-            .map_err(|e| e.finish(Location::Undefined))
-        {
-            Ok(bytes) => bytes,
-            Err(err) if allow_loading_failure => return Err(err),
-            Err(err) => {
-                return Err(expect_no_verification_errors(err));
-            },
-        };
+    ) -> VMResult<(usize, Arc<CompiledModule>)> {
+        let (module, size, hash_value) =
+            data_store.load_compiled_module_to_cache(id.clone(), allow_loading_failure)?;
 
-        // for bytes obtained from the data store, they should always deserialize and verify.
-        // It is an invariant violation if they don't.
-        let module =
-            CompiledModule::deserialize_with_config(&bytes, &self.vm_config.deserializer_config)
-                .map_err(|err| {
-                    let msg = format!("Deserialization error: {:?}", err);
-                    PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
-                        .with_message(msg)
-                        .finish(Location::Module(id.clone()))
-                })
-                .map_err(expect_no_verification_errors)?;
-
-        fail::fail_point!("verifier-failpoint-2", |_| { Ok(module.clone()) });
+        fail::fail_point!("verifier-failpoint-2", |_| { Ok((size, module.clone())) });
 
         if self.vm_config.paranoid_type_checks && &module.self_id() != id {
             return Err(
@@ -882,10 +940,6 @@ impl Loader {
         }
 
         // Verify the module if it hasn't been verified before.
-        let mut sha3_256 = Sha3_256::new();
-        sha3_256.update(bytes);
-        let hash_value: [u8; 32] = sha3_256.finalize().into();
-
         if VERIFIED_MODULES.lock().get(&hash_value).is_none() {
             move_bytecode_verifier::verify_module_with_config(&self.vm_config.verifier, &module)
                 .map_err(expect_no_verification_errors)?;
@@ -895,7 +949,7 @@ impl Loader {
 
         self.check_natives(&module)
             .map_err(expect_no_verification_errors)?;
-        Ok(module)
+        Ok((size, module))
     }
 
     // Everything in `load_and_verify_module` and also recursively load and verify all the
@@ -904,7 +958,7 @@ impl Loader {
         &self,
         id: &ModuleId,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
-        data_store: &TransactionDataCache,
+        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
         visited: &mut BTreeSet<ModuleId>,
         friends_discovered: &mut BTreeSet<ModuleId>,
@@ -918,7 +972,8 @@ impl Loader {
         }
 
         // module self-check
-        let module = self.load_and_verify_module(id, data_store, allow_module_loading_failure)?;
+        let (size, module) =
+            self.load_and_verify_module(id, data_store, allow_module_loading_failure)?;
         visited.insert(id.clone());
         friends_discovered.extend(module.immediate_friends());
 
@@ -937,7 +992,7 @@ impl Loader {
 
         // if linking goes well, insert the module to the code cache
         let module_ref =
-            module_store.insert(&self.natives, id.clone(), module, &self.name_cache)?;
+            module_store.insert(&self.natives, id.clone(), size, module, &self.name_cache)?;
 
         Ok(module_ref)
     }
@@ -947,7 +1002,7 @@ impl Loader {
         &self,
         module: &CompiledModule,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
-        data_store: &TransactionDataCache,
+        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
         visited: &mut BTreeSet<ModuleId>,
         friends_discovered: &mut BTreeSet<ModuleId>,
@@ -1014,7 +1069,7 @@ impl Loader {
         id: &ModuleId,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         bundle_unverified: &BTreeSet<ModuleId>,
-        data_store: &TransactionDataCache,
+        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
         allow_module_loading_failure: bool,
         dependencies_depth: usize,
@@ -1054,7 +1109,7 @@ impl Loader {
         friends_discovered: BTreeSet<ModuleId>,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         bundle_unverified: &BTreeSet<ModuleId>,
-        data_store: &TransactionDataCache,
+        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
         allow_friend_loading_failure: bool,
         dependencies_depth: usize,
@@ -2170,7 +2225,7 @@ impl Loader {
     pub(crate) fn get_type_layout(
         &self,
         type_tag: &TypeTag,
-        move_storage: &TransactionDataCache,
+        move_storage: &mut TransactionDataCache,
         module_storage: &ModuleStorageAdapter,
     ) -> VMResult<MoveTypeLayout> {
         let ty = self.load_type(type_tag, move_storage, module_storage)?;
@@ -2181,7 +2236,7 @@ impl Loader {
     pub(crate) fn get_fully_annotated_type_layout(
         &self,
         type_tag: &TypeTag,
-        move_storage: &TransactionDataCache,
+        move_storage: &mut TransactionDataCache,
         module_storage: &ModuleStorageAdapter,
     ) -> VMResult<MoveTypeLayout> {
         let ty = self.load_type(type_tag, move_storage, module_storage)?;

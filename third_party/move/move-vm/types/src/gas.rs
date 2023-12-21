@@ -299,6 +299,8 @@ pub trait GasMeter {
     ) -> PartialVMResult<()>;
 
     fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()>;
+
+    fn charge_dependency(&mut self, module_id: &ModuleId, size: NumBytes) -> PartialVMResult<()>;
 }
 
 /// A dummy gas meter that does not meter anything.
@@ -532,6 +534,10 @@ impl GasMeter for UnmeteredGasMeter {
     }
 
     fn charge_create_ty(&mut self, _num_nodes: NumTypeNodes) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn charge_dependency(&mut self, _module_id: &ModuleId, _size: NumBytes) -> PartialVMResult<()> {
         Ok(())
     }
 }

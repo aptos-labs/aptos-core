@@ -340,7 +340,8 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
         }
     }
 
-    fn to_bcs(&self, value: Value, tag: &TypeTag) -> PartialVMResult<Vec<u8>> {
+    #[allow(clippy::wrong_self_convention)]
+    fn to_bcs(&mut self, value: Value, tag: &TypeTag) -> PartialVMResult<Vec<u8>> {
         let type_layout = self
             .vm_session
             .get_type_layout(tag)
