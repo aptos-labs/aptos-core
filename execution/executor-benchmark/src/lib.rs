@@ -66,6 +66,7 @@ where
             false,
             config.storage.buffered_state_target_items,
             config.storage.max_num_nodes_per_lru_cache_shard,
+            false,
         )
         .expect("DB should open."),
     );

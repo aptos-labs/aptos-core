@@ -12,7 +12,12 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
-    contract_event, event, state_store::state_key::StateKey, transaction, write_set,
+    contract_event, event,
+    state_store::{
+        state_key::StateKey,
+        state_value::{PersistedStateValueMetadata, StateValueMetadata},
+    },
+    transaction, write_set,
 };
 use move_core_types::language_storage;
 use rand::{rngs::StdRng, SeedableRng};
@@ -70,6 +75,9 @@ pub fn get_registry() -> Result<Registry> {
         &aptos_consensus_types::block::Block::make_genesis_block(),
     )?;
     tracer.trace_value(&mut samples, &event::EventKey::random())?;
+    tracer.trace_value(&mut samples, &write_set::WriteOp::Deletion {
+        metadata: StateValueMetadata::none(),
+    })?;
 
     // 2. Trace the main entry point(s) + every enum separately.
     tracer.trace_type::<contract_event::ContractEvent>(&samples)?;
@@ -83,6 +91,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::authenticator::AnyPublicKey>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnySignature>(&samples)?;
     tracer.trace_type::<write_set::WriteOp>(&samples)?;
+    tracer.trace_type::<PersistedStateValueMetadata>(&samples)?;
 
     tracer.trace_type::<StateKey>(&samples)?;
     tracer.trace_type::<aptos_consensus::quorum_store::types::BatchResponse>(&samples)?;

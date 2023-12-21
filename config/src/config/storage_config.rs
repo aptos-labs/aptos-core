@@ -169,6 +169,7 @@ pub struct StorageConfig {
     /// Try to enable the internal indexer. The indexer expects to have seen all transactions
     /// since genesis. To recover operation after data loss, or to bootstrap a node in fast sync
     /// mode, the indexer db needs to be copied in from another node.
+    /// TODO(jill): deprecate Indexer once Indexer Async V2 is ready
     pub enable_indexer: bool,
     /// Fine grained control for db paths of individal databases/shards.
     /// If not specificed, will use `dir` as default.

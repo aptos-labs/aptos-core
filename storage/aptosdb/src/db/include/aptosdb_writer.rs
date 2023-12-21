@@ -201,6 +201,45 @@ impl DbWriter for AptosDB {
             Ok(())
         })
     }
+
+    /// Open up dbwriter for table info indexing on indexer async v2 rocksdb
+    fn index_table_info(
+        &self,
+        db_reader: Arc<dyn DbReader>,
+        first_version: Version,
+        write_sets: &[&WriteSet],
+        end_early_if_pending_on_empty: bool,
+    ) -> Result<()> {
+        gauged_api("index_table_info", || {
+            self.indexer_async_v2
+                .as_ref()
+                .map(|indexer| indexer.index_table_info(db_reader, first_version, write_sets, end_early_if_pending_on_empty))
+                .unwrap_or(Ok(()))
+        })
+    }
+
+    fn cleanup_pending_on_items(
+        &self,
+    ) -> Result<()> {
+        gauged_api("cleanup_pending_on_items", || {
+            self.indexer_async_v2
+                .as_ref()
+                .map(|indexer| indexer.cleanup_pending_on_items())
+                .unwrap_or(Ok(()))
+        })
+    }
+
+    fn update_next_version(
+        &self,
+        end_version: u64
+    ) -> Result<()> {
+        gauged_api("update_next_version", || {
+            self.indexer_async_v2
+                .as_ref()
+                .map(|indexer| indexer.update_next_version(end_version))
+                .unwrap_or(Ok(()))
+        })
+    }
 }
 
 impl AptosDB {

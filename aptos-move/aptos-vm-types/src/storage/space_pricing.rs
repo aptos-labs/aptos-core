@@ -33,7 +33,7 @@ impl DiskSpacePricing {
         params: &TransactionGasParameters,
         key: &StateKey,
         op_size: &WriteOpSize,
-        metadata: Option<&mut StateValueMetadata>,
+        metadata: &mut StateValueMetadata,
     ) -> ChargeAndRefund {
         match self {
             Self::V1 => Self::charge_refund_write_op_v1(params, key, op_size, metadata),
@@ -97,7 +97,7 @@ impl DiskSpacePricing {
         params: &TransactionGasParameters,
         key: &StateKey,
         op_size: &WriteOpSize,
-        metadata: Option<&mut StateValueMetadata>,
+        metadata: &mut StateValueMetadata,
     ) -> ChargeAndRefund {
         use WriteOpSize::*;
 
@@ -107,8 +107,8 @@ impl DiskSpacePricing {
                 let bytes_fee = Self::discounted_write_op_size_for_v1(params, key, *write_len)
                     * params.storage_fee_per_excess_state_byte;
 
-                if let Some(m) = metadata {
-                    m.set_deposit(slot_fee.into())
+                if !metadata.is_none() {
+                    metadata.set_slot_deposit(slot_fee.into())
                 }
 
                 ChargeAndRefund {
@@ -125,17 +125,9 @@ impl DiskSpacePricing {
                     refund: 0.into(),
                 }
             },
-            Deletion => {
-                let refund = match metadata {
-                    None => 0,
-                    Some(m) => m.deposit(),
-                }
-                .into();
-
-                ChargeAndRefund {
-                    charge: 0.into(),
-                    refund,
-                }
+            Deletion => ChargeAndRefund {
+                charge: 0.into(),
+                refund: metadata.total_deposit().into(),
             },
         }
     }

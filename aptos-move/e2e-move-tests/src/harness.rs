@@ -559,7 +559,7 @@ impl MoveHarness {
         &self,
         addr: &AccountAddress,
         struct_tag: StructTag,
-    ) -> Option<Option<StateValueMetadata>> {
+    ) -> Option<StateValueMetadata> {
         self.read_state_value(&StateKey::access_path(
             AccessPath::resource_access_path(*addr, struct_tag).expect("access path in test"),
         ))

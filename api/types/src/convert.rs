@@ -421,7 +421,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         key: &[u8],
         value: &[u8],
     ) -> Result<Option<DecodedTableData>> {
-        if !self.db.indexer_enabled() {
+        if !self.db.indexer_enabled() && !self.db.indexer_async_v2_enabled() {
             return Ok(None);
         }
         let table_info = match self.db.get_table_info(handle) {
@@ -450,7 +450,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         handle: TableHandle,
         key: &[u8],
     ) -> Result<Option<DeletedTableData>> {
-        if !self.db.indexer_enabled() {
+        if !self.db.indexer_enabled() && !self.db.indexer_async_v2_enabled() {
             return Ok(None);
         }
         let table_info = match self.db.get_table_info(handle) {

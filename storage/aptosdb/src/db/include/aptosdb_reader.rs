@@ -742,12 +742,40 @@ impl DbReader for AptosDB {
         self.indexer.is_some()
     }
 
+    /// Returns whether the indexer async v2 DB has been enabled or not
+    fn indexer_async_v2_enabled(&self) -> bool {
+        self.indexer_async_v2.is_some()
+    }
+
     fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
         gauged_api("get_state_storage_usage", || {
             if let Some(v) = version {
                 self.error_if_ledger_pruned("state storage usage", v)?;
             }
             self.state_store.get_usage(version)
+        })
+    }
+
+    /// Returns the next version for indexer async v2 to be processed
+    /// It is mainly used by table info service to decide the start version
+    fn get_indexer_async_v2_next_version(&self) -> Result<Version> {
+        gauged_api("get_indexer_async_v2_next_version", || {
+            Ok(self
+                .indexer_async_v2
+                .as_ref()
+                .map(|indexer| indexer.next_version())
+                .unwrap_or(0))
+        })
+    }
+
+    fn is_indexer_async_v2_pending_on_empty(&self) -> Result<bool> {
+        gauged_api("is_indexer_async_v2_pending_on_empty", || {
+            Ok(self
+                .indexer_async_v2
+                .as_ref()
+                .map(|indexer| indexer.is_indexer_async_v2_pending_on_empty())
+                .unwrap_or(false)
+            )
         })
     }
 }
@@ -918,11 +946,28 @@ impl AptosDB {
     }
 
     fn get_table_info_option(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
+        if self.indexer_async_v2_enabled() {
+            return self.get_table_info_from_indexer_async_v2(handle);
+        }
+
+        self.get_table_info_from_indexer(handle)
+    }
+
+    fn get_table_info_from_indexer_async_v2(
+        &self,
+        handle: TableHandle,
+    ) -> Result<Option<TableInfo>> {
+        match &self.indexer_async_v2 {
+            Some(indexer_async_v2) => indexer_async_v2.get_table_info_with_retry(handle),
+            None => bail!("Indexer Async V2 not enabled."),
+        }
+    }
+
+    /// TODO(jill): deprecate Indexer once Indexer Async V2 is ready
+    fn get_table_info_from_indexer(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
         match &self.indexer {
             Some(indexer) => indexer.get_table_info(handle),
-            None => {
-                bail!("Indexer not enabled.");
-            },
+            None => bail!("Indexer not enabled."),
         }
     }
 }

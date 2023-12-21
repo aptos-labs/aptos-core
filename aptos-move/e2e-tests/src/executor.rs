@@ -48,8 +48,8 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        EntryFunction, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
-        TransactionPayload, TransactionStatus, VMValidatorResult,
+        BlockOutput, EntryFunction, ExecutionStatus, SignedTransaction, Transaction,
+        TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
     },
     vm_status::VMStatus,
     write_set::WriteSet,
@@ -487,7 +487,7 @@ impl FakeExecutor {
                 onchain: onchain_config,
             },
             None,
-        )
+        ).map(BlockOutput::into_transaction_outputs_forced)
     }
 
     pub fn execute_transaction_block(
@@ -521,11 +521,14 @@ impl FakeExecutor {
         let onchain_config = BlockExecutorConfigFromOnchain::on_but_large_for_test();
 
         let sequential_output = if mode != ExecutorMode::ParallelOnly {
-            Some(AptosVM::execute_block(
-                &sig_verified_block,
-                &self.data_store,
-                onchain_config.clone(),
-            ))
+            Some(
+                AptosVM::execute_block(
+                    &sig_verified_block,
+                    &self.data_store,
+                    onchain_config.clone(),
+                )
+                .map(BlockOutput::into_transaction_outputs_forced),
+            )
         } else {
             None
         };

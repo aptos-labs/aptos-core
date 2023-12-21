@@ -337,8 +337,9 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> transaction::WriteSe
         WriteSetChange::DeleteTableItem(delete_table_item) => {
             let data = delete_table_item.data.as_ref().unwrap_or_else(|| {
                 panic!(
-                    "Could not extract data from DeletedTableItem '{:?}'",
-                    delete_table_item
+                    "Could not extract data from DeletedTableItem '{:?}' with handle '{:?}'",
+                    delete_table_item,
+                    delete_table_item.handle.to_string()
                 )
             });
 
@@ -389,8 +390,9 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> transaction::WriteSe
         WriteSetChange::WriteTableItem(write_table_item) => {
             let data = write_table_item.data.as_ref().unwrap_or_else(|| {
                 panic!(
-                    "Could not extract data from DecodedTableData '{:?}'",
-                    write_table_item
+                    "Could not extract data from DecodedTableData '{:?}' with handle '{:?}'",
+                    write_table_item,
+                    write_table_item.handle.to_string(),
                 )
             });
             transaction::WriteSetChange {

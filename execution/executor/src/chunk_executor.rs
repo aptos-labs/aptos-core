@@ -754,7 +754,6 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
                     .map(|txn_info| txn_info.state_checkpoint_hash())
                     .collect(),
             ),
-            None,
         )?;
         ensure_no_discard(to_discard)?;
         ensure_no_retry(to_retry)?;

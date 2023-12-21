@@ -11,7 +11,12 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
-    contract_event, event, state_store::state_key::StateKey, transaction, write_set,
+    contract_event, event,
+    state_store::{
+        state_key::StateKey,
+        state_value::{PersistedStateValueMetadata, StateValueMetadata},
+    },
+    transaction, write_set,
 };
 use move_core_types::language_storage;
 use rand::{rngs::StdRng, SeedableRng};
@@ -63,6 +68,9 @@ pub fn get_registry() -> Result<Registry> {
     // 1. Record samples for types with custom deserializers.
     trace_crypto_values(&mut tracer, &mut samples)?;
     tracer.trace_value(&mut samples, &event::EventKey::random())?;
+    tracer.trace_value(&mut samples, &write_set::WriteOp::Deletion {
+        metadata: StateValueMetadata::none(),
+    })?;
 
     // 2. Trace the main entry point(s) + every enum separately.
     tracer.trace_type::<contract_event::ContractEvent>(&samples)?;
@@ -72,6 +80,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::TransactionPayload>(&samples)?;
     tracer.trace_type::<transaction::WriteSetPayload>(&samples)?;
     tracer.trace_type::<StateKey>(&samples)?;
+    tracer.trace_type::<PersistedStateValueMetadata>(&samples)?;
 
     tracer.trace_type::<transaction::authenticator::AccountAuthenticator>(&samples)?;
     tracer.trace_type::<transaction::authenticator::TransactionAuthenticator>(&samples)?;

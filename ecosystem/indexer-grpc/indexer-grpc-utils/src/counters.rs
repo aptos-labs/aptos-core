@@ -24,6 +24,9 @@ pub enum IndexerGrpcStep {
     FullnodeDecodedBatch, // [Indexer Fullnode] Decoded batch of transactions from fullnode
     FullnodeProcessedBatch, // [Indexer Fullnode] Processed batch of transactions from fullnode
     FullnodeSentBatch,    // [Indexer Fullnode] Sent batch successfully
+
+    TableInfoProcessedBatch, // [Indexer Table Info] Processed batch of transactions from fullnode
+    TableInfoProcessed,      // [Indexer Table Info] Processed transactions from fullnode
 }
 
 impl IndexerGrpcStep {
@@ -47,6 +50,9 @@ impl IndexerGrpcStep {
             IndexerGrpcStep::FullnodeDecodedBatch => "2",
             IndexerGrpcStep::FullnodeSentBatch => "3",
             IndexerGrpcStep::FullnodeProcessedBatch => "4",
+            // Table info service steps
+            IndexerGrpcStep::TableInfoProcessedBatch => "1",
+            IndexerGrpcStep::TableInfoProcessed => "2",
         }
     }
 
@@ -76,6 +82,13 @@ impl IndexerGrpcStep {
             IndexerGrpcStep::FullnodeDecodedBatch => "[Indexer Fullnode] Decoded batch of transactions from fullnode",
             IndexerGrpcStep::FullnodeProcessedBatch => "[Indexer Fullnode] Processed batch of transactions from fullnode",
             IndexerGrpcStep::FullnodeSentBatch => "[Indexer Fullnode] Sent batch successfully",
+            // Table info service steps
+            IndexerGrpcStep::TableInfoProcessedBatch => {
+                "[Indexer Table Info] Processed batch successfully"
+            },
+            IndexerGrpcStep::TableInfoProcessed => {
+                "[Indexer Table Info] Processed successfully"
+            },
         }
     }
 }

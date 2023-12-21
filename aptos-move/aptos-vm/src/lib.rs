@@ -128,8 +128,8 @@ use aptos_types::{
         config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
     },
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
-        TransactionOutput, VMValidatorResult,
+        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
+        SignedTransaction, TransactionOutput, VMValidatorResult,
     },
     vm_status::VMStatus,
 };
@@ -158,7 +158,21 @@ pub trait VMExecutor: Send + Sync {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<Vec<TransactionOutput>, VMStatus>;
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus>;
+
+    /// Executes a block of transactions and returns output for each one of them,
+    /// Without applying any block limit
+    fn execute_block_no_limit(
+        transactions: &[SignatureVerifiedTransaction],
+        state_view: &(impl StateView + Sync),
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        Self::execute_block(
+            transactions,
+            state_view,
+            BlockExecutorConfigFromOnchain::new_no_block_limit(),
+        )
+        .map(BlockOutput::into_transaction_outputs_forced)
+    }
 
     /// Executes a block of transactions using a sharded block executor and returns the results.
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(

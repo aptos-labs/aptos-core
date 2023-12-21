@@ -54,10 +54,9 @@ where
             .ledger_update(block_id, parent_block_id, state_checkpoint_output)
             .unwrap();
 
-        let num_txns = output.compute_status().len();
-        self.version += num_txns as Version;
+        self.version += output.transactions_to_commit_len() as Version;
         let discards = output
-            .compute_status()
+            .compute_status_for_input_txns()
             .iter()
             .flat_map(|status| match status.status() {
                 Ok(_) => None,
@@ -66,7 +65,7 @@ where
             .collect::<Vec<_>>();
 
         let aborts = output
-            .compute_status()
+            .compute_status_for_input_txns()
             .iter()
             .flat_map(|status| match status.status() {
                 Ok(execution_status) => {
@@ -84,7 +83,7 @@ where
                 "Some transactions were not successful: {} discards and {} aborts out of {}, examples: discards: {:?}, aborts: {:?}",
                 discards.len(),
                 aborts.len(),
-                output.compute_status().len(),
+                output.compute_status_for_input_txns().len(),
                 &discards[..(discards.len().min(3))],
                 &aborts[..(aborts.len().min(3))]
             )
@@ -111,7 +110,7 @@ where
                 current_block_start_time,
                 partition_time,
                 execution_time,
-                num_txns: num_txns - discards.len(),
+                num_txns: output.transactions_to_commit_len(),
             };
             commit_sender.send(msg).unwrap();
         } else {

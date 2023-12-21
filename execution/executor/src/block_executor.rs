@@ -253,10 +253,7 @@ where
                     .start_timer();
 
                 THREAD_MANAGER.get_exe_cpu_pool().install(|| {
-                    chunk_output.into_state_checkpoint_output(
-                        parent_output.state(),
-                        onchain_config.has_any_block_gas_limit().then_some(block_id),
-                    )
+                    chunk_output.into_state_checkpoint_output(parent_output.state(), block_id)
                 })?
             };
 
