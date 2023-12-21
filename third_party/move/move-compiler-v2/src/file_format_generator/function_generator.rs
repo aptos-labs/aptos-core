@@ -460,6 +460,9 @@ impl<'a> FunctionGenerator<'a> {
                 self.gen_builtin(ctx, dest, FF::Bytecode::WriteRef, &[source[1], source[0]])
             },
             Operation::Destroy => {
+                // Currently Destroy is only translated for references. It may also make
+                // sense for other values, as we may figure later. Its known to be required
+                // for references to make the bytecode verifier happy.
                 if ctx.fun_ctx.fun.get_local_type(source[0]).is_reference() {
                     self.gen_builtin(ctx, dest, FF::Bytecode::Pop, source)
                 }

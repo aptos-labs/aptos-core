@@ -631,7 +631,7 @@ impl<'env> LifeTimeAnalysis<'env> {
                 self.error_with_hints(
                     edge.loc.as_ref().expect("only Skip edge has no location"),
                     format!(
-                        "cannot mutable borrow {} since other references exists",
+                        "cannot mutably borrow {} since other references exists",
                         msg_for_source()
                     ),
                     "mutable borrow attempted here",
@@ -644,7 +644,7 @@ impl<'env> LifeTimeAnalysis<'env> {
                 self.error_with_hints(
                     edge.loc.as_ref().expect("only Skip edge has no location"),
                     format!(
-                        "cannot immutable borrow {} since other mutable references exist",
+                        "cannot immutably borrow {} since other mutable references exist",
                         msg_for_source()
                     ),
                     "immutable borrow attempted here",
@@ -1098,6 +1098,7 @@ impl<'env> LifeTimeAnalysis<'env> {
                 self.borrow_info(state, &label, false, alive).into_iter(),
             )
         }
+        state.moved.insert(src);
         state.moved.remove(&dest);
     }
 
@@ -1393,7 +1394,7 @@ impl FunctionTargetProcessor for ReferenceSafetyProcessor {
                 after: after.clone(),
             },
         );
-        // For dead code, there may be wholes in the map. Identify those and populate with default so
+        // For dead code, there may be holes in the map. Identify those and populate with default so
         // that each code offset actually has an annotation.
         for offset in 0..code.len() {
             state_map_per_instr
