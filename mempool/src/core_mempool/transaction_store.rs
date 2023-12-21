@@ -379,7 +379,7 @@ impl TransactionStore {
     fn log_ready_transaction(
         ranking_score: u64,
         bucket: &str,
-        insertion_info: InsertionInfo,
+        insertion_info: &InsertionInfo,
         broadcast_ready: bool,
     ) {
         if let Ok(time_delta) = SystemTime::now().duration_since(insertion_info.insertion_time) {
@@ -445,7 +445,7 @@ impl TransactionStore {
                     Self::log_ready_transaction(
                         txn.ranking_score,
                         self.timeline_index.get_bucket(txn.ranking_score),
-                        txn.insertion_info,
+                        &txn.insertion_info,
                         process_broadcast_ready,
                     );
                 }
@@ -606,7 +606,7 @@ impl TransactionStore {
                         }
                         let bucket = self.timeline_index.get_bucket(txn.ranking_score);
                         Mempool::log_txn_latency(
-                            txn.insertion_info,
+                            &txn.insertion_info,
                             bucket,
                             BROADCAST_BATCHED_LABEL,
                         );
