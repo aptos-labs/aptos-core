@@ -289,11 +289,9 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
                 let key = CacheEntryKey::new(
                     version - CACHE_SIZE_EVICTION_LOWER_BOUND,
                     self.storage_format,
-                ).to_string();
-                redis_pipeline
-                    .cmd("DEL")
-                    .arg(key)
-                    .ignore();
+                )
+                .to_string();
+                redis_pipeline.cmd("DEL").arg(key).ignore();
             }
         }
         // Note: this method is and should be only used by `cache_worker`.
@@ -305,6 +303,61 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
             Some(end_version as i64),
             start_txn_timestamp.as_ref(),
             end_txn_timestamp.as_ref(),
+            Some(start_time.elapsed().as_secs_f64()),
+            Some(size_in_bytes),
+            Some(num_transactions as i64),
+            None,
+        );
+
+        let redis_result: RedisResult<()> =
+            redis_pipeline.query_async::<_, _>(&mut self.conn).await;
+
+        match redis_result {
+            Ok(_) => Ok(()),
+            Err(err) => Err(err.into()),
+        }
+    }
+
+    pub async fn update_cache_transactions_with_bytes(
+        &mut self,
+        transactions: Vec<Vec<u8>>,
+        start_version: u64,
+    ) -> anyhow::Result<()> {
+        let end_version = start_version + transactions.len() as u64 - 1;
+        let num_transactions = transactions.len();
+        let size_in_bytes = transactions.iter().map(|e| e.len()).sum::<usize>();
+        let mut redis_pipeline = redis::pipe();
+        let start_time = std::time::Instant::now();
+        let storage_format = self.storage_format;
+        for (i, transaction) in transactions.into_iter().enumerate() {
+            let version = start_version + i as u64;
+            let cache_key = CacheEntryKey::new(version, storage_format).to_string();
+            redis_pipeline
+                .cmd("SET")
+                .arg(cache_key)
+                .arg(transaction)
+                .arg("EX")
+                .arg(get_ttl_in_seconds(0))
+                .ignore();
+            // Actively evict the expired cache. This is to avoid using Redis
+            // eviction policy, which is probabilistic-based and may evict the
+            // cache that is still needed.
+            if version >= CACHE_SIZE_EVICTION_LOWER_BOUND {
+                let key =
+                    CacheEntryKey::new(version - CACHE_SIZE_EVICTION_LOWER_BOUND, storage_format)
+                        .to_string();
+                redis_pipeline.cmd("DEL").arg(key).ignore();
+            }
+        }
+        // Note: this method is and should be only used by `cache_worker`.
+        let service_type = "cache_worker";
+        log_grpc_step(
+            service_type,
+            IndexerGrpcStep::CacheWorkerTxnEncoded,
+            Some(start_version as i64),
+            Some(end_version as i64),
+            None,
+            None,
             Some(start_time.elapsed().as_secs_f64()),
             Some(size_in_bytes),
             Some(num_transactions as i64),
