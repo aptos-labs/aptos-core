@@ -21,21 +21,6 @@ module std::config_for_next_epoch {
         locked: bool,
     }
 
-    /// We need to allow extraction of pending configs ONLY when we are at the end of a reconfiguration.
-    struct ExtractPermit has copy, drop, key {}
-
-    public fun extracts_enabled(): bool {
-        exists<ExtractPermit>(@vm) || exists<ExtractPermit>(@std)
-    }
-
-    public fun enable_extracts(account: &signer) {
-        move_to(account, ExtractPermit {});
-    }
-
-    public fun disable_extracts(account: &signer) acquires ExtractPermit {
-        move_from<ExtractPermit>(address_of(account));
-    }
-
     public fun upserts_enabled(): bool acquires UpsertLock {
         !latest_upsert_lock_state().locked
     }

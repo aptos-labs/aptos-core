@@ -8,11 +8,7 @@ This wrapper helps store an on-chain config for the next epoch.
 
 -  [Resource `ForNextEpoch`](#0x1_config_for_next_epoch_ForNextEpoch)
 -  [Resource `UpsertLock`](#0x1_config_for_next_epoch_UpsertLock)
--  [Resource `ExtractPermit`](#0x1_config_for_next_epoch_ExtractPermit)
 -  [Constants](#@Constants_0)
--  [Function `extracts_enabled`](#0x1_config_for_next_epoch_extracts_enabled)
--  [Function `enable_extracts`](#0x1_config_for_next_epoch_enable_extracts)
--  [Function `disable_extracts`](#0x1_config_for_next_epoch_disable_extracts)
 -  [Function `upserts_enabled`](#0x1_config_for_next_epoch_upserts_enabled)
 -  [Function `disable_upserts`](#0x1_config_for_next_epoch_disable_upserts)
 -  [Function `enable_upserts`](#0x1_config_for_next_epoch_enable_upserts)
@@ -94,34 +90,6 @@ We need to temporarily reject on-chain config changes during DKG.
 
 </details>
 
-<a id="0x1_config_for_next_epoch_ExtractPermit"></a>
-
-## Resource `ExtractPermit`
-
-We need to allow extraction of pending configs ONLY when we are at the end of a reconfiguration.
-
-
-<pre><code><b>struct</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ExtractPermit">ExtractPermit</a> <b>has</b> <b>copy</b>, drop, key
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>dummy_field: bool</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
 <a id="@Constants_0"></a>
 
 ## Constants
@@ -171,78 +139,6 @@ We need to allow extraction of pending configs ONLY when we are at the end of a 
 </code></pre>
 
 
-
-<a id="0x1_config_for_next_epoch_extracts_enabled"></a>
-
-## Function `extracts_enabled`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_extracts_enabled">extracts_enabled</a>(): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_extracts_enabled">extracts_enabled</a>(): bool {
-    <b>exists</b>&lt;<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ExtractPermit">ExtractPermit</a>&gt;(@vm) || <b>exists</b>&lt;<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ExtractPermit">ExtractPermit</a>&gt;(@std)
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_config_for_next_epoch_enable_extracts"></a>
-
-## Function `enable_extracts`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_enable_extracts">enable_extracts</a>(account: &<a href="signer.md#0x1_signer">signer</a>)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_enable_extracts">enable_extracts</a>(account: &<a href="signer.md#0x1_signer">signer</a>) {
-    <b>move_to</b>(account, <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ExtractPermit">ExtractPermit</a> {});
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_config_for_next_epoch_disable_extracts"></a>
-
-## Function `disable_extracts`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_disable_extracts">disable_extracts</a>(account: &<a href="signer.md#0x1_signer">signer</a>)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_disable_extracts">disable_extracts</a>(account: &<a href="signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ExtractPermit">ExtractPermit</a> {
-    <b>move_from</b>&lt;<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ExtractPermit">ExtractPermit</a>&gt;(address_of(account));
-}
-</code></pre>
-
-
-
-</details>
 
 <a id="0x1_config_for_next_epoch_upserts_enabled"></a>
 
