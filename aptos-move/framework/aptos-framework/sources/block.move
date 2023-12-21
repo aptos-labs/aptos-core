@@ -4,6 +4,7 @@ module aptos_framework::block {
     use std::features;
     use std::vector;
     use std::option;
+    use std::signer::address_of;
     use aptos_std::randomness;
 
     use aptos_framework::account;
@@ -101,7 +102,7 @@ module aptos_framework::block {
     }
 
     fun block_prologue_common(
-        vm: &signer,
+        account: &signer,
         hash: address,
         epoch: u64,
         round: u64,
@@ -111,7 +112,7 @@ module aptos_framework::block {
         timestamp: u64
     ): u64 acquires BlockResource {
         // Operational constraint: can only be invoked by the VM.
-        system_addresses::assert_vm(vm);
+        system_addresses::is_reserved_address(address_of(account));
 
         // Blocks can only be produced by a valid proposer or by the VM itself for Nil blocks (no user txs).
         assert!(
@@ -137,7 +138,7 @@ module aptos_framework::block {
             failed_proposer_indices,
             time_microseconds: timestamp,
         };
-        emit_new_block_event(vm, &mut block_metadata_ref.new_block_events, new_block_event);
+        emit_new_block_event(account, &mut block_metadata_ref.new_block_events, new_block_event);
 
         if (features::collect_and_distribute_gas_fees()) {
             // Assign the fees collected from the previous block to the previous block proposer.
@@ -175,8 +176,9 @@ module aptos_framework::block {
     }
 
     /// `block_prologue()` but do reconfiguration with DKG after epoch timed out.
+    /// It will also run as account `0x1` to make on-chain config locking easier.
     fun block_prologue_ext(
-        vm: signer,
+        account: signer,
         hash: address,
         epoch: u64,
         round: u64,
@@ -189,11 +191,11 @@ module aptos_framework::block {
     ) acquires BlockResource {
         assert!(features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
 
-        let epoch_interval = block_prologue_common(&vm, hash, epoch, round, proposer, failed_proposer_indices, previous_block_votes_bitvec, timestamp);
-        randomness::on_new_block(&vm, randomness_available, randomness);
+        let epoch_interval = block_prologue_common(&account, hash, epoch, round, proposer, failed_proposer_indices, previous_block_votes_bitvec, timestamp);
+        randomness::on_new_block(&account, randomness_available, randomness);
 
         if (!dkg::in_progress() && timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
-            reconfiguration_with_dkg::start(&vm);
+            reconfiguration_with_dkg::start(&account);
         };
     }
 
@@ -204,8 +206,9 @@ module aptos_framework::block {
     }
 
     /// Emit the event and update height and global timestamp
-    fun emit_new_block_event(vm: &signer, event_handle: &mut EventHandle<NewBlockEvent>, new_block_event: NewBlockEvent) {
-        timestamp::update_global_time(vm, new_block_event.proposer, new_block_event.time_microseconds);
+    fun emit_new_block_event(
+        account: &signer, event_handle: &mut EventHandle<NewBlockEvent>, new_block_event: NewBlockEvent) {
+        timestamp::update_global_time(account, new_block_event.proposer, new_block_event.time_microseconds);
         assert!(
             event::counter(event_handle) == new_block_event.height,
             error::invalid_argument(ENUM_NEW_BLOCK_EVENTS_DOES_NOT_MATCH_BLOCK_HEIGHT),

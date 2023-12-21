@@ -92,7 +92,7 @@ spec aptos_framework::block {
         let timestamp = new_block_event.time_microseconds;
 
         requires chain_status::is_operating();
-        requires system_addresses::is_vm(vm);
+        requires system_addresses::is_vm(account);
         requires (proposer == @vm_reserved) ==> (timestamp::spec_now_microseconds() == timestamp);
         requires (proposer != @vm_reserved) ==> (timestamp::spec_now_microseconds() < timestamp);
         /// [high-level-req-5]

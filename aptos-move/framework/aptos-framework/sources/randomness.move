@@ -11,13 +11,13 @@ module aptos_std::randomness {
     }
 
     /// Invoked in `block_prologue_ext()` to update the block-level seed randomness.
-    public(friend) fun on_new_block(vm: &signer, randomness_available: bool, block_randomness: vector<u8>) acquires BlockRandomness {
-        system_addresses::assert_vm(vm);
-        if (exists<BlockRandomness>(@vm)) {
-            move_from<BlockRandomness>(@vm);
+    public(friend) fun on_new_block(account: &signer, randomness_available: bool, block_randomness: vector<u8>) acquires BlockRandomness {
+        system_addresses::assert_aptos_framework(account);
+        if (exists<BlockRandomness>(@aptos_framework)) {
+            move_from<BlockRandomness>(@aptos_framework);
         };
         if (randomness_available) {
-            move_to(vm, BlockRandomness { block_randomness })
+            move_to(account, BlockRandomness { block_randomness })
         };
     }
 }
