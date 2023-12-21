@@ -469,6 +469,17 @@ where
 
         self.algebra.charge_execution(cost)
     }
+
+    #[inline]
+    fn charge_dependency(&mut self, module_id: &ModuleId, size: NumBytes) -> PartialVMResult<()> {
+        // TODO: How about 0xA550C18?
+        if self.feature_version() >= 14 && !module_id.address().is_special() {
+            self.algebra
+                .charge_execution(DEPENDENCY_PER_MODULE + DEPENDENCY_PER_BYTE * size)?;
+            self.algebra.count_dependency(size)?;
+        }
+        Ok(())
+    }
 }
 
 impl<A> AptosGasMeter for StandardGasMeter<A>

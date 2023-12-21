@@ -109,6 +109,32 @@ impl TransactionGasLog {
             data.insert("intrinsic-percentage".to_string(), json!(percentage));
         }
 
+        let mut deps = self.exec_io.dependencies.clone();
+        deps.sort_by(|lhs, rhs| rhs.cost.cmp(&lhs.cost));
+        data.insert(
+            "deps".to_string(),
+            Value::Array(
+                deps.iter()
+                    .map(|dep| {
+                        let name = format!("{}", Render(&dep.id));
+                        let cost_scaled =
+                            format!("{:.8}", (u64::from(dep.cost) as f64 / scaling_factor));
+                        let cost_scaled =
+                            crate::misc::strip_trailing_zeros_and_decimal_point(&cost_scaled);
+                        let percentage =
+                            format!("{:.2}%", u64::from(dep.cost) as f64 / total_exec_io * 100.0);
+
+                        json!({
+                            "name": name,
+                            "size": u64::from(dep.size),
+                            "cost": cost_scaled,
+                            "percentage": percentage,
+                        })
+                    })
+                    .collect(),
+            ),
+        );
+
         // Execution & IO (aggregated)
         let aggregated: crate::aggregate::AggregatedExecutionGasEvents =
             self.exec_io.aggregate_gas_events();

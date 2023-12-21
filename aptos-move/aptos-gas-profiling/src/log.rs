@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_gas_algebra::{Fee, GasScalingFactor, InternalGas};
+use aptos_gas_algebra::{Fee, GasScalingFactor, InternalGas, NumBytes};
 use aptos_types::state_store::state_key::StateKey;
 use move_binary_format::{file_format::CodeOffset, file_format_common::Opcodes};
 use move_core_types::{
@@ -94,18 +94,28 @@ pub struct EventStorage {
     pub cost: Fee,
 }
 
+#[derive(Debug, Clone)]
+/// Struct representing the cost of a dependency.
+pub struct Dependency {
+    pub id: ModuleId,
+    pub size: NumBytes,
+    pub cost: InternalGas,
+}
+
+/// Struct containing all execution and io costs.
 #[derive(Debug)]
 pub struct ExecutionAndIOCosts {
     pub gas_scaling_factor: GasScalingFactor,
     pub total: InternalGas,
 
     pub intrinsic_cost: InternalGas,
+    pub dependencies: Vec<Dependency>,
     pub call_graph: CallFrame,
     pub write_set_transient: Vec<WriteTransient>,
 }
 
 #[derive(Debug)]
-// Struct containing all types of storage fees.
+/// Struct containing all types of storage fees.
 pub struct StorageFees {
     pub total: Fee,
     pub total_refund: Fee,
@@ -218,6 +228,10 @@ impl ExecutionAndIOCosts {
         let mut total = InternalGas::zero();
 
         total += self.intrinsic_cost;
+
+        for dep in &self.dependencies {
+            total += dep.cost;
+        }
 
         for op in self.gas_events() {
             match op {
