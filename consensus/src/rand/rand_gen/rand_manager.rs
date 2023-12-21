@@ -113,7 +113,7 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
             .lock()
             .add_share(self_share)
             .expect("Add self share should succeed");
-        self.aggregate_shares_task(metadata)
+        self.spawn_aggregate_shares_task(metadata)
     }
 
     fn process_ready_blocks(&mut self, ready_blocks: Vec<OrderedBlocks>) {
@@ -178,28 +178,40 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
         }
     }
 
-    fn aggregate_shares_task(&self, metadata: RandMetadata) -> DropGuard {
+    fn spawn_aggregate_shares_task(&self, metadata: RandMetadata) -> DropGuard {
         let rb = self.reliable_broadcast.clone();
         let aggregate_state = Arc::new(ShareAggregateState::new(
             self.rand_store.clone(),
             metadata.clone(),
             self.config.clone(),
         ));
-        let epoch = metadata.epoch();
+        let epoch_state = self.epoch_state.clone();
         let round = metadata.round();
-        let request = RequestShare::new(self.epoch_state.epoch, metadata);
+        let rand_store = self.rand_store.clone();
         let task = async move {
-            info!(
-                epoch = epoch,
-                round = round,
-                "[RandManager] Start broadcasting share request",
-            );
-            rb.broadcast(request, aggregate_state).await;
-            info!(
-                epoch = epoch,
-                round = round,
-                "[RandManager] Finish broadcasting share request",
-            );
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            let maybe_existing_shares = rand_store.lock().get_all_shares_authors(&metadata);
+            if let Some(existing_shares) = maybe_existing_shares {
+                let epoch = epoch_state.epoch;
+                let request = RequestShare::new(epoch, metadata);
+                let targets = epoch_state
+                    .verifier
+                    .get_ordered_account_addresses_iter()
+                    .filter(|author| !existing_shares.contains(author))
+                    .collect::<Vec<_>>();
+                info!(
+                    epoch = epoch,
+                    round = round,
+                    "[RandManager] Start broadcasting share request for {}",
+                    targets.len(),
+                );
+                rb.multicast(request, aggregate_state, targets).await;
+                info!(
+                    epoch = epoch,
+                    round = round,
+                    "[RandManager] Finish broadcasting share request",
+                );
+            }
         };
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         tokio::spawn(Abortable::new(task, abort_registration));
