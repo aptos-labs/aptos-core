@@ -22,6 +22,8 @@ pub enum LogEvent {
     NetworkReceiveProposal,
     NewEpoch,
     NewRound,
+    ProofOfStoreInit,
+    ProofOfStoreReady,
     Propose,
     ReceiveBatchRetrieval,
     ReceiveBlockRetrieval,
