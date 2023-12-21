@@ -269,11 +269,21 @@ impl<S: Share> RandStore<S> {
         Ok(rand_item.decision().is_some())
     }
 
-    pub fn get_self_share(&mut self, metadata: &RandMetadata) -> Option<RandShare<S>> {
-        self.rand_map
+    pub fn get_self_share(
+        &mut self,
+        metadata: &RandMetadata,
+    ) -> anyhow::Result<Option<RandShare<S>>> {
+        ensure!(
+            metadata.round() <= self.highest_known_round,
+            "Request share from future round {}, highest known round {}",
+            metadata.round(),
+            self.highest_known_round
+        );
+        Ok(self
+            .rand_map
             .get(&metadata.round())
             .and_then(|item| item.get_self_share())
-            .filter(|share| share.metadata() == metadata)
+            .filter(|share| share.metadata() == metadata))
     }
 }
 
