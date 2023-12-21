@@ -186,18 +186,55 @@ impl Worker {
 async fn process_transactions_from_node_response(
     response: CacheTaskItem,
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
+    batch_start_time: &mut std::time::Instant,
 ) -> Result<()> {
     match response {
-        CacheTaskItem::UpdateCacheLatestVersion((num_of_transactions, version)) => cache_operator
-            .update_cache_latest_version(num_of_transactions, version)
-            .await
-            .context("update failure"),
+        CacheTaskItem::UpdateCacheLatestVersion((num_of_transactions, version)) => {
+            let start_version = version;
+            let end_version = start_version + num_of_transactions - 1;
+
+            cache_operator
+                .update_cache_latest_version(num_of_transactions, version)
+                .await
+                .context("update failure")?;
+            log_grpc_step(
+                SERVICE_TYPE,
+                IndexerGrpcStep::CacheWorkerBatchProcessed,
+                Some(start_version as i64),
+                Some(end_version as i64),
+                None,
+                None,
+                Some(batch_start_time.elapsed().as_secs_f64()),
+                None,
+                Some(num_of_transactions as i64),
+                None,
+            );
+            *batch_start_time = std::time::Instant::now();
+            Ok(())
+        },
         CacheTaskItem::UpdateCacheTransactions((data, first_version)) => {
             // Push to cache.
+            let start_version = first_version;
+            let end_version = start_version + data.len() as u64 - 1;
+            let num_of_transactions = data.len() as u64;
+            let start_time = std::time::Instant::now();
             cache_operator
                 .update_cache_transactions_with_bytes(data, first_version)
                 .await
-                .context("update failure")
+                .context("update failure")?;
+            log_grpc_step(
+                SERVICE_TYPE,
+                IndexerGrpcStep::CacheWorkerTxnsProcessed,
+                Some(start_version as i64),
+                Some(end_version as i64),
+                None,
+                None,
+                Some(start_time.elapsed().as_secs_f64()),
+                None,
+                Some(num_of_transactions as i64),
+                None,
+            );
+            Ok(())
         },
     }
 }
@@ -274,11 +311,17 @@ async fn process_streaming_response(
     // process the cache items.
     tokio::spawn({
         let mut cache_operator_clone = cache_operator.clone();
+
         async move {
+            let mut batch_start_time = std::time::Instant::now();
             while let Some(item) = rx.recv().await {
-                process_transactions_from_node_response(item, &mut cache_operator_clone)
-                    .await
-                    .expect("process failure");
+                process_transactions_from_node_response(
+                    item,
+                    &mut cache_operator_clone,
+                    &mut batch_start_time,
+                )
+                .await
+                .expect("process failure");
             }
             panic!("Cache worker channel closed.");
         }
@@ -377,7 +420,7 @@ async fn process_streaming_response(
 
                 log_grpc_step(
                     SERVICE_TYPE,
-                    IndexerGrpcStep::CacheWorkerTxnsProcessed,
+                    IndexerGrpcStep::CacheWorkerTxnEncoded,
                     Some(first_transaction_version as i64),
                     Some(last_transaction_version as i64),
                     first_transaction_pb_timestamp.as_ref(),
