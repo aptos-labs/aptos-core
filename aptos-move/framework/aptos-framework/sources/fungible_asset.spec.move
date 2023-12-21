@@ -49,8 +49,8 @@ spec aptos_framework::fungible_asset {
     /// Implementation: The withdraw function ensures that the store is not frozen before calling withdraw_internal
     /// which ensures that the withdrawing amount is greater than 0 and less than the total balance from the store.
     /// The withdraw_with_ref ensures that the reference's metadata matches the store metadata.
-    /// Enforcement: Audited that it aborts if the withdrawing store is frozen. Audited that it aborts if the store
-    /// doesn't have sufficient balance. Audited that the balance of the withdrawing store is reduced by amount.
+    /// Enforcement: Formally verified via [high-level-req-6.1](withdraw), [high-level-req-6.2](withdrawl_internal),
+    /// and [high-level-req-6.3](withdrawl_with_ref).
     ///
     /// No.: 7
     /// Property: Only the same type of fungible assets should be deposited in a fungible asset store, if the store is
@@ -61,7 +61,8 @@ spec aptos_framework::fungible_asset {
     /// function which validates the store's metadata and the depositing asset's metadata followed by increasing the
     /// store balance by the given amount. The deposit_with_ref ensures that the reference's metadata matches the
     /// depositing asset's metadata.
-    /// Enforcement: Audited that it aborts if the store is frozen. Audited that it aborts if the asset and asset store are different. Audited that the store's balance is increased by the deposited amount.
+    /// Enforcement: Audited that it aborts if the store is frozen. Audited that it aborts if the asset and asset store
+    /// are different. Audited that the store's balance is increased by the deposited amount.
     ///
     /// No.: 8
     /// Property: An object should only be allowed to hold one store for fungible assets.
@@ -106,7 +107,8 @@ spec aptos_framework::fungible_asset {
     /// Implementation: The set_frozen_flag function ensures that the TransferRef is provided via function argument and
     /// that the store's metadata matches the metadata from the reference. It then proceeds to update the frozen flag of
     /// the store.
-    /// Enforcement: Audited that it aborts if the metadata doesn't match. Audited that the frozen flag is updated properly.
+    /// Enforcement: Audited that it aborts if the metadata doesn't match. Audited that the frozen flag is updated
+    /// properly.
     ///
     /// No.: 14
     /// Property: Extracting a specific amount from the fungible asset should be possible only if the total amount that
@@ -114,7 +116,8 @@ spec aptos_framework::fungible_asset {
     /// Criticality: High
     /// Implementation: The extract function validates that the fungible asset has enough balance to extract and then
     /// updates it by subtracting the extracted amount.
-    /// Enforcement: Audited that it aborts if the asset didn't have sufficient balance. Audited that the balance of the asset is updated. Audited that the extract function returns the extracted asset.
+    /// Enforcement: Audited that it aborts if the asset didn't have sufficient balance. Audited that the balance of
+    /// the asset is updated. Audited that the extract function returns the extracted asset.
     ///
     /// No.: 15
     /// Property: Merging two fungible assets should only be possible if both share the same metadata.
@@ -294,6 +297,7 @@ spec aptos_framework::fungible_asset {
         aborts_if !exists<FungibleAssetEvents>(current_address_0);
 
         aborts_if (amount == 0);
+        /// [high-level-spec-6.1]
         aborts_if (is_frozen(store));
 
         let fungible_store = global<FungibleStore>(current_address_0);
@@ -349,6 +353,9 @@ spec aptos_framework::fungible_asset {
         amount: u64
         ): FungibleAsset  {
         pragma aborts_if_is_partial;
+
+        /// [high-level-req-6.3]
+        aborts_if (ref.metadata != store_metadata(store));
     }
 
     spec deposit_with_ref<T: key>(
@@ -402,6 +409,7 @@ spec aptos_framework::fungible_asset {
         aborts_if (amount == 0);
 
         let store = global<FungibleStore>(store_addr);
+        /// [high-level-req-6.2]
         aborts_if (store.balance < amount);
         aborts_if !exists<FungibleStore>(store_addr);
         aborts_if !exists<FungibleAssetEvents>(store_addr);
