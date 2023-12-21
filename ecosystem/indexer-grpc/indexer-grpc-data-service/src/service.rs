@@ -7,7 +7,7 @@ use crate::metrics::{
     PROCESSED_LATENCY_IN_SECS, PROCESSED_LATENCY_IN_SECS_ALL, PROCESSED_VERSIONS_COUNT,
     SHORT_CONNECTION_COUNT,
 };
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{Context, Result};
 use aptos_indexer_grpc_utils::{
     build_protobuf_encoded_transaction_wrappers,
     cache_operator::{CacheBatchGetStatus, CacheOperator},
@@ -202,7 +202,6 @@ impl RawData for RawDataServerWrapper {
                     },
                 };
                 let mut cache_operator = CacheOperator::new(conn);
-                file_store_operator.verify_storage_bucket_existence().await;
 
                 // Validate chain id
                 let mut metadata = file_store_operator.get_file_store_metadata().await;

@@ -361,10 +361,10 @@ async fn process_streaming_response(
 
     let mut current_version = starting_version;
     let mut batch_start_time = std::time::Instant::now();
-    let mut start_time = std::time::Instant::now();
 
     // 4. Process the streaming response.
     loop {
+        let start_time = std::time::Instant::now();
         let received = match resp_stream.next().await {
             Some(r) => r,
             _ => {
@@ -409,7 +409,6 @@ async fn process_streaming_response(
                     // TODO: Reasses whether this metric useful
                     LATEST_PROCESSED_VERSION_OLD.set(current_version as i64);
                     PROCESSED_BATCH_SIZE.set(num_of_transactions as i64);
-                    start_time = std::time::Instant::now();
                 },
                 GrpcDataStatus::StreamInit(new_version) => {
                     error!(
