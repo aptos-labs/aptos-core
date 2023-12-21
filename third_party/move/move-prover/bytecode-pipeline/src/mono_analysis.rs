@@ -466,7 +466,7 @@ impl<'a> Analyzer<'a> {
     }
 
     fn analyze_exp(&mut self, exp: &ExpData) {
-        exp.visit(&mut |e| {
+        exp.visit_post_order(&mut |e| {
             let node_id = e.node_id();
             self.add_type_root(&self.env.get_node_type(node_id));
             for ref ty in self.env.get_node_instantiation(node_id) {
@@ -517,6 +517,7 @@ impl<'a> Analyzer<'a> {
                     }
                 }
             }
+            true // keep going
         });
     }
 
