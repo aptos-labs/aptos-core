@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::client::CompressionClient;
 use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, HistogramTimer, HistogramVec, IntCounterVec,
 };
@@ -11,31 +12,6 @@ pub const COMPRESS: &str = "compress";
 pub const DECOMPRESS: &str = "decompress";
 pub const COMPRESSED_BYTES: &str = "compressed_bytes";
 pub const RAW_BYTES: &str = "raw_bytes";
-
-/// A simple enum for identifying clients of the compression crate. This
-/// allows us to provide a runtime breakdown of compression metrics for
-/// each client.
-#[derive(Clone, Debug)]
-pub enum CompressionClient {
-    Consensus,
-    Mempool,
-    StateSync,
-    DKG,
-    JWKConsensus,
-}
-
-impl CompressionClient {
-    /// Returns a summary label for the request
-    pub fn get_label(&self) -> &'static str {
-        match self {
-            Self::Consensus => "consensus",
-            Self::Mempool => "mempool",
-            Self::StateSync => "state_sync",
-            CompressionClient::DKG => "dkg",
-            CompressionClient::JWKConsensus => "jwk_consensus",
-        }
-    }
-}
 
 /// Counters for tracking the data compression ratio (i.e., total byte counts)
 pub static BYTE_COUNTS: Lazy<IntCounterVec> = Lazy::new(|| {
