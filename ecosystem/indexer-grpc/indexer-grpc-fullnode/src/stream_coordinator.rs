@@ -95,7 +95,7 @@ impl IndexerStreamCoordinator {
             let transaction_sender = self.transactions_sender.clone();
 
             let task = tokio::spawn(async move {
-                let batch_start_time = std::time::Instant::now();
+                let fetch_start_time = std::time::Instant::now();
                 // Fetch and convert transactions from API
                 let raw_txns =
                     Self::fetch_raw_txns_with_retries(context.clone(), ledger_version, batch).await;
@@ -118,9 +118,11 @@ impl IndexerStreamCoordinator {
                     last_transaction_timestamp.as_ref(),
                     Some(ledger_version as i64),
                     None,
-                    Some(batch_start_time.elapsed().as_secs_f64()),
+                    Some(fetch_start_time.elapsed().as_secs_f64()),
                     Some(raw_txns.len() as i64),
                 );
+
+                let convert_start_time = std::time::Instant::now();
                 let api_txns = Self::convert_to_api_txns(context, raw_txns).await;
                 api_txns.last().map(record_fetched_transaction_latency);
                 let pb_txns = Self::convert_to_pb_txns(api_txns);
@@ -135,9 +137,11 @@ impl IndexerStreamCoordinator {
                     end_txn_timestamp.as_ref(),
                     Some(ledger_version as i64),
                     None,
-                    Some(batch_start_time.elapsed().as_secs_f64()),
+                    Some(convert_start_time.elapsed().as_secs_f64()),
                     Some(pb_txns.len() as i64),
                 );
+
+                let send_start_time = std::time::Instant::now();
 
                 // Wrap in stream response object and send to channel
                 for chunk in pb_txns.chunks(output_batch_size as usize) {
@@ -169,7 +173,7 @@ impl IndexerStreamCoordinator {
                     end_txn_timestamp.as_ref(),
                     Some(ledger_version as i64),
                     None,
-                    Some(batch_start_time.elapsed().as_secs_f64()),
+                    Some(send_start_time.elapsed().as_secs_f64()),
                     Some(pb_txns.len() as i64),
                 );
                 Ok(end_transaction.version)
