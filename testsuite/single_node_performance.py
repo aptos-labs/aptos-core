@@ -26,6 +26,10 @@ class Flow(Flag):
     PREVIEWNET = auto()
     # Tests used for previewnet evaluation
     PREVIEWNET_LARGE_DB = auto()
+    # Tests for Agg V2 performance
+    AGG_V2 = auto()
+    # Test resource groups
+    RESOURCE_GROUPS = auto()
 
 
 # Tests that are run on LAND_BLOCKING and continuously on main
@@ -111,6 +115,22 @@ TESTS = [
     RunGroupConfig(expected_tps=5, key=RunGroupKey("smart-table-picture1-b-with1-k-change"), included_in=Flow(0), waived=True),
     RunGroupConfig(expected_tps=10, key=RunGroupKey("smart-table-picture1-b-with1-k-change", module_working_set_size=20), included_in=Flow(0), waived=True),
 
+    RunGroupConfig(expected_tps=4050, key=RunGroupKey("modify-global-resource-agg-v2"), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-resource-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=4050, key=RunGroupKey("modify-global-flag-agg-v2"), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-flag-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=4050, key=RunGroupKey("modify-global-bounded-agg-v2"), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-bounded-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
+
+    RunGroupConfig(expected_tps=4000, key=RunGroupKey("resource-groups-global-write-tag1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-write-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=4000, key=RunGroupKey("resource-groups-global-write-and-read-tag1-kb"), included_in=Flow.CONTINUOUS | Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-write-and-read-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-write-tag1-kb"), included_in=Flow.CONTINUOUS | Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-write-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-multi-change1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-multi-change1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
+    
     RunGroupConfig(expected_tps=1890, key=RunGroupKey("token-v1ft-mint-and-transfer"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=9250, key=RunGroupKey("token-v1ft-mint-and-transfer", module_working_set_size=20), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=1100, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential"), included_in=Flow.CONTINUOUS),

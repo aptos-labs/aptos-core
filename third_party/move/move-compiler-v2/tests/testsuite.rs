@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
-use move_binary_format::{binary_views::BinaryIndexedView, file_format as FF};
+use move_binary_format::binary_views::BinaryIndexedView;
 use move_command_line_common::files::FileHash;
 use move_compiler::compiled_unit::CompiledUnit;
 use move_compiler_v2::{
@@ -82,7 +82,7 @@ impl TestConfig {
         let path = path.to_string_lossy();
         let verbose = cfg!(feature = "verbose-debug-print");
         let mut pipeline = FunctionTargetPipeline::default();
-        if path.contains("/inlining/bug_") {
+        if path.contains("/inlining/bug_11112") || path.contains("/inlining/bug_9717_looponly") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
             pipeline.add_processor(Box::new(VisibilityChecker {}));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
@@ -97,6 +97,19 @@ impl TestConfig {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
             pipeline.add_processor(Box::new(VisibilityChecker {}));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+            Self {
+                type_check_only: false,
+                dump_ast: true,
+                pipeline,
+                generate_file_format: false,
+                dump_annotated_targets: verbose,
+            }
+        } else if path.contains("/inlining/") {
+            pipeline.add_processor(Box::new(VisibilityChecker {}));
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+            pipeline.add_processor(Box::new(ExplicitDrop {}));
+            pipeline.add_processor(Box::new(AbilityChecker {}));
             Self {
                 type_check_only: false,
                 dump_ast: true,
@@ -285,10 +298,15 @@ impl TestConfig {
                     out.push_str("\n============ disassembled file-format ==================\n");
                     Self::check_diags(out, &env);
                     for compiled_unit in units {
-                        if let CompiledUnit::Module(compiled_mod) = compiled_unit {
-                            let cont = Self::disassemble(&compiled_mod.module)?;
-                            out.push_str(&cont)
-                        }
+                        let disassembled = match compiled_unit {
+                            CompiledUnit::Module(module) => {
+                                Self::disassemble(BinaryIndexedView::Module(&module.module))?
+                            },
+                            CompiledUnit::Script(script) => {
+                                Self::disassemble(BinaryIndexedView::Script(&script.script))?
+                            },
+                        };
+                        out.push_str(&disassembled);
                     }
                 }
             }
@@ -319,11 +337,8 @@ impl TestConfig {
         ok
     }
 
-    fn disassemble(module: &FF::CompiledModule) -> anyhow::Result<String> {
-        let diss = Disassembler::from_view(
-            BinaryIndexedView::Module(module),
-            location::Loc::new(FileHash::empty(), 0, 0),
-        )?;
+    fn disassemble(view: BinaryIndexedView) -> anyhow::Result<String> {
+        let diss = Disassembler::from_view(view, location::Loc::new(FileHash::empty(), 0, 0))?;
         diss.disassemble()
     }
 }

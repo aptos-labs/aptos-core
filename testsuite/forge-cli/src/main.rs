@@ -1035,7 +1035,7 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
                 transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
                 num_modules: 1,
                 unique_senders: true,
-                mempool_backlog: 10000,
+                mempool_backlog: 30000,
             },
             // transactions get rejected, to fix.
             // TransactionWorkload {
@@ -1047,17 +1047,24 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         ]),
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
-            (5500, 0.35, 0.3, 0.8, 0.65),
-            (4500, 0.35, 0.3, 1.0, 1.0),
-            (2000, 0.35, 0.3, 1.0, 1.0),
-            (600, 0.35, 0.3, 1.0, 1.0),
+            (5500, 100, 0.3, 0.3, 0.8, 0.65),
+            (4500, 100, 0.3, 0.4, 1.0, 1.5),
+            (2000, 300, 0.3, 0.3, 0.8, 1.0),
+            (600, 500, 0.3, 0.3, 0.8, 1.0),
             // (150, 0.5, 1.0, 1.5, 0.65),
         ]
         .into_iter()
         .map(
-            |(min_tps, batch_to_pos, pos_to_proposal, proposal_to_ordered, ordered_to_commit)| {
+            |(
+                min_tps,
+                max_expired,
+                batch_to_pos,
+                pos_to_proposal,
+                proposal_to_ordered,
+                ordered_to_commit,
+            )| {
                 SuccessCriteria::new(min_tps)
-                    .add_max_expired_tps(200)
+                    .add_max_expired_tps(max_expired)
                     .add_max_failed_submission_tps(200)
                     .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
                         (LatencyBreakdownSlice::QsBatchToPos, batch_to_pos),
@@ -1846,6 +1853,9 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             mempool_backlog: 500_000,
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
+            increase_state_sync_chunk_sizes(config);
+
             // consensus and quorum store configs copied from the consensus-only suite
             optimize_for_maximum_throughput(config);
 
@@ -1891,13 +1901,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             .with_initial_fullnode_count(VALIDATOR_COUNT)
             .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
                 // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
-                let max_chunk_size = 10_000;
-                let aptos_data_client_config = &mut config.state_sync.aptos_data_client;
-                let storage_service_config = &mut config.state_sync.storage_service;
-                aptos_data_client_config.max_transaction_chunk_size = max_chunk_size;
-                aptos_data_client_config.max_transaction_output_chunk_size = max_chunk_size;
-                storage_service_config.max_transaction_chunk_size = max_chunk_size;
-                storage_service_config.max_transaction_output_chunk_size = max_chunk_size;
+                increase_state_sync_chunk_sizes(config);
 
                 // Experimental storage optimizations
                 config.storage.rocksdb_configs.enable_storage_sharding = true;
@@ -1947,6 +1951,21 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     }
 
     forge_config
+}
+
+/// Increases the state sync chunk sizes for a given node config
+fn increase_state_sync_chunk_sizes(node_config: &mut NodeConfig) {
+    let max_chunk_size = 10_000; // This allows > 10k TPS
+
+    // Update the chunk sizes for the data client
+    let data_client_config = &mut node_config.state_sync.aptos_data_client;
+    data_client_config.max_transaction_chunk_size = max_chunk_size;
+    data_client_config.max_transaction_output_chunk_size = max_chunk_size;
+
+    // Update the chunk sizes for the storage service
+    let storage_service_config = &mut node_config.state_sync.storage_service;
+    storage_service_config.max_transaction_chunk_size = max_chunk_size;
+    storage_service_config.max_transaction_output_chunk_size = max_chunk_size;
 }
 
 fn pre_release_suite() -> ForgeConfig {
