@@ -1,11 +1,6 @@
-processed 1 task
+processed 3 tasks
 
-task 0 'publish'. lines 1-11:
-
-
-
->>> V1 Compiler {
-== BEGIN Bytecode ==
+task 0 'print-bytecode'. lines 1-11:
 // Move bytecode v6
 module cafe.vectors {
 
@@ -66,6 +61,4 @@ B6:
 B7:
 	40: Ret
 }
-}
-== END Bytecode ==
 }

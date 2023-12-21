@@ -1,5 +1,5 @@
 comparison between v1 and v2 failed:
-= processed 2 tasks
+= processed 3 tasks
 = 
 = task 0 'print-bytecode'. lines 1-11:
 - // Move bytecode v6
@@ -133,7 +133,7 @@ comparison between v1 and v2 failed:
 = }
 = }
 = 
-= task 1 'publish'. lines 13-23:
++ task 1 'publish'. lines 13-23:
 + Error: Unable to publish module '000000000000000000000000000000000000000000000000000000000000cafe::vectors'. Got VMError: {
 +     major_status: MOVELOC_EXISTS_BORROW_ERROR,
 +     sub_status: None,
@@ -141,6 +141,13 @@ comparison between v1 and v2 failed:
 +     indices: redacted,
 +     offsets: redacted,
 + }
-= 
-- 
-- 
++ 
++ task 2 'run'. lines 25-25:
++ Error: Function execution failed with VMError: {
++     major_status: LINKER_ERROR,
++     sub_status: None,
++     location: undefined,
++     indices: redacted,
++     offsets: redacted,
++ }
++ 

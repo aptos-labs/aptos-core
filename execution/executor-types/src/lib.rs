@@ -280,7 +280,7 @@ pub trait TransactionReplayer: Send {
 
 /// A structure that holds relevant information about a chunk that was committed.
 pub struct ChunkCommitNotification {
-    pub committed_events: Vec<ContractEvent>,
+    pub subscribable_events: Vec<ContractEvent>,
     pub committed_transactions: Vec<Transaction>,
     pub reconfiguration_occurred: bool,
 }
@@ -324,7 +324,7 @@ pub struct StateComputeResult {
     /// The transaction info hashes of all success txns.
     transaction_info_hashes: Vec<HashValue>,
 
-    reconfig_events: Vec<ContractEvent>,
+    subscribable_events: Vec<ContractEvent>,
 }
 
 impl StateComputeResult {
@@ -337,7 +337,7 @@ impl StateComputeResult {
         epoch_state: Option<EpochState>,
         compute_status_for_input_txns: Vec<TransactionStatus>,
         transaction_info_hashes: Vec<HashValue>,
-        reconfig_events: Vec<ContractEvent>,
+        subscribable_events: Vec<ContractEvent>,
     ) -> Self {
         Self {
             root_hash,
@@ -348,7 +348,7 @@ impl StateComputeResult {
             epoch_state,
             compute_status_for_input_txns,
             transaction_info_hashes,
-            reconfig_events,
+            subscribable_events,
         }
     }
 
@@ -365,7 +365,7 @@ impl StateComputeResult {
             epoch_state: None,
             compute_status_for_input_txns: vec![],
             transaction_info_hashes: vec![],
-            reconfig_events: vec![],
+            subscribable_events: vec![],
         }
     }
 
@@ -382,7 +382,7 @@ impl StateComputeResult {
                 num_txns
             ],
             transaction_info_hashes: vec![],
-            reconfig_events: vec![],
+            subscribable_events: vec![],
         }
     }
 
@@ -499,8 +499,8 @@ impl StateComputeResult {
         self.epoch_state.is_some()
     }
 
-    pub fn reconfig_events(&self) -> &[ContractEvent] {
-        &self.reconfig_events
+    pub fn subscribable_events(&self) -> &[ContractEvent] {
+        &self.subscribable_events
     }
 }
 
@@ -522,4 +522,14 @@ impl ProofRead for ProofReader {
     fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt> {
         self.proofs.get(&key)
     }
+}
+
+/// Used in both state sync and consensus to filter the txn events that should be subscribable by node components.
+pub fn should_forward_to_subscription_service(event: &ContractEvent) -> bool {
+    matches!(
+        event.type_tag().to_string().as_str(),
+        "0x1::reconfiguration::NewEpochEvent"
+            | "0x1::dkg::DKGStartEvent"
+            | "0x1::jwks::OnChainJWKMapUpdated"
+    )
 }

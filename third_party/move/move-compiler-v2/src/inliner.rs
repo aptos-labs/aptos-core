@@ -805,14 +805,8 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         let tuple_args: Vec<Pattern> = parameters
             .iter()
             .map(|param| {
-                let Parameter(sym, ty) = *param;
-                // TODO(10731): ideally, each Parameter has its own loc.  For now, we use the
-                // function location.  body should have types rewritten, other inlining complete,
-                // lambdas inlined, etc.
-                let id = env.new_node(
-                    function_loc.clone().inlined_from(call_site_loc),
-                    ty.instantiate(self.type_args),
-                );
+                let Parameter(sym, ty, loc) = *param;
+                let id = env.new_node(loc.clone(), ty.instantiate(self.type_args));
                 if let Some(new_sym) = self.shadow_stack.get_shadow_symbol(*sym, true) {
                     Pattern::Var(id, new_sym)
                 } else {
@@ -987,12 +981,14 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         }
     }
 
-    /// Convert a single-variable pattern into a `Pattern::Tuple` if needed.
+    /// Convert any non-`Tuple` pattern `pat` into a a singleton `Pattern::Tuple` if needed,
+    /// for convenience in matching it to a `Tuple` of expressions.
     fn make_lambda_pattern_a_tuple(&mut self, pat: &Pattern) -> Pattern {
-        if let Pattern::Var(id, _) = pat {
+        if !matches!(pat, Pattern::Tuple(..)) {
+            let id = pat.node_id();
             let new_id = self.env.new_node(
-                self.env.get_node_loc(*id),
-                Type::Tuple(vec![self.env.get_node_type(*id)]),
+                self.env.get_node_loc(id),
+                Type::Tuple(vec![self.env.get_node_type(id)]),
             );
             Pattern::Tuple(new_id, vec![pat.clone()])
         } else {

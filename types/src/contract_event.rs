@@ -5,6 +5,7 @@
 use crate::{
     account_config::{DepositEvent, NewBlockEvent, NewEpochEvent, WithdrawEvent},
     event::EventKey,
+    on_chain_config::new_epoch_event_key,
     transaction::Version,
 };
 use anyhow::{bail, Error, Result};
@@ -18,7 +19,7 @@ use once_cell::sync::Lazy;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::convert::TryFrom;
+use std::{convert::TryFrom, str::FromStr};
 
 pub static FEE_STATEMENT_EVENT_TYPE: Lazy<TypeTag> = Lazy::new(|| {
     TypeTag::Struct(Box::new(StructTag {
@@ -76,6 +77,13 @@ impl ContractEvent {
 
     pub fn new_v2(type_tag: TypeTag, event_data: Vec<u8>) -> Self {
         ContractEvent::V2(ContractEventV2::new(type_tag, event_data))
+    }
+
+    pub fn new_v2_with_type_tag_str(type_tag_str: &str, event_data: Vec<u8>) -> Self {
+        ContractEvent::V2(ContractEventV2::new(
+            TypeTag::from_str(type_tag_str).unwrap(),
+            event_data,
+        ))
     }
 
     pub fn event_key(&self) -> Option<&EventKey> {
@@ -143,6 +151,13 @@ impl ContractEvent {
         }
 
         Ok(None)
+    }
+
+    pub fn is_new_epoch_event(&self) -> bool {
+        match self {
+            ContractEvent::V1(event) => *event.key() == new_epoch_event_key(),
+            ContractEvent::V2(_event) => false,
+        }
     }
 }
 
@@ -264,6 +279,17 @@ impl TryFrom<&ContractEvent> for NewBlockEvent {
             },
             ContractEvent::V2(_) => bail!("This is a module event"),
         }
+    }
+}
+
+impl From<(u64, NewEpochEvent)> for ContractEvent {
+    fn from((seq_num, event): (u64, NewEpochEvent)) -> Self {
+        Self::new_v1(
+            new_epoch_event_key(),
+            seq_num,
+            TypeTag::from(NewEpochEvent::struct_tag()),
+            bcs::to_bytes(&event).unwrap(),
+        )
     }
 }
 

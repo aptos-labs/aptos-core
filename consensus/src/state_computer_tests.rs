@@ -29,7 +29,7 @@ use std::sync::Arc;
 use tokio::runtime::Handle;
 
 struct DummyStateSyncNotifier {
-    invocations: Mutex<Vec<Vec<Transaction>>>,
+    invocations: Mutex<Vec<(Vec<Transaction>, Vec<ContractEvent>)>>,
 }
 
 impl DummyStateSyncNotifier {
@@ -45,9 +45,11 @@ impl ConsensusNotificationSender for DummyStateSyncNotifier {
     async fn notify_new_commit(
         &self,
         transactions: Vec<Transaction>,
-        _reconfiguration_events: Vec<ContractEvent>,
+        subscribable_events: Vec<ContractEvent>,
     ) -> Result<(), Error> {
-        self.invocations.lock().push(transactions);
+        self.invocations
+            .lock()
+            .push((transactions, subscribable_events));
         Ok(())
     }
 
@@ -250,7 +252,7 @@ async fn commit_should_discover_validator_txns() {
     let _ = rx.await;
 
     // Get all txns that state sync was notified with.
-    let txns = state_sync_notifier.invocations.lock()[0].clone();
+    let (txns, _) = state_sync_notifier.invocations.lock()[0].clone();
 
     let supposed_validator_txn_0 = txns[1].try_as_validator_txn().unwrap();
     let supposed_validator_txn_1 = txns[2].try_as_validator_txn().unwrap();

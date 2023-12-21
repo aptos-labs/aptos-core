@@ -93,8 +93,8 @@ impl Attribute {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum ConditionKind {
-    LetPost(Symbol),
-    LetPre(Symbol),
+    LetPost(Symbol, Loc),
+    LetPre(Symbol, Loc),
     Assert,
     Assume,
     Decreases,
@@ -108,10 +108,10 @@ pub enum ConditionKind {
     StructInvariant,
     FunctionInvariant,
     LoopInvariant,
-    GlobalInvariant(Vec<Symbol>),
-    GlobalInvariantUpdate(Vec<Symbol>),
+    GlobalInvariant(Vec<(Symbol, Loc)>),
+    GlobalInvariantUpdate(Vec<(Symbol, Loc)>),
     SchemaInvariant,
-    Axiom(Vec<Symbol>),
+    Axiom(Vec<(Symbol, Loc)>),
     Update,
 }
 
@@ -177,7 +177,10 @@ impl ConditionKind {
 
 impl std::fmt::Display for ConditionKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        fn display_ty_params(f: &mut Formatter<'_>, ty_params: &[Symbol]) -> std::fmt::Result {
+        fn display_ty_params(
+            f: &mut Formatter<'_>,
+            ty_params: &[(Symbol, Loc)],
+        ) -> std::fmt::Result {
             if !ty_params.is_empty() {
                 write!(
                     f,
@@ -190,8 +193,8 @@ impl std::fmt::Display for ConditionKind {
 
         use ConditionKind::*;
         match self {
-            LetPost(sym) => write!(f, "let({:?})", sym),
-            LetPre(sym) => write!(f, "let old({:?})", sym),
+            LetPost(sym, _loc) => write!(f, "let({:?})", sym),
+            LetPre(sym, _loc) => write!(f, "let old({:?})", sym),
             Assert => write!(f, "assert"),
             Assume => write!(f, "assume"),
             Decreases => write!(f, "decreases"),
@@ -2093,13 +2096,13 @@ impl fmt::Display for MemoryLabel {
 impl<'a> fmt::Display for EnvDisplay<'a, Condition> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match &self.val.kind {
-            ConditionKind::LetPre(name) => write!(
+            ConditionKind::LetPre(name, _loc) => write!(
                 f,
                 "let {} = {};",
                 name.display(self.env.symbol_pool()),
                 self.val.exp.display(self.env)
             )?,
-            ConditionKind::LetPost(name) => write!(
+            ConditionKind::LetPost(name, _loc) => write!(
                 f,
                 "let post {} = {};",
                 name.display(self.env.symbol_pool()),

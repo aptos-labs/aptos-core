@@ -28,6 +28,9 @@ once_cell = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 
+[dev-dependencies]
+aptos-types = { workspace = true, features = ["fuzzing"] }
+
 [features]
 default = []
 fuzzing = ["aptos-crypto/fuzzing", "aptos-types/fuzzing"]

@@ -668,7 +668,8 @@ impl SoliditySignature {
     ) -> Self {
         let fun_name = fun.symbol_pool().string(fun.get_name()).to_string();
         let mut para_type_lst = vec![];
-        for (pos, Parameter(para_name, move_ty)) in fun.get_parameters().into_iter().enumerate() {
+        for (pos, Parameter(para_name, move_ty, _)) in fun.get_parameters().into_iter().enumerate()
+        {
             if pos == 0 && ctx.is_storage_ref(storage_type, &move_ty) {
                 // Skip the first parameter if it is a reference to contract storage.
                 continue;
@@ -755,7 +756,7 @@ impl SoliditySignature {
             let mut para_names = fun
                 .get_parameters()
                 .iter()
-                .map(|Parameter(para_name, _)| fun.symbol_pool().string(*para_name).to_string())
+                .map(|Parameter(para_name, _, _)| fun.symbol_pool().string(*para_name).to_string())
                 .collect_vec();
             // Handle external functions where the first parameter is contract
             if attributes::is_external_fun(fun) {
