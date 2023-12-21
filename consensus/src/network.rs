@@ -14,7 +14,7 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkClient, RPC},
     pipeline::commit_reliable_broadcast::CommitMessage,
     quorum_store::types::{Batch, BatchMsg, BatchRequest},
-    randomness::types::RandMessage,
+    rand::rand_gen::RandGenMessage,
 };
 use anyhow::{anyhow, bail, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
@@ -34,7 +34,7 @@ use aptos_network::{
     protocols::{network::Event, rpc::error::RpcError},
     ProtocolId,
 };
-use aptos_reliable_broadcast::RBNetworkSender;
+use aptos_reliable_broadcast::{RBMessage, RBNetworkSender};
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
@@ -58,12 +58,7 @@ use tokio::time::timeout;
 pub trait TConsensusMsg: Sized + Serialize + DeserializeOwned {
     fn epoch(&self) -> u64;
 
-    fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self> {
-        match msg {
-            ConsensusMsg::DAGMessage(msg) => Ok(bcs::from_bytes(&msg.data)?),
-            _ => bail!("unexpected consensus message type {:?}", msg),
-        }
-    }
+    fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self>;
 
     fn into_network_message(self) -> ConsensusMsg;
 }
@@ -100,8 +95,9 @@ pub struct IncomingCommitRequest {
 }
 
 #[derive(Debug)]
-pub struct IncomingRandRequest {
-    pub req: RandMessage,
+pub struct IncomingRandGenRequest {
+    pub req: RandGenMessage,
+    pub sender: Author,
     pub protocol: ProtocolId,
     pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
 }
@@ -112,7 +108,7 @@ pub enum IncomingRpcRequest {
     BatchRetrieval(IncomingBatchRetrievalRequest),
     DAGRequest(IncomingDAGRequest),
     CommitRequest(IncomingCommitRequest),
-    RandRequest(IncomingRandRequest),
+    RandGenRequest(IncomingRandGenRequest),
 }
 
 /// Just a convenience struct to keep all the network proxy receiving queues in one place.
@@ -275,6 +271,26 @@ impl NetworkSender {
 
         // Get the list of validators excluding our own account address. Note the
         // ordering is not important in this case.
+        let self_author = self.author;
+        let other_validators: Vec<_> = self
+            .validators
+            .get_ordered_account_addresses_iter()
+            .filter(|author| author != &self_author)
+            .collect();
+
+        counters::CONSENSUS_SENT_MSGS
+            .with_label_values(&[msg.name()])
+            .inc_by(other_validators.len() as u64);
+        // Broadcast message over direct-send to all other validators.
+        if let Err(err) = self
+            .consensus_network_client
+            .send_to_many(other_validators.into_iter(), msg)
+        {
+            warn!(error = ?err, "Error broadcasting message");
+        }
+    }
+
+    pub fn broadcast_without_self(&self, msg: ConsensusMsg) {
         let self_author = self.author;
         let other_validators: Vec<_> = self
             .validators
@@ -502,13 +518,15 @@ impl TDAGNetworkSender for NetworkSender {
 }
 
 #[async_trait]
-impl RBNetworkSender<DAGMessage, DAGRpcResult> for NetworkSender {
+impl<Req: TConsensusMsg + RBMessage + 'static, Res: TConsensusMsg + RBMessage + 'static>
+    RBNetworkSender<Req, Res> for NetworkSender
+{
     async fn send_rb_rpc(
         &self,
         receiver: Author,
-        message: DAGMessage,
+        message: Req,
         timeout: Duration,
-    ) -> anyhow::Result<DAGRpcResult> {
+    ) -> anyhow::Result<Res> {
         self.send_rpc(receiver, message.into_network_message(), timeout)
             .await
             .map_err(|e| anyhow!("invalid rpc response: {}", e))
@@ -516,32 +534,32 @@ impl RBNetworkSender<DAGMessage, DAGRpcResult> for NetworkSender {
     }
 }
 
-#[async_trait]
-impl RBNetworkSender<RandMessage, RandMessage> for NetworkSender {
-    async fn send_rb_rpc(
-        &self,
-        receiver: Author,
-        message: RandMessage,
-        timeout_duration: Duration,
-    ) -> anyhow::Result<RandMessage> {
-        let msg = ConsensusMsg::RandMessage(message.into());
-        let response = match self.send_rpc(receiver, msg, timeout_duration).await? {
-            ConsensusMsg::RandMessage(resp)
-                if matches!(
-                    *resp,
-                    RandMessage::ShareAck(_)
-                        | RandMessage::DeltaAck(_)
-                        | RandMessage::CertifiedDeltaAck(_)
-                ) =>
-            {
-                *resp
-            },
-            _ => bail!("[RandMessage] Invalid response to request"),
-        };
-
-        Ok(response)
-    }
-}
+// #[async_trait]
+// impl RBNetworkSender<RandMessage, RandMessage> for NetworkSender {
+//     async fn send_rb_rpc(
+//         &self,
+//         receiver: Author,
+//         message: RandMessage,
+//         timeout_duration: Duration,
+//     ) -> anyhow::Result<RandMessage> {
+//         let msg = ConsensusMsg::RandMessage(message.into());
+//         let response = match self.send_rpc(receiver, msg, timeout_duration).await? {
+//             ConsensusMsg::RandMessage(resp)
+//                 if matches!(
+//                     *resp,
+//                     RandMessage::ShareAck(_)
+//                         | RandMessage::DeltaAck(_)
+//                         | RandMessage::CertifiedDeltaAck(_)
+//                 ) =>
+//             {
+//                 *resp
+//             },
+//             _ => bail!("[RandMessage] Invalid response to request"),
+//         };
+//
+//         Ok(response)
+//     }
+// }
 
 #[async_trait]
 impl ProofNotifier for NetworkSender {
@@ -701,6 +719,23 @@ impl NetworkTask {
                             }
                             Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);
                         },
+                        // TODO: get rid of the rpc dummy value
+                        ConsensusMsg::RandGenMessage(req) => {
+                            let (tx, _rx) = oneshot::channel();
+                            let req_with_callback =
+                                IncomingRpcRequest::RandGenRequest(IncomingRandGenRequest {
+                                    req,
+                                    sender: peer_id,
+                                    protocol: RPC[0],
+                                    response_sender: tx,
+                                });
+                            if let Err(e) = self.rpc_tx.push(
+                                (peer_id, discriminant(&req_with_callback)),
+                                (peer_id, req_with_callback),
+                            ) {
+                                warn!(error = ?e, "aptos channel closed");
+                            };
+                        },
                         _ => {
                             warn!(remote_peer = peer_id, "Unexpected direct send msg");
                             continue;
@@ -753,9 +788,10 @@ impl NetworkTask {
                                 response_sender: callback,
                             })
                         },
-                        ConsensusMsg::RandMessage(req) => {
-                            IncomingRpcRequest::RandRequest(IncomingRandRequest {
-                                req: *req,
+                        ConsensusMsg::RandGenMessage(req) => {
+                            IncomingRpcRequest::RandGenRequest(IncomingRandGenRequest {
+                                req,
+                                sender: peer_id,
                                 protocol,
                                 response_sender: callback,
                             })

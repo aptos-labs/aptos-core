@@ -8,15 +8,15 @@ macro_rules! dealt_secret_key_impl {
         $GTProjective:ident,
         $gt:ident
     ) => {
-        use crate::algebra::lagrange::lagrange_coefficients;
-        use crate::constants::$GT_PROJ_NUM_BYTES;
-        use crate::pvss::dealt_secret_key_share::$gt::DealtSecretKeyShare;
-        use crate::pvss::player::Player;
-        use crate::pvss::threshold_config::ThresholdConfig;
-        use crate::pvss::traits;
-        use crate::pvss::traits::SecretSharingConfig;
-        use crate::utils::serialization::$gt_proj_from_bytes;
-        use crate::utils::$gt_multi_exp;
+        use crate::{
+            algebra::lagrange::lagrange_coefficients,
+            constants::$GT_PROJ_NUM_BYTES,
+            pvss::{
+                dealt_secret_key_share::$gt::DealtSecretKeyShare, player::Player,
+                threshold_config::ThresholdConfig, traits, traits::SecretSharingConfig,
+            },
+            utils::{serialization::$gt_proj_from_bytes, $gt_multi_exp},
+        };
         use aptos_crypto::CryptoMaterialError;
         use aptos_crypto_derive::{SilentDebug, SilentDisplay};
         use blstrs::{$GTProjective, Scalar};
@@ -102,17 +102,17 @@ macro_rules! dealt_secret_key_impl {
                 // println!("Lagrange IDs: {:?}", ids);
                 // println!("Lagrange coeffs");
                 // for l in lagr.iter() {
-                    // println!(" + {}", hex::encode(l.to_bytes_le()));
+                // println!(" + {}", hex::encode(l.to_bytes_le()));
                 // }
                 // println!("Bases: ");
                 // for b in bases.iter() {
-                    // println!(" + {}", hex::encode(b.to_bytes()));
+                // println!(" + {}", hex::encode(b.to_bytes()));
                 // }
 
                 assert_eq!(lagr.len(), bases.len());
 
                 DealtSecretKey {
-                    h_hat: $gt_multi_exp(bases.as_slice(), lagr.as_slice())
+                    h_hat: $gt_multi_exp(bases.as_slice(), lagr.as_slice()),
                 }
             }
         }

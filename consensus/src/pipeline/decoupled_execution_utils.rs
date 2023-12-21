@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::buffer_manager::Sender;
+use super::buffer_manager::{OrderedBlocks};
 use crate::{
     network::{IncomingCommitRequest, NetworkSender},
     pipeline::{
@@ -13,7 +13,6 @@ use crate::{
         pipeline_phase::{CountedRequest, PipelinePhase},
         signing_phase::{CommitSignerProvider, SigningPhase, SigningRequest, SigningResponse},
     },
-    randomness::{block_queue::RandReadyBlocks, rand_manager::BufferManagerEvent},
     state_replication::StateComputer,
 };
 use aptos_channels::aptos_channel::Receiver;
@@ -33,10 +32,9 @@ pub fn prepare_phases_and_buffer_manager(
     commit_msg_tx: NetworkSender,
     commit_msg_rx: Receiver<AccountAddress, IncomingCommitRequest>,
     persisting_proxy: Arc<dyn StateComputer>,
-    block_rx: UnboundedReceiver<RandReadyBlocks>,
+    block_rx: UnboundedReceiver<OrderedBlocks>,
     sync_rx: UnboundedReceiver<ResetRequest>,
     epoch_state: Arc<EpochState>,
-    buffer_manager_event_tx: Sender<BufferManagerEvent>,
 ) -> (
     PipelinePhase<ExecutionSchedulePhase>,
     PipelinePhase<ExecutionWaitPhase>,
@@ -117,7 +115,6 @@ pub fn prepare_phases_and_buffer_manager(
             block_rx,
             sync_rx,
             epoch_state,
-            buffer_manager_event_tx,
             ongoing_tasks,
             reset_flag.clone(),
         ),

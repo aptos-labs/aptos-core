@@ -10,7 +10,7 @@ use crate::{
         storage::{CommitEvent, DAGStorage},
         CertifiedNode, Node, NodeId, Vote,
     },
-    randomness::block_queue::OrderedBlocks,
+    pipeline::buffer_manager::OrderedBlocks,
 };
 use anyhow::{anyhow, bail};
 use aptos_bitvec::BitVec;
@@ -189,7 +189,6 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                     update_counters_for_committed_blocks(committed_blocks);
                 },
             ),
-            maybe_randomness: None, // rand todo: optimistic commit add rand decision
         };
         if self
             .executor_channel

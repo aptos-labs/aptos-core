@@ -42,10 +42,13 @@ pub enum LogEvent {
     VoteNIL,
     // log events related to randomness generation
     BroadcastRandShare,
-    ReceiveRandShare,
+    ReceiveProactiveRandShare,
+    ReceiveReactiveRandShare,
     AggregateRandDecision,
-    AddFirstRandDecision,
-    ReceiveAckedRandDecision,
+    BroadcastAugData,
+    ReceiveAugData,
+    BroadcastCertifiedAugData,
+    ReceiveCertifiedAugData,
 }
 
 impl LogSchema {

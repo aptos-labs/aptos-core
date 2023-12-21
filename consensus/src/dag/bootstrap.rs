@@ -31,9 +31,10 @@ use crate::{
     network::IncomingDAGRequest,
     payload_client::PayloadClient,
     payload_manager::PayloadManager,
-    randomness::block_queue::OrderedBlocks,
+    pipeline::buffer_manager::OrderedBlocks,
     state_replication::StateComputer,
 };
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{
     aptos_channel::{self, Receiver},
     message_queues::QueueStyle,
@@ -485,6 +486,7 @@ impl DagBootstrapper {
             rb_backoff_policy,
             self.time_service.clone(),
             Duration::from_millis(rb_config.rpc_timeout_ms),
+            BoundedExecutor::new(8, Handle::current()),
         ));
 
         let BootstrapBaseState {

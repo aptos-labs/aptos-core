@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::network::IncomingRandGenRequest;
 use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
@@ -29,8 +30,7 @@ use crate::{
     monitor,
     network::{
         IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest, IncomingCommitRequest,
-        IncomingDAGRequest, IncomingRandRequest, IncomingRpcRequest, NetworkReceivers,
-        NetworkSender,
+        IncomingDAGRequest, IncomingRpcRequest, NetworkReceivers, NetworkSender,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::{
@@ -39,7 +39,7 @@ use crate::{
     payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
     pipeline::{
-        buffer_manager::ResetRequest,
+        buffer_manager::{OrderedBlocks, ResetRequest, ResetSignal},
         decoupled_execution_utils::prepare_phases_and_buffer_manager,
         ordering_state_computer::{DagStateSyncComputer, OrderingStateComputer},
         signing_phase::CommitSignerProvider,
@@ -49,10 +49,11 @@ use crate::{
         quorum_store_coordinator::CoordinatorCommand,
         quorum_store_db::QuorumStoreStorage,
     },
-    randomness::{
-        block_queue::{OrderedBlocks, RandReadyBlocks},
-        rand_manager::{BufferManagerEvent, RandManager},
-    },
+    rand::rand_gen::{RandConfig, RandDb, RandManager, RealAugmentedData, RealProof, RealShare},
+    // randomness::{
+    //     block_queue::{OrderedBlocks, RandReadyBlocks},
+    //     rand_manager::{BufferManagerEvent, RandManager},
+    // },
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
     state_replication::StateComputer,
@@ -96,7 +97,7 @@ use aptos_types::{
         OnChainConfigProvider, OnChainConsensusConfig, OnChainExecutionConfig,
         ProposerElectionType, ValidatorSet,
     },
-    randomness::{RandConfig, RandKeys, WvufPP, WVUF},
+    randomness::{RandKeys, WvufPP, WVUF},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
@@ -117,6 +118,7 @@ use std::{
     collections::HashMap,
     hash::Hash,
     mem::{discriminant, Discriminant},
+    path::PathBuf,
     sync::Arc,
     time::Duration,
 };
@@ -154,7 +156,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     validator_txn_pool_client: Arc<dyn ValidatorTxnPayloadClient>,
     reconfig_events: ReconfigNotificationListener<P>,
     // channels to rand manager
-    rand_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingRandRequest>>,
+    rand_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingRandGenRequest>>,
     rand_manager_reset_tx: Option<UnboundedSender<ResetRequest>>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingCommitRequest>>,
@@ -181,6 +183,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     dag_rpc_tx: Option<aptos_channel::Sender<AccountAddress, IncomingDAGRequest>>,
     dag_shutdown_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     dag_config: DagConsensusConfig,
+    storage_path: PathBuf,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -204,6 +207,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let config = node_config.consensus.clone();
         let execution_config = node_config.execution.clone();
         let dag_config = node_config.dag_consensus.clone();
+        let storage_path = node_config.storage.dir();
         Self {
             author,
             config,
@@ -239,6 +243,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             dag_shutdown_tx: None,
             aptos_time_service,
             dag_config,
+            storage_path,
         }
     }
 
@@ -592,50 +597,50 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.self_sender.clone(),
             epoch_state.verifier.clone(),
         );
-
-        // channel for sending ordered blocks to rand_manager
-        let (ordered_block_tx, ordered_block_rx) = unbounded::<OrderedBlocks>();
-        // channel for sending rand ready blocks to buffer_manager
-        let (rand_ready_block_tx, rand_ready_block_rx) = unbounded::<RandReadyBlocks>();
-
         // reset channel between epoch_manager and rand_manager
         let (reset_rand_manager_tx, reset_rand_manager_rx) = unbounded::<ResetRequest>();
-
-        let (buffer_manager_event_tx, buffer_manager_event_rx) = unbounded::<BufferManagerEvent>();
-
-        let (rand_msg_tx, rand_msg_rx) = aptos_channel::new::<AccountAddress, IncomingRandRequest>(
-            QueueStyle::FIFO,
-            100,
-            Some(&counters::RAND_MANAGER_CHANNEL_MSGS),
-        );
-
-        self.rand_manager_msg_tx = Some(rand_msg_tx);
-        self.rand_manager_reset_tx = Some(reset_rand_manager_tx.clone());
-
-        // rand todo: decide gaps
-        let gc_gap_below = 10 * self.config.vote_back_pressure_limit;
-        let gc_gap_above = 10 * self.config.vote_back_pressure_limit;
-
-        let signer = new_signer_from_storage(self.author, &self.config.safety_rules.backend);
-
-        let rand_manager = RandManager::new(
-            self.author,
-            self.epoch(),
-            Arc::new(epoch_state.verifier.clone()),
-            signer,
-            rand_config,
-            gc_gap_below,
-            gc_gap_above,
-            ordered_block_rx,
-            rand_ready_block_tx,
-            buffer_manager_event_rx,
-            reset_rand_manager_rx,
-            Arc::new(network_sender.clone()),
-            rand_msg_rx,
-        );
-
         // reset channel between epoch_manager and buffer_manager
         let (reset_buffer_manager_tx, reset_buffer_manager_rx) = unbounded::<ResetRequest>();
+
+        let (ordered_block_tx, ordered_block_rx) = if let Some(rand_config) = rand_config {
+            // channel for sending ordered blocks to rand_manager
+            let (ordered_block_tx, ordered_block_rx) = unbounded::<OrderedBlocks>();
+            // channel for sending rand ready blocks to buffer_manager
+            let (rand_ready_block_tx, rand_ready_block_rx) = unbounded::<OrderedBlocks>();
+
+            let (rand_msg_tx, rand_msg_rx) =
+                aptos_channel::new::<AccountAddress, IncomingRandGenRequest>(
+                    QueueStyle::FIFO,
+                    100,
+                    Some(&counters::RAND_MANAGER_CHANNEL_MSGS),
+                );
+
+            self.rand_manager_msg_tx = Some(rand_msg_tx);
+            self.rand_manager_reset_tx = Some(reset_rand_manager_tx.clone());
+
+            let signer = new_signer_from_storage(self.author, &self.config.safety_rules.backend);
+
+            let db = Arc::new(RandDb::new(&self.storage_path));
+            let rand_manager = RandManager::<RealShare, RealProof, RealAugmentedData, RandDb>::new(
+                self.author,
+                Arc::new(self.epoch_state().clone()),
+                signer,
+                rand_config,
+                rand_ready_block_tx,
+                Arc::new(network_sender.clone()),
+                db,
+            );
+            tokio::spawn(rand_manager.start(
+                ordered_block_rx,
+                rand_msg_rx,
+                reset_rand_manager_rx,
+                self.bounded_executor.clone(),
+            ));
+
+            (ordered_block_tx, rand_ready_block_rx)
+        } else {
+            unbounded()
+        };
 
         let (commit_msg_tx, commit_msg_rx) =
             aptos_channel::new::<AccountAddress, IncomingCommitRequest>(
@@ -660,10 +665,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             network_sender,
             commit_msg_rx,
             self.commit_state_computer.clone(),
-            rand_ready_block_rx,
+            ordered_block_rx,
             reset_buffer_manager_rx,
             epoch_state,
-            buffer_manager_event_tx,
         );
         let bounded_executor = self.bounded_executor.clone();
 
@@ -672,8 +676,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         tokio::spawn(signing_phase.start());
         tokio::spawn(persisting_phase.start());
         tokio::spawn(buffer_manager.start(bounded_executor));
-
-        tokio::spawn(rand_manager.start());
 
         (
             ordered_block_tx,
@@ -713,7 +715,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let (ack_tx, ack_rx) = oneshot::channel();
             tx.send(ResetRequest {
                 tx: ack_tx,
-                stop: true,
+                signal: ResetSignal::Stop,
             })
             .await
             .expect("[EpochManager] Fail to drop rand manager");
@@ -728,7 +730,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let (ack_tx, ack_rx) = oneshot::channel();
             tx.send(ResetRequest {
                 tx: ack_tx,
-                stop: true,
+                signal: ResetSignal::Stop,
             })
             .await
             .expect("[EpochManager] Fail to drop buffer manager");
@@ -1064,6 +1066,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             epoch: payload.epoch(),
             verifier: (&validator_set).into(),
         });
+        self.epoch_state = Some(epoch_state.clone());
         let maybe_dkg_state: anyhow::Result<DKGState> = payload.get();
         // Generate randomness config
         let mut rand_config = None;
@@ -1130,6 +1133,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
                                 rand_config = Some(RandConfig::new(
                                     self.author,
+                                    self.epoch(),
                                     epoch_state.verifier.clone(),
                                     vuf_pp,
                                     dealt_pk,
@@ -1164,7 +1168,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             error!("Failed to read on-chain execution config {}", error);
         }
 
-        self.epoch_state = Some(epoch_state.clone());
 
         let consensus_config = onchain_consensus_config.unwrap_or_default();
         let execution_config = onchain_execution_config
@@ -1609,19 +1612,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     Err(anyhow::anyhow!("Buffer manager not started"))
                 }
             },
-            IncomingRpcRequest::RandRequest(request) => {
-                let msg_epoch = request.req.epoch();
-                if msg_epoch == self.epoch() {
-                    if let Some(tx) = &self.rand_manager_msg_tx {
-                        tx.push(peer_id, request)
-                    } else {
-                        Err(anyhow::anyhow!("Rand manager not started"))
-                    }
+            IncomingRpcRequest::RandGenRequest(request) => {
+                if let Some(tx) = &self.rand_manager_msg_tx {
+                    tx.push(peer_id, request)
                 } else {
-                    monitor!(
-                        "process_different_epoch_dag_rpc",
-                        self.process_different_epoch(msg_epoch, peer_id)
-                    )
+                    bail!("Rand manager not started");
                 }
             },
         }

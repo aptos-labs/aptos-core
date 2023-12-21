@@ -6,6 +6,7 @@ use anyhow::bail;
 pub use aptos_consensus_types::common::Author;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_enum_conversion_derive::EnumConversion;
+use aptos_infallible::Mutex;
 use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
 pub use aptos_types::dkg::DKGAggNode;
 use aptos_types::{
@@ -13,7 +14,7 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
 pub trait TDKGMessage: Into<DKGMessage> + TryFrom<DKGMessage> {
     fn verify(
@@ -120,31 +121,27 @@ impl DKGNodeAck {
 
 pub struct DKGNodeAckState {
     num_validators: usize,
-    received: HashSet<Author>,
+    received: Mutex<HashSet<Author>>,
 }
 
 impl DKGNodeAckState {
     pub fn new(num_validators: usize) -> Self {
         Self {
             num_validators,
-            received: HashSet::new(),
+            received: Mutex::new(HashSet::new()),
         }
     }
 }
 
-impl<M> BroadcastStatus<M> for DKGNodeAckState
-where
-    M: RBMessage,
-    DKGNodeAck: TryFrom<M> + Into<M>,
-    DKGNode: TryFrom<M> + Into<M>,
-{
-    type Ack = DKGNodeAck;
+impl BroadcastStatus<DKGMessage> for Arc<DKGNodeAckState> {
     type Aggregated = ();
     type Message = DKGNode;
+    type Response = DKGNodeAck;
 
-    fn add(&mut self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
-        self.received.insert(peer);
-        if self.received.len() == self.num_validators {
+    fn add(&self, peer: Author, _ack: Self::Response) -> anyhow::Result<Option<Self::Aggregated>> {
+        let mut validators = self.received.lock();
+        validators.insert(peer);
+        if validators.len() == self.num_validators {
             Ok(Some(()))
         } else {
             Ok(None)
@@ -187,31 +184,27 @@ impl DKGAggNodeAck {
 
 pub struct DKGAggNodeAckState {
     num_validators: usize,
-    received: HashSet<Author>,
+    received: Mutex<HashSet<Author>>,
 }
 
 impl DKGAggNodeAckState {
     pub fn new(num_validators: usize) -> Self {
         Self {
             num_validators,
-            received: HashSet::new(),
+            received: Mutex::new(HashSet::new()),
         }
     }
 }
 
-impl<M> BroadcastStatus<M> for DKGAggNodeAckState
-where
-    M: RBMessage,
-    DKGAggNodeAck: TryFrom<M> + Into<M>,
-    DKGAggNode: TryFrom<M> + Into<M>,
-{
-    type Ack = DKGAggNodeAck;
+impl BroadcastStatus<DKGMessage> for Arc<DKGAggNodeAckState> {
     type Aggregated = ();
     type Message = DKGAggNode;
+    type Response = DKGAggNodeAck;
 
-    fn add(&mut self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
-        self.received.insert(peer);
-        if self.received.len() == self.num_validators {
+    fn add(&self, peer: Author, _ack: Self::Response) -> anyhow::Result<Option<Self::Aggregated>> {
+        let mut validators = self.received.lock();
+        validators.insert(peer);
+        if validators.len() == self.num_validators {
             Ok(Some(()))
         } else {
             Ok(None)

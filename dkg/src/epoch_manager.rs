@@ -6,6 +6,7 @@ use crate::{
     network_interface::{DKGMsg, DKGNetworkClient},
 };
 use anyhow::anyhow;
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{NodeConfig, SecureBackend};
 use aptos_consensus_types::common::Author;
@@ -192,6 +193,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 ExponentialBackoff::from_millis(5),
                 aptos_time_service::TimeService::real(),
                 Duration::from_millis(1000),
+                BoundedExecutor::new(8, tokio::runtime::Handle::current()),
             ));
 
             let (start_dkg_event_tx, start_dkg_event_rx) =

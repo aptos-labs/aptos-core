@@ -6,10 +6,9 @@ use crate::{
     error::StateSyncError,
     payload_manager::PayloadManager,
     pipeline::{
-        buffer_manager::{ResetAck, ResetRequest},
+        buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
         errors::Error,
     },
-    randomness::block_queue::OrderedBlocks,
     state_computer::PipelineExecutionResult,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
@@ -102,7 +101,6 @@ impl StateComputer for OrderingStateComputer {
                     .collect::<Vec<ExecutedBlock>>(),
                 ordered_proof: finality_proof,
                 callback,
-                maybe_randomness: None, // rand todo: pass in optimistic randomness
             })
             .await
             .is_err()
@@ -125,7 +123,7 @@ impl StateComputer for OrderingStateComputer {
             .clone()
             .send(ResetRequest {
                 tx,
-                stop: false, // rand manager is responsible for sending stop request
+                signal: ResetSignal::TargetRound(target.commit_info().round()),
             })
             .await
             .map_err(|_| Error::ResetDropped)?;
@@ -137,7 +135,7 @@ impl StateComputer for OrderingStateComputer {
             .clone()
             .send(ResetRequest {
                 tx,
-                stop: false, // epoch manager is responsible for sending stop request
+                signal: ResetSignal::TargetRound(target.commit_info().round()),
             })
             .await
             .map_err(|_| Error::ResetDropped)?;

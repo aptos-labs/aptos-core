@@ -7,7 +7,10 @@ use crate::{
     network::{IncomingCommitRequest, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     pipeline::{
-        buffer_manager::{create_channel, BufferManager, Receiver, ResetAck, ResetRequest, Sender},
+        buffer_manager::{
+            create_channel, BufferManager, OrderedBlocks, Receiver, ResetAck, ResetRequest,
+            ResetSignal, Sender,
+        },
         decoupled_execution_utils::prepare_phases_and_buffer_manager,
         execution_schedule_phase::ExecutionSchedulePhase,
         execution_wait_phase::ExecutionWaitPhase,
@@ -17,7 +20,6 @@ use crate::{
         signing_phase::SigningPhase,
         tests::test_utils::prepare_executed_blocks_with_ledger_info,
     },
-    randomness::block_queue::{OrderedBlocks, RandReadyBlocks},
     test_utils::{
         consensus_runtime, timed_block_on, EmptyStateComputer, MockStorage,
         RandomComputeResultStateComputer,
@@ -58,7 +60,7 @@ use tokio::runtime::Runtime;
 
 pub fn prepare_buffer_manager() -> (
     BufferManager,
-    Sender<RandReadyBlocks>,
+    Sender<OrderedBlocks>,
     Sender<ResetRequest>,
     aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
     aptos_channels::Receiver<Event<ConsensusMsg>>,
@@ -135,9 +137,8 @@ pub fn prepare_buffer_manager() -> (
         reset_buffer_mgr_tx,
     ));
 
-    let (block_tx, block_rx) = create_channel::<RandReadyBlocks>();
+    let (block_tx, block_rx) = create_channel::<OrderedBlocks>();
     let (buffer_reset_tx, buffer_reset_rx) = create_channel::<ResetRequest>();
-    let (buffer_manager_event_tx, _) = create_channel();
 
     let mocked_execution_proxy = Arc::new(RandomComputeResultStateComputer::new());
     let hash_val = mocked_execution_proxy.get_root_hash();
@@ -161,7 +162,6 @@ pub fn prepare_buffer_manager() -> (
             epoch: 1,
             verifier: validators.clone(),
         }),
-        buffer_manager_event_tx,
     );
 
     (
@@ -182,7 +182,7 @@ pub fn prepare_buffer_manager() -> (
 }
 
 pub fn launch_buffer_manager() -> (
-    Sender<RandReadyBlocks>,
+    Sender<OrderedBlocks>,
     Sender<ResetRequest>,
     aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
     aptos_channels::Receiver<Event<ConsensusMsg>>,
@@ -311,7 +311,7 @@ fn buffer_manager_happy_path_test() {
     timed_block_on(&runtime, async move {
         for i in 0..num_batches {
             block_tx
-                .send(RandReadyBlocks {
+                .send(OrderedBlocks {
                     ordered_blocks: batches[i].clone(),
                     ordered_proof: proofs[i].clone(),
                     callback: Box::new(move |_, _| {}),
@@ -377,7 +377,7 @@ fn buffer_manager_sync_test() {
     timed_block_on(&runtime, async move {
         for i in 0..dropped_batches {
             block_tx
-                .send(RandReadyBlocks {
+                .send(OrderedBlocks {
                     ordered_blocks: batches[i].clone(),
                     ordered_proof: proofs[i].clone(),
                     callback: Box::new(move |_, _| {}),
@@ -389,7 +389,13 @@ fn buffer_manager_sync_test() {
         // reset
         let (tx, rx) = oneshot::channel::<ResetAck>();
 
-        reset_tx.send(ResetRequest { tx, stop: false }).await.ok();
+        reset_tx
+            .send(ResetRequest {
+                tx,
+                signal: ResetSignal::TargetRound(1),
+            })
+            .await
+            .ok();
         rx.await.ok();
 
         // start sending back commit vote after reset, to avoid [0..dropped_batches] being sent to result_rx
@@ -401,7 +407,7 @@ fn buffer_manager_sync_test() {
 
         for i in dropped_batches..num_batches {
             block_tx
-                .send(RandReadyBlocks {
+                .send(OrderedBlocks {
                     ordered_blocks: batches[i].clone(),
                     ordered_proof: proofs[i].clone(),
                     callback: Box::new(move |_, _| {}),

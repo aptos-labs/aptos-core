@@ -10,14 +10,14 @@ use crate::{
     pipeline::{
         buffer::{Buffer, Cursor},
         buffer_item::BufferItem,
-        commit_reliable_broadcast::{AckState, CommitMessage, DropGuard},
+        commit_reliable_broadcast::{AckState, CommitMessage},
         execution_schedule_phase::ExecutionRequest,
         execution_wait_phase::{ExecutionResponse, ExecutionWaitRequest},
         persisting_phase::PersistingRequest,
         pipeline_phase::CountedRequest,
         signing_phase::{SigningRequest, SigningResponse},
     },
-    randomness::{block_queue::RandReadyBlocks, rand_manager::BufferManagerEvent},
+    state_replication::StateComputerCommitCallBackType,
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_consensus_types::{
@@ -25,10 +25,11 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
-use aptos_reliable_broadcast::ReliableBroadcast;
+use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof, epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
 };
 use futures::{
     channel::{
@@ -53,9 +54,20 @@ pub const LOOP_INTERVAL_MS: u64 = 1500;
 #[derive(Debug, Default)]
 pub struct ResetAck {}
 
+pub enum ResetSignal {
+    Stop,
+    TargetRound(u64),
+}
+
 pub struct ResetRequest {
     pub tx: oneshot::Sender<ResetAck>,
-    pub stop: bool,
+    pub signal: ResetSignal,
+}
+
+pub struct OrderedBlocks {
+    pub ordered_blocks: Vec<ExecutedBlock>,
+    pub ordered_proof: LedgerInfoWithSignatures,
+    pub callback: StateComputerCommitCallBackType,
 }
 
 pub type BufferItemRootType = Cursor;
@@ -97,12 +109,11 @@ pub struct BufferManager {
     // we don't hear back from the persisting phase
     persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
 
-    block_rx: UnboundedReceiver<RandReadyBlocks>,
+    block_rx: UnboundedReceiver<OrderedBlocks>,
     reset_rx: UnboundedReceiver<ResetRequest>,
     stop: bool,
 
     epoch_state: Arc<EpochState>,
-    rand_manager_tx: Sender<BufferManagerEvent>,
 
     ongoing_tasks: Arc<AtomicU64>,
     // Since proposal_generator is not aware of reconfiguration any more, the suffix blocks
@@ -133,10 +144,9 @@ impl BufferManager {
             IncomingCommitRequest,
         >,
         persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
-        block_rx: UnboundedReceiver<RandReadyBlocks>,
+        block_rx: UnboundedReceiver<OrderedBlocks>,
         reset_rx: UnboundedReceiver<ResetRequest>,
         epoch_state: Arc<EpochState>,
-        rand_manager_tx: Sender<BufferManagerEvent>,
         ongoing_tasks: Arc<AtomicU64>,
         reset_flag: Arc<AtomicBool>,
     ) -> Self {
@@ -166,6 +176,7 @@ impl BufferManager {
                 rb_backoff_policy,
                 TimeService::real(),
                 Duration::from_millis(COMMIT_VOTE_BROADCAST_INTERVAL_MS),
+                BoundedExecutor::new(8, tokio::runtime::Handle::current()),
             ),
             commit_proof_rb_handle: None,
             commit_msg_tx,
@@ -178,7 +189,6 @@ impl BufferManager {
             stop: false,
 
             epoch_state,
-            rand_manager_tx,
 
             ongoing_tasks,
             end_epoch_timestamp: OnceCell::new(),
@@ -191,11 +201,11 @@ impl BufferManager {
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let task = self.reliable_broadcast.broadcast(
             message,
-            AckState::new(
+            Arc::new(AckState::new(
                 self.epoch_state
                     .verifier
                     .get_ordered_account_addresses_iter(),
-            ),
+            )),
         );
         tokio::spawn(Abortable::new(task, abort_registration));
         DropGuard::new(abort_handle)
@@ -222,8 +232,8 @@ impl BufferManager {
 
     /// process incoming ordered blocks
     /// push them into the buffer and update the roots if they are none.
-    async fn process_execution_ready_blocks(&mut self, blocks: RandReadyBlocks) {
-        let RandReadyBlocks {
+    async fn process_execution_ready_blocks(&mut self, blocks: OrderedBlocks) {
+        let OrderedBlocks {
             ordered_blocks,
             ordered_proof,
             callback,
@@ -378,13 +388,6 @@ impl BufferManager {
                     self.buffer.head_cursor()
                 );
                 self.previous_commit_time = Instant::now();
-                if let Err(e) = self
-                    .rand_manager_tx
-                    .send(BufferManagerEvent::Commit(committed_round))
-                    .await
-                {
-                    warn!("Failed to send commit round to rand manager: {:?}", e);
-                }
                 return;
             }
         }
@@ -410,11 +413,11 @@ impl BufferManager {
 
     /// It pops everything in the buffer and if reconfig flag is set, it stops the main loop
     async fn process_reset_request(&mut self, request: ResetRequest) {
-        let ResetRequest { tx, stop } = request;
+        let ResetRequest { tx, signal } = request;
         info!("Receive reset");
         self.reset_flag.store(true, Ordering::SeqCst);
 
-        self.stop = stop;
+        self.stop = matches!(signal, ResetSignal::Stop);
         self.reset().await;
         let _ = tx.send(ResetAck::default());
         self.reset_flag.store(false, Ordering::SeqCst);

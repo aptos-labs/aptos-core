@@ -5,7 +5,7 @@
 use crate::{
     error::StateSyncError,
     payload_manager::PayloadManager,
-    randomness::block_queue::OrderedBlocks,
+    pipeline::buffer_manager::OrderedBlocks,
     state_computer::{PipelineExecutionResult, StateComputeResultFut},
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     test_utils::mock_storage::MockStorage,
@@ -54,7 +54,6 @@ impl MockStateComputer {
             ordered_blocks,
             ordered_proof,
             callback,
-            maybe_randomness: _,
         } = blocks;
 
         self.consensus_db
@@ -118,7 +117,6 @@ impl StateComputer for MockStateComputer {
                     .collect::<Vec<ExecutedBlock>>(),
                 ordered_proof: finality_proof,
                 callback,
-                maybe_randomness: None,
             })
             .await
             .is_err()

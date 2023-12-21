@@ -7,7 +7,7 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::PayloadManager,
-    randomness::block_queue::OrderedBlocks,
+    pipeline::buffer_manager::OrderedBlocks,
     test_utils::{consensus_runtime, EmptyStateComputer, MockPayloadManager, MockStorage},
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};

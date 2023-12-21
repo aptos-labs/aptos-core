@@ -260,9 +260,11 @@ impl DagDriver {
         let rb = self.reliable_broadcast.clone();
         let rb2 = self.reliable_broadcast.clone();
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
-        let signature_builder =
-            SignatureBuilder::new(node.metadata().clone(), self.epoch_state.clone());
-        let cert_ack_set = CertificateAckState::new(self.epoch_state.verifier.len());
+        let signature_builder = Arc::new(SignatureBuilder::new(
+            node.metadata().clone(),
+            self.epoch_state.clone(),
+        ));
+        let cert_ack_set = Arc::new(CertificateAckState::new(self.epoch_state.verifier.len()));
         let latest_ledger_info = self.ledger_info_provider.clone();
 
         let round = node.round();

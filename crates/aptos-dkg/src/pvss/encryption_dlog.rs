@@ -45,21 +45,23 @@ macro_rules! encryption_dlog_pp_impl {
 /// Implements structs for SKs and PKs, where SKs are scalars and the PKs can be implemented to be
 /// any function of the SK via the `crate::pvss::traits::Convert` trait (e.g., $pk = h^{sk^{-1}}$).
 macro_rules! encryption_dlog_keys_impl {
-    (
-        $GT_PROJ_NUM_BYTES:ident,
-        $gt_proj_from_bytes:ident,
-        $GTProjective:ident
-    ) => {
-        use crate::constants::{$GT_PROJ_NUM_BYTES, SCALAR_NUM_BYTES};
-        use crate::utils::random::random_scalar;
-        use crate::utils::serialization::{scalar_from_bytes_le, $gt_proj_from_bytes};
+    ($GT_PROJ_NUM_BYTES:ident, $gt_proj_from_bytes:ident, $GTProjective:ident) => {
+        use crate::{
+            constants::{$GT_PROJ_NUM_BYTES, SCALAR_NUM_BYTES},
+            utils::{
+                random::random_scalar,
+                serialization::{scalar_from_bytes_le, $gt_proj_from_bytes},
+            },
+        };
         use aptos_crypto::{
             CryptoMaterialError, Length, Uniform, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
         };
         use aptos_crypto_derive::{DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};
         use blstrs::{$GTProjective, Scalar};
-        use std::hash::{Hash, Hasher};
-        use std::fmt;
+        use std::{
+            fmt,
+            hash::{Hash, Hasher},
+        };
 
         //
         // Constants
@@ -107,10 +109,9 @@ macro_rules! encryption_dlog_keys_impl {
 
             pub fn from_bytes_be(bytes: &[u8; DECRYPT_KEY_NUM_BYTES]) -> Self {
                 Self {
-                    dk: Scalar::from_bytes_be(bytes).unwrap()
+                    dk: Scalar::from_bytes_be(bytes).unwrap(),
                 }
             }
-
         }
 
         // impl fmt::Debug for DecryptPrivKey {

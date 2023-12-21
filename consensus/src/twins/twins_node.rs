@@ -10,8 +10,8 @@ use crate::{
     network_tests::{NetworkPlayground, TwinId},
     payload_client::validator::DummyValidatorTxnClient,
     payload_manager::PayloadManager,
+    pipeline::buffer_manager::OrderedBlocks,
     quorum_store::quorum_store_db::MockQuorumStoreDB,
-    randomness::block_queue::OrderedBlocks,
     test_utils::{MockStateComputer, MockStorage},
     util::time_service::ClockTimeService,
 };

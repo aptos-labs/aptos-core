@@ -2,13 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{block_info::Round, validator_verifier::ValidatorVerifier};
+use crate::block_info::Round;
 use aptos_crypto::HashValue;
-use aptos_dkg::{
-    pvss::{Player, WeightedConfig},
-    weighted_vuf::{self, traits::WeightedVUF},
-};
-use move_core_types::account_address::AccountAddress;
+use aptos_dkg::weighted_vuf::{self, traits::WeightedVUF};
+use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 
 pub type WVUF = weighted_vuf::pinkas::PinkasWUF;
@@ -23,13 +20,13 @@ pub type Delta = <WVUF as WeightedVUF>::Delta;
 pub type Evaluation = <WVUF as WeightedVUF>::Evaluation;
 pub type Proof = <WVUF as WeightedVUF>::Proof;
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct RandMetadataToSign {
     pub epoch: u64,
     pub round: Round,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct RandMetadata {
     pub metadata_to_sign: RandMetadataToSign,
     // not used for signing
@@ -58,6 +55,11 @@ impl RandMetadata {
 
     pub fn epoch(&self) -> u64 {
         self.metadata_to_sign.epoch
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn new_for_testing(round: Round) -> Self {
+        Self::new(1, round, HashValue::zero(), 1)
     }
 }
 
@@ -89,6 +91,17 @@ impl Randomness {
 
     pub fn randomness(&self) -> &[u8] {
         &self.randomness
+    }
+}
+
+impl Default for Randomness {
+    fn default() -> Self {
+        let metadata = RandMetadata::new(0, 0, HashValue::zero(), 0);
+        let randomness = vec![];
+        Self {
+            metadata,
+            randomness,
+        }
     }
 }
 
@@ -140,18 +153,18 @@ impl RandDecision {
         self.metadata().timestamp
     }
 
-    pub fn verify(&self, rand_config: &RandConfig) -> anyhow::Result<()> {
-        // If the caller locally does not have all the certified apks corresponding to self.proof, the verification should fail.
-        // Then RandShare multicast may be retried periodically and the caller will receive RandDecision.
-        // Eventually the caller will receive certified apks to verify the proof in RandDecision.
-        <WVUF as WeightedVUF>::verify_proof(
-            &rand_config.vuf_pp,
-            &rand_config.pk,
-            rand_config.get_all_certified_apk(),
-            self.randomness.metadata.to_bytes().as_slice(),
-            &self.proof,
-        )
-    }
+    // pub fn verify(&self, rand_config: &RandConfig) -> anyhow::Result<()> {
+    //     // If the caller locally does not have all the certified apks corresponding to self.proof, the verification should fail.
+    //     // Then RandShare multicast may be retried periodically and the caller will receive RandDecision.
+    //     // Eventually the caller will receive certified apks to verify the proof in RandDecision.
+    //     <WVUF as WeightedVUF>::verify_proof(
+    //         &rand_config.vuf_pp,
+    //         &rand_config.pk,
+    //         rand_config.get_all_certified_apk(),
+    //         self.randomness.metadata.to_bytes().as_slice(),
+    //         &self.proof,
+    //     )
+    // }
 }
 
 #[derive(Clone)]
@@ -165,7 +178,7 @@ pub struct RandKeys {
     // certified augmented public key share of all validators,
     // obtained from all validators in the new epoch,
     // which necessary for verifying randomness shares
-    pub certified_apks: Vec<Option<APK>>,
+    pub certified_apks: Vec<OnceCell<APK>>,
     // public key share of all validators, obtained from the DKG transcript of last epoch
     pub pk_shares: Vec<PKShare>,
 }
@@ -173,7 +186,7 @@ pub struct RandKeys {
 impl RandKeys {
     pub fn new(ask: ASK, apk: APK, pk_shares: Vec<PKShare>, num_validators: usize) -> Self {
         let signed_deltas = vec![None; num_validators];
-        let certified_apks = vec![None; num_validators];
+        let certified_apks = vec![OnceCell::new(); num_validators];
 
         Self {
             ask,
@@ -193,113 +206,113 @@ impl RandKeys {
         Ok(())
     }
 
-    pub fn add_certified_apk(&mut self, index: usize, apk: APK) -> anyhow::Result<()> {
+    pub fn add_certified_apk(&self, index: usize, apk: APK) -> anyhow::Result<()> {
         assert!(index < self.certified_apks.len());
-        if self.certified_apks[index].is_some() {
+        if self.certified_apks[index].get().is_some() {
             return Ok(());
         }
-        self.certified_apks[index] = Some(apk);
+        self.certified_apks[index].set(apk).unwrap();
         Ok(())
     }
 }
 
-#[derive(Clone)]
-#[allow(dead_code)]
-pub struct RandConfig {
-    pub author: AccountAddress,
-    pub validator: ValidatorVerifier,
-    // public parameters of the weighted VUF
-    pub vuf_pp: WvufPP,
-    // public key for the weighted VUF
-    pub pk: PK,
-    // key shares for weighted VUF
-    pub keys: RandKeys,
-    // weighted config for weighted VUF
-    pub wconfig: WeightedConfig,
-}
-
-impl RandConfig {
-    pub fn new(
-        author: AccountAddress,
-        validator: ValidatorVerifier,
-        vuf_pp: WvufPP,
-        pk: PK,
-        keys: RandKeys,
-        wconfig: WeightedConfig,
-    ) -> Self {
-        Self {
-            author,
-            validator,
-            vuf_pp,
-            pk,
-            keys,
-            wconfig,
-        }
-    }
-
-    pub fn get_id(&self, peer: &AccountAddress) -> usize {
-        *self
-            .validator
-            .address_to_validator_index()
-            .get(peer)
-            .unwrap()
-    }
-
-    pub fn get_signed_delta(&self, peer: &AccountAddress) -> Option<&Delta> {
-        let index = self.get_id(peer);
-        self.keys.signed_deltas[index].as_ref()
-    }
-
-    pub fn add_signed_delta(&mut self, peer: &AccountAddress, delta: Delta) -> anyhow::Result<()> {
-        let index = self.get_id(peer);
-        self.keys.add_signed_delta(index, delta)
-    }
-
-    pub fn get_certified_apk(&self, peer: &AccountAddress) -> Option<&APK> {
-        let index = self.get_id(peer);
-        self.keys.certified_apks[index].as_ref()
-    }
-
-    pub fn get_all_certified_apk(&self) -> &[Option<APK>] {
-        self.keys.certified_apks.as_slice()
-    }
-
-    pub fn add_certified_apk(&mut self, peer: &AccountAddress, apk: APK) -> anyhow::Result<()> {
-        let index = self.get_id(peer);
-        self.keys.add_certified_apk(index, apk)
-    }
-
-    pub fn add_certified_delta(
-        &mut self,
-        peer: &AccountAddress,
-        delta: Delta,
-    ) -> anyhow::Result<()> {
-        let apk = <WVUF as WeightedVUF>::augment_pubkey(
-            &self.vuf_pp,
-            self.get_pk_share(peer).clone(),
-            delta,
-        )?;
-        self.add_certified_apk(peer, apk)?;
-        Ok(())
-    }
-
-    pub fn get_my_delta(&self) -> &Delta {
-        <WVUF as WeightedVUF>::get_public_delta(&self.keys.apk)
-    }
-
-    pub fn get_pk_share(&self, peer: &AccountAddress) -> &PKShare {
-        let index = self.get_id(peer);
-        &self.keys.pk_shares[index]
-    }
-
-    pub fn get_peer_weight(&self, peer: &AccountAddress) -> usize {
-        let player = Player {
-            id: self.get_id(peer),
-        };
-        self.wconfig.get_player_weight(&player)
-    }
-
-    pub fn threshold(&self) -> usize {
-        self.wconfig.get_threshold_weight()
-    }
-}
+// #[derive(Clone)]
+// #[allow(dead_code)]
+// pub struct RandConfig {
+//     pub author: AccountAddress,
+//     pub validator: ValidatorVerifier,
+//     // public parameters of the weighted VUF
+//     pub vuf_pp: WvufPP,
+//     // public key for the weighted VUF
+//     pub pk: PK,
+//     // key shares for weighted VUF
+//     pub keys: RandKeys,
+//     // weighted config for weighted VUF
+//     pub wconfig: WeightedConfig,
+// }
+//
+// impl RandConfig {
+//     pub fn new(
+//         author: AccountAddress,
+//         validator: ValidatorVerifier,
+//         vuf_pp: WvufPP,
+//         pk: PK,
+//         keys: RandKeys,
+//         wconfig: WeightedConfig,
+//     ) -> Self {
+//         Self {
+//             author,
+//             validator,
+//             vuf_pp,
+//             pk,
+//             keys,
+//             wconfig,
+//         }
+//     }
+//
+//     pub fn get_id(&self, peer: &AccountAddress) -> usize {
+//         *self
+//             .validator
+//             .address_to_validator_index()
+//             .get(peer)
+//             .unwrap()
+//     }
+//
+//     pub fn get_signed_delta(&self, peer: &AccountAddress) -> Option<&Delta> {
+//         let index = self.get_id(peer);
+//         self.keys.signed_deltas[index].as_ref()
+//     }
+//
+//     pub fn add_signed_delta(&mut self, peer: &AccountAddress, delta: Delta) -> anyhow::Result<()> {
+//         let index = self.get_id(peer);
+//         self.keys.add_signed_delta(index, delta)
+//     }
+//
+//     pub fn get_certified_apk(&self, peer: &AccountAddress) -> Option<&APK> {
+//         let index = self.get_id(peer);
+//         self.keys.certified_apks[index].get()
+//     }
+//
+//     pub fn get_all_certified_apk(&self) -> &[Option<APK>] {
+//         self.keys.certified_apks.as_slice()
+//     }
+//
+//     pub fn add_certified_apk(&mut self, peer: &AccountAddress, apk: APK) -> anyhow::Result<()> {
+//         let index = self.get_id(peer);
+//         self.keys.add_certified_apk(index, apk)
+//     }
+//
+//     pub fn add_certified_delta(
+//         &mut self,
+//         peer: &AccountAddress,
+//         delta: Delta,
+//     ) -> anyhow::Result<()> {
+//         let apk = <WVUF as WeightedVUF>::augment_pubkey(
+//             &self.vuf_pp,
+//             self.get_pk_share(peer).clone(),
+//             delta,
+//         )?;
+//         self.add_certified_apk(peer, apk)?;
+//         Ok(())
+//     }
+//
+//     pub fn get_my_delta(&self) -> &Delta {
+//         <WVUF as WeightedVUF>::get_public_delta(&self.keys.apk)
+//     }
+//
+//     pub fn get_pk_share(&self, peer: &AccountAddress) -> &PKShare {
+//         let index = self.get_id(peer);
+//         &self.keys.pk_shares[index]
+//     }
+//
+//     pub fn get_peer_weight(&self, peer: &AccountAddress) -> usize {
+//         let player = Player {
+//             id: self.get_id(peer),
+//         };
+//         self.wconfig.get_player_weight(&player)
+//     }
+//
+//     pub fn threshold(&self) -> usize {
+//         self.wconfig.get_threshold_weight()
+//     }
+// }

@@ -261,7 +261,7 @@ impl DKGManager {
             handle.abort();
         }
 
-        let ack_set = DKGNodeAckState::new(self.epoch_state.verifier.len());
+        let ack_set = Arc::new(DKGNodeAckState::new(self.epoch_state.verifier.len()));
         let rb = self.reliable_broadcast.clone();
         let task = rb.broadcast(my_node.as_ref().clone(), ack_set);
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
@@ -288,7 +288,7 @@ impl DKGManager {
             handle.abort();
         }
 
-        let ack_set = DKGAggNodeAckState::new(self.epoch_state.verifier.len());
+        let ack_set = Arc::new(DKGAggNodeAckState::new(self.epoch_state.verifier.len()));
         let rb = self.reliable_broadcast.clone();
         let task = rb.broadcast(agg_node.as_ref().clone(), ack_set);
         let (abort_handle, abort_registration) = AbortHandle::new_pair();

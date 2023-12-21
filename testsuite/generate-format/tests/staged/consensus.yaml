@@ -311,6 +311,10 @@ ConsensusMsg:
       CommitMessage:
         NEWTYPE:
           TYPENAME: CommitMessage
+    16:
+      RandGenMessage:
+        NEWTYPE:
+          TYPENAME: RandGenMessage
 ContractEvent:
   ENUM:
     0:
@@ -506,6 +510,10 @@ QuorumCert:
         TYPENAME: VoteData
     - signed_ledger_info:
         TYPENAME: LedgerInfoWithSignatures
+RandGenMessage:
+  STRUCT:
+    - epoch: U64
+    - data: BYTES
 RawTransaction:
   STRUCT:
     - sender:
