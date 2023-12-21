@@ -6,20 +6,15 @@ use crate::{
     pipeline::buffer_manager::OrderedBlocks,
     rand::rand_gen::{
         block_queue::{BlockQueue, QueueItem},
-        storage::interface::RandStorage,
-        types::{Proof, RandConfig, RandDecision, RandShare, Share},
+        types::{RandConfig, RandShare, Share},
     },
 };
 use anyhow::ensure;
 use aptos_consensus_types::{
     common::{Author, Round},
-    randomness::RandMetadata,
+    randomness::{RandMetadata, Randomness},
 };
-use aptos_logger::error;
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::collections::{BTreeMap, HashMap};
 
 const FUTURE_ROUNDS_TO_ACCEPT: u64 = 200;
 
@@ -46,15 +41,15 @@ impl<S: Share> ShareAggregator<S> {
         }
     }
 
-    pub fn try_aggregate<P: Proof<Share = S>>(
+    pub fn try_aggregate(
         &self,
         rand_config: &RandConfig,
         rand_metadata: RandMetadata,
-    ) -> Option<RandDecision<P>> {
+    ) -> Option<Randomness> {
         if self.total_weight < rand_config.threshold_weight() {
             return None;
         }
-        Some(P::aggregate(
+        Some(S::aggregate(
             self.shares.values(),
             rand_config,
             rand_metadata,
@@ -80,24 +75,24 @@ impl<S: Share> ShareAggregator<S> {
     }
 }
 
-enum RandItem<S, P> {
+enum RandItem<S> {
     PendingMetadata(ShareAggregator<S>),
     PendingDecision {
         metadata: RandMetadata,
         share_aggregator: ShareAggregator<S>,
     },
     Decided {
-        decision: RandDecision<P>,
+        decision: Randomness,
         self_share: RandShare<S>,
     },
 }
 
-impl<S: Share, P: Proof<Share = S>> RandItem<S, P> {
+impl<S: Share> RandItem<S> {
     fn new(author: Author) -> Self {
         Self::PendingMetadata(ShareAggregator::new(author))
     }
 
-    fn decision(&self) -> Option<&RandDecision<P>> {
+    fn decision(&self) -> Option<&Randomness> {
         match self {
             RandItem::PendingMetadata(_) | RandItem::PendingDecision { .. } => None,
             RandItem::Decided { decision, .. } => Some(decision),
@@ -147,7 +142,7 @@ impl<S: Share, P: Proof<Share = S>> RandItem<S, P> {
                     share_aggregator.try_aggregate(rand_config, metadata.clone())
                 {
                     observe_block(
-                        decision.rand_metadata().timestamp(),
+                        decision.metadata().timestamp(),
                         BlockStage::RAND_AGG_DECISION,
                     );
                     Self::Decided {
@@ -194,65 +189,24 @@ impl<S: Share, P: Proof<Share = S>> RandItem<S, P> {
     }
 }
 
-pub struct RandStore<S, P, Storage> {
+pub struct RandStore<S> {
     epoch: u64,
     author: Author,
     rand_config: RandConfig,
-    rand_map: BTreeMap<Round, RandItem<S, P>>,
+    rand_map: BTreeMap<Round, RandItem<S>>,
     block_queue: BlockQueue,
-    db: Arc<Storage>,
     highest_known_round: u64,
 }
 
-impl<S: Share, P: Proof<Share = S>, Storage: RandStorage<S, P>> RandStore<S, P, Storage> {
-    pub fn new(epoch: u64, author: Author, rand_config: RandConfig, db: Arc<Storage>) -> Self {
-        let mut rand_map: BTreeMap<Round, RandItem<S, P>> = BTreeMap::new();
-        let all_shares = db.get_all_shares().unwrap_or_default();
-        let mut shares_to_delete = vec![];
-        for (_, share) in all_shares {
-            let rand_metadata = share.metadata();
-            if rand_metadata.epoch() != epoch {
-                shares_to_delete.push(share);
-                continue;
-            }
-            let rand_item = rand_map
-                .entry(rand_metadata.round())
-                .or_insert_with(|| RandItem::new(author));
-            let _ = rand_item.add_share(share, &rand_config);
-        }
-        let all_decisions = db.get_all_decisions().unwrap_or_default();
-        let mut decisions_to_delete = vec![];
-        for (_, decision) in all_decisions {
-            let round = decision.rand_metadata().round();
-            if decision.rand_metadata().epoch() != epoch {
-                decisions_to_delete.push(decision);
-                continue;
-            }
-            let self_share = rand_map
-                .get(&round)
-                .expect("Decision should have share")
-                .get_self_share()
-                .expect("Decision should have self share");
-            rand_map.insert(round, RandItem::Decided {
-                decision,
-                self_share,
-            });
-        }
-        if let Err(e) = db.remove_shares(shares_to_delete.into_iter()) {
-            error!("[RandStore] Failed to remove shares: {:?}", e);
-        }
-        if let Err(e) = db.remove_decisions(decisions_to_delete.into_iter()) {
-            error!("[RandStore] Failed to remove decisions: {:?}", e);
-        }
-        let max_round = rand_map.last_key_value().map_or(0, |(k, _)| *k);
+impl<S: Share> RandStore<S> {
+    pub fn new(epoch: u64, author: Author, rand_config: RandConfig) -> Self {
         Self {
             epoch,
             author,
             rand_config,
-            rand_map,
+            rand_map: BTreeMap::new(),
             block_queue: BlockQueue::new(),
-            db,
-            highest_known_round: max_round,
+            highest_known_round: 0,
         }
     }
 
@@ -272,15 +226,12 @@ impl<S: Share, P: Proof<Share = S>, Storage: RandStorage<S, P>> RandStore<S, P, 
 
     fn try_aggregate(
         rand_config: &RandConfig,
-        rand_item: &mut RandItem<S, P>,
+        rand_item: &mut RandItem<S>,
         block_queue: &mut BlockQueue,
     ) {
         rand_item.try_aggregate(rand_config);
         if let Some(decision) = rand_item.decision() {
-            block_queue.set_randomness(
-                decision.rand_metadata().round(),
-                decision.randomness().clone(),
-            );
+            block_queue.set_randomness(decision.metadata().round(), decision.clone());
         }
     }
 
@@ -308,7 +259,6 @@ impl<S: Share, P: Proof<Share = S>, Storage: RandStorage<S, P>> RandStore<S, P, 
             share.metadata().round() <= self.highest_known_round + FUTURE_ROUNDS_TO_ACCEPT,
             "Share from future round"
         );
-        self.db.save_share(&share)?;
         let rand_metadata = share.metadata().clone();
         let rand_item = self
             .rand_map
@@ -332,12 +282,11 @@ mod tests {
     use crate::rand::rand_gen::{
         block_queue::QueueItem,
         rand_store::{RandItem, RandStore, ShareAggregator},
-        storage::in_memory::InMemRandDb,
         test_utils::{create_ordered_blocks, create_share, create_share_for_round},
-        types::{MockAugData, MockProof, MockShare, RandConfig},
+        types::{MockShare, RandConfig},
     };
     use aptos_consensus_types::{common::Author, randomness::RandMetadata};
-    use std::{collections::HashMap, str::FromStr, sync::Arc};
+    use std::{collections::HashMap, str::FromStr};
 
     #[test]
     fn test_share_aggregator() {
@@ -374,7 +323,7 @@ mod tests {
             create_share_for_round(1, Author::ZERO),
         ];
 
-        let mut item = RandItem::<MockShare, MockProof>::new(Author::TWO);
+        let mut item = RandItem::<MockShare>::new(Author::TWO);
         for share in shares.iter() {
             item.add_share(share.clone(), &config).unwrap();
         }
@@ -384,7 +333,7 @@ mod tests {
         item.try_aggregate(&config);
         assert!(item.decision().is_some());
 
-        let mut item = RandItem::<MockShare, MockProof>::new(Author::ONE);
+        let mut item = RandItem::<MockShare>::new(Author::ONE);
         item.add_metadata(&config, RandMetadata::new_for_testing(2));
         for share in shares[1..].iter() {
             item.add_share(share.clone(), &config).unwrap_err();
@@ -399,12 +348,7 @@ mod tests {
         let weights: HashMap<Author, u64> = authors.iter().map(|addr| (*addr, 1)).collect();
         let authors: Vec<Author> = weights.keys().cloned().collect();
         let config = RandConfig::new(1, Author::ZERO, weights);
-        let mut rand_store = RandStore::new(
-            1,
-            authors[1],
-            config,
-            Arc::new(InMemRandDb::<MockShare, MockProof, MockAugData>::new()),
-        );
+        let mut rand_store = RandStore::new(1, authors[1], config);
 
         let rounds = vec![vec![1], vec![2, 3], vec![5, 8, 13]];
         let blocks_1 = QueueItem::new(create_ordered_blocks(rounds[0].clone()), None);
