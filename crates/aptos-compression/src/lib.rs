@@ -1,10 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::{
-    increment_compression_byte_count, increment_compression_error,
-    start_compression_operation_timer, CompressionClient, COMPRESS, COMPRESSED_BYTES, DECOMPRESS,
-    RAW_BYTES,
+use crate::{
+    client::CompressionClient,
+    metrics::{
+        increment_compression_byte_count, increment_compression_error,
+        start_compression_operation_timer, COMPRESS, COMPRESSED_BYTES, DECOMPRESS, RAW_BYTES,
+    },
 };
 use aptos_logger::prelude::*;
 use lz4::block::CompressionMode;
@@ -20,6 +22,7 @@ use thiserror::Error;
 /// Note: the crate also exposes some basic compression metrics
 /// that can be used to track the cumulative compression ratio
 /// and compression/decompression durations during the runtime.
+pub mod client;
 pub mod metrics;
 #[cfg(test)]
 mod tests;
@@ -50,7 +53,7 @@ pub fn compress(
         )));
     }
     // Start the compression timer
-    let timer = start_compression_operation_timer(COMPRESS, client.clone());
+    let timer = start_compression_operation_timer(COMPRESS, client);
 
     // Compress the data
     let compression_mode = CompressionMode::FAST(ACCELERATION_PARAMETER);
@@ -78,7 +81,7 @@ pub fn compress(
 
     // Stop the timer and update the metrics
     let compression_duration = timer.stop_and_record();
-    increment_compression_byte_count(RAW_BYTES, client.clone(), raw_data.len() as u64);
+    increment_compression_byte_count(RAW_BYTES, client, raw_data.len() as u64);
     increment_compression_byte_count(COMPRESSED_BYTES, client, compressed_data.len() as u64);
 
     // Log the relative data compression statistics
@@ -101,7 +104,7 @@ pub fn decompress(
     max_size: usize,
 ) -> Result<Vec<u8>, CompressionError> {
     // Start the decompression timer
-    let timer = start_compression_operation_timer(DECOMPRESS, client.clone());
+    let timer = start_compression_operation_timer(DECOMPRESS, client);
 
     // Check size of the data and initialize raw_data
     let size = match get_decompressed_size(compressed_data, max_size) {

@@ -13,7 +13,7 @@ use crate::{
     responses::Error::DegenerateRangeError,
     Epoch, StorageServiceRequest, COMPRESSION_SUFFIX_LABEL,
 };
-use aptos_compression::{metrics::CompressionClient, CompressedData, CompressionError};
+use aptos_compression::{client::CompressionClient, CompressedData, CompressionError};
 use aptos_config::config::{
     AptosDataClientConfig, StorageServiceConfig, MAX_APPLICATION_MESSAGE_SIZE,
 };
@@ -65,6 +65,7 @@ impl StorageServiceResponse {
     /// Creates a new response and performs compression if required
     pub fn new(data_response: DataResponse, perform_compression: bool) -> Result<Self, Error> {
         if perform_compression {
+            // Serialize and compress the raw data
             let raw_data = bcs::to_bytes(&data_response)
                 .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
             let compressed_data = aptos_compression::compress(
@@ -72,6 +73,8 @@ impl StorageServiceResponse {
                 CompressionClient::StateSync,
                 MAX_APPLICATION_MESSAGE_SIZE,
             )?;
+
+            // Create the compressed response
             let label = data_response.get_label().to_string() + COMPRESSION_SUFFIX_LABEL;
             Ok(StorageServiceResponse::CompressedResponse(
                 label,
