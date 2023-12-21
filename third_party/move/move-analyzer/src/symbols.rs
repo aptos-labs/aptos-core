@@ -525,10 +525,7 @@ impl UseDef {
             col_end,
         };
 
-        references
-            .entry(def_loc)
-            .or_default()
-            .insert(use_loc);
+        references.entry(def_loc).or_default().insert(use_loc);
         Self {
             col_start: use_start.character,
             col_end,
@@ -597,10 +594,7 @@ impl FunctionIdentTypeMap {
 impl Symbols {
     pub fn merge(&mut self, other: Self) {
         for (k, v) in other.references {
-            self.references
-                .entry(k)
-                .or_default()
-                .extend(v);
+            self.references.entry(k).or_default().extend(v);
         }
         self.file_use_defs.extend(other.file_use_defs);
         self.file_name_mapping.extend(other.file_name_mapping);
