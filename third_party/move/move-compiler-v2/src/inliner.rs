@@ -805,14 +805,8 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         let tuple_args: Vec<Pattern> = parameters
             .iter()
             .map(|param| {
-                let Parameter(sym, ty) = *param;
-                // TODO(10731): ideally, each Parameter has its own loc.  For now, we use the
-                // function location.  body should have types rewritten, other inlining complete,
-                // lambdas inlined, etc.
-                let id = env.new_node(
-                    function_loc.clone().inlined_from(call_site_loc),
-                    ty.instantiate(self.type_args),
-                );
+                let Parameter(sym, ty, loc) = *param;
+                let id = env.new_node(loc.clone(), ty.instantiate(self.type_args));
                 if let Some(new_sym) = self.shadow_stack.get_shadow_symbol(*sym, true) {
                     Pattern::Var(id, new_sym)
                 } else {
@@ -1084,7 +1078,8 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
             let param = &self.inlined_formal_params[idx];
             let sym = param.0;
             let param_type = &param.1;
-            let new_node_id = self.env.new_node(loc, param_type.clone());
+            let instantiated_param_type = param_type.instantiate(self.type_args);
+            let new_node_id = self.env.new_node(loc, instantiated_param_type);
             if let Some(new_sym) = self.shadow_stack.get_shadow_symbol(sym, false) {
                 Some(ExpData::LocalVar(new_node_id, new_sym).into())
             } else {

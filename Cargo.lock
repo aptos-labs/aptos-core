@@ -4029,6 +4029,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-transactional-test-harness"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-api-types",
+ "aptos-cached-packages",
+ "aptos-crypto",
+ "aptos-framework",
+ "aptos-gas-schedule",
+ "aptos-language-e2e-tests",
+ "aptos-storage-interface",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-vm-genesis",
+ "bcs 0.1.4",
+ "clap 4.3.21",
+ "datatest-stable",
+ "hex",
+ "move-binary-format",
+ "move-command-line-common",
+ "move-compiler",
+ "move-core-types",
+ "move-resource-viewer",
+ "move-transactional-test-runner",
+ "move-vm-runtime",
+ "once_cell",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "aptos-types"
 version = "0.0.3"
 dependencies = [
