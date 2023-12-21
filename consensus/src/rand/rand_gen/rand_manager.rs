@@ -287,8 +287,20 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
                     } = request;
                     match rand_gen_msg {
                         RandMessage::RequestShare(request) => {
-                            if let Some(share) = self.rand_store.lock().get_self_share(request.rand_metadata()) {
-                                self.process_response(protocol, response_sender, RandMessage::Share(share));
+                            let result = self.rand_store.lock().get_self_share(request.rand_metadata());
+                            match result {
+                                Ok(maybe_share) => {
+                                    let share = maybe_share.unwrap_or_else(|| {
+                                        // reproduce previous share if not found
+                                        let share = S::generate(&self.config, request.rand_metadata().clone());
+                                        self.rand_store.lock().add_share(share.clone()).expect("Add self share should succeed");
+                                        share
+                                    });
+                                    self.process_response(protocol, response_sender, RandMessage::Share(share));
+                                },
+                                Err(e) => {
+                                    warn!("[RandManager] Failed to get share: {}", e);
+                                }
                             }
                         }
                         RandMessage::Share(share) => {
