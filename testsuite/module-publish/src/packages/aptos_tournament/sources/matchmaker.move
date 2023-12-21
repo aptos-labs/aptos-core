@@ -13,10 +13,6 @@ module tournament::matchmaker {
 
     friend tournament::round;
 
-    #[test_only]
-    friend tournament::main_unit_test;
-
-
     /// Attempted to matchmake for a tournament that the signer does not own
     const ENOT_MATCHMAKER_OWNER: u64 = 0;
 
