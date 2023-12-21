@@ -805,14 +805,8 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         let tuple_args: Vec<Pattern> = parameters
             .iter()
             .map(|param| {
-                let Parameter(sym, ty) = *param;
-                // TODO(10731): ideally, each Parameter has its own loc.  For now, we use the
-                // function location.  body should have types rewritten, other inlining complete,
-                // lambdas inlined, etc.
-                let id = env.new_node(
-                    function_loc.clone().inlined_from(call_site_loc),
-                    ty.instantiate(self.type_args),
-                );
+                let Parameter(sym, ty, loc) = *param;
+                let id = env.new_node(loc.clone(), ty.instantiate(self.type_args));
                 if let Some(new_sym) = self.shadow_stack.get_shadow_symbol(*sym, true) {
                     Pattern::Var(id, new_sym)
                 } else {
