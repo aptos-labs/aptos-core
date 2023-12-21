@@ -7,10 +7,10 @@ use crate::{
         increment_compression_byte_count, increment_compression_error,
         start_compression_operation_timer, COMPRESS, COMPRESSED_BYTES, DECOMPRESS, RAW_BYTES,
     },
+    Error::{CompressionError, DecompressionError},
 };
 use aptos_logger::prelude::*;
 use lz4::block::CompressionMode;
-use std::io::{Error, ErrorKind};
 use thiserror::Error;
 
 /// This crate provides a simple library interface for data compression.
@@ -23,7 +23,7 @@ use thiserror::Error;
 /// that can be used to track the cumulative compression ratio
 /// and compression/decompression durations during the runtime.
 pub mod client;
-pub mod metrics;
+mod metrics;
 #[cfg(test)]
 mod tests;
 
@@ -35,16 +35,20 @@ const ACCELERATION_PARAMETER: i32 = 1;
 pub type CompressedData = Vec<u8>;
 
 /// An error type for capturing compression/decompression failures
-#[derive(Clone, Debug, Error)]
-#[error("Encountered a compression error! Error: {0}")]
-pub struct CompressionError(String);
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
+pub enum Error {
+    #[error("Encountered a compression error! Error: {0}")]
+    CompressionError(String),
+    #[error("Encountered a decompression error! Error: {0}")]
+    DecompressionError(String),
+}
 
 /// Compresses the raw data stream
 pub fn compress(
     raw_data: Vec<u8>,
     client: CompressionClient,
     max_bytes: usize,
-) -> Result<CompressedData, CompressionError> {
+) -> Result<CompressedData, Error> {
     if raw_data.len() > max_bytes {
         return Err(CompressionError(format!(
             "Uncompressed size greater than max. size: {}, max: {}",
@@ -102,7 +106,7 @@ pub fn decompress(
     compressed_data: &CompressedData,
     client: CompressionClient,
     max_size: usize,
-) -> Result<Vec<u8>, CompressionError> {
+) -> Result<Vec<u8>, Error> {
     // Start the decompression timer
     let timer = start_compression_operation_timer(DECOMPRESS, client);
 
@@ -111,7 +115,7 @@ pub fn decompress(
         Ok(size) => size,
         Err(error) => {
             increment_compression_error(DECOMPRESS, client);
-            return Err(CompressionError(format!(
+            return Err(DecompressionError(format!(
                 "Failed to get decompressed size: {}",
                 error
             )));
@@ -122,7 +126,7 @@ pub fn decompress(
     // Decompress the data
     if let Err(error) = lz4::block::decompress_to_buffer(compressed_data, None, &mut raw_data) {
         increment_compression_error(DECOMPRESS, client);
-        return Err(CompressionError(format!(
+        return Err(DecompressionError(format!(
             "Failed to decompress the data: {}",
             error
         )));
@@ -144,31 +148,31 @@ pub fn decompress(
 
 /// Derived from lz4-rs crate, which starts the compressed payload with the original data size as i32
 /// see: https://github.com/10XGenomics/lz4-rs/blob/0abc0a52af1f6010f9a57640b1dc8eb8d2d697aa/src/block/mod.rs#L162
-fn get_decompressed_size(src: &CompressedData, max_size: usize) -> std::io::Result<usize> {
+fn get_decompressed_size(src: &CompressedData, max_size: usize) -> Result<usize, Error> {
     if src.len() < 4 {
-        return Err(Error::new(
-            ErrorKind::InvalidInput,
-            "Source buffer must at least contain size prefix.",
-        ));
+        return Err(DecompressionError(format!(
+            "Source buffer must at least contain size prefix: {}",
+            src.len()
+        )));
     }
 
     let size =
         (src[0] as i32) | (src[1] as i32) << 8 | (src[2] as i32) << 16 | (src[3] as i32) << 24;
 
     if size < 0 {
-        return Err(Error::new(
-            ErrorKind::InvalidInput,
-            "Parsed size prefix in buffer must not be negative.",
-        ));
+        return Err(DecompressionError(format!(
+            "Parsed size prefix in buffer must not be negative: {}",
+            size
+        )));
     }
 
     let size = size as usize;
 
     if size > max_size {
-        return Err(Error::new(
-            ErrorKind::InvalidInput,
-            format!("Given size parameter is too big: {} > {}", size, max_size),
-        ));
+        return Err(DecompressionError(format!(
+            "Parsed size prefix in buffer is too big: {} > {}",
+            size, max_size
+        )));
     }
 
     Ok(size)
