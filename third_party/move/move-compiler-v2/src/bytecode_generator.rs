@@ -564,6 +564,22 @@ impl<'env> Generator<'env> {
                     self.internal_error(id, "inconsistent type in select expression")
                 }
             },
+            Operation::Exists(None)
+            | Operation::BorrowGlobal(_)
+            | Operation::MoveFrom
+            | Operation::MoveTo
+                if self.env().get_node_instantiation(id)[0]
+                    .get_struct(self.env())
+                    .is_none() =>
+            {
+                self.error(
+                    id,
+                    format!(
+                        "expected `Type::Struct`, found: `{:?}`",
+                        self.env().get_node_instantiation(id)[0]
+                    ),
+                )
+            },
             Operation::Exists(None) => {
                 let inst = self.env().get_node_instantiation(id);
                 let (mid, sid, inst) = inst[0].require_struct();

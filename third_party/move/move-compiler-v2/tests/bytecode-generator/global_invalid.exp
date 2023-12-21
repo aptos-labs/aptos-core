@@ -1,0 +1,36 @@
+// ---- Model Dump
+module 0x42::m {
+    private fun invalid<T>(addr: address) {
+        if exists<T>(addr) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        {
+          let _ = BorrowGlobal(Immutable)<T>(addr);
+          MoveFrom<T>(addr);
+          Tuple()
+        }
+    }
+    spec fun $invalid<T>(addr: address);
+} // end 0x42::m
+
+
+Diagnostics:
+error: expected `Type::Struct`, found: `TypeParameter(0)`
+  ┌─ tests/bytecode-generator/global_invalid.move:4:17
+  │
+4 │         assert!(exists<T>(addr), 0);
+  │                 ^^^^^^^^^^^^^^^
+
+error: expected `Type::Struct`, found: `TypeParameter(0)`
+  ┌─ tests/bytecode-generator/global_invalid.move:5:17
+  │
+5 │         let _ = borrow_global<T>(addr);
+  │                 ^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected `Type::Struct`, found: `TypeParameter(0)`
+  ┌─ tests/bytecode-generator/global_invalid.move:6:9
+  │
+6 │         move_from<T>(addr);
+  │         ^^^^^^^^^^^^^^^^^^
