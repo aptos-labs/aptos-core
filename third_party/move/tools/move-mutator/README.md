@@ -19,32 +19,41 @@ cargo test -p move-mutator -- --test-threads=1
 
 To check if it works, run the following command:
 ```bash
-./target/debug/move mutate sources third_party/move/tools/move-mutator/tests/move-assets/simple/sources/Sum.move
+./target/debug/move mutate -m third_party/move/tools/move-mutator/tests/move-assets/simple/sources/Sum.move
 ```
 
 or
 
 ```bash
-./target/debug/aptos move mutate --move-sources third_party/move/tools/move-mutator/tests/move-assets/simple/sources/Sum.move
+./target/debug/aptos move mutate -m third_party/move/tools/move-mutator/tests/move-assets/simple/sources/Sum.move
 ```
 
-The output will be generated under the `mutants_output` directory.
+The output will be generated under the `mutants_output` (or any other selected) directory.
+
+To check possible options run:
+```bash
+./target/debug/move mutate --help
+```
+or
+```bash
+./target/debug/aptos move mutate --help
+```
 
 There are also good tests in the Move Prover repository that can be used to test the tool. To run them just use:
 ```
-./target/debug/move mutate sources third_party/move/move-prover/tests/sources/functional/arithm.move
-./target/debug/move mutate sources third_party/move/move-prover/tests/sources/functional/bitwise_operators.move
-./target/debug/move mutate sources third_party/move/move-prover/tests/sources/functional/nonlinear_arithm.move
-./target/debug/move mutate sources third_party/move/move-prover/tests/sources/functional/shift.move
+./target/debug/move mutate -m third_party/move/move-prover/tests/sources/functional/arithm.move
+./target/debug/move mutate -m third_party/move/move-prover/tests/sources/functional/bitwise_operators.move
+./target/debug/move mutate -m third_party/move/move-prover/tests/sources/functional/nonlinear_arithm.move
+./target/debug/move mutate -m third_party/move/move-prover/tests/sources/functional/shift.move
 ```
 
 To generate mutants for all files within a test project run (there are `Sum.move`, `Operators.move`, `Negation.move` and `StillSimple.move`):
 ```bash
-./target/debug/move mutate sources third_party/move/tools/move-mutator/tests/move-assets/simple/
+./target/debug/move mutate -m third_party/move/tools/move-mutator/tests/move-assets/simple/
 ```
 or appropriately for `aptos`:
 ```bash
-./target/debug/aptos move mutate --move-sources third_party/move/tools/move-mutator/tests/move-assets/simple/
+./target/debug/aptos move mutate -m third_party/move/tools/move-mutator/tests/move-assets/simple/
 ```
 
 Running the above command (`aptos` one) will generate mutants for all files within the `simple` test project and should generate following output:

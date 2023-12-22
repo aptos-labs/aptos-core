@@ -35,7 +35,7 @@ pub fn generate_ast(
     config: BuildConfig,
     package_path: PathBuf,
 ) -> Result<(FilesSourceText, move_compiler::parser::ast::Program), anyhow::Error> {
-    let source_files = mutator_config.project.move_sources.clone();
+    let source_files = mutator_config.project.move_sources.iter().map(|p| p.to_str().unwrap_or("")).collect::<Vec<_>>();
 
     let named_addr_map = config
         .additional_named_addresses

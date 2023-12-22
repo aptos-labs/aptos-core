@@ -11,12 +11,11 @@ mod report;
 use crate::compiler::generate_ast;
 use std::path::Path;
 
+use crate::cli::DEFAULT_OUTPUT_DIR;
 use crate::configuration::Configuration;
 use crate::report::Report;
 use move_package::BuildConfig;
 use std::path::PathBuf;
-
-const DEFAULT_OUTPUT_DIR: &str = "mutants_output";
 
 /// Runs the Move mutator tool.
 /// Entry point for the Move mutator tool both for the CLI and the Rust API.
@@ -67,13 +66,16 @@ pub fn run_move_mutator(
             let mutated_sources = mutant.apply(&source);
             for mutated in mutated_sources {
                 let mutant_path = setup_mutant_path(&output_dir, file_name, i);
-
-                println!(
-                    "{} written to {}",
-                    mutant,
-                    mutant_path.to_str().unwrap_or("")
-                );
                 std::fs::write(&mutant_path, &mutated.mutated_source)?;
+
+                if mutator_configuration.project.verbose {
+                    println!(
+                        "{} written to {}",
+                        mutant,
+                        mutant_path.to_str().unwrap_or("")
+                    );
+                }
+
                 let mut entry = report::MutationReport::new(
                     mutant_path.as_path(),
                     path,
@@ -108,11 +110,7 @@ fn setup_mutant_path(output_dir: &Path, filename: &str, index: u64) -> PathBuf {
 
 /// Sets up the output directory for the mutants.
 fn setup_output_dir(mutator_configuration: &Configuration) -> anyhow::Result<PathBuf> {
-    let output_dir = mutator_configuration
-        .project
-        .output_dir
-        .clone()
-        .unwrap_or(PathBuf::from(DEFAULT_OUTPUT_DIR));
+    let output_dir = mutator_configuration.project.out_mutant_dir.clone();
 
     // Check if output directory exists and if it should be overwritten
     if output_dir.exists() && mutator_configuration.project.no_overwrite.unwrap_or(false) {
@@ -167,7 +165,7 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let output_dir = temp_dir.path().join("output");
         let options = cli::Options {
-            output_dir: Some(output_dir.clone()),
+            out_mutant_dir: output_dir.clone(),
             no_overwrite: Some(false),
             ..Default::default()
         };
@@ -182,7 +180,7 @@ mod tests {
         let output_dir = temp_dir.path().join("output");
         fs::create_dir(&output_dir).unwrap();
         let options = cli::Options {
-            output_dir: Some(output_dir.clone()),
+            out_mutant_dir: output_dir.clone(),
             no_overwrite: Some(false),
             ..Default::default()
         };
@@ -197,7 +195,7 @@ mod tests {
         let output_dir = temp_dir.path().join("output");
         fs::create_dir(&output_dir).unwrap();
         let options = cli::Options {
-            output_dir: Some(output_dir.clone()),
+            out_mutant_dir: output_dir.clone(),
             no_overwrite: Some(true),
             ..Default::default()
         };
