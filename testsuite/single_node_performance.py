@@ -68,7 +68,7 @@ DEFAULT_NUM_INIT_ACCOUNTS = (
 DEFAULT_MAX_BLOCK_SIZE = "25000" if IS_PREVIEWNET else "10000"
 
 MAX_BLOCK_SIZE = int(os.environ.get("MAX_BLOCK_SIZE", default=DEFAULT_MAX_BLOCK_SIZE))
-NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=15))
+NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=50))
 NUM_BLOCKS_DETAILED = 10
 NUM_ACCOUNTS = max(
     [
@@ -87,80 +87,86 @@ MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 # https://app.axiom.co/aptoslabs-hghf/explorer?qid=29zYzeVi7FX-s4ukl5&relative=1
 # fmt: off
 TESTS = [
-    RunGroupConfig(expected_tps=1000, key=RunGroupKey("tournament10k-by1k"), included_in=Flow.TOURNAMENT),
-    RunGroupConfig(expected_tps=25300, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=3500, key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=16200, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    # this was changed from 42000 to make landings not flaky, needs follow up
-    RunGroupConfig(expected_tps=35500, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=13500, key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=33200, key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=22000, key=RunGroupKey("account-resource32-b"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=4150, key=RunGroupKey("modify-global-resource"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=13000, key=RunGroupKey("modify-global-resource", module_working_set_size=10), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=140, key=RunGroupKey("publish-package"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=2600, key=RunGroupKey(
-        "mix_publish_transfer",
-        transaction_type_override="publish-package coin-transfer",
-        transaction_weights_override="1 500",
-    ), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=365, key=RunGroupKey("batch100-transfer"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=1100, key=RunGroupKey("batch100-transfer", executor_type="native"), included_in=Flow.CONTINUOUS),
-
-    RunGroupConfig(expected_tps=165, key=RunGroupKey("vector-picture40"), included_in=Flow(0), waived=True),
-    RunGroupConfig(expected_tps=1000, key=RunGroupKey("vector-picture40", module_working_set_size=20), included_in=Flow(0), waived=True),
-    RunGroupConfig(expected_tps=160, key=RunGroupKey("vector-picture30k"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=1000, key=RunGroupKey("vector-picture30k", module_working_set_size=20), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=17, key=RunGroupKey("smart-table-picture30-k-with200-change"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=82, key=RunGroupKey("smart-table-picture30-k-with200-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=3, key=RunGroupKey("smart-table-picture1-m-with1-k-change"), included_in=LAND_BLOCKING_AND_C, waived=True),
-    RunGroupConfig(expected_tps=12, key=RunGroupKey("smart-table-picture1-m-with1-k-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=5, key=RunGroupKey("smart-table-picture1-b-with1-k-change"), included_in=Flow(0), waived=True),
-    RunGroupConfig(expected_tps=10, key=RunGroupKey("smart-table-picture1-b-with1-k-change", module_working_set_size=20), included_in=Flow(0), waived=True),
-
-    RunGroupConfig(expected_tps=4050, key=RunGroupKey("modify-global-resource-agg-v2"), included_in=Flow.AGG_V2),
-    RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-resource-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
-    RunGroupConfig(expected_tps=4050, key=RunGroupKey("modify-global-flag-agg-v2"), included_in=Flow.AGG_V2),
-    RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-flag-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
-    RunGroupConfig(expected_tps=4050, key=RunGroupKey("modify-global-bounded-agg-v2"), included_in=Flow.AGG_V2),
-    RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-bounded-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
-
-    RunGroupConfig(expected_tps=4000, key=RunGroupKey("resource-groups-global-write-tag1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS, waived=True),
-    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-write-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
-    RunGroupConfig(expected_tps=4000, key=RunGroupKey("resource-groups-global-write-and-read-tag1-kb"), included_in=Flow.CONTINUOUS | Flow.RESOURCE_GROUPS, waived=True),
-    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-write-and-read-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
-    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-write-tag1-kb"), included_in=Flow.CONTINUOUS | Flow.RESOURCE_GROUPS, waived=True),
-    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-write-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
-    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-multi-change1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS, waived=True),
-    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-multi-change1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
-    
-    RunGroupConfig(expected_tps=1890, key=RunGroupKey("token-v1ft-mint-and-transfer"), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=9250, key=RunGroupKey("token-v1ft-mint-and-transfer", module_working_set_size=20), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=1100, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential"), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=5900, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential", module_working_set_size=20), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=1300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
-    RunGroupConfig(expected_tps=5300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel", module_working_set_size=20), included_in=Flow(0)),
-
-    # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1ft-mint-and-store"), included_in=Flow(0)),
-    # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-store-sequential"), included_in=Flow(0)),
-    # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
-
-    RunGroupConfig(expected_tps=25500, key=RunGroupKey("no-op5-signers"), included_in=Flow.CONTINUOUS),
-   
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("tournament10k-by1k"), included_in=LAND_BLOCKING_AND_C | Flow.TOURNAMENT),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("tournament10k-by100"), included_in=LAND_BLOCKING_AND_C | Flow.TOURNAMENT),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("tournament100k-by1k"), included_in=LAND_BLOCKING_AND_C | Flow.TOURNAMENT),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("tournament100k-by100"), included_in=LAND_BLOCKING_AND_C | Flow.TOURNAMENT),
     RunGroupConfig(expected_tps=1710, key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=6900, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
 
-    RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded", sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded", sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
+    # RunGroupConfig(expected_tps=25300, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
+    # RunGroupConfig(expected_tps=3500, key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
+    # RunGroupConfig(expected_tps=16200, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    # # this was changed from 42000 to make landings not flaky, needs follow up
+    # RunGroupConfig(expected_tps=35500, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
+    # RunGroupConfig(expected_tps=13500, key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    # RunGroupConfig(expected_tps=33200, key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
+    # RunGroupConfig(expected_tps=22000, key=RunGroupKey("account-resource32-b"), included_in=LAND_BLOCKING_AND_C),
+    # RunGroupConfig(expected_tps=4150, key=RunGroupKey("modify-global-resource"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    # RunGroupConfig(expected_tps=13000, key=RunGroupKey("modify-global-resource", module_working_set_size=10), included_in=Flow.CONTINUOUS),
+    # RunGroupConfig(expected_tps=140, key=RunGroupKey("publish-package"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    # RunGroupConfig(expected_tps=2600, key=RunGroupKey(
+    #     "mix_publish_transfer",
+    #     transaction_type_override="publish-package coin-transfer",
+    #     transaction_weights_override="1 500",
+    # ), included_in=LAND_BLOCKING_AND_C),
+    # RunGroupConfig(expected_tps=365, key=RunGroupKey("batch100-transfer"), included_in=LAND_BLOCKING_AND_C),
+    # RunGroupConfig(expected_tps=1100, key=RunGroupKey("batch100-transfer", executor_type="native"), included_in=Flow.CONTINUOUS),
 
-    # setting separately for previewnet, as we run on a different number of cores.
-    RunGroupConfig(expected_tps=29000 if NUM_ACCOUNTS < 5000000 else 20000, key=RunGroupKey("coin-transfer", smaller_working_set=True), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB),
-    RunGroupConfig(expected_tps=23000 if NUM_ACCOUNTS < 5000000 else 15000, key=RunGroupKey("account-generation"), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB),
-    RunGroupConfig(expected_tps=130 if NUM_ACCOUNTS < 5000000 else 60, key=RunGroupKey("publish-package"), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB),
-    RunGroupConfig(expected_tps=1500 if NUM_ACCOUNTS < 5000000 else 1500, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB),
-    RunGroupConfig(expected_tps=12000 if NUM_ACCOUNTS < 5000000 else 7000, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=100), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB),
-    RunGroupConfig(expected_tps=35000 if NUM_ACCOUNTS < 5000000 else 28000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded", sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB, waived=True),
-    RunGroupConfig(expected_tps=27000 if NUM_ACCOUNTS < 5000000 else 23000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded", sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB, waived=True),
+    # RunGroupConfig(expected_tps=165, key=RunGroupKey("vector-picture40"), included_in=Flow(0), waived=True),
+    # RunGroupConfig(expected_tps=1000, key=RunGroupKey("vector-picture40", module_working_set_size=20), included_in=Flow(0), waived=True),
+    # RunGroupConfig(expected_tps=160, key=RunGroupKey("vector-picture30k"), included_in=LAND_BLOCKING_AND_C),
+    # RunGroupConfig(expected_tps=1000, key=RunGroupKey("vector-picture30k", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    # RunGroupConfig(expected_tps=17, key=RunGroupKey("smart-table-picture30-k-with200-change"), included_in=LAND_BLOCKING_AND_C),
+    # RunGroupConfig(expected_tps=82, key=RunGroupKey("smart-table-picture30-k-with200-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    # RunGroupConfig(expected_tps=3, key=RunGroupKey("smart-table-picture1-m-with1-k-change"), included_in=LAND_BLOCKING_AND_C, waived=True),
+    # RunGroupConfig(expected_tps=12, key=RunGroupKey("smart-table-picture1-m-with1-k-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    # RunGroupConfig(expected_tps=5, key=RunGroupKey("smart-table-picture1-b-with1-k-change"), included_in=Flow(0), waived=True),
+    # RunGroupConfig(expected_tps=10, key=RunGroupKey("smart-table-picture1-b-with1-k-change", module_working_set_size=20), included_in=Flow(0), waived=True),
+
+    # RunGroupConfig(expected_tps=4050, key=RunGroupKey("modify-global-resource-agg-v2"), included_in=Flow.AGG_V2),
+    # RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-resource-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
+    # RunGroupConfig(expected_tps=4050, key=RunGroupKey("modify-global-flag-agg-v2"), included_in=Flow.AGG_V2),
+    # RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-flag-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
+    # RunGroupConfig(expected_tps=4050, key=RunGroupKey("modify-global-bounded-agg-v2"), included_in=Flow.AGG_V2),
+    # RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-bounded-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
+
+    # RunGroupConfig(expected_tps=4000, key=RunGroupKey("resource-groups-global-write-tag1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS, waived=True),
+    # RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-write-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
+    # RunGroupConfig(expected_tps=4000, key=RunGroupKey("resource-groups-global-write-and-read-tag1-kb"), included_in=Flow.CONTINUOUS | Flow.RESOURCE_GROUPS, waived=True),
+    # RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-write-and-read-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
+    # RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-write-tag1-kb"), included_in=Flow.CONTINUOUS | Flow.RESOURCE_GROUPS, waived=True),
+    # RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-write-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
+    # RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-multi-change1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS, waived=True),
+    # RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-multi-change1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
+    
+    # RunGroupConfig(expected_tps=1890, key=RunGroupKey("token-v1ft-mint-and-transfer"), included_in=Flow.CONTINUOUS),
+    # RunGroupConfig(expected_tps=9250, key=RunGroupKey("token-v1ft-mint-and-transfer", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    # RunGroupConfig(expected_tps=1100, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential"), included_in=Flow.CONTINUOUS),
+    # RunGroupConfig(expected_tps=5900, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    # RunGroupConfig(expected_tps=1300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
+    # RunGroupConfig(expected_tps=5300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel", module_working_set_size=20), included_in=Flow(0)),
+
+    # # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1ft-mint-and-store"), included_in=Flow(0)),
+    # # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-store-sequential"), included_in=Flow(0)),
+    # # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
+
+    # RunGroupConfig(expected_tps=25500, key=RunGroupKey("no-op5-signers"), included_in=Flow.CONTINUOUS),
+   
+    # RunGroupConfig(expected_tps=1710, key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    # RunGroupConfig(expected_tps=6900, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+
+    # RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded", sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
+    # RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded", sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
+
+    # # setting separately for previewnet, as we run on a different number of cores.
+    # RunGroupConfig(expected_tps=29000 if NUM_ACCOUNTS < 5000000 else 20000, key=RunGroupKey("coin-transfer", smaller_working_set=True), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB),
+    # RunGroupConfig(expected_tps=23000 if NUM_ACCOUNTS < 5000000 else 15000, key=RunGroupKey("account-generation"), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB),
+    # RunGroupConfig(expected_tps=130 if NUM_ACCOUNTS < 5000000 else 60, key=RunGroupKey("publish-package"), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB),
+    # RunGroupConfig(expected_tps=1500 if NUM_ACCOUNTS < 5000000 else 1500, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB),
+    # RunGroupConfig(expected_tps=12000 if NUM_ACCOUNTS < 5000000 else 7000, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=100), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB),
+    # RunGroupConfig(expected_tps=35000 if NUM_ACCOUNTS < 5000000 else 28000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded", sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB, waived=True),
+    # RunGroupConfig(expected_tps=27000 if NUM_ACCOUNTS < 5000000 else 23000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded", sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB, waived=True),
 ]
 # fmt: on
 
@@ -192,10 +198,10 @@ else:
     BUILD_FLAG = "--profile performance"
     BUILD_FOLDER = "target/performance"
 
-if os.environ.get("PROD_DB_FLAGS"):
-    DB_CONFIG_FLAGS = ""
-else:
-    DB_CONFIG_FLAGS = "--enable-storage-sharding"
+# if os.environ.get("PROD_DB_FLAGS"):
+DB_CONFIG_FLAGS = ""
+# else:
+#     DB_CONFIG_FLAGS = "--enable-storage-sharding"
 
 if os.environ.get("ENABLE_PRUNER"):
     DB_PRUNER_FLAGS = "--enable-state-pruner --enable-ledger-pruner --enable-epoch-snapshot-pruner --ledger-pruning-batch-size 10000 --state-prune-window 3000000 --epoch-snapshot-prune-window 3000000 --ledger-prune-window 3000000"

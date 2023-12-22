@@ -155,7 +155,7 @@ impl WorkflowTxnGeneratorCreator {
         root_account: &mut LocalAccount,
         txn_executor: &dyn ReliableTransactionSubmitter,
         num_modules: usize,
-        _initial_account_pool: Option<Arc<ObjectPool<LocalAccount>>>,
+        initial_account_pool: Option<Arc<ObjectPool<LocalAccount>>>,
         cur_phase: Option<Arc<AtomicUsize>>,
     ) -> Self {
         let stage_tracking = cur_phase.map_or_else(
