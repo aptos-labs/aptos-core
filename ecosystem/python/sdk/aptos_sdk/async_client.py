@@ -809,7 +809,7 @@ class RestClient:
                 "ledger_version": ledger_version,
             },
             headers={
-                "Accept": "application/json, application/x-bcs",
+                "Accept": "application/json",
                 "Content-Type": "application/json",
             },
             data={
@@ -837,7 +837,6 @@ class RestClient:
             url=f"{self.base_url}/{endpoint}",
             params=params,
             headers=headers,
-            # data=data,
             json=data,
         )
 
