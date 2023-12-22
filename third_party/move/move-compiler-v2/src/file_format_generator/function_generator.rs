@@ -717,7 +717,7 @@ impl<'a> FunctionGenerator<'a> {
         }
         self.abstract_flush_stack_before(ctx, stack_to_flush);
         // Finally, push `temps_to_push` onto the stack.
-        for temp in temps_to_push {
+        for (pos, temp) in temps_to_push.iter().enumerate() {
             let local = self.temp_to_local(fun_ctx, *temp);
             match push_kind {
                 Some(AssignKind::Move) => {
@@ -731,8 +731,11 @@ impl<'a> FunctionGenerator<'a> {
                         .internal_error("Inferred and Store AssignKind should be not appear here.");
                 },
                 None => {
-                    // Copy the temporary if it is copyable and still used after this code point.
-                    if fun_ctx.is_copyable(*temp) && ctx.is_alive_after(*temp) {
+                    // Copy the temporary if it is copyable and still used after this code point, or
+                    // if it appears again in temps_to_push.
+                    if fun_ctx.is_copyable(*temp)
+                        && (ctx.is_alive_after(*temp) || temps_to_push[pos + 1..].contains(temp))
+                    {
                         self.emit(FF::Bytecode::CopyLoc(local))
                     } else {
                         self.emit(FF::Bytecode::MoveLoc(local));
