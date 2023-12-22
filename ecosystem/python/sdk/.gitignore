@@ -164,4 +164,3 @@ cython_debug/
 .idea/
 
 # testing/fidling script:
-playground.py
