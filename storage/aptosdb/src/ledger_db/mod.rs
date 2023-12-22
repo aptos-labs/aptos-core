@@ -12,6 +12,7 @@ use crate::{
         transaction_accumulator_db_column_families, transaction_db_column_families,
         transaction_info_db_column_families, write_set_db_column_families,
     },
+    ledger_db::transaction_db::TransactionDb,
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
 };
 use anyhow::Result;
@@ -24,6 +25,10 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
+
+mod transaction_db;
+#[cfg(test)]
+pub(crate) mod transaction_db_test;
 
 pub const LEDGER_DB_FOLDER_NAME: &str = "ledger_db";
 pub const LEDGER_DB_NAME: &str = "ledger_db";
@@ -68,7 +73,7 @@ pub struct LedgerDb {
     ledger_metadata_db: Arc<DB>,
     event_db: Arc<DB>,
     transaction_accumulator_db: Arc<DB>,
-    transaction_db: Arc<DB>,
+    transaction_db: TransactionDb,
     transaction_info_db: Arc<DB>,
     write_set_db: Arc<DB>,
 }
@@ -104,7 +109,7 @@ impl LedgerDb {
                 ledger_metadata_db: Arc::clone(&ledger_metadata_db),
                 event_db: Arc::clone(&ledger_metadata_db),
                 transaction_accumulator_db: Arc::clone(&ledger_metadata_db),
-                transaction_db: Arc::clone(&ledger_metadata_db),
+                transaction_db: TransactionDb::new(Arc::clone(&ledger_metadata_db)),
                 transaction_info_db: Arc::clone(&ledger_metadata_db),
                 write_set_db: Arc::clone(&ledger_metadata_db),
             });
@@ -126,12 +131,12 @@ impl LedgerDb {
             readonly,
         )?);
 
-        let transaction_db = Arc::new(Self::open_rocksdb(
+        let transaction_db = TransactionDb::new(Arc::new(Self::open_rocksdb(
             ledger_db_folder.join(TRANSACTION_DB_NAME),
             TRANSACTION_DB_NAME,
             &rocksdb_configs.ledger_db_config,
             readonly,
-        )?);
+        )?));
 
         let transaction_info_db = Arc::new(Self::open_rocksdb(
             ledger_db_folder.join(TRANSACTION_INFO_DB_NAME),
@@ -217,10 +222,7 @@ impl LedgerDb {
             &DbMetadataKey::TransactionAccumulatorPrunerProgress,
             &DbMetadataValue::Version(version),
         )?;
-        self.transaction_db.put::<DbMetadataSchema>(
-            &DbMetadataKey::TransactionPrunerProgress,
-            &DbMetadataValue::Version(version),
-        )?;
+        self.transaction_db.write_pruner_progress(version)?;
         self.transaction_info_db.put::<DbMetadataSchema>(
             &DbMetadataKey::TransactionInfoPrunerProgress,
             &DbMetadataValue::Version(version),
@@ -259,12 +261,13 @@ impl LedgerDb {
         Arc::clone(&self.transaction_accumulator_db)
     }
 
-    pub(crate) fn transaction_db(&self) -> &DB {
+    pub(crate) fn transaction_db(&self) -> &TransactionDb {
         &self.transaction_db
     }
 
-    pub(crate) fn transaction_db_arc(&self) -> Arc<DB> {
-        Arc::clone(&self.transaction_db)
+    // TODO(grao): Remove this after sharding migration.
+    pub(crate) fn transaction_db_raw(&self) -> &DB {
+        self.transaction_db.db()
     }
 
     pub(crate) fn transaction_info_db(&self) -> &DB {
