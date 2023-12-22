@@ -1,5 +1,6 @@
 use clap::{Arg, Command};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 /// Command line options for mutator
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
@@ -7,21 +8,28 @@ use serde::{Deserialize, Serialize};
 pub struct Options {
     /// The paths to the Move sources.
     pub move_sources: Vec<String>,
+    /// The paths to the Move sources to include.
+    pub include_only_files: Option<Vec<PathBuf>>,
+    /// The paths to the Move sources to exclude.
+    pub exclude_files: Option<Vec<PathBuf>>,
+    /// The path where to put the output files.
+    pub output_dir: Option<PathBuf>,
+    /// Indicates if mutants should be verified and made sure mutants can compile.
+    pub verify_mutants: Option<bool>,
+    /// Indicates if the output files should be overwritten.
+    pub no_overwrite: Option<bool>,
+    /// Name of the filter to use for down sampling.
+    pub downsample_filter: Option<String>,
+    /// Optional configuration file. If provided, it will override the default configuration.
+    pub configuration_file: Option<PathBuf>,
+    /// Indicates if the output should be verbose.
+    pub verbose: Option<bool>,
 }
 
 impl Options {
-    /// Creates options from the TOML configuration source.
-    pub fn from_toml(toml_source: &str) -> anyhow::Result<Options> {
-        Ok(toml::from_str(toml_source)?)
-    }
-
-    /// Creates options from the TOML configuration file.
-    pub fn from_toml_file(toml_file: &str) -> anyhow::Result<Options> {
-        Self::from_toml(&std::fs::read_to_string(toml_file)?)
-    }
-
     /// Creates Options struct from command line arguments.
     pub fn create_from_args(args: &[String]) -> anyhow::Result<Options> {
+        //TODO: this code need to be updated to use clap parser directly
         let cli = Command::new("mutate")
             .version("0.1.0")
             .about("The Move Mutator")
@@ -64,35 +72,6 @@ impl Options {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs::File;
-    use std::io::Write;
-    use std::path::Path;
-
-    #[test]
-    fn test_from_toml() {
-        let toml_str = r#"
-            move_sources = ["src/main.rs", "src/lib.rs"]
-        "#;
-
-        let options = Options::from_toml(toml_str).unwrap();
-        assert_eq!(options.move_sources, vec!["src/main.rs", "src/lib.rs"]);
-    }
-
-    #[test]
-    fn test_from_toml_file() {
-        let toml_str = r#"
-            move_sources = ["src/main.rs", "src/lib.rs"]
-        "#;
-
-        let path = Path::new("test.toml");
-        let mut file = File::create(&path).unwrap();
-        file.write_all(toml_str.as_bytes()).unwrap();
-
-        let options = Options::from_toml_file(path.to_str().unwrap()).unwrap();
-        assert_eq!(options.move_sources, vec!["src/main.rs", "src/lib.rs"]);
-
-        std::fs::remove_file(path).unwrap();
-    }
 
     #[test]
     fn test_create_from_args() {
