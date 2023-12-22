@@ -1,27 +1,27 @@
 spec aptos_framework::gas_schedule {
     /// <high-level-req>
     /// No.: 1
-    /// Property: During genesis, the Aptos framework account should be assigned the gas schedule resource.
+    /// Requirement: During genesis, the Aptos framework account should be assigned the gas schedule resource.
     /// Criticality: Medium
     /// Implementation: The gas_schedule::initialize function calls the assert_aptos_framework function to ensure that
     /// the signer is the aptos_framework and then assigns the GasScheduleV2 resource to it.
     /// Enforcement: Formally verified via [high-level-req-1](initialize).
     ///
     /// No.: 2
-    /// Property: Only the Aptos framework account should be allowed to update the gas schedule resource.
+    /// Requirement: Only the Aptos framework account should be allowed to update the gas schedule resource.
     /// Criticality: Critical
     /// Implementation: The gas_schedule::set_gas_schedule function calls the assert_aptos_framework function to ensure
     /// that the signer is the aptos framework account.
     /// Enforcement: Formally verified via [high-level-req-2](set_gas_schedule).
     ///
     /// No.: 3
-    /// Property: Only valid gas schedule should be allowed for initialization and update.
+    /// Requirement: Only valid gas schedule should be allowed for initialization and update.
     /// Criticality: Medium
     /// Implementation: The initialize and set_gas_schedule functions ensures that the gas_schedule_blob is not empty.
     /// Enforcement: Formally verified via [high-level-req-3.3](initialize) and [high-level-req-3.2](set_gas_schedule).
     ///
     /// No.: 4
-    /// Property: Only a gas schedule with the feature version greater or equal than the current feature version is
+    /// Requirement: Only a gas schedule with the feature version greater or equal than the current feature version is
     /// allowed to be provided when performing an update operation.
     /// Criticality: Medium
     /// Implementation: The set_gas_schedule function validates the feature_version of the new_gas_schedule by ensuring

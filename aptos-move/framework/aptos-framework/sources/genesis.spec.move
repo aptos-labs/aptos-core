@@ -1,7 +1,7 @@
 spec aptos_framework::genesis {
     /// <high-level-req>
     /// No.: 1
-    /// Property: All the core resources and modules should be created during genesis and owned by the Aptos framework
+    /// Requirement: All the core resources and modules should be created during genesis and owned by the Aptos framework
     /// account.
     /// Criticality: Critical
     /// Implementation: Resources created during genesis initialization: GovernanceResponsbility, ConsensusConfig,
@@ -13,7 +13,7 @@ spec aptos_framework::genesis {
     /// Enforcement: Formally verified via [high-level-req-1](initialize).
     ///
     /// No.: 2
-    /// Property: Addresses ranging from 0x0 - 0xa should be reserved for the framework and part of aptos governance.
+    /// Requirement: Addresses ranging from 0x0 - 0xa should be reserved for the framework and part of aptos governance.
     /// Criticality: Critical
     /// Implementation: The function genesis::initialize calls account::create_framework_reserved_account for addresses
     /// 0x0, 0x2, 0x3, 0x4, ..., 0xa which creates an account and authentication_key for them. This should be formally
@@ -22,7 +22,7 @@ spec aptos_framework::genesis {
     /// Enforcement: Formally verified via [high-level-req-2](initialize).
     ///
     /// No.: 3
-    /// Property: The Aptos coin should be initialized during genesis and only the Aptos framework account should own
+    /// Requirement: The Aptos coin should be initialized during genesis and only the Aptos framework account should own
     /// the mint and burn capabilities for the APT token.
     /// Criticality: Critical
     /// Implementation: Both mint and burn capabilities are wrapped inside the stake::AptosCoinCapabilities and
@@ -30,14 +30,14 @@ spec aptos_framework::genesis {
     /// Enforcement: Formally verified via [high-level-req-3](initialize_aptos_coin).
     ///
     /// No.: 4
-    /// Property: An initial set of validators should exist before the end of genesis.
+    /// Requirement: An initial set of validators should exist before the end of genesis.
     /// Criticality: Low
     /// Implementation: To ensure that there will be a set of validators available to validate the genesis block, the
     /// length of the ValidatorSet.active_validators vector should be > 0.
     /// Enforcement: Formally verified via [high-level-req-4](set_genesis_end).
     ///
     /// No.: 5
-    /// Property: The end of genesis should be marked on chain.
+    /// Requirement: The end of genesis should be marked on chain.
     /// Criticality: Low
     /// Implementation: The end of genesis is marked, on chain, via the chain_status::GenesisEndMarker resource. The
     /// ownership of this resource marks the operating state of the chain.

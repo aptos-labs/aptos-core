@@ -1,7 +1,7 @@
 spec aptos_framework::storage_gas {
     /// <high-level-req>
     /// No.: 1
-    /// Property: The module's initialization guarantees the creation of the StorageGasConfig resource with a precise
+    /// Requirement: The module's initialization guarantees the creation of the StorageGasConfig resource with a precise
     /// configuration, including accurate gas curves for per-item and per-byte operations.
     /// Criticality: Medium
     /// Implementation: The initialize function is responsible for setting up the initial state of the module, ensuring
@@ -11,20 +11,20 @@ spec aptos_framework::storage_gas {
     /// Enforcement: Formally verified via [high-level-req-1](initialize). Moreover, the native gas logic has been manually audited.
     ///
     /// No.: 2
-    /// Property: The gas curve approximates an exponential curve based on a minimum and maximum gas charge.
+    /// Requirement: The gas curve approximates an exponential curve based on a minimum and maximum gas charge.
     /// Criticality: High
     /// Implementation: The validate_points function ensures that the provided vector of points represents a
     /// monotonically non-decreasing curve.
     /// Enforcement: Formally verified via [high-level-req-2](validate_points). Moreover, the configuration logic has been manually audited.
     ///
     /// No.: 3
-    /// Property: The initialized gas curve structure has values set according to the provided parameters.
+    /// Requirement: The initialized gas curve structure has values set according to the provided parameters.
     /// Criticality: Low
     /// Implementation: The new_gas_curve function initializes the GasCurve structure with values provided as parameters.
     /// Enforcement: Formally verified via [high-level-req-3](new_gas_curve).
     ///
     /// No.: 4
-    /// Property: The initialized usage gas configuration structure has values set according to the provided parameters.
+    /// Requirement: The initialized usage gas configuration structure has values set according to the provided parameters.
     /// Criticality: Low
     /// Implementation: The new_usage_gas_config function initializes the UsageGasConfig structure with values provided
     /// as parameters.

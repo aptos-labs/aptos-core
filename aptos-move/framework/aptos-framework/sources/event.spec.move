@@ -1,35 +1,35 @@
 spec aptos_framework::event {
     /// <high-level-req>
     /// No.: 1
-    /// Property: Each event handle possesses a distinct and unique GUID.
+    /// Requirement: Each event handle possesses a distinct and unique GUID.
     /// Criticality: Critical
     /// Implementation: The new_event_handle function creates an EventHandle object with a unique GUID, ensuring
     /// distinct identification.
     /// Enforcement: Audited: GUIDs are created in guid::create. Each time the function is called, it increments creation_num_ref. Multiple calls to the function will result in distinct GUID values.
     ///
     /// No.: 2
-    /// Property: Unable to publish two events with the same GUID & sequence number.
+    /// Requirement: Unable to publish two events with the same GUID & sequence number.
     /// Criticality: Critical
     /// Implementation: Two events may either have the same GUID with a different counter or the same counter with a
     /// different GUID.
     /// Enforcement: This is implied by [high-level-req](high-level requirement 1).
     ///
     /// No.: 3
-    /// Property: Event native functions respect normal Move rules around object creation and destruction.
+    /// Requirement: Event native functions respect normal Move rules around object creation and destruction.
     /// Criticality: Critical
     /// Implementation: Must follow the same rules and principles that apply to object creation and destruction in Move
     /// when using event native functions.
     /// Enforcement: The native functions of this module have been manually audited.
     ///
     /// No.: 4
-    /// Property: Counter increases monotonically between event emissions
+    /// Requirement: Counter increases monotonically between event emissions
     /// Criticality: Medium
     /// Implementation: With each event emission, the emit_event function increments the counter of the EventHandle by
     /// one.
     /// Enforcement: Formally verified in the post condition of [high-level-req-4](emit_event).
     ///
     /// No.: 5
-    /// Property: For a given EventHandle, it should always be possible to: (1) return the GUID associated with this
+    /// Requirement: For a given EventHandle, it should always be possible to: (1) return the GUID associated with this
     /// EventHandle, (2) return the current counter associated with this EventHandle, and (3) destroy the handle.
     /// Criticality: Low
     /// Implementation: The following functions should not abort if EventHandle exists: guid(), counter(),

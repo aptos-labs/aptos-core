@@ -1,14 +1,14 @@
 spec aptos_framework::resource_account {
     /// <high-level-req>
     /// No.: 1
-    /// Property: The length of the authentication key must be 32 bytes.
+    /// Requirement: The length of the authentication key must be 32 bytes.
     /// Criticality: Medium
     /// Implementation: The rotate_authentication_key_internal function ensures that the authentication key passed to it
     /// is of 32 bytes.
     /// Enforcement: Formally verified via [high-level-req-1](RotateAccountAuthenticationKeyAndStoreCapabilityAbortsIf).
     ///
     /// No.: 2
-    /// Property: The Container structure must exist in the origin account in order to rotate the authentication key of
+    /// Requirement: The Container structure must exist in the origin account in order to rotate the authentication key of
     /// a resource account and to store its signer capability.
     /// Criticality: High
     /// Implementation: The rotate_account_authentication_key_and_store_capability function makes sure the Container
@@ -16,42 +16,42 @@ spec aptos_framework::resource_account {
     /// Enforcement: Formally verified via [high-level-req-2](rotate_account_authentication_key_and_store_capability).
     ///
     /// No.: 3
-    /// Property: The resource account is registered for the Aptos coin.
+    /// Requirement: The resource account is registered for the Aptos coin.
     /// Criticality: High
     /// Implementation: The create_resource_account_and_fund ensures the newly created resource account is registered to
     /// receive the AptosCoin.
     /// Enforcement: Formally verified via [high-level-req-3](create_resource_account_and_fund).
     ///
     /// No.: 4
-    /// Property: It is not possible to store two capabilities for the same resource address.
+    /// Requirement: It is not possible to store two capabilities for the same resource address.
     /// Criticality: Medium
     /// Implementation: The rotate_account_authentication_key_and_store_capability will abort if the resource signer
     /// capability for the given resource address already exists in container.store.
     /// Enforcement: Formally verified via [high-level-req-4](rotate_account_authentication_key_and_store_capability).
     ///
     /// No.: 5
-    /// Property: If provided, the optional authentication key is used for key rotation.
+    /// Requirement: If provided, the optional authentication key is used for key rotation.
     /// Criticality: Low
     /// Implementation: The rotate_account_authentication_key_and_store_capability function will use optional_auth_key
     /// if it is provided as a parameter.
     /// Enforcement: Formally verified via [high-level-req-5](rotate_account_authentication_key_and_store_capability).
     ///
     /// No.: 6
-    /// Property: The container stores the resource accounts' signer capabilities.
+    /// Requirement: The container stores the resource accounts' signer capabilities.
     /// Criticality: Low
     /// Implementation: retrieve_resource_account_cap will abort if there is no Container structure assigned to
     /// source_addr.
     /// Enforcement: Formally verified via [high-level-req-6](retreive_resource_account_cap).
     ///
     /// No.: 7
-    /// Property: Resource account may retrieve the signer capability if it was previously added to its container.
+    /// Requirement: Resource account may retrieve the signer capability if it was previously added to its container.
     /// Criticality: High
     /// Implementation: retrieve_resource_account_cap will abort if the container of source_addr doesn't store the
     /// signer capability for the given resource.
     /// Enforcement: Formally verified via [high-level-req-7](retrieve_resource_account_cap).
     ///
     /// No.: 8
-    /// Property: Retrieving the last signer capability from the container must result in the container being removed.
+    /// Requirement: Retrieving the last signer capability from the container must result in the container being removed.
     /// Criticality: Low
     /// Implementation: retrieve_resource_account_cap will remove the container if the retrieved signer_capability was
     /// the last one stored under it.
