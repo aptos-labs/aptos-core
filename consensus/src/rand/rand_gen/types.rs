@@ -27,6 +27,7 @@ impl Share for MockShare {
         &self,
         _rand_config: &RandConfig,
         _rand_metadata: &RandMetadata,
+        _author: &Author,
     ) -> anyhow::Result<()> {
         Ok(())
     }
@@ -35,20 +36,12 @@ impl Share for MockShare {
     where
         Self: Sized,
     {
-        RandShare::new(rand_config.author(), rand_metadata, Self)
+        RandShare::new(*rand_config.author(), rand_metadata, Self)
     }
 }
 
 impl Proof for MockProof {
     type Share = MockShare;
-
-    fn verify(
-        &self,
-        _rand_config: &RandConfig,
-        _rand_metadata: &RandMetadata,
-    ) -> anyhow::Result<()> {
-        Ok(())
-    }
 
     fn aggregate<'a>(
         _shares: impl Iterator<Item = &'a RandShare<Self::Share>>,
@@ -64,14 +57,25 @@ impl AugmentedData for MockAugData {
     where
         Self: Sized,
     {
-        AugData::new(rand_config.epoch(), rand_config.author(), Self)
+        AugData::new(rand_config.epoch(), *rand_config.author(), Self)
+    }
+
+    fn augment(&self, _rand_config: &RandConfig, _author: &Author) {}
+
+    fn verify(&self, _rand_config: &RandConfig, _author: &Author) -> anyhow::Result<()> {
+        Ok(())
     }
 }
 
 pub trait Share:
     Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned + 'static
 {
-    fn verify(&self, rand_config: &RandConfig, rand_metadata: &RandMetadata) -> anyhow::Result<()>;
+    fn verify(
+        &self,
+        rand_config: &RandConfig,
+        rand_metadata: &RandMetadata,
+        author: &Author,
+    ) -> anyhow::Result<()>;
 
     fn generate(rand_config: &RandConfig, rand_metadata: RandMetadata) -> RandShare<Self>
     where
@@ -82,7 +86,6 @@ pub trait Proof:
     Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned + 'static
 {
     type Share: Share;
-    fn verify(&self, rand_config: &RandConfig, rand_metadata: &RandMetadata) -> anyhow::Result<()>;
 
     fn aggregate<'a>(
         shares: impl Iterator<Item = &'a RandShare<Self::Share>>,
@@ -99,6 +102,10 @@ pub trait AugmentedData:
     fn generate(rand_config: &RandConfig) -> AugData<Self>
     where
         Self: Sized;
+
+    fn augment(&self, rand_config: &RandConfig, author: &Author);
+
+    fn verify(&self, rand_config: &RandConfig, author: &Author) -> anyhow::Result<()>;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -141,7 +148,7 @@ impl<S: Share> RandShare<S> {
     }
 
     pub fn verify(&self, rand_config: &RandConfig) -> anyhow::Result<()> {
-        self.share.verify(rand_config, &self.metadata)
+        self.share.verify(rand_config, &self.metadata, &self.author)
     }
 
     pub fn share_id(&self) -> ShareId {
@@ -162,17 +169,6 @@ pub struct RandDecision<P> {
 impl<P: Proof> RandDecision<P> {
     pub fn new(randomness: Randomness, proof: P) -> Self {
         Self { randomness, proof }
-    }
-
-    pub fn verify(&self, rand_config: &RandConfig, metadata: &RandMetadata) -> anyhow::Result<()> {
-        ensure!(
-            metadata == self.randomness.metadata(),
-            "Metadata does not match: local {:?}, received {:?}",
-            metadata,
-            self.randomness.metadata()
-        );
-        self.proof.verify(rand_config, self.randomness.metadata())?;
-        Ok(())
     }
 
     pub fn randomness(&self) -> &Randomness {
@@ -234,7 +230,7 @@ pub struct AugData<D> {
     data: D,
 }
 
-impl<D> AugData<D> {
+impl<D: AugmentedData> AugData<D> {
     pub fn new(epoch: u64, author: Author, data: D) -> Self {
         Self {
             epoch,
@@ -254,12 +250,13 @@ impl<D> AugData<D> {
         }
     }
 
-    pub fn author(&self) -> Author {
-        self.author
+    pub fn author(&self) -> &Author {
+        &self.author
     }
 
-    pub fn verify(&self, sender: Author) -> anyhow::Result<()> {
+    pub fn verify(&self, rand_config: &RandConfig, sender: Author) -> anyhow::Result<()> {
         ensure!(self.author == sender, "Invalid author");
+        self.data.verify(rand_config, &self.author)?;
         Ok(())
     }
 }
@@ -315,13 +312,17 @@ impl<D: AugmentedData> CertifiedAugData<D> {
         self.aug_data.id()
     }
 
-    pub fn author(&self) -> Author {
+    pub fn author(&self) -> &Author {
         self.aug_data.author()
     }
 
     pub fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         verifier.verify_multi_signatures(&self.aug_data, &self.signatures)?;
         Ok(())
+    }
+
+    pub fn data(&self) -> &D {
+        &self.aug_data.data
     }
 }
 
@@ -365,8 +366,8 @@ impl RandConfig {
         self.epoch
     }
 
-    pub fn author(&self) -> Author {
-        self.author
+    pub fn author(&self) -> &Author {
+        &self.author
     }
 
     pub fn get_peer_weight(&self, author: &Author) -> u64 {

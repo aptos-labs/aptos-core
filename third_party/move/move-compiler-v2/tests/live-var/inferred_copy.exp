@@ -98,6 +98,7 @@ fun m::f1_ok() {
      var $t1: m::R
      var $t2: u64
      var $t3: m::R
+     var $t4: m::R
      # live vars:
   0: $t2 := 0
      # live vars: $t2
@@ -109,58 +110,16 @@ fun m::f1_ok() {
      # live vars: $t0, $t3
   4: m::some($t3)
      # live vars: $t0
-  5: m::some($t0)
+  5: $t4 := copy($t0)
+     # live vars: $t4
+  6: m::some($t4)
      # live vars:
-  6: return ()
+  7: return ()
 }
 
 
 [variant baseline]
 fun m::f2_ok() {
-     var $t0: m::R
-     var $t1: m::R
-     var $t2: u64
-     var $t3: m::R
-     # live vars:
-  0: $t2 := 0
-     # live vars: $t2
-  1: $t1 := pack m::R($t2)
-     # live vars: $t1
-  2: $t0 := copy($t1)
-     # live vars: $t0
-  3: $t3 := copy($t0)
-     # live vars: $t0, $t3
-  4: m::some2($t3, $t0)
-     # live vars:
-  5: return ()
-}
-
-
-[variant baseline]
-fun m::f3_ok() {
-     var $t0: m::R
-     var $t1: m::R
-     var $t2: u64
-     var $t3: m::R
-     # live vars:
-  0: $t2 := 0
-     # live vars: $t2
-  1: $t1 := pack m::R($t2)
-     # live vars: $t1
-  2: $t0 := copy($t1)
-     # live vars: $t0
-  3: $t3 := copy($t0)
-     # live vars: $t0, $t3
-  4: m::some($t0)
-     # live vars: $t3
-  5: m::some($t3)
-     # live vars:
-  6: return ()
-}
-
-
-[variant baseline]
-fun m::f4_fail() {
      var $t0: m::R
      var $t1: m::R
      var $t2: u64
@@ -173,15 +132,74 @@ fun m::f4_fail() {
      # live vars: $t1
   2: $t0 := copy($t1)
      # live vars: $t0
+  3: $t3 := copy($t0)
+     # live vars: $t0, $t3
+  4: $t4 := copy($t0)
+     # live vars: $t3, $t4
+  5: m::some2($t3, $t4)
+     # live vars:
+  6: return ()
+}
+
+
+[variant baseline]
+fun m::f3_ok() {
+     var $t0: m::R
+     var $t1: m::R
+     var $t2: u64
+     var $t3: m::R
+     var $t4: m::R
+     var $t5: m::R
+     # live vars:
+  0: $t2 := 0
+     # live vars: $t2
+  1: $t1 := pack m::R($t2)
+     # live vars: $t1
+  2: $t0 := copy($t1)
+     # live vars: $t0
+  3: $t3 := copy($t0)
+     # live vars: $t0, $t3
+  4: $t4 := copy($t0)
+     # live vars: $t3, $t4
+  5: m::some($t4)
+     # live vars: $t3
+  6: $t5 := copy($t3)
+     # live vars: $t5
+  7: m::some($t5)
+     # live vars:
+  8: return ()
+}
+
+
+[variant baseline]
+fun m::f4_fail() {
+     var $t0: m::R
+     var $t1: m::R
+     var $t2: u64
+     var $t3: m::R
+     var $t4: m::R
+     var $t5: m::R
+     var $t6: m::R
+     # live vars:
+  0: $t2 := 0
+     # live vars: $t2
+  1: $t1 := pack m::R($t2)
+     # live vars: $t1
+  2: $t0 := copy($t1)
+     # live vars: $t0
   3: $t4 := move($t0)
      # live vars: $t0, $t4
   4: $t3 := copy($t4)
      # live vars: $t0, $t3
-  5: m::some($t0)
+  5: $t5 := copy($t0)
+     # live vars: $t3, $t5
+  6: m::some($t5)
      # live vars: $t3
-  6: m::some($t3)
+  7: $t6 := copy($t3)
+     # live vars: $t6
+  8: m::some($t6)
      # live vars:
-  7: return ()
+  9: return ()
 }
 
 

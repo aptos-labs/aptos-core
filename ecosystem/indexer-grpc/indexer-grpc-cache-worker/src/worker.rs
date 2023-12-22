@@ -294,7 +294,7 @@ async fn process_transactions_from_node_response(
     }
 }
 
-//// Setup the cache operator with init signal, includeing chain id and starting version from fullnode.
+// Setup the cache operator with init signal, including chain id and starting version from fullnode.
 async fn verify_fullnode_init_signal(
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
     init_signal: TransactionsFromNodeResponse,

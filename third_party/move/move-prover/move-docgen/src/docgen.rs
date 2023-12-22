@@ -719,6 +719,7 @@ impl<'env> Docgen<'env> {
         }
     }
 
+    #[allow(clippy::format_collect)]
     fn gen_html_table(&self, input: &str, column_names: Vec<&str>) {
         let row_blocks = input.split("\n\n").collect::<Vec<_>>();
 
@@ -782,7 +783,7 @@ impl<'env> Docgen<'env> {
                 let req_tag = *parts.get(1).unwrap_or(&"");
                 let label_link = self
                     .resolve_to_label(module_name, false)
-                    .unwrap_or(String::new());
+                    .unwrap_or_default();
                 let module_link = label_link.split('#').next().unwrap_or("").to_string();
                 let suffix = format!(" of the <a href={}>{}</a> module", module_link, module_name);
                 (req_tag, module_link, suffix)
@@ -834,7 +835,7 @@ impl<'env> Docgen<'env> {
             if tag.starts_with("http://") || tag.starts_with("https://") {
                 format!("<a href=\"{}\">{}</a>", tag, text)
             } else if tag.contains("::") {
-                let parts = tag.clone().split("::").collect::<Vec<_>>();
+                let parts = tag.split("::").collect::<Vec<_>>();
                 if let Some(module_name) = parts.first() {
                     let label_link = self
                         .resolve_to_label(module_name, false)

@@ -185,7 +185,7 @@ fun m::f1_ok() {
      # live vars: $t2
   1: $t1 := pack m::R($t2)
      # live vars: $t1
-  2: $t0 := copy($t1)
+  2: $t0 := move($t1)
      # live vars: $t0
   3: $t4 := borrow_local($t0)
      # live vars: $t4
@@ -210,29 +210,26 @@ fun m::f1a_ok() {
      var $t4: &mut m::R
      var $t5: m::R
      var $t6: &mut m::R
-     var $t7: &mut m::R
      # live vars:
   0: $t2 := 0
      # live vars: $t2
   1: $t1 := pack m::R($t2)
      # live vars: $t1
-  2: $t0 := copy($t1)
+  2: $t0 := move($t1)
      # live vars: $t0
   3: $t4 := borrow_local($t0)
      # live vars: $t4
   4: $t3 := move($t4)
      # live vars: $t3
-  5: $t6 := copy($t3)
+  5: $t5 := read_ref($t3)
+     # live vars: $t3
+  6: $t6 := copy($t3)
      # live vars: $t3, $t6
-  6: $t5 := read_ref($t6)
+  7: m::some($t6)
      # live vars: $t3
-  7: $t7 := copy($t3)
-     # live vars: $t3, $t7
-  8: m::some($t7)
-     # live vars: $t3
-  9: m::some($t3)
+  8: m::some($t3)
      # live vars:
- 10: return ()
+  9: return ()
 }
 
 
@@ -245,13 +242,12 @@ fun m::f1b_ok() {
      var $t4: &mut m::R
      var $t5: m::R
      var $t6: &mut m::R
-     var $t7: &mut m::R
      # live vars:
   0: $t2 := 0
      # live vars: $t2
   1: $t1 := pack m::R($t2)
      # live vars: $t1
-  2: $t0 := copy($t1)
+  2: $t0 := move($t1)
      # live vars: $t0
   3: $t4 := borrow_local($t0)
      # live vars: $t4
@@ -261,13 +257,11 @@ fun m::f1b_ok() {
      # live vars: $t3, $t6
   6: m::some($t6)
      # live vars: $t3
-  7: $t7 := copy($t3)
-     # live vars: $t3, $t7
-  8: $t5 := read_ref($t7)
+  7: $t5 := read_ref($t3)
      # live vars: $t3
-  9: m::some($t3)
+  8: m::some($t3)
      # live vars:
- 10: return ()
+  9: return ()
 }
 
 
@@ -283,7 +277,7 @@ fun m::f2_fail() {
      # live vars: $t2
   1: $t1 := pack m::R($t2)
      # live vars: $t1
-  2: $t0 := copy($t1)
+  2: $t0 := move($t1)
      # live vars: $t0
   3: $t4 := borrow_local($t0)
      # live vars: $t4
@@ -308,7 +302,7 @@ fun m::f3_ok() {
      # live vars: $t2
   1: $t1 := pack m::R($t2)
      # live vars: $t1
-  2: $t0 := copy($t1)
+  2: $t0 := move($t1)
      # live vars: $t0
   3: $t4 := borrow_local($t0)
      # live vars: $t0, $t4
@@ -339,7 +333,7 @@ fun m::f4_ok() {
      # live vars: $t2
   1: $t1 := pack m::R($t2)
      # live vars: $t1
-  2: $t0 := copy($t1)
+  2: $t0 := move($t1)
      # live vars: $t0
   3: $t4 := borrow_local($t0)
      # live vars: $t4
@@ -368,7 +362,7 @@ fun m::f5_fail($t0: bool) {
      # live vars: $t0, $t3
   1: $t2 := pack m::R($t3)
      # live vars: $t0, $t2
-  2: $t1 := copy($t2)
+  2: $t1 := move($t2)
      # live vars: $t0, $t1
   3: $t5 := borrow_local($t1)
      # live vars: $t0, $t5
