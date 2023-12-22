@@ -308,11 +308,13 @@ fun ability::no_key($t0: address) {
   3: $t3 := move_from<ability::S<ability::Impotent>>($t0)
   4: destroy($t3)
   5: $t4 := borrow_global<ability::Impotent>($t0)
-  6: $t5 := borrow_global<ability::Impotent>($t0)
-  7: destroy($t4)
-  8: $t6 := exists<ability::Impotent>($t0)
+  6: destroy($t4)
+  7: $t5 := borrow_global<ability::Impotent>($t0)
+  8: destroy($t4)
   9: destroy($t5)
- 10: return ()
+ 10: $t6 := exists<ability::Impotent>($t0)
+ 11: destroy($t5)
+ 12: return ()
 }
 
 
@@ -434,9 +436,11 @@ fun ability::no_key($t0: address) {
   3: $t3 := move_from<ability::S<ability::Impotent>>($t0)
   4: destroy($t3)
   5: $t4 := borrow_global<ability::Impotent>($t0)
-  6: $t5 := borrow_global<ability::Impotent>($t0)
-  7: destroy($t4)
-  8: $t6 := exists<ability::Impotent>($t0)
+  6: destroy($t4)
+  7: $t5 := borrow_global<ability::Impotent>($t0)
+  8: destroy($t4)
   9: destroy($t5)
- 10: return ()
+ 10: $t6 := exists<ability::Impotent>($t0)
+ 11: destroy($t5)
+ 12: return ()
 }
