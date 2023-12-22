@@ -3,7 +3,7 @@
 
 use crate::dag::{
     dag_fetcher::TFetchRequester,
-    dag_store::Dag,
+    dag_store::PersistentDagStore,
     errors::NodeBroadcastHandleError,
     health::{HealthBackoff, NoChainHealth, NoPipelineBackpressure},
     rb_handler::NodeBroadcastHandler,
@@ -16,7 +16,6 @@ use crate::dag::{
     NodeId, RpcHandler, Vote,
 };
 use aptos_config::config::DagPayloadConfig;
-use aptos_infallible::RwLock;
 use aptos_types::{
     aggregate_signature::PartialSignatures, epoch_state::EpochState,
     on_chain_config::ValidatorTxnConfig, validator_verifier::random_validator_verifier,
@@ -48,13 +47,13 @@ async fn test_node_broadcast_receiver_succeed() {
 
     // Scenario: Start DAG from beginning
     let storage = Arc::new(MockStorage::new());
-    let dag = Arc::new(RwLock::new(Dag::new(
+    let dag = Arc::new(PersistentDagStore::new(
         epoch_state.clone(),
         storage.clone(),
         Arc::new(MockPayloadManager {}),
         0,
         TEST_DAG_WINDOW,
-    )));
+    ));
 
     let health_backoff = HealthBackoff::new(
         epoch_state.clone(),
@@ -106,13 +105,13 @@ async fn test_node_broadcast_receiver_failure() {
         .iter()
         .map(|signer| {
             let storage = Arc::new(MockStorage::new());
-            let dag = Arc::new(RwLock::new(Dag::new(
+            let dag = Arc::new(PersistentDagStore::new(
                 epoch_state.clone(),
                 storage.clone(),
                 Arc::new(MockPayloadManager {}),
                 0,
                 TEST_DAG_WINDOW,
-            )));
+            ));
 
             NodeBroadcastHandler::new(
                 dag,
@@ -192,13 +191,13 @@ async fn test_node_broadcast_receiver_storage() {
     });
 
     let storage = Arc::new(MockStorage::new());
-    let dag = Arc::new(RwLock::new(Dag::new(
+    let dag = Arc::new(PersistentDagStore::new(
         epoch_state.clone(),
         storage.clone(),
         Arc::new(MockPayloadManager {}),
         0,
         TEST_DAG_WINDOW,
-    )));
+    ));
 
     let node = new_node(1, 10, signers[0].author(), vec![]);
 

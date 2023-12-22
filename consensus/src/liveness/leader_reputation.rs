@@ -578,7 +578,11 @@ impl LeaderReputation {
     // Compute chain health metrics, and
     // - return participating voting power percentage for the window_for_chain_health
     // - update metric counters for different windows
-    fn compute_chain_health_and_add_metrics(&self, history: &[NewBlockEvent], round: Round) -> VotingPowerRatio {
+    fn compute_chain_health_and_add_metrics(
+        &self,
+        history: &[NewBlockEvent],
+        round: Round,
+    ) -> VotingPowerRatio {
         let candidates = self.epoch_to_proposers.get(&self.epoch).unwrap();
         // use f64 counter, as total voting power is u128
         let total_voting_power = self.voting_powers.iter().map(|v| *v as f64).sum();

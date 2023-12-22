@@ -2,7 +2,7 @@
 
 use super::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, ChainHealthBackoffValues,
-    Error, NodeConfig, QuorumStoreConfig, PipelineBackpressureValues,
+    Error, NodeConfig, PipelineBackpressureValues, QuorumStoreConfig,
 };
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};

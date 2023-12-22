@@ -8,7 +8,7 @@ use super::{
     dag_handler::NetworkHandler,
     dag_network::TDAGNetworkSender,
     dag_state_sync::{DagStateSynchronizer, StateSyncTrigger},
-    dag_store::Dag,
+    dag_store::PersistentDagStore,
     health::{ChainHealthBackoff, HealthBackoff, PipelineLatencyBasedBackpressure, TChainHealth},
     order_rule::OrderRule,
     rb_handler::NodeBroadcastHandler,
@@ -60,7 +60,7 @@ use futures_channel::{
     mpsc::{UnboundedReceiver, UnboundedSender},
     oneshot,
 };
-use std::{collections::HashMap, fmt, sync::Arc, time::Duration};
+use std::{collections::HashMap, fmt, ops::Deref, sync::Arc, time::Duration};
 use tokio::{
     runtime::Handle,
     select,
@@ -70,7 +70,7 @@ use tokio_retry::strategy::ExponentialBackoff;
 
 #[derive(Clone)]
 struct BootstrapBaseState {
-    dag_store: Arc<RwLock<Dag>>,
+    dag_store: Arc<PersistentDagStore>,
     order_rule: OrderRule,
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     ordered_notifier: Arc<OrderedNotifierAdapter>,
@@ -131,7 +131,7 @@ impl ActiveMode {
     ) -> Option<Mode> {
         info!(
             LogSchema::new(LogEvent::ActiveMode)
-                .round(self.base_state.dag_store.read().highest_round()),
+                .round(self.base_state.dag_store.deref().read().highest_round()),
             highest_committed_round = self
                 .base_state
                 .ledger_info_provider
@@ -497,13 +497,13 @@ impl DagBootstrapper {
                 .saturating_sub(dag_window_size_config),
         );
 
-        let dag = Arc::new(RwLock::new(Dag::new(
+        let dag = Arc::new(PersistentDagStore::new(
             self.epoch_state.clone(),
             self.storage.clone(),
             self.payload_manager.clone(),
             initial_round,
             dag_window_size_config,
-        )));
+        ));
 
         let ordered_notifier = Arc::new(OrderedNotifierAdapter::new(
             self.ordered_nodes_tx.clone(),

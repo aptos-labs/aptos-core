@@ -13,6 +13,7 @@ mod dag_network;
 mod dag_state_sync;
 mod dag_store;
 mod errors;
+mod health;
 mod observability;
 mod order_rule;
 mod rb_handler;
@@ -21,7 +22,6 @@ mod storage;
 #[cfg(test)]
 mod tests;
 mod types;
-mod health;
 
 pub use adapter::{ProofNotifier, StorageAdapter};
 pub use bootstrap::DagBootstrapper;
