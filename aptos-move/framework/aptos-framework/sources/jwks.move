@@ -35,19 +35,6 @@ module aptos_framework::jwks {
         providers: vector<OIDCProvider>, // The order does not matter.
     }
 
-    /// Some extra configs that controls JWK consensus behavior. Maintained by governance proposals.
-    ///
-    /// Currently supported `content` types:
-    /// - `JWKConsensusConfigV0`
-    struct JWKConsensusConfig has drop, key {
-        content: Any,
-    }
-
-
-    struct JWKConsensusConfigV0 has copy, drop, store {
-        observation_interval_ms: u64,
-    }
-
     /// An observed but not yet supported JWK.
     struct UnsupportedJWK has copy, drop, store {
         payload: vector<u8>,
@@ -144,7 +131,6 @@ module aptos_framework::jwks {
     public(friend) fun initialize(account: &signer) {
         system_addresses::assert_aptos_framework(account);
         move_to(account, OIDCProviderSet { providers: vector[] });
-        move_to(account, jwk_consensus_config_v0(10000));
         move_to(account, OnChainJWKMap { version: 0, jwk_map: JWKMap { entries: vector[] } });
         move_to(account, JWKMapPatch { edits: vector[] });
     }
@@ -177,20 +163,6 @@ module aptos_framework::jwks {
         };
 
         old_config_endpoint
-    }
-
-    /// Create a `JWKConsensusConfig` with content type `JWKConsensusConfigV0`.
-    public fun jwk_consensus_config_v0(observation_interval_ms: u64): JWKConsensusConfig {
-        let v0 = JWKConsensusConfigV0 { observation_interval_ms };
-        JWKConsensusConfig {
-            content: pack(v0),
-        }
-    }
-
-    /// Update JWK consensus config. Should only be invoked by governance proposals.
-    public fun update_jwk_consensus_config(account: &signer, config: JWKConsensusConfig) acquires JWKConsensusConfig {
-        system_addresses::assert_aptos_framework(account);
-        *borrow_global_mut<JWKConsensusConfig>(@aptos_framework) = config;
     }
 
     /// Update the JWK set. Should only be invoked by validator transactions/governance proposals.

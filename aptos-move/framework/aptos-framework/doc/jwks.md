@@ -8,8 +8,6 @@ JWK functions and structs.
 
 -  [Struct `OIDCProvider`](#0x1_jwks_OIDCProvider)
 -  [Resource `OIDCProviderSet`](#0x1_jwks_OIDCProviderSet)
--  [Resource `JWKConsensusConfig`](#0x1_jwks_JWKConsensusConfig)
--  [Struct `JWKConsensusConfigV0`](#0x1_jwks_JWKConsensusConfigV0)
 -  [Struct `UnsupportedJWK`](#0x1_jwks_UnsupportedJWK)
 -  [Struct `RSA_JWK`](#0x1_jwks_RSA_JWK)
 -  [Struct `JWK`](#0x1_jwks_JWK)
@@ -26,8 +24,6 @@ JWK functions and structs.
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_jwks_initialize)
 -  [Function `update_oidc_provider`](#0x1_jwks_update_oidc_provider)
--  [Function `jwk_consensus_config_v0`](#0x1_jwks_jwk_consensus_config_v0)
--  [Function `update_jwk_consensus_config`](#0x1_jwks_update_jwk_consensus_config)
 -  [Function `update_onchain_jwk_map`](#0x1_jwks_update_onchain_jwk_map)
 -  [Function `update_jwk_map_patch`](#0x1_jwks_update_jwk_map_patch)
 -  [Function `jwk_map_edit_del_all`](#0x1_jwks_jwk_map_edit_del_all)
@@ -101,64 +97,6 @@ The OIDC provider set. Maintained by governance proposals.
 <dl>
 <dt>
 <code>providers: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_OIDCProvider">jwks::OIDCProvider</a>&gt;</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a id="0x1_jwks_JWKConsensusConfig"></a>
-
-## Resource `JWKConsensusConfig`
-
-Some extra configs that controls JWK consensus behavior. Maintained by governance proposals.
-
-Currently supported <code>content</code> types:
-- <code><a href="jwks.md#0x1_jwks_JWKConsensusConfigV0">JWKConsensusConfigV0</a></code>
-
-
-<pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_JWKConsensusConfig">JWKConsensusConfig</a> <b>has</b> drop, key
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>content: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_Any">copyable_any::Any</a></code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a id="0x1_jwks_JWKConsensusConfigV0"></a>
-
-## Struct `JWKConsensusConfigV0`
-
-
-
-<pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_JWKConsensusConfigV0">JWKConsensusConfigV0</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>observation_interval_ms: u64</code>
 </dt>
 <dd>
 
@@ -658,7 +596,6 @@ Initialize some JWK resources. Should only be invoked by genesis.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwks.md#0x1_jwks_initialize">initialize</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(<a href="account.md#0x1_account">account</a>);
     <b>move_to</b>(<a href="account.md#0x1_account">account</a>, <a href="jwks.md#0x1_jwks_OIDCProviderSet">OIDCProviderSet</a> { providers: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[] });
-    <b>move_to</b>(<a href="account.md#0x1_account">account</a>, <a href="jwks.md#0x1_jwks_jwk_consensus_config_v0">jwk_consensus_config_v0</a>(10000));
     <b>move_to</b>(<a href="account.md#0x1_account">account</a>, <a href="jwks.md#0x1_jwks_OnChainJWKMap">OnChainJWKMap</a> { <a href="version.md#0x1_version">version</a>: 0, jwk_map: <a href="jwks.md#0x1_jwks_JWKMap">JWKMap</a> { entries: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[] } });
     <b>move_to</b>(<a href="account.md#0x1_account">account</a>, <a href="jwks.md#0x1_jwks_JWKMapPatch">JWKMapPatch</a> { edits: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[] });
 }
@@ -711,60 +648,6 @@ Designed to be used only in governance proposal-only.
     };
 
     old_config_endpoint
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_jwks_jwk_consensus_config_v0"></a>
-
-## Function `jwk_consensus_config_v0`
-
-Create a <code><a href="jwks.md#0x1_jwks_JWKConsensusConfig">JWKConsensusConfig</a></code> with content type <code><a href="jwks.md#0x1_jwks_JWKConsensusConfigV0">JWKConsensusConfigV0</a></code>.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_jwk_consensus_config_v0">jwk_consensus_config_v0</a>(observation_interval_ms: u64): <a href="jwks.md#0x1_jwks_JWKConsensusConfig">jwks::JWKConsensusConfig</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_jwk_consensus_config_v0">jwk_consensus_config_v0</a>(observation_interval_ms: u64): <a href="jwks.md#0x1_jwks_JWKConsensusConfig">JWKConsensusConfig</a> {
-    <b>let</b> v0 = <a href="jwks.md#0x1_jwks_JWKConsensusConfigV0">JWKConsensusConfigV0</a> { observation_interval_ms };
-    <a href="jwks.md#0x1_jwks_JWKConsensusConfig">JWKConsensusConfig</a> {
-        content: pack(v0),
-    }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_jwks_update_jwk_consensus_config"></a>
-
-## Function `update_jwk_consensus_config`
-
-Update JWK consensus config. Should only be invoked by governance proposals.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_update_jwk_consensus_config">update_jwk_consensus_config</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="jwks.md#0x1_jwks_JWKConsensusConfig">jwks::JWKConsensusConfig</a>)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_update_jwk_consensus_config">update_jwk_consensus_config</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="jwks.md#0x1_jwks_JWKConsensusConfig">JWKConsensusConfig</a>) <b>acquires</b> <a href="jwks.md#0x1_jwks_JWKConsensusConfig">JWKConsensusConfig</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(<a href="account.md#0x1_account">account</a>);
-    *<b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_JWKConsensusConfig">JWKConsensusConfig</a>&gt;(@aptos_framework) = config;
 }
 </code></pre>
 
