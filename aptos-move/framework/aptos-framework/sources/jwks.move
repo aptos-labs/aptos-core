@@ -42,6 +42,7 @@ module aptos_framework::jwks {
     }
 
     /// An JWK variant that represents the JWKs which were observed but not yet supported by Aptos.
+    /// Observing `UnsupportedJWK`s means the providers adopted a new key type/format, and the system should be updated.
     struct UnsupportedJWK has copy, drop, store {
         id: vector<u8>,
         payload: vector<u8>,
