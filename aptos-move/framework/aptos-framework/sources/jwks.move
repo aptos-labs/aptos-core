@@ -10,9 +10,12 @@ module aptos_framework::jwks {
     use aptos_std::comparator::{compare_u8_vector, is_greater_than, is_equal};
     use aptos_std::copyable_any;
     use aptos_std::copyable_any::{Any, pack};
+    use aptos_std::debug;
     use aptos_framework::event::emit;
     use aptos_framework::reconfiguration;
     use aptos_framework::system_addresses;
+    #[test_only]
+    use aptos_framework::account::create_account_for_test;
 
     friend aptos_framework::genesis;
 
@@ -206,7 +209,7 @@ module aptos_framework::jwks {
     }
 
     /// Set the `JWKPatches`. Only called in governance proposals.
-    public fun set_jwk_patches(aptos_framework: &signer, patches: vector<JWKPatch>) acquires JWKPatches, FinalJWKs {
+    public fun set_jwk_patches(aptos_framework: &signer, patches: vector<JWKPatch>) acquires JWKPatches, FinalJWKs, ObservedJWKs {
         system_addresses::assert_aptos_framework(aptos_framework);
         borrow_global_mut<JWKPatches>(@aptos_framework).patches = patches;
         regenerate_final_jwks();
@@ -273,8 +276,8 @@ module aptos_framework::jwks {
     ///
     /// NOTE: for validator-proposed updates, the quorum certificate acquisition and verification should be done before invoking this.
     /// This function should only worry about on-chain state updates.
-    fun set_observed_jwks(account: signer, version: u64, jwks: JWKs) acquires ObservedJWKs, FinalJWKs, JWKPatches {
-        system_addresses::assert_aptos_framework(&account);
+    fun set_observed_jwks(account: &signer, version: u64, jwks: JWKs) acquires ObservedJWKs, FinalJWKs, JWKPatches {
+        system_addresses::assert_aptos_framework(account);
         *borrow_global_mut<ObservedJWKs>(@aptos_framework) = ObservedJWKs { version, jwks };
         let epoch = reconfiguration::current_epoch();
         emit(ObservedJWKsUpdated { epoch, version, jwks });
@@ -282,8 +285,8 @@ module aptos_framework::jwks {
     }
 
     /// Regenerate `FinalJWKs` from `ObservedJWKs` and `JWKPatches` and save the result.
-    fun regenerate_final_jwks() acquires FinalJWKs, JWKPatches {
-        let jwks = borrow_global<FinalJWKs>(@aptos_framework).jwks;
+    fun regenerate_final_jwks() acquires FinalJWKs, JWKPatches, ObservedJWKs {
+        let jwks = borrow_global<ObservedJWKs>(@aptos_framework).jwks;
         let patches = borrow_global<JWKPatches>(@aptos_framework);
         vector::for_each_ref(&patches.patches, |obj|{
             let patch: &JWKPatch = obj;
@@ -296,7 +299,7 @@ module aptos_framework::jwks {
     fun exists_in_jwks(jwks: &JWKs, issuer: vector<u8>, jwk_id: vector<u8>): bool {
         let (issuer_found, index) = vector::find(&jwks.entries, |obj| {
             let provider_jwks: &ProviderJWKs = obj;
-            is_greater_than(&compare_u8_vector(issuer, provider_jwks.issuer))
+            !is_greater_than(&compare_u8_vector(issuer, provider_jwks.issuer))
         });
 
         issuer_found && exists_in_provider_jwks(vector::borrow(&jwks.entries, index), jwk_id)
@@ -313,9 +316,12 @@ module aptos_framework::jwks {
     /// Get a JWK by issuer and key ID from a `JWKs`.
     /// Abort if such a JWK does not exist.
     fun get_jwk_from_jwks(jwks: &JWKs, issuer: vector<u8>, jwk_id: vector<u8>): JWK {
+        debug::print(&utf8(issuer));
+        debug::print(&utf8(b"get_jwk_from_jwks for loop"));
         let (issuer_found, index) = vector::find(&jwks.entries, |obj| {
             let provider_jwks: &ProviderJWKs = obj;
-            is_greater_than(&compare_u8_vector(issuer, provider_jwks.issuer))
+            debug::print(&utf8(provider_jwks.issuer));
+            !is_greater_than(&compare_u8_vector(issuer, provider_jwks.issuer))
         });
 
         assert!(issuer_found, invalid_argument(EISSUER_NOT_FOUND));
@@ -328,7 +334,7 @@ module aptos_framework::jwks {
     fun get_jwk_from_provider_jwks(provider_jwks: &ProviderJWKs, jwk_id: vector<u8>): JWK {
         let (jwk_id_found, index) = vector::find(&provider_jwks.jwks, |obj|{
             let jwk: &JWK = obj;
-            is_greater_than(&compare_u8_vector(jwk_id, get_jwk_id(jwk)))
+            !is_greater_than(&compare_u8_vector(jwk_id, get_jwk_id(jwk)))
         });
 
         assert!(jwk_id_found, error::invalid_argument(EJWK_ID_NOT_FOUND));
@@ -339,7 +345,7 @@ module aptos_framework::jwks {
     fun try_get_jwk_from_jwks(jwks: &JWKs, issuer: vector<u8>, jwk_id: vector<u8>): Option<JWK> {
         let (issuer_found, index) = vector::find(&jwks.entries, |obj| {
             let provider_jwks: &ProviderJWKs = obj;
-            is_greater_than(&compare_u8_vector(issuer, provider_jwks.issuer))
+            !is_greater_than(&compare_u8_vector(issuer, provider_jwks.issuer))
         });
 
         if (issuer_found) {
@@ -354,7 +360,7 @@ module aptos_framework::jwks {
     fun try_get_jwk_from_provider_jwks(provider_jwks: &ProviderJWKs, jwk_id: vector<u8>): Option<JWK> {
         let (jwk_id_found, index) = vector::find(&provider_jwks.jwks, |obj|{
             let jwk: &JWK = obj;
-            is_greater_than(&compare_u8_vector(jwk_id, get_jwk_id(jwk)))
+            !is_greater_than(&compare_u8_vector(jwk_id, get_jwk_id(jwk)))
         });
 
         if (jwk_id_found) {
@@ -531,6 +537,13 @@ module aptos_framework::jwks {
     // Tests begin.
     //
 
+    #[test_only]
+    fun initialize_for_test(aptos_framework: &signer) {
+        create_account_for_test(@aptos_framework);
+        reconfiguration::initialize_for_test(aptos_framework);
+        initialize(aptos_framework);
+    }
+
     #[test]
     fun test_apply_patch_to_jwks() {
         let jwks = JWKs {
@@ -629,5 +642,57 @@ module aptos_framework::jwks {
         let patch = new_jwk_patch_remove_all();
         apply_patch_to_jwks(&mut jwks, patch);
         assert!(jwks == JWKs { entries: vector[] }, 1);
+    }
+
+    #[test(aptos_framework = @aptos_framework)]
+    fun test_final_jwks(aptos_framework: signer) acquires ObservedJWKs, FinalJWKs, JWKPatches {
+        initialize_for_test(&aptos_framework);
+        let jwk_0 = new_unsupported_jwk(b"key_id_0", b"key_payload_0");
+        let jwk_1 = new_unsupported_jwk(b"key_id_1", b"key_payload_1");
+        let jwk_2 = new_unsupported_jwk(b"key_id_2", b"key_payload_2");
+        let jwk_3 = new_unsupported_jwk(b"key_id_3", b"key_payload_3");
+        let jwk_3b = new_unsupported_jwk(b"key_id_3", b"key_payload_3b");
+
+        // Fake observation from validators.
+        set_observed_jwks(&aptos_framework, 1, JWKs {
+            entries: vector[
+                ProviderJWKs {
+                    issuer: b"alice",
+                    jwks: vector[jwk_0, jwk_1],
+                },
+                ProviderJWKs{
+                    issuer: b"bob",
+                    jwks: vector[jwk_2, jwk_3],
+                },
+            ],
+        });
+        assert!(jwk_3 == get_final_jwk(b"bob", b"key_id_3"), 1);
+        assert!(exists_in_final_jwks(b"bob", b"key_id_3"), 1);
+        assert!(option::some(jwk_3) == try_get_final_jwk(b"bob", b"key_id_3"), 1);
+
+        // Ignore all Bob's keys.
+        set_jwk_patches(&aptos_framework, vector[
+            new_jwk_patch_remove_issuer(b"bob"),
+        ]);
+        assert!(!exists_in_final_jwks(b"bob", b"key_id_3"), 1);
+        assert!(option::none() == try_get_final_jwk(b"bob", b"key_id_3"), 1);
+
+        // Update one of Bob's key..
+        set_jwk_patches(&aptos_framework, vector[
+            new_jwk_patch_upsert_jwk(b"bob", jwk_3b),
+        ]);
+        assert!(jwk_3b == get_final_jwk(b"bob", b"key_id_3"), 1);
+        assert!(exists_in_final_jwks(b"bob", b"key_id_3"), 1);
+        assert!(option::some(jwk_3b) == try_get_final_jwk(b"bob", b"key_id_3"), 1);
+
+        // Wipe everything, then add some keys back.
+        set_jwk_patches(&aptos_framework, vector[
+            new_jwk_patch_remove_all(),
+            new_jwk_patch_upsert_jwk(b"alice", jwk_1),
+            new_jwk_patch_upsert_jwk(b"bob", jwk_3),
+        ]);
+        assert!(jwk_3 == get_final_jwk(b"bob", b"key_id_3"), 1);
+        assert!(exists_in_final_jwks(b"bob", b"key_id_3"), 1);
+        assert!(option::some(jwk_3) == try_get_final_jwk(b"bob", b"key_id_3"), 1);
     }
 }
