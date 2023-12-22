@@ -12,7 +12,8 @@ use crate::{
         transaction_accumulator_db_column_families, transaction_db_column_families,
         transaction_info_db_column_families, write_set_db_column_families,
     },
-    ledger_db::transaction_db::TransactionDb,
+    event_store::EventStore,
+    ledger_db::{event_db::EventDb, transaction_db::TransactionDb},
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
 };
 use anyhow::Result;
@@ -26,6 +27,9 @@ use std::{
     sync::Arc,
 };
 
+mod event_db;
+#[cfg(test)]
+mod event_db_test;
 mod transaction_db;
 #[cfg(test)]
 pub(crate) mod transaction_db_test;
@@ -71,7 +75,7 @@ impl LedgerDbSchemaBatches {
 #[derive(Debug)]
 pub struct LedgerDb {
     ledger_metadata_db: Arc<DB>,
-    event_db: Arc<DB>,
+    event_db: EventDb,
     transaction_accumulator_db: Arc<DB>,
     transaction_db: TransactionDb,
     transaction_info_db: Arc<DB>,
@@ -107,7 +111,10 @@ impl LedgerDb {
             info!("Individual ledger dbs are not enabled!");
             return Ok(Self {
                 ledger_metadata_db: Arc::clone(&ledger_metadata_db),
-                event_db: Arc::clone(&ledger_metadata_db),
+                event_db: EventDb::new(
+                    Arc::clone(&ledger_metadata_db),
+                    EventStore::new(Arc::clone(&ledger_metadata_db)),
+                ),
                 transaction_accumulator_db: Arc::clone(&ledger_metadata_db),
                 transaction_db: TransactionDb::new(Arc::clone(&ledger_metadata_db)),
                 transaction_info_db: Arc::clone(&ledger_metadata_db),
@@ -117,12 +124,13 @@ impl LedgerDb {
 
         let ledger_db_folder = db_root_path.as_ref().join(LEDGER_DB_FOLDER_NAME);
 
-        let event_db = Arc::new(Self::open_rocksdb(
+        let event_db_raw = Arc::new(Self::open_rocksdb(
             ledger_db_folder.join(EVENT_DB_NAME),
             EVENT_DB_NAME,
             &rocksdb_configs.ledger_db_config,
             readonly,
         )?);
+        let event_db = EventDb::new(event_db_raw.clone(), EventStore::new(event_db_raw));
 
         let transaction_accumulator_db = Arc::new(Self::open_rocksdb(
             ledger_db_folder.join(TRANSACTION_ACCUMULATOR_DB_NAME),
@@ -214,10 +222,7 @@ impl LedgerDb {
     // Only expect to be used by fast sync when it is finished.
     pub(crate) fn write_pruner_progress(&self, version: Version) -> Result<()> {
         info!("Fast sync is done, writing pruner progress {version} for all ledger sub pruners.");
-        self.event_db.put::<DbMetadataSchema>(
-            &DbMetadataKey::EventPrunerProgress,
-            &DbMetadataValue::Version(version),
-        )?;
+        self.event_db.write_pruner_progress(version)?;
         self.transaction_accumulator_db.put::<DbMetadataSchema>(
             &DbMetadataKey::TransactionAccumulatorPrunerProgress,
             &DbMetadataValue::Version(version),
@@ -245,12 +250,13 @@ impl LedgerDb {
         Arc::clone(&self.ledger_metadata_db)
     }
 
-    pub(crate) fn event_db(&self) -> &DB {
+    pub(crate) fn event_db(&self) -> &EventDb {
         &self.event_db
     }
 
-    pub(crate) fn event_db_arc(&self) -> Arc<DB> {
-        Arc::clone(&self.event_db)
+    // TODO(grao): Remove this after sharding migration.
+    pub(crate) fn event_db_raw(&self) -> &DB {
+        self.event_db.db()
     }
 
     pub(crate) fn transaction_accumulator_db(&self) -> &DB {

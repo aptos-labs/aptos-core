@@ -5,7 +5,6 @@
 //! database restore operations, as required by restore and
 //! state sync v2.
 use crate::{
-    event_store::EventStore,
     ledger_db::{LedgerDb, LedgerDbSchemaBatches},
     ledger_store::LedgerStore,
     schema::{
@@ -111,7 +110,6 @@ pub fn confirm_or_save_frozen_subtrees(
 pub(crate) fn save_transactions(
     ledger_store: Arc<LedgerStore>,
     transaction_store: Arc<TransactionStore>,
-    event_store: Arc<EventStore>,
     state_store: Arc<StateStore>,
     ledger_db: Arc<LedgerDb>,
     first_version: Version,
@@ -130,7 +128,6 @@ pub(crate) fn save_transactions(
         save_transactions_impl(
             Arc::clone(&ledger_store),
             transaction_store,
-            event_store,
             state_store,
             ledger_db,
             first_version,
@@ -150,7 +147,6 @@ pub(crate) fn save_transactions(
         save_transactions_impl(
             Arc::clone(&ledger_store),
             transaction_store,
-            event_store,
             Arc::clone(&state_store),
             Arc::clone(&ledger_db),
             first_version,
@@ -226,7 +222,6 @@ fn save_ledger_infos_impl(
 pub(crate) fn save_transactions_impl(
     ledger_store: Arc<LedgerStore>,
     transaction_store: Arc<TransactionStore>,
-    event_store: Arc<EventStore>,
     state_store: Arc<StateStore>,
     ledger_db: Arc<LedgerDb>,
     first_version: Version,
@@ -255,7 +250,7 @@ pub(crate) fn save_transactions_impl(
         &ledger_db_batch.transaction_accumulator_db_batches,
     )?;
 
-    event_store.put_events_multiple_versions(
+    ledger_db.event_db().put_events_multiple_versions(
         first_version,
         events,
         &ledger_db_batch.event_db_batches,

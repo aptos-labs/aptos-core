@@ -194,7 +194,6 @@ impl AptosDB {
             Arc::clone(&self.ledger_store),
             Arc::clone(&self.transaction_store),
             Arc::clone(&self.state_store),
-            Arc::clone(&self.event_store),
             Arc::clone(&self.ledger_db),
         )
     }
