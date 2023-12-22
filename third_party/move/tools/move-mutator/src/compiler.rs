@@ -3,6 +3,7 @@ use move_command_line_common::parser::NumberFormat;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use crate::configuration::Configuration;
 use move_compiler::diagnostics::FilesSourceText;
 use move_compiler::{
     command_line::compiler::*, diagnostics::unwrap_or_report_diagnostics, shared::Flags,
@@ -30,10 +31,12 @@ use move_package::BuildConfig;
 ///
 /// * `Result<(FilesSourceText, move_compiler::parser::ast::Program), anyhow::Error>` - tuple of FilesSourceText and Program if successful, or an error if any error occurs.
 pub fn generate_ast(
-    source_files: Vec<String>,
+    mutator_config: &Configuration,
     config: BuildConfig,
     package_path: PathBuf,
 ) -> Result<(FilesSourceText, move_compiler::parser::ast::Program), anyhow::Error> {
+    let source_files = mutator_config.project.move_sources.clone();
+
     let named_addr_map = config
         .additional_named_addresses
         .into_iter()

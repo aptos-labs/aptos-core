@@ -134,7 +134,7 @@ The last module in the main logic layer filters the mutants and reduces the outc
 
 This layer handles data sources - reading Move projects (source code) and configuration files. It also provides data to the other layers.
 
-The configuration file is a JSON file that contains the configuration of the Move mutator tool. It includes information on the project to mutate, mutation operators to use, mutation categories to use, and so on.
+The configuration file is a JSON or TOML (both supported) file that contains the configuration of the Move mutator tool. It includes information on the project to mutate, mutation operators to use, mutation categories to use, and so on.
 
 Sample configuration file:
 ```json

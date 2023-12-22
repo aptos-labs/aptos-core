@@ -24,3 +24,6 @@ move-command-line-common = { path = "../../move-command-line-common" }
 move-compiler = { path = "../../move-compiler" }
 move-ir-types = { path = "../../move-ir/types" }
 move-package = { path = "../move-package" }
+
+[dev-dependencies]
+tempfile = "3.8"
