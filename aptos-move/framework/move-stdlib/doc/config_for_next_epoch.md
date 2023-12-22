@@ -17,11 +17,11 @@ NOTE: on-chain config <code>0x1::state::ValidatorSet</code> implemented its own 
 
 
 -  [Resource `ForNextEpoch`](#0x1_config_for_next_epoch_ForNextEpoch)
--  [Resource `UpsertLocked`](#0x1_config_for_next_epoch_UpsertLocked)
+-  [Resource `ValidatorSetChangeLocked`](#0x1_config_for_next_epoch_ValidatorSetChangeLocked)
 -  [Constants](#@Constants_0)
--  [Function `upserts_enabled`](#0x1_config_for_next_epoch_upserts_enabled)
--  [Function `disable_upserts`](#0x1_config_for_next_epoch_disable_upserts)
--  [Function `enable_upserts`](#0x1_config_for_next_epoch_enable_upserts)
+-  [Function `validator_set_changes_disabled`](#0x1_config_for_next_epoch_validator_set_changes_disabled)
+-  [Function `disable_validator_set_changes`](#0x1_config_for_next_epoch_disable_validator_set_changes)
+-  [Function `enable_validator_set_changes`](#0x1_config_for_next_epoch_enable_validator_set_changes)
 -  [Function `does_exist`](#0x1_config_for_next_epoch_does_exist)
 -  [Function `upsert`](#0x1_config_for_next_epoch_upsert)
 -  [Function `extract`](#0x1_config_for_next_epoch_extract)
@@ -62,14 +62,14 @@ NOTE: on-chain config <code>0x1::state::ValidatorSet</code> implemented its own 
 
 </details>
 
-<a id="0x1_config_for_next_epoch_UpsertLocked"></a>
+<a id="0x1_config_for_next_epoch_ValidatorSetChangeLocked"></a>
 
-## Resource `UpsertLocked`
+## Resource `ValidatorSetChangeLocked`
 
-This flag exists under account 0x1 if and only if any on-chain config change for the next epoch should be rejected.
+This flag exists under account 0x1 if and only if any validator set change for the next epoch should be rejected.
 
 
-<pre><code><b>struct</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_UpsertLocked">UpsertLocked</a> <b>has</b> <b>copy</b>, drop, key
+<pre><code><b>struct</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ValidatorSetChangeLocked">ValidatorSetChangeLocked</a> <b>has</b> <b>copy</b>, drop, key
 </code></pre>
 
 
@@ -113,13 +113,14 @@ This flag exists under account 0x1 if and only if any on-chain config change for
 
 
 
-<a id="0x1_config_for_next_epoch_upserts_enabled"></a>
+<a id="0x1_config_for_next_epoch_validator_set_changes_disabled"></a>
 
-## Function `upserts_enabled`
+## Function `validator_set_changes_disabled`
+
+Return whether validator set changes are disabled (because of ongoing DKG).
 
 
-
-<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_upserts_enabled">upserts_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_validator_set_changes_disabled">validator_set_changes_disabled</a>(): bool
 </code></pre>
 
 
@@ -128,8 +129,8 @@ This flag exists under account 0x1 if and only if any on-chain config change for
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_upserts_enabled">upserts_enabled</a>(): bool {
-    !<b>exists</b>&lt;<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_UpsertLocked">UpsertLocked</a>&gt;(@std)
+<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_validator_set_changes_disabled">validator_set_changes_disabled</a>(): bool {
+    <b>exists</b>&lt;<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ValidatorSetChangeLocked">ValidatorSetChangeLocked</a>&gt;(@std)
 }
 </code></pre>
 
@@ -137,14 +138,14 @@ This flag exists under account 0x1 if and only if any on-chain config change for
 
 </details>
 
-<a id="0x1_config_for_next_epoch_disable_upserts"></a>
+<a id="0x1_config_for_next_epoch_disable_validator_set_changes"></a>
 
-## Function `disable_upserts`
+## Function `disable_validator_set_changes`
 
-Disable on-chain config updates. Called by the system when a reconfiguration with DKG starts.
+When a DKG starts, call this to disable validator set changes.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_disable_upserts">disable_upserts</a>(account: &<a href="signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_disable_validator_set_changes">disable_validator_set_changes</a>(account: &<a href="signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -153,10 +154,10 @@ Disable on-chain config updates. Called by the system when a reconfiguration wit
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_disable_upserts">disable_upserts</a>(account: &<a href="signer.md#0x1_signer">signer</a>) {
+<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_disable_validator_set_changes">disable_validator_set_changes</a>(account: &<a href="signer.md#0x1_signer">signer</a>) {
     <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_abort_unless_std">abort_unless_std</a>(account);
-    <b>if</b> (!<b>exists</b>&lt;<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_UpsertLocked">UpsertLocked</a>&gt;(@std)) {
-        <b>move_to</b>(account, <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_UpsertLocked">UpsertLocked</a> {})
+    <b>if</b> (!<b>exists</b>&lt;<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ValidatorSetChangeLocked">ValidatorSetChangeLocked</a>&gt;(@std)) {
+        <b>move_to</b>(account, <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ValidatorSetChangeLocked">ValidatorSetChangeLocked</a> {})
     }
 }
 </code></pre>
@@ -165,14 +166,14 @@ Disable on-chain config updates. Called by the system when a reconfiguration wit
 
 </details>
 
-<a id="0x1_config_for_next_epoch_enable_upserts"></a>
+<a id="0x1_config_for_next_epoch_enable_validator_set_changes"></a>
 
-## Function `enable_upserts`
+## Function `enable_validator_set_changes`
 
-Enable on-chain config updates. Called by the system when a reconfiguration with DKG finishes.
+When a DKG finishes, call this to re-enable validator set changes.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_enable_upserts">enable_upserts</a>(account: &<a href="signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_enable_validator_set_changes">enable_validator_set_changes</a>(account: &<a href="signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -181,10 +182,10 @@ Enable on-chain config updates. Called by the system when a reconfiguration with
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_enable_upserts">enable_upserts</a>(account: &<a href="signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_UpsertLocked">UpsertLocked</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_enable_validator_set_changes">enable_validator_set_changes</a>(account: &<a href="signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ValidatorSetChangeLocked">ValidatorSetChangeLocked</a> {
     <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_abort_unless_std">abort_unless_std</a>(account);
-    <b>if</b> (!<b>exists</b>&lt;<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_UpsertLocked">UpsertLocked</a>&gt;(@std)) {
-        <b>move_from</b>&lt;<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_UpsertLocked">UpsertLocked</a>&gt;(address_of(account));
+    <b>if</b> (!<b>exists</b>&lt;<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ValidatorSetChangeLocked">ValidatorSetChangeLocked</a>&gt;(@std)) {
+        <b>move_from</b>&lt;<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ValidatorSetChangeLocked">ValidatorSetChangeLocked</a>&gt;(address_of(account));
     }
 }
 </code></pre>
@@ -238,7 +239,6 @@ Typically used in <code>X::set_for_next_epoch()</code> where X is an on-chaon co
 
 <pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_upsert">upsert</a>&lt;T: drop + store&gt;(account: &<a href="signer.md#0x1_signer">signer</a>, config: T) <b>acquires</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ForNextEpoch">ForNextEpoch</a> {
     <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_abort_unless_std">abort_unless_std</a>(account);
-    <b>assert</b>!(<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_upserts_enabled">upserts_enabled</a>(), std::error::invalid_state(<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ERESOURCE_BUSY">ERESOURCE_BUSY</a>));
     <b>if</b> (<b>exists</b>&lt;<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ForNextEpoch">ForNextEpoch</a>&lt;T&gt;&gt;(@std)) {
         <b>move_from</b>&lt;<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ForNextEpoch">ForNextEpoch</a>&lt;T&gt;&gt;(@std);
     };

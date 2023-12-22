@@ -21,26 +21,27 @@ module std::config_for_next_epoch {
         payload: T,
     }
 
-    /// This flag exists under account 0x1 if and only if any on-chain config change for the next epoch should be rejected.
-    struct UpsertLocked has copy, drop, key {}
+    /// This flag exists under account 0x1 if and only if any validator set change for the next epoch should be rejected.
+    struct ValidatorSetChangeLocked has copy, drop, key {}
 
-    public fun upserts_enabled(): bool {
-        !exists<UpsertLocked>(@std)
+    /// Return whether validator set changes are disabled (because of ongoing DKG).
+    public fun validator_set_changes_disabled(): bool {
+        exists<ValidatorSetChangeLocked>(@std)
     }
 
-    /// Disable on-chain config updates. Called by the system when a reconfiguration with DKG starts.
-    public fun disable_upserts(account: &signer) {
+    /// When a DKG starts, call this to disable validator set changes.
+    public fun disable_validator_set_changes(account: &signer) {
         abort_unless_std(account);
-        if (!exists<UpsertLocked>(@std)) {
-            move_to(account, UpsertLocked {})
+        if (!exists<ValidatorSetChangeLocked>(@std)) {
+            move_to(account, ValidatorSetChangeLocked {})
         }
     }
 
-    /// Enable on-chain config updates. Called by the system when a reconfiguration with DKG finishes.
-    public fun enable_upserts(account: &signer) acquires UpsertLocked {
+    /// When a DKG finishes, call this to re-enable validator set changes.
+    public fun enable_validator_set_changes(account: &signer) acquires ValidatorSetChangeLocked {
         abort_unless_std(account);
-        if (!exists<UpsertLocked>(@std)) {
-            move_from<UpsertLocked>(address_of(account));
+        if (!exists<ValidatorSetChangeLocked>(@std)) {
+            move_from<ValidatorSetChangeLocked>(address_of(account));
         }
     }
 
@@ -54,7 +55,6 @@ module std::config_for_next_epoch {
     /// Typically used in `X::set_for_next_epoch()` where X is an on-chaon config.
     public fun upsert<T: drop + store>(account: &signer, config: T) acquires ForNextEpoch {
         abort_unless_std(account);
-        assert!(upserts_enabled(), std::error::invalid_state(ERESOURCE_BUSY));
         if (exists<ForNextEpoch<T>>(@std)) {
             move_from<ForNextEpoch<T>>(@std);
         };

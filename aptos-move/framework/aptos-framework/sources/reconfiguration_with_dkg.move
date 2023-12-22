@@ -14,7 +14,7 @@ module aptos_framework::reconfiguration_with_dkg {
     /// Trigger a reconfiguration with DKG.
     /// Abort if there is a DKG in progress.
     public(friend) fun start(account: &signer) {
-        config_for_next_epoch::disable_upserts(account);
+        config_for_next_epoch::disable_validator_set_changes(account);
         let cur_epoch = reconfiguration::current_epoch();
         dkg::start(cur_epoch, stake::cur_validator_set(), cur_epoch + 1, stake::next_validator_set());
     }
@@ -28,7 +28,7 @@ module aptos_framework::reconfiguration_with_dkg {
         gas_schedule::on_new_epoch(account);
         std::version::on_new_epoch(account);
         features::on_new_epoch(account);
-        config_for_next_epoch::enable_upserts(account);
+        config_for_next_epoch::enable_validator_set_changes(account);
         reconfiguration::reconfigure();
     }
 
