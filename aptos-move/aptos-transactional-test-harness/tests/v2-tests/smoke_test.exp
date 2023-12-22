@@ -1,0 +1,87 @@
+processed 6 tasks
+
+task 1 'print-bytecode'. lines 4-30:
+// Move bytecode v7
+module f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6.hello_world {
+use 0000000000000000000000000000000000000000000000000000000000000001::string;
+use 0000000000000000000000000000000000000000000000000000000000000001::aptos_coin;
+use 0000000000000000000000000000000000000000000000000000000000000001::coin;
+use 0000000000000000000000000000000000000000000000000000000000000001::signer;
+
+
+struct ModuleData has store, key {
+	global_counter: u64,
+	state: String
+}
+
+public foo(Arg0: address): u64 {
+B0:
+	0: MoveLoc[0](Arg0: address)
+	1: Call coin::balance<AptosCoin>(address): u64
+	2: Ret
+}
+entry public hi(Arg0: &signer, Arg1: String) {
+L0:	loc2: String
+B0:
+	0: MoveLoc[0](Arg0: &signer)
+	1: Call signer::address_of(&signer): address
+	2: MutBorrowGlobal[0](ModuleData)
+	3: StLoc[2](loc0: &mut ModuleData)
+	4: CopyLoc[2](loc0: &mut ModuleData)
+	5: MutBorrowField[0](ModuleData.state: String)
+	6: StLoc[3](loc1: &mut String)
+	7: CopyLoc[1](Arg1: String)
+	8: StLoc[4](loc2: String)
+	9: MoveLoc[4](loc2: String)
+	10: CopyLoc[3](loc1: &mut String)
+	11: WriteRef
+	12: MoveLoc[3](loc1: &mut String)
+	13: Pop
+	14: MoveLoc[2](loc0: &mut ModuleData)
+	15: Pop
+	16: Ret
+}
+init_module(Arg0: &signer) {
+L0:	loc1: vector<u8>
+L1:	loc2: String
+L2:	loc3: String
+L3:	loc4: ModuleData
+B0:
+	0: LdU64(0)
+	1: LdConst[0](Vector(U8): [4, 105, 110, 105, 116])
+	2: StLoc[1](loc0: vector<u8>)
+	3: CopyLoc[1](loc0: vector<u8>)
+	4: StLoc[2](loc1: vector<u8>)
+	5: MoveLoc[2](loc1: vector<u8>)
+	6: Call string::utf8(vector<u8>): String
+	7: StLoc[3](loc2: String)
+	8: CopyLoc[3](loc2: String)
+	9: StLoc[4](loc3: String)
+	10: MoveLoc[4](loc3: String)
+	11: Pack[0](ModuleData)
+	12: StLoc[5](loc4: ModuleData)
+	13: MoveLoc[0](Arg0: &signer)
+	14: MoveLoc[5](loc4: ModuleData)
+	15: MoveTo[0](ModuleData)
+	16: Ret
+}
+}
+
+task 3 'run'. lines 65-65:
+Events:
+{
+    type:    0x1::transaction_fee::FeeStatement
+    data:    "05000000000000000400000000000000020000000000000000000000000000000000000000000000"
+}mutable inputs after call: local#0: 0
+return values: 0
+
+task 4 'view'. lines 67-67:
+store key 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::hello_world::ModuleData {
+    global_counter: 0
+    state: copy drop store 0x1::string::String {
+        bytes: 68656c6c6f20776f726c64
+    }
+}
+
+task 5 'run'. lines 69-69:
+Error: Failed to execute transaction. ExecutionStatus: MoveAbort { location: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::hello_world, code: 12, info: None }
