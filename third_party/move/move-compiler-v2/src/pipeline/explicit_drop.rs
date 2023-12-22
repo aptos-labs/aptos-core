@@ -167,7 +167,7 @@ fn released_temps(
         }
     }
     for t in life_time_info.released_temps() {
-        if !live_var_info.after.contains_key(&t) {
+        if life_time_info.before.is_borrowed(t) && !live_var_info.after.contains_key(&t) {
             released_temps.insert(t);
         }
     }
