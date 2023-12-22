@@ -1,7 +1,7 @@
 spec aptos_framework::stake {
     /// <high-level-req>
     /// No.: 1
-    /// Property: The validator set resource stores consensus information for each validator. The consensus scheme
+    /// Requirement: The validator set resource stores consensus information for each validator. The consensus scheme
     /// remains consistent across all validators within the set.
     /// Criticality: Low
     /// Implementation: The consensus_scheme attribute within ValidatorSet initializes with the value zero during the
@@ -9,7 +9,7 @@ spec aptos_framework::stake {
     /// Enforcement: Formally verified by the data invariant of [high-level-req-1](ValidatorSet).
     ///
     /// No.: 2
-    /// Property: The owner of a validator is immutable.
+    /// Requirement: The owner of a validator is immutable.
     /// Criticality: Low
     /// Implementation: During the initialization of a validator, the owner attribute becomes the signer's address. This
     /// assignment establishes the signer as the owner and controller of the validator entity. Subsequently, the owner
@@ -18,7 +18,7 @@ spec aptos_framework::stake {
     /// Enforcement: Formally verified in the schema [high-level-req-2](ValidatorOwnerNoChange).
     ///
     /// No.: 3
-    /// Property: The total staked value in the stake pool should remain constant, excluding operations related to
+    /// Requirement: The total staked value in the stake pool should remain constant, excluding operations related to
     /// adding and withdrawing.
     /// Criticality: Low
     /// Implementation: The total staked value (AptosCoin) of a stake pool is grouped by: active, inactive,
@@ -27,7 +27,7 @@ spec aptos_framework::stake {
     /// Enforcement: Formally specified in the schema [high-level-req-3](StakedValueNoChange).
     ///
     /// No.: 4
-    /// Property: During each epoch, the following operations should be consistently performed without aborting: rewards
+    /// Requirement: During each epoch, the following operations should be consistently performed without aborting: rewards
     /// distribution, validator activation/deactivation, updates to validator sets and voting power, and renewal of
     /// lockups.
     /// Criticality: Low

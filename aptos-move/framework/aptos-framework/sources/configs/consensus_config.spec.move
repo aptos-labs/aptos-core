@@ -1,20 +1,20 @@
 spec aptos_framework::consensus_config {
     /// <high-level-req>
     /// No.: 1
-    /// Property: During genesis, the Aptos framework account should be assigned the consensus config resource.
+    /// Requirement: During genesis, the Aptos framework account should be assigned the consensus config resource.
     /// Criticality: Medium
     /// Implementation: The consensus_config::initialize function calls the assert_aptos_framework function to ensure
     /// that the signer is the aptos_framework and then assigns the ConsensusConfig resource to it.
     /// Enforcement: Formally verified via [high-level-req-1](initialize).
     ///
     /// No.: 2
-    /// Property: Only aptos framework account is allowed to update the consensus configuration.
+    /// Requirement: Only aptos framework account is allowed to update the consensus configuration.
     /// Criticality: Medium
     /// Implementation: The consensus_config::set function ensures that the signer is aptos_framework.
     /// Enforcement: Formally verified via [high-level-req-2](set).
     ///
     /// No.: 3
-    /// Property: Only a valid configuration can be used during initialization and update.
+    /// Requirement: Only a valid configuration can be used during initialization and update.
     /// Criticality: Medium
     /// Implementation: Both the initialize and set functions validate the config by ensuring its length to be greater
     /// than 0.

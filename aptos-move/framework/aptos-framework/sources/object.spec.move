@@ -1,35 +1,35 @@
 spec aptos_framework::object {
     /// <high-level-req>
     /// No.: 1
-    /// Property: It's not possible to create an object twice on the same address.
+    /// Requirement: It's not possible to create an object twice on the same address.
     /// Criticality: Critical
     /// Implementation: The create_object_internal function includes an assertion to ensure that the object being
     /// created does not already exist at the specified address.
     /// Enforcement: Formally verified via [high-level-req-1](create_object_internal).
     ///
     /// No.: 2
-    /// Property: Only its owner may transfer an object.
+    /// Requirement: Only its owner may transfer an object.
     /// Criticality: Critical
     /// Implementation: The transfer function mandates that the transaction be signed by the owner's address, ensuring
     /// that only the rightful owner may initiate the object transfer.
     /// Enforcement: Audited that it aborts if anyone other than the owner attempts to transfer.
     ///
     /// No.: 3
-    /// Property: The indirect owner of an object may transfer the object.
+    /// Requirement: The indirect owner of an object may transfer the object.
     /// Criticality: Medium
     /// Implementation: The owns function evaluates to true when the given address possesses either direct or indirect
     /// ownership of the specified object.
     /// Enforcement: Audited that it aborts if address transferring is not indirect owner.
     ///
     /// No.: 4
-    /// Property: Objects may never change the address which houses them.
+    /// Requirement: Objects may never change the address which houses them.
     /// Criticality: Low
     /// Implementation: After creating an object, transfers to another owner may occur. However, the address which
     /// stores the object may not be changed.
     /// Enforcement: This is implied by [high-level-req](high-level requirement 1).
     ///
     /// No.: 5
-    /// Property: If an ungated transfer is disabled on an object in an indirect ownership chain, a transfer should not
+    /// Requirement: If an ungated transfer is disabled on an object in an indirect ownership chain, a transfer should not
     /// occur.
     /// Criticality: Medium
     /// Implementation: Calling disable_ungated_transfer disables direct transfer, and only TransferRef may trigger
@@ -37,7 +37,7 @@ spec aptos_framework::object {
     /// Enforcement: Formally verified via [high-level-req-5](transfer_with_ref).
     ///
     /// No.: 6
-    /// Property: Object addresses must not overlap with other addresses in different domains.
+    /// Requirement: Object addresses must not overlap with other addresses in different domains.
     /// Criticality: Critical
     /// Implementation: The current addressing scheme with suffixes does not conflict with any existing addresses,
     /// such as resource accounts. The GUID space is explicitly separated to ensure this doesn't happen.

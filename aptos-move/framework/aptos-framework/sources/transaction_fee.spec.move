@@ -1,7 +1,7 @@
 spec aptos_framework::transaction_fee {
     /// <high-level-req>
     /// No.: 1
-    /// Property: Given the blockchain is in an operating state, it guarantees that the Aptos framework signer may burn
+    /// Requirement: Given the blockchain is in an operating state, it guarantees that the Aptos framework signer may burn
     /// Aptos coins.
     /// Criticality: Critical
     /// Implementation: The AptosCoinCapabilities structure is defined in this module and it stores burn capability to
@@ -9,21 +9,21 @@ spec aptos_framework::transaction_fee {
     /// Enforcement: Formally Verified via [high-level-req-1](module).
     ///
     /// No.: 2
-    /// Property: The initialization function may only be called once.
+    /// Requirement: The initialization function may only be called once.
     /// Criticality: Medium
     /// Implementation: The initialize_fee_collection_and_distribution function ensures CollectedFeesPerBlock does not
     /// already exist.
     /// Enforcement: Formally verified via [high-level-req-2](initialize_fee_collection_and_distribution).
     ///
     /// No.: 3
-    /// Property: Only the admin address is authorized to call the initialization function.
+    /// Requirement: Only the admin address is authorized to call the initialization function.
     /// Criticality: Critical
     /// Implementation: The initialize_fee_collection_and_distribution function ensures only the Aptos framework address
     /// calls it.
     /// Enforcement: Formally verified via [high-level-req-3](initialize_fee_collection_and_distribution).
     ///
     /// No.: 4
-    /// Property: The percentage of the burnt collected fee is always a value from 0 to 100.
+    /// Requirement: The percentage of the burnt collected fee is always a value from 0 to 100.
     /// Criticality: Medium
     /// Implementation: During the initialization of CollectedFeesPerBlock in
     /// Initialize_fee_collection_and_distribution, and while upgrading burn percentage, it asserts that burn_percentage
@@ -31,14 +31,14 @@ spec aptos_framework::transaction_fee {
     /// Enforcement: Formally verified via [high-level-req-4](CollectedFeesPerBlock).
     ///
     /// No.: 5
-    /// Property: Prior to upgrading the burn percentage, it must process all the fees collected up to that point.
+    /// Requirement: Prior to upgrading the burn percentage, it must process all the fees collected up to that point.
     /// Criticality: Critical
     /// Implementation: The upgrade_burn_percentage function ensures process_collected_fees function is called before
     /// updating the burn percentage.
     /// Enforcement: Formally verified in [high-level-req-5](ProcessCollectedFeesRequiresAndEnsures).
     ///
     /// No.: 6
-    /// Property: The presence of the resource, indicating collected fees per block under the Aptos framework account,
+    /// Requirement: The presence of the resource, indicating collected fees per block under the Aptos framework account,
     /// is a prerequisite for the successful execution of the following functionalities: Upgrading burn percentage.
     /// Registering a block proposer. Processing collected fees.
     /// Criticality: Low

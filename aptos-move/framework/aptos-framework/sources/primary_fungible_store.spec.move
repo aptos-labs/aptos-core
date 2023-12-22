@@ -1,7 +1,7 @@
 spec aptos_framework::primary_fungible_store {
     /// <high-level-req>
     /// No.: 1
-    /// Property: Creating a fungible asset with primary store support should initiate a derived reference and store it
+    /// Requirement: Creating a fungible asset with primary store support should initiate a derived reference and store it
     /// under the metadata object.
     /// Criticality: Medium
     /// Implementation: The function create_primary_store_enabled_fungible_asset makes an existing object, fungible, via
@@ -10,7 +10,7 @@ spec aptos_framework::primary_fungible_store {
     /// Enforcement: Audited that the DeriveRefPod has been properly initialized and stored under the metadata object.
     ///
     /// No.: 2
-    /// Property: Fetching and creating a primary fungible store of an asset should only succeed if the object supports
+    /// Requirement: Fetching and creating a primary fungible store of an asset should only succeed if the object supports
     /// primary store.
     /// Criticality: Low
     /// Implementation: The function create_primary_store is used to create a primary store by borrowing the DeriveRef
@@ -21,14 +21,14 @@ spec aptos_framework::primary_fungible_store {
     /// FungibleStore resource exists already under the object address.
     ///
     /// No.: 3
-    /// Property: It should be possible to create a primary store to hold a fungible asset.
+    /// Requirement: It should be possible to create a primary store to hold a fungible asset.
     /// Criticality: Medium
     /// Implementation: The function create_primary_store borrows the DeriveRef resource from DeriveRefPod and then
     /// creates the store which is returned.
     /// Enforcement: Audited that it returns the newly created FungibleStore.
     ///
     /// No.: 4
-    /// Property: Fetching the balance or the frozen status of a primary store should never abort.
+    /// Requirement: Fetching the balance or the frozen status of a primary store should never abort.
     /// Criticality: Low
     /// Implementation: The function balance returns the balance of the store, if the store exists, otherwise it returns 0.
     /// The function is_frozen returns the frozen flag of the fungible store, if the store exists, otherwise it returns
@@ -37,7 +37,7 @@ spec aptos_framework::primary_fungible_store {
     /// is_frozen function returns the frozen status of the FungibleStore resource. Audited that it never aborts.
     ///
     /// No.: 5
-    /// Property: The ability to withdraw, deposit, transfer, mint and burn should only be available for assets with
+    /// Requirement: The ability to withdraw, deposit, transfer, mint and burn should only be available for assets with
     /// primary store support.
     /// Criticality: Medium
     /// Implementation: The primary store is fetched before performing either of withdraw, deposit, transfer, mint, burn
@@ -45,7 +45,7 @@ spec aptos_framework::primary_fungible_store {
     /// Enforcement: Audited that it aborts if the primary store FungibleStore doesn't exist.
     ///
     /// No.: 6
-    /// Property: The action of depositing a fungible asset of the same type as the store should never fail if the store
+    /// Requirement: The action of depositing a fungible asset of the same type as the store should never fail if the store
     /// is not frozen.
     /// Criticality: Medium
     /// Implementation: The function deposit fetches the owner's store, if it doesn't exist it will be created, and then
@@ -57,7 +57,7 @@ spec aptos_framework::primary_fungible_store {
     /// and the asset differs (deposit, deposit_with_ref).
     ///
     /// No.: 7
-    /// Property: Withdrawing should only be allowed to the owner of an existing store with sufficient balance.
+    /// Requirement: Withdrawing should only be allowed to the owner of an existing store with sufficient balance.
     /// Criticality: Critical
     /// Implementation: The withdraw function fetches the owner's store via the primary_store function and then calls
     /// fungible_asset::withdraw which validates the owner of the store, checks the frozen status and the balance of the
@@ -70,14 +70,14 @@ spec aptos_framework::primary_fungible_store {
     /// Audited that the store is not burned. Audited that the balance of the store is decreased by the amount withdrawn.
     ///
     /// No.: 8
-    /// Property: Only the fungible store owner is allowed to unburn a burned store.
+    /// Requirement: Only the fungible store owner is allowed to unburn a burned store.
     /// Criticality: High
     /// Implementation: The function may_be_unburn checks if the store is burned and then proceeds to call
     /// object::unburn which ensures that the owner of the object matches the address of the signer.
     /// Enforcement: Audited that the store is unburned successfully.
     ///
     /// No.: 9
-    /// Property: Only the owner of a primary store can transfer its balance to any recipient's primary store.
+    /// Requirement: Only the owner of a primary store can transfer its balance to any recipient's primary store.
     /// Criticality: High
     /// Implementation: The function transfer fetches sender and recipient's primary stores, if the sender's store is
     /// burned it unburns the store and calls the fungile_asset::transfer to proceed with the transfer, which first
@@ -91,7 +91,7 @@ spec aptos_framework::primary_fungible_store {
     /// store is not burned (transfer).
     ///
     /// No.: 10
-    /// Property: Minting an amount of assets to an unfrozen store is only allowed with a valid mint reference.
+    /// Requirement: Minting an amount of assets to an unfrozen store is only allowed with a valid mint reference.
     /// Criticality: High
     /// Implementation: The mint function fetches the primary store and calls the fungible_asset::mint_to, which mints
     /// with MintRef's metadata which internally validates the amount and the increases the total supply of the asset.
@@ -103,7 +103,7 @@ spec aptos_framework::primary_fungible_store {
     /// the minted amount.
     ///
     /// No.: 11
-    /// Property: Burning an amount of assets from an existing unfrozen store is only allowed with a valid burn
+    /// Requirement: Burning an amount of assets from an existing unfrozen store is only allowed with a valid burn
     /// reference.
     /// Criticality: High
     /// Implementation: The burn function fetches the primary store and calls the fungible_asset::burn_from function
@@ -116,7 +116,7 @@ spec aptos_framework::primary_fungible_store {
     /// total supply of the asset is decreased. Audited that the store's balance is reduced by the amount burned.
     ///
     /// No.: 12
-    /// Property: Setting the frozen flag of a store is only allowed with a valid reference.
+    /// Requirement: Setting the frozen flag of a store is only allowed with a valid reference.
     /// Criticality: High
     /// Implementation: The function set_frozen_flag fetches the primary store and calls fungible_asset::set_frozen_flag
     /// which validates the TransferRef's metadata with the store's metadata and then updates the frozen flag.

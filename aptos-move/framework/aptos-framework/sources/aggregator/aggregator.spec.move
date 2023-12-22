@@ -1,7 +1,7 @@
 spec aptos_framework::aggregator {
     /// <high-level-req>
     /// No.: 1
-    /// Property: For a given aggregator, it should always be possible to: Return the limit value of the aggregator.
+    /// Requirement: For a given aggregator, it should always be possible to: Return the limit value of the aggregator.
     /// Return the current value stored in the aggregator. Destroy an aggregator, removing it from its
     /// AggregatorFactory.
     /// Criticality: Low
@@ -9,14 +9,14 @@ spec aptos_framework::aggregator {
     /// Enforcement: Formally verified via [high-level-req-1.1](read), [high-level-req-1.2](destroy), and [high-level-req-1.3](limit).
     ///
     /// No.: 2
-    /// Property: If the value during addition exceeds the limit, an overflow occurs.
+    /// Requirement: If the value during addition exceeds the limit, an overflow occurs.
     /// Criticality: High
     /// Implementation: The native add() function checks the value of the addition to ensure it does not pass the
     /// defined limit and results in aggregator overflow.
     /// Enforcement: Formally verified via [high-level-req-2](add).
     ///
     /// No.: 3
-    /// Property: Operations over aggregators should be correct.
+    /// Requirement: Operations over aggregators should be correct.
     /// Criticality: High
     /// Implementation: The implementation of the add, sub, read and destroy functions is correct.
     /// Enforcement: The native implementation of the add, sub, read and destroy functions have been manually audited.

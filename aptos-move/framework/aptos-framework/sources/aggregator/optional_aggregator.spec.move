@@ -1,7 +1,7 @@
 spec aptos_framework::optional_aggregator {
     /// <high-level-req>
     /// No.: 1
-    /// Property: When creating a new integer instance, it guarantees that the limit assigned is a value passed into the
+    /// Requirement: When creating a new integer instance, it guarantees that the limit assigned is a value passed into the
     /// function as an argument, and the value field becomes zero.
     /// Criticality: High
     /// Implementation: The new_integer function sets the limit field to the argument passed in, and the value field is
@@ -9,7 +9,7 @@ spec aptos_framework::optional_aggregator {
     /// Enforcement: Formally verified via [high-level-req-1](new_integer).
     ///
     /// No.: 2
-    /// Property: For a given integer instance it should always be possible to: (1) return the limit value of the integer
+    /// Requirement: For a given integer instance it should always be possible to: (1) return the limit value of the integer
     /// resource, (2) return the current value stored in that particular instance, and (3) destroy the integer instance.
     /// Criticality: Low
     /// Implementation: The following functions should not abort if the Integer instance exists: limit(), read_integer(),
@@ -18,7 +18,7 @@ spec aptos_framework::optional_aggregator {
     /// [high-level-req-2.3](destroy_integer).
     ///
     /// No.: 3
-    /// Property: Every successful switch must end with the aggregator type changed from non-parallelizable to
+    /// Requirement: Every successful switch must end with the aggregator type changed from non-parallelizable to
     /// parallelizable or vice versa.
     /// Criticality: High
     /// Implementation: The switch function run, if successful, should always change the aggregator type.

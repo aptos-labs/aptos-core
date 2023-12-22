@@ -1,7 +1,7 @@
 spec aptos_framework::transaction_context {
     /// <high-level-req>
     /// No.: 1
-    /// Property: Fetching the transaction hash should return a vector with 32 bytes.
+    /// Requirement: Fetching the transaction hash should return a vector with 32 bytes.
     /// Criticality: Medium
     /// Implementation: The get_transaction_hash function calls the native function get_txn_hash, which fetches the
     /// NativeTransactionContext struct and returns the txn_hash field.
@@ -9,13 +9,13 @@ spec aptos_framework::transaction_context {
     /// modeled as the abstract postcondition that the returned vector is of length 32. Formally verified via [high-level-req-1](get_txn_hash).
     ///
     /// No.: 2
-    /// Property: Fetching the unique address should never abort.
+    /// Requirement: Fetching the unique address should never abort.
     /// Criticality: Low
     /// Implementation: The function auid_address returns the unique address from a supplied AUID resource.
     /// Enforcement: Formally verified via [high-level-req-2](auid_address).
     ///
     /// No.: 3
-    /// Property: Generating the unique address should return a vector with 32 bytes.
+    /// Requirement: Generating the unique address should return a vector with 32 bytes.
     /// Criticality: Medium
     /// Implementation: The generate_auid_address function checks calls the native function generate_unique_address
     /// which fetches the NativeTransactionContext struct, increments the auid_counter by one, and then creates a new
@@ -25,7 +25,7 @@ spec aptos_framework::transaction_context {
     /// Formally verified via [high-level-req-3](generate_auid_address).
     ///
     /// No.: 4
-    /// Property: Fetching the script hash of the current entry function should never fail and should return a vector
+    /// Requirement: Fetching the script hash of the current entry function should never fail and should return a vector
     /// with 32 bytes if the transaction payload is a script, otherwise an empty vector.
     /// Criticality: Low
     /// Implementation: The native function get_script_hash returns the NativeTransactionContext.script_hash field.

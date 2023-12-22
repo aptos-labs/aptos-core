@@ -2,7 +2,7 @@ spec aptos_framework::aggregator_factory {
     use aptos_framework::aggregator;
     /// <high-level-req>
     /// No.: 1
-    /// Property: During the module's initialization, it guarantees that the Aptos framework is the caller and that the
+    /// Requirement: During the module's initialization, it guarantees that the Aptos framework is the caller and that the
     /// AggregatorFactory resource will move under the Aptos framework account.
     /// Criticality: High
     /// Implementation: The initialize function is responsible for establishing the initial state of the module by
@@ -11,7 +11,7 @@ spec aptos_framework::aggregator_factory {
     /// Enforcement: Formally verified via [high-level-req-1](initialize_aggregator_factory).
     ///
     /// No.: 2
-    /// Property: To create a new aggregator instance, the aggregator factory must already be initialized and exist
+    /// Requirement: To create a new aggregator instance, the aggregator factory must already be initialized and exist
     /// under the Aptos account.
     /// Criticality: High
     /// Implementation: The create_aggregator_internal function asserts that AggregatorFactory exists for the Aptos
@@ -19,14 +19,14 @@ spec aptos_framework::aggregator_factory {
     /// Enforcement: Formally verified via [high-level-req-2](CreateAggregatorInternalAbortsIf).
     ///
     /// No.: 3
-    /// Property: Only the Aptos framework address may create an aggregator instance currently.
+    /// Requirement: Only the Aptos framework address may create an aggregator instance currently.
     /// Criticality: Low
     /// Implementation: The create_aggregator function ensures that the address calling it is the Aptos framework
     /// address.
     /// Enforcement: Formally verified via [high-level-req-3](create_aggregator).
     ///
     /// No.: 4
-    /// Property: The creation of new aggregators should be done correctly.
+    /// Requirement: The creation of new aggregators should be done correctly.
     /// Criticality: High
     /// Implementation: The native new_aggregator function correctly creates a new aggregator.
     /// Enforcement: The new_aggregator native function has been manually audited.

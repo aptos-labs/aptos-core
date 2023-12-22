@@ -1,21 +1,21 @@
 spec aptos_framework::code {
     /// <high-level-req>
     /// No.: 1
-    /// Property: Updating a package should fail if the user is not the owner of it.
+    /// Requirement: Updating a package should fail if the user is not the owner of it.
     /// Criticality: Critical
     /// Implementation: The publish_package function may only be able to update the package if the signer is the actual
     /// owner of the package.
     /// Enforcement: The Aptos upgrade native functions have been manually audited.
     ///
     /// No.: 2
-    /// Property: The arbitrary upgrade policy should never be used.
+    /// Requirement: The arbitrary upgrade policy should never be used.
     /// Criticality: Critical
     /// Implementation: There should never be a pass of an arbitrary upgrade policy to the
     /// request_publish native function.
     /// Enforcement: Manually audited that it aborts if package.upgrade_policy.policy == 0.
     ///
     /// No.: 3
-    /// Property: Should perform accurate compatibility checks when the policy indicates
+    /// Requirement: Should perform accurate compatibility checks when the policy indicates
     /// compatibility, ensuring it meets the required conditions.
     /// Criticality: Critical
     /// Implementation: Specifies if it should perform compatibility checks for upgrades. The check
@@ -24,7 +24,7 @@ spec aptos_framework::code {
     /// Enforcement: The Move upgradability patterns have been manually audited.
     ///
     /// No.: 4
-    /// Property: Package upgrades should abide by policy change rules. In particular, The new
+    /// Requirement: Package upgrades should abide by policy change rules. In particular, The new
     /// upgrade policy must be equal to or stricter when compared to the old one. The original
     /// upgrade policy must not be immutable. The new package must contain all modules contained
     /// in the old package.
@@ -34,7 +34,7 @@ spec aptos_framework::code {
     /// Enforcement: This is audited by a manual review of the check_upgradability patterns.
     ///
     /// No.: 5
-    /// Property: The upgrade policy of a package must not exceed the strictness level imposed by
+    /// Requirement: The upgrade policy of a package must not exceed the strictness level imposed by
     /// its dependencies.
     /// Criticality: Medium
     /// Implementation: The upgrade_policy of a package may only be less than its dependencies
@@ -43,13 +43,13 @@ spec aptos_framework::code {
     /// Enforcement: This has been manually audited.
     ///
     /// No.: 6
-    /// Property: The extension for package metadata is currently unused.
+    /// Requirement: The extension for package metadata is currently unused.
     /// Criticality: Medium
     /// Implementation: The extension field in PackageMetadata should be unused.
     /// Enforcement: Data invariant on the extension field has been manually audited.
     ///
     /// No.: 7
-    /// Property: The upgrade number of a package increases incrementally in a monotonic manner
+    /// Requirement: The upgrade number of a package increases incrementally in a monotonic manner
     /// with each subsequent upgrade.
     /// Criticality: Low
     /// Implementation: On each upgrade of a particular package, the publish_package function

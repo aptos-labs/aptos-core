@@ -1,14 +1,14 @@
 spec aptos_framework::state_storage {
     /// <high-level-req>
     /// No.: 1
-    /// Property: Given the blockchain is in an operating state, the resources for tracking state storage usage and gas
+    /// Requirement: Given the blockchain is in an operating state, the resources for tracking state storage usage and gas
     /// parameters must exist for the Aptos framework address.
     /// Criticality: Critical
     /// Implementation: The initialize function ensures only the Aptos framework address can call it.
     /// Enforcement: Formally verified via [high-level-req-1](module).
     ///
     /// No.: 2
-    /// Property: During the initialization of the module, it is guaranteed that the resource for tracking state
+    /// Requirement: During the initialization of the module, it is guaranteed that the resource for tracking state
     /// storage usage will be moved under the Aptos framework account with default initial values.
     /// Criticality: Medium
     /// Implementation: The resource for tracking state storage usage may only be initialized with specific values and
@@ -16,13 +16,13 @@ spec aptos_framework::state_storage {
     /// Enforcement: Formally verified via [high-level-req-2](initialize).
     ///
     /// No.: 3
-    /// Property: The initialization function is only called once, during genesis.
+    /// Requirement: The initialization function is only called once, during genesis.
     /// Criticality: Medium
     /// Implementation: The initialize function ensures StateStorageUsage does not already exist.
     /// Enforcement: Formally verified via [high-level-req-3](initialize).
     ///
     /// No.: 4
-    /// Property: During the initialization of the module, it is guaranteed that the resource for tracking state storage
+    /// Requirement: During the initialization of the module, it is guaranteed that the resource for tracking state storage
     /// usage will be moved under the Aptos framework account with default initial values.
     /// Criticality: Medium
     /// Implementation: The resource for tracking state storage usage may only be initialized with specific values and
@@ -30,7 +30,7 @@ spec aptos_framework::state_storage {
     /// Enforcement: Formally verified via [high-level-req-4](initialize).
     ///
     /// No.: 5
-    /// Property: The structure for tracking state storage usage should exist for it to be updated at the beginning of
+    /// Requirement: The structure for tracking state storage usage should exist for it to be updated at the beginning of
     /// each new block and for retrieving the values of structure members.
     /// Criticality: Medium
     /// Implementation: The functions on_new_block and current_items_and_bytes verify that the StateStorageUsage
