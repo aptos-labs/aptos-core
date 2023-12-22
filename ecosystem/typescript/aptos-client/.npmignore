@@ -1,6 +1,0 @@
-node_modules
-tsconfig.json
-tsup.config.js
-.prettierignore
-.gitignore
-.eslintignore

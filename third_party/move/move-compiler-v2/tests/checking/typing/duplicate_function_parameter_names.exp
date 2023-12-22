@@ -1,9 +1,0 @@
-
-Diagnostics:
-error: duplicate declaration of `x`
-  ┌─ tests/checking/typing/duplicate_function_parameter_names.move:2:21
-  │
-2 │     fun foo(x: u64, x: u64) {}
-  │             -       ^
-  │             │
-  │             previous declaration of `x`

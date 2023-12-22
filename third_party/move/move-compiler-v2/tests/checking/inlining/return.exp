@@ -1,7 +1,0 @@
-
-Diagnostics:
-error: Return not currently supported in inline functions
-  ┌─ tests/checking/inlining/return.move:3:9
-  │
-3 │         return 5
-  │         ^^^^^^^^

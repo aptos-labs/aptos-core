@@ -1,7 +1,0 @@
-
-Diagnostics:
-error: expected `bool` but found `integer`
-   ┌─ tests/checking/typing/type_variable_join_threaded_pack_invalid.move:42:9
-   │
-42 │         b
-   │         ^
