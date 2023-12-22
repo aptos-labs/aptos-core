@@ -802,6 +802,7 @@ dependencies = [
  "bcs 0.1.4",
  "lz4",
  "once_cell",
+ "rand 0.7.3",
  "serde",
  "thiserror",
 ]

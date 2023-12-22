@@ -144,7 +144,7 @@ impl<'a> FunctionGenerator<'a> {
     /// Generates code for a function.
     fn gen_code(&mut self, ctx: &FunctionContext<'_>) -> FF::CodeUnit {
         // Initialize the abstract virtual machine
-        self.pinned = Self::referenced_temps(ctx);
+        self.pinned = Self::pinned_temps(ctx);
         self.temps = (0..ctx.fun.get_parameter_count())
             .map(|temp| (temp, TempInfo::new(self.temp_to_local(ctx, temp))))
             .collect();
@@ -205,10 +205,14 @@ impl<'a> FunctionGenerator<'a> {
     }
 
     /// Compute the set of temporaries which are referenced in borrow instructions.
-    fn referenced_temps(ctx: &FunctionContext) -> BTreeSet<TempIndex> {
+    /// TODO: right now we also pin locals which are parameter of the destroy instruction.
+    ///   This is needed since we cannot determine whether the local has been already moved on
+    ///   the stack and is not longer available in the associated local. This needs to be reworked
+    ///   to avoid this.
+    fn pinned_temps(ctx: &FunctionContext) -> BTreeSet<TempIndex> {
         let mut result = BTreeSet::new();
         for bc in ctx.fun.get_bytecode() {
-            if let Bytecode::Call(_, _, Operation::BorrowLoc, args, _) = bc {
+            if let Bytecode::Call(_, _, Operation::BorrowLoc | Operation::Destroy, args, _) = bc {
                 result.insert(args[0]);
             }
         }
@@ -455,6 +459,14 @@ impl<'a> FunctionGenerator<'a> {
                 // order, perhaps we should fix this.
                 self.gen_builtin(ctx, dest, FF::Bytecode::WriteRef, &[source[1], source[0]])
             },
+            Operation::Destroy => {
+                // Currently Destroy is only translated for references. It may also make
+                // sense for other values, as we may figure later. Its known to be required
+                // for references to make the bytecode verifier happy.
+                if ctx.fun_ctx.fun.get_local_type(source[0]).is_reference() {
+                    self.gen_builtin(ctx, dest, FF::Bytecode::Pop, source)
+                }
+            },
             Operation::FreezeRef => self.gen_builtin(ctx, dest, FF::Bytecode::FreezeRef, source),
             Operation::CastU8 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU8, source),
             Operation::CastU16 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU16, source),
@@ -494,7 +506,6 @@ impl<'a> FunctionGenerator<'a> {
             | Operation::GetField(_, _, _, _)
             | Operation::GetGlobal(_, _, _)
             | Operation::Uninit
-            | Operation::Destroy
             | Operation::Havoc(_)
             | Operation::Stop
             | Operation::IsParent(_, _)

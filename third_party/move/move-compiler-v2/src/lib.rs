@@ -10,6 +10,7 @@ mod options;
 pub mod pipeline;
 
 use crate::pipeline::{
+    ability_checker::AbilityChecker, explicit_drop::ExplicitDrop,
     livevar_analysis_processor::LiveVarAnalysisProcessor,
     reference_safety_processor::ReferenceSafetyProcessor, visibility_checker::VisibilityChecker,
 };
@@ -165,10 +166,19 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     if safety_on {
         pipeline.add_processor(Box::new(VisibilityChecker()));
     }
-    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor()));
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+        with_copy_inference: true,
+    }));
+    pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+    pipeline.add_processor(Box::new(ExplicitDrop {}));
     if safety_on {
-        pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+        // Ability checker is functionally not relevant so can be completely skipped if safety is off
+        pipeline.add_processor(Box::new(AbilityChecker {}));
     }
+    // Run live var again because it is invalidated by ExplicitDrop but needed by file format generator
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+        with_copy_inference: false,
+    }));
     pipeline
 }
 

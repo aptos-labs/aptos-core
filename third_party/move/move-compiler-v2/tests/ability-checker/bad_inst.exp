@@ -45,30 +45,35 @@ fun test::test(): test::U<test::S<test::T>> {
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {}
      #
   0: $t3 := false
      # live vars: $t3
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {}
      #
   1: $t2 := pack test::T($t3)
      # live vars: $t2
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {$t3}
      #
   2: $t1 := pack test::S<test::T>($t2)
      # live vars: $t1
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {$t2,$t3}
      #
   3: $t0 := pack test::U<test::S<test::T>>($t1)
      # live vars: $t0
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {$t1,$t2,$t3}
      #
   4: return $t0
 }

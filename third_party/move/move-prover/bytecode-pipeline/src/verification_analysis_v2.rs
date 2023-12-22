@@ -148,9 +148,8 @@ fn compute_disabled_invs_for_fun(
                 .cloned()
                 .expect(COMPILED_MODULE_AVAILABLE);
             for called_fun_id in called_funs {
-                let disabled_invs_for_called = disabled_invs_for_fun
-                    .entry(called_fun_id)
-                    .or_insert_with(BTreeSet::new);
+                let disabled_invs_for_called =
+                    disabled_invs_for_fun.entry(called_fun_id).or_default();
                 // if caller has any disabled_invs that callee does not, add them to called
                 // and add called to the worklist for further processing
                 if !disabled_invs_for_caller.is_subset(disabled_invs_for_called) {
@@ -377,9 +376,7 @@ fn compute_funs_that_modify_inv(
                     let fun_id = fun_env.get_qualified_id();
                     fun_id_set.insert(fun_id);
                     funs_that_modify_some_inv.insert(fun_id);
-                    let inv_set = invs_modified_by_fun
-                        .entry(fun_id)
-                        .or_insert_with(BTreeSet::new);
+                    let inv_set = invs_modified_by_fun.entry(fun_id).or_default();
                     inv_set.insert(*inv_id);
                 }
             }

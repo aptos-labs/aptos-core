@@ -220,7 +220,7 @@ impl SuccessCriteriaChecker {
     ) -> anyhow::Result<()> {
         let traffic_name_addition = traffic_name
             .map(|n| format!(" for {}", n))
-            .unwrap_or_else(|| "".to_string());
+            .unwrap_or_default();
         Self::check_throughput(
             success_criteria.min_avg_tps,
             success_criteria.max_expired_tps,
