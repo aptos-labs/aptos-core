@@ -179,16 +179,15 @@ fn released_temps(
 
     // this is needed because unused vars are not released by live var info
     for dst in bytecode.dests() {
-        if !live_var_info.before.contains_key(&dst)
-            && !live_var_info.after.contains_key(&dst)
-            && !life_time_info.before.is_borrowed(dst)
-            && !life_time_info.after.is_borrowed(dst)
-        {
-            // TODO: triggered in ability-checker/ability_violation.move
-            // debug_assert!(
-            //     !life_time_info.after.is_borrowed(dst),
-            //     "dead assignment borrowed later"
-            // );
+        if !live_var_info.before.contains_key(&dst) && !live_var_info.after.contains_key(&dst) {
+            debug_assert!(
+                !life_time_info.before.is_borrowed(dst),
+                "local assigned while still borrowed"
+            );
+            debug_assert!(
+                !life_time_info.after.is_borrowed(dst),
+                "dead assignment borrowed later"
+            );
             released_temps.insert(dst);
         }
     }
